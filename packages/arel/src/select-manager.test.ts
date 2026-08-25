@@ -28,7 +28,7 @@ describe("SelectManagerTest", () => {
         const mgr = new SelectManager();
         mgr.project("id");
         mgr.from(users);
-        expect(mgr.toSql()).toContain("SELECT id");
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT id FROM "users"`));
       });
     });
 
@@ -38,8 +38,7 @@ describe("SelectManagerTest", () => {
         mgr.project(star);
         mgr.from(users);
         mgr.order(new Nodes.SqlLiteral("foo"));
-        expect(mgr.toSql()).toContain("ORDER BY");
-        expect(mgr.toSql()).toContain("foo");
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT * FROM "users" ORDER BY foo`));
       });
     });
 
@@ -48,8 +47,7 @@ describe("SelectManagerTest", () => {
         const mgr = new SelectManager();
         mgr.from(users);
         mgr.group("foo");
-        expect(mgr.toSql()).toContain("GROUP BY");
-        expect(mgr.toSql()).toContain("foo");
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" GROUP BY foo`));
       });
     });
 
@@ -57,29 +55,28 @@ describe("SelectManagerTest", () => {
       it("makes an AS node by grouping the AST", () => {
         const mgr = new SelectManager();
         const as = mgr.as("foo");
-        expect(as).toBeInstanceOf(Nodes.TableAlias);
-        expect((as.name as Nodes.SqlLiteral).value).toBe("foo");
+        expect(as.left).toBeInstanceOf(Nodes.Grouping);
+        expect((as.left as Nodes.Grouping).expr).toBe(mgr.ast);
+        expect(String(as.right)).toBe("foo");
       });
 
       it("converts right to SqlLiteral if a string", () => {
         const mgr = new SelectManager();
         const as = mgr.as("foo");
-        expect(as).toBeInstanceOf(Nodes.TableAlias);
-        const sql = new Visitors.ToSql(testConnection).compile(as);
-        expect(sql).toContain("foo");
+        expect(as.right).toBeInstanceOf(Nodes.SqlLiteral);
       });
 
       it("can make a subselect", () => {
         const mgr = new SelectManager();
         mgr.project(star);
-        mgr.from(new Nodes.SqlLiteral("zomg"));
+        mgr.from(sql("zomg"));
         const as = mgr.as("foo");
         const outer = new SelectManager();
-        outer.project(new Nodes.SqlLiteral("name"));
+        outer.project(sql("name"));
         outer.from(as);
-        const sql = outer.toSql();
-        expect(sql).toContain("name");
-        expect(sql).toContain("foo");
+        expect(mustBeLike(outer.toSql())).toBe(
+          mustBeLike("SELECT name FROM (SELECT * FROM zomg) foo"),
+        );
       });
     });
 
@@ -89,9 +86,7 @@ describe("SelectManagerTest", () => {
         mgr.from(users);
         mgr.from("users");
         mgr.project(users.get("id"));
-        const sql = mgr.toSql();
-        expect(sql).toContain('"users"."id"');
-        expect(sql).toContain("FROM");
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike('SELECT "users"."id" FROM users'));
       });
 
       it("should support any ast", () => {
@@ -100,9 +95,11 @@ describe("SelectManagerTest", () => {
         mgr2.project(star);
         mgr2.from(users);
         const as = mgr2.as("omg");
-        mgr1.project(new Nodes.SqlLiteral("lol"));
+        mgr1.project(sql("lol"));
         mgr1.from(as);
-        expect(mgr1.toSql()).toContain("lol");
+        expect(mustBeLike(mgr1.toSql())).toBe(
+          mustBeLike(`SELECT lol FROM (SELECT * FROM "users") omg`),
+        );
       });
 
       // Mirrors Rails: `from(table)` (select_manager.rb) routes a Join
@@ -125,24 +122,21 @@ describe("SelectManagerTest", () => {
     describe("having", () => {
       it("converts strings to SQLLiterals", () => {
         const mgr = users.from();
-        mgr.having(new Nodes.SqlLiteral("foo"));
-        expect(mgr.toSql()).toContain("HAVING");
-        expect(mgr.toSql()).toContain("foo");
+        mgr.having(sql("foo"));
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" HAVING foo`));
       });
 
       it("can have multiple items specified separately", () => {
         const mgr = users.from();
-        mgr.having(new Nodes.SqlLiteral("foo"));
-        mgr.having(new Nodes.SqlLiteral("bar"));
-        expect(mgr.toSql()).toContain("HAVING");
-        expect(mgr.toSql()).toContain("foo");
+        mgr.having(sql("foo"));
+        mgr.having(sql("bar"));
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" HAVING foo AND bar`));
       });
 
       it("can receive any node", () => {
         const mgr = users.from();
-        mgr.having(new Nodes.And([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]));
-        expect(mgr.toSql()).toContain("HAVING");
-        expect(mgr.toSql()).toContain("foo");
+        mgr.having(new Nodes.And([sql("foo"), sql("bar")]));
+        expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" HAVING foo AND bar`));
       });
     });
 
@@ -181,18 +175,18 @@ describe("SelectManagerTest", () => {
 
   describe("initialize", () => {
     it("uses alias in sql", () => {
-      const aliased = users.alias("u");
-      const mgr = new SelectManager();
-      mgr.from(aliased);
-      mgr.project(new Nodes.SqlLiteral("*"));
-      expect(mgr.toSql()).toContain('"u"');
+      const table = new Table("users", { as: "foo" });
+      const mgr = table.from();
+      mgr.skip(10);
+      expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" "foo" OFFSET 10`));
     });
   });
 
   describe("skip", () => {
     it("should add an offset", () => {
-      const mgr = users.project(star).skip(5);
-      expect(mgr.toSql()).toContain("OFFSET 5");
+      const mgr = users.from();
+      mgr.skip(10);
+      expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" OFFSET 10`));
     });
 
     // Mirrors Rails: `skip(amount)` flows the raw value into
@@ -272,72 +266,108 @@ describe("SelectManagerTest", () => {
 
   describe("offset", () => {
     it("should add an offset", () => {
-      const mgr = users.skip(5).project(star);
-      expect(mgr.toSql()).toContain("OFFSET 5");
+      const mgr = users.from();
+      mgr.offset = 10;
+      expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" OFFSET 10`));
     });
 
     it("should remove an offset", () => {
-      const mgr = new SelectManager(users);
-      mgr.skip(10);
-      expect(mgr.offset).not.toBeNull();
-      mgr.ast.offset = null;
-      expect(mgr.offset).toBeNull();
+      const mgr = users.from();
+      mgr.offset = 10;
+      expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users" OFFSET 10`));
+
+      mgr.offset = null;
+      expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT FROM "users"`));
     });
 
     it("should return the offset", () => {
-      const mgr = users.project(star).skip(5);
-      expect(mgr.offset).not.toBeNull();
+      const mgr = users.from();
+      mgr.offset = 10;
+      expect(mgr.offset).toBe(10);
     });
   });
 
   describe("exists", () => {
     it("should create an exists clause", () => {
-      const mgr = users.project(star).where(users.get("age").gt(21));
-      const exists = mgr.exists();
-      expect(exists).toBeInstanceOf(Nodes.Exists);
+      const manager = new SelectManager(users);
+      manager.project(new Nodes.SqlLiteral("*"));
+      const m2 = new SelectManager();
+      m2.project(manager.exists());
+      expect(mustBeLike(m2.toSql())).toBe(mustBeLike(`SELECT EXISTS (${manager.toSql()})`));
     });
 
     it("can be aliased", () => {
-      const mgr = users.project(users.get("id"));
-      const aliased = mgr.as("sub");
-      expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect((aliased.name as Nodes.SqlLiteral).value).toBe("sub");
+      const manager = new SelectManager(users);
+      manager.project(new Nodes.SqlLiteral("*"));
+      const m2 = new SelectManager();
+      m2.project(manager.exists().as("foo"));
+      expect(mustBeLike(m2.toSql())).toBe(mustBeLike(`SELECT EXISTS (${manager.toSql()}) AS foo`));
     });
   });
 
   describe("union", () => {
+    const m1 = new SelectManager(users);
+    m1.project(star);
+    m1.where(users.get("age").lt(18));
+
+    const m2 = new SelectManager(users);
+    m2.project(star);
+    m2.where(users.get("age").gt(99));
+
     it("should union two managers", () => {
-      const q1 = users.project(users.get("name")).where(users.get("age").gt(21));
-      const q2 = users.project(users.get("name")).where(users.get("age").lt(18));
-      const union = q1.union(q2);
-      const visitor = new Visitors.ToSql(testConnection);
-      const compiled = visitor.compile(union);
-      expect(compiled).toContain("UNION");
+      const node = m1.union(m2);
+      expect(mustBeLike(visitor.compile(node))).toBe(
+        mustBeLike(
+          `( SELECT * FROM "users" WHERE "users"."age" < 18 UNION SELECT * FROM "users" WHERE "users"."age" > 99 )`,
+        ),
+      );
     });
 
     it("should union all", () => {
-      const q1 = users.project(star);
-      const q2 = users.project(star);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(q1.union(":all", q2))).toContain("UNION ALL");
+      const node = m1.union(":all", m2);
+      expect(mustBeLike(visitor.compile(node))).toBe(
+        mustBeLike(
+          `( SELECT * FROM "users" WHERE "users"."age" < 18 UNION ALL SELECT * FROM "users" WHERE "users"."age" > 99 )`,
+        ),
+      );
     });
   });
 
   describe("intersect", () => {
     it("should intersect two managers", () => {
-      const q1 = users.project(star);
-      const q2 = users.project(star);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(q1.intersect(q2))).toContain("INTERSECT");
+      const m1 = new SelectManager(users);
+      m1.project(star);
+      m1.where(users.get("age").gt(18));
+
+      const m2 = new SelectManager(users);
+      m2.project(star);
+      m2.where(users.get("age").lt(99));
+
+      const node = m1.intersect(m2);
+      expect(mustBeLike(visitor.compile(node))).toBe(
+        mustBeLike(
+          `( SELECT * FROM "users" WHERE "users"."age" > 18 INTERSECT SELECT * FROM "users" WHERE "users"."age" < 99 )`,
+        ),
+      );
     });
   });
 
   describe("except", () => {
     it("should except two managers", () => {
-      const q1 = users.project(star);
-      const q2 = users.project(star);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(q1.except(q2))).toContain("EXCEPT");
+      const m1 = new SelectManager(users);
+      m1.project(star);
+      m1.where(users.get("age").between(18, 60));
+
+      const m2 = new SelectManager(users);
+      m2.project(star);
+      m2.where(users.get("age").between(40, 99));
+
+      const node = m1.except(m2);
+      expect(mustBeLike(visitor.compile(node))).toBe(
+        mustBeLike(
+          `( SELECT * FROM "users" WHERE "users"."age" BETWEEN 18 AND 60 EXCEPT SELECT * FROM "users" WHERE "users"."age" BETWEEN 40 AND 99 )`,
+        ),
+      );
     });
   });
 
@@ -412,15 +442,16 @@ describe("SelectManagerTest", () => {
 
   describe("ast", () => {
     it("should return the ast", () => {
-      const mgr = users.project(star);
-      expect(mgr.ast).toBeInstanceOf(Nodes.SelectStatement);
+      const mgr = users.from();
+      expect(mgr.ast).toBeTruthy();
     });
   });
 
   describe("taken", () => {
     it("should return limit", () => {
-      const mgr = users.project(star).take(10);
-      expect(mgr.limit).not.toBeNull();
+      const manager = new SelectManager();
+      manager.take(10);
+      expect(manager.taken).toBe(10);
     });
 
     it("taken aliases limit", () => {
@@ -432,22 +463,29 @@ describe("SelectManagerTest", () => {
 
   describe("lock", () => {
     it("adds a lock node", () => {
-      const mgr = users.project(star).lock();
-      expect(mgr.toSql()).toContain("FOR UPDATE");
+      const mgr = users.from();
+      expect(mustBeLike(mgr.lock().toSql())).toBe(mustBeLike(`SELECT FROM "users" FOR UPDATE`));
     });
   });
 
   describe("orders", () => {
     it("returns order clauses", () => {
-      const mgr = users.project(star).order(users.get("name").asc());
-      expect(mgr.orders.length).toBe(1);
+      const manager = new SelectManager();
+      const order = users.get("id");
+      manager.order(users.get("id"));
+      expect(manager.orders).toEqual([order]);
     });
   });
 
   describe("order", () => {
     it("generates order clauses", () => {
-      const mgr = users.project(star).order(users.get("name").asc());
-      expect(mgr.toSql()).toContain("ORDER BY");
+      const manager = new SelectManager();
+      manager.project(new Nodes.SqlLiteral("*"));
+      manager.from(users);
+      manager.order(users.get("id"));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT * FROM "users" ORDER BY "users"."id"`),
+      );
     });
 
     it("accepts string and wraps in SqlLiteral", () => {
@@ -471,33 +509,58 @@ describe("SelectManagerTest", () => {
 
   describe("order", () => {
     it("has order attributes", () => {
-      const mgr = users.project(star).order(users.get("name").asc());
-      expect(mgr.orders[0]).toBeInstanceOf(Nodes.Ascending);
+      const manager = new SelectManager();
+      manager.project(new Nodes.SqlLiteral("*"));
+      manager.from(users);
+      manager.order(users.get("id").desc());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT * FROM "users" ORDER BY "users"."id" DESC`),
+      );
     });
   });
 
   describe("on", () => {
     it("takes two params", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(users.get("id"), users.get("name"));
-      const sql = mgr.toSql();
-      expect(sql).toContain('"id"');
-      expect(sql).toContain('"name"');
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const manager = new SelectManager();
+
+      manager.from(left);
+      manager.join(right).on(predicate, predicate);
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT FROM "users"
+            INNER JOIN "users" "users_2"
+              ON "users"."id" = "users_2"."id" AND
+              "users"."id" = "users_2"."id"
+        `),
+      );
     });
 
     it("takes three params", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(users.get("id"), users.get("name"), users.get("email"));
-      const sql = mgr.toSql();
-      expect(sql).toContain('"id"');
-      expect(sql).toContain('"name"');
-      expect(sql).toContain('"email"');
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const manager = new SelectManager();
+
+      manager.from(left);
+      manager.join(right).on(predicate, predicate, left.get("name").eq(right.get("name")));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT FROM "users"
+            INNER JOIN "users" "users_2"
+              ON "users"."id" = "users_2"."id" AND
+              "users"."id" = "users_2"."id" AND
+              "users"."name" = "users_2"."name"
+        `),
+      );
     });
   });
 
   it("should hand back froms", () => {
-    const mgr = users.project(star);
-    expect(mgr.froms.length).toBe(1);
+    const relation = new SelectManager();
+    expect(relation.froms).toEqual([]);
   });
 
   it("froms filters null — fromless manager returns empty array", () => {
@@ -614,47 +677,62 @@ describe("SelectManagerTest", () => {
 
   describe("joins", () => {
     it("returns inner join sql", () => {
-      const mgr = users
-        .project(users.get("name"), posts.get("title"))
-        .join(posts)
-        .on(users.get("id").eq(posts.get("user_id")));
-      expect(mgr.toSql()).toContain("INNER JOIN");
+      const table = new Table("users");
+      const aliaz = table.alias();
+      const manager = new SelectManager();
+      manager.from(new Nodes.InnerJoin(aliaz, table.get("id").eq(aliaz.get("id"))));
+      expect(manager.toSql()).toMatch('INNER JOIN "users" "users_2" "users"."id" = "users_2"."id"');
     });
 
     it("returns outer join sql", () => {
-      const mgr = users
-        .project(star)
-        .outerJoin(posts)
-        .on(users.get("id").eq(posts.get("user_id")));
-      expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
+      const table = new Table("users");
+      const aliaz = table.alias();
+      const manager = new SelectManager();
+      manager.from(new Nodes.OuterJoin(aliaz, table.get("id").eq(aliaz.get("id"))));
+      expect(manager.toSql()).toMatch(
+        'LEFT OUTER JOIN "users" "users_2" "users"."id" = "users_2"."id"',
+      );
     });
 
     it("can have a non-table alias as relation name", () => {
-      const subq = new SelectManager(users);
-      subq.project(star);
-      const alias = subq.as("subquery");
-      expect(alias).toBeInstanceOf(Nodes.TableAlias);
+      const comments = new Table("comments");
+
+      const counts = comments
+        .from()
+        .group(comments.get("user_id"))
+        .project(comments.get("user_id").as("user_id"), comments.get("user_id").count().as("count"))
+        .as("counts");
+
+      const joins = users.join(counts).on(counts.get("user_id").eq(10));
+      expect(mustBeLike(joins.toSql())).toBe(
+        mustBeLike(
+          `SELECT FROM "users" INNER JOIN (SELECT "comments"."user_id" AS user_id, COUNT("comments"."user_id") AS count FROM "comments" GROUP BY "comments"."user_id") counts ON counts."user_id" = 10`,
+        ),
+      );
     });
 
     it("joins itself", () => {
-      const mgr = users
-        .project(star)
-        .join(posts)
-        .on(users.get("id").eq(posts.get("user_id")));
-      const result = mgr.toSql();
-      expect(result).toContain("INNER JOIN");
-      expect(result).toContain('"posts"');
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+
+      const mgr = left.join(right);
+      mgr.project(new Nodes.SqlLiteral("*"));
+      expect(mgr.on(predicate)).toBe(mgr);
+
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT * FROM "users"
+            INNER JOIN "users" "users_2"
+              ON "users"."id" = "users_2"."id"
+        `),
+      );
     });
 
     it("returns string join sql", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star);
-      mgr.ast.cores[0].source.right.push(
-        new Nodes.StringJoin(
-          new Nodes.SqlLiteral('JOIN "posts" ON "posts"."user_id" = "users"."id"'),
-        ),
-      );
-      expect(mgr.toSql()).toContain('JOIN "posts"');
+      const manager = new SelectManager();
+      manager.from(new Nodes.StringJoin(new Nodes.Quoted("hello")));
+      expect(manager.toSql()).toMatch("'hello'");
     });
   });
 
@@ -676,119 +754,146 @@ describe("SelectManagerTest", () => {
 
   describe("project", () => {
     it("takes multiple args", () => {
-      const mgr = users.project(users.get("id"), users.get("name"));
-      expect(mgr.toSql()).toContain('"users"."id"');
-      expect(mgr.toSql()).toContain('"users"."name"');
+      const manager = new SelectManager();
+      manager.project(new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar"));
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike(`SELECT foo, bar`));
     });
   });
 
   describe("window definition", () => {
     it("can be empty", () => {
-      const mgr = new SelectManager();
-      expect(mgr.toSql()).toBeDefined();
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window");
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS ()`),
+      );
     });
 
     it("takes a partition and an order", () => {
-      const w = new Nodes.Window();
-      w.partition(users.get("department_id"));
-      w.order(users.get("salary").desc());
-      const fn = new Nodes.NamedFunction("ROW_NUMBER", []);
-      const compiled = visitor.compile(new Nodes.Over(fn, w));
-      expect(compiled).toContain("ROW_NUMBER()");
-      expect(compiled).toContain("OVER");
-      expect(compiled).toContain("PARTITION BY");
-      expect(compiled).toContain("ORDER BY");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").partition(users.get("foo")).order(users.get("foo").asc());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(
+          `SELECT FROM "users" WINDOW "a_window" AS (PARTITION BY "users"."foo" ORDER BY "users"."foo" ASC)`,
+        ),
+      );
     });
 
     it("takes a rows frame, unbounded preceding", () => {
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      w.frame(new Nodes.Rows(new Nodes.Preceding()));
-      const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("ROWS UNBOUNDED PRECEDING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").rows(new Nodes.Preceding());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (ROWS UNBOUNDED PRECEDING)`),
+      );
     });
 
     it("takes a rows frame, bounded preceding", () => {
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      w.frame(new Nodes.Rows(new Nodes.Preceding(new Nodes.Quoted(3))));
-      const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("3 PRECEDING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").rows(new Nodes.Preceding(5));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (ROWS 5 PRECEDING)`),
+      );
     });
 
     it("takes a rows frame, unbounded following", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Following())).toBe("UNBOUNDED FOLLOWING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").rows(new Nodes.Following());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (ROWS UNBOUNDED FOLLOWING)`),
+      );
     });
 
     it("takes a rows frame, bounded following", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Following(new Nodes.Quoted(5)))).toBe("5 FOLLOWING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").rows(new Nodes.Following(5));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (ROWS 5 FOLLOWING)`),
+      );
     });
 
     it("takes a rows frame, current row", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.CurrentRow())).toBe("CURRENT ROW");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").rows(new Nodes.CurrentRow());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (ROWS CURRENT ROW)`),
+      );
     });
 
     it("takes a rows frame, between two delimiters", () => {
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      w.frame(new Nodes.Rows(new Nodes.Between(new Nodes.CurrentRow(), new Nodes.Following())));
-      const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql(testConnection);
-      const result = visitor.compile(new Nodes.Over(fn, w));
-      expect(result).toContain("ROWS");
-      expect(result).toContain("CURRENT ROW");
+      const manager = new SelectManager();
+      manager.from(users);
+      const window = manager.window("a_window");
+      window.frame(
+        new Nodes.Between(
+          window.rows(),
+          new Nodes.And([new Nodes.Preceding(), new Nodes.CurrentRow()]),
+        ),
+      );
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(
+          `SELECT FROM "users" WINDOW "a_window" AS (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`,
+        ),
+      );
     });
 
     it("takes a range frame, unbounded preceding", () => {
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      w.frame(new Nodes.Range(new Nodes.Preceding()));
-      const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("RANGE UNBOUNDED PRECEDING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").range(new Nodes.Preceding());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (RANGE UNBOUNDED PRECEDING)`),
+      );
     });
 
     it("takes a range frame, bounded preceding", () => {
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      w.frame(new Nodes.Range(new Nodes.Preceding(new Nodes.Quoted(3))));
-      const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("3 PRECEDING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").range(new Nodes.Preceding(5));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (RANGE 5 PRECEDING)`),
+      );
     });
 
     it("takes a range frame, bounded following", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(users.get("id"));
-      const win = mgr.window("w");
-      win.frame(new Nodes.Range(new Nodes.Following(new Nodes.Quoted(3))));
-      const sql = mgr.toSql();
-      expect(sql).toContain("RANGE");
-      expect(sql).toContain("FOLLOWING");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").range(new Nodes.Following(5));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (RANGE 5 FOLLOWING)`),
+      );
     });
 
     it("takes a range frame, current row", () => {
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      w.frame(new Nodes.Range(new Nodes.CurrentRow()));
-      const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("RANGE CURRENT ROW");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.window("a_window").range(new Nodes.CurrentRow());
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT FROM "users" WINDOW "a_window" AS (RANGE CURRENT ROW)`),
+      );
     });
 
     it("takes a range frame, between two delimiters", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(users.get("id"));
-      const win = mgr.window("w");
-      win.frame(new Nodes.Rows(new Nodes.Preceding()));
-      const sql = mgr.toSql();
-      expect(sql).toContain("ROWS");
-      expect(sql).toContain("UNBOUNDED PRECEDING");
+      const manager = new SelectManager();
+      manager.from(users);
+      const window = manager.window("a_window");
+      window.frame(
+        new Nodes.Between(
+          window.range(),
+          new Nodes.And([new Nodes.Preceding(), new Nodes.CurrentRow()]),
+        ),
+      );
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(
+          `SELECT FROM "users" WINDOW "a_window" AS (RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`,
+        ),
+      );
     });
   });
 
@@ -820,19 +925,20 @@ describe("SelectManagerTest", () => {
 
   describe("where_sql", () => {
     it("gives me back the where sql", () => {
-      const mgr = users
-        .project(star)
-        .where(users.get("name").eq("Alice"))
-        .where(users.get("age").gt(18));
-      expect(mgr.constraints.length).toBe(2);
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.where(users.get("id").eq(10));
+      expect(mustBeLike(manager.whereSql()!.value)).toBe(mustBeLike(`WHERE "users"."id" = 10`));
     });
 
     it("joins wheres with AND", () => {
-      const mgr = users
-        .project(star)
-        .where(users.get("name").eq("Alice"))
-        .where(users.get("age").gt(18));
-      expect(mgr.toSql()).toContain("AND");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.where(users.get("id").eq(10));
+      manager.where(users.get("id").eq(11));
+      expect(mustBeLike(manager.whereSql()!.value)).toBe(
+        mustBeLike(`WHERE "users"."id" = 10 AND "users"."id" = 11`),
+      );
     });
   });
 
@@ -901,15 +1007,15 @@ describe("SelectManagerTest", () => {
 
   describe("project", () => {
     it("takes sql literals", () => {
-      const mgr = users.project(new Nodes.SqlLiteral("*"));
-      expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+      const manager = new SelectManager();
+      manager.project(new Nodes.SqlLiteral("*"));
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike(`SELECT *`));
     });
 
     it("takes strings", () => {
-      const mgr = users.project(new Nodes.SqlLiteral("id"), new Nodes.SqlLiteral("name"));
-      const result = mgr.toSql();
-      expect(result).toContain("id");
-      expect(result).toContain("name");
+      const manager = new SelectManager();
+      manager.project("*");
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike(`SELECT *`));
     });
   });
 
@@ -922,10 +1028,10 @@ describe("SelectManagerTest", () => {
 
   describe("projections=", () => {
     it("overwrites projections", () => {
-      const mgr = users.project(users.get("name"));
-      mgr.projections = [users.get("age")];
-      expect(mgr.projections.length).toBe(1);
-      expect(mgr.toSql()).toContain('"age"');
+      const manager = new SelectManager();
+      manager.project(sql("foo"));
+      manager.projections = [sql("bar")];
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike(`SELECT bar`));
     });
   });
 
@@ -938,15 +1044,27 @@ describe("SelectManagerTest", () => {
 
   describe("take", () => {
     it("removes LIMIT when nil is passed", () => {
-      const mgr = users.project(star).take(10);
-      expect(mgr.toSql()).toContain("LIMIT 10");
+      const manager = new SelectManager();
+      manager.limit = 10;
+      expect(manager.toSql()).toMatch("LIMIT");
+
+      manager.limit = null;
+      expect(manager.toSql()).not.toMatch("LIMIT");
     });
   });
 
   describe("where", () => {
     it("knows where", () => {
-      const mgr = users.project(star).where(users.get("id").eq(1));
-      expect(mgr.toSql()).toContain("WHERE");
+      const manager = new SelectManager();
+      manager.from(users).project(users.get("id"));
+      manager.where(users.get("id").eq(1));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id"
+          FROM "users"
+          WHERE "users"."id" = 1
+        `),
+      );
     });
 
     it("accepts a TreeManager and unwraps to ast", () => {
@@ -972,8 +1090,10 @@ describe("SelectManagerTest", () => {
 
   describe("from", () => {
     it("makes sql", () => {
-      const mgr = users.project(star);
-      expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.project(users.get("id"));
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike('SELECT "users"."id" FROM "users"'));
     });
 
     it("chains", () => {
@@ -986,8 +1106,8 @@ describe("SelectManagerTest", () => {
 
   describe("source", () => {
     it("returns the join source of the select core", () => {
-      const mgr = users.project(star);
-      expect(mgr.source).toBeDefined();
+      const manager = new SelectManager();
+      expect(manager.source).toBe(manager.ast.cores[manager.ast.cores.length - 1].source);
     });
   });
 
@@ -996,7 +1116,9 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager();
 
       mgr.distinct();
-      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeInstanceOf(Nodes.Distinct);
+      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier?.constructor).toBe(
+        Nodes.Distinct,
+      );
 
       mgr.distinct(false);
       expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeNull();
@@ -1034,8 +1156,18 @@ describe("SelectManagerTest", () => {
 
   describe("comment", () => {
     it("appends a comment to the generated query", () => {
-      const mgr = users.project(star).comment("load users");
-      expect(mgr.toSql()).toContain("/* load users */");
+      const manager = new SelectManager();
+      manager.from(users).project(users.get("id"));
+
+      manager.comment("selecting");
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT "users"."id" FROM "users" /* selecting */`),
+      );
+
+      manager.comment("selecting", "with", "comment");
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT "users"."id" FROM "users" /* selecting */ /* with */ /* comment */`),
+      );
     });
 
     it("stores the Comment node on the SelectCore (Rails fidelity)", () => {
@@ -1301,38 +1433,56 @@ describe("SelectManagerTest", () => {
 
   describe("skip", () => {
     it("should chain", () => {
-      const mgr = new SelectManager(users);
-      expect(mgr.project(star)).toBe(mgr);
-      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
-      expect(mgr.order(users.get("id").asc())).toBe(mgr);
+      const mgr = users.from();
+      expect(mustBeLike(mgr.skip(10).toSql())).toBe(mustBeLike(`SELECT FROM "users" OFFSET 10`));
     });
   });
 
   describe("order", () => {
     it("takes *args", () => {
-      const mgr = users.project(star).order(users.get("id").asc(), users.get("name").desc());
-      expect(mgr.orders.length).toBe(2);
-      expect(mgr.toSql()).toContain("ORDER BY");
+      const manager = new SelectManager();
+      manager.project(new Nodes.SqlLiteral("*"));
+      manager.from(users);
+      manager.order(users.get("id"), users.get("name"));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`SELECT * FROM "users" ORDER BY "users"."id", "users"."name"`),
+      );
     });
   });
 
   describe("join", () => {
     it("takes the full outer join class", () => {
-      const mgr = users
-        .project(star)
-        .join(posts, Nodes.FullOuterJoin)
-        .on(users.get("id").eq(posts.get("user_id")));
-      expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.FullOuterJoin);
-      expect(mgr.toSql()).toContain("FULL OUTER JOIN");
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const manager = new SelectManager();
+
+      manager.from(left);
+      manager.join(right, Nodes.FullOuterJoin).on(predicate);
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT FROM "users"
+            FULL OUTER JOIN "users" "users_2"
+              ON "users"."id" = "users_2"."id"
+        `),
+      );
     });
 
     it("takes the right outer join class", () => {
-      const mgr = users
-        .project(star)
-        .join(posts, Nodes.RightOuterJoin)
-        .on(users.get("id").eq(posts.get("user_id")));
-      expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.RightOuterJoin);
-      expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const manager = new SelectManager();
+
+      manager.from(left);
+      manager.join(right, Nodes.RightOuterJoin).on(predicate);
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT FROM "users"
+            RIGHT OUTER JOIN "users" "users_2"
+              ON "users"."id" = "users_2"."id"
+        `),
+      );
     });
   });
 
@@ -1344,10 +1494,10 @@ describe("SelectManagerTest", () => {
     });
 
     it("makes strings literals", () => {
-      const mgr = new SelectManager();
-      mgr.from("users").project("*");
-      expect(mgr.froms[0]).toBeInstanceOf(Nodes.SqlLiteral);
-      expect(mgr.toSql()).toContain("FROM users");
+      const manager = new SelectManager();
+      manager.from(users);
+      manager.group("foo");
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike(`SELECT FROM "users" GROUP BY foo`));
     });
   });
 
@@ -1443,10 +1593,19 @@ describe("SelectManagerTest", () => {
 
   describe("take", () => {
     it("knows take", () => {
-      const mgr = new SelectManager(users).project(star).take(5);
-      expect(mgr.ast.limit).toBeInstanceOf(Nodes.Limit);
-      expect(mgr.limit).toBe(5);
-      expect(mgr.toSql()).toContain("LIMIT 5");
+      const manager = new SelectManager();
+      manager.from(users).project(users.get("id"));
+      manager.where(users.get("id").eq(1));
+      manager.take(1);
+
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id"
+          FROM "users"
+          WHERE "users"."id" = 1
+          LIMIT 1
+        `),
+      );
     });
   });
 
