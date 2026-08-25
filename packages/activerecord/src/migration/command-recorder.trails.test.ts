@@ -143,17 +143,17 @@ describe("CommandRecorder", () => {
         await t.removeCheckConstraint();
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeColumns", args: ["fruits", "name"] },
-        { cmd: "addIndex", args: ["fruits", "kind"] },
-        { cmd: "addTimestamps", args: ["fruits"] },
-        { cmd: "removeTimestamps", args: ["fruits"] },
-        { cmd: "removeIndex", args: ["fruits", "kind"] },
-        { cmd: "addReference", args: ["fruits", "supplier"] },
-        { cmd: "removeReference", args: ["fruits", "supplier"] },
-        { cmd: "addForeignKey", args: ["fruits", "suppliers"] },
-        { cmd: "removeForeignKey", args: ["fruits"] },
-        { cmd: "addCheckConstraint", args: ["fruits", "qty > 0"] },
-        { cmd: "removeCheckConstraint", args: ["fruits"] },
+        ["removeColumns", ["fruits", "name"]],
+        ["addIndex", ["fruits", "kind"]],
+        ["addTimestamps", ["fruits"]],
+        ["removeTimestamps", ["fruits"]],
+        ["removeIndex", ["fruits", "kind"]],
+        ["addReference", ["fruits", "supplier"]],
+        ["removeReference", ["fruits", "supplier"]],
+        ["addForeignKey", ["fruits", "suppliers"]],
+        ["removeForeignKey", ["fruits"]],
+        ["addCheckConstraint", ["fruits", "qty > 0"]],
+        ["removeCheckConstraint", ["fruits"]],
       ]);
     });
 
@@ -165,9 +165,9 @@ describe("CommandRecorder", () => {
         await t.removeCheckConstraint({ name: "chk" });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeCheckConstraint", args: ["fruits", "qty > 0", { name: "chk" }] },
-        { cmd: "removeCheckConstraint", args: ["fruits", "qty > 0"] },
-        { cmd: "removeCheckConstraint", args: ["fruits", { name: "chk" }] },
+        ["removeCheckConstraint", ["fruits", "qty > 0", { name: "chk" }]],
+        ["removeCheckConstraint", ["fruits", "qty > 0"]],
+        ["removeCheckConstraint", ["fruits", { name: "chk" }]],
       ]);
     });
 
