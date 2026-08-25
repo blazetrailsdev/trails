@@ -4537,13 +4537,14 @@ extend(Base, _Validations.ClassMethods);
 // constant lookup, so they ride on `Base` as statics, inherited the way Ruby
 // inherits the constant. Assigned, not extended: `extend()` skips constants
 // because Ruby's `extend` copies methods only.
+// Listed in the require order of validations.rb:96-101.
 Object.assign(Base, {
-  AbsenceValidator: _Validations.AbsenceValidator,
   AssociatedValidator: _Validations.AssociatedValidator,
+  UniquenessValidator: _Validations.UniquenessValidator,
+  PresenceValidator: _Validations.PresenceValidator,
+  AbsenceValidator: _Validations.AbsenceValidator,
   LengthValidator: _Validations.LengthValidator,
   NumericalityValidator: _Validations.NumericalityValidator,
-  PresenceValidator: _Validations.PresenceValidator,
-  UniquenessValidator: _Validations.UniquenessValidator,
 });
 include(Base, CallbacksInstanceMethods);
 // Ruby `include ActiveRecord::Transactions` (transactions.rb:10-14).
