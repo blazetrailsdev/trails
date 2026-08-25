@@ -4,11 +4,11 @@
  * the prototype chain. Replaces the duplicated `host = (k) => k as
  * unknown as Host` cast in `trailtie.ts` and `engine.ts`.
  *
- * @noRailsEquivalent PERMANENT -- Ruby gives every class object its own ivars,
- * so `Railtie` just writes `@blocks` and each subclass starts empty
- * (railtie.rb:227-245). A JS class object inherits its properties down the
- * prototype chain, so own-state needs an explicit `hasOwnProperty` guard;
- * there is no Ruby method to mirror.
+ * @noRailsEquivalent PERMANENT — Ruby gives every class object its own ivars,
+ * so `Railtie#register_block_for` writes the per-type block array straight onto
+ * the class and each subclass starts empty (railtie.rb:235-241). A JS class
+ * object inherits its properties down the prototype chain, so own-state needs
+ * an explicit `hasOwnProperty` guard; there is no Ruby method to mirror.
  */
 export function ownState<T>(klass: object, key: string, factory: () => T): T {
   const bag = klass as Record<string, unknown>;
@@ -19,8 +19,8 @@ export function ownState<T>(klass: object, key: string, factory: () => T): T {
 /**
  * @internal Read own-state without initializing.
  *
- * @noRailsEquivalent PERMANENT -- the read half of the `@ivar`-on-a-class
- * emulation above; Ruby spells it `@blocks` (railtie.rb:227-245).
+ * @noRailsEquivalent PERMANENT — the read half of the `@ivar`-on-a-class
+ * emulation above; Ruby spells it `instance_variable_get` (railtie.rb:235-241).
  */
 export function readOwnState<T>(klass: object, key: string): T | undefined {
   const bag = klass as Record<string, unknown>;
@@ -30,8 +30,8 @@ export function readOwnState<T>(klass: object, key: string): T | undefined {
 /**
  * @internal Write own-state.
  *
- * @noRailsEquivalent PERMANENT -- the write half of the `@ivar`-on-a-class
- * emulation above; Ruby spells it `@blocks = ...` (railtie.rb:227-245).
+ * @noRailsEquivalent PERMANENT — the write half of the `@ivar`-on-a-class
+ * emulation above; Ruby spells it `instance_variable_set` (railtie.rb:235-241).
  */
 export function writeOwnState(klass: object, key: string, value: unknown): void {
   (klass as Record<string, unknown>)[key] = value;

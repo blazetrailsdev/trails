@@ -98,10 +98,10 @@ export class Trailtie extends Initializable {
   /**
    * @internal Read the blocks registered directly on `klass` for `kind`.
    *
-   * @noRailsEquivalent PERMANENT -- Rails reads the per-class `@blocks` ivar
-   * straight off the class inside `Railtie` (railtie.rb:227-245). JS class
-   * objects have no ivars, so own-state has to be read through a named accessor;
-   * see `ownState` in trailtie/per-class-state.ts.
+   * @noRailsEquivalent PERMANENT — Rails reads the per-class block array
+   * straight off the class with `instance_variable_get` (railtie.rb:235-241).
+   * JS class objects have no ivars, so own-state has to be read through a named
+   * accessor; see `ownState` in trailtie/per-class-state.ts.
    */
   static registeredBlocksFor(kind: BlockRunnerKind): TrailtieBlock[] {
     return readOwnState<TrailtieBlock[]>(this, blockKey(kind)) ?? [];

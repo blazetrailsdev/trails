@@ -20,10 +20,11 @@ export function sealAgainstInheritance(klass: typeof Trailtie): void {
  * prototype-chain step (no early termination on anonymous classes — an
  * anonymous intermediate must not let a sealed grandparent slip past).
  *
- * @noRailsEquivalent CONVERGEABLE -- Rails raises inline in
- * `Railtie.inherited` (railtie.rb:207-210). JS has no `inherited` hook
- * (CLAUDE.md, "Module mixins"), so the check is a function the registration
- * path calls; it folds back in whenever the `inherited` deferral is settled.
+ * @noRailsEquivalent CONVERGEABLE — Rails raises inline in
+ * `Railtie::Configurable::ClassMethods#inherited`
+ * (railtie/configurable.rb:13-15). JS has no `inherited` hook (CLAUDE.md,
+ * "Module mixins"), so the check is a function the registration path calls; it
+ * folds back in whenever the `inherited` deferral is settled.
  */
 export function assertNotSealed(subclass: typeof Trailtie): void {
   let parent = Object.getPrototypeOf(subclass) as typeof Trailtie | null;

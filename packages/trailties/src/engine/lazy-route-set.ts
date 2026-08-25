@@ -29,11 +29,11 @@ let reloadHook: ReloadHook = () => undefined;
  * `Trails.application` setter calls this; tests use it to assert each
  * routing op consults the hook exactly once. Not part of Rails.
  *
- * @noRailsEquivalent CONVERGEABLE -- Rails names
+ * @noRailsEquivalent CONVERGEABLE — Rails names
  * `Rails.application&.reload_routes_unless_loaded` directly at each call site
- * (engine/lazy_route_set.rb:8-52); there is no setter because the constant
- * resolves at call time. The seam exists only until `Trails.application`
- * lands, and disappears with it.
+ * (engine/lazy_route_set.rb:12-104); there is no setter because the constant
+ * resolves at call time. The seam exists only until `Trails.application` lands,
+ * and disappears with it.
  */
 export function setReloadRoutesHook(fn: ReloadHook): void {
   reloadHook = fn;
@@ -42,8 +42,8 @@ export function setReloadRoutesHook(fn: ReloadHook): void {
 /**
  * @internal Reset to the default no-op. Used by tests.
  *
- * @noRailsEquivalent CONVERGEABLE -- the teardown half of
- * `setReloadRoutesHook` above, and it retires with it.
+ * @noRailsEquivalent CONVERGEABLE — the teardown half of `setReloadRoutesHook`
+ * above, and it retires with it.
  */
 export function resetReloadRoutesHook(): void {
   reloadHook = () => undefined;

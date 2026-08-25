@@ -21,8 +21,8 @@ export class Updater {
    * @internal Trails-private. Inject the `PluginGenerator` factory. Resets the
    * memoised generator.
    *
-   * @noRailsEquivalent CONVERGEABLE -- Rails builds the generator inline in
-   * `Updater.generator` (engine/updater.rb:8-10); trails has no
+   * @noRailsEquivalent CONVERGEABLE — Rails builds the generator inline in
+   * `Updater.generator` (engine/updater.rb:10-13); trails has no
    * `PluginGenerator` / `ENGINE_ROOT` yet, so the factory is injected. The seam
    * retires when `PluginGenerator` lands.
    */
@@ -34,8 +34,8 @@ export class Updater {
   /**
    * @internal Drop the cached generator without changing the factory.
    *
-   * @noRailsEquivalent CONVERGEABLE -- Rails memoises with `@generator ||=`
-   * (engine/updater.rb:8), an ivar tests reset by allocating a new object; it
+   * @noRailsEquivalent CONVERGEABLE — Rails memoises with `@generator ||=`
+   * (engine/updater.rb:11), an ivar tests reset by allocating a new object; it
    * retires with `setGeneratorFactory` above.
    */
   static resetGenerator(): void {
@@ -45,8 +45,8 @@ export class Updater {
   /**
    * @internal Clear both the cached generator and the installed factory.
    *
-   * @noRailsEquivalent CONVERGEABLE -- the full teardown for the injected
-   * factory above (engine/updater.rb:8-10 has no such state); it retires with
+   * @noRailsEquivalent CONVERGEABLE — the full teardown for the injected
+   * factory above (engine/updater.rb:10-13 has no such state); it retires with
    * it.
    */
   static reset(): void {
