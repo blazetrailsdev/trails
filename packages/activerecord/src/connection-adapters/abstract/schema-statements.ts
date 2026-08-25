@@ -705,8 +705,6 @@ export class SchemaStatements {
   ): Promise<void> {
     this.validateChangeColumnNullArgumentBang(allowNull);
     if (!allowNull && defaultValue !== undefined) {
-      // Rails: `column = column_for(table_name, column_name)` before quoting
-      // (postgresql/schema_statements.rb:502-503).
       const column = await this.columnFor(tableName, columnName);
       const quoted = await this.quoteDefaultExpression(defaultValue, column);
       await this.execute(

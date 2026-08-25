@@ -100,9 +100,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("_read_attribute raises for a name with no reader, as __send__ does", () => {
-    // Ruby's `_read_attribute` is `__send__(attr)` (attribute_methods.rb:556),
-    // which raises NoMethodError for an undefined name; `method_missing`
-    // (:507-514) re-raises it through `super` when nothing matched.
     class Person extends Model {
       static {
         this.attribute("name", "string");

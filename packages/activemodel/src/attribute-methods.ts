@@ -305,9 +305,9 @@ class NoMethodError extends NameError {
  * @internal Rails-private helper.
  */
 export function _readAttribute(this: InstanceHost, attr: string): unknown {
-  const self = this as unknown as InstanceMethods & AttributeMethods;
+  const self = this as unknown as RespondToHost & AttributeMethods;
   if (!self.isRespondToWithoutAttributes(attr)) {
-    const match = matchedAttributeMethod.call(self, attr);
+    const match = self.matchedAttributeMethod(attr);
     if (match) return self.attributeMissing(match);
     throw new NoMethodError(
       `undefined method '${attr}' for an instance of ${(this.constructor as { name?: string }).name ?? "unknown"}`,
