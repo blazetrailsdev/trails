@@ -105,7 +105,7 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaTypeWithVirtual(column: Column): string {
-    if (column.virtual) return "virtual";
+    if (this.supportsVirtualColumns && column.virtual) return "virtual";
     return this.schemaType(column);
   }
 
@@ -133,14 +133,31 @@ export class SchemaDumper extends BaseSchemaDumper {
     // predicate `schema_type` uses, so a column whose bigint-ness is only visible through
     // sqlType is limit-suppressed too.
     if (this.isBigint(column)) return undefined;
-    // Rails suppresses the serial/bigserial limit because it matches the native
-    // database type's default (int4 limit = 4, int8 limit = 8). We don't have
-    // the native_database_types comparison available here, so we guard explicitly
-    // on isSerial — functionally equivalent to the Rails approach.
-    if (column.isSerial) return undefined;
     const limit = column.limit;
     if (limit == null) return undefined;
+    // Rails: `limit.inspect if limit && limit != @connection.native_database_types[column.type][:limit]`
+    // (abstract/schema_dumper.rb:64). A raw/mock source has no adapter and so no
+    // type map to compare against; it then dumps the limit, as Rails does for a
+    // type whose native entry carries no `:limit`.
+    if (limit === this._nativeTypeLimit(column)) return undefined;
     return String(limit);
+  }
+
+  /**
+   * `@connection.native_database_types[column.type][:limit]`
+   * (abstract/schema_dumper.rb:64), split out because the lookup has to survive
+   * a dumper with no backing adapter (raw/mock sources).
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE — inline in Ruby; extracted only because
+   *   trails' dumper also runs against adapterless schema sources.
+   */
+  private _nativeTypeLimit(column: Column): unknown {
+    const adapter = this._adapter();
+    if (!adapter || typeof adapter.nativeDatabaseTypes !== "function") return undefined;
+    const native = adapter.nativeDatabaseTypes()?.[column.type ?? ""] as
+      | { limit?: unknown }
+      | undefined;
+    return native?.limit;
   }
 
   /** @internal */

@@ -357,10 +357,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     super(targetModel, targetModel.arelTable);
     this._record = record;
     this._assocName = assocName;
-    const instance = record.association(assocName) as unknown as CollectionAssociation;
-    this._association = instance.isCollection()
-      ? instance
-      : new CollectionAssociation(record, assocDef);
+    this._association = record.association(assocName) as unknown as CollectionAssociation;
 
     // `extend(*extensions)` (collection_proxy.rb:35-37) mixes into this object
     // only; chained relations get the same modules independently through
@@ -601,7 +598,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   private _collectionAssociation(): CollectionAssociation {
-    return this._record.association(this._assocName) as unknown as CollectionAssociation;
+    return this._association;
   }
 
   /**

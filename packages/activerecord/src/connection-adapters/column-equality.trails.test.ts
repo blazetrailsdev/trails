@@ -97,3 +97,35 @@ describe("ColumnEqualityTrails", () => {
     expect(sqlite.equals(pg)).toBe(false);
   });
 });
+
+describe("ColumnDeduplicationTrails", () => {
+  it("collapses identical columns onto one frozen instance through the registry", () => {
+    const a = new Column("dedup_title", "hi", meta(), false, { comment: "c" }).deduplicate();
+    const b = new Column("dedup_title", "hi", meta(), false, { comment: "c" }).deduplicate();
+    expect(b).toBe(a);
+    expect(Object.isFrozen(a)).toBe(true);
+  });
+
+  it("keeps columns differing only in an attribute Rails hashes apart", () => {
+    const a = new Column("dedup_split", "hi", meta(), false).deduplicate();
+    const b = new Column("dedup_split", "bye", meta(), false).deduplicate();
+    expect(b).not.toBe(a);
+  });
+
+  it("folds the PostgreSQL identity and serial flags into the key", () => {
+    const opts = { sqlType: "integer", type: "integer" };
+    const plain = new PostgreSQLColumn("dedup_pg", null, new PgTypeMetadata(opts), false);
+    const serial = new PostgreSQLColumn("dedup_pg", null, new PgTypeMetadata(opts), false, {
+      serial: true,
+    });
+    expect(plain.deduplicate()).not.toBe(serial.deduplicate());
+  });
+
+  it("folds the SQLite3 rowid flag into the key, which its equality ignores", () => {
+    const opts = { sqlType: "integer", type: "integer" };
+    const plain = new SQLite3Column("dedup_sqlite", null, opts, false);
+    const rowid = new SQLite3Column("dedup_sqlite", null, opts, false, { rowid: true });
+    expect(plain.equals(rowid)).toBe(true);
+    expect(plain.deduplicate()).not.toBe(rowid.deduplicate());
+  });
+});

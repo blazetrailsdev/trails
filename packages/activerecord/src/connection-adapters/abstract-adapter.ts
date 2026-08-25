@@ -77,7 +77,7 @@ import {
   quoteString as abstractQuoteString,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
-  isSqlLiteral,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
   quotedTrue as abstractQuotedTrue,
   quotedFalse as abstractQuotedFalse,
   unquotedTrue as abstractUnquotedTrue,
@@ -1031,23 +1031,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
-    if (value === undefined) return "";
-    if (typeof value === "function") {
-      const result = (value as () => unknown)();
-      if (typeof result === "string") return result;
-      if (isSqlLiteral(result)) return result.value;
-      throw new TypeError(
-        "quoteDefaultExpression expected function default to return a string or SqlLiteral",
-      );
-    }
-    if (isSqlLiteral(value)) return value.value;
-    // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
-    // (abstract/quoting.rb:161) before quoting. Returns a bare literal — the
-    // ` DEFAULT ` keyword is owned by the caller (add_column_options!).
-    const sqlType = (column as { sqlType?: string | null }).sqlType;
-    const castType = this.lookupCastType(sqlType ?? null) as { serialize?(v: unknown): unknown };
-    if (typeof castType?.serialize === "function") value = castType.serialize(value);
-    return this.quote(value);
+    return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
   }
 
   quotedTrue(): string {

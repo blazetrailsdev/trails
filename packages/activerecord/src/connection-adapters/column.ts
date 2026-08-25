@@ -4,11 +4,13 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::Column
  */
 
+import { deduplicate } from "./deduplicable.js";
+import type { Deduplicable } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { SqlTypeMetadataJSON } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
 
-export class Column {
+export class Column implements Deduplicable {
   name: string;
   sqlTypeMetadata: SqlTypeMetadata | null;
   null: boolean;
@@ -191,16 +193,50 @@ export class Column {
     coder["comment"] = this.comment;
   }
 
-  deduplicate(): this {
-    return this.deduplicated();
+  /**
+   * The registry key over exactly the attributes `Column#==` compares and
+   * `Column#hash` folds in (`column.rb:75-88`) — what Rails gets from pairing
+   * those two so the `Hash` lookup in `Deduplicable#deduplicate` works.
+   * Subclasses extend it with the attributes their own `hash` adds.
+   * @internal
+   * @noRailsEquivalent PERMANENT — Ruby's `Deduplicable` registry is a Hash
+   *   keyed by the object itself, which works because Rails pairs `==`/`eql?`
+   *   with `hash` (`column.rb:75`/`:87`). A JS `Map` keys by identity, so the
+   *   port needs an explicit string key over exactly those attributes.
+   */
+  deduplicateKey(): string {
+    return JSON.stringify([
+      this.name,
+      this.default ?? null,
+      this.sqlTypeMetadata?.deduplicateKey() ?? null,
+      this.null,
+      this.defaultFunction,
+      this.collation,
+      this.comment,
+    ]);
   }
 
-  /** @internal */
-  protected deduplicated(): this {
+  /**
+   * Mirrors `Deduplicable#deduplicate` — `self.class.registry[self] ||=
+   * deduplicated` (`deduplicable.rb:18`).
+   */
+  deduplicate(): this {
+    return deduplicate(this);
+  }
+
+  /**
+   * Mirrors `Column#deduplicated` (`column.rb:104-112`): dedup the metadata,
+   * then `super` — `Deduplicable#deduplicated`'s `freeze` (`deduplicable.rb:26`).
+   * Ruby's `-string` interning has no JS counterpart (strings are already
+   * immutable and pooled), so the five `-name` / `-default` lines have nothing
+   * to call.
+   * @internal
+   */
+  deduplicated(): this {
     if (this.sqlTypeMetadata) {
       this.sqlTypeMetadata.deduplicate();
     }
-    return this;
+    return Object.freeze(this);
   }
 
   toString(): string {

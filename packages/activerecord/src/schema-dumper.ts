@@ -799,6 +799,20 @@ export abstract class SchemaDumper {
     // authoritative PK column order before iterating columns so `emitTable` /
     // `resolvePrimaryKeyColumns` render composite/promoted keys in key order.
     const adapter = this._adapter();
+    // Rails reads `@connection.supports_virtual_columns?` inline inside
+    // `schema_type_with_virtual` (abstract/schema_dumper.rb:47). In trails that
+    // predicate is async (it awaits `databaseVersion`), and the column-spec
+    // chain below it is synchronous — `emitTable` is also reached from the
+    // sync mock-source dump path, which raises on any Promise. So the answer is
+    // resolved once here, at the one async point above the emitter, and read
+    // synchronously where Ruby reads the connection.
+    if (adapter && typeof adapter.supportsVirtualColumns === "function") {
+      try {
+        this.supportsVirtualColumns = await adapter.supportsVirtualColumns();
+      } catch {
+        this.supportsVirtualColumns = false;
+      }
+    }
     if (adapter && typeof adapter.primaryKeys === "function") {
       try {
         this.primaryKeyOrderCache[table] = await adapter.primaryKeys(table);
@@ -1006,6 +1020,15 @@ export abstract class SchemaDumper {
 
   /** @internal */
   protected abstract isExplicitPrimaryKeyDefault(column: Column): boolean;
+
+  /**
+   * The `@connection.supports_virtual_columns?` answer (abstract/schema_dumper.rb:47),
+   * resolved once in `table()` because trails' predicate is async.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE — Rails reads the connection predicate
+   *   inline; trails' is async and the emitter chain is sync.
+   */
+  protected supportsVirtualColumns = false;
 
   /** @internal */
   protected abstract schemaTypeWithVirtual(column: Column): string;
