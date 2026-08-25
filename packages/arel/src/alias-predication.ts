@@ -13,11 +13,11 @@ export interface AliasPredicationModule {
   // Rails' Function.as / Table.as / SelectManager.as all return `this` after
   // setting an internal alias, while AliasPredication's own implementation
   // returns an `As` wrapper. The widened return type accommodates both.
-  as(other: string): Node;
+  as(other: string | SqlLiteral): Node;
 }
 
 export const AliasPredication: AliasPredicationModule = {
-  as(this: Node, other: string): As {
+  as(this: Node, other: string | SqlLiteral): As {
     return new As(this, new SqlLiteral(other, { retryable: true }));
   },
 };

@@ -111,7 +111,7 @@ describe("AttributeAssignmentTest", () => {
         (this as Base)._writeAttribute("name", v.toUpperCase());
       }
       get name(): string {
-        return this._readAttribute("name") as string;
+        return this.attribute("name") as string;
       }
     }
     class Child extends Base {
@@ -123,7 +123,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const c = new Child({});
     void c.assignAttributes({ name: "bob" });
-    expect(c._readAttribute("name")).toBe("BOB");
+    expect(c.attribute("name")).toBe("BOB");
   });
 
   it("routes through instance-own setter (JS singleton method)", () => {
@@ -143,7 +143,7 @@ describe("AttributeAssignmentTest", () => {
     });
     void p.assignAttributes({ name: "bob" });
     expect(seen).toEqual(["bob"]);
-    expect(p._readAttribute("name")).toBe("BOB");
+    expect(p.attribute("name")).toBe("BOB");
   });
 
   it("routes through user-defined setter if present", () => {
@@ -157,7 +157,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "  bob  " });
-    expect(p._readAttribute("name")).toBe("BOB");
+    expect(p.attribute("name")).toBe("BOB");
   });
 
   it("an ArgumentError is raised if a non-hash-like object is passed", () => {

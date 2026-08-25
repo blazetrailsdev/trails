@@ -8,15 +8,10 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Person.includeRootInJson = true;
-    try {
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJSON());
-      expect(json["person"]).toBeDefined();
-      expect(json["person"]["name"]).toBe("Alice");
-    } finally {
-      Person.includeRootInJson = false;
-    }
+    const p = new Person({ name: "Alice" });
+    const json = JSON.parse(p.toJSON({ root: true }));
+    expect(json["person"]).toBeDefined();
+    expect(json["person"]["name"]).toBe("Alice");
   });
 
   it("should include custom root in JSON", () => {
@@ -25,15 +20,10 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Person.includeRootInJson = "human";
-    try {
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJSON());
-      expect(json["human"]).toBeDefined();
-      expect(json["human"]["name"]).toBe("Alice");
-    } finally {
-      Person.includeRootInJson = false;
-    }
+    const p = new Person({ name: "Alice" });
+    const json = JSON.parse(p.toJSON({ root: "human" }));
+    expect(json["human"]).toBeDefined();
+    expect(json["human"]["name"]).toBe("Alice");
   });
 
   it("methods are called on object", () => {
@@ -69,11 +59,9 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Person.includeRootInJson = "custom_root";
     const p = new Person({ name: "Alice" });
-    const json = p.asJson();
+    const json = p.asJson({ root: "custom_root" });
     expect(json["custom_root"]).toBeDefined();
-    Person.includeRootInJson = false;
   });
 
   it("as_json should work with include option paired with only filter", () => {
@@ -287,7 +275,7 @@ describe("JsonSerializationTest", () => {
       }
     }
     const c = new Contact({ name: "Konata" });
-    const json = c.toJSON();
+    const json = c.toJSON({ root: false });
     expect(json).not.toMatch(/"contact":/);
     expect(json).toMatch(/"name":"Konata"/);
   });
@@ -311,15 +299,10 @@ describe("JsonSerializationTest", () => {
         this.attribute("age", "integer");
       }
     }
-    Contact.includeRootInJson = true;
-    try {
-      const c = new Contact({ name: "Konata", age: 16 });
-      const json = c.asJson();
-      expect(json.contact).toBeDefined();
-      expect((json.contact as any).name).toBe("Konata");
-    } finally {
-      Contact.includeRootInJson = false;
-    }
+    const c = new Contact({ name: "Konata", age: 16 });
+    const json = c.asJson({ root: true });
+    expect(json.contact).toBeDefined();
+    expect((json.contact as any).name).toBe("Konata");
   });
 
   it("as_json should work with methods options", () => {
@@ -372,9 +355,9 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => new P({}).fromJson("42")).toThrow(/got number/);
-    expect(() => new P({}).fromJson("[1,2]")).toThrow(/got array/);
-    expect(() => new P({}).fromJson("null")).toThrow(/got null/);
+    expect(() => new P({}).fromJson("42")).toThrow(/Number passed/);
+    expect(() => new P({}).fromJson("[1,2]")).toThrow(/Array passed/);
+    expect(() => new P({}).fromJson("null")).toThrow(/NilClass passed/);
   });
 
   it("from_json rejects non-object root payload after unwrap", () => {
@@ -385,7 +368,7 @@ describe("JsonSerializationTest", () => {
       }
     }
     try {
-      expect(() => new P({}).fromJson('{"p":42}')).toThrow(/root payload must be.*got number/);
+      expect(() => new P({}).fromJson('{"p":42}')).toThrow(/Number passed/);
     } finally {
       P.includeRootInJson = false;
     }

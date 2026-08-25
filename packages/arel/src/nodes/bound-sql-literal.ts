@@ -15,6 +15,14 @@ export class BoundSqlLiteral extends NodeExpression {
   readonly positionalBinds: unknown[];
   readonly namedBinds: Record<string, unknown>;
 
+  /**
+   * Mirrors: bound_sql_literal.rb:8-40 — `initialize`, whose named-bind arm
+   * dedupes both token lists (`.uniq`, :20-21).
+   *
+   * @missingRailsCall uniq — PERMANENT: Language shortcoming: Ruby's
+   * `Array#uniq` has no JS function to call; `[...new Set(...)]` IS the
+   * dedupe, spelled with the language's own primitive.
+   */
   constructor(
     sqlWithPlaceholders: string,
     positionalBinds: unknown[] = [],

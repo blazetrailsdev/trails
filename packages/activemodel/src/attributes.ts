@@ -255,6 +255,22 @@ export class Attributes {
       : new AttributeSet();
   }
 
+  /**
+   * Mirrors: attributes.rb:160-163
+   *   private
+   *     def attribute(attr_name)
+   *       @attributes.fetch_value(attr_name)
+   *     end
+   *
+   * The reader `define_proxy_call` generates for the bare attribute pattern
+   * dispatches here (attribute_methods.rb:333-346).
+   *
+   * @internal Rails-private helper.
+   */
+  attribute(attrName: string): unknown {
+    return this._attributes.fetchValue(attrName) ?? null;
+  }
+
   /** Mirrors: attributes.rb:131-133 — `def attributes; @attributes.to_hash; end` */
   get attributes(): Record<string, unknown> {
     return this._attributes.toHash();

@@ -137,7 +137,7 @@ export class AttributeMethodPattern {
 /** Minimum shape required of an instance accessed through a generated attribute method closure. */
 interface ReadWriteHost {
   /** @internal */
-  _readAttribute(name: string): unknown;
+  _readAttribute(attr: string): unknown;
   /** @internal */
   _writeAttribute(name: string, value: unknown): void;
   [key: string]: unknown;
@@ -268,18 +268,22 @@ export function missingAttribute(this: InstanceHost, attrName: string, stack?: s
 }
 
 /**
- * @internal Rails-private helper. Mirrors: #_read_attribute
- * Bypasses alias resolution and reads directly from the attribute store,
- * matching Rails AR _read_attribute (fetch_value without alias lookup).
+ * Mirrors: attribute_methods.rb:555-558
+ *   private
+ *     def _read_attribute(attr)
+ *       __send__(attr)
+ *     end
+ *
+ * ActiveModel dispatches through the reader method; only ActiveRecord's
+ * override goes to the attribute set (activerecord/attribute_methods/read.rb:
+ * 35-37). A generated reader is an accessor property in trails (CLAUDE.md
+ * § "Generated attribute readers are properties"), so `__send__(attr)` is a
+ * property read rather than a call.
+ *
+ * @internal Rails-private helper.
  */
-export function _readAttribute(
-  this: InstanceHost & {
-    _attributes?: { fetchValue(name: string, block?: (name: string) => unknown): unknown };
-  },
-  attr: string,
-  block?: (name: string) => unknown,
-): unknown {
-  return this._attributes?.fetchValue(attr, block) ?? null;
+export function _readAttribute(this: InstanceHost, attr: string): unknown {
+  return (this as unknown as Record<string, unknown>)[attr];
 }
 
 /**
@@ -856,6 +860,7 @@ export function defineMethodAttribute(
       Object.defineProperty(mod, mangledName, {
         get(
           this: ReadWriteHost & {
+            attribute(n: string): unknown;
             _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
           },
         ) {
@@ -864,7 +869,7 @@ export function defineMethodAttribute(
               `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
             );
           }
-          return this._readAttribute(canonicalName);
+          return this.attribute(canonicalName);
         },
         set(this: ReadWriteHost, value: unknown) {
           this._writeAttribute(canonicalName, value);

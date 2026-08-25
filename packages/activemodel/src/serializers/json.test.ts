@@ -10,7 +10,8 @@ import { Model } from "../index.js";
 // must expose a per-key reader for every attribute name (`attr_accessor`
 // parity) — the `attributes` hash only names the keys, it is not a value
 // fallback. These test models therefore define per-key getters alongside the
-// `attributes` accessor.
+// `attributes` reader, and the `attributes=` alias `from_json` writes through
+// (json.rb:147) as `setAttributes` (attribute_assignment.rb:36).
 describe("Serializers::JSON host", () => {
   class Person extends JSONHost {
     static {
@@ -181,12 +182,6 @@ describe("Serializers::JSON host", () => {
     expect(c.asJson()).toMatchObject({ author: { name: "Eve" } });
   });
 
-  it("fromJson rejects non-object JSON with shape-accurate diagnostics", () => {
-    expect(() => new Person().fromJson("42")).toThrow(/got number/);
-    expect(() => new Person().fromJson("[1,2,3]")).toThrow(/got array/);
-    expect(() => new Person().fromJson("null")).toThrow(/got null/);
-  });
-
   it("fromJson always unwraps via first-value semantics (Rails hash.values.first)", () => {
     // Rails json.rb:147 — `hash = hash.values.first if include_root`,
     // ignoring the configured root key. Pin that behavior explicitly so
@@ -218,6 +213,31 @@ describe("Serializers::JSON host", () => {
     }
     const k = new Keyed().fromJson('{"payload":{"v":7},"data":{"v":1}}');
     expect(k._v).toBe(7);
+  });
+
+  it("fromJson treats an explicitly passed nil includeRoot as nil, not the class default", () => {
+    // json.rb:144 — `include_root = include_root_in_json` is a Ruby optional
+    // parameter, so the default applies only when the argument is omitted.
+    class ExplicitNil extends JSONHost {
+      static {
+        this.includeRootInJson = true;
+        Object.defineProperty(this.prototype, "attributes", {
+          get() {
+            return { v: this._v };
+          },
+          configurable: true,
+        });
+      }
+      _v = 0;
+      setAttributes(h: { v: number }) {
+        this._v = h.v;
+      }
+      get v() {
+        return this._v;
+      }
+    }
+    const e = new ExplicitNil().fromJson('{"v":7}', null);
+    expect(e._v).toBe(7);
   });
 
   it("fromJson uses class-level includeRootInJson default when no second arg passed", () => {
@@ -278,8 +298,6 @@ describe("Serializers::JSON host", () => {
   });
 
   it("Model already implements the same surface ergonomically", () => {
-    // Sanity: the JSON host is the canonical mixin form; Model continues
-    // to compose asJson/fromJson directly (model.ts already mirrors json.rb).
     expect(typeof Model.prototype.asJson).toBe("function");
   });
 });

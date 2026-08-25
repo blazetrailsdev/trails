@@ -1,40 +1,43 @@
 import { describe, it, expect } from "vitest";
+import { uniq } from "../test-helpers/uniq.js";
 import { Table, Nodes } from "../index.js";
+import type { Node } from "./node.js";
 
 describe("Cte", () => {
-  const users = new Table("users");
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const c1 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
-      const c2 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
-      expect(c1.conditions.length).toBe(c2.conditions.length);
-      expect(c1.case).toBeInstanceOf(Nodes.Attribute);
-      expect(c2.case).toBeInstanceOf(Nodes.Attribute);
+      const array = [
+        new Nodes.Cte("foo", "bar" as unknown as Node, true),
+        new Nodes.Cte("foo", "bar" as unknown as Node, true),
+      ];
+
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with unequal ivars", () => {
-      const rel = users.project(users.get("id")).ast;
-      const a = new Nodes.Cte("cte1", rel);
-      const b = new Nodes.Cte("cte2", rel);
-      expect(a.name).not.toBe(b.name);
+      const array = [
+        new Nodes.Cte("foo", "bar" as unknown as Node, true),
+        new Nodes.Cte("foo", "bar" as unknown as Node),
+      ];
+
+      expect(uniq(array).length).toBe(2);
     });
   });
 
   describe("#to_cte", () => {
     it("returns self", () => {
-      const rel = users.project(users.get("id")).ast;
-      const cte = new Nodes.Cte("cte", rel);
-      expect(cte).toBeInstanceOf(Nodes.Cte);
+      const cte = new Nodes.Cte("foo", "bar" as unknown as Node);
+
+      expect(cte.toCte()).toBe(cte);
     });
   });
 
   describe("#to_table", () => {
     it("returns an Arel::Table using the Cte's name", () => {
-      const rel = users.project(users.get("id")).ast;
-      const cte = new Nodes.Cte("cte_table", rel);
-      const table = cte.toTable();
+      const table = new Nodes.Cte("foo", "bar" as unknown as Node).toTable();
+
       expect(table).toBeInstanceOf(Table);
-      expect(table.name).toBe("cte_table");
+      expect(table.name).toBe("foo");
     });
   });
 });

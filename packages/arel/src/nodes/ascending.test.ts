@@ -1,44 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
+import { Nodes } from "../index.js";
 
 describe("TestAscending", () => {
-  const users = new Table("users");
   it("construct", () => {
-    const asc = new Nodes.Ascending(users.get("name"));
-    expect(asc).toBeInstanceOf(Nodes.Ascending);
-    expect(asc.expr).toBeInstanceOf(Nodes.Attribute);
+    const ascending = new Nodes.Ascending("zomg");
+    expect(ascending.expr).toBe("zomg");
   });
 
   it("reverse", () => {
-    const asc = new Nodes.Ascending(users.get("name"));
-    const reversed = asc.reverse();
-    expect(reversed).toBeInstanceOf(Nodes.Descending);
+    const ascending = new Nodes.Ascending("zomg");
+    const descending = ascending.reverse();
+    expect(descending).toBeInstanceOf(Nodes.Descending);
+    expect(descending.expr).toBe(ascending.expr);
   });
 
   it("direction", () => {
-    const asc = new Nodes.Ascending(users.get("name"));
-    expect(asc.direction).toBe("asc");
+    const ascending = new Nodes.Ascending("zomg");
+    expect(ascending.direction).toBe("asc");
   });
 
   it("ascending?", () => {
-    const asc = new Nodes.Ascending(users.get("name"));
-    expect(asc.isAscending()).toBe(true);
+    const ascending = new Nodes.Ascending("zomg");
+    expect(ascending.isAscending()).toBe(true);
   });
 
   it("descending?", () => {
-    const asc = new Nodes.Ascending(users.get("name"));
-    expect(asc.isDescending()).toBe(false);
+    const ascending = new Nodes.Ascending("zomg");
+    expect(ascending.isDescending()).toBeFalsy();
   });
 
   it("equality with same ivars", () => {
-    const a = new Nodes.Ascending(users.get("name"));
-    const b = new Nodes.Ascending(users.get("name"));
-    expect(a.direction).toBe(b.direction);
+    const array = [new Nodes.Ascending("zomg"), new Nodes.Ascending("zomg")];
+    expect(uniq(array).length).toBe(1);
   });
 
   it("inequality with different ivars", () => {
-    const a = new Nodes.Ascending(users.get("name"));
-    const b = new Nodes.Ascending(users.get("email"));
-    expect((a.expr as Nodes.Attribute).name).not.toBe((b.expr as Nodes.Attribute).name);
+    const array = [new Nodes.Ascending("zomg"), new Nodes.Ascending("zomg!")];
+    expect(uniq(array).length).toBe(2);
   });
 });

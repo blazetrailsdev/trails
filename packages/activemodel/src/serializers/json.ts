@@ -17,17 +17,6 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "../attribute-assignment.js";
-
-function isPlainJsonObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function describeJsonShape(v: unknown): string {
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "array";
-  return typeof v;
-}
 
 /**
  * JSON serializer mixin host.
@@ -46,9 +35,10 @@ function describeJsonShape(v: unknown): string {
  *
  * Rails ships JSON as a module that pulls in `Serialization` (giving
  * `serializable_hash`) and extends `Naming` (giving `model_name`).
- * Trails' `Model` already wires up `asJson` / `fromJson`; this class
- * is the canonical mixin host for lighter-weight adopters and the
- * file-level Rails surface (`serializable_hash`, `model_name`).
+ * `Model` gets `as_json` / `from_json` from this module, via the
+ * `include(Model, JSON)` in `model.ts`; the class is also the mixin host for
+ * lighter-weight adopters and the file-level Rails surface
+ * (`serializable_hash`, `model_name`).
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class JSON {
@@ -122,38 +112,23 @@ export class JSON {
    *     self.attributes = hash
    *     self
    *   end
+   *
+   * `include_root` is a Ruby optional parameter, so its default is evaluated
+   * only when the argument is OMITTED — an explicit `nil` stays `nil` and
+   * :147's `if include_root` is false. A TS default parameter would swallow
+   * that (CLAUDE.md § "Ruby idioms that do not translate literally", kwargs),
+   * so the argument rides in a rest tuple whose length IS the distinction.
    */
-  fromJson(json: string, includeRoot?: boolean | string): this {
+  fromJson(json: string, ...includeRoot: [includeRoot?: boolean | string | null]): this {
     const ctor = this.constructor as typeof JSON;
-    const root = includeRoot ?? ctor.includeRootInJson;
+    const root = includeRoot.length > 0 ? includeRoot[0] : ctor.includeRootInJson;
     let hash = globalThis.JSON.parse(json) as unknown;
-    // Rails' `self.attributes = hash` routes through `assign_attributes`,
-    // which raises `ArgumentError` when the argument isn't hash-like
-    // (attribute_assignment.rb:29-30). Surface the same class loudly instead
-    // of silently writing `undefined` into `attributes`.
-    if (!isPlainJsonObject(hash)) {
-      throw new ArgumentError(`fromJson expected a JSON object, got ${describeJsonShape(hash)}`);
-    }
-    // Rails truthiness: false/nil skip; everything else (including
-    // empty string and any string root key) triggers unwrap via
-    // `hash.values.first` unconditionally — Rails ignores the configured
-    // root key on the read path (json.rb:146-147).
+    // Ruby truthiness: only `false`/`nil` skip the unwrap, and Rails ignores
+    // the configured root key on the read path (json.rb:146-147).
     if (root !== false && root != null) {
-      hash = Object.values(hash)[0];
-      if (!isPlainJsonObject(hash)) {
-        throw new ArgumentError(
-          `fromJson root payload must be a JSON object, got ${describeJsonShape(hash)}`,
-        );
-      }
+      hash = Object.values(hash as object)[0];
     }
-    // json.rb:147 — `self.attributes = hash`. `attributes=` is
-    // `alias attributes= assign_attributes` on any AttributeAssignment host
-    // (attribute_assignment.rb:36), and trails spells that alias
-    // `setAttributes` because the write path can owe I/O; Rails' `from_json`
-    // does not await it either.
-    void (this as unknown as { setAttributes(h: Record<string, unknown>): unknown }).setAttributes(
-      hash,
-    );
+    void this.setAttributes(hash);
     return this;
   }
 
@@ -234,6 +209,16 @@ export class JSON {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface JSON {
+  /**
+   * `alias attributes= assign_attributes` (attribute_assignment.rb:36) — the
+   * write half `from_json` uses (json.rb:147), which a host declares just as
+   * json.rb's own docstring host declares `def attributes=(hash)`. A TS `set`
+   * accessor cannot be awaited and the aliased path can owe I/O, so trails
+   * keeps the Rails name in a `setX()` method (CLAUDE.md § "Fidelity is the
+   * job").
+   */
+  setAttributes(newAttributes: unknown): Promise<void> | void;
+
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
