@@ -1823,22 +1823,14 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesCube(o: Nodes.Cube, collector: SQLString): SQLString {
     collector.append("CUBE(");
-    const exprs = o.expressions;
-    for (let i = 0; i < exprs.length; i++) {
-      if (i > 0) collector.append(", ");
-      this.visit(exprs[i], collector);
-    }
+    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
     collector.append(")");
     return collector;
   }
 
   protected visitArelNodesRollUp(o: Nodes.RollUp, collector: SQLString): SQLString {
     collector.append("ROLLUP(");
-    const exprs = o.expressions;
-    for (let i = 0; i < exprs.length; i++) {
-      if (i > 0) collector.append(", ");
-      this.visit(exprs[i], collector);
-    }
+    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
     collector.append(")");
     return collector;
   }
@@ -1848,22 +1840,14 @@ export class ToSql extends Visitor {
     collector: SQLString,
   ): SQLString {
     collector.append("(");
-    const exprs = o.expressions;
-    for (let i = 0; i < exprs.length; i++) {
-      if (i > 0) collector.append(", ");
-      this.visit(exprs[i], collector);
-    }
+    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
     collector.append(")");
     return collector;
   }
 
   protected visitArelNodesGroupingSet(o: Nodes.GroupingSet, collector: SQLString): SQLString {
     collector.append("GROUPING SETS(");
-    const exprs = o.expressions;
-    for (let i = 0; i < exprs.length; i++) {
-      if (i > 0) collector.append(", ");
-      this.visit(exprs[i], collector);
-    }
+    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
     collector.append(")");
     return collector;
   }

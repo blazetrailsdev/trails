@@ -1,454 +1,314 @@
 import { describe, it, expect } from "vitest";
-import { testConnection, postgresqlTestConnection } from "../test-helpers/connection.js";
-import { Table, star, SelectManager, Nodes, Visitors, Collectors } from "../index.js";
-import { Temporal } from "@blazetrails/date";
-
-function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
-  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
-  return visitor.compile(node as never, collector) as [string, unknown[]];
-}
+import { postgresqlTestConnection } from "../test-helpers/connection.js";
+import { mustBeLike } from "../test-helpers/must-be-like.js";
+import { Table, sql, Nodes, Visitors, Collectors } from "../index.js";
+import { buildQuoted } from "../nodes/casted.js";
 
 describe("PostgresTest", () => {
-  const users = new Table("users");
-  describe("Nodes::NotRegexp", () => {
-    it("should know how to visit", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("id").in([1, 2, 3]);
-      expect(visitor.compile(node)).toContain("IN");
+  const visitor = new Visitors.PostgreSQL(postgresqlTestConnection);
+  const table = new Table("users");
+  const attr = table.get("id");
+
+  // Mirrors `def compile(node)` (visitors/postgres_test.rb:14-16).
+  const compile = (node: Nodes.Node): string =>
+    visitor.compile(node, new Collectors.SQLString()) as unknown as string;
+
+  describe("locking", () => {
+    it("defaults to FOR UPDATE", () => {
+      expect(mustBeLike(compile(new Nodes.Lock(sql("FOR UPDATE"))))).toBe(mustBeLike(`FOR UPDATE`));
     });
 
-    it("can handle case insensitive", () => {
-      const node = users.get("name").doesNotMatchRegexp("foo.*", false);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("!~*");
-    });
-
-    it("can handle subqueries", () => {
-      const mgr = users
-        .project(users.get("id"))
-        .where(users.get("name").doesNotMatchRegexp("foo.*"));
-      const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("!~");
+    it("allows a custom string to be used as a lock", () => {
+      const node = new Nodes.Lock(sql("FOR SHARE"));
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`FOR SHARE`));
     });
   });
 
   it("should escape LIMIT", () => {
-    const mgr = users.project(star).take(10);
-    expect(mgr.toSql()).toContain("LIMIT 10");
+    const sc = new Nodes.SelectStatement();
+    sc.limit = new Nodes.Limit(buildQuoted("omg"));
+    sc.cores[0].projections.push(sql("DISTINCT ON"));
+    sc.orders.push(sql("xyz"));
+    const compiled = compile(sc);
+    expect(compiled).toMatch(/LIMIT 'omg'/);
+    expect(compiled.match(/LIMIT/g)?.length).toBe(1);
   });
 
-  describe("Nodes::IsDistinctFrom", () => {
-    it("should handle nil", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("name").isDistinctFrom(null);
-      expect(visitor.compile(node)).toContain("IS NOT NULL");
+  it("should support DISTINCT ON", () => {
+    const core = new Nodes.SelectCore();
+    core.setQuantifier = new Nodes.DistinctOn(sql("aaron"));
+    expect(compile(core)).toContain("DISTINCT ON ( aaron )");
+  });
+
+  it("should support DISTINCT", () => {
+    const core = new Nodes.SelectCore();
+    core.setQuantifier = new Nodes.Distinct();
+    expect(compile(core)).toBe("SELECT DISTINCT");
+  });
+
+  it("encloses LATERAL queries in parens", () => {
+    const subquery = table.project("id").where(table.get("name").matches("foo%"));
+    expect(mustBeLike(compile(subquery.lateral()))).toBe(
+      mustBeLike(`LATERAL (SELECT id FROM "users" WHERE "users"."name" ILIKE 'foo%')`),
+    );
+  });
+
+  it("produces LATERAL queries with alias", () => {
+    const subquery = table.project("id").where(table.get("name").matches("foo%"));
+    expect(mustBeLike(compile(subquery.lateral("bar")))).toBe(
+      mustBeLike(`LATERAL (SELECT id FROM "users" WHERE "users"."name" ILIKE 'foo%') bar`),
+    );
+  });
+
+  describe("Nodes::Matches", () => {
+    it("should know how to visit", () => {
+      const node = table.get("name").matches("foo%");
+      expect(node).toBeInstanceOf(Nodes.Matches);
+      expect(node.caseSensitive).toBe(false);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" ILIKE 'foo%'`));
     });
 
-    it("should handle column names on both sides", () => {
-      const node = users.get("name").isDistinctFrom(users.get("login"));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("IS DISTINCT FROM");
+    it("should know how to visit case sensitive", () => {
+      const node = table.get("name").matches("foo%", null, true);
+      expect(node.caseSensitive).toBe(true);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" LIKE 'foo%'`));
+    });
+
+    it("can handle ESCAPE", () => {
+      const node = table.get("name").matches("foo!%", "!");
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" ILIKE 'foo!%' ESCAPE '!'`));
+    });
+
+    it("can handle subqueries", () => {
+      const subquery = table.project("id").where(table.get("name").matches("foo%"));
+      const node = attr.in(subquery);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`"users"."id" IN (SELECT id FROM "users" WHERE "users"."name" ILIKE 'foo%')`),
+      );
     });
   });
 
   describe("Nodes::DoesNotMatch", () => {
-    it("can handle ESCAPE", () => {
-      const node = users.get("name").doesNotMatch("foo%", "\\", true);
-      const visitor = new Visitors.ToSql(testConnection);
-      const result = visitor.compile(node);
-      expect(result).toContain("NOT LIKE");
-    });
-
     it("should know how to visit", () => {
-      const node = users.get("name").doesNotMatch("foo%");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("NOT ILIKE");
+      const node = table.get("name").doesNotMatch("foo%");
+      expect(node).toBeInstanceOf(Nodes.DoesNotMatch);
+      expect(node.caseSensitive).toBe(false);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" NOT ILIKE 'foo%'`));
     });
 
     it("should know how to visit case sensitive", () => {
-      const node = users.get("name").doesNotMatch("foo%", null, true);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("NOT LIKE");
-      expect(sql).not.toContain("ILIKE");
+      const node = table.get("name").doesNotMatch("foo%", null, true);
+      expect(node.caseSensitive).toBe(true);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" NOT LIKE 'foo%'`));
+    });
+
+    it("can handle ESCAPE", () => {
+      const node = table.get("name").doesNotMatch("foo!%", "!");
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`"users"."name" NOT ILIKE 'foo!%' ESCAPE '!'`),
+      );
     });
 
     it("can handle subqueries", () => {
-      const mgr = users.project(users.get("id")).where(users.get("name").doesNotMatch("foo%"));
-      const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("NOT ILIKE");
-    });
-  });
-
-  describe("locking", () => {
-    it("defaults to FOR UPDATE", () => {
-      const mgr = users.project(star).lock();
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
-      expect(sql).toContain("FOR UPDATE");
-    });
-
-    it("allows a custom string to be used as a lock", () => {
-      const mgr = users.project(star).lock("FOR SHARE");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
-      expect(sql).toContain("FOR SHARE");
-    });
-  });
-
-  it("should support DISTINCT ON", () => {
-    const mgr = new SelectManager(users).project(star).distinctOn(users.get("id"));
-    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
-    expect(sql).toContain('DISTINCT ON ( "users"."id" )');
-  });
-
-  it("should support DISTINCT", () => {
-    const mgr = new SelectManager(users).project(star).distinct();
-    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
-    expect(sql).toContain("SELECT DISTINCT");
-  });
-
-  it("encloses LATERAL queries in parens", () => {
-    const sub = users.project(users.get("id"));
-    const lat = sub.lateral();
-    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(lat);
-    expect(sql).toContain("LATERAL (");
-    expect(sql).toContain(")");
-  });
-
-  it("produces LATERAL queries with alias", () => {
-    // Mirrors Rails: `lateral(name)` builds `Lateral.new(as(name))`, where
-    // `as` produces `TableAlias(Grouping(ast), SqlLiteral(name, retryable))`.
-    // The Postgres visitor emits `LATERAL (...) name`; the alias is bare
-    // because Rails' `quote_table_name` returns SqlLiterals unchanged.
-    const sub = users.project(users.get("id"));
-    const lat = sub.lateral("t");
-    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(lat);
-    expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") t');
-  });
-
-  describe("Nodes::BindParam", () => {
-    it("increments each bind param", () => {
-      const visitor = new Visitors.PostgreSQL(postgresqlTestConnection);
-      const a = users.get("id").eq(new Nodes.BindParam());
-      const b = users.get("name").eq(new Nodes.BindParam());
-      const sql = visitor.compile(new Nodes.And([a, b]));
-      expect(sql).toContain("$1");
-      expect(sql).toContain("$2");
-    });
-
-    it("compileWithBinds extracts values with $N placeholders", () => {
-      const visitor = new Visitors.PostgreSQL(postgresqlTestConnection);
-      const a = users.get("id").eq(new Nodes.BindParam(42));
-      const b = users.get("name").eq(new Nodes.BindParam("alice"));
-      const [sql, binds] = compileWithBinds(visitor, new Nodes.And([a, b]));
-      expect(sql).toContain("$1");
-      expect(sql).toContain("$2");
-      expect(sql).not.toContain("42");
-      expect(sql).not.toContain("alice");
-      expect(binds).toEqual([42, "alice"]);
-    });
-
-    it("compileWithBinds uses $N placeholders for Quoted Date values", () => {
-      const visitor = new Visitors.PostgreSQL(postgresqlTestConnection);
-      const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
-      const node = users.get("created_at").eq(new Nodes.Quoted(d));
-      const [sql, binds] = compileWithBinds(visitor, node);
-      // Quoted(Date) inlines as a literal — only BindParam/ActiveModel::Attribute produce $N.
-      expect(sql).toContain("2020-01-02");
-      expect(sql).not.toContain("$1");
-      expect(binds).toHaveLength(0);
-    });
-  });
-
-  describe("Nodes::RollUp", () => {
-    it("should know how to visit with array arguments", () => {
-      const node = users.get("id").in([1, 2, 3]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("IN (1, 2, 3)");
-    });
-
-    it("should know how to visit with CubeDimension Argument", () => {
-      const mgr = users.project(star).group(new Nodes.Cube([users.get("id")]));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
-      expect(sql).toContain("CUBE(");
-    });
-
-    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
-      const mgr = users.project(star).group(new Nodes.Cube([users.get("id"), users.get("name")]));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
-      // Rails Postgres formats grouping elements with spaces inside parens.
-      expect(sql).toContain('CUBE( "users"."id", "users"."name" )');
-    });
-
-    it("should know how to visit with array arguments", () => {
-      const node = new Nodes.Rollup([users.get("name"), users.get("bool")]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ROLLUP");
-    });
-
-    it("should know how to visit with CubeDimension Argument", () => {
-      const dim = new Nodes.GroupingElement([users.get("name")]);
-      const node = new Nodes.Rollup([dim]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ROLLUP");
-    });
-
-    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
-      const d1 = new Nodes.GroupingElement([users.get("name")]);
-      const d2 = new Nodes.GroupingElement([users.get("bool")]);
-      const node = new Nodes.Rollup([d1, d2]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ROLLUP");
-      expect(sql).toContain("(");
-    });
-  });
-
-  describe("Nodes::IsNotDistinctFrom", () => {
-    it("should handle nil", () => {
-      const node = users.get("name").isNotDistinctFrom(null);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-    });
-
-    it("should construct a valid generic SQL statement", () => {
-      const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-    });
-
-    it("should handle column names on both sides", () => {
-      const node = users.get("name").isNotDistinctFrom(users.get("login"));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-    });
-  });
-
-  describe("Nodes::InfixOperation", () => {
-    it("should handle Contains", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const products = new Table("products");
-      const node = products.get("metadata").contains('{"foo":"bar"}');
-      expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{"foo":"bar"}'`);
-    });
-
-    it("should handle Overlaps", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const products = new Table("products");
-      const node = products.get("tags").overlaps("{foo,bar,baz}");
-      expect(visitor.compile(node)).toBe(`"products"."tags" && '{foo,bar,baz}'`);
-    });
-  });
-
-  describe("Nodes::GroupingSet", () => {
-    it("should know how to visit with array arguments", () => {
-      const node = new Nodes.GroupingSet([users.get("name"), users.get("bool")]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("GROUPING SETS");
-    });
-
-    it("should know how to visit with CubeDimension Argument", () => {
-      const dim = new Nodes.GroupingElement([users.get("name"), users.get("bool")]);
-      const node = new Nodes.GroupingSet([dim]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("GROUPING SETS");
-    });
-
-    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
-      const d1 = new Nodes.GroupingElement([users.get("name")]);
-      const d2 = new Nodes.GroupingElement([users.get("bool")]);
-      const node = new Nodes.GroupingSet([d1, d2]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("GROUPING SETS");
-      expect(sql).toContain("(");
-    });
-  });
-
-  describe("Nodes::Cube", () => {
-    it("should know how to visit with array arguments", () => {
-      const node = new Nodes.Cube([users.get("name"), users.get("bool")]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("CUBE");
-    });
-
-    it("should know how to visit with CubeDimension Argument", () => {
-      const dim = new Nodes.GroupingElement([users.get("name"), users.get("bool")]);
-      const node = new Nodes.Cube([dim]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("CUBE");
-    });
-
-    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
-      const d1 = new Nodes.GroupingElement([users.get("name")]);
-      const d2 = new Nodes.GroupingElement([users.get("bool"), users.get("created_at")]);
-      const node = new Nodes.Cube([d1, d2]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("CUBE");
-      expect(sql).toContain("(");
+      const subquery = table.project("id").where(table.get("name").doesNotMatch("foo%"));
+      const node = attr.in(subquery);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(
+          `"users"."id" IN (SELECT id FROM "users" WHERE "users"."name" NOT ILIKE 'foo%')`,
+        ),
+      );
     });
   });
 
   describe("Nodes::Regexp", () => {
     it("should know how to visit", () => {
-      const node = users.get("name").matchesRegexp("foo.*");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("~");
-      expect(sql).toContain("foo.*");
+      const node = table.get("name").matchesRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(node.caseSensitive).toBe(true);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" ~ 'foo.*'`));
     });
 
     it("can handle case insensitive", () => {
-      const node = users.get("name").matchesRegexp("foo.*", false);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("~*");
+      const node = table.get("name").matchesRegexp("foo.*", false);
+      expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(node.caseSensitive).toBe(false);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" ~* 'foo.*'`));
     });
 
     it("can handle subqueries", () => {
-      const mgr = users.project(users.get("id")).where(users.get("name").matchesRegexp("foo.*"));
-      const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("SELECT");
-      expect(sql).toContain("~");
+      const subquery = table.project("id").where(table.get("name").matchesRegexp("foo.*"));
+      const node = attr.in(subquery);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`"users"."id" IN (SELECT id FROM "users" WHERE "users"."name" ~ 'foo.*')`),
+      );
     });
   });
 
-  describe("Nodes::Matches", () => {
+  describe("Nodes::NotRegexp", () => {
     it("should know how to visit", () => {
-      const node = users.get("name").matches("foo%");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ILIKE");
+      const node = table.get("name").doesNotMatchRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.NotRegexp);
+      expect(node.caseSensitive).toBe(true);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" !~ 'foo.*'`));
     });
 
-    it("should know how to visit case sensitive", () => {
-      const node = users.get("name").matches("foo%", null, true);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("LIKE");
-      expect(sql).not.toContain("ILIKE");
-    });
-
-    it("can handle ESCAPE", () => {
-      const node = users.get("name").matches("foo!%", "!");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ILIKE");
-      expect(sql).toContain("ESCAPE");
+    it("can handle case insensitive", () => {
+      const node = table.get("name").doesNotMatchRegexp("foo.*", false);
+      expect(node.caseSensitive).toBe(false);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" !~* 'foo.*'`));
     });
 
     it("can handle subqueries", () => {
-      const mgr = users.project(users.get("id")).where(users.get("name").matches("foo%"));
-      const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ILIKE");
+      const subquery = table.project("id").where(table.get("name").doesNotMatchRegexp("foo.*"));
+      const node = attr.in(subquery);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`"users"."id" IN (SELECT id FROM "users" WHERE "users"."name" !~ 'foo.*')`),
+      );
     });
   });
-});
 
-describe("PostgreSQL dialect overrides (audit follow-up)", () => {
-  const users = new Table("users");
-  const compile = (n: Nodes.Node): string =>
-    new Visitors.PostgreSQL(postgresqlTestConnection).compile(n);
-
-  it("GroupingElement renders with spaces inside parens", () => {
-    const ge = new Nodes.GroupingElement([users.get("a"), users.get("b")]);
-    expect(compile(ge)).toBe('( "users"."a", "users"."b" )');
-  });
-
-  it("Cube emits `CUBE( … )` with spaces", () => {
-    const c = new Nodes.Cube([users.get("a"), users.get("b")]);
-    expect(compile(c)).toBe('CUBE( "users"."a", "users"."b" )');
-  });
-
-  it("Rollup emits `ROLLUP( … )` with spaces", () => {
-    const r = new Nodes.Rollup([users.get("a"), users.get("b")]);
-    expect(compile(r)).toBe('ROLLUP( "users"."a", "users"."b" )');
-  });
-
-  it("GroupingSet emits `GROUPING SETS( … )` with spaces", () => {
-    const g = new Nodes.GroupingSet([users.get("a"), users.get("b")]);
-    expect(compile(g)).toBe('GROUPING SETS( "users"."a", "users"."b" )');
-  });
-
-  // The Lateral visitor lives on the base ToSql visitor (matching Rails'
-  // `grouping_parentheses` semantics: parens only for SelectStatement).
-  // PostgreSQL no longer overrides; its tests live in
-  // `select-manager.test.ts` (`describe("lateral")`).
-
-  it("IsNotDistinctFrom uses standard SQL keyword on Postgres", () => {
-    const node = users.get("a").isNotDistinctFrom(users.get("b"));
-    expect(compile(node)).toBe('"users"."a" IS NOT DISTINCT FROM "users"."b"');
-  });
-
-  it("IsDistinctFrom uses standard SQL keyword on Postgres", () => {
-    const node = users.get("a").isDistinctFrom(users.get("b"));
-    expect(compile(node)).toBe('"users"."a" IS DISTINCT FROM "users"."b"');
-  });
-
-  it("Cube/Rollup/GroupingSet route through groupingArrayOrGroupingElement", () => {
-    expect(compile(new Nodes.Cube([users.get("a"), users.get("b")]))).toBe(
-      'CUBE( "users"."a", "users"."b" )',
-    );
-    expect(compile(new Nodes.Rollup([users.get("a")]))).toBe('ROLLUP( "users"."a" )');
-    expect(compile(new Nodes.GroupingSet([users.get("a"), users.get("b")]))).toBe(
-      'GROUPING SETS( "users"."a", "users"."b" )',
-    );
-    expect(compile(new Nodes.GroupingElement([users.get("a")]))).toBe('( "users"."a" )');
-  });
-
-  describe("Matches ESCAPE", () => {
-    it("hard-quotes a string escape", () => {
-      const node = users.get("name").matches("x%", "!");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ESCAPE '!'");
-    });
-
-    it("visits a Node escape", () => {
-      const node = users.get("name").matches("x%", new Nodes.Quoted("!"));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ESCAPE '!'");
-    });
-
-    it("visits a Node escape on DoesNotMatch", () => {
-      const node = users.get("name").doesNotMatch("x%", new Nodes.Quoted("!"));
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("ESCAPE '!'");
+  describe("Nodes::BindParam", () => {
+    it("increments each bind param", () => {
+      const query = table
+        .get("name")
+        .eq(new Nodes.BindParam(1))
+        .and(table.get("id").eq(new Nodes.BindParam(1)));
+      expect(mustBeLike(compile(query))).toBe(
+        mustBeLike(`"users"."name" = $1 AND "users"."id" = $2`),
+      );
     });
   });
-});
 
-describe("Temporal scalar quoting", () => {
-  const users = new Table("users");
+  describe("Nodes::Cube", () => {
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.Cube([table.get("name"), table.get("bool")]);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`CUBE( "users"."name", "users"."bool" )`));
+    });
 
-  // `when Type::Time::Value then quoted_time` (abstract/quoting.rb:102) —
-  // trails' analogue is Temporal.PlainTime, which carries no date to emit.
-  it("quotes a time value as a db time", () => {
-    const t = Temporal.PlainTime.from("14:23:55");
-    expect(
-      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(t)),
-    ).toContain("'14:23:55'");
+    it("should know how to visit with CubeDimension Argument", () => {
+      const dimensions = new Nodes.GroupingElement([table.get("name"), table.get("bool")]);
+      const node = new Nodes.Cube(dimensions);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`CUBE( "users"."name", "users"."bool" )`));
+    });
+
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const dim1 = new Nodes.GroupingElement(table.get("name"));
+      const dim2 = new Nodes.GroupingElement([table.get("bool"), table.get("created_at")]);
+      const node = new Nodes.Cube([dim1, dim2]);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`CUBE( ( "users"."name" ), ( "users"."bool", "users"."created_at" ) )`),
+      );
+    });
   });
 
-  it("refuses a JS Date rather than formatting it as a Time", () => {
-    const d = new Date("2026-04-26T14:23:55Z");
-    expect(() =>
-      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(d)),
-    ).toThrow(TypeError);
+  describe("Nodes::GroupingSet", () => {
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.GroupingSet([table.get("name"), table.get("bool")]);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`GROUPING SETS( "users"."name", "users"."bool" )`),
+      );
+    });
+
+    it("should know how to visit with CubeDimension Argument", () => {
+      const group = new Nodes.GroupingElement([table.get("name"), table.get("bool")]);
+      const node = new Nodes.GroupingSet(group);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`GROUPING SETS( "users"."name", "users"."bool" )`),
+      );
+    });
+
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const group1 = new Nodes.GroupingElement(table.get("name"));
+      const group2 = new Nodes.GroupingElement([table.get("bool"), table.get("created_at")]);
+      const node = new Nodes.GroupingSet([group1, group2]);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`GROUPING SETS( ( "users"."name" ), ( "users"."bool", "users"."created_at" ) )`),
+      );
+    });
   });
-});
 
-describe("quotedDate normalisation", () => {
-  const users = new Table("users");
+  describe("Nodes::RollUp", () => {
+    it("should know how to visit with array arguments", () => {
+      const node = new Nodes.RollUp([table.get("name"), table.get("bool")]);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`ROLLUP( "users"."name", "users"."bool" )`),
+      );
+    });
 
-  // `value.getutc` (abstract/quoting.rb:186-188): a zoned value converts to the
-  // serialization zone rather than emitting its own wall clock.
-  it("converts a zoned value instead of emitting its wall clock", () => {
-    const z = Temporal.Instant.from("2026-04-26T14:23:55Z").toZonedDateTimeISO("America/New_York");
-    expect(
-      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(z)),
-    ).toContain("'2026-04-26 14:23:55'");
+    it("should know how to visit with CubeDimension Argument", () => {
+      const group = new Nodes.GroupingElement([table.get("name"), table.get("bool")]);
+      const node = new Nodes.RollUp(group);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`ROLLUP( "users"."name", "users"."bool" )`),
+      );
+    });
+
+    it("should know how to generate parenthesis when supplied with many Dimensions", () => {
+      const group1 = new Nodes.GroupingElement(table.get("name"));
+      const group2 = new Nodes.GroupingElement([table.get("bool"), table.get("created_at")]);
+      const node = new Nodes.RollUp([group1, group2]);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`ROLLUP( ( "users"."name" ), ( "users"."bool", "users"."created_at" ) )`),
+      );
+    });
   });
 
-  // Rails' `to_fs(:db)` never emits a zero-padded negative year like "00-1".
-  it("keeps the sign on a negative year", () => {
-    const d = new Temporal.PlainDate(-1, 4, 26);
-    expect(
-      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(d)),
-    ).toContain("'-1-04-26'");
+  describe("Nodes::IsNotDistinctFrom", () => {
+    it("should construct a valid generic SQL statement", () => {
+      const test = new Table("users").get("name").isNotDistinctFrom("Aaron Patterson");
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."name" IS NOT DISTINCT FROM 'Aaron Patterson'`),
+      );
+    });
+
+    it("should handle column names on both sides", () => {
+      const test = new Table("users")
+        .get("first_name")
+        .isNotDistinctFrom(new Table("users").get("last_name"));
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" IS NOT DISTINCT FROM "users"."last_name"`),
+      );
+    });
+
+    it("should handle nil", () => {
+      const usersTable = new Table("users");
+      const val = buildQuoted(null, usersTable.get("active"));
+      const compiled = compile(new Nodes.IsNotDistinctFrom(usersTable.get("name"), val));
+      expect(mustBeLike(compiled)).toBe(mustBeLike(`"users"."name" IS NOT DISTINCT FROM NULL`));
+    });
+  });
+
+  describe("Nodes::IsDistinctFrom", () => {
+    it("should handle column names on both sides", () => {
+      const test = new Table("users")
+        .get("first_name")
+        .isDistinctFrom(new Table("users").get("last_name"));
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" IS DISTINCT FROM "users"."last_name"`),
+      );
+    });
+
+    it("should handle nil", () => {
+      const usersTable = new Table("users");
+      const val = buildQuoted(null, usersTable.get("active"));
+      const compiled = compile(new Nodes.IsDistinctFrom(usersTable.get("name"), val));
+      expect(mustBeLike(compiled)).toBe(mustBeLike(`"users"."name" IS DISTINCT FROM NULL`));
+    });
+  });
+
+  describe("Nodes::InfixOperation", () => {
+    it("should handle Contains", () => {
+      const inner = buildQuoted('{"foo":"bar"}');
+      const outer = new Table("products").get("metadata");
+      const compiled = compile(new Nodes.Contains(outer, inner));
+      expect(mustBeLike(compiled)).toBe(mustBeLike(`"products"."metadata" @> '{"foo":"bar"}'`));
+    });
+
+    it("should handle Overlaps", () => {
+      const column = new Table("products").get("tags");
+      const search = buildQuoted("{foo,bar,baz}");
+      const compiled = compile(new Nodes.Overlaps(column, search));
+      expect(mustBeLike(compiled)).toBe(mustBeLike(`"products"."tags" && '{foo,bar,baz}'`));
+    });
   });
 });

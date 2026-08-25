@@ -55,15 +55,15 @@ describe("Unary reparenting (Rails fidelity)", () => {
       expect(ge.expr).toEqual([a, b]);
     });
 
-    it("expressions getter returns expr (back-compat)", () => {
-      const ge = new Nodes.GroupingElement([new Nodes.Quoted(1)]);
-      expect(ge.expressions).toBe(ge.expr);
-    });
-
-    it("normalises a single Node into an array (preserved behaviour)", () => {
+    it("keeps a bare Node in expr (Rails: no array coercion)", () => {
       const single = new Nodes.Quoted(1);
       const ge = new Nodes.GroupingElement(single);
-      expect(ge.expressions).toEqual([single]);
+      expect(ge.expr).toBe(single);
+    });
+
+    it("Cube does not inherit from GroupingElement (Rails: both are Unary)", () => {
+      const cube = new Nodes.Cube([new Nodes.Quoted(1)]);
+      expect(cube).not.toBeInstanceOf(Nodes.GroupingElement);
     });
   });
 

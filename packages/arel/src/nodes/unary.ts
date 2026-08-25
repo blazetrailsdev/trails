@@ -43,24 +43,15 @@ export class Lateral extends Unary {
   }
 }
 
-// Mirrors Rails: `GroupingElement < Unary` (unary.rb). Children live in the
-// inherited `expr` slot — Rails' visitors read `o.expr` (postgresql.rb).
-// `expressions` is preserved as a getter for back-compat with the existing
-// Trails visitor accessors. Trails always normalises to an array; Rails'
-// `grouping_array_or_grouping_element` then branches on `is_a? Array`.
-export class GroupingElement extends Unary {
-  declare readonly expr: Node[];
-  constructor(expressions: Node | Node[]) {
-    super(Array.isArray(expressions) ? expressions : [expressions]);
-  }
-  get expressions(): Node[] {
-    return this.expr;
-  }
-}
-
-export class Cube extends GroupingElement {}
-export class RollUp extends GroupingElement {}
-export class GroupingSet extends GroupingElement {}
+// Mirrors Rails: `Cube`, `GroupingElement`, `GroupingSet` and `RollUp` are
+// each `Class.new(Unary)` (unary.rb:25-42). Children live in the inherited
+// `expr` slot — the visitors read `o.expr` (postgresql.rb:44) and
+// `grouping_array_or_grouping_element` branches on `o.expr.is_a? Array`
+// (postgresql.rb:88-96), so `expr` keeps whatever the caller passed.
+export class GroupingElement extends Unary {}
+export class Cube extends Unary {}
+export class RollUp extends Unary {}
+export class GroupingSet extends Unary {}
 
 /** @deprecated Use RollUp (Rails casing) */
 export const Rollup = RollUp;
