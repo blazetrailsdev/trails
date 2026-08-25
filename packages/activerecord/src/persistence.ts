@@ -1414,6 +1414,7 @@ type PersistenceInstanceChainHost = {
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
   _attributes: any;
+  attributeNames(): string[];
   readAttribute(name: string): unknown;
   isWillSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
