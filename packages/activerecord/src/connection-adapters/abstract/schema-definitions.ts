@@ -1723,6 +1723,9 @@ export class Table {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
+    if (Object.keys(options).length === 0) {
+      return this._schema.indexExists(this.name, columnName);
+    }
     return this._schema.indexExists(this.name, columnName, options);
   }
 
@@ -1803,6 +1806,9 @@ export class Table {
   }
 
   async foreignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
+    if (toTableOrOptions === undefined) {
+      return this._schema.foreignKeyExists(this.name);
+    }
     return this._schema.foreignKeyExists(this.name, toTableOrOptions);
   }
 
@@ -1832,6 +1838,9 @@ export class Table {
   async checkConstraintExists(
     options: { name?: string; expression?: string } = {},
   ): Promise<boolean> {
+    if (Object.keys(options).length === 0) {
+      return this._schema.checkConstraintExists(this.name);
+    }
     return this._schema.checkConstraintExists(this.name, options);
   }
 

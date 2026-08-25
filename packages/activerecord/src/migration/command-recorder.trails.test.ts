@@ -128,9 +128,6 @@ describe("CommandRecorder", () => {
     });
 
     it("forwarders record no trailing options hash when the splat is empty", async () => {
-      // Ruby's `**options` passes no argument at all when the hash is empty
-      // (schema_definitions.rb:829, :756, :786, :852), and CommandRecorder
-      // stores the arguments verbatim.
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.changeTable("fruits", async (t) => {
         await t.remove("name");
