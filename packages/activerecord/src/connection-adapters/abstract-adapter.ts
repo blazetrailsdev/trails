@@ -769,7 +769,7 @@ export interface AbstractAdapter {
    * renders `arel` via `to_sql(arel, binds)` before executing, so the base
    * input is an Arel node/AST (`unknown`), not a pre-rendered SQL string.
    */
-  explain(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
+  explain?(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#dump_schema_information
