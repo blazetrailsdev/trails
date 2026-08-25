@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "./test-helpers/connection.js";
+import { fakeRecordConnection } from "./test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "./index.js";
 
 describe("Math", () => {
   const users = new Table("users");
-  const visitor = new Visitors.ToSql(testConnection);
+  const visitor = new Visitors.ToSql(fakeRecordConnection);
 
   describe("operands pass through raw (no Quoted wrapper)", () => {
     const arg = new Nodes.SqlLiteral("42");

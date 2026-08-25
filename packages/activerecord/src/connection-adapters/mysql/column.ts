@@ -22,7 +22,7 @@ export class Column extends BaseColumn {
       limit?: number | null;
       precision?: number | null;
       scale?: number | null;
-      extra?: string;
+      extra?: string | null;
     } = {},
     null_: boolean = true,
     options: {
@@ -60,8 +60,8 @@ export class Column extends BaseColumn {
    *
    *  Mirrors: `delegate :extra, to: :sql_type_metadata, allow_nil: true`
    *  (mysql/column.rb:7). */
-  get extra(): string {
-    return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? "";
+  get extra(): string | null {
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? null;
   }
 
   /**

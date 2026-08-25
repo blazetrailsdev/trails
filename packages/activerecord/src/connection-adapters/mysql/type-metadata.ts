@@ -17,7 +17,7 @@ import {
 /** The `class`-tagged payload `toJSON` writes, so `extra` survives the
  *  schema-cache round trip the way Ruby's YAML tag carries it. */
 export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
-  extra: string;
+  extra: string | null;
 }
 
 /**
@@ -27,7 +27,7 @@ export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
  * `__getobj__`.
  */
 export class TypeMetadata extends SqlTypeMetadata {
-  readonly extra: string;
+  readonly extra: string | null;
 
   constructor(
     typeMetadata: {
@@ -37,13 +37,15 @@ export class TypeMetadata extends SqlTypeMetadata {
       precision?: number | null;
       scale?: number | null;
     },
-    options: { extra?: string } = {},
+    options: { extra?: string | null } = {},
   ) {
     // Rails' MySQL TypeMetadata delegates `type` to the wrapped
     // SqlTypeMetadata, which is nil for an unmapped sql_type — no sqlType
     // fallback. Keep it nil-faithful.
     super(typeMetadata);
-    this.extra = options.extra ?? "";
+    // `def initialize(type_metadata, extra: nil)` (mysql/type_metadata.rb:13-16) —
+    // `nil` where none was given, not a `""` stand-in.
+    this.extra = options.extra ?? null;
   }
 
   override equals(other: unknown): boolean {

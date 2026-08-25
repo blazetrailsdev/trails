@@ -2,6 +2,28 @@ import { Type } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 import { RuntimeError } from "./attribute-assignment.js";
+import { isDuplicable } from "@blazetrails/activesupport";
+
+/**
+ * Ruby `Object#dup` on the memoized cast value — the shallow copy
+ * `@value = @value.dup` makes in `Attribute#initialize_dup`
+ * (attribute.rb:155-157). Ruby's immutable-ish scalars are already immutable in
+ * JS, so only the mutable built-ins need a copy. Not exported: Ruby gets `dup`
+ * from Object, so it is not part of Attribute's surface.
+ */
+function dupValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.slice();
+  if (value instanceof Map) return new Map(value);
+  if (value instanceof Set) return new Set(value);
+  if (typeof value === "object" && value !== null) {
+    // A copy is only safe for a plain object: a built-in with internal slots
+    // (Temporal, BigDecimal) throws on a slot-less clone, and every such value
+    // in a cast attribute is immutable anyway, so Ruby's `dup` of it is unobservable.
+    const proto = Object.getPrototypeOf(value) as object | null;
+    if (proto === Object.prototype || proto === null) return { ...value };
+  }
+  return value;
+}
 
 /**
  * Symbol so identity comparisons work across module copies and can't collide with any user value.
@@ -229,6 +251,27 @@ export abstract class Attribute {
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
     return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
+  }
+
+  /**
+   * `Object#deep_dup` for an Attribute — `duplicable? ? dup : self`
+   * (activesupport/lib/active_support/core_ext/object/deep_dup.rb:16), which is
+   * what `attributes.transform_values(&:deep_dup)` reaches
+   * (attribute_set.rb:72-74). Ruby's `dup` shallow-copies every ivar and then
+   * runs {@link initializeDup}, so `@original_attribute` is carried into the
+   * copy by reference.
+   */
+  deepDup(): Attribute {
+    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
+    dup.initializeDup(this);
+    return dup;
+  }
+
+  /** Mirrors: `def initialize_dup(other)` (attribute.rb:155-157). */
+  private initializeDup(_other: Attribute): void {
+    if (this._hasValue && isDuplicable(this._value)) {
+      this._value = dupValue(this._value);
+    }
   }
 
   /**

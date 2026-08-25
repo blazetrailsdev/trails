@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Arel::Nodes::OverTest", () => {
@@ -7,7 +7,7 @@ describe("Arel::Nodes::OverTest", () => {
   describe("as", () => {
     it("should alias the expression", () => {
       const over = users.get("id").count().over().as("foo");
-      expect(new Visitors.ToSql(testConnection).compile(over)).toBe(
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(over)).toBe(
         'COUNT("users"."id") OVER () AS foo',
       );
     });
@@ -16,7 +16,9 @@ describe("Arel::Nodes::OverTest", () => {
   describe("with SQL literal", () => {
     it("should reference the window definition by name", () => {
       const over = users.get("id").count().over(new Nodes.SqlLiteral("foo"));
-      expect(new Visitors.ToSql(testConnection).compile(over)).toBe('COUNT("users"."id") OVER foo');
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(over)).toBe(
+        'COUNT("users"."id") OVER foo',
+      );
     });
   });
 
@@ -24,7 +26,7 @@ describe("Arel::Nodes::OverTest", () => {
     it("should use empty definition", () => {
       const fn = new Nodes.NamedFunction("ROW_NUMBER", []);
       const over = new Nodes.Over(fn);
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       expect(visitor.compile(over)).toBe("ROW_NUMBER() OVER ()");
     });
   });
@@ -35,7 +37,7 @@ describe("Arel::Nodes::OverTest", () => {
       const w = new Nodes.Window();
       w.partition(users.get("department_id"));
       const over = new Nodes.Over(fn, w);
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const result = visitor.compile(over);
       expect(result).toContain("SUM");
       expect(result).toContain("PARTITION BY");
@@ -58,7 +60,9 @@ describe("Arel::Nodes::OverTest", () => {
 
   describe("with literal", () => {
     it("should reference the window definition by name", () => {
-      const sql = new Visitors.ToSql(testConnection).compile(users.get("id").count().over("foo"));
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
+        users.get("id").count().over("foo"),
+      );
       expect(sql).toBe('COUNT("users"."id") OVER "foo"');
     });
   });

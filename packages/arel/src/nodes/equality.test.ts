@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Arel", () => {
@@ -67,7 +67,7 @@ describe("Arel", () => {
         it("takes an engine", () => {
           const attr = users.get("id");
           const test = attr.eq(10);
-          const sql = new Visitors.ToSql(testConnection).compile(test);
+          const sql = new Visitors.ToSql(fakeRecordConnection).compile(test);
           expect(sql).toContain('"users"."id"');
           expect(sql).toContain("10");
         });

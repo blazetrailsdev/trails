@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Arel::Nodes::CountTest", () => {
@@ -8,7 +8,7 @@ describe("Arel::Nodes::CountTest", () => {
     it("should alias the count", () => {
       const count = users.get("id").count();
       const aliased = count.as("user_count");
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       expect(visitor.compile(aliased)).toBe('COUNT("users"."id") AS user_count');
     });
   });

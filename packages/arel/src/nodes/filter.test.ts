@@ -1,15 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("FilterTest", () => {
   const users = new Table("users");
   describe("Filter", () => {
     it("should add filter to expression", () => {
-      const count = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-      const filter = new Nodes.Filter(count, users.get("active").eq(true));
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(filter)).toBe('COUNT(*) FILTER (WHERE "users"."active" = TRUE)');
+      const count = users.get("id").count();
+      const filter = new Nodes.Filter(count, users.get("income").gteq(40000));
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
+      expect(visitor.compile(filter)).toBe(
+        'COUNT("users"."id") FILTER (WHERE "users"."income" >= 40000)',
+      );
     });
 
     it("should alias the expression", () => {
@@ -24,7 +26,7 @@ describe("FilterTest", () => {
       const w = new Nodes.Window();
       w.order(users.get("id").asc());
       const over = new Nodes.Over(fn, w);
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const result = visitor.compile(over);
       expect(result).toContain("OVER");
       expect(result).toContain("ORDER BY");
@@ -37,7 +39,7 @@ describe("FilterTest", () => {
         const window = new Nodes.Window();
         window.partition(users.get("year"));
         const over = new Nodes.Over(filter, window);
-        const sql = new Visitors.ToSql(testConnection).compile(over);
+        const sql = new Visitors.ToSql(fakeRecordConnection).compile(over);
         expect(sql).toContain("FILTER");
         expect(sql).toContain("OVER");
         expect(sql).toContain("PARTITION BY");
@@ -49,7 +51,7 @@ describe("FilterTest", () => {
         const count = users.get("id").count();
         const filter = new Nodes.Filter(count, users.get("income").gteq(40000));
         const aliased = filter.as("rich_users_count");
-        const sql = new Visitors.ToSql(testConnection).compile(aliased);
+        const sql = new Visitors.ToSql(fakeRecordConnection).compile(aliased);
         expect(sql).toContain("FILTER");
         expect(sql).toContain("AS rich_users_count");
       });

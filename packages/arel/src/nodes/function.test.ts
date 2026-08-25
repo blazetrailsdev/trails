@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 import { SqlLiteral } from "./sql-literal.js";
 
@@ -67,7 +67,7 @@ describe("Arel::Nodes::ExistsTest", () => {
   it("renders EXISTS(subquery) correctly", () => {
     const inner = users.project(users.get("id")).ast;
     const node = new Nodes.Exists(inner);
-    const sql = new Visitors.ToSql(testConnection).compile(node);
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
     expect(sql).toBe('EXISTS (SELECT "users"."id" FROM "users")');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors, Collectors } from "../index.js";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
@@ -33,7 +33,7 @@ describe("MatchesTest", () => {
     it("inlines a string escape literal even in bind-extraction mode", async () => {
       const { Visitors } = await import("../index.js");
       const node = users.get("name").matches("x%", "!");
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const [sql] = compileWithBinds(visitor, node);
       expect(sql).toContain("ESCAPE '!'");
       expect(sql).not.toContain("ESCAPE ?");

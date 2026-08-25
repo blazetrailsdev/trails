@@ -9,7 +9,11 @@ import {
   Visitors,
   EmptyJoinError,
 } from "./index.js";
-import { testConnection, mysqlTestConnection } from "./test-helpers/connection.js";
+import {
+  testConnection,
+  fakeRecordConnection,
+  mysqlTestConnection,
+} from "./test-helpers/connection.js";
 
 describe("TableTest", () => {
   const users = new Table("users");
@@ -295,7 +299,7 @@ describe("TableTest", () => {
       const aliased = users.alias("u");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect(aliased.relation).toBe(users);
-      const sql = new Visitors.ToSql(testConnection).compile(aliased.get("id"));
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(aliased.get("id"));
       expect(sql).toBe('"u"."id"');
     });
   });
@@ -318,7 +322,7 @@ describe("TableTest", () => {
       const aliased = users.alias("u");
       const attr = users.get("id", aliased);
       expect(attr.relation).toBe(aliased);
-      expect(new Visitors.ToSql(testConnection).compile(attr)).toBe('"u"."id"');
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(attr)).toBe('"u"."id"');
     });
   });
 

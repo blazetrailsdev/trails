@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "./test-helpers/connection.js";
+import { fakeRecordConnection } from "./test-helpers/connection.js";
 import { Table, Nodes, Visitors, Collectors } from "./index.js";
 
 const users = new Table("users");
-const compile = (n: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(n);
+const compile = (n: Nodes.Node): string => new Visitors.ToSql(fakeRecordConnection).compile(n);
 
 describe("Attribute aggregates return typed Function subclasses", () => {
   it("count compiles to COUNT(...) and is a Count", () => {
@@ -96,7 +96,7 @@ describe("Per-class `as(name)` marks the alias SqlLiteral as retryable", () => {
   // collector.retryable to false.
 
   const collectorIsRetryableAfter = (n: Nodes.Node): boolean =>
-    new Visitors.ToSql(testConnection).accept(n, new Collectors.SQLString()).retryable;
+    new Visitors.ToSql(fakeRecordConnection).accept(n, new Collectors.SQLString()).retryable;
 
   it("Attribute#as keeps the collector retryable", () => {
     expect(collectorIsRetryableAfter(users.get("id").as("aliased"))).toBe(true);

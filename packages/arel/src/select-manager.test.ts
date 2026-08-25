@@ -15,7 +15,7 @@ import { mustBeLike } from "./test-helpers/must-be-like.js";
 describe("SelectManagerTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-  const visitor = new Visitors.ToSql(testConnection);
+  const visitor = new Visitors.ToSql(fakeRecordConnection);
   it("join sources", () => {
     const manager = new SelectManager();
     manager.joinSources().push(new Nodes.StringJoin(new Nodes.Quoted("foo")));
@@ -375,7 +375,7 @@ describe("SelectManagerTest", () => {
     it("minus aliases except", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
-      expect(new Visitors.ToSql(testConnection).compile(q1.minus(q2))).toContain("EXCEPT");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(q1.minus(q2))).toContain("EXCEPT");
     });
   });
 
@@ -1262,7 +1262,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager(users).project(users.get("id"));
       const lat = mgr.lateral();
       expect(lat).toBeInstanceOf(Nodes.Lateral);
-      const sql = new Visitors.PostgreSQL(testConnection).compile(lat);
+      const sql = new Visitors.PostgreSQL(fakeRecordConnection).compile(lat);
       expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users")');
     });
 
@@ -1274,7 +1274,7 @@ describe("SelectManagerTest", () => {
       const lat = mgr.lateral("u");
       expect(lat).toBeInstanceOf(Nodes.Lateral);
       expect(lat.expr).toBeInstanceOf(Nodes.TableAlias);
-      const sql = new Visitors.PostgreSQL(testConnection).compile(lat);
+      const sql = new Visitors.PostgreSQL(fakeRecordConnection).compile(lat);
       expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") u');
     });
   });

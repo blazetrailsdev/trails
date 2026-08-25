@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Arel::Nodes::SumTest", () => {
@@ -8,7 +8,7 @@ describe("Arel::Nodes::SumTest", () => {
     it("should alias the sum", () => {
       const sum = users.get("age").sum();
       const aliased = sum.as("total_age");
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       expect(visitor.compile(aliased)).toBe('SUM("users"."age") AS total_age');
     });
   });
