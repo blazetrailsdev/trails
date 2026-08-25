@@ -53,7 +53,7 @@ describe("Serialization — trails-only coverage", () => {
         this.attribute("name", "string");
       }
       get name(): string {
-        return "OVERRIDE:" + (this._readAttribute("name") as string);
+        return "OVERRIDE:" + (this.attribute("name") as string);
       }
     }
     const p = new Person({ name: "Bob" });
@@ -282,7 +282,7 @@ describe("Serialization — trails-only coverage", () => {
       }
       const w = new Weird({ toJSON: "raw-value", name: "w" });
       expect(JSON.parse(JSON.stringify(w))).toEqual({ toJSON: "raw-value", name: "w" });
-      expect(w._readAttribute("toJSON")).toBe("raw-value");
+      expect(w.attribute("toJSON")).toBe("raw-value");
     });
 
     it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
