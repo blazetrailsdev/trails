@@ -11,6 +11,7 @@
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
+import type { MigrationCommand } from "../../migration/command-recorder.js";
 import { ArgumentError, type Type } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
 import {
@@ -1803,7 +1804,7 @@ export class SchemaStatements {
     return this.supportsForeignKeys() && this.isForeignKeysEnabled();
   }
 
-  async bulkChangeTable(tableName: string, operations: Array<[string, unknown[]]>): Promise<void> {
+  async bulkChangeTable(tableName: string, operations: MigrationCommand[]): Promise<void> {
     const sqlFragments: string[] = [];
     const nonCombinable: Array<() => Promise<void>> = [];
 
