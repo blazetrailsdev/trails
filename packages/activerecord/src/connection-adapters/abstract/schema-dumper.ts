@@ -135,10 +135,6 @@ export class SchemaDumper extends BaseSchemaDumper {
     if (this.isBigint(column)) return undefined;
     const limit = column.limit;
     if (limit == null) return undefined;
-    // Rails: `limit.inspect if limit && limit != @connection.native_database_types[column.type][:limit]`
-    // (abstract/schema_dumper.rb:64). A raw/mock source has no adapter and so no
-    // type map to compare against; it then dumps the limit, as Rails does for a
-    // type whose native entry carries no `:limit`.
     if (limit === this._nativeTypeLimit(column)) return undefined;
     return String(limit);
   }
