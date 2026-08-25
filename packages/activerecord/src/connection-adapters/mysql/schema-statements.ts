@@ -406,11 +406,19 @@ export async function newColumnFromField(
     [def, defFn] = [null, def];
   }
 
+  // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) wraps
+  // `Column.new` itself, so every constructed column goes through the registry
+  // (`deduplicable.rb:18`). TS cannot mirror that on the class: a base
+  // constructor returning the deduplicated instance freezes it before the
+  // subclass assigns its own fields, so `new SQLite3::Column(...)` would throw
+  // `Cannot add property _generatedType, object is not extensible`. Ruby has no
+  // such split — `new` wraps allocate+initialize for the most-derived class —
+  // so the hook fires here instead, on the fully-built object.
   return new Column(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
     comment: presence(field["Comment"] as string | undefined) ?? null,
-  });
+  }).deduplicate();
 }
 
 /** @internal */

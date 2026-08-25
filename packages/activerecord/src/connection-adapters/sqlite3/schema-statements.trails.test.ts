@@ -248,8 +248,13 @@ describe("SQLite3::SchemaStatements", () => {
     });
 
     it("marks generated stored columns", () => {
+      // Distinct column name from the virtual case above: `Column.new` now goes
+      // through the Deduplicable registry (`deduplicable.rb:13-18`), and
+      // `SQLite3::Column#==`/`#hash` (`sqlite3/column.rb:47-58`) do not fold in
+      // `@generated_type`, so two columns identical but for generated-ness
+      // collapse onto one instance — verified against real Rails.
       const field = {
-        name: "full_name",
+        name: "stored_full_name",
         type: "varchar",
         notnull: 0,
         dflt_value: null,
