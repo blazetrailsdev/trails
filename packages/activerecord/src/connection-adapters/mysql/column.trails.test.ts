@@ -4,10 +4,6 @@ import { Column as MysqlColumn } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
 describe("MysqlColumn", () => {
-  // mysql/column.rb defines no `encode_with` / `init_with`: every predicate it
-  // adds derives from `sql_type` / `collation` / `sql_type_metadata.extra`, all
-  // of which the BASE coder persists. So the round-trip carries no MySQL keys
-  // and the predicates still answer.
   it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", () => {
     const original = new MysqlColumn(
       "id",

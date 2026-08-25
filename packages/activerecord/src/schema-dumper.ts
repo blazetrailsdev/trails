@@ -357,8 +357,6 @@ class AdapterSchemaSource implements SchemaSource {
         isEnum: col.type === "enum" ? true : undefined,
         isSerial: (col as any).isSerial === true ? true : undefined,
         comment: col.comment ?? undefined,
-        // MySQL derives both from sql_type/extra (mysql/column.rb:9-19), so the
-        // predicate is the reader; sqlite3 and plain mock sources still carry a flag.
         autoIncrement:
           (typeof (col as any).isAutoIncrement === "function"
             ? (col as any).isAutoIncrement()

@@ -26,8 +26,6 @@ function makeColumn(
     options.name ?? "id",
     null,
     {
-      // `array` derives from the UNSTRIPPED sql_type (postgresql/column.rb:37-39),
-      // so the fixture spells the "[]" suffix rather than setting a flag.
       sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
       type: options.type ?? "integer",
     },

@@ -54,8 +54,11 @@ export class Column extends BaseColumn {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? null;
   }
 
-  // Mirrors: mysql/column.rb:9-11. End-anchored, and no /i flag as in Rails —
-  // SHOW FULL FIELDS reports the `Type` column lowercased.
+  /**
+   * Mirrors: MySQL::Column#unsigned? (`mysql/column.rb:9-11`). End-anchored,
+   * and without an `/i` flag as in Rails — SHOW FULL FIELDS reports the `Type`
+   * column lowercased.
+   */
   isUnsigned(): boolean {
     return /\bunsigned(?: zerofill)?$/.test(this.sqlType ?? "");
   }
@@ -64,18 +67,17 @@ export class Column extends BaseColumn {
     return this.collation != null && !this.collation.endsWith("_ci");
   }
 
-  // Mirrors: mysql/column.rb:17-19
+  /** Mirrors: MySQL::Column#auto_increment? (`mysql/column.rb:17-19`) */
   isAutoIncrement(): boolean {
     return this.extra === "auto_increment";
   }
 
-  // Mirrors: `alias_method :auto_incremented_by_db?, :auto_increment?`
-  // (mysql/column.rb:20)
+  /** Mirrors: `alias_method :auto_incremented_by_db?, :auto_increment?` (`mysql/column.rb:20`) */
   isAutoIncrementedByDb(): boolean {
     return this.isAutoIncrement();
   }
 
-  // Mirrors: mysql/column.rb:22-24
+  /** Mirrors: MySQL::Column#virtual? (`mysql/column.rb:22-24`) */
   isVirtual(): boolean {
     return /\b(?:VIRTUAL|STORED|PERSISTENT)\b/.test(this.extra);
   }

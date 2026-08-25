@@ -1473,9 +1473,6 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
 });
 
 describe("DatabaseTasksCheckSchemaFileTest", () => {
-  // `Kernel.abort` leaves the host at exit status 1; under the node process
-  // adapter that is `process.exitCode`, which would red the whole vitest
-  // worker, so the adapter's two abort effects are captured here instead.
   let exitCodes: number[];
   let stderrWrites: string[];
 

@@ -93,10 +93,12 @@ export class Column extends BaseColumn {
     return this.serial;
   }
 
-  // Mirrors: Column#identity? — the adapter already seats `identity.presence`
-  // (postgresql/schema_statements.rb:990), so Ruby's truthiness on the raw ivar
-  // is `!= null`. A coder that never carried the key leaves it `undefined`,
-  // which `!= null` reads as falsy the way Ruby reads a missing ivar's nil.
+  /**
+   * Mirrors: PostgreSQL::Column#identity? (`postgresql/column.rb:16-18`) — the
+   * raw ivar's truthiness. The adapter seats `identity.presence`
+   * (`postgresql/schema_statements.rb:990`), and a coder that never carried the
+   * key leaves it absent, which `!= null` reads the way Ruby reads nil.
+   */
   get isIdentity(): boolean {
     return this.identity != null;
   }
@@ -106,8 +108,7 @@ export class Column extends BaseColumn {
     return this.isSerial || this.isIdentity;
   }
 
-  // Mirrors: Column#virtual? — `@generated.present?` (postgresql/column.rb:29),
-  // so "" is blank and a nil/absent ivar is falsy.
+  /** Mirrors: PostgreSQL::Column#virtual? — `@generated.present?` (`postgresql/column.rb:27-30`) */
   override isVirtual(): boolean {
     return isPresent(this.generated);
   }
@@ -117,14 +118,16 @@ export class Column extends BaseColumn {
     return super.hasDefault && !this.isVirtual();
   }
 
-  // Mirrors: `def array; sql_type_metadata.sql_type.end_with?("[]"); end`
-  // (postgresql/column.rb:37-39) — derived from the UNSTRIPPED sql_type, which
-  // is why it reads the metadata rather than this class' `sqlType` override.
+  /**
+   * Mirrors: PostgreSQL::Column#array (`postgresql/column.rb:37-39`) — derived
+   * from the metadata's UNSTRIPPED `sql_type`, which is why it reads the
+   * metadata rather than this class' `sqlType` override.
+   */
   get array(): boolean {
     return this.sqlTypeMetadata?.sqlType?.endsWith("[]") ?? false;
   }
 
-  // Mirrors: `alias :array? :array` (postgresql/column.rb:40)
+  /** Mirrors: `alias :array? :array` (`postgresql/column.rb:40`) */
   isArray(): boolean {
     return this.array;
   }
@@ -143,9 +146,12 @@ export class Column extends BaseColumn {
     );
   }
 
-  // Mirrors: postgresql/column.rb:50-55 — `serial`, `identity`, `generated`,
-  // then `super`. `oid`/`fmod` are not ivars here (they delegate to the
-  // metadata, which the base coder persists) and `array` is derived.
+  /**
+   * Mirrors: PostgreSQL::Column#init_with (`postgresql/column.rb:50-55`) —
+   * `serial`, `identity`, `generated`, then `super`. `oid` / `fmod` are not
+   * ivars here (they delegate to the metadata, which the base coder persists)
+   * and `array` is derived.
+   */
   override initWith(coder: ColumnCoder): void {
     this.serial = (coder["serial"] as boolean) ?? false;
     this.identity = (coder["identity"] as string | null) ?? null;

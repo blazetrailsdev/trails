@@ -12,7 +12,6 @@ import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
-  // `auto_increment?` derives from `sql_type_metadata.extra` (mysql/column.rb:17-19).
   return new Column(
     "id",
     null,

@@ -1621,8 +1621,6 @@ export class SchemaStatements {
     const values = this.columnsForDistinct(primaryKeyColumns, relation.orderValues as string[]);
 
     const limited = relation.reselect(values).distinctBang();
-    // Rails hands `select_rows` the ARel node (schema_statements.rb:1440) so the
-    // adapter compiles and binds it; flattening to SQL here would strand the binds.
     const limitedIds = (await this.selectRows(limited.arel(), "SQL")).map((results) =>
       results.slice(-wrap(relation.primaryKey).length),
     );
@@ -1630,7 +1628,7 @@ export class SchemaStatements {
     if (limitedIds.length === 0) {
       relation.noneBang();
     } else {
-      const transposed = wrap(relation.primaryKey).map((_, i) => limitedIds.map((row) => row[i]));
+      const transposed = limitedIds[0].map((_, i) => limitedIds.map((row) => row[i]));
       relation.whereBang(
         Object.fromEntries(wrap(relation.primaryKey).map((key, i) => [key, transposed[i]])),
       );

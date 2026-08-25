@@ -717,8 +717,6 @@ describe("distinctRelationForPrimaryKey", () => {
     expect(whereBang).not.toHaveBeenCalled();
   });
 
-  // Rails has no nil-pk guard: `Array(nil)` is `[]`, so the projection is empty
-  // and `limit_value`/`offset_value` are still cleared (schema_statements.rb:1451).
   it("clears limit and offset for a relation with no primary key", async () => {
     const selectRows = vi.fn().mockResolvedValue([]);
     const noneBang = vi.fn();

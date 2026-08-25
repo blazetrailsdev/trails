@@ -533,6 +533,7 @@ export class DatabaseTasks {
   }
 
   static checkSchemaFile(filename: string): void {
+    // Rails: unless File.exist?(filename) → Kernel.abort (database_tasks.rb:482-487).
     // No blank-string special case — Rails only does File.exist?, so "" flows through
     // the same path (existsSync("") === false) and aborts with the filename in the message.
     if (!getFs().existsSync(filename)) {

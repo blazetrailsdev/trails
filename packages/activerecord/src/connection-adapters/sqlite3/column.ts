@@ -52,9 +52,11 @@ export class Column extends BaseColumn {
     return this.autoIncrement || this.rowid;
   }
 
-  // Mirrors: `!@generated_type.nil?` (sqlite3/column.rb:25). A coder that never
-  // carried the key leaves the ivar absent, and `!= null` reads that as Ruby
-  // reads a missing ivar's nil — falsy.
+  /**
+   * Mirrors: SQLite3::Column#virtual? — `!@generated_type.nil?`
+   * (`sqlite3/column.rb:24-26`). A coder that never carried the key leaves the
+   * ivar absent, which `!= null` reads the way Ruby reads nil.
+   */
   isVirtual(): boolean {
     return this._generatedType != null;
   }
@@ -73,8 +75,11 @@ export class Column extends BaseColumn {
     );
   }
 
-  // Mirrors: sqlite3/column.rb:35-42 — `auto_increment` only, then `super`.
-  // `rowid` and `@generated_type` are dropped by a round-trip upstream too.
+  /**
+   * Mirrors: SQLite3::Column#init_with (`sqlite3/column.rb:35-38`) —
+   * `auto_increment` only, then `super`; `rowid` and `@generated_type` are
+   * dropped by a round-trip upstream too.
+   */
   override initWith(coder: ColumnCoder): void {
     this.autoIncrement = (coder["auto_increment"] as boolean) ?? false;
     super.initWith(coder);
