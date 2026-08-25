@@ -59,7 +59,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-export function rubyInspectHash(value: Record<string, unknown>): string {
+export function rubyInspectHash(value: object): string {
   const pairs = Object.entries(value).map(([key, val]) => `${key}: ${rubyInspect(val)}`);
   return `{${pairs.join(", ")}}`;
 }

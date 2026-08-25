@@ -59,7 +59,7 @@ import {
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
-import { rubyInspect } from "../../relation/ruby-inspect.js";
+import { rubyInspect, rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import {
   globalPluralizeTableNames,
@@ -2141,7 +2141,7 @@ export class SchemaStatements {
     const fk = await this.foreignKeyFor(fromTable, options);
     if (!fk) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${options.toTable ?? JSON.stringify(options)}`,
+        `Table '${fromTable}' has no foreign key for ${options.toTable ?? rubyInspectHash(options)}`,
       );
     }
     return fk;
@@ -2232,15 +2232,25 @@ export class SchemaStatements {
     return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
   }
 
-  /** @internal */
+  /**
+   * Mirrors: SchemaStatements#check_constraint_for!
+   * (schema_statements.rb:1802-1806) — the raise interpolates the options
+   * Hash, so the message carries Ruby's `{name: "x"}` rendering, not JSON's.
+   * Ruby's `expression: nil, **options` split happens in the body: an optional
+   * parameter cannot be destructured in the AbstractAdapter interface
+   * declaration the mixin-declaration-drift guard compares against, so `kwargs`
+   * carries the bag and `options` keeps Rails' name for the interpolated rest.
+   * @internal
+   */
   async checkConstraintForBang(
     tableName: string,
-    options: { name?: string; expression?: string; validate?: boolean } = {},
+    kwargs: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition> {
-    const chk = await this.checkConstraintFor(tableName, options);
+    const { expression, ...options } = kwargs;
+    const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${options.expression ?? JSON.stringify(options)}`,
+        `Table '${tableName}' has no check constraint for ${expression ?? rubyInspectHash(options)}`,
       );
     }
     return chk;

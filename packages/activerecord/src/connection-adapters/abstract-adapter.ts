@@ -504,7 +504,7 @@ export interface AbstractAdapter {
   /** @internal */
   checkConstraintForBang(
     tableName: string,
-    options?: { name?: string; expression?: string; validate?: boolean },
+    kwargs?: { name?: string; expression?: string; validate?: boolean },
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
