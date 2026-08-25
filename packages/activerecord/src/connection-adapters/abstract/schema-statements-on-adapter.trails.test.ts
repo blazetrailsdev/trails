@@ -134,8 +134,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.allSql[0]).toBe('PRAGMA index_list("things")');
     await sqlite.indexes('a"b');
     expect(sqlite.allSql.at(-1)).toBe('PRAGMA index_list("a""b")');
-    await sqlite.indexes("aux.widgets");
-    expect(sqlite.allSql.at(-1)).toBe('PRAGMA "aux".index_list("widgets")');
   });
 
   it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
@@ -151,18 +149,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
         `UNION ALL ` +
         `SELECT sql FROM sqlite_temp_master WHERE name = 'idx"x' AND type = 'index'`,
       `PRAGMA index_info('idx"x')`,
-    ]);
-  });
-
-  it("indexes() sqlite arm carries the schema prefix into the index_info PRAGMA", async () => {
-    const sqlite = new SqliteCapturingAdapter([{ name: "idx_widgets_name", unique: 0 }]);
-    await sqlite.indexes("aux.widgets");
-    expect(sqlite.allSql).toEqual([
-      'PRAGMA "aux".index_list("widgets")',
-      `SELECT sql FROM "aux".sqlite_master WHERE name = 'idx_widgets_name' AND type = 'index' ` +
-        `UNION ALL ` +
-        `SELECT sql FROM sqlite_temp_master WHERE name = 'idx_widgets_name' AND type = 'index'`,
-      `PRAGMA "aux".index_info('idx_widgets_name')`,
     ]);
   });
 

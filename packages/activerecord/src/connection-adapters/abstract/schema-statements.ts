@@ -336,21 +336,6 @@ export class SchemaStatements {
     return new SchemaCreation(this as unknown as SchemaCreationConn);
   }
 
-  /**
-   * Split a (possibly schema-qualified) table name into the introspection-PRAGMA
-   * schema prefix and bare name, converged with SQLite3Adapter's
-   * `_splitTableName` form. The schema qualifier comes BEFORE the PRAGMA keyword
-   * (`PRAGMA aux.table_info("widgets")`) — `PRAGMA table_info("aux"."widgets")`
-   * makes SQLite treat the whole quoted string as one bare table name and
-   * return zero rows for ATTACHed databases.
-   */
-  protected _sqliteSchemaPrefix(tableName: string): { prefix: string; bare: string } {
-    const dot = tableName.lastIndexOf(".");
-    const schema = dot === -1 ? "" : tableName.slice(0, dot);
-    const bare = dot === -1 ? tableName : tableName.slice(dot + 1);
-    return { prefix: schema ? `${this.quoteColumnName(schema)}.` : "", bare };
-  }
-
   async createTable(
     tableName: string,
     optionsOrFn?:

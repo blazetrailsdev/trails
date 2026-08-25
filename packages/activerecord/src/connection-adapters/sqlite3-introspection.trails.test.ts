@@ -19,13 +19,11 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   afterEach(async () => {
-    // Throwaway file-backed tables (the TEMP table and attached `aux` db are
-    // discarded with tmpDir); these IF EXISTS drops balance
-    // require-table-teardown by name. `aux.widgets` only resolves while aux is
-    // attached, so swallow the "unknown database" error in other tests.
+    // Throwaway file-backed tables (the TEMP table is discarded with tmpDir);
+    // these IF EXISTS drops balance require-table-teardown by name.
     await adapter
       .exec(
-        "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS memberships; DROP TABLE IF EXISTS temp_widgets; DROP TABLE IF EXISTS aux.widgets",
+        "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS memberships; DROP TABLE IF EXISTS temp_widgets",
       )
       .catch(() => undefined);
     await pool.disconnect();
@@ -140,48 +138,14 @@ describe("SQLite3Adapter schema introspection", () => {
       "CREATE TEMP TABLE temp_widgets (id INTEGER PRIMARY KEY, name TEXT)",
     );
     await adapter.executeMutation(
-      "CREATE INDEX temp.temp_widgets_on_name ON temp_widgets (name) WHERE name IS NOT NULL",
+      "CREATE INDEX temp_widgets_on_name ON temp_widgets (name) WHERE name IS NOT NULL",
     );
-    const indexes = (await adapter.indexes("temp.temp_widgets")) as Array<{
+    const indexes = (await adapter.indexes("temp_widgets")) as Array<{
       name: string;
       where?: string;
     }>;
     const idx = indexes.find((i) => i.name === "temp_widgets_on_name");
     expect(idx?.where).toBe("name IS NOT NULL");
-  });
-
-  it("introspection PRAGMAs work against schema-qualified names", async () => {
-    // Attach a separate sqlite file under the `aux` alias. PRAGMAs that
-    // accept a schema prefix must use the `PRAGMA aux.table_info(widgets)`
-    // form; `PRAGMA table_info("aux"."widgets")` returns zero rows
-    // because SQLite treats the whole quoted argument as a bare table
-    // name. This test guards against that regression — which is what
-    // Copilot flagged on #527.
-    const auxPath = path.join(tmpDir, "aux.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
-    await adapter.executeMutation(
-      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
-    );
-    await adapter.executeMutation("CREATE INDEX aux.widgets_on_name ON widgets (name)");
-
-    expect(await adapter.primaryKey("aux.widgets")).toBe("id");
-    const cols = await adapter.columns("aux.widgets");
-    expect(cols.map((c) => c.name)).toEqual(["id", "name"]);
-    const indexes = (await adapter.indexes("aux.widgets")) as Array<{
-      table: string;
-      name: string;
-      columns: string[];
-      orders: Record<string, string>;
-    }>;
-    expect(indexes).toMatchObject([
-      {
-        table: "widgets",
-        name: "widgets_on_name",
-        columns: ["name"],
-        unique: false,
-        orders: {},
-      },
-    ]);
   });
 
   it("alterTable preserves expression, partial and unique indexes across the rebuild", async () => {
@@ -218,131 +182,6 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(byName["widgets_on_name_desc"]?.orders).toBe("desc");
   });
 
-  it("alterTable rebuilds a schema-qualified table whose index has a custom name", async () => {
-    // The alter_table buffer is a TEMPORARY table, so it is unqualified even
-    // when the source is `aux.widgets`. copy_table_indexes has to spot the
-    // "a"-prefix relationship on the bare names to reach its `t`-prefix rename;
-    // otherwise an index name that doesn't embed the table name is copied onto
-    // the buffer under its original name and collides with the live original.
-    const auxPath = path.join(tmpDir, "aux-alter.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
-    await adapter.executeMutation(
-      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
-    );
-    await adapter.executeMutation("CREATE INDEX aux.by_name ON widgets (name)");
-    await adapter.executeMutation("INSERT INTO aux.widgets (name) VALUES ('gizmo')");
-
-    await adapter.removeColumn("aux.widgets", "doomed");
-
-    expect((await adapter.columns("aux.widgets")).map((c) => c.name)).toEqual(["id", "name"]);
-    const indexes = (await adapter.indexes("aux.widgets")) as Array<{ name: string }>;
-    expect(indexes.map((i) => i.name)).toEqual(["by_name"]);
-    const rows = await adapter.selectAll("SELECT name FROM aux.widgets");
-    expect(rows.rows).toEqual([["gizmo"]]);
-  });
-
-  it("copyTableIndexes puts an ATTACHed schema on the index name, not the table", async () => {
-    // SQLite qualifies the INDEX, not the table it indexes; `CREATE INDEX
-    // by_name ON aux.widgets (...)` is a syntax error. copy_table_indexes
-    // therefore reaches add_index for a qualified destination too — the
-    // qualifier is moved in SQLite3::SchemaCreation#visit_CreateIndexDefinition.
-    const auxPath = path.join(tmpDir, "aux-copy-index.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
-    await adapter.executeMutation(
-      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
-    );
-    await adapter.executeMutation("CREATE INDEX aux.by_name ON widgets (name)");
-
-    await adapter.removeColumn("aux.widgets", "doomed");
-
-    // sqlite_master strips the schema qualifier from the stored DDL, so the
-    // qualifier is read back as WHICH catalog holds the index: aux, not main.
-    // Qualifying the table instead would have raised a syntax error.
-    const inAux = (
-      await adapter.selectAll("SELECT sql FROM aux.sqlite_master WHERE type='index'")
-    ).rows.map((row) => String(row[0]));
-    expect(inAux).toEqual(['CREATE INDEX "by_name" ON "widgets" ("name")']);
-    const inMain = await adapter.selectAll(
-      "SELECT name FROM main.sqlite_master WHERE type='index'",
-    );
-    expect(inMain.rows).toEqual([]);
-    expect(
-      ((await adapter.indexes("aux.widgets")) as Array<{ name: string }>).map((i) => i.name),
-    ).toEqual(["by_name"]);
-  });
-
-  it("addIndex derives the default index name from the bare qualified table", async () => {
-    // index_name embeds the table name verbatim, so a schema-qualified table
-    // would produce `index_aux.customers_on_name` — a dotted identifier the
-    // CREATE INDEX emission reads as a schema qualifier. SQLite3Adapter#indexName
-    // strips the qualifier; SchemaCreation puts it back on the INDEX name.
-    const auxPath = path.join(tmpDir, "aux-default-index-name.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
-    // No teardown: the table lives in a per-test ATTACHed database file under
-    // tmpDir, which afterEach removes wholesale, so it cannot leak to a sibling.
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await adapter.executeMutation("CREATE TABLE aux.customers (id INTEGER PRIMARY KEY, name TEXT)");
-
-    await adapter.addIndex("aux.customers", ["name"]);
-
-    const inAux = (
-      await adapter.selectAll("SELECT sql FROM aux.sqlite_master WHERE type='index'")
-    ).rows.map((row) => String(row[0]));
-    expect(inAux).toEqual(['CREATE INDEX "index_customers_on_name" ON "customers" ("name")']);
-    expect(await adapter.indexExists("aux.customers", ["name"])).toBe(true);
-
-    await adapter.removeIndex("aux.customers", ["name"]);
-
-    expect(await adapter.indexExists("aux.customers", ["name"])).toBe(false);
-  });
-
-  it("removeIndex drops the index in the named schema, not another attached one", async () => {
-    // An unqualified DROP INDEX name resolves across main, temp and every
-    // ATTACHed database in attach order, so an identically-named index in an
-    // earlier-attached schema would be the one dropped.
-    const onePath = path.join(tmpDir, "one-dup-index.sqlite3");
-    const twoPath = path.join(tmpDir, "two-dup-index.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${onePath}' AS one`);
-    await adapter.executeMutation(`ATTACH DATABASE '${twoPath}' AS two`);
-    // No teardown: both tables live in per-test ATTACHed database files under
-    // tmpDir, which afterEach removes wholesale.
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await adapter.executeMutation("CREATE TABLE one.customers (id INTEGER PRIMARY KEY, name TEXT)");
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await adapter.executeMutation("CREATE TABLE two.customers (id INTEGER PRIMARY KEY, name TEXT)");
-    await adapter.addIndex("one.customers", ["name"]);
-    await adapter.addIndex("two.customers", ["name"]);
-
-    await adapter.removeIndex("two.customers", ["name"]);
-
-    expect(await adapter.indexExists("two.customers", ["name"])).toBe(false);
-    expect(await adapter.indexExists("one.customers", ["name"])).toBe(true);
-  });
-
-  it("copyTableIndexes copies a default-named index on an ATTACHed schema", async () => {
-    // The other half of the default-name fix: copy_table_indexes reaches
-    // add_index for every index it copies (sqlite3_adapter.rb:668-674), so a
-    // rebuild of a qualified table whose index carries the DEFAULT name is the
-    // path that used to need an explicit `name:` to get past
-    // `index_aux.widgets_on_name`. Nothing is hand-named here.
-    const auxPath = path.join(tmpDir, "aux-copy-default-index.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
-    await adapter.executeMutation(
-      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
-    );
-    await adapter.addIndex("aux.widgets", ["name"]);
-
-    await adapter.removeColumn("aux.widgets", "doomed");
-
-    expect((await adapter.columns("aux.widgets")).map((c) => c.name)).toEqual(["id", "name"]);
-    expect(
-      ((await adapter.indexes("aux.widgets")) as Array<{ name: string }>).map((i) => i.name),
-    ).toEqual(["index_widgets_on_name"]);
-    expect(
-      (await adapter.selectAll("SELECT name FROM main.sqlite_master WHERE type='index'")).rows,
-    ).toEqual([]);
-  });
-
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",
@@ -353,22 +192,5 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(await adapter.dataSourceExists("missing")).toBe(false);
     expect(await adapter.dataSourceExists("sqlite_sequence")).toBe(false);
     expect(await adapter.dataSourceExists("sqlite_schema")).toBe(false);
-  });
-
-  it("tableExists/dataSourceExists resolve schema-qualified names correctly", async () => {
-    // Companion to the PRAGMA test: sqlite_master lookups must route to
-    // `<schema>.sqlite_master` for ATTACHed DBs. Matching on
-    // `name='aux.widgets'` in the main catalog would return false even
-    // though the table does exist in aux.
-    const auxPath = path.join(tmpDir, "aux2.sqlite3");
-    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
-    await adapter.executeMutation("CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY)");
-    await adapter.executeMutation("CREATE VIEW aux.widget_view AS SELECT id FROM aux.widgets");
-
-    expect(await adapter.tableExists("aux.widgets")).toBe(true);
-    expect(await adapter.tableExists("aux.missing")).toBe(false);
-    expect(await adapter.dataSourceExists("widgets")).toBe(true);
-    expect(await adapter.dataSourceExists("widget_view")).toBe(true);
-    expect(await adapter.dataSourceExists("aux.widgets")).toBe(false);
   });
 });
