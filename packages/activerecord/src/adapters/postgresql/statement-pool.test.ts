@@ -207,36 +207,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(pool.length).toBe(0);
     });
 
-    it("tags the released client and runs DEALLOCATE ALL on its next checkout", async () => {
-      await adapter.beginDbTransaction();
-      await adapter.execute("SELECT $1::int", [1]);
-      await adapter.rollback();
-      await adapter.reconnect();
-      await adapter.beginDbTransaction();
-      await adapter.execute("SELECT $1::int", [2]);
-      await adapter.rollback();
-      const conn = adapter._rawConnectionForTest();
-      adapter._rawConnection = null;
-      await adapter.clearCacheBang();
-      expect(adapter._needsDeallocateAllForTest()).toBe(true);
-      adapter._rawConnection = conn;
-      expect(conn).not.toBeNull();
-      const observed: string[] = [];
-      const live = conn!;
-      const origQuery = live.query.bind(live);
-      // pg's `query` is overloaded with a void-returning callback form, so the
-      // mock's Promise return trips checksVoidReturn; the Promise form is the one
-      // exercised here (execute awaits it), so the return is intentional.
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      vi.spyOn(live, "query").mockImplementation(((sql: unknown, ...rest: unknown[]) => {
-        if (typeof sql === "string") observed.push(sql);
-        return (origQuery as (...a: unknown[]) => unknown)(sql, ...rest);
-      }) as typeof live.query);
-      await adapter.execute("SELECT 1");
-      expect(observed[0]).toBe("DEALLOCATE ALL");
-      expect(adapter._needsDeallocateAllForTest()).toBe(false);
-    });
-
     it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);

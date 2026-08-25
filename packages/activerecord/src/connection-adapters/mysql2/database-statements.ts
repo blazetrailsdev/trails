@@ -9,6 +9,7 @@ import type mysql from "mysql2/promise";
 import { Result, type ColumnTypes } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
+import type { StatementPool } from "../statement-pool.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -113,7 +114,8 @@ export function buildColumnTypes(
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
   _lastId?: number;
-  _statements?: { delete(key: string): unknown } | null;
+  /** Rails' `@statements` (abstract_adapter.rb:156). */
+  _statements?: StatementPool | null;
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
   preparedStatements?: boolean;
