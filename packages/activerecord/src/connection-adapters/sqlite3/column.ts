@@ -61,7 +61,6 @@ export class Column extends BaseColumn {
     return JSON.stringify([super.deduplicateKey(), this.isAutoIncrement(), this.rowid]);
   }
 
-
   /** Mirrors: SQLite3::Column#auto_increment? (`sqlite3/column.rb:18-20`) */
   isAutoIncrement(): boolean {
     return this._autoIncrement;
