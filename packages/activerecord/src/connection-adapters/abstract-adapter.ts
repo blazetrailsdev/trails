@@ -2752,15 +2752,13 @@ export class AbstractAdapter implements Quoting {
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
-    // Ruby's `String#match?` takes a Regexp OR a String, and a String argument
-    // is a regexp SOURCE, not a substring (abstract_adapter.rb:1229).
-    const matchP = (str: string, warningMatcher: string | RegExp): boolean =>
-      (typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher).test(str);
-    return ActiveRecord.dbWarningsIgnore.some(
-      (warningMatcher) =>
-        matchP(warning.message ?? "", warningMatcher) ||
-        matchP(String(warning.code ?? ""), warningMatcher),
-    );
+    return ActiveRecord.dbWarningsIgnore.some((warningMatcher) => {
+      // Ruby's `String#match?` takes a Regexp OR a String, and a String
+      // argument is a regexp SOURCE, not a substring (abstract_adapter.rb:1229).
+      const matcher =
+        typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
+      return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));
+    });
   }
 
   /**
