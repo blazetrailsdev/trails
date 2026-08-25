@@ -138,7 +138,7 @@ describe("LazyAttributeHash", () => {
     expect(hash.fetch("missing", fallback)).toBe(fallback);
   });
 
-  it("keys drops names whose attribute is not initialized", () => {
+  it("key? reports the delegate hash, values and types", () => {
     const hash = new LazyAttributeHash(
       new Map([
         ["age", intType],
@@ -146,8 +146,9 @@ describe("LazyAttributeHash", () => {
       ]),
       { age: "42" },
     );
-    expect(hash.keys()).toEqual(["age"]);
+    expect(hash.isKey("age")).toBe(true);
     expect(hash.isKey("name")).toBe(true);
+    expect(hash.isKey("missing")).toBe(false);
   });
 
   it("except returns a copy without the given names", () => {

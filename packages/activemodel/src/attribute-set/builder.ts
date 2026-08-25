@@ -63,10 +63,8 @@ export class LazyAttributeSet extends AttributeSet {
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = this._attributes.get(name);
     if (attr) {
-      // Ruby `attr.value(&block)`: an Uninitialized attribute yields its name to
-      // the block, every other attribute ignores it (attribute.rb `Uninitialized#value`).
-      // trails' `Attribute#value` is a getter, so the block arm lives at the call
-      // site — the same spelling `AttributeSet#fetchValue` uses.
+      // builder.rb:43 `attr.value(&block)`. trails' `Attribute#value` is a getter,
+      // so `Uninitialized#value`'s yield-the-name arm lives at the call site.
       if (block !== undefined && attr instanceof Uninitialized) return block(name);
       return attr.value;
     }
@@ -317,7 +315,10 @@ export class LazyAttributeHash {
 
   /**
    * @internal Rails-private helper. Mirrors: `def assign_default_value(name)`
-   * (builder.rb:165-180).
+   * (builder.rb:165-180). Ruby's implicit `nil` when `name` is in neither table
+   * is `Attribute.null(name)` here, the null object `AttributeSet#default_attribute`
+   * (attribute_set.rb:114-116) returns for the same case — `[]` is typed to an
+   * Attribute, and TS has no nil that answers `value`.
    */
   assignDefaultValue(name: string): Attribute {
     const type = this.additionalTypes.get(name) ?? this.types.get(name);
@@ -340,14 +341,5 @@ export class LazyAttributeHash {
       return built;
     }
     return Attribute.null(name);
-  }
-
-  keys(): string[] {
-    const keys = new Set([
-      ...Object.keys(this.values),
-      ...this.types.keys(),
-      ...this.delegate.keys(),
-    ]);
-    return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 }
