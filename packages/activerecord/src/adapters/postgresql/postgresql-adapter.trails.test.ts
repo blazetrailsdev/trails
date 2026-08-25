@@ -111,6 +111,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       },
     );
 
+    itIfSupports("index_include", "indexParts emits include before nullsNotDistinct", async () => {
+      if ((await adapter.getDatabaseVersion()) < PG_NND_MIN_VERSION) return;
+      await adapter.exec(
+        `CREATE TABLE "ex_idx_both" ("id" SERIAL PRIMARY KEY, "n" INTEGER, "d" TEXT)`,
+      );
+      await adapter.exec(
+        `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
+      );
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "ex_idx_both");
+      const indexLine = lines.find((l) => l.includes("ex_idx_both_i"))!;
+      expect(indexLine.indexOf("include:")).toBeGreaterThan(-1);
+      expect(indexLine.indexOf("include:")).toBeLessThan(indexLine.indexOf("nullsNotDistinct:"));
+    });
+
     it("pk and sequence for table with serial pk", async () => {
       await adapter.exec(`CREATE TABLE "ex_serial" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       const rows = await adapter.execute(

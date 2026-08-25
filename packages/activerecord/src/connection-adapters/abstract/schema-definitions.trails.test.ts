@@ -86,6 +86,20 @@ describe("CheckConstraintDefinition#validate?", () => {
   });
 });
 
+describe("CheckConstraintDefinition#defined_for?", () => {
+  it("compares the residual options with to_s, sliced to the stored keys", () => {
+    const definition = new CheckConstraintDefinition("t", "e", {
+      name: "chk",
+      validate: true,
+      comment: "priced",
+    });
+
+    expect(definition.isDefinedFor({ name: "chk", comment: "priced" })).toBe(true);
+    expect(definition.isDefinedFor({ name: "chk", comment: "other" })).toBe(false);
+    expect(definition.isDefinedFor({ name: "chk", ifExists: true })).toBe(true);
+  });
+});
+
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
     const t = new TableDefinition("astronauts", { adapter: conn });

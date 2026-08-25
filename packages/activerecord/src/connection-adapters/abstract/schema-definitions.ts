@@ -430,12 +430,12 @@ export class PrimaryKeyDefinition {
 export class CheckConstraintDefinition {
   readonly tableName: string;
   readonly expression: string;
-  readonly options: { name?: string; validate?: boolean | null };
+  readonly options: { name?: string; validate?: boolean | null; [key: string]: unknown };
 
   constructor(
     tableName: string,
     expression: string,
-    options: { name?: string; validate?: boolean | null } = {},
+    options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
   ) {
     this.tableName = tableName;
     this.expression = expression;
@@ -462,25 +462,35 @@ export class CheckConstraintDefinition {
     return this.name != null ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
   }
 
+  /**
+   * Mirrors: `defined_for?(name:, expression: nil, validate: nil, **options)`
+   * (schema_definitions.rb:189-195).
+   *
+   * `expression` is accepted but never compared — Rails does not compare it
+   * either (it is used upstream to derive the name), and a raw-string compare
+   * would spuriously fail against the adapter's normalized form (e.g.
+   * PostgreSQL's `pg_get_constraintdef`).
+   *
+   * The validate arm is `validate.nil? || validate == options.fetch(:validate,
+   * validate)`: with `:validate` unstored the fetch falls back to the lookup
+   * value, so the comparison is trivially true and the `validate?` getter's
+   * `true` default must not stand in for it. The residual arm is
+   * `options.slice(*self.options.keys)` followed by the `to_s` compare, where
+   * Ruby's `nil.to_s` is `""`.
+   */
   isDefinedFor(options: {
     name: string | null | undefined;
     expression?: string;
     validate?: boolean | null;
+    [key: string]: unknown;
   }): boolean {
-    // Mirrors Rails CheckConstraintDefinition#defined_for?(name:, expression: nil,
-    // ...): it matches on name (and validate) only — the expression is accepted
-    // but never compared (it is used upstream to derive the name). A raw-string
-    // expression compare would spuriously fail against the adapter's normalized
-    // form (e.g. PostgreSQL's `pg_get_constraintdef`). The validate arm mirrors
-    // `validate.nil? || validate == self.options.fetch(:validate, validate)`
-    // (schema_definitions.rb:193): with `:validate` unstored the fetch falls back
-    // to the lookup value, so the comparison is trivially true — the getter's
-    // `true` default must not stand in for it.
+    const { name, expression: _expression, validate, ...rest } = options;
+    const sliced = Object.entries(rest).filter(([k]) => k in this.options);
+    const toS = (v: unknown): string => (v == null ? "" : String(v));
     return (
-      this.name === (options.name == null ? "" : options.name.toString()) &&
-      (options.validate == null ||
-        !("validate" in this.options) ||
-        options.validate === this.validate)
+      this.name === (name == null ? "" : name.toString()) &&
+      (validate == null || !("validate" in this.options) || validate === this.validate) &&
+      sliced.every(([k, v]) => toS(this.options[k]) === toS(v))
     );
   }
 }
