@@ -39,8 +39,10 @@ describe("SchemaStatements#viewExists", () => {
   });
 
   it("treats a blank name as absent, like Rails' present? guard", async () => {
-    expect(await conn().viewExists("")).toBe(false);
-    expect(await conn().viewExists("   ")).toBe(false);
-    expect(await conn().viewExists(null as unknown as string)).toBe(false);
+    // `if view_name.present?` (schema_statements.rb:75) is a trailing modifier,
+    // so a blank name falls off the end of the method and answers nil.
+    expect(await conn().viewExists("")).toBeNull();
+    expect(await conn().viewExists("   ")).toBeNull();
+    expect(await conn().viewExists(null as unknown as string)).toBeNull();
   });
 });

@@ -1005,11 +1005,6 @@ export class AlterTable {
   readonly checkConstraintAdds: CheckConstraintDefinition[] = [];
   readonly checkConstraintDrops: string[] = [];
   readonly constraintDrops: string[] = [];
-  readonly columnDefaultChanges: Array<{
-    columnName: string;
-    defaultValue: unknown;
-  }> = [];
-
   constructor(td: TableDefinition) {
     this._td = td;
   }
@@ -1046,10 +1041,6 @@ export class AlterTable {
 
   dropConstraint(name: string): void {
     this.constraintDrops.push(name);
-  }
-
-  changeColumnDefault(columnName: string, defaultValue: unknown): void {
-    this.columnDefaultChanges.push({ columnName, defaultValue });
   }
 }
 

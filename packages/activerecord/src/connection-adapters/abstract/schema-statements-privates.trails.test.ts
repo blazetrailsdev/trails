@@ -725,12 +725,12 @@ describe("unsupported-adapter bodies", () => {
 });
 
 describe("tableExists NotImplementedError fallback", () => {
-  it("returns false for a blank table name without querying", async () => {
+  it("returns null for a blank table name without querying", async () => {
     const execute = vi.fn().mockResolvedValue([]);
     const ss = makeStatements({ quote: (v: string) => `'${v}'`, execute });
 
-    expect(await ss.tableExists("")).toBe(false);
-    expect(await ss.tableExists("   ")).toBe(false);
+    expect(await ss.tableExists("")).toBeNull();
+    expect(await ss.tableExists("   ")).toBeNull();
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -795,15 +795,17 @@ describe("dataSources NotImplementedError fallback", () => {
 });
 
 describe("dataSourceExists NotImplementedError fallback", () => {
-  it("returns false for a blank data source name without querying", async () => {
+  it("returns null for a blank data source name without querying", async () => {
     const execute = vi.fn().mockResolvedValue([]);
     const ss = makeStatements({
       execute,
       dataSourceSql: (n: string) => `SELECT 1 WHERE name = '${n}'`,
     });
 
-    expect(await ss.dataSourceExists("")).toBe(false);
-    expect(await ss.dataSourceExists("   ")).toBe(false);
+    // Rails' trailing `if name.present?` modifier (schema_statements.rb:45)
+    // falls off the end of the method, so the value is nil — not false.
+    expect(await ss.dataSourceExists("")).toBeNull();
+    expect(await ss.dataSourceExists("   ")).toBeNull();
     expect(execute).not.toHaveBeenCalled();
   });
 

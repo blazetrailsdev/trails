@@ -300,22 +300,6 @@ export class SchemaCreation {
     ).join(" ");
     sql += o.constraintDrops.map((con) => this.visitDropConstraint(con)).join(" ");
 
-    // Not in Rails' visit_AlterTable (schema_creation.rb:24-32): trails'
-    // AlterTable carries column-default changes as their own group.
-    const parts: string[] = [];
-    for (const change of o.columnDefaultChanges) {
-      const col = this.adapter.quoteColumnName(change.columnName);
-      if (change.defaultValue == null) {
-        parts.push(`ALTER COLUMN ${col} DROP DEFAULT`);
-      } else {
-        parts.push(
-          `ALTER COLUMN ${col} SET DEFAULT ${await this.adapter.quoteDefaultExpression(change.defaultValue)}`,
-        );
-      }
-    }
-
-    sql += parts.join(" ");
-
     return sql;
   }
 

@@ -617,8 +617,11 @@ export class SchemaStatements {
     );
   }
 
-  async tableExists(tableName: string): Promise<boolean> {
-    if (!isPresent(tableName)) return false;
+  // Rails guards with a trailing `if table_name.present?` modifier
+  // (schema_statements.rb:60), so a blank name falls off the end of the method
+  // and the value is `nil` — not `false`.
+  async tableExists(tableName: string): Promise<boolean | null> {
+    if (!isPresent(tableName)) return null;
     try {
       return any(
         await this.queryValues(this.dataSourceSql(tableName, { type: "BASE TABLE" }), "SCHEMA"),
@@ -1199,7 +1202,7 @@ export class SchemaStatements {
     return (await this.queryValues(this.dataSourceSql({ type: "VIEW" }), "SCHEMA")).map(String);
   }
 
-  async viewExists(viewName: string): Promise<boolean> {
+  async viewExists(viewName: string): Promise<boolean | null> {
     // Mirrors Rails:
     //   query_values(data_source_sql(view_name, type: "VIEW"), "SCHEMA").any?
     //     if view_name.present?
@@ -1208,7 +1211,7 @@ export class SchemaStatements {
     //
     // present? covers blank strings including whitespace-only.
     // The "SCHEMA" name is what keeps the probe out of assertQueries counts.
-    if (!isPresent(viewName)) return false;
+    if (!isPresent(viewName)) return null;
     try {
       return any(await this.queryValues(this.dataSourceSql(viewName, { type: "VIEW" }), "SCHEMA"));
     } catch (e) {
@@ -1311,8 +1314,8 @@ export class SchemaStatements {
     }
   }
 
-  async dataSourceExists(name: string): Promise<boolean> {
-    if (!isPresent(name)) return false;
+  async dataSourceExists(name: string): Promise<boolean | null> {
+    if (!isPresent(name)) return null;
     try {
       return any(await this.queryValues(this.dataSourceSql(name), "SCHEMA"));
     } catch (error) {
@@ -1796,14 +1799,11 @@ export class SchemaStatements {
     return this.supportsForeignKeys() && this.isForeignKeysEnabled();
   }
 
-  async bulkChangeTable(
-    tableName: string,
-    operations: Array<{ cmd: string; args: unknown[] }>,
-  ): Promise<void> {
+  async bulkChangeTable(tableName: string, operations: Array<[string, unknown[]]>): Promise<void> {
     const sqlFragments: string[] = [];
     const nonCombinable: Array<() => Promise<void>> = [];
 
-    for (const { cmd: command, args } of operations) {
+    for (const [command, args] of operations) {
       const [table, ...arguments_] = args as [string, ...unknown[]];
       const forAlterTarget =
         typeof (this as any)[`${command}ForAlter`] === "function"
