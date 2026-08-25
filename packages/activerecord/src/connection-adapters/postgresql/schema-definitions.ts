@@ -94,7 +94,8 @@ export interface ColumnMethods {
   xml(...names: string[]): unknown;
   xml(...args: [...names: string[], options: ColumnOptions]): unknown;
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
-  enum(name: string, options: ColumnOptions & { enum_type: string }): unknown;
+  enum(...names: string[]): unknown;
+  enum(...args: [...names: string[], options: ColumnOptions & { enum_type?: string }]): unknown;
 }
 
 export interface ExclusionConstraintOptions {
@@ -564,7 +565,8 @@ export class TableDefinition extends AbstractTableDefinition {
    * (postgresql/schema_definitions.rb:186-189); `type_to_sql` resolves and
    * validates `enum_type` (postgresql/schema_statements.rb:854-857).
    */
-  enum(...args: [...names: string[], options: ColumnOptions & { enum_type: string }]): this;
+  enum(...names: string[]): this;
+  enum(...args: [...names: string[], options: ColumnOptions & { enum_type?: string }]): this;
   enum(...args: unknown[]): this {
     const { names, options } = splitColumnNames(args, "enum");
     const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type?: string };

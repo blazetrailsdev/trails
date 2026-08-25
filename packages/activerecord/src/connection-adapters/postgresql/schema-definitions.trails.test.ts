@@ -213,9 +213,15 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
     expect(typeToSql(col.type, col.options)).toBe("mood");
   });
 
+  it("defines one column per name", () => {
+    const td = new TableDefinition("t", { adapter: leased });
+    td.enum("a", "b", { enum_type: "mood" });
+    expect(td.columns.map((c) => c.name)).toEqual(["a", "b"]);
+  });
+
   it("raises when enum_type is missing", () => {
     const td = new TableDefinition("t", { adapter: leased });
-    (td as unknown as Record<string, (...args: unknown[]) => void>).enum("current_mood", {});
+    td.enum("current_mood");
     const [col] = td.columns;
     expect(() => typeToSql(col.type, col.options)).toThrow(
       new ArgumentError("enum_type is required for enums"),
