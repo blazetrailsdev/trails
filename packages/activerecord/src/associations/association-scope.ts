@@ -1,4 +1,3 @@
-import { isPlainObject } from "@blazetrails/activesupport";
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
@@ -7,9 +6,8 @@ import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
-import { JoinDependency } from "./join-dependency.js";
 import { WhereClause } from "../relation/where-clause.js";
-import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
+import { constructJoinDependency } from "../relation/query-methods.js";
 import { drop } from "../ruby-drop.js";
 
 /**
@@ -708,96 +706,26 @@ export class AssociationScope {
               []) as unknown[]
           ).length > 0
         ) {
-          // Rails: `scope.merge! item.only(:joins, :left_outer_joins)`, then
+          // Rails: `scope.merge! item.only(:joins, :left_outer_joins)` then
           // `associations = item.eager_load_values | item.includes_values` and
           // `scope.joins! item.construct_join_dependency(associations,
-          // OuterJoin)` (association_scope.rb:139-146). A through scope such as
-          // `-> { where("comments.id" => nil).includes(:comments) }` relies on
-          // this to actually JOIN comments; without it the WHERE references a
-          // missing table.
+          // Arel::Nodes::OuterJoin)` (association_scope.rb:139-146). A through
+          // scope such as `-> { where("comments.id" => nil).includes(:comments) }`
+          // relies on this to actually JOIN comments; without it the WHERE
+          // references a missing table.
           //
-          // `merge!` routes the named `joins` / `left_outer_joins` through
-          // Merger#merge_joins / #merge_outer_joins (merger.rb:118-150), which
-          // branch on `other.model == relation.model`: when the item's klass
-          // equals the target scope's klass the names union directly into
-          // `joins_values` / `left_outer_joins_values`; otherwise a cross-klass
-          // JoinDependency is built against the ITEM and stashed. Both branches
-          // are mirrored here (the same split Relation::Merger implements) so a
-          // same-klass entry — e.g. a self-through whose chain entry resolves to
-          // the association's own target — folds its join names in for the
-          // receiver to resolve rather than pre-building a JD.
+          // `merge!` is what routes the named `joins` / `left_outer_joins`
+          // through `Merger#merge_joins` / `#merge_outer_joins`
+          // (merger.rb:116-152) — the same-model union and the cross-model
+          // partition + `construct_join_dependency` both live there, ported once.
+          (scope as { mergeBang: (other: unknown) => unknown }).mergeBang(
+            (item as { only: (...onlies: string[]) => unknown }).only("joins", "leftOuterJoins"),
+          );
+
           const itemValues = item as {
-            joinsValues?: unknown[];
-            leftOuterJoinsValues?: unknown[];
             includesValues?: unknown[];
             eagerLoadValues?: unknown[];
-            _model?: typeof Base;
           };
-          const target = scope as {
-            joinsValues: unknown[];
-            leftOuterJoinsValues: unknown[];
-            _model?: typeof Base;
-          };
-          const sameKlass = itemValues._model !== undefined && itemValues._model === target._model;
-          // merger.rb:123-126 — `other.joins_values.partition { |join| case join
-          // when Hash, Symbol, Array; true end }`: association specs on one
-          // side, raw SQL / Arel nodes and stashed JoinDependencies on the other.
-          const namedInner: unknown[] = [];
-          const others: unknown[] = [];
-          for (const v of itemValues.joinsValues ?? []) {
-            if (
-              isPlainObject(v) ||
-              Array.isArray(v) ||
-              (typeof v === "string" && v.startsWith(":"))
-            ) {
-              namedInner.push(v);
-            } else {
-              others.push(v);
-            }
-          }
-          for (const v of others) target.joinsValues = [...target.joinsValues, v];
-          if (namedInner.length > 0) {
-            if (sameKlass) {
-              for (const v of namedInner)
-                if (!target.joinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-                  target.joinsValues = [...target.joinsValues, v];
-            } else {
-              target.joinsValues = [
-                ...target.joinsValues,
-                constructJoinDependency.call(
-                  itemValues as never,
-                  namedInner as never,
-                  Nodes.InnerJoin,
-                ),
-              ];
-            }
-          }
-          const namedLeft = (itemValues.leftOuterJoinsValues ?? []).filter(
-            (v) => !(v instanceof JoinDependency),
-          );
-          const leftDeps = (itemValues.leftOuterJoinsValues ?? []).filter(
-            (v) => v instanceof JoinDependency,
-          );
-          if (namedLeft.length > 0) {
-            if (sameKlass) {
-              for (const v of namedLeft)
-                if (
-                  !target.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v))
-                )
-                  target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, v];
-            } else {
-              target.leftOuterJoinsValues = [
-                ...target.leftOuterJoinsValues,
-                constructJoinDependency.call(
-                  itemValues as never,
-                  namedLeft as never,
-                  Nodes.OuterJoin,
-                ),
-              ];
-            }
-          }
-          target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, ...leftDeps];
-          // associations = eager_load_values | includes_values → OuterJoin.
           // Rails' `|` unions with dedup, so an association named in BOTH
           // eager_load and includes yields a single JoinDependency entry (not a
           // double join).
@@ -808,14 +736,13 @@ export class AssociationScope {
             ]),
           ];
           if (associations.length > 0) {
-            target.leftOuterJoinsValues = [
-              ...target.leftOuterJoinsValues,
+            (scope as { joinsBang: (...values: unknown[]) => unknown }).joinsBang(
               constructJoinDependency.call(
                 itemValues as never,
                 associations as never,
                 Nodes.OuterJoin,
               ),
-            ];
+            );
           }
         }
 

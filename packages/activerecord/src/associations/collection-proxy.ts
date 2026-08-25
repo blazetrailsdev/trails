@@ -134,7 +134,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private _association!: CollectionAssociation;
   private _assocName: string;
-  private _assocDef: AssociationDefinition;
   // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
   // and `@replaced_or_added_targets` all read `@association`
   // (collection_proxy.rb:33, 53). trails keeps that direction: these accessors
@@ -255,19 +254,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Mirrors Rails' `Association#reflection` (association.rb:16), which is the
    * rich `AssociationReflection` the constructor was handed off the owner's
-   * class (`associations.rb:290-296`). The proxy is built from the thin macro
-   * definition, so the reader resolves the reflection here — once — instead of
-   * every rich-predicate call site re-resolving `_reflectOnAssociation`. An
-   * anonymous inline association has no registered reflection; it falls back to
-   * the macro definition.
+   * class (`associations.rb:290-296`). Every macro declaration registers one
+   * (`associations.ts:704,723,742,813`, beside the `_associations` push the
+   * proxy is built from), so there is no reflection-less association to fall
+   * back for.
    * @internal
    */
   get reflection(): AssociationDefinition {
     const ctor = this._record.constructor as typeof Base;
-    return (
-      (ctor._reflectOnAssociation?.(this._assocName) as AssociationDefinition | null) ??
-      this._assocDef
-    );
+    return ctor._reflectOnAssociation(this._assocName) as unknown as AssociationDefinition;
   }
 
   /**
@@ -278,7 +273,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private get _callbackHost(): CallbackHost {
     return {
       owner: this._record,
-      reflection: this._assocDef,
+      reflection: this.reflection,
       callback: assocCallback,
       callbacksFor: assocCallbacksFor,
     };
@@ -362,7 +357,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     super(targetModel, targetModel.arelTable);
     this._record = record;
     this._assocName = assocName;
-    this._assocDef = assocDef;
     const instance = record.association(assocName) as unknown as CollectionAssociation;
     this._association = instance.isCollection()
       ? instance
@@ -432,7 +426,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
     const { _buildAssociationInstance } = await import("./instance-methods.js");
-    const assoc = _buildAssociationInstance.call(this._record, this._assocDef) as unknown as {
+    const assoc = _buildAssociationInstance.call(this._record, this.reflection) as unknown as {
       _queryExecutor?: () => Promise<Base[]>;
       findTarget(): Promise<Base[]>;
     };
@@ -662,7 +656,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * callbacks all land on this proxy too.
    */
   async push(...records: T[]): Promise<Omit<this, "then"> | false> {
-    if (this._assocDef.options.through) {
+    if (this.reflection.options.through) {
       await this._pushThrough(records);
       return stripThenable(this._proxySelf ?? this);
     }
@@ -920,7 +914,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Convergence story: 0106-wide-call-set-direct-burndown/
     // djar-eager-chain-ids-drop-disable-joins-arms.
     if (this.isNullScope()) return this.scope().pluck(...columnNames);
-    if (this._assocDef.options.disableJoins) {
+    if (this.reflection.options.disableJoins) {
       return this.scope().pluck(...columnNames);
     }
     return super.pluck(...columnNames);
@@ -1121,7 +1115,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Convergence story: 0106-wide-call-set-direct-burndown/
     // djar-eager-chain-ids-drop-disable-joins-arms.
     if (this.isNullScope()) return this.scope().calculate(operation, columnName);
-    if (this._assocDef.options.disableJoins) {
+    if (this.reflection.options.disableJoins) {
       return this.scope().calculate(operation, columnName);
     }
     return super.calculate(operation, columnName);
