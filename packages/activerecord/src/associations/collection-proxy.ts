@@ -437,9 +437,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
     if (
       !queryExecutor &&
-      !(
-        this._collectionAssociation() as unknown as { findTargetNeeded(): boolean }
-      ).findTargetNeeded()
+      !(this._association as unknown as { findTargetNeeded(): boolean }).findTargetNeeded()
     ) {
       return [];
     }
