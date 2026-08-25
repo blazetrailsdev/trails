@@ -24,6 +24,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { ActiveRecord } from "../../ar-config.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -101,17 +102,17 @@ async function withExtensionEnabled(
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  let savedWarningsAction: typeof PostgreSQLAdapter.dbWarningsAction;
+  let savedWarningsAction: typeof ActiveRecord.dbWarningsAction;
   let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    savedWarningsAction = PostgreSQLAdapter.dbWarningsAction;
+    savedWarningsAction = ActiveRecord.dbWarningsAction;
     savedWarningsIgnore = PostgreSQLAdapter.dbWarningsIgnore;
   });
 
   afterEach(async () => {
-    PostgreSQLAdapter.dbWarningsAction = savedWarningsAction;
+    ActiveRecord.dbWarningsAction = savedWarningsAction ?? "ignore";
     PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
     vi.restoreAllMocks();
     if (adapter.isConnected()) {
@@ -821,20 +822,20 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("ignores warnings when behaviour ignore", async () => {
-      PostgreSQLAdapter.dbWarningsAction = "ignore";
+      ActiveRecord.dbWarningsAction = "ignore";
       const rows = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");
       expect(rows).toEqual([]);
     });
 
     it("logs warnings when behaviour log", async () => {
-      PostgreSQLAdapter.dbWarningsAction = "log";
+      ActiveRecord.dbWarningsAction = "log";
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("PostgreSQL SQL warning"));
     });
 
     it("raises warnings when behaviour raise", async () => {
-      PostgreSQLAdapter.dbWarningsAction = "raise";
+      ActiveRecord.dbWarningsAction = "raise";
       await expect(
         adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
       ).rejects.toBeInstanceOf(SQLWarning);
@@ -842,7 +843,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reports when behaviour report", async () => {
       const { ActiveSupport, ErrorReporter } = await import("@blazetrails/activesupport");
-      PostgreSQLAdapter.dbWarningsAction = "report";
+      ActiveRecord.dbWarningsAction = "report";
       const previousReporter = ActiveSupport.errorReporter;
       const reporter = new ErrorReporter();
       const events: Array<{ error: Error; handled: boolean }> = [];
@@ -865,7 +866,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("warnings behaviour can be customized with a proc", async () => {
       let captured: SQLWarning | null = null;
-      PostgreSQLAdapter.dbWarningsAction = (w) => {
+      ActiveRecord.dbWarningsAction = (w) => {
         captured = w;
       };
       await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
@@ -875,7 +876,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("allowlist of warnings to ignore", async () => {
-      PostgreSQLAdapter.dbWarningsAction = "raise";
+      ActiveRecord.dbWarningsAction = "raise";
       PostgreSQLAdapter.dbWarningsIgnore = [/PostgreSQL SQL warning/];
       const rows = await adapter.execute(
         "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
@@ -884,7 +885,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("allowlist of warning codes to ignore", async () => {
-      PostgreSQLAdapter.dbWarningsAction = "raise";
+      ActiveRecord.dbWarningsAction = "raise";
       PostgreSQLAdapter.dbWarningsIgnore = ["01000"];
       const rows = await adapter.execute(
         "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
@@ -893,7 +894,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("does not raise notice level warnings", async () => {
-      PostgreSQLAdapter.dbWarningsAction = "raise";
+      ActiveRecord.dbWarningsAction = "raise";
       await expect(
         adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
       ).resolves.toBeDefined();

@@ -67,7 +67,15 @@ export function setBaseResolver(resolver: () => any): void {
   _baseResolver = resolver;
 }
 
-function getBase(): any {
+/**
+ * Read the `ActiveRecord::Base` constant at call time. Exported for the other
+ * modules that name it inside a method body where Ruby's autoload resolves it
+ * (`ActiveRecord.db_warnings_action=`'s `:log` arm, active_record.rb:245).
+ *
+ * @internal
+ */
+
+export function getBase(): any {
   return _baseResolver?.() ?? null;
 }
 

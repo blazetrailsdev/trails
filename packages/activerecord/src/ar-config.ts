@@ -5,8 +5,14 @@
  * module itself (active_record.rb:321-322).
  */
 import { ArgumentError } from "@blazetrails/activemodel";
+import { ActiveSupport } from "@blazetrails/activesupport";
+import type { SQLWarning } from "./errors.js";
+import { getBase } from "./log-subscriber.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { QueryTransformer } from "./query-transformers.js";
+
+/** Mirrors the values `ActiveRecord.db_warnings_action=` accepts (active_record.rb:231). */
+type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
 
 /** Any constructable class — used for module-config flags that hold a class. */
 type AnyClass = abstract new (...args: never[]) => object;
@@ -46,6 +52,7 @@ let _indexNestedAttributeErrors = false;
 let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _defaultTimezone: "utc" | "local" = "utc";
+let _dbWarningsAction: ((warning: SQLWarning) => void) | null = null;
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
 let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
 
@@ -201,6 +208,62 @@ export const ActiveRecord = {
   /** @internal */
   set schemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp>) {
     _schemaCacheIgnoredTables = value;
+  },
+
+  /**
+   * The action to take when database query produces warning. Must be one of
+   * `"ignore"`, `"log"`, `"raise"`, `"report"`, or a custom function. The
+   * default is `"ignore"`.
+   *
+   * The reader answers the *resolved* callable (Rails'
+   * `singleton_class.attr_reader :db_warnings_action`, active_record.rb:232),
+   * so every adapter's `handle_warnings` is a single `.call(warning)` and the
+   * symbol -> behavior mapping exists once, in the writer below.
+   *
+   * Mirrors `ActiveRecord.db_warnings_action` (active_record.rb:228-254).
+   */
+  get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
+    return _dbWarningsAction;
+  },
+
+  set dbWarningsAction(action: DbWarningsAction) {
+    switch (action) {
+      case "ignore":
+        _dbWarningsAction = null;
+        break;
+      case "log":
+        _dbWarningsAction = (warning) => {
+          let warningMessage = `[ActiveRecord::SQLWarning] ${warning.message}`;
+          if (warning.code) warningMessage += ` (${warning.code})`;
+          // Rails is `ActiveRecord::Base.logger.warn(warning_message)`
+          // (active_record.rb:245); `getBase` is the call-time resolver that
+          // stands in for Ruby resolving that constant when the Proc runs.
+          const logger = getBase()?.logger as { warn?: (msg: string) => void } | null | undefined;
+          if (logger?.warn) logger.warn(warningMessage);
+          else console.warn(warningMessage);
+        };
+        break;
+      case "raise":
+        _dbWarningsAction = (warning) => {
+          throw warning;
+        };
+        break;
+      case "report":
+        // Rails' `Rails.error.report(warning, handled: true)`
+        // (active_record.rb:249).
+        _dbWarningsAction = (warning) => {
+          ActiveSupport.errorReporter.report(warning, { handled: true });
+        };
+        break;
+      default:
+        if (typeof action === "function") {
+          _dbWarningsAction = action;
+          break;
+        }
+        throw new ArgumentError(
+          "db_warnings_action must be one of :ignore, :log, :raise, :report, or a custom proc.",
+        );
+    }
   },
 
   /**

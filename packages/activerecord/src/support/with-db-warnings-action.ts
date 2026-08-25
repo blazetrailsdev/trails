@@ -1,10 +1,11 @@
+import { ActiveRecord } from "../ar-config.js";
 import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLWarning } from "../errors.js";
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void);
 
 /**
- * Scope `AbstractAdapter.dbWarningsAction` (+ optional ignore list) to a
+ * Scope `ActiveRecord.dbWarningsAction` (+ optional ignore list) to a
  * single block, restoring the prior values afterwards even on throw. Mirrors
  * Rails' `ActiveRecord::TestCase#with_db_warnings_action` (test_case.rb:164),
  * which toggles the global `ActiveRecord.db_warnings_action` /
@@ -14,8 +15,8 @@ type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((w: SQLWarning)
  * `configure_connection` — trails' adapters read `dbWarningsAction` live on
  * each warning-bearing query, so no reconnect is needed.
  *
- * `dbWarningsAction` is declared on the base adapter, so setting it here is a
- * single global toggle observed by every concrete adapter (PostgreSQL/MySQL
+ * `dbWarningsAction` is a module-level config, as in Rails, so setting it here
+ * is a single global toggle observed by every concrete adapter (PostgreSQL/MySQL
  * escalate under `"raise"`; SQLite has no warning channel and so is a no-op,
  * matching Rails).
  */
@@ -28,14 +29,14 @@ export async function withDbWarningsAction(
     typeof warningsToIgnore === "function" ? warningsToIgnore : fn
   ) as () => Promise<void> | void;
   const ignore = Array.isArray(warningsToIgnore) ? warningsToIgnore : [];
-  const savedAction = AbstractAdapter.dbWarningsAction;
+  const savedAction = ActiveRecord.dbWarningsAction;
   const savedIgnore = AbstractAdapter.dbWarningsIgnore;
-  AbstractAdapter.dbWarningsAction = action;
+  ActiveRecord.dbWarningsAction = action;
   AbstractAdapter.dbWarningsIgnore = ignore;
   try {
     await body();
   } finally {
-    AbstractAdapter.dbWarningsAction = savedAction;
+    ActiveRecord.dbWarningsAction = savedAction ?? "ignore";
     AbstractAdapter.dbWarningsIgnore = savedIgnore;
   }
 }

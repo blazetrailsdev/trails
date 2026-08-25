@@ -884,7 +884,9 @@ export class PostgreSQLAdapter
    * from _doAcquire (matches Rails' single-slot set_notice_receiver).
    */
   private _attachNoticeListener(client: pg.Client): void {
-    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction === "ignore") return;
+    // Rails' `unless ActiveRecord.db_warnings_action.nil?`
+    // (postgresql_adapter.rb:965).
+    if (ActiveRecord.dbWarningsAction == null) return;
     client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
       // Rails' notice receiver buffers SQLWarning instances themselves
       // (postgresql_adapter.rb:970), so `handle_warnings` dispatches the very

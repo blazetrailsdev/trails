@@ -1,6 +1,7 @@
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { ActiveRecord } from "../../ar-config.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   ConnectionNotEstablished,
@@ -814,14 +815,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    let savedWarningsAction: typeof PostgreSQLAdapter.dbWarningsAction;
+    let savedWarningsAction: typeof ActiveRecord.dbWarningsAction;
     let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
     beforeEach(() => {
-      savedWarningsAction = PostgreSQLAdapter.dbWarningsAction;
+      savedWarningsAction = ActiveRecord.dbWarningsAction;
       savedWarningsIgnore = PostgreSQLAdapter.dbWarningsIgnore;
     });
     afterEach(() => {
-      PostgreSQLAdapter.dbWarningsAction = savedWarningsAction;
+      ActiveRecord.dbWarningsAction = savedWarningsAction ?? "ignore";
       PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
       vi.restoreAllMocks();
     });

@@ -4,6 +4,7 @@ import { CurrentAttributes } from "./current-attributes.js";
 import { methodMissingProxy } from "./method-missing-proxy.js";
 import { assertSame } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 describe("CurrentAttributesTest", () => {
   /** Rails' `Person = Struct.new(:id, :name, :time_zone)`. */
@@ -278,8 +279,23 @@ describe("CurrentAttributesTest", () => {
     expect(Current.counterInteger).toBe(0);
   });
 
-  it.skip("CurrentAttributes use fiber-local variables");
-  it.skip("CurrentAttributes can use thread-local variables");
+  // Rails flips `IsolatedExecutionState.isolation_level` and reads the
+  // attribute from inside an `Enumerator`, which runs its block on a separate
+  // fiber. JS has neither fibers nor threads, so the two levels port to the two
+  // things trails' IsolatedExecutionState actually distinguishes: a forked
+  // execution context (`run`, the analogue of :fiber) and the caller's own
+  // context (the analogue of :thread, which the Enumerator's fiber shares).
+  it("CurrentAttributes use fiber-local variables", () => {
+    Session.current = 42;
+    const inner = IsolatedExecutionState.run(() => Session.current);
+    expect(inner).toBeUndefined();
+  });
+
+  it("CurrentAttributes can use thread-local variables", () => {
+    Session.current = 42;
+    const inner = (() => Session.current)();
+    expect(inner).toBe(42);
+  });
 
   it("CurrentAttributes doesn't populate #attributes when not using defaults", () => {
     expect(Current.attributes).toEqual({ counterInteger: 0, counterCallable: 0 });
