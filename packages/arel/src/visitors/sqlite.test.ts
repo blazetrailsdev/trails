@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { buildQuoted } from "../nodes/casted.js";
 import { Table, sql, Nodes, Visitors, Collectors } from "../index.js";
@@ -7,7 +7,7 @@ import { Table, sql, Nodes, Visitors, Collectors } from "../index.js";
 describe("SqliteTest", () => {
   let visitor: Visitors.SQLite;
   beforeEach(() => {
-    visitor = new Visitors.SQLite(testConnection);
+    visitor = new Visitors.SQLite(fakeRecordConnection);
   });
 
   function compile(node: Nodes.Node): string {

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { postgresqlTestConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { Table, sql, Nodes, Visitors, Collectors } from "../index.js";
 import { buildQuoted } from "../nodes/casted.js";
 
 describe("PostgresTest", () => {
-  const visitor = new Visitors.PostgreSQL(postgresqlTestConnection);
+  const visitor = new Visitors.PostgreSQL(fakeRecordConnection);
   const table = new Table("users");
   const attr = table.get("id");
 
