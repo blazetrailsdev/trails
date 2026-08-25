@@ -2,8 +2,8 @@
  * The bare `Arel.*` module functions (arel.rb:31-72).
  *
  * This file deliberately imports nothing at runtime beyond
- * `nodes/sql-literal.js` and `nodes/bound-sql-literal.js`, both leaves. Ruby resolves `Arel.sql` when the
- * calling method runs, so a Rails body anywhere in the package may name it;
+ * `nodes/sql-literal.js` and `nodes/bound-sql-literal.js`, both leaves. Ruby
+ * resolves `Arel.sql` when the calling method runs, so a Rails body anywhere in the package may name it;
  * in ESM every import is eager, and re-importing them from `index.ts` — which
  * re-exports `select-manager.js`, `visitors/index.js` and friends — would
  * close a cycle over index.ts's top-level `include()` / `registerNodeDeps()`
@@ -43,7 +43,7 @@ export function sql(
     namedBinds = rest;
   }
   if (positionalBinds.length === 0 && Object.keys(namedBinds).length === 0) {
-    return new SqlLiteral(sqlString, { retryable: retryable });
+    return new SqlLiteral(sqlString, { retryable });
   } else {
     return new BoundSqlLiteral(sqlString, positionalBinds, namedBinds);
   }
