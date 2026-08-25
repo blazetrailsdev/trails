@@ -34,10 +34,6 @@ describe("Serializers::JSON host", () => {
     }
     _name = "";
     _age = 0;
-    setAttributes(h: { name: string; age: number }) {
-      this._name = h.name;
-      this._age = h.age;
-    }
     get name() {
       return this._name;
     }
@@ -106,9 +102,6 @@ describe("Serializers::JSON host", () => {
         this._x = h.x;
       }
       _x = 0;
-      setAttributes(h: { x: number }) {
-        this._x = h.x;
-      }
       get x() {
         return this._x;
       }
@@ -150,9 +143,6 @@ describe("Serializers::JSON host", () => {
         this._id = h.id;
       }
       _id = 0n;
-      setAttributes(h: { id: bigint }) {
-        this._id = h.id;
-      }
       get id() {
         return this._id;
       }
@@ -183,9 +173,6 @@ describe("Serializers::JSON host", () => {
         this._name = h.name;
       }
       _name = "";
-      setAttributes(h: { name: string }) {
-        this._name = h.name;
-      }
       get name() {
         return this._name;
       }
@@ -220,9 +207,6 @@ describe("Serializers::JSON host", () => {
         this._v = h.v;
       }
       _v = 0;
-      setAttributes(h: { v: number }) {
-        this._v = h.v;
-      }
       get v() {
         return this._v;
       }
@@ -277,9 +261,6 @@ describe("Serializers::JSON host", () => {
         this._v = h.v;
       }
       _v = 0;
-      setAttributes(h: { v: number }) {
-        this._v = h.v;
-      }
       get v() {
         return this._v;
       }
