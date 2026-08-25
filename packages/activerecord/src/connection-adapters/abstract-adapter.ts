@@ -490,7 +490,7 @@ export interface AbstractAdapter {
   ): Record<string, unknown>;
   checkConstraintExists(
     tableName: string,
-    options: { name?: string; expression?: string; validate?: boolean },
+    options?: { name?: string; expression?: string; validate?: boolean },
   ): Promise<boolean>;
   /** @internal */
   checkConstraintForBang(
