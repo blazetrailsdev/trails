@@ -231,6 +231,31 @@ describe("Serializers::JSON host", () => {
     expect(k._v).toBe(7);
   });
 
+  it("fromJson treats an explicitly passed nil includeRoot as nil, not the class default", () => {
+    // json.rb:144 — `include_root = include_root_in_json` is a Ruby optional
+    // parameter, so the default applies only when the argument is omitted.
+    class ExplicitNil extends JSONHost {
+      static {
+        this.includeRootInJson = true;
+        Object.defineProperty(this.prototype, "attributes", {
+          get() {
+            return { v: this._v };
+          },
+          configurable: true,
+        });
+      }
+      _v = 0;
+      setAttributes(h: { v: number }) {
+        this._v = h.v;
+      }
+      get v() {
+        return this._v;
+      }
+    }
+    const e = new ExplicitNil().fromJson('{"v":7}', null);
+    expect(e._v).toBe(7);
+  });
+
   it("fromJson uses class-level includeRootInJson default when no second arg passed", () => {
     class Defaulted extends JSONHost {
       static {

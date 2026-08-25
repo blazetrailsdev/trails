@@ -35,9 +35,10 @@ import {
  *
  * Rails ships JSON as a module that pulls in `Serialization` (giving
  * `serializable_hash`) and extends `Naming` (giving `model_name`).
- * Trails' `Model` already wires up `asJson` / `fromJson`; this class
- * is the canonical mixin host for lighter-weight adopters and the
- * file-level Rails surface (`serializable_hash`, `model_name`).
+ * `Model` gets `as_json` / `from_json` from this module, via the
+ * `include(Model, JSON)` in `model.ts`; the class is also the mixin host for
+ * lighter-weight adopters and the file-level Rails surface
+ * (`serializable_hash`, `model_name`).
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class JSON {
@@ -111,10 +112,16 @@ export class JSON {
    *     self.attributes = hash
    *     self
    *   end
+   *
+   * `include_root` is a Ruby optional parameter, so its default is evaluated
+   * only when the argument is OMITTED — an explicit `nil` stays `nil` and
+   * :147's `if include_root` is false. A TS default parameter would swallow
+   * that (CLAUDE.md § "Ruby idioms that do not translate literally", kwargs),
+   * so the argument rides in a rest tuple whose length IS the distinction.
    */
-  fromJson(json: string, includeRoot?: boolean | string): this {
+  fromJson(json: string, ...includeRoot: [includeRoot?: boolean | string | null]): this {
     const ctor = this.constructor as typeof JSON;
-    const root = includeRoot ?? ctor.includeRootInJson;
+    const root = includeRoot.length > 0 ? includeRoot[0] : ctor.includeRootInJson;
     let hash = globalThis.JSON.parse(json) as unknown;
     // Ruby truthiness: only `false`/`nil` skip the unwrap, and Rails ignores
     // the configured root key on the read path (json.rb:146-147).
