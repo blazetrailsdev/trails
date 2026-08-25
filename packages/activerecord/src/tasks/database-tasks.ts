@@ -1367,6 +1367,10 @@ export class DatabaseTasks {
    * Mirrors: DatabaseTasks#for_each (`tasks/database_tasks.rb:141-154`).
    * `:142`'s `return {} unless defined?(Rails)` has no trails counterpart —
    * there is no `Rails` constant to branch on — so the body always runs.
+   * `:150`'s `db_config.database_tasks?` is defined on `HashConfig`
+   * (`hash_config.rb:161`), not on the abstract `DatabaseConfig`, so the
+   * receiver is narrowed the same way `DatabaseConfigurations#configsFor`
+   * narrows it for the identical Ruby call.
    */
   static forEach(
     databases: RawConfigurations | DatabaseConfig[],
