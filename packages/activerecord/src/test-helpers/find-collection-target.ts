@@ -3,14 +3,19 @@ import type { AssociationDefinition, AssociationOptions } from "../associations.
 import { _buildAssociationInstance } from "../associations/instance-methods.js";
 
 /**
- * Runs a has_many load the way `CollectionProxy` and the through loaders do —
- * `load_target` (`association.rb:189-195`) on an association holder — for an
- * options set that is not necessarily the declared one.
+ * Runs a has_many load the way `CollectionProxy` does — `find_target?`
+ * (`association.rb:190`) decides whether to query, `find_target`
+ * (`association.rb:248`) does the querying — for an options set that is not
+ * necessarily the declared one.
  *
- * The holder is built fresh rather than taken from `record.association(name)`
- * so the load leaves the record's real holder (its loadedness, its writeback
- * suppression, its inverse wiring) untouched, which is what these tests want
- * when they drive the loader directly.
+ * As in `CollectionProxy._findTargetViaAssociation`, the gate is read off the
+ * owner's own holder (whose reflection answers `klass` and
+ * `active_record_primary_key`) while the load runs on a holder built fresh, so
+ * it leaves the record's real holder — its loadedness, its writeback
+ * suppression, its inverse wiring — untouched, which is what these tests want
+ * when they drive the loader directly. A `name` the owner never declared has no
+ * real holder and so no `find_target?` to consult: Rails has no association
+ * without a reflection, and that inline-fallback shape is trails-only.
  *
  * Test-only sugar: every call site would otherwise repeat the same cast.
  * `async` so `check_validity!` — run when
@@ -38,16 +43,27 @@ export async function findCollectionTarget(
   } else if (scope !== null) {
     options = scope;
   }
+  const declared = (
+    record.constructor as unknown as {
+      _reflectOnAssociation?: (n: string) => unknown;
+    }
+  )._reflectOnAssociation?.(name);
+  if (declared) {
+    const holder = (
+      record as unknown as {
+        association(n: string): { findTargetNeeded(): boolean; target: Base[] };
+      }
+    ).association(name);
+    // `load_target` answers `target` whether or not `find_target?` sent it to
+    // the database (association.rb:189-195), so an already-loaded holder
+    // reports what it holds rather than an empty list.
+    if (!holder.findTargetNeeded()) return holder.target ?? [];
+  }
   const assoc = _buildAssociationInstance.call(record, {
     name,
     type: "hasMany",
     scope: positionalScope,
     options,
   });
-  // `load_target` rather than `find_target`: the `find_target?` gate lives
-  // there (association.rb:190), and `CollectionProxy` now loads through it too.
-  const loaded = await (
-    assoc as unknown as { loadTarget(): Promise<Base[] | Base | null> | Base[] | Base | null }
-  ).loadTarget();
-  return (loaded ?? []) as Base[];
+  return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
 }
