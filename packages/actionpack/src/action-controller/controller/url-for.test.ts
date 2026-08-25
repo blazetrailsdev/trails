@@ -159,39 +159,34 @@ describe("UrlForTest", () => {
     ).toBe("http://openid.aol.com%2Fnextangler:one+two%3F@www.basecamphq.com/c/a/i");
   });
 
-  it("trailing slash", () => {
-    // pending: needs RouteSet trailing_slash propagation. `:trailing_slash` on a
-    // non-blank path is applied by the route set (route_set.rb:882); Http::URL's own
-    // arm only fills a blank path (url.rb:76).
-    expect(true).toBe(true);
+  it.skip("trailing slash", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with protocol", () => {
-    // pending: needs RouteSet trailing_slash propagation. `:trailing_slash` on a
-    // non-blank path is applied by the route set (route_set.rb:882); Http::URL's own
-    // arm only fills a blank path (url.rb:76).
-    expect(true).toBe(true);
+  it.skip("trailing slash with protocol", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with only path", () => {
-    // pending: needs RouteSet trailing_slash propagation. `:trailing_slash` on a
-    // non-blank path is applied by the route set (route_set.rb:882); Http::URL's own
-    // arm only fills a blank path (url.rb:76).
-    expect(true).toBe(true);
+  it.skip("trailing slash with only path", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with anchor", () => {
-    // pending: needs RouteSet trailing_slash propagation. `:trailing_slash` on a
-    // non-blank path is applied by the route set (route_set.rb:882); Http::URL's own
-    // arm only fills a blank path (url.rb:76).
-    expect(true).toBe(true);
+  it.skip("trailing slash with anchor", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with params", () => {
-    // pending: needs RouteSet trailing_slash propagation. `:trailing_slash` on a
-    // non-blank path is applied by the route set (route_set.rb:882); Http::URL's own
-    // arm only fills a blank path (url.rb:76).
-    expect(true).toBe(true);
+  it.skip("trailing slash with params", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
   it("relative url root is respected", () => {
@@ -228,20 +223,11 @@ describe("UrlForTest", () => {
     expect(true).toBe(true); // pending: needs RouteSet scoped :account_id
   });
 
-  it("using nil script name properly concats with original script name", () => {
-    // `:original_script_name` is consumed by the route set, which prepends it to
-    // `find_script_name`'s answer before handing `:script_name` to
-    // ActionDispatch::Http::URL (route_set.rb#url_for). Http::URL itself only ever
-    // sees the concatenated `:script_name`.
-    const originalScriptName = "/subdir";
-    expect(
-      URL.urlFor({
-        host: "www.basecamphq.com",
-        protocol: "https",
-        path: "/c/a/i",
-        scriptName: originalScriptName + "",
-      }),
-    ).toBe("https://www.basecamphq.com/subdir/c/a/i");
+  it.skip("using nil script name properly concats with original script name", () => {
+    // needs RouteSet `:original_script_name` handling. The concatenation under test
+    // is `script_name = original_script_name + script_name` (route_set.rb:869-873);
+    // ActionDispatch::Http::URL only ever sees the already-concatenated
+    // `:script_name`, so there is nothing at this layer to assert.
   });
 
   it("only path", () => {
