@@ -92,7 +92,7 @@ describe("CheckConstraintDefinition#defined_for?", () => {
       name: "chk",
       validate: true,
       comment: "priced",
-    } as { name?: string; validate?: boolean | null });
+    });
 
     expect(definition.isDefinedFor({ name: "chk", comment: "priced" })).toBe(true);
     expect(definition.isDefinedFor({ name: "chk", comment: "other" })).toBe(false);

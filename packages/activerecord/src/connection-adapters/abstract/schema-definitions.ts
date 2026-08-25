@@ -430,12 +430,12 @@ export class PrimaryKeyDefinition {
 export class CheckConstraintDefinition {
   readonly tableName: string;
   readonly expression: string;
-  readonly options: { name?: string; validate?: boolean | null };
+  readonly options: { name?: string; validate?: boolean | null; [key: string]: unknown };
 
   constructor(
     tableName: string,
     expression: string,
-    options: { name?: string; validate?: boolean | null } = {},
+    options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
   ) {
     this.tableName = tableName;
     this.expression = expression;
@@ -490,7 +490,7 @@ export class CheckConstraintDefinition {
     return (
       this.name === (name == null ? "" : name.toString()) &&
       (validate == null || !("validate" in this.options) || validate === this.validate) &&
-      sliced.every(([k, v]) => toS((this.options as Record<string, unknown>)[k]) === toS(v))
+      sliced.every(([k, v]) => toS(this.options[k]) === toS(v))
     );
   }
 }
