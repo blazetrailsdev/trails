@@ -71,7 +71,7 @@ describe("SQLite3::Column JSON round-trip", () => {
       ].sort(),
     );
     expect(back).toBeInstanceOf(Column);
-    expect(back.autoIncrement).toBe(true);
+    expect(back.isAutoIncrement()).toBe(true);
     expect(back.rowid).toBeUndefined();
     expect(back.isVirtual()).toBe(false);
     expect(back.isVirtualStored()).toBe(false);

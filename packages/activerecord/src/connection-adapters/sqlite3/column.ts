@@ -9,7 +9,7 @@ import type { ColumnCoder } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class Column extends BaseColumn {
-  autoIncrement: boolean;
+  private _autoIncrement: boolean;
   rowid: boolean;
   private _generatedType: "stored" | "virtual" | null;
 
@@ -43,13 +43,19 @@ export class Column extends BaseColumn {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
     });
-    this.autoIncrement = options.autoIncrement ?? false;
+    this._autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;
   }
 
+  /** Mirrors: SQLite3::Column#auto_increment? (`sqlite3/column.rb:18-20`) */
+  isAutoIncrement(): boolean {
+    return this._autoIncrement;
+  }
+
+  /** Mirrors: SQLite3::Column#auto_incremented_by_db? (`sqlite3/column.rb:22-24`) */
   isAutoIncrementedByDb(): boolean {
-    return this.autoIncrement || this.rowid;
+    return this.isAutoIncrement() || this.rowid;
   }
 
   /**
@@ -71,7 +77,9 @@ export class Column extends BaseColumn {
 
   override equals(other: unknown): boolean {
     return (
-      other instanceof Column && super.equals(other) && this.autoIncrement === other.autoIncrement
+      other instanceof Column &&
+      super.equals(other) &&
+      this.isAutoIncrement() === other.isAutoIncrement()
     );
   }
 
@@ -81,13 +89,13 @@ export class Column extends BaseColumn {
    * dropped by a round-trip upstream too.
    */
   override initWith(coder: ColumnCoder): void {
-    this.autoIncrement = (coder["auto_increment"] as boolean) ?? false;
+    this._autoIncrement = (coder["auto_increment"] as boolean) ?? false;
     super.initWith(coder);
   }
 
   /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
   override encodeWith(coder: ColumnCoder): void {
-    coder["auto_increment"] = this.autoIncrement;
+    coder["auto_increment"] = this._autoIncrement;
     super.encodeWith(coder);
     coder["class"] = "SQLite3::Column";
   }
