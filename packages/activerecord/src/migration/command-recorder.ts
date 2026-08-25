@@ -97,9 +97,25 @@ export class CommandRecorder {
    * Returns the inverse command and args for the given command.
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#inverse_of
+   * (command_recorder.rb:114-123). The `method in this` test is Ruby's
+   * `respond_to?(method, true)` (command_recorder.rb:116), routed through the
+   * `methodMissingProxy` `has` trap; membership is tested before the read,
+   * because a name the recorder does not answer reads back as the proxy's
+   * `NoMethodError`-raising function rather than `undefined`.
    */
   inverseOf(cmd: string, args: unknown[]): { cmd: string; args: unknown[] } {
-    const [invertedCmd, invertedArgs] = this._dispatchInvert(cmd, args);
+    const method = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
+    if (!(method in this)) {
+      throw new IrreversibleMigration(
+        `This migration uses ${cmd}, which is not automatically reversible.\n` +
+          `To make the migration reversible you can either:\n` +
+          `1. Define #up and #down methods in place of the #change method.\n` +
+          `2. Use the #reversible method to define reversible behavior.\n`,
+      );
+    }
+    const [invertedCmd, invertedArgs] = (
+      this[method] as (args: unknown[]) => [string, unknown[]]
+    ).call(this, args);
     return { cmd: invertedCmd, args: invertedArgs };
   }
 
@@ -170,10 +186,7 @@ export class CommandRecorder {
 
   /** Returns the full inverse command list. */
   inverse(): Array<{ cmd: string; args: unknown[] }> {
-    return [...this._commands].reverse().map(({ cmd, args }) => {
-      const [invertedCmd, invertedArgs] = this._dispatchInvert(cmd, args);
-      return { cmd: invertedCmd, args: invertedArgs };
-    });
+    return [...this._commands].reverse().map(({ cmd, args }) => this.inverseOf(cmd, args));
   }
 
   // ---------------------------------------------------------------------------
@@ -674,24 +687,6 @@ export class CommandRecorder {
   /** @internal */
   joinTableName(table1: string, table2: string): string {
     return _joinTableName(table1, table2);
-  }
-
-  // ---------------------------------------------------------------------------
-  // private dispatch
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Mirrors `inverse_of`'s `respond_to?(method, true)` guard
-   * (command_recorder.rb:116): membership is tested before the read, because a
-   * name the recorder does not answer takes the proxy's `method_missing` arm.
-   */
-  private _dispatchInvert(cmd: string, args: unknown[]): [string, unknown[]] {
-    const methodName = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
-    const method = methodName in this ? this[methodName] : undefined;
-    if (typeof method === "function") {
-      return (method as (args: unknown[]) => [string, unknown[]]).call(this, args);
-    }
-    throw new IrreversibleMigration(`${cmd} is not reversible`);
   }
 }
 

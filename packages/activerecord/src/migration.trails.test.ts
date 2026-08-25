@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration, IllegalMigrationNameError } from "./migration.js";
@@ -386,5 +387,17 @@ describe("Schema.verbose", () => {
     } finally {
       Migration.verbose = was;
     }
+  });
+});
+
+describe("createTable force + ifNotExists key presence", () => {
+  it("raises when ifNotExists is present but false", async () => {
+    // Rails guards on `options.key?(:if_not_exists)`, not on the value
+    // (schema_statements.rb:297-299), so `if_not_exists: false` raises too.
+    const adapter = Base.connection;
+    // The guard raises before any DDL runs, so no table is created.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    const create = adapter.createTable("things", { force: true, ifNotExists: false });
+    await expect(create).rejects.toThrow(ArgumentError);
   });
 });
