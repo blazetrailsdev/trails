@@ -1636,6 +1636,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * nullable for the disconnected adapter, so the guard joins the `.nil?`
    * early return rather than becoming a second branch Rails does not have.
    *
+   * Rails' closing `ActiveRecord.db_warnings_action.call(warning)`
+   * (abstract_mysql_adapter.rb:782) is spelled `Function#call`, which takes the
+   * receiver first and so fills the slot Ruby's `Proc#call` has no argument for.
+   *
    * Public rather than Ruby-private for the same reason PostgreSQL's is:
    * `perform_query` reaches it through a structurally-typed mixin host.
    *
@@ -1670,10 +1674,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
-      // Rails' `ActiveRecord.db_warnings_action.call(warning)`
-      // (abstract_mysql_adapter.rb:782). JS `Function#call` takes the receiver
-      // first, so the adapter fills the slot Ruby's `Proc#call` has no
-      // argument for.
       action.call(this, warning);
     }
   }

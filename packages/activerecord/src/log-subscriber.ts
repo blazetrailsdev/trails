@@ -73,8 +73,10 @@ export function setBaseResolver(resolver: () => any): void {
  * (`ActiveRecord.db_warnings_action=`'s `:log` arm, active_record.rb:245).
  *
  * @internal
+ * @noRailsEquivalent PERMANENT — the read half of the `setBaseResolver` seam
+ *   above; Ruby resolves `ActiveRecord::Base` by autoload at call time, which a
+ *   static TS import cannot do without closing a cycle.
  */
-
 export function getBase(): any {
   return _baseResolver?.() ?? null;
 }

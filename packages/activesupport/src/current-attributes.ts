@@ -171,39 +171,6 @@ export abstract class CurrentAttributes {
     return instance as InstanceType<T>;
   }
 
-  /** Mirrors: CurrentAttributes.reset_all (current_attributes.rb:156-158) @internal */
-  static resetAll(): void {
-    for (const instance of this.currentInstances().values()) instance.reset();
-  }
-
-  /** Mirrors: CurrentAttributes.clear_all (current_attributes.rb:160-163) @internal */
-  static clearAll(): void {
-    this.resetAll();
-    this.currentInstances().clear();
-  }
-
-  /** Mirrors: CurrentAttributes.current_instances (:170-172) @internal */
-  private static currentInstances(): Map<string, CurrentAttributes> {
-    return IsolatedExecutionState.fetch(
-      CURRENT_ATTRIBUTES_INSTANCES,
-      () => new Map<string, CurrentAttributes>(),
-    );
-  }
-
-  /**
-   * Mirrors: CurrentAttributes.current_instances_key (:174-176). Ruby memoizes
-   * `name.to_sym` in a per-class ivar, so the memo is read as an *own*
-   * property — a subclass keys on its own name, never its parent's.
-   *
-   * @internal
-   */
-  private static currentInstancesKey(): string {
-    if (!Object.prototype.hasOwnProperty.call(this, "_currentInstancesKey")) {
-      (this as CurrentAttributesClass)._currentInstancesKey = this.name;
-    }
-    return (this as CurrentAttributesClass)._currentInstancesKey!;
-  }
-
   /**
    * Registers a callback to run before #reset clears the attributes. Mirrors
    * Rails' `before_reset` (`set_callback :reset, :before`).
@@ -249,6 +216,39 @@ export abstract class CurrentAttributes {
    */
   static set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return this.instance().set(attributes, block);
+  }
+
+  /** Mirrors: CurrentAttributes.reset_all (current_attributes.rb:156-158) @internal */
+  static resetAll(): void {
+    for (const instance of this.currentInstances().values()) instance.reset();
+  }
+
+  /** Mirrors: CurrentAttributes.clear_all (current_attributes.rb:160-163) @internal */
+  static clearAll(): void {
+    this.resetAll();
+    this.currentInstances().clear();
+  }
+
+  /** Mirrors: CurrentAttributes.current_instances (:170-172) @internal */
+  private static currentInstances(): Map<string, CurrentAttributes> {
+    return IsolatedExecutionState.fetch(
+      CURRENT_ATTRIBUTES_INSTANCES,
+      () => new Map<string, CurrentAttributes>(),
+    );
+  }
+
+  /**
+   * Mirrors: CurrentAttributes.current_instances_key (:174-176). Ruby memoizes
+   * `name.to_sym` in a per-class ivar, so the memo is read as an *own*
+   * property — a subclass keys on its own name, never its parent's.
+   *
+   * @internal
+   */
+  private static currentInstancesKey(): string {
+    if (!Object.prototype.hasOwnProperty.call(this, "_currentInstancesKey")) {
+      (this as CurrentAttributesClass)._currentInstancesKey = this.name;
+    }
+    return (this as CurrentAttributesClass)._currentInstancesKey!;
   }
 
   // -------------------------------------------------------------------------

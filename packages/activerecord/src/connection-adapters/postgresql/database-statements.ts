@@ -382,6 +382,13 @@ interface HandleWarningsHost {
  * PG::Result, database_statements.rb:166), and calls the resolved
  * `ActiveRecord.db_warnings_action` on each surviving warning.
  *
+ * Rails' `.call(warning)` has no nil guard here — the notice receiver that
+ * fills `_noticeReceiverSqlWarnings` is only attached while
+ * `ActiveRecord.db_warnings_action` is set (postgresql_adapter.rb:965) — so the
+ * `!` carries that invariant rather than adding a branch. JS `Function#call`
+ * takes the receiver first, filling the slot Ruby's `Proc#call` has no argument
+ * for.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings
  * (postgresql/database_statements.rb:216-223)
  * @internal
@@ -391,11 +398,7 @@ export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
     if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
 
     warning.sql = sql;
-    // Rails' `ActiveRecord.db_warnings_action.call(warning)`
-    // (postgresql/database_statements.rb:222). JS `Function#call` takes the
-    // receiver first, so the adapter fills the slot Ruby's `Proc#call` has no
-    // argument for.
-    ActiveRecord.dbWarningsAction?.call(this, warning as unknown as SQLWarning);
+    ActiveRecord.dbWarningsAction!.call(this, warning as unknown as SQLWarning);
   }
 }
 

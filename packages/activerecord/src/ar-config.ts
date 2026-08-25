@@ -220,6 +220,11 @@ export const ActiveRecord = {
    * so every adapter's `handle_warnings` is a single `.call(warning)` and the
    * symbol -> behavior mapping exists once, in the writer below.
    *
+   * The `"log"` arm names `ActiveRecord::Base.logger` (active_record.rb:245),
+   * which Ruby resolves when the Proc runs; `getBase` is the call-time resolver
+   * that stands in for that. The `"report"` arm is Rails'
+   * `Rails.error.report(warning, handled: true)` (active_record.rb:249).
+   *
    * Mirrors `ActiveRecord.db_warnings_action` (active_record.rb:228-254).
    */
   get dbWarningsAction(): ((warning: SQLWarning) => void) | null {
@@ -235,9 +240,6 @@ export const ActiveRecord = {
         _dbWarningsAction = (warning) => {
           let warningMessage = `[ActiveRecord::SQLWarning] ${warning.message}`;
           if (warning.code) warningMessage += ` (${warning.code})`;
-          // Rails is `ActiveRecord::Base.logger.warn(warning_message)`
-          // (active_record.rb:245); `getBase` is the call-time resolver that
-          // stands in for Ruby resolving that constant when the Proc runs.
           const logger = getBase()?.logger as { warn?: (msg: string) => void } | null | undefined;
           if (logger?.warn) logger.warn(warningMessage);
           else console.warn(warningMessage);
@@ -249,8 +251,6 @@ export const ActiveRecord = {
         };
         break;
       case "report":
-        // Rails' `Rails.error.report(warning, handled: true)`
-        // (active_record.rb:249).
         _dbWarningsAction = (warning) => {
           ActiveSupport.errorReporter.report(warning, { handled: true });
         };
