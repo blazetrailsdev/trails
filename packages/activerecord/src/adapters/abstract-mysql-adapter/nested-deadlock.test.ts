@@ -76,6 +76,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     afterEach(async () => {
+      // nested_deadlock_test.rb:24 — clear first, so no connection another
+      // execution context still holds is sitting on a `samples` lock when the
+      // drop runs.
+      Base.connectionHandler.clearActiveConnectionsBang("all");
       const connection = await leaseMysqlAdapter();
       await connection.dropTable("samples", { ifExists: true });
     });
