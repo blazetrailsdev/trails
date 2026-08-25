@@ -1,168 +1,210 @@
+/**
+ * Mirrors Rails
+ * activerecord/test/cases/adapters/abstract_mysql_adapter/nested_deadlock_test.rb
+ */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./test-helper.js";
-import { Deadlocked, Rollback } from "../../errors.js";
+import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
+import { fixtures } from "../../test-fixtures.js";
+import { registerModel } from "../../associations.js";
+import { Base } from "../../base.js";
+import { Deadlocked, Rollback, StatementInvalid } from "../../errors.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
-function createBarrier(n: number): { wait: () => Promise<void> } {
+// Rails' `class Sample < ActiveRecord::Base` (nested_deadlock_test.rb:9-12) —
+// an inline model over the table the test creates itself.
+class Sample extends Base {
+  declare id: number;
+  declare value: number | null;
+  static {
+    this.tableName = "samples";
+  }
+}
+registerModel([Sample]);
+
+// `Concurrent::CyclicBarrier.new(2)` (nested_deadlock_test.rb:38).
+function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   let count = 0;
-  let resolve!: () => void;
-  const promise = new Promise<void>((r) => {
-    resolve = r;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
   });
   return {
     wait: () => {
-      count++;
-      if (count >= n) resolve();
-      return promise;
+      if (++count >= parties) release();
+      return gate;
     },
   };
 }
 
-async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
-  await a.execQuery("SELECT * FROM `samples` LIMIT 1");
+// nested_deadlock_test.rb:177-180 — dirty the parent transaction so the next
+// nested one is a savepoint transaction.
+async function makeParentTransactionDirty(): Promise<void> {
+  await Sample.take();
 }
 
-function assertSavepoint(a: Mysql2Adapter): void {
-  expect(a.currentTransaction()).toBeInstanceOf(SavepointTransaction);
+// nested_deadlock_test.rb:182-187.
+async function assertCurrentTransactionIsSavepointTransaction(): Promise<void> {
+  const currentTransaction = (await Sample.leaseConnection()).currentTransaction();
+  expect(currentTransaction).toBeInstanceOf(SavepointTransaction);
+}
+
+// nested_deadlock_test.rb:64-70 — the savepoint race surfaces as an opaque
+// StatementInvalid, so Rails flunks with a diagnosis rather than re-raising it.
+function flunkOnLostSavepoint(errors: unknown[]): void {
+  const lost = errors.find(
+    (e) =>
+      e instanceof StatementInvalid && /SAVEPOINT active_record_. does not exist/.test(String(e)),
+  );
+  if (lost === undefined) return;
+  expect.fail(
+    `ROLLBACK TO SAVEPOINT query issued for savepoint that no longer exists due to deadlock: ${String(lost)}`,
+  );
 }
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
-  let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = await leaseMysqlAdapter();
-  });
-
   describe("NestedDeadlockTest", () => {
-    let s1id: number;
-    let s2id: number;
+    fixtures([], { useTransactionalTests: false });
 
     beforeEach(async () => {
-      await adapter.execute("DROP TABLE IF EXISTS `samples`");
-      await adapter.execute(
-        "CREATE TABLE `samples` (id INT AUTO_INCREMENT PRIMARY KEY, value INT)",
-      );
-      await adapter.execute("INSERT INTO `samples` (value) VALUES (1)");
-      await adapter.execute("INSERT INTO `samples` (value) VALUES (2)");
-      const rows = await adapter.execute("SELECT id FROM `samples` ORDER BY id");
-      s1id = Number(rows[0]["id"]);
-      s2id = Number(rows[1]["id"]);
+      const connection = await leaseMysqlAdapter();
+      await connection.clearCache();
+      await connection.createTable("samples", { force: true }, (t) => {
+        t.integer("value");
+      });
+      Sample.resetColumnInformation();
     });
+
     afterEach(async () => {
-      await adapter.execute("DROP TABLE IF EXISTS `samples`").catch(() => {});
+      // nested_deadlock_test.rb:24 — clear first, so no connection another
+      // execution context still holds is sitting on a `samples` lock when the
+      // drop runs.
+      Base.connectionHandler.clearActiveConnectionsBang("all");
+      const connection = await leaseMysqlAdapter();
+      await connection.dropTable("samples", { ifExists: true });
     });
-
-    async function raceNestedTransactions(
-      adapter2: Mysql2Adapter,
-      onDeadlock?: "rollback" | "swallow",
-    ): Promise<{ results: PromiseSettledResult<void>[]; deadlocks: number }> {
-      const barrier = createBarrier(2);
-      let deadlocks = 0;
-
-      const side = async (
-        a: Mysql2Adapter,
-        lockId: number,
-        updateId: number,
-        value: number,
-      ): Promise<void> => {
-        await a.transaction(async () => {
-          await makeParentDirty(a);
-          const nested = a.transaction({ requiresNew: true }, async () => {
-            assertSavepoint(a);
-            await a.execute(`SELECT * FROM \`samples\` WHERE id = ${lockId} FOR UPDATE`);
-            await barrier.wait();
-            try {
-              await a.executeMutation(
-                `UPDATE \`samples\` SET value = ${value} WHERE id = ${updateId}`,
-              );
-            } catch (e) {
-              if (onDeadlock === "rollback" && e instanceof Deadlocked) {
-                deadlocks++;
-                throw new Rollback();
-              }
-              throw e;
-            }
-          });
-          if (onDeadlock === "swallow") {
-            try {
-              await nested;
-            } catch (e) {
-              if (!(e instanceof Deadlocked)) throw e;
-              deadlocks++;
-            }
-          } else {
-            await nested;
-          }
-          if (onDeadlock !== undefined) {
-            await a.executeMutation(`UPDATE \`samples\` SET value = 10 WHERE id = ${updateId}`);
-          }
-        });
-      };
-
-      const results = await Promise.allSettled([
-        side(adapter, s1id, s2id, onDeadlock ? 4 : 1),
-        side(adapter2, s2id, s1id, onDeadlock ? 3 : 2),
-      ]);
-      return { results, deadlocks };
-    }
-
-    async function expectFinalValues(values: number[]): Promise<void> {
-      const finalRows = await adapter.execute("SELECT value FROM `samples` ORDER BY id");
-      expect(finalRows.map((r) => Number(r["value"]))).toEqual(values);
-    }
 
     it("deadlock correctly raises Deadlocked inside nested SavepointTransaction", async () => {
-      // Stays self-built: the second side of the deadlock needs its own
-      // connection (Rails runs it on its own thread).
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
-      try {
-        const { results } = await raceNestedTransactions(adapter2);
+      const connection = await Sample.leaseConnection();
+      const barrier = cyclicBarrier(2);
 
-        const errors = results.filter((r) => r.status === "rejected").map((r) => r.reason);
-        expect(errors).toHaveLength(1);
-        expect(errors[0]).toBeInstanceOf(Deadlocked);
+      const s1 = await Sample.create({ value: 1 });
+      const s2 = await Sample.create({ value: 2 });
 
-        expect(await adapter.active()).toBe(true);
-        expect(await adapter2.active()).toBe(true);
-      } finally {
-        await adapter2.close();
-      }
+      // Rails' `Thread.new` (nested_deadlock_test.rb:45). `withExecutionContext`
+      // is the trails analogue for the part that matters here: the pool leases
+      // per execution context (connection_pool.rb:711 `connection_lease`), so
+      // the two sides run on two connections and can really deadlock.
+      const thread = withExecutionContext(async () =>
+        Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          await Sample.transaction(
+            async () => {
+              await assertCurrentTransactionIsSavepointTransaction();
+              await s1.lockBang();
+              await barrier.wait();
+              await s2.update({ value: 1 });
+            },
+            { requiresNew: true },
+          );
+        }),
+      );
+
+      const main = Sample.transaction(async () => {
+        await makeParentTransactionDirty();
+        await Sample.transaction(
+          async () => {
+            await assertCurrentTransactionIsSavepointTransaction();
+            await s2.lockBang();
+            await barrier.wait();
+            await s1.update({ value: 2 });
+          },
+          { requiresNew: true },
+        );
+      });
+
+      const outcomes = await Promise.allSettled([thread, main]);
+      const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
+      flunkOnLostSavepoint(errors);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toBeInstanceOf(Deadlocked);
+
+      expect(await connection.active()).toBe(true);
     });
 
     it("rollback exception is swallowed after a rollback", async () => {
-      // Stays self-built: the second side of the deadlock needs its own
-      // connection (Rails runs it on its own thread).
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
-      try {
-        const { results, deadlocks } = await raceNestedTransactions(adapter2, "rollback");
+      const barrier = cyclicBarrier(2);
+      let deadlocks = 0;
 
-        expect(results[0].status).toBe("fulfilled");
-        expect(results[1].status).toBe("fulfilled");
-        expect(deadlocks).toBe(1);
-        await expectFinalValues([10, 10]);
-      } finally {
-        await adapter2.close();
-      }
+      const s1 = await Sample.create({ value: 1 });
+      const s2 = await Sample.create({ value: 2 });
+
+      const side = async (locked: Sample, updated: Sample, value: number): Promise<void> =>
+        Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          await Sample.transaction(
+            async () => {
+              try {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await locked.lockBang();
+                await barrier.wait();
+                await updated.update({ value });
+              } catch (e) {
+                if (!(e instanceof Deadlocked)) throw e;
+                deadlocks += 1;
+                // nested_deadlock_test.rb:99-101: "This rollback is actually
+                // wrong as mysql automatically rollbacks the transaction which
+                // means we have nothing to rollback on the db side but we
+                // expect the framework to handle our mistake gracefully".
+                throw new Rollback();
+              }
+            },
+            { requiresNew: true },
+          );
+          await updated.update({ value: 10 });
+        });
+
+      const thread = withExecutionContext(async () => side(s1, s2, 4));
+      await side(s2, s1, 3);
+      await thread;
+
+      expect(deadlocks).toBe(1);
+      expect(await Sample.pluck("value")).toEqual([10, 10]);
     });
 
     it("deadlock inside nested SavepointTransaction is recoverable", async () => {
-      // Stays self-built: the second side of the deadlock needs its own
-      // connection (Rails runs it on its own thread).
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
-      try {
-        const { results, deadlocks } = await raceNestedTransactions(adapter2, "swallow");
+      const barrier = cyclicBarrier(2);
+      let deadlocks = 0;
 
-        expect(results[0].status).toBe("fulfilled");
-        expect(results[1].status).toBe("fulfilled");
-        expect(deadlocks).toBe(1);
-        await expectFinalValues([10, 10]);
-      } finally {
-        await adapter2.close();
-      }
+      const s1 = await Sample.create({ value: 1 });
+      const s2 = await Sample.create({ value: 2 });
+
+      const side = async (locked: Sample, updated: Sample, value: number): Promise<void> =>
+        Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          try {
+            await Sample.transaction(
+              async () => {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await locked.lockBang();
+                await barrier.wait();
+                await updated.update({ value });
+              },
+              { requiresNew: true },
+            );
+          } catch (e) {
+            if (!(e instanceof Deadlocked)) throw e;
+            deadlocks += 1;
+          }
+          await updated.update({ value: 10 });
+        });
+
+      const thread = withExecutionContext(async () => side(s1, s2, 4));
+      await side(s2, s1, 3);
+      await thread;
+
+      expect(deadlocks).toBe(1);
+      expect(await Sample.pluck("value")).toEqual([10, 10]);
     });
   });
 });

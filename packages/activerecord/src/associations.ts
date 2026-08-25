@@ -1,11 +1,21 @@
 import type { Base } from "./base.js";
+/**
+ * Evaluate `relation.ts` before anything below reaches
+ * `relation/query-methods.ts` on its own: `relation.ts`'s module body runs
+ * `include(Relation, QueryMethodBangs)` (`relation.rb:68`), so a graph entered
+ * at THIS module that reaches query-methods first sees `QueryMethodBangs` in
+ * TDZ. `relation.ts` already imports this module (relation -> insert-all ->
+ * model-schema -> associations), so this closes no NEW cycle, and nothing here
+ * touches `Relation` at module scope. It replaces the side-effect imports of
+ * Relation SUBCLASSES that used to sit here and made entering at `relation.ts`
+ * impossible; those now load through their zero-import slots (CLAUDE.md,
+ * "Call-time constant resolution (Ruby autoload -> the zero-import slot)").
+ */
+import "./relation.js";
 import type { Relation } from "./relation.js";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
-import "./associations/collection-proxy.js";
-import "./association-relation.js";
-import "./associations/disable-joins-association-scope.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import {
   delegateArrayMethod,

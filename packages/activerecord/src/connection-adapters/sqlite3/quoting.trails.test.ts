@@ -5,7 +5,9 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { type SQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
+import { SQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
+import { TypeMap } from "../../type/type-map.js";
+import { lookupCastType } from "../abstract/quoting.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
 import {
@@ -23,7 +25,16 @@ import {
   typeCast as typeCastFn,
 } from "./quoting.js";
 
+// `quoteDefaultExpression`'s non-Proc arm delegates to the abstract body, which
+// self-sends `lookup_cast_type` (`abstract/quoting.rb:161`); the bare prototype
+// carries no instance config, so wire the SQLite3 type map here.
+const TYPE_MAP = new TypeMap();
+SQLite3Adapter.initializeTypeMap(TYPE_MAP);
+
 const HOST = quotingHost({
+  lookupCastType(sqlType: string | null) {
+    return lookupCastType.call({ typeMap: TYPE_MAP }, sqlType);
+  },
   quotedDate,
   quotedTime,
   quotedBinary,
@@ -232,6 +243,14 @@ describe("SQLite3::Quoting", () => {
       expect(quoteDefaultExpression.call(HOST, () => "CURRENT_TIMESTAMP", {})).toBe(
         "CURRENT_TIMESTAMP",
       );
+    });
+
+    it("serializes a non-Proc default through the column's cast type", () => {
+      // `sqlite3/quoting.rb:107` is `super`, i.e. `abstract/quoting.rb:161`'s
+      // `lookup_cast_type(column.sql_type).serialize(value)` — a structured
+      // `json` default must reach the JSON text, not `String({})`.
+      expect(quoteDefaultExpression.call(HOST, {}, { sqlType: "json" })).toBe("'{}'");
+      expect(quoteDefaultExpression.call(HOST, { a: 1 }, { sqlType: "json" })).toBe("'{\"a\":1}'");
     });
 
     it("quotes a binary default through SQLite's quotedBinary", () => {
