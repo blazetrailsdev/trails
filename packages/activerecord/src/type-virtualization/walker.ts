@@ -402,9 +402,9 @@ function readScopeCall(call: ts.CallExpression): ScopeCall | null {
   if (!ts.isArrowFunction(fnArg) && !ts.isFunctionExpression(fnArg)) {
     return { kind: "scope", name: nameArg.text, paramsAfterThis: [] };
   }
-  // A `this` parameter is a type-position annotation, not an argument, so it
-  // is the only leading parameter dropped here.
-  const rest = fnArg.parameters.filter((p) => p.name.getText() !== "this");
+  // A leading `this` parameter is a type-position annotation, not an argument.
+  const params = fnArg.parameters;
+  const rest = params.length > 0 && params[0].name.getText() === "this" ? params.slice(1) : params;
   return {
     kind: "scope",
     name: nameArg.text,
