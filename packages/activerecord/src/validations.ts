@@ -238,117 +238,6 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
 // Wired onto Base via extend(Base, Validations.ClassMethods) in base.ts.
 // ---------------------------------------------------------------------------
 
-// Options passed alongside any validator: on/if/unless/strict plus
-// allowNil/allowBlank that are shared across all validators.
-function extractShared(rules: Record<string, unknown>): Record<string, unknown> {
-  const shared: Record<string, unknown> = {};
-  if (rules.on !== undefined) shared.on = rules.on;
-  if (rules.if !== undefined) shared.if = rules.if;
-  if (rules.unless !== undefined) shared.unless = rules.unless;
-  if (rules.strict) shared.strict = rules.strict;
-  if (rules.allowNil !== undefined) shared.allowNil = rules.allowNil;
-  if (rules.allowBlank !== undefined) shared.allowBlank = rules.allowBlank;
-  return shared;
-}
-
-/**
- * Route AR-specific rules (presence/absence/length/numericality) through AR
- * validator classes that add association/column awareness, and delegate the
- * rest (inclusion/exclusion/format/...) to ActiveModel's `validates`.
- *
- * Mirrors: ActiveRecord::Validations::ClassMethods#validates (the override
- * over ActiveModel::Validations::ClassMethods#validates).
- */
-export function validates(
-  this: {
-    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-    // The Model.validates class method is reached via _parentValidates,
-    // registered by Base at module load via _setSuperValidates.
-  },
-  ...args: [...attributes: string[], rules: Record<string, unknown>]
-): void {
-  const rules = args[args.length - 1] as Record<string, unknown>;
-  const attributes = args.slice(0, -1) as string[];
-  const arRules = { ...rules };
-  const shared = extractShared(arRules);
-  const { allowNil: sharedAllowNil, allowBlank: sharedAllowBlank, ...sharedRest } = shared;
-
-  const buildOpts = (opts: Record<string, unknown>) => ({
-    ...opts,
-    attributes,
-    ...sharedRest,
-    ...(opts.allowNil === undefined && sharedAllowNil !== undefined
-      ? { allowNil: sharedAllowNil }
-      : {}),
-    ...(opts.allowBlank === undefined && sharedAllowBlank !== undefined
-      ? { allowBlank: sharedAllowBlank }
-      : {}),
-  });
-
-  if (arRules.presence) {
-    const opts = arRules.presence === true ? {} : (arRules.presence as Record<string, unknown>);
-    delete arRules.presence;
-    this.validatesWith(PresenceValidator, buildOpts(opts));
-  }
-  if (arRules.absence) {
-    const opts = arRules.absence === true ? {} : (arRules.absence as Record<string, unknown>);
-    delete arRules.absence;
-    this.validatesWith(AbsenceValidator, buildOpts(opts));
-  }
-  if (arRules.length) {
-    const opts = arRules.length as Record<string, unknown>;
-    delete arRules.length;
-    this.validatesWith(LengthValidator, buildOpts(opts));
-  }
-  if (arRules.numericality) {
-    const opts =
-      arRules.numericality === true ? {} : (arRules.numericality as Record<string, unknown>);
-    delete arRules.numericality;
-    this.validatesWith(NumericalityValidator, buildOpts(opts));
-  }
-  if (arRules.uniqueness) {
-    const opts = arRules.uniqueness === true ? {} : (arRules.uniqueness as Record<string, unknown>);
-    delete arRules.uniqueness;
-    // Uniqueness registers a UniquenessValidator via validatesUniqueness (which
-    // routes to validatesWith); its async validateEach runs the existence check
-    // inline in the async validation chain, honoring on/if/unless/strict.
-    const { attributes: _attributes, ...uniqOpts } = buildOpts(opts) as Record<string, unknown>;
-    for (const attribute of attributes) {
-      validatesUniqueness.call(
-        this,
-        attribute,
-        uniqOpts as Parameters<typeof validatesUniqueness>[1],
-      );
-    }
-  }
-  // Delegate remaining rules (inclusion/exclusion/format/...) to ActiveModel's validates.
-  const hasRemaining = Object.keys(arRules).some(
-    (k) => !["on", "if", "unless", "strict", "allowNil", "allowBlank"].includes(k),
-  );
-  if (hasRemaining) {
-    if (_parentValidates == null) {
-      throw new ActiveRecordError(
-        "ActiveRecord::Validations#validates called before Base registered the super validates",
-      );
-    }
-    // `super.validates` — delegate to Model's `validates` class method.
-    _parentValidates.call(this, ...attributes, arRules);
-  }
-}
-
-// Late-bound reference to Model's `validates` class method — registered by
-// Base to break the circular-import chain.
-let _parentValidates:
-  | ((this: unknown, ...args: [...attributes: string[], rules: Record<string, unknown>]) => void)
-  | null = null;
-
-/** @internal Called by Base to register Model's validates as the super. */
-export function _setSuperValidates(
-  fn: (this: unknown, ...args: [...attributes: string[], rules: Record<string, unknown>]) => void,
-): void {
-  _parentValidates = fn;
-}
-
 /**
  * Host shape for the `validates_*_of` helper overrides: the AR-specific
  * `validatesWith` plus `_mergeAttributes` (inherited from Model).
@@ -402,7 +291,6 @@ export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: un
  * matching Rails' file layout.
  */
 export const ClassMethods = {
-  validates,
   validatesAssociated,
   validatesUniqueness,
   validatesUniquenessOf,

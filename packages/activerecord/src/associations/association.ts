@@ -25,6 +25,29 @@ import {
 } from "../errors.js";
 
 /**
+ * Back an ad-hoc definition with the registered reflection for its name, so an
+ * `Association` built from one answers `klass`, `extensions` and `scopeFor` the
+ * way one built from the reflection does. Rails always constructs from the
+ * reflection (`associations.rb:290-296`:
+ * `reflection.association_class.new(self, reflection)`), which is why `klass`
+ * can be the plain `reflection.klass` delegate `association.rb:36-38` writes;
+ * trails has loader-local holders carrying a synthesised `options`/`scope`, and
+ * those own properties still win over the reflection's.
+ *
+ * @noRailsEquivalent Rails has no ad-hoc holder to re-home; this exists only to
+ *   give the trails-only ones a real reflection to delegate to.
+ */
+function _richReflectionFor(owner: Base, reflection: AssociationDefinition): AssociationDefinition {
+  if (Object.getPrototypeOf(reflection) !== Object.prototype) return reflection;
+  const rich = (owner.constructor as typeof Base)._reflectOnAssociation?.(reflection.name);
+  if (!rich) return reflection;
+  return Object.create(
+    rich as object,
+    Object.getOwnPropertyDescriptors(reflection),
+  ) as AssociationDefinition;
+}
+
+/**
  * Base class for all association proxies. An Association wraps a single
  * association between an owner record and its target(s).
  *
@@ -169,7 +192,7 @@ export class Association {
 
   constructor(owner: Base, reflection: AssociationDefinition) {
     this.owner = owner;
-    this.reflection = reflection;
+    this.reflection = _richReflectionFor(owner, reflection);
     this.disableJoins = reflection.options.disableJoins || false;
 
     // Rails' `check_validity! → klass → compute_class` raises NameError
@@ -525,16 +548,7 @@ export class Association {
   }
 
   get klass(): typeof Base {
-    // Use the rich reflection's klass getter when available — it does
-    // namespace-relative resolution, matching Rails' compute_type walk.
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
-    };
-    const richKlass = ctor._reflectOnAssociation?.(this.reflection.name)?.klass;
-    if (richKlass) return richKlass;
-    const className = this.reflection.options.className ?? this.deriveClassName();
-    autoloadModel(className);
-    return constantize(className) as typeof Base;
+    return this.reflection.klass as typeof Base;
   }
 
   /**
