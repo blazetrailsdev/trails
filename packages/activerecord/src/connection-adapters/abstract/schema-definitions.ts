@@ -1478,12 +1478,6 @@ export class TableDefinition {
     return this.column(name, type, { ...options, array: true });
   }
 
-  /** @internal Mirrors PostgreSQL TableDefinition#enum for schema-dump round-trip. */
-  enum(name: string, options: ColumnOptions & { enum_type: string }): this {
-    const { enum_type: enumType, ...rest } = options;
-    return this.column(name, enumType as ColumnType, rest);
-  }
-
   timestamps(
     options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
   ): this {

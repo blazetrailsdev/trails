@@ -26,7 +26,6 @@ import {
 import { type NativeDatabaseType, type NativeDatabaseTypes } from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError } from "../../errors.js";
 
 type Definition =
   | TableDefinition
@@ -53,6 +52,24 @@ export interface SchemaCreationConn extends SchemaQuoter {
   supportsPartialIndex(): boolean;
   supportsUniqueConstraints(): boolean;
   useForeignKeys(): boolean;
+}
+
+/**
+ * The MySQL-only half of the visitor. Rails' `accept` resolves
+ * `visit_IndexDefinition` / `index_in_create` at call time through `send`
+ * (abstract/schema_creation.rb:12-14), so the abstract visitor declares
+ * neither; both live only on `MySQL::SchemaCreation`
+ * (mysql/schema_creation.rb:40,98). TypeScript needs a type for the two call
+ * sites that Rails reaches by name, so they are narrowed against this
+ * non-exported interface instead of being declared on the base class.
+ */
+interface IndexVisitor {
+  visitIndexDefinition(o: IndexDefinition, create?: boolean): Promise<string>;
+  indexInCreate(
+    tableName: string,
+    columnName: string | string[],
+    options: AddIndexOptions,
+  ): Promise<string>;
 }
 
 export class SchemaCreation {
@@ -153,7 +170,8 @@ export class SchemaCreation {
     if (o instanceof AddColumnDefinition) return this.visitAddColumnDefinition(o);
     if (o instanceof ColumnDefinition) return this.visitColumnDefinition(o);
     if (o instanceof CreateIndexDefinition) return this.visitCreateIndexDefinition(o);
-    if (o instanceof IndexDefinition) return this.visitIndexDefinition(o);
+    if (o instanceof IndexDefinition)
+      return (this as unknown as IndexVisitor).visitIndexDefinition(o);
     if (o instanceof ForeignKeyDefinition) return this.visitForeignKeyDefinition(o);
     if (o instanceof CheckConstraintDefinition) return this.visitCheckConstraintDefinition(o);
     if (o instanceof PrimaryKeyDefinition) return this.visitPrimaryKeyDefinition(o);
@@ -179,7 +197,9 @@ export class SchemaCreation {
 
     if (this.supportsIndexesInCreate()) {
       for (const [columnName, options] of o.indexes) {
-        statements.push(await this.indexInCreate(o.name, columnName, options));
+        statements.push(
+          await (this as unknown as IndexVisitor).indexInCreate(o.name, columnName, options),
+        );
       }
     }
 
@@ -202,33 +222,6 @@ export class SchemaCreation {
     if (o.as) createSql += ` AS ${this.toSql(o.as)}`;
 
     return createSql;
-  }
-
-  /**
-   * Rails leaves `index_in_create` undefined on the abstract visitor and relies
-   * on `supports_indexes_in_create?` being false there; TS's static dispatch
-   * needs the declaration, so the unreachable arm raises the way Ruby's missing
-   * method would.
-   * @internal
-   */
-  protected indexInCreate(
-    _tableName: string,
-    _columnName: string | string[],
-    _options: AddIndexOptions,
-  ): Promise<string> {
-    // @nie disposition=TODO
-    throw new NotImplementedError();
-  }
-
-  /**
-   * Same shape as {@link indexInCreate}: Rails defines `visit_IndexDefinition`
-   * only on `MySQL::SchemaCreation` (mysql/schema_creation.rb:44), and `accept`'s
-   * `send` would raise for any other adapter.
-   * @internal
-   */
-  protected visitIndexDefinition(_o: IndexDefinition, _create = false): Promise<string> {
-    // @nie disposition=TODO
-    throw new NotImplementedError();
   }
 
   /** @internal */
