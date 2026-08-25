@@ -1380,7 +1380,7 @@ export class DatabaseTasks {
     if (databaseConfigs.length === 1) return;
 
     for (const dbConfig of databaseConfigs) {
-      if (!(dbConfig instanceof HashConfig && dbConfig.databaseTasks())) continue;
+      if (dbConfig instanceof HashConfig && !dbConfig.databaseTasks()) continue;
 
       fn(dbConfig.name);
     }
