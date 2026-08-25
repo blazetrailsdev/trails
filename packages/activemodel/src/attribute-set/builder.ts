@@ -1,5 +1,6 @@
 import { Attribute, Uninitialized } from "../attribute.js";
 import { Type } from "../type/value.js";
+import { defaultValue } from "../type.js";
 import { AttributeSet } from "../attribute-set.js";
 
 export class Builder {
@@ -19,7 +20,16 @@ export class Builder {
   }
 }
 
-/** Mirrors: ActiveModel::LazyAttributeSet */
+/**
+ * Mirrors: ActiveModel::LazyAttributeSet
+ *
+ * Rails' `types` here is `attribute_types`, a Hash whose `default` is
+ * `Type.default_value` (attribute_registration.rb:37-41), so
+ * `additional_types.fetch(name, types[name])` still resolves a type for a name
+ * the model does not declare — an extra/computed select column. A JS `Map` has
+ * no such default, so it is applied at each of those lookups here and in
+ * {@link LazyAttributeHash}.
+ */
 export class LazyAttributeSet extends AttributeSet {
   private values: Record<string, unknown>;
   private types: Map<string, Type>;
@@ -80,7 +90,7 @@ export class LazyAttributeSet extends AttributeSet {
     }
 
     if (valuePresent) {
-      const type = this.additionalTypes.get(name) ?? this.types.get(name)!;
+      const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
       const casted = type.deserialize(value);
       this.castedValues.set(name, casted);
       return casted;
@@ -117,19 +127,19 @@ export class LazyAttributeSet extends AttributeSet {
       value = valuePresent ? this.values[name] : undefined;
     }
 
-    const type = this.additionalTypes.get(name) ?? this.types.get(name);
+    const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
 
     if (valuePresent) {
       const castedValue = this.castedValues.get(name);
       const attr =
         castedValue === undefined
-          ? Attribute.fromDatabase(name, value, type!)
-          : Attribute.fromDatabase(name, value, type!, castedValue);
+          ? Attribute.fromDatabase(name, value, type)
+          : Attribute.fromDatabase(name, value, type, castedValue);
       this._attributes.set(name, attr);
       return attr;
     } else if (this.types.has(name)) {
       const attr = this.defaultAttributes.get(name);
-      const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
+      const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
       this._attributes.set(name, built);
       return built;
     } else {
@@ -321,7 +331,7 @@ export class LazyAttributeHash {
    * Attribute, and TS has no nil that answers `value`.
    */
   assignDefaultValue(name: string): Attribute {
-    const type = this.additionalTypes.get(name) ?? this.types.get(name);
+    const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
     let valuePresent = true;
     let value: unknown;
     if (Object.hasOwn(this.values, name)) {
@@ -331,12 +341,12 @@ export class LazyAttributeHash {
     }
 
     if (valuePresent) {
-      const attr = Attribute.fromDatabase(name, value, type!);
+      const attr = Attribute.fromDatabase(name, value, type);
       this.delegate.set(name, attr);
       return attr;
     } else if (this.types.has(name)) {
       const attr = this.defaultAttributes.get(name);
-      const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
+      const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
       this.delegate.set(name, built);
       return built;
     }

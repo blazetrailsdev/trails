@@ -3395,7 +3395,13 @@ export class PostgreSQLAdapter
     }
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
+   *
+   * Rails hands the `PostgreSQL::Name` itself to `quote_table_name`
+   * (postgresql/schema_statements.rb:561), which `to_s`es it; trails'
+   * `quoteTableName` takes a string, so `indexToRemove` holds the `to_s`ed name.
+   */
   async removeIndex(
     tableName: string,
     columnOrOptions?:
@@ -3442,12 +3448,12 @@ export class PostgreSQLAdapter
     const indexToRemove = new Name(
       table.schema,
       await this.indexNameForRemove(table.toString(), columnName, options),
-    );
+    ).toString();
 
     await this.execute(
       // `?? ""` is Ruby's `#{nil}` — `index_algorithm` returns nil with no
       // `:algorithm`, so the statement carries the empty slot Rails emits.
-      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove.toString())}`,
+      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove)}`,
     );
   }
 
@@ -3918,6 +3924,11 @@ export class PostgreSQLAdapter
    * Return the default expression as-is when it is a SQL function/expression.
    * Mirrors: PostgreSQLAdapter#extract_default_function
    * @internal
+   *
+   * @missingRailsArgs has_default_function? — PERMANENT: Rails passes the local
+   *   `default` (postgresql_adapter.rb:781-782); `default` is a reserved word in
+   *   JavaScript and cannot be a binding identifier, so the parameter is spelled
+   *   `defaultExpr`. Same value, same position.
    */
   extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null {
     if (defaultExpr != null && this.hasDefaultFunction(defaultValue, defaultExpr)) {

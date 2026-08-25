@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -12,8 +11,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     // Rails: @connection.create_table :postgresql_collations, force: true { |t| ... }
-    await adapter.createTable("postgresql_collations", { force: true }, (table) => {
-      const t = table as PgTableDefinition;
+    await adapter.createTable("postgresql_collations", { force: true }, (t) => {
       t.string("string_c", { collation: "C" });
       t.text("text_posix", { collation: "POSIX" });
     });

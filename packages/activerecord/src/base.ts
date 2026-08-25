@@ -31,7 +31,6 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
-  Attribute,
   AttributeMethodPattern,
   Model,
   Type,
@@ -72,7 +71,6 @@ import {
   baseClass as _inheritanceBaseClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
-  narrowToProjectedColumns,
   defineDynamicSelectReaders,
   subclassFromAttributesForNew,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
@@ -2737,6 +2735,17 @@ export class Base extends Model {
 
   /**
    * Instantiate a model from a database row (marks it as persisted).
+   *
+   * Mirrors `instantiate_instance_of` (persistence.rb:82-87):
+   * `klass.attributes_builder.build_from_database(attributes, column_types)`,
+   * installed by `init_with_attributes`. The resulting LazyAttributeSet reports
+   * only the projected columns from `keys`/`key?`, because the unprojected ones
+   * were never in `values` (attribute_set/builder.rb:32-39).
+   *
+   * trails carries a per-query `overrideTypes` map Rails has no counterpart
+   * for; it is merged into Rails' single `additional_types` argument, an
+   * override winning over the result set's reported column type for the same
+   * name.
    */
   static _instantiate<T extends typeof Base>(
     this: T,
@@ -2762,9 +2771,9 @@ export class Base extends Model {
     }
 
     // Ensure schema reflection has populated _attributeDefinitions with
-    // adapter-resolved cast types before hydrating from the row —
-    // otherwise writeFromDatabase falls back to ValueType and PG OID
-    // casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
+    // adapter-resolved cast types before hydrating from the row — otherwise
+    // `attributes_builder`'s `attribute_types` falls back to ValueType and PG
+    // OID casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
     // reads an already-populated schema cache; the preceding query
     // would have populated it.
 
@@ -2797,35 +2806,11 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    // Load DB values through deserialize (not cast) so encrypted types decrypt.
-    // Extra/computed select columns aren't in the schema, so pass the result
-    // set's column type (when the adapter reported one) to cast them — mirrors
-    // Rails' `instantiate(record, column_types)` slice in find_by_sql /
-    // JoinDependency#instantiate.
-    for (const [key, value] of Object.entries(row)) {
-      const override = overrideTypes?.[key];
-      if (override) {
-        // An explicit per-attribute `types` override supersedes the schema
-        // type, the way LazyAttributeHash resolves
-        // `additional_types.fetch(name, types[name])` (builder.rb:76).
-        record._attributes.set(key, Attribute.fromDatabase(key, value, override as Type));
-      } else {
-        record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
-      }
-    }
-    // A SELECT that projects only a subset of columns yields a row with just
-    // those keys, so hasAttribute() must reflect what was loaded rather than
-    // the full schema. Mirrors Rails' attributes_builder narrowing (see
-    // narrowToProjectedColumns). Shared with the STI path in inheritance.ts.
-    // `overrideTypes` is threaded so a schema column absent from the row adopts
-    // the per-query override type when narrowed to uninitialized (builder.rb's
-    // `else Attribute.uninitialized(name, type)` branch, where `type` resolves
-    // via `additional_types.fetch(name, types[name])`).
-    narrowToProjectedColumns(
-      this as unknown as typeof Base,
-      record as unknown as Base,
-      row,
-      overrideTypes,
+    const additionalTypes = new Map<string, any>();
+    for (const [key, type] of Object.entries(columnTypes ?? {})) additionalTypes.set(key, type);
+    for (const [key, type] of Object.entries(overrideTypes ?? {})) additionalTypes.set(key, type);
+    (record as any).initWithAttributes(
+      (this as any).attributesBuilder().buildFromDatabase(row, additionalTypes),
     );
     defineDynamicSelectReaders(record as unknown as Base);
     record._newRecord = false;

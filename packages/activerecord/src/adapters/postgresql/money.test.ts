@@ -8,7 +8,6 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 // Rails: class PostgresqlMoney < ActiveRecord::Base
@@ -33,8 +32,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.execute("set lc_monetary = 'C'");
     // Rails: @connection.create_table("postgresql_moneys", force: true) { |t| ... }
     await connection.createTable("postgresql_moneys", { force: true }, (t) => {
-      (t as PgTableDefinition).money("wealth");
-      (t as PgTableDefinition).money("depth", { default: "150.55" });
+      t.money("wealth");
+      t.money("depth", { default: "150.55" });
     });
     void PostgresqlMoney.resetColumnInformation();
     await PostgresqlMoney.loadSchema();

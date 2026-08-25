@@ -2417,7 +2417,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // --- Rails: table-rebuild helpers (move_table / copy_table family) ---
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsArgs quote_table_name — PERMANENT: Rails passes `table_name`
+   *   whole (sqlite3_adapter.rb:790-795); PRAGMA takes an attached-schema
+   *   qualifier as two separately-quoted identifiers rather than one quoted
+   *   name, so the two halves are quoted apart (see the split rationale on
+   *   `indexes` in sqlite3/schema-statements.ts).
+   */
   private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteTableName(schema)}.` : "";

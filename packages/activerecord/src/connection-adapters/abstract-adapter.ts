@@ -108,6 +108,7 @@ import {
 import type {
   AlterTable,
   TableDefinition,
+  TableDefinitionOf,
   Table,
   ForeignKeyDefinition,
   IndexDefinition,
@@ -251,8 +252,8 @@ export interface AbstractAdapter {
           limit?: number;
           precision?: number;
         }
-      | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void,
+      | ((t: TableDefinitionOf<this>) => void),
+    fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void>;
   dropTable(
     ...args:

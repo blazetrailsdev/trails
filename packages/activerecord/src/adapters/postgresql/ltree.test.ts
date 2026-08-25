@@ -7,7 +7,6 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { Base } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
-import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 // Rails: class Ltree < ActiveRecord::Base
 //   self.table_name = "ltrees"
@@ -33,7 +32,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     // Rails: @connection.create_table("ltrees") { |t| t.ltree "path" }
     await connection.createTable("ltrees", (t) => {
-      (t as PgTableDefinition).ltree("path");
+      t.ltree("path");
     });
 
     void Ltree.resetColumnInformation();

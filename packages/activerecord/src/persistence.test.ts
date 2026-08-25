@@ -25,7 +25,6 @@ import {
   registerModel,
 } from "./index.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
-import type { TableDefinition as PgTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -1880,8 +1879,7 @@ describe("PersistenceTest", () => {
       // Mirror postgresql_specific_schema.rb `create_table :defaults`.
       const pg = connection as PostgreSQLAdapter;
       const supportsVirtualColumns = await pg.supportsVirtualColumns();
-      await pg.createTable("defaults", { force: true }, (t) => {
-        const d = t as PgTableDefinition;
+      await pg.createTable("defaults", { force: true }, (d) => {
         if (supportsVirtualColumns) {
           d.virtual("virtual_stored_number", {
             type: "integer",
