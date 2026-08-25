@@ -116,7 +116,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
+  protected quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
     return this.adapter.quoteDefaultExpression(value, column);
   }
 

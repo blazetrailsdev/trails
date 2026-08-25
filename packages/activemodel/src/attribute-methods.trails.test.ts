@@ -98,4 +98,18 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Employee.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length + 1);
     expect(Model.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length);
   });
+
+  it("_read_attribute raises for a name with no reader, as __send__ does", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const person = new Person({ name: "Alexander" });
+
+    expect(person._readAttribute("name")).toBe("Alexander");
+    expect(() => person._readAttribute("nope")).toThrow(
+      /undefined method 'nope' for an instance of Person/,
+    );
+  });
 });

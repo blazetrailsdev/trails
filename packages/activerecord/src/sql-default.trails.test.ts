@@ -25,7 +25,7 @@ const DEFAULT_EXPRESSION_HOST = quotingHost({
     return lookupCastType.call({ typeMap: TYPE_MAP }, sqlType);
   },
 });
-const quoteDefaultExpression = (value: unknown, column?: { sqlType?: string | null } | null) =>
+const quoteDefaultExpression = (value: unknown, column: { sqlType?: string | null } = {}) =>
   quoteDefaultExpressionFn.call(DEFAULT_EXPRESSION_HOST, value, column);
 
 describe("quote", () => {

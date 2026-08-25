@@ -117,9 +117,11 @@ describe("PostgreSQL quoting", () => {
     // form, not the abstract byte-string fallback. Cover both shapes here —
     // the raw Uint8Array trails' BinaryType#serialize actually returns, and the
     // BinaryData Rails' Binary#serialize returns (activemodel/.../binary.rb:31).
-    expect(await quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
+    expect(await quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]), {})).toBe(
+      "'\\x1f8b'",
+    );
     expect(
-      await quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b]))),
+      await quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b])), {}),
     ).toBe("'\\x1f8b'");
   });
 
@@ -127,9 +129,9 @@ describe("PostgreSQL quoting", () => {
     // Dates self-dispatch through the host, so they must reach PG's BC-suffixing
     // quotedDate (postgresql/quoting.rb:143), not the abstract formatter which
     // drops " BC".
-    expect(await quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"))).toBe(
-      "'0044-03-15 BC'",
-    );
+    expect(
+      await quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"), {}),
+    ).toBe("'0044-03-15 BC'");
   });
 
   it("quotes a binary default produced by BinaryType#serialize", async () => {

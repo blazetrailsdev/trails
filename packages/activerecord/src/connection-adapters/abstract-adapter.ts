@@ -1036,7 +1036,7 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
+  quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
     if (value === undefined) return "";
     if (typeof value === "function") {
       const result = (value as () => unknown)();
@@ -1050,11 +1050,9 @@ export class AbstractAdapter implements Quoting {
     // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
     // (abstract/quoting.rb:161) before quoting. Returns a bare literal — the
     // ` DEFAULT ` keyword is owned by the caller (add_column_options!).
-    const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
-    if (sqlType) {
-      const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
-      if (typeof castType?.serialize === "function") value = castType.serialize(value);
-    }
+    const sqlType = (column as { sqlType?: string | null }).sqlType;
+    const castType = this.lookupCastType(sqlType ?? null) as { serialize?(v: unknown): unknown };
+    if (typeof castType?.serialize === "function") value = castType.serialize(value);
     return this.quote(value);
   }
 

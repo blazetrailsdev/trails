@@ -294,7 +294,7 @@ export function quoteTableNameForAssignment(
 export function quoteDefaultExpression(
   this: QuotingDispatchHost & QuotingHost,
   value: unknown,
-  column?: { sqlType?: string | null } | null,
+  column: { sqlType?: string | null },
 ): string {
   if (value === undefined) return "";
   if (typeof value === "function") {
@@ -308,18 +308,12 @@ export function quoteDefaultExpression(
   if (isSqlLiteral(value)) return value.value;
   // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
   // (abstract/quoting.rb:161) — dispatched unconditionally, since every host of
-  // this module is an adapter carrying a type map. `column` stays optional only
-  // because trails' DDL callers reach `SET DEFAULT` with no column in hand
-  // (schema-statements.ts:600); Rails' signature requires it.
-  let serialized: unknown = value;
-  if (column != null) {
-    const castType = this.lookupCastType(column.sqlType ?? null) as {
-      serialize?(v: unknown): unknown;
-    } | null;
-    if (castType && typeof castType.serialize === "function") {
-      serialized = castType.serialize(value);
-    }
-  }
+  // this module is an adapter carrying a type map.
+  const castType = this.lookupCastType(column.sqlType ?? null) as {
+    serialize?(v: unknown): unknown;
+  } | null;
+  const serialized: unknown =
+    castType && typeof castType.serialize === "function" ? castType.serialize(value) : value;
   // Rails: `quote(value)` (abstract/quoting.rb:162) — self-sent, so the receiver's
   // dialect quoting applies, including the raw-view branches the abstract `quote`
   // deliberately lacks.
@@ -608,7 +602,7 @@ export interface Quoting {
    * `SELECT '<sql_type>'::regtype::oid` query (postgresql/quoting.rb:195),
    * so callers must `await` the result; the other adapters return plain
    * strings. */
-  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string>;
+  quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string>;
 
   /** Mirrors: Quoting#quoted_true. Abstract/PG/MySQL: `"TRUE"`; SQLite: `"1"`. */
   quotedTrue(): string;

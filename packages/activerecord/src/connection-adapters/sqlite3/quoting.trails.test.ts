@@ -217,19 +217,19 @@ describe("SQLite3::Quoting", () => {
 
   describe("quoteDefaultExpression", () => {
     it("returns empty string for undefined", () => {
-      expect(quoteDefaultExpression.call(HOST, undefined)).toBe("");
+      expect(quoteDefaultExpression.call(HOST, undefined, {})).toBe("");
     });
 
     it("returns NULL for null", () => {
-      expect(quoteDefaultExpression.call(HOST, null)).toBe("NULL");
+      expect(quoteDefaultExpression.call(HOST, null, {})).toBe("NULL");
     });
 
     it("wraps function results in parens", () => {
-      expect(quoteDefaultExpression.call(HOST, () => "NOW()")).toBe("(NOW())");
+      expect(quoteDefaultExpression.call(HOST, () => "NOW()", {})).toBe("(NOW())");
     });
 
     it("returns non-function results as raw SQL", () => {
-      expect(quoteDefaultExpression.call(HOST, () => "CURRENT_TIMESTAMP")).toBe(
+      expect(quoteDefaultExpression.call(HOST, () => "CURRENT_TIMESTAMP", {})).toBe(
         "CURRENT_TIMESTAMP",
       );
     });
@@ -240,18 +240,18 @@ describe("SQLite3::Quoting", () => {
       // that reach here — the `BinaryData` that `BinaryType#serialize` returns
       // (activemodel/.../binary.rb:31) and the raw `Uint8Array` view, which
       // takes the abstract `ArrayBuffer.isView` branch back to `quotedBinary`.
-      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]))).toBe("x'dead'");
-      expect(quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
-        "x'dead'",
-      );
+      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]), {})).toBe("x'dead'");
+      expect(
+        quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])), {}),
+      ).toBe("x'dead'");
       // A *bare* `ArrayBuffer` has no Rails counterpart — Rails only ever
       // reaches `quote` with a `Type::Binary::Data`, and `ArrayBuffer.isView`
       // is false for a bare buffer — so it falls to the abstract
       // `else raise TypeError, "can't quote ..."` (abstract/quoting.rb:87) like
       // any other unquotable object. Hand a view instead.
-      expect(() => quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer)).toThrow(
-        /can't quote ArrayBuffer/,
-      );
+      expect(() =>
+        quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer, {}),
+      ).toThrow(/can't quote ArrayBuffer/);
     });
   });
 

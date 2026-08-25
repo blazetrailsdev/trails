@@ -24,6 +24,22 @@ describe("LazyAttributeHash defaultAttributes", () => {
     expect(hash.getAttribute("status").value).toBe("archived");
   });
 
+  it("materializing a mutable schema default twice does not share the value", () => {
+    const arrayType = Object.create(typeRegistry.lookup("value")) as typeof strType;
+    const types = new Map([["tags", arrayType]]);
+    const prototype = Attribute.withCastValue("tags", ["a"], arrayType);
+    void prototype.value;
+    const defaults = new Map([["tags", prototype]]);
+
+    const first = new LazyAttributeHash(types, {}, new Map(), defaults).getAttribute("tags");
+    const second = new LazyAttributeHash(types, {}, new Map(), defaults).getAttribute("tags");
+    (first.value as string[]).push("b");
+
+    expect(first.value).toEqual(["a", "b"]);
+    expect(second.value).toEqual(["a"]);
+    expect(prototype.value).toEqual(["a"]);
+  });
+
   it("returns Uninitialized when key is absent from both values and defaultAttributes", () => {
     const types = new Map([["age", intType]]);
     const hash = new LazyAttributeHash(types, {});

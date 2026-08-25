@@ -229,7 +229,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * (abstract_mysql_adapter.rb:975) and never exposes. trails' constructors
    * destructure the adapter-level keys out of the config hash, so the value is
    * held here — read by `buildStatementPool` and, in Mysql2Adapter, by
-   * `_getStmtPool` / `_shouldPrepare`.
+   * `_getStmtPool`.
    *
    * @internal
    */

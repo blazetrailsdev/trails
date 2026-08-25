@@ -543,7 +543,7 @@ export { TagStack, Formatter, LocalTagStorage } from "./tagged-logging.js";
 export { TaggedLogging } from "./tagged-logging.js";
 export { DeepMergeable } from "./deep-mergeable.js";
 export { DelegationError, Delegation } from "./delegation.js";
-export { ActiveSupportJSON } from "./json.js";
+export { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "./json.js";
 export { JSON } from "./json-stdlib.js";
 export {
   presence,

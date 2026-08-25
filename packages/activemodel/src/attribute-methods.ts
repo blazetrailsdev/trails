@@ -15,6 +15,7 @@ import {
   include,
   included,
   Module,
+  NameError,
 } from "@blazetrails/activesupport";
 
 export interface AttributeMethods {
@@ -268,6 +269,20 @@ export function missingAttribute(this: InstanceHost, attrName: string, stack?: s
 }
 
 /**
+ * Ruby's `NoMethodError`, which `__send__` raises for an undefined name and
+ * `method_missing`'s `else super` arm re-raises (attribute_methods.rb:507-514).
+ * It subclasses `NameError` because Ruby's does (`NoMethodError < NameError`).
+ * Local to this module, as in activesupport's `method-missing-proxy.ts`: the
+ * raise site is here and callers identify it by `name` and message.
+ */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
  * Mirrors: attribute_methods.rb:555-558
  *   private
  *     def _read_attribute(attr)
@@ -280,9 +295,24 @@ export function missingAttribute(this: InstanceHost, attrName: string, stack?: s
  * § "Generated attribute readers are properties"), so `__send__(attr)` is a
  * property read rather than a call.
  *
+ * A name the receiver does not answer is where Ruby's `__send__` raises
+ * `NoMethodError` and `method_missing` (attribute_methods.rb:507-514) takes
+ * over: a `matched_attribute_method` goes to `attribute_missing`, and anything
+ * else falls to `super` and propagates. JS has no `method_missing`, so a bare
+ * property read would answer `undefined` there instead — the cascade is spelled
+ * out here.
+ *
  * @internal Rails-private helper.
  */
 export function _readAttribute(this: InstanceHost, attr: string): unknown {
+  const self = this as unknown as RespondToHost & AttributeMethods;
+  if (!self.isRespondToWithoutAttributes(attr)) {
+    const match = self.matchedAttributeMethod(attr);
+    if (match) return self.attributeMissing(match);
+    throw new NoMethodError(
+      `undefined method '${attr}' for an instance of ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+    );
+  }
   return (this as unknown as Record<string, unknown>)[attr];
 }
 

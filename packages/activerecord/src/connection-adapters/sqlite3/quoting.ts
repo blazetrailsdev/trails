@@ -173,7 +173,11 @@ export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): stri
   return `x'${hex}'`;
 }
 
-export function quoteDefaultExpression(this: QuotingDispatchHost, value: unknown): string {
+export function quoteDefaultExpression(
+  this: QuotingDispatchHost,
+  value: unknown,
+  _column: unknown,
+): string {
   if (value === undefined) return "";
   if (value === null) return "NULL";
   if (typeof value === "function") {

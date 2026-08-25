@@ -246,6 +246,9 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       static override quoteColumnName(name: string) {
         return `"${name}"`;
       }
+      override async columns(_tableName: string) {
+        return [{ name: "title", sqlType: "varchar" }] as any;
+      }
       async changeColumnDefault(tableName: string, columnName: string, options: any) {
         this.changeColumnDefaultCalls += 1;
         return super.changeColumnDefault(tableName, columnName, options);
