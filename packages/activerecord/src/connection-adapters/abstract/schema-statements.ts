@@ -579,48 +579,27 @@ export class SchemaStatements {
     }
   }
 
+  /**
+   * Changes the column's definition according to the new options.
+   * See TableDefinition#column for details of the options you can use.
+   *
+   *   changeColumn('suppliers', 'name', 'string', { limit: 80 })
+   *   changeColumn('accounts', 'description', 'text')
+   *
+   * Mirrors: `SchemaStatements#change_column` (`schema_statements.rb:711-713`).
+   * Every adapter overrides it: MySQL and PostgreSQL through
+   * `change_column_for_alter` (abstract_mysql_adapter.rb:396-398,
+   * postgresql/schema_statements.rb:466-471), SQLite through `alter_table`
+   * (sqlite3_adapter.rb:385-389).
+   */
   async changeColumn(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions = {},
+    _tableName: string,
+    _columnName: string,
+    _type: ColumnType,
+    _options: ColumnOptions = {},
   ): Promise<void> {
-    const sqlType = this.schemaCreation.typeToSql(type, options);
-    const table = this.quoteColumnName(tableName);
-    const col = this.quoteColumnName(columnName);
-
-    if (this.adapterName === "mysql2") {
-      const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause =
-        options.default === undefined
-          ? ""
-          : ` DEFAULT ${await this.quoteDefaultExpression(options.default, { sqlType })}`;
-      await this.execute(
-        `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
-      );
-    } else if (this.adapterName === "postgres") {
-      const clauses: string[] = [`ALTER COLUMN ${col} TYPE ${sqlType}`];
-      if (options.null !== undefined) {
-        clauses.push(
-          `ALTER COLUMN ${col} ${options.null === false ? "SET NOT NULL" : "DROP NOT NULL"}`,
-        );
-      }
-      if (options.default !== undefined) {
-        clauses.push(
-          `ALTER COLUMN ${col} SET DEFAULT ${await this.quoteDefaultExpression(options.default, { sqlType })}`,
-        );
-      }
-      await this.execute(`ALTER TABLE ${table} ${clauses.join(", ")}`);
-    } else {
-      const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause =
-        options.default === undefined
-          ? ""
-          : ` DEFAULT ${await this.quoteDefaultExpression(options.default, { sqlType })}`;
-      await this.execute(
-        `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
-      );
-    }
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:711
+    throw new NotImplementedError("change_column is not implemented");
   }
 
   /**

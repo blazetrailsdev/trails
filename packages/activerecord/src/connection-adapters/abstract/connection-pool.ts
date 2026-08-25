@@ -709,7 +709,10 @@ export class ConnectionPool implements ReapablePool {
         }
         lease.connection = pinned;
       } else {
-        lease.connection = checkoutAndVerify(this, this._acquireConnection());
+        lease.connection = checkoutAndVerify(
+          this,
+          this.acquireConnectionSync(this.checkoutTimeout),
+        );
       }
     }
     return lease.connection;
@@ -892,42 +895,43 @@ export class ConnectionPool implements ReapablePool {
     return pinned;
   }
 
-  private _acquireConnection(): DatabaseAdapter {
+  /**
+   * The synchronous seams' entry into `acquire_connection`
+   * (connection_pool.rb:862): the same sequence — poll, try a new connection,
+   * reap, retry — minus the blocking `@available.poll(checkout_timeout)`, which
+   * has no synchronous spelling in JS. Where Rails' thread would block and then
+   * raise on expiry, this raises straight away with the same error. The
+   * blocking wait itself lives in {@link acquireConnection}; this exists only
+   * for {@link leaseConnectionSync} and `checkout_for_exclusive_access`, whose
+   * callers (`disconnect!`, `reload`, `Migration#connection`) are synchronous
+   * all the way up.
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT Rails' `acquire_connection` blocks the calling
+   *   thread; a JS function that cannot await has no way to wait, so the wait
+   *   branch collapses to its timeout arm.
+   */
+  acquireConnectionSync(checkoutTimeout: number): DatabaseAdapter {
+    // Stands in for `checkout`'s `unless @pinned_connection` guard
+    // (connection_pool.rb:548), which is where both sync seams enter Rails.
     const pinned = this._resolvePinnedConnection();
     if (pinned) return pinned;
-    const conn = this._tryAcquire();
-    if (conn) return conn;
-    throw new ConnectionTimeoutError(
-      `Could not obtain a connection from the pool. All ${this.size} connections are in use.`,
-      { connectionPool: this },
-    );
-  }
-
-  private _tryAcquire(): DatabaseAdapter | undefined {
     if (this.isDiscarded()) {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
-    if (this._available) {
-      const conn = this._available.poll();
-      if (conn) {
-        this._checkedOut.add(conn);
-        return conn;
-      }
+    let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
+    if (!conn) {
+      this.reap();
+      conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     }
-    if (this._connections && this._connections.length < this.size) {
-      if (!this.automaticReconnect) {
-        throw new ConnectionNotEstablished(
-          "No connection available from pool and automatic_reconnect is disabled",
-          { connectionPool: this },
-        );
-      }
-      const conn = this.newConnection();
-      this._connections.push(conn);
-      this._checkedOut.add(conn);
-      (conn as unknown as PoolManagedConnection).lease?.();
-      return conn;
+    if (!conn) {
+      throw new ConnectionTimeoutError(
+        `Could not obtain a connection from the pool within ${checkoutTimeout} seconds`,
+        { connectionPool: this },
+      );
     }
-    return undefined;
+    this._checkedOut.add(conn);
+    return conn;
   }
 
   checkin(conn: DatabaseAdapter): void {
@@ -1518,7 +1522,7 @@ export class ConnectionPool implements ReapablePool {
   /**
    * Resolve the connection that all checkouts in the current execution
    * context should route to while a pin is active. Centralizes the lookup
-   * used by `checkout` and `_acquireConnection` so every
+   * used by `checkout` and `acquireConnectionSync` so every
    * lease entry point honors `pinConnectionBang` consistently — mirrors
    * Rails' `@pinned_connection` short-circuit in
    * `ConnectionPool#checkout` (connection_pool.rb:547).
@@ -1702,7 +1706,7 @@ function attemptToCheckoutAllExistingConnections(
  */
 function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
   try {
-    return pool._acquireConnection();
+    return pool.acquireConnectionSync(checkoutTimeout);
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {
       throw new ExclusiveConnectionTimeoutError(

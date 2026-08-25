@@ -8,6 +8,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { setTokenForSecret } from "./token-for.js";
+import { Base } from "./base.js";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fixtures } from "./test-fixtures.js";
 
 class TokenUser extends User {
@@ -43,6 +45,18 @@ describe("token-for relation finders", () => {
 
     await user.update({ token: "second" });
     expect(await TokenUser.findByTokenFor("token_snapshot", token)).toBeNull();
+  });
+
+  // railtie.rb:331 assigns the boot verifier with `||=`, so an explicitly
+  // assigned one survives — Rails' own tests inject a verifier that way.
+  it("keeps an explicitly assigned generated_token_verifier when the secret seam re-runs", () => {
+    const explicit = new MessageVerifier("explicit");
+    Base.generatedTokenVerifier = explicit;
+
+    setTokenForSecret("another secret");
+
+    expect(Base.generatedTokenVerifier).toBe(explicit);
+    Base.generatedTokenVerifier = null;
   });
 
   it("raises Ruby's Hash#fetch KeyError when a relation looks up an unknown purpose", async () => {
