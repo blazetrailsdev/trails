@@ -56,7 +56,7 @@ export class Attribute extends Node {
   constructor(relation: RelationLike | null, name: string | Node | null) {
     super();
     this.relation = relation as RelationLike;
-    this.name = name as string;
+    this.name = name as string | Node;
   }
 
   get typeCaster(): unknown {

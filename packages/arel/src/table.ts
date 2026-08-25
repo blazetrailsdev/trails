@@ -185,7 +185,7 @@ export class Table extends Node {
     // whose name is nil; only a subquery-shaped statement ever renders it. It
     // also takes a node name — `@table[Arel.star]`
     // (test/cases/arel/visitors/to_sql_test.rb:50) — which the alias lookup
-    // skips and the visitor renders as-is (table.rb:110-113).
+    // skips and the visitor renders as-is (table.rb:81-85).
     const resolved =
       name === null || name instanceof Node ? name : (this.klass?.attributeAliases?.[name] ?? name);
     return new Attribute(table ?? this, resolved);
