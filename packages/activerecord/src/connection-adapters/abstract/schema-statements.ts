@@ -1622,15 +1622,16 @@ export class SchemaStatements {
 
     const limited = relation.reselect(values).distinctBang();
     const limitedIds = (await this.selectRows(limited.arel(), "SQL")).map((results) =>
-      results.slice(-wrap(relation.primaryKey).length),
+      results.slice(results.length - wrap(relation.primaryKey).length),
     );
 
     if (limitedIds.length === 0) {
       relation.noneBang();
     } else {
-      const transposed = limitedIds[0].map((_, i) => limitedIds.map((row) => row[i]));
       relation.whereBang(
-        Object.fromEntries(wrap(relation.primaryKey).map((key, i) => [key, transposed[i]])),
+        Object.fromEntries(
+          wrap(relation.primaryKey).map((key, i) => [key, limitedIds.map((row) => row[i])]),
+        ),
       );
     }
 
