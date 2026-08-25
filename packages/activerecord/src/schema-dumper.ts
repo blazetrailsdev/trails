@@ -22,7 +22,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/abstract/schema-dumper.js";
 import { isBlank } from "@blazetrails/activesupport";
-import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type { Type } from "@blazetrails/activemodel";
@@ -257,9 +256,8 @@ const DSL_HELPER_METHODS = new Set([
 
 /**
  * Bridges a DatabaseAdapter to the SchemaSource protocol. Not public —
- * used internally by `SchemaDumper.dump(adapter, ...)` /
- * `dumpWithVersion(adapter, ...)` so adapter dumps don't require
- * callers to build a SchemaSource by hand.
+ * used internally by `SchemaDumper.dump(adapter, ...)` so adapter dumps
+ * don't require callers to build a SchemaSource by hand.
  */
 class AdapterSchemaSource implements SchemaSource {
   private _adapter: DatabaseAdapter;
@@ -519,8 +517,9 @@ export abstract class SchemaDumper {
       tableNamePrefix: config.tableNamePrefix ?? "",
       tableNameSuffix: config.tableNameSuffix ?? "",
       // Rails' dumper reads the version off the connection in `initialize`
-      // (`schema_dumper.rb:73`); trails resolves it in `dumpWithVersion` and
-      // hands it down here, and emits TS or JS rather than only Ruby.
+      // (`schema_dumper.rb:74`); trails resolves it in `dump` (a constructor
+      // cannot await) and hands it down here, and emits TS or JS rather than
+      // only Ruby.
       language: config.language,
       version: config.version,
     };
@@ -569,19 +568,36 @@ export abstract class SchemaDumper {
     // into dumps.
     if (isDatabaseAdapter(pool)) {
       const source = new AdapterSchemaSource(pool);
-      // Instantiate the adapter-specific subclass when the adapter exposes
-      // createSchemaDumper() (MySQL/PG/SQLite) so dialect overrides like
-      // MySQL's schemaPrecision (datetime precision 0 → `precision: nil`)
-      // apply. Mirrors Rails' `connection.create_schema_dumper`, which mixes
-      // the adapter's SchemaDumper module into the dumper. Without the hook,
-      // `create` still resolves to the ConnectionAdapters subclass (see its
-      // redirect) — never the bare base.
-      const createDialectDumper = (pool as { createSchemaDumper?: unknown }).createSchemaDumper;
-      const dumper =
-        (typeof createDialectDumper === "function"
-          ? (createDialectDumper.call(pool, options) as SchemaDumper | undefined | null)
-          : undefined) ?? this.create(source, options);
-      return dumper.dump(stream) as Promise<string[]>;
+      // Rails reads the version in the dumper's `initialize`:
+      // `@version = connection.pool.migration_context.current_version rescue nil`
+      // (schema_dumper.rb:74). A TS constructor cannot await, so the one async
+      // read happens here and reaches the dumper through its options hash; the
+      // `rescue nil` arm is the catch (no schema_migrations table yet).
+      return (async () => {
+        try {
+          // A NullPool has no migration_context at all — Ruby's NoMethodError
+          // there is the same `rescue nil` case as a missing schema_migrations.
+          const version = await (
+            pool.pool as { migrationContext: { currentVersion(): Promise<number | undefined> } }
+          ).migrationContext.currentVersion();
+          if (version != null) options.version = String(version);
+        } catch {
+          // rescue nil
+        }
+        // Instantiate the adapter-specific subclass when the adapter exposes
+        // createSchemaDumper() (MySQL/PG/SQLite) so dialect overrides like
+        // MySQL's schemaPrecision (datetime precision 0 → `precision: nil`)
+        // apply. Mirrors Rails' `connection.create_schema_dumper`, which mixes
+        // the adapter's SchemaDumper module into the dumper. Without the hook,
+        // `create` still resolves to the ConnectionAdapters subclass (see its
+        // redirect) — never the bare base.
+        const createDialectDumper = (pool as { createSchemaDumper?: unknown }).createSchemaDumper;
+        const dumper =
+          (typeof createDialectDumper === "function"
+            ? (createDialectDumper.call(pool, options) as SchemaDumper | undefined | null)
+            : undefined) ?? this.create(source, options);
+        return dumper.dump(stream) as Promise<string[]>;
+      })();
     }
     if (isConnectionPool(pool)) {
       return pool
@@ -616,28 +632,6 @@ export abstract class SchemaDumper {
     await dumper.types(stream);
     await dumper.dumpTable(stream, tableName);
     return stream.join("\n");
-  }
-
-  /**
-   * Dump an adapter's schema with a `// Schema version: N` header
-   * derived from schema_migrations. No direct Rails analog — Rails
-   * emits the version as a block argument in schema.rb; our generated
-   * DSL is a plain function, so we use a comment.
-   */
-  static async dumpWithVersion(
-    adapter: DatabaseAdapter,
-    options: SchemaDumperOptions = {},
-  ): Promise<string> {
-    const schemaMigration = new SchemaMigration(adapter.pool);
-    let version = "0";
-    if (await schemaMigration.tableExists()) {
-      const versions = await schemaMigration.allVersions();
-      if (versions.length > 0) {
-        version = versions[versions.length - 1];
-      }
-    }
-    const schema = await this.dump(adapter, [], { ...options, version });
-    return `// Schema version: ${version}\n${schema.join("\n")}`;
   }
 
   dump(stream: string[] = []): string[] | Promise<string[]> {

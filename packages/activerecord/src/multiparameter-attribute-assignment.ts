@@ -25,10 +25,6 @@ const MAX_MULTIPARAMETER_INDEX = 100;
 
 const MULTIPARAMETER_ATTRIBUTE_PATTERN = /^([^(]+)\((\d+)([if]?)\)$/;
 
-export function hasMultiparameterKeys(attrs: Record<string, unknown>): boolean {
-  return Object.keys(attrs).some((k) => MULTIPARAMETER_ATTRIBUTE_PATTERN.test(k));
-}
-
 /**
  * Separate a flat attribute hash into multiparameter groups and regular keys.
  * Mirrors Rails' extract_callstack_for_multiparameter_attributes.

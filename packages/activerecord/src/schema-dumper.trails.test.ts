@@ -321,34 +321,6 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).not.toContain("ar_internal_metadata");
   }, 60000);
 
-  it("dumpWithVersion defaults to 0 when no versions recorded", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
-    const { SchemaMigration } = await import("./schema-migration.js");
-    const sm = new SchemaMigration(adapter.pool);
-    await sm.createTable();
-    await sm.deleteAllVersions();
-    const result = await TopLevelDumper.dumpWithVersion(adapter);
-    expect(result).toContain("Schema version: 0");
-  }, 60000);
-
-  it("dumpWithVersion includes latest migration version", async () => {
-    const { SchemaDumper: TopLevelDumper } =
-      await import("./connection-adapters/abstract/schema-dumper.js");
-    const { SchemaMigration } = await import("./schema-migration.js");
-    const sm = new SchemaMigration(adapter.pool);
-    await sm.createTable();
-    // schema_migrations survives per-file truncation (truncate skips it by
-    // design), so a prior run's version row can survive in the shared PG
-    // worker DB and collide on schema_migrations_pkey. Clear first to keep
-    // this test hermetic — same guard the sibling "defaults to 0" test uses.
-    await sm.deleteAllVersions();
-    await sm.createVersion("20240101000000");
-    await sm.createVersion("20240201000000");
-    const result = await TopLevelDumper.dumpWithVersion(adapter);
-    expect(result).toContain("Schema version: 20240201000000");
-  }, 60000);
-
   it("emitTable forwards comment from fetchTableOptions into createTable options", async () => {
     // Subclasses the ConnectionAdapters dumper directly — that's where emitTable
     // (the single column_spec dispatch) lives; the bare base delegates to it.
