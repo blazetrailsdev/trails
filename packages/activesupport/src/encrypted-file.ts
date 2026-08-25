@@ -12,15 +12,12 @@
  *
  * - **Async API.** Rails is sync; the async surface is required for
  *   trailties' "async fs only" rule and for browser hosts without sync fs.
- * - **Default serializer = `NullSerializer`** (raw string in/out). Rails
- *   uses `Marshal`; we have no Marshal port. The higher-level
- *   `EncryptedConfiguration` parses contents itself.
  * - **Env lookup goes through `processAdapter.env`**, not `process.env`.
  */
 
 import { getCrypto } from "./crypto-adapter.js";
 import { getFsAsync, getPathAsync } from "./fs-adapter.js";
-import { MessageEncryptor, NullSerializer } from "./message-encryptor.js";
+import { MessageEncryptor } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
 import { chomp } from "./string-utils.js";
 import { Tempfile } from "./tempfile.js";
@@ -187,15 +184,17 @@ export class EncryptedFile {
   /**
    * @missingRailsArgs new — PERMANENT. encrypted_file.rb:113
    *   `MessageEncryptor.new([key].pack("H*"), cipher: CIPHER, serializer: Marshal)`
-   *   — `Buffer.from(key, "hex")` is the `pack("H*")`, and Ruby's `Marshal` has
-   *   no JS equivalent: the file body is already a string, so trails passes
-   *   `NullSerializer`, the settled substitute.
+   *   — `Buffer.from(key, "hex")` is the `pack("H*")`, and Ruby's `Marshal`
+   *   constant is spelled here as the `"marshal"` format key, which is how the
+   *   whole package names the trails Marshal-equivalent
+   *   (`messages/serializer-with-fallback.ts`). Ruby's Marshal wire format is
+   *   excluded project-wide in `scripts/api-compare/unported-files.ts`.
    */
   private async encryptor(): Promise<MessageEncryptor> {
     if (this.memoEncryptor) return this.memoEncryptor;
     this.memoEncryptor = new MessageEncryptor(Buffer.from((await this.key()) ?? "", "hex"), {
       cipher: CIPHER,
-      serializer: NullSerializer,
+      serializer: "marshal",
     });
     return this.memoEncryptor;
   }

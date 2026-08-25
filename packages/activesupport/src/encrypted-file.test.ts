@@ -204,8 +204,8 @@ describe("EncryptedFileTest", () => {
 
   // Rails exercises `Messages::Codec.with(default_serializer: :marshal/:json)`
   // to flip a global serializer across an encrypt/decrypt boundary and
-  // assert the envelope still round-trips. Our port hardcodes
-  // `NullSerializer` (Rails uses Marshal) and exposes serializer choice
+  // assert the envelope still round-trips. Our port hardcodes the `marshal`
+  // serializer, as Rails does, and exposes serializer choice
   // per-MessageEncryptor — there is no global flip-able state, so the
   // "changing" half of this scenario does not apply. Until `Codec.with` is
   // ported, the test reduces to the basic round-trip the name promises.

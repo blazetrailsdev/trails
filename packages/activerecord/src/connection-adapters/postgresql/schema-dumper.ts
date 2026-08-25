@@ -235,10 +235,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await super.table(tableName, stream);
-    if (stream[stream.length - 1] === "") stream.pop();
     await this.exclusionConstraintsInCreate(tableName, stream);
     await this.uniqueConstraintsInCreate(tableName, stream);
-    stream.push("");
   }
 
   /**
