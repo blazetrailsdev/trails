@@ -12,6 +12,7 @@
 
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
+import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
 import { Nodes, Table } from "@blazetrails/arel";
 import { isAssociationCached, _cacheSingularTarget } from "../associations.js";
@@ -581,19 +582,41 @@ export class JoinDependency {
    * (returns `parents.values`).
    */
   instantiate(
-    resultSet: Record<string, unknown>[],
+    resultSet: Result,
     strictLoadingValue?: boolean | null,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
     block?: (record: any) => void,
   ): any[] {
+    // join_dependency.rb:120-132: every result column that is not one of the
+    // `t<n>_r<n>` join aliases keeps the result set's reported type, minus the
+    // names the join root already declares — so a decorated (serialized,
+    // encrypted, enum) attribute is never superseded, and an extra select like
+    // `posts.id * 1.1 AS foo` still type-casts.
+    const columnNames = resultSet.columns.filter((name) => !/^t\d+_r\d+$/.test(name));
+    let columnTypes: Record<string, { deserialize(value: unknown): unknown }> = {};
+    if (columnNames.length !== 0) {
+      const reported = resultSet.columnTypes as Record<
+        string,
+        { deserialize(value: unknown): unknown }
+      >;
+      if (Object.keys(reported).length !== 0) {
+        const attributeTypes = this._baseModel.attributeTypes();
+        columnTypes = Object.fromEntries(
+          columnNames
+            .filter((name) => Object.hasOwn(reported, name) && !Object.hasOwn(attributeTypes, name))
+            .map((name) => [name, reported[name]]),
+        );
+      }
+    }
+
+    const rows = resultSet.toArray();
     const payload = {
-      record_count: resultSet.length,
+      record_count: rows.length,
       class_name: this._baseModel.baseClass.name,
     };
     const { parents, associations, parentKeys } = Notifications.instrument(
       "instantiation.active_record",
       payload,
-      () => this.instantiateFromRows(resultSet, strictLoadingValue, columnTypes),
+      () => this.instantiateFromRows(rows, strictLoadingValue, columnTypes),
     );
 
     const inverseMap = new Map<string, string | undefined>();

@@ -1817,12 +1817,16 @@ export class SchemaStatements {
       const method = `${command}ForAlter`;
 
       if (typeof (this as any)[method] === "function") {
+        const result = await (this as any)[method](table, ...arguments_);
+        // Ruby `Array(x)`: nil is [], an Array passes through, anything else
+        // wraps. `partition` then splits it on String, so every non-String —
+        // not only a callable — lands in `procs`.
+        const values = result == null ? [] : Array.isArray(result) ? result : [result];
         const sqls: string[] = [];
         const procs: Array<() => Promise<void>> = [];
-        const result = await (this as any)[method](table, ...arguments_);
-        for (const v of Array.isArray(result) ? result : [result]) {
+        for (const v of values) {
           if (typeof v === "string") sqls.push(v);
-          else if (typeof v === "function") procs.push(v);
+          else procs.push(v as () => Promise<void>);
         }
         sqlFragments = sqlFragments.concat(sqls);
         nonCombinableOperations = nonCombinableOperations.concat(procs);
@@ -1835,10 +1839,6 @@ export class SchemaStatements {
         for (const proc of nonCombinableOperations) await proc();
         sqlFragments = [];
         nonCombinableOperations = [];
-
-        if (typeof (this as any)[command] !== "function") {
-          throw new Error(`Unknown bulk change command: ${command}`);
-        }
         await (this as any)[command](table, ...arguments_);
       }
     }

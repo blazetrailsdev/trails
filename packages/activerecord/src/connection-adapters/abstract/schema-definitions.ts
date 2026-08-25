@@ -1045,11 +1045,6 @@ export class AlterTable {
 }
 
 /**
- * TableDefinition — used inside create_table blocks.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition
- */
-/**
  * The table-definition type an adapter's own `create_table_definition` builds.
  *
  * Ruby resolves a yielded object's methods at call time, so a PostgreSQL
@@ -1058,6 +1053,10 @@ export class AlterTable {
  * TypeScript resolves against the DECLARED parameter type instead, so the
  * `create_table` yield has to name the receiver's own definition class for the
  * same names to resolve.
+ *
+ * @noRailsEquivalent PERMANENT: Ruby needs no type to express what a
+ *   `create_table` block yields, so there is nothing to mirror. This is the
+ *   declaration-site expression of that same fact.
  */
 export type TableDefinitionOf<A> = A extends {
   createTableDefinition(name: string, options?: Record<string, unknown>): infer T;
@@ -1065,6 +1064,11 @@ export type TableDefinitionOf<A> = A extends {
   ? T
   : TableDefinition;
 
+/**
+ * TableDefinition — used inside create_table blocks.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition
+ */
 export class TableDefinition {
   readonly name: string;
   readonly columns: ColumnDefinition[] = [];

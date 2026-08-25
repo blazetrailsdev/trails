@@ -172,6 +172,7 @@ const CR_SERVER_LOST = 2013;
 const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
 type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
+type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
@@ -2009,9 +2010,7 @@ export interface AbstractMysqlAdapter {
 
   createTable(
     name: string,
-    optionsOrFn?:
-      | Extract<CreateTableArgs[1], { options?: string }>
-      | ((t: TableDefinitionOf<this>) => void),
+    optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void),
     fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void>;
 

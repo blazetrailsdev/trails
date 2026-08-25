@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { except, hexdigest, isBlank, Notifications, toFs } from "@blazetrails/activesupport";
+import { except, hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
@@ -1937,23 +1937,15 @@ export class Relation<T extends Base> {
    */
   private instantiateRecords(result: Result): T[] {
     if (result.isEmpty()) return [];
-    const rows = result.toArray();
-    const columnTypes = result.columnTypes as Record<
-      string,
-      { deserialize(value: unknown): unknown }
-    >;
     const block = this._instantiateBlock;
 
     const joinDependency = this._joinDependency;
     if (joinDependency) {
       this._joinDependency = null;
-      return joinDependency.instantiate(rows, this.strictLoadingValue, columnTypes, block) as T[];
+      return joinDependency.instantiate(result, this.strictLoadingValue, block) as T[];
     }
 
-    const payload = { record_count: rows.length, class_name: this._model.name };
-    return Notifications.instrument("instantiation.active_record", payload, () =>
-      rows.map((row) => this._model._instantiate(row, block as never, columnTypes) as T),
-    );
+    return this._model._loadFromSql(result, block as never) as T[];
   }
 
   /**

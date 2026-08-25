@@ -2736,6 +2736,17 @@ export class Base extends Model {
 
   /**
    * Instantiate a model from a database row (marks it as persisted).
+   *
+   * Mirrors `instantiate_instance_of` (persistence.rb:82-87):
+   * `klass.attributes_builder.build_from_database(attributes, column_types)`,
+   * installed by `init_with_attributes`. The resulting LazyAttributeSet reports
+   * only the projected columns from `keys`/`key?`, because the unprojected ones
+   * were never in `values` (attribute_set/builder.rb:32-39).
+   *
+   * trails carries a per-query `overrideTypes` map Rails has no counterpart
+   * for; it is merged into Rails' single `additional_types` argument, an
+   * override winning over the result set's reported column type for the same
+   * name.
    */
   static _instantiate<T extends typeof Base>(
     this: T,
@@ -2761,9 +2772,9 @@ export class Base extends Model {
     }
 
     // Ensure schema reflection has populated _attributeDefinitions with
-    // adapter-resolved cast types before hydrating from the row —
-    // otherwise writeFromDatabase falls back to ValueType and PG OID
-    // casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
+    // adapter-resolved cast types before hydrating from the row — otherwise
+    // `attributes_builder`'s `attribute_types` falls back to ValueType and PG
+    // OID casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
     // reads an already-populated schema cache; the preceding query
     // would have populated it.
 
@@ -2796,14 +2807,6 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    // Rails: `klass.attributes_builder.build_from_database(attributes,
-    // column_types)` then `allocate.init_with_attributes(attributes)`
-    // (persistence.rb:82-87). The LazyAttributeSet reports only the projected
-    // columns from `keys`/`key?` because the unprojected ones were never in
-    // `values` (attribute_set/builder.rb:32-39), so there is no narrowing pass.
-    // trails merges its per-query `overrideTypes` into Rails' single
-    // `additional_types` argument, an override winning over the result set's
-    // reported column type for the same name.
     const additionalTypes = new Map<string, any>();
     for (const [key, type] of Object.entries(columnTypes ?? {})) additionalTypes.set(key, type);
     for (const [key, type] of Object.entries(overrideTypes ?? {})) additionalTypes.set(key, type);

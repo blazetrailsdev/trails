@@ -3395,7 +3395,13 @@ export class PostgreSQLAdapter
     }
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#remove_index
+   *
+   * Rails hands the `PostgreSQL::Name` itself to `quote_table_name`
+   * (postgresql/schema_statements.rb:561), which `to_s`es it; trails'
+   * `quoteTableName` takes a string, so `indexToRemove` holds the `to_s`ed name.
+   */
   async removeIndex(
     tableName: string,
     columnOrOptions?:
@@ -3439,9 +3445,6 @@ export class PostgreSQLAdapter
     // Rails resolves the name against `table.to_s` — the SCHEMA-QUALIFIED name,
     // so a generated index name matches the one addIndex produced for the same
     // argument. Passing the bare identifier here silently misses those.
-    // Rails passes the PostgreSQL::Name itself to `quote_table_name`, which
-    // `to_s`es it; trails' `quoteTableName` takes a string, so the `to_s`
-    // happens here rather than at the call site.
     const indexToRemove = new Name(
       table.schema,
       await this.indexNameForRemove(table.toString(), columnName, options),
