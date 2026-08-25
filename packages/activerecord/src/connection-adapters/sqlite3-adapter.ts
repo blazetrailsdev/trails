@@ -2557,7 +2557,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       }
       if (!cols.length) continue;
       const escapedFrom = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${to}_`);
+      const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`, "g"), `$1${to}_`);
       const options: {
         name: string;
         internal: boolean;
