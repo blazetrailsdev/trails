@@ -208,7 +208,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     name: string,
     options: Record<string, unknown> = {},
   ): SQLite3TableDefinition {
-    return new SQLite3TableDefinition(name, { ...options, adapter: this });
+    return new SQLite3TableDefinition(this, name, options);
   }
 
   /**
@@ -2636,7 +2636,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`) and so
    * does this, for a schema-qualified destination as much as a bare one: the
    * qualifier lands on the INDEX name, which is where SQLite takes it, in
-   * `SQLite3::SchemaCreation#visit_CreateIndexDefinition`.
+   * `SQLite3::SchemaCreation#quotedIndexNameAndTable`.
    * @internal
    */
   private async copyTableIndexes(

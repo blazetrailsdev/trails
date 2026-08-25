@@ -646,7 +646,7 @@ class MockAdapter {
   useForeignKeys = () => true;
   createTableDefinition = (n: string, opts: Record<string, unknown>) =>
     // Rails' create_table_definition passes `self` (schema_statements.rb:1041).
-    new TableDefinition(n, { adapter: this as never, ...opts, adapterName: "sqlite" });
+    new TableDefinition(this as never, n, { ...opts });
 
   constructor(cache: SchemaCache) {
     this.schemaCache = BoundSchemaReflection.forLoneConnection(

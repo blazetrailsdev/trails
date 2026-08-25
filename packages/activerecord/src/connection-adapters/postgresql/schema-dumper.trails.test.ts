@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
+import { TypeMetadata } from "./type-metadata.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 
 const emptySource: SchemaSource = {
@@ -25,10 +26,10 @@ function makeColumn(
   return new Column(
     options.name ?? "id",
     null,
-    {
+    new TypeMetadata({
       sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
       type: options.type ?? "integer",
-    },
+    }),
     true,
     { serial: options.serial, generated: options.generated },
   );
@@ -137,10 +138,16 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      const col = new Column("computed", null, { sqlType: "integer", type: "integer" }, true, {
-        defaultFunction: "(a + b)",
-        generated: "s",
-      });
+      const col = new Column(
+        "computed",
+        null,
+        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        true,
+        {
+          defaultFunction: "(a + b)",
+          generated: "s",
+        },
+      );
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["as"]).toBe(JSON.stringify("(a + b)"));
       expect(spec["stored"]).toBe(true);
@@ -155,10 +162,16 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      const col = new Column("status", null, { sqlType: "mood", type: "enum" }, true, {
-        defaultFunction: "('happy'::mood)",
-        generated: "s",
-      });
+      const col = new Column(
+        "status",
+        null,
+        new TypeMetadata({ sqlType: "mood", type: "enum" }),
+        true,
+        {
+          defaultFunction: "('happy'::mood)",
+          generated: "s",
+        },
+      );
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["stored"]).toBe(true);
       expect(spec["enum_type"]).toBe(JSON.stringify("mood"));
@@ -172,17 +185,29 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => false,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      const col = new Column("computed", null, { sqlType: "integer", type: "integer" }, true, {
-        defaultFunction: "(a + b)",
-        generated: "s",
-      });
+      const col = new Column(
+        "computed",
+        null,
+        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        true,
+        {
+          defaultFunction: "(a + b)",
+          generated: "s",
+        },
+      );
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["as"]).toBeUndefined();
     });
 
     it("adds enum_type for enum columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      const col = new Column("status", null, { sqlType: "mood", type: "enum" }, true, {});
+      const col = new Column(
+        "status",
+        null,
+        new TypeMetadata({ sqlType: "mood", type: "enum" }),
+        true,
+        {},
+      );
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["enum_type"]).toBe(JSON.stringify("mood"));
     });
@@ -191,9 +216,15 @@ describe("PostgreSQL::SchemaDumper", () => {
   describe("schemaTypeWithVirtual", () => {
     it("returns virtual for generated (stored) PG columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      const col = new Column("computed", null, { sqlType: "integer", type: "integer" }, true, {
-        generated: "s",
-      });
+      const col = new Column(
+        "computed",
+        null,
+        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        true,
+        {
+          generated: "s",
+        },
+      );
       expect(dumper.schemaTypeWithVirtual(col)).toBe("virtual");
     });
 
@@ -207,10 +238,16 @@ describe("PostgreSQL::SchemaDumper", () => {
   describe("extractExpressionForVirtualColumn", () => {
     it("returns JSON-stringified defaultFunction", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      const col = new Column("full_name", null, { sqlType: "text", type: "string" }, true, {
-        defaultFunction: "concat(first_name, ' ', last_name)",
-        generated: "s",
-      });
+      const col = new Column(
+        "full_name",
+        null,
+        new TypeMetadata({ sqlType: "text", type: "string" }),
+        true,
+        {
+          defaultFunction: "concat(first_name, ' ', last_name)",
+          generated: "s",
+        },
+      );
       expect(dumper.extractExpressionForVirtualColumn(col)).toBe(
         JSON.stringify("concat(first_name, ' ', last_name)"),
       );

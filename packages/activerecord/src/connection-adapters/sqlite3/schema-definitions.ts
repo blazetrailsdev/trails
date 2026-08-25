@@ -9,16 +9,8 @@ import {
   ColumnDefinition,
 } from "../abstract/schema-definitions.js";
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
-import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
-  constructor(
-    tableName: string,
-    options: { id?: boolean | "uuid"; adapter: TableDefinitionConn; [key: string]: unknown },
-  ) {
-    super(tableName, { ...options, adapterName: "sqlite" });
-  }
-
   override references(name: string, options: Record<string, unknown> = {}): this {
     return super.references(name, { type: "integer", ...options } as any);
   }

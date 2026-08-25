@@ -4,6 +4,7 @@ import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 import { Column } from "./column.js";
+import { TypeMetadata } from "./type-metadata.js";
 import {
   ForeignKeyDefinition,
   ChangeColumnDefinition,
@@ -119,7 +120,11 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition", async () => {
-    const col = new Column("x", null, { sqlType: "character varying", type: "string" });
+    const col = new Column(
+      "x",
+      null,
+      new TypeMetadata({ sqlType: "character varying", type: "string" }),
+    );
     expect(
       await s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, null)),
     ).toContain("DROP DEFAULT");
@@ -131,7 +136,7 @@ describe("PostgreSQL SchemaCreation", () => {
   it("visitChangeColumnDefaultDefinition: uuid function default stays bare", async () => {
     // postgresql/quoting.rb:159-160 — a `()`-bearing string default on a
     // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
-    const col = new Column("id", null, { sqlType: "uuid", type: "uuid" });
+    const col = new Column("id", null, new TypeMetadata({ sqlType: "uuid", type: "uuid" }));
     const host = s();
     host.adapter.quoteDefaultExpression = (v: unknown, c: unknown) =>
       quoteDefaultExpression.call(null as never, v, c as never);

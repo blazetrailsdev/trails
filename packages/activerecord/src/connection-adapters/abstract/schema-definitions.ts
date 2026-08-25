@@ -1086,14 +1086,12 @@ export class TableDefinition {
   readonly options?: string;
   readonly comment?: string;
   private _primaryKeys?: PrimaryKeyDefinition;
-  private _adapterName: "sqlite" | "postgres" | "mysql2";
   protected _adapter: TableDefinitionConn;
 
   constructor(
+    conn: TableDefinitionConn,
     name: string,
     tdOptions: {
-      adapterName?: "sqlite" | "postgres" | "mysql2";
-      adapter: TableDefinitionConn;
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
@@ -1101,11 +1099,11 @@ export class TableDefinition {
       comment?: string;
       charset?: string;
       collation?: string;
-    },
+      [key: string]: unknown;
+    } = {},
   ) {
+    this._adapter = conn;
     this.name = name;
-    this._adapterName = tdOptions.adapterName ?? "sqlite";
-    this._adapter = tdOptions.adapter;
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
     this.as = tdOptions.as;

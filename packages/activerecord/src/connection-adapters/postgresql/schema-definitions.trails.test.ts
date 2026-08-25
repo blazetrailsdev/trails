@@ -148,7 +148,7 @@ describe("UniqueConstraintDefinition", () => {
 
 describeIfPostgresqlAdapter("TableDefinition", () => {
   it("accumulates exclusion constraints", () => {
-    const td = new TableDefinition("products", { adapter: leased });
+    const td = new TableDefinition(leased, "products");
     td.exclusionConstraint("price WITH =, range WITH &&", { name: "price_check", using: "gist" });
 
     expect(td.exclusionConstraints).toHaveLength(1);
@@ -159,7 +159,7 @@ describeIfPostgresqlAdapter("TableDefinition", () => {
   });
 
   it("accumulates unique constraints", () => {
-    const td = new TableDefinition("orders", { adapter: leased });
+    const td = new TableDefinition(leased, "orders");
     td.uniqueConstraint("position", { name: "unique_position", deferrable: "deferred" });
 
     expect(td.uniqueConstraints).toHaveLength(1);
@@ -170,17 +170,17 @@ describeIfPostgresqlAdapter("TableDefinition", () => {
   });
 
   it("defaults unlogged to false", () => {
-    const td = new TableDefinition("t", { adapter: leased });
+    const td = new TableDefinition(leased, "t");
     expect(td.unlogged).toBe(false);
   });
 
   it("accepts unlogged option", () => {
-    const td = new TableDefinition("t", { adapter: leased, unlogged: true });
+    const td = new TableDefinition(leased, "t", { unlogged: true });
     expect(td.unlogged).toBe(true);
   });
 
   it("newExclusionConstraintDefinition returns definition without pushing", () => {
-    const td = new TableDefinition("products", { adapter: leased });
+    const td = new TableDefinition(leased, "products");
     const defn = td.newExclusionConstraintDefinition("price WITH =", { name: "pc" });
     expect(defn).toBeInstanceOf(ExclusionConstraintDefinition);
     expect(defn.tableName).toBe("products");
@@ -188,7 +188,7 @@ describeIfPostgresqlAdapter("TableDefinition", () => {
   });
 
   it("newUniqueConstraintDefinition returns definition without pushing", () => {
-    const td = new TableDefinition("orders", { adapter: leased });
+    const td = new TableDefinition(leased, "orders");
     const defn = td.newUniqueConstraintDefinition("col", { name: "uc" });
     expect(defn).toBeInstanceOf(UniqueConstraintDefinition);
     expect(defn.tableName).toBe("orders");
@@ -205,7 +205,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
     ).typeToSql(type, options);
 
   it("passes :enum through as the column type with enum_type forwarded", () => {
-    const td = new TableDefinition("t", { adapter: leased });
+    const td = new TableDefinition(leased, "t");
     td.enum("current_mood", { enum_type: "mood" });
     const [col] = td.columns;
     expect(col.type).toBe("enum");
@@ -214,13 +214,13 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
   });
 
   it("defines one column per name", () => {
-    const td = new TableDefinition("t", { adapter: leased });
+    const td = new TableDefinition(leased, "t");
     td.enum("a", "b", { enum_type: "mood" });
     expect(td.columns.map((c) => c.name)).toEqual(["a", "b"]);
   });
 
   it("raises when enum_type is missing", () => {
-    const td = new TableDefinition("t", { adapter: leased });
+    const td = new TableDefinition(leased, "t");
     td.enum("current_mood");
     const [col] = td.columns;
     expect(() => typeToSql(col.type, col.options)).toThrow(
@@ -266,7 +266,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
 
   it("defines one column per name", () => {
     for (const [method] of types) {
-      const td = new TableDefinition("t", { adapter: leased });
+      const td = new TableDefinition(leased, "t");
       (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", "c");
       expect(td.columns.map((c) => c.name)).toEqual(["a", "b", "c"]);
     }
@@ -274,7 +274,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
 
   it("applies the trailing options to every name", () => {
     for (const [method] of types) {
-      const td = new TableDefinition("t", { adapter: leased });
+      const td = new TableDefinition(leased, "t");
       (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
         null: false,
       });
@@ -287,7 +287,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
 
   it("raises when given no column name", () => {
     for (const [method, railsType] of types) {
-      const td = new TableDefinition("t", { adapter: leased });
+      const td = new TableDefinition(leased, "t");
       expect(() =>
         (td as unknown as Record<string, (...args: unknown[]) => void>)[method](),
       ).toThrow(`Missing column name(s) for ${railsType}`);
@@ -299,7 +299,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
 
   it("creates an index for every name when index is passed", () => {
     for (const [method] of types) {
-      const td = new TableDefinition("t", { adapter: leased });
+      const td = new TableDefinition(leased, "t");
       (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
         index: true,
       });
@@ -310,7 +310,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
 
   it("raises on a duplicate column name", () => {
     for (const [method] of types) {
-      const td = new TableDefinition("t", { adapter: leased });
+      const td = new TableDefinition(leased, "t");
       expect(() =>
         (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "a"),
       ).toThrow("you can't define an already defined column 'a' on 't'.");
@@ -318,7 +318,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
   });
 
   it("keeps type-specific SQL types when defining multiple columns", () => {
-    const td = new TableDefinition("t", { adapter: leased });
+    const td = new TableDefinition(leased, "t");
     td.bit("a", "b", { limit: 8 });
     td.bitVarying("c", { limit: 4 });
     td.bigserial("d", "e");
@@ -334,14 +334,14 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
 
 describeIfPostgresqlAdapter("AlterTable", () => {
   it("validateConstraint pushes to constraintValidations", () => {
-    const td = new TableDefinition("products", { adapter: leased });
+    const td = new TableDefinition(leased, "products");
     const at = new AlterTable(td);
     at.validateConstraint("price_check");
     expect(at.constraintValidations).toEqual(["price_check"]);
   });
 
   it("addExclusionConstraint pushes to exclusionConstraintAdds", () => {
-    const td = new TableDefinition("products", { adapter: leased });
+    const td = new TableDefinition(leased, "products");
     const at = new AlterTable(td);
     at.addExclusionConstraint("price WITH =", { name: "pc", using: "gist" });
     expect(at.exclusionConstraintAdds).toHaveLength(1);
@@ -349,7 +349,7 @@ describeIfPostgresqlAdapter("AlterTable", () => {
   });
 
   it("addUniqueConstraint pushes to uniqueConstraintAdds", () => {
-    const td = new TableDefinition("orders", { adapter: leased });
+    const td = new TableDefinition(leased, "orders");
     const at = new AlterTable(td);
     at.addUniqueConstraint("position", { name: "unique_position" });
     expect(at.uniqueConstraintAdds).toHaveLength(1);
@@ -366,23 +366,20 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   };
 
   it("emits UNLOGGED when unlogged: true", async () => {
-    const td = new TableDefinition("products", {
-      adapter: leased,
-      unlogged: true,
-    });
+    const td = new TableDefinition(leased, "products", { unlogged: true });
     td.string("name");
     expect(await toSql(td)).toMatch(/^CREATE UNLOGGED TABLE/);
   });
 
   it("does not emit UNLOGGED by default", async () => {
-    const td = new TableDefinition("products", { adapter: leased });
+    const td = new TableDefinition(leased, "products");
     td.string("name");
     expect(await toSql(td)).toMatch(/^CREATE TABLE/);
     expect(await toSql(td)).not.toContain("UNLOGGED");
   });
 
   it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
-    const td = new TableDefinition("articles", { adapter: leased });
+    const td = new TableDefinition(leased, "articles");
     td.column("full_name", "virtual" as any, { as: "a || b", stored: true } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
@@ -392,7 +389,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("emits exclusion constraint in CREATE TABLE", async () => {
-    const td = new TableDefinition("meetings", { adapter: leased });
+    const td = new TableDefinition(leased, "meetings");
     td.exclusionConstraint("room WITH =, during WITH &&", { name: "no_overlap", using: "gist" });
     const sql = await toSql(td);
     expect(sql).toContain(
@@ -401,7 +398,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("emits unique constraint in CREATE TABLE", async () => {
-    const td = new TableDefinition("orders", { adapter: leased });
+    const td = new TableDefinition(leased, "orders");
     td.uniqueConstraint("position", { name: "unique_pos", deferrable: "deferred" });
     const sql = await toSql(td);
     expect(sql).toContain(
@@ -410,14 +407,14 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("emits unique constraint with nulls not distinct", async () => {
-    const td = new TableDefinition("orders", { adapter: leased });
+    const td = new TableDefinition(leased, "orders");
     td.uniqueConstraint("position", { name: "unique_pos", nullsNotDistinct: true });
     const sql = await toSql(td);
     expect(sql).toContain("NULLS NOT DISTINCT");
   });
 
   it("emits exclusion constraint with a generated name when name is omitted", async () => {
-    const td = new TableDefinition("meetings", { adapter: leased });
+    const td = new TableDefinition(leased, "meetings");
     td.exclusionConstraint("room WITH =", { using: "gist" });
     const sql = await toSql(td);
     expect(sql).toContain("EXCLUDE USING gist (room WITH =)");
@@ -425,7 +422,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("emits unique constraint with a generated name when name is omitted", async () => {
-    const td = new TableDefinition("orders", { adapter: leased });
+    const td = new TableDefinition(leased, "orders");
     td.uniqueConstraint("position");
     const sql = await toSql(td);
     expect(sql).toContain('UNIQUE ("position")');
@@ -433,7 +430,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("handles constraint-only table with no columns (id: false)", async () => {
-    const td = new TableDefinition("link_table", { adapter: leased });
+    const td = new TableDefinition(leased, "link_table");
     td.uniqueConstraint("ref", { name: "unique_ref" });
     const sql = await toSql(td);
     expect(sql).not.toContain("(,");
@@ -441,8 +438,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("injects constraints before trailing table options clause", async () => {
-    const td = new TableDefinition("logs", {
-      adapter: leased,
+    const td = new TableDefinition(leased, "logs", {
       options: "WITH (autovacuum_enabled = false)",
     });
     td.string("message");
@@ -455,8 +451,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("skips constraint injection for CREATE TABLE ... AS queries", async () => {
-    const td = new TableDefinition("archived_orders", {
-      adapter: leased,
+    const td = new TableDefinition(leased, "archived_orders", {
       as: "SELECT (1) AS id, amount FROM orders WHERE archived = true",
     });
     td.uniqueConstraint("id", { name: "unique_id" });
@@ -470,7 +465,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     // whose default branch returns an unrecognized type verbatim (Rails parity:
     // `type.to_s` — it never uppercases). This matches the real-PostgreSQLAdapter
     // path, where typeToSql("cidr") also returns "cidr" via NATIVE_DATABASE_TYPES.
-    const td = new TableDefinition("widgets", { adapter: leased });
+    const td = new TableDefinition(leased, "widgets");
     td.cidr("net");
     td.inet("addr");
     td.hstore("props");
@@ -517,7 +512,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
       supportsUniqueConstraints: () => true,
       useForeignKeys: () => true,
     };
-    const td = new TableDefinition("widgets", { adapter: stubAdapter as any });
+    const td = new TableDefinition(stubAdapter as any, "widgets");
     td.cidr("net");
     td.inet("addr");
     td.hstore("props");
@@ -536,7 +531,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
 
 describeIfPostgresqlAdapter("TableDefinition#toSql default quoting", () => {
   it("handles default values containing doubled single-quotes without mis-parsing", async () => {
-    const td = new TableDefinition("messages", { adapter: leased });
+    const td = new TableDefinition(leased, "messages");
     td.string("body", { default: "Bob's" });
     td.uniqueConstraint("body", { name: "unique_body" });
     const sql = await new PgSchemaCreation(leased as unknown as PgSchemaCreationHost).accept(td);
@@ -610,7 +605,7 @@ describe("Table delegation", () => {
 
 describeIfPostgresqlAdapter("TableDefinition#validColumnDefinitionOptions", () => {
   it("adds the PostgreSQL-specific option keys to the abstract set", () => {
-    const td = new TableDefinition("articles", { adapter: leased });
+    const td = new TableDefinition(leased, "articles");
     const opts = (td as any).validColumnDefinitionOptions() as string[];
     for (const key of ["array", "using", "castAs", "as", "type", "enumType", "stored"]) {
       expect(opts).toContain(key);

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { Column } from "./mysql/column.js";
+import { TypeMetadata } from "./mysql/type-metadata.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -15,7 +16,7 @@ function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | 
   return new Column(
     "id",
     null,
-    { sqlType: "bigint", extra: opts.autoIncrement ? "auto_increment" : "" },
+    new TypeMetadata({ sqlType: "bigint" }, { extra: opts.autoIncrement ? "auto_increment" : "" }),
     false,
     { defaultFunction: opts.defaultFunction ?? null },
   );
@@ -192,10 +193,16 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
   function makeTextColumn(
     opts: { collation?: string | null; defaultFunction?: string | null } = {},
   ) {
-    return new Column("body", "hello", { sqlType: "varchar(255)", type: "string" }, true, {
-      collation: opts.collation ?? "utf8mb4_unicode_ci",
-      defaultFunction: opts.defaultFunction ?? null,
-    });
+    return new Column(
+      "body",
+      "hello",
+      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      true,
+      {
+        collation: opts.collation ?? "utf8mb4_unicode_ci",
+        defaultFunction: opts.defaultFunction ?? null,
+      },
+    );
   }
 
   async function makeAdapter(column: Column) {
@@ -406,7 +413,7 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown 
   return new Column(
     "body",
     opts.default_ === undefined ? "hello" : opts.default_,
-    { sqlType: "varchar(255)", type: "string" },
+    new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
     opts.null_ ?? true,
   );
 }

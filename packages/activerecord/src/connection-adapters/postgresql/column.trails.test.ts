@@ -8,7 +8,7 @@ describe("PostgreSQL::Column JSON round-trip", () => {
     const col = new Column(
       "tags",
       null,
-      { sqlType: "character varying[]", type: "string", oid: 1015, fmod: -1 },
+      new TypeMetadata({ sqlType: "character varying[]", type: "string" }, { oid: 1015, fmod: -1 }),
       true,
       { serial: false, identity: "a", generated: "s" },
     );
@@ -62,7 +62,11 @@ describe("PostgreSQL::TypeMetadata JSON round-trip", () => {
   });
 
   it("delegates the Column readers to the metadata object", () => {
-    const col = new Column("n", null, { sqlType: "int4", type: "integer", oid: 23, fmod: -1 });
+    const col = new Column(
+      "n",
+      null,
+      new TypeMetadata({ sqlType: "int4", type: "integer" }, { oid: 23, fmod: -1 }),
+    );
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.oid).toBe(23);
     expect(col.fmod).toBe(-1);

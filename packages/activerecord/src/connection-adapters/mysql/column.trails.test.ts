@@ -8,7 +8,10 @@ describe("MysqlColumn", () => {
     const original = new MysqlColumn(
       "id",
       null,
-      { sqlType: "bigint(20) unsigned", type: "integer", limit: 8, extra: "auto_increment" },
+      new TypeMetadata(
+        { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
+        { extra: "auto_increment" },
+      ),
       false,
     );
     const coder: Record<string, unknown> = {};
@@ -41,11 +44,11 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
   });
 
   it("delegates the Column reader to the metadata object", () => {
-    const col = new MysqlColumn("id", null, {
-      sqlType: "bigint(20)",
-      type: "integer",
-      extra: "auto_increment",
-    });
+    const col = new MysqlColumn(
+      "id",
+      null,
+      new TypeMetadata({ sqlType: "bigint(20)", type: "integer" }, { extra: "auto_increment" }),
+    );
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.extra).toBe("auto_increment");
 
@@ -60,7 +63,11 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     const meta = new TypeMetadata({ sqlType: "varchar(255)", type: "string", limit: 255 });
     expect(meta.extra).toBeNull();
 
-    const col = new MysqlColumn("name", null, { sqlType: "varchar(255)", type: "string" });
+    const col = new MysqlColumn(
+      "name",
+      null,
+      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+    );
     expect(col.extra).toBeNull();
     expect(col.isAutoIncrement()).toBe(false);
     expect(col.isVirtual()).toBe(false);
