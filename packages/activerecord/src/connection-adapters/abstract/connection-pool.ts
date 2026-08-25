@@ -868,23 +868,32 @@ export class ConnectionPool implements ReapablePool {
   // return type — do not "converge back" to a sync return. See RFC
   // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
   /**
-   * @missingRailsCall lock — PERMANENT: connection_pool.rb:550 wraps the pinned
-   *   branch in `@pinned_connection.lock.synchronize { synchronize { ... } }`.
-   *   A Monitor guards a connection against concurrent *threads*; JS has none,
-   *   and `_resolvePinnedConnection` resolves the pin in the same tick, so
-   *   there is no TypeScript spelling of the lock to call.
+   * @missingRailsCall lock — PERMANENT: connection_pool.rb:550-551 wraps the
+   *   pinned branch in `@pinned_connection.lock.synchronize { synchronize
+   *   { ... } }`. Both monitors guard against concurrent *threads*, and the
+   *   section they close is unreachable here: the branch has exactly one yield
+   *   point (`verifyBang`), and everything after it — the `@connections`
+   *   membership read and the push that follows — runs in a single
+   *   synchronous continuation, so no second checkout can observe the pool
+   *   between the two. A body that mutates only before its first `await`, or
+   *   only after its last one, needs no JS analogue of the mutex.
    */
   async checkout(timeout?: number): Promise<DatabaseAdapter> {
+    const checkoutTimeout = timeout ?? this.checkoutTimeout;
     const pinned = this._resolvePinnedConnection();
     // Rails' guard clause: `return checkout_and_verify(acquire_connection(
     // checkout_timeout)) unless @pinned_connection` (connection_pool.rb:548).
+    // Rails re-reads `@pinned_connection` a second time inside the lock
+    // (:552, "may have been cleaned up before we synchronized") and falls back
+    // to the same acquire on nil; with no lock to acquire, the two reads are
+    // one read here — nothing can clear the pin between them.
     if (!pinned) {
-      return checkoutAndVerify(this, await this.acquireConnection(timeout ?? this.checkoutTimeout));
+      return checkoutAndVerify(this, await this.acquireConnection(checkoutTimeout));
     }
 
-    // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
-    // unconditionally, ensure membership in @connections, and return — no
-    // checkout_and_verify / QueryCache wiring on the pinned connection.
+    // Mirrors Rails' pinned branch (connection_pool.rb:553-563): verify!,
+    // ensure membership in @connections, and return —
+    // no checkout_and_verify / QueryCache wiring on the pinned connection.
     // verifyBang is async in trails (Rails' verify! is sync); await it on the
     // async path so verification completes before the connection is handed out
     // and a rejection surfaces here rather than as an unhandled rejection.

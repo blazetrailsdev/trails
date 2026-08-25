@@ -20,11 +20,7 @@ import { AssociatedValidator, validatesAssociated } from "./validations/associat
 import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
-import {
-  UniquenessValidator,
-  validatesUniqueness,
-  validatesUniquenessOf,
-} from "./validations/uniqueness.js";
+import { UniquenessValidator, validatesUniquenessOf } from "./validations/uniqueness.js";
 import { _preloadedHolderTarget } from "./associations.js";
 import type { Base } from "./base.js";
 
@@ -39,7 +35,6 @@ export {
   PresenceValidator,
   UniquenessValidator,
   validatesAssociated,
-  validatesUniqueness,
   validatesUniquenessOf,
 };
 
@@ -286,13 +281,12 @@ export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: un
 /**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveRecord::Validations::ClassMethods` / `ActiveSupport::Concern#ClassMethods`.
- * `validatesAssociated` and `validatesUniqueness` live next to their
+ * `validatesAssociated` and `validatesUniquenessOf` live next to their
  * validator classes in validations/associated.ts and validations/uniqueness.ts
  * matching Rails' file layout.
  */
 export const ClassMethods = {
   validatesAssociated,
-  validatesUniqueness,
   validatesUniquenessOf,
   validatesPresenceOf,
   validatesAbsenceOf,

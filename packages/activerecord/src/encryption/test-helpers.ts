@@ -452,7 +452,7 @@ export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapt
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
-      this.validatesUniqueness("name");
+      this.validatesUniquenessOf("name");
       this.encrypts("name", { deterministic: true });
     }
   } as any;

@@ -66,7 +66,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>" });
-        this.validatesUniqueness("name");
+        this.validatesUniquenessOf("name");
         this.encrypts("name", { deterministic: true, downcase: true });
       }
     }
@@ -84,7 +84,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>" });
-        this.validatesUniqueness("name");
+        this.validatesUniquenessOf("name");
         this.encrypts("name", { deterministic: true, downcase: true });
       }
     }
@@ -110,7 +110,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>" });
-        this.validatesUniqueness("name");
+        this.validatesUniquenessOf("name");
         this.encrypts("name", { deterministic: true, supportUnencryptedData: false });
       }
     }
@@ -136,7 +136,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>" });
-        this.validatesUniqueness("name");
+        this.validatesUniquenessOf("name");
         this.encrypts("name", { deterministic: true, supportUnencryptedData: true });
       }
     }
@@ -163,7 +163,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>" });
-        this.validatesUniqueness("name");
+        this.validatesUniquenessOf("name");
         this.encrypts("name", { deterministic: true, downcase: false });
       }
     }
@@ -182,7 +182,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
         this._tableName = "encrypted_books";
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>" });
-        this.validatesUniqueness("name");
+        this.validatesUniquenessOf("name");
         this.encrypts("name", { deterministic: true });
       }
     }

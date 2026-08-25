@@ -38,7 +38,7 @@ const INT_MAX_VALUE = 2147483647;
 class Wizard extends Base {
   static {
     this.abstractClass = true;
-    this.validatesUniqueness("name");
+    this.validatesUniquenessOf("name");
   }
 }
 
@@ -46,7 +46,7 @@ class Wizard extends Base {
 class IneptWizard extends Wizard {
   static _tableName = "inept_wizards";
   static {
-    this.validatesUniqueness("city");
+    this.validatesUniquenessOf("city");
   }
 }
 
@@ -57,14 +57,14 @@ class Thaumaturgist extends IneptWizard {}
 //        validates_uniqueness_of :content, scope: :title; ...`.
 class ReplyWithTitleObject extends Reply {
   static {
-    this.validatesUniqueness("content", { scope: "title" });
+    this.validatesUniquenessOf("content", { scope: "title" });
   }
 }
 
 // Rails `class CoolTopic < Topic; validates_uniqueness_of :id; end`.
 class CoolTopic extends Topic {
   static {
-    this.validatesUniqueness("id");
+    this.validatesUniquenessOf("id");
   }
 }
 
@@ -86,7 +86,7 @@ class LessonWithUniqKeyboard extends Base {
   static _tableName = "lessons";
   static {
     this.belongsTo("keyboard", { primaryKey: "name", foreignKey: "name" });
-    this.validatesUniqueness("keyboard");
+    this.validatesUniquenessOf("keyboard");
   }
 }
 
@@ -101,7 +101,7 @@ class DashboardWithoutPrimaryKey extends Base {
   // (which never sets `self.primary_key`).
   static name = "Dashboard";
   static {
-    this.validatesUniqueness("dashboard_id");
+    this.validatesUniquenessOf("dashboard_id");
   }
 }
 
@@ -152,7 +152,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
 
     const t = new Topic({ title: "I'm uniqué!" });
     expect(await t.save()).toBe(true);
@@ -175,7 +175,7 @@ describe("UniquenessValidationTest", () => {
     // Rails declares the validation on `t2.singleton_class`; trails has no
     // per-instance validator, so the class-level declaration plus a save-time
     // check expresses the same "duplicate is rejected, fresh row is accepted".
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     const t2 = new Topic({ title: "abc" });
     expect(await t2.save()).toBe(false);
   });
@@ -183,14 +183,14 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with alias attribute", async () => {
     // Rails aliases :new_title → :title and validates :new_title; `heading` is
     // the canonical Topic alias for :title, so it exercises the same path.
-    Topic.validatesUniqueness("heading");
+    Topic.validatesUniquenessOf("heading");
 
     const topic = new Topic({ title: "abc" });
     expect(await topic.save()).toBe(true);
   });
 
   it("validates uniqueness with nil value", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
 
     const t = new Topic({ title: null });
     expect(await t.save()).toBe(true);
@@ -222,7 +222,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with newline chars", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: false });
+    Topic.validatesUniquenessOf("title", { caseSensitive: false });
 
     const t = new Topic({ title: "new\nline" });
     expect(await t.save()).toBe(true);
@@ -237,7 +237,7 @@ describe("UniquenessValidationTest", () => {
   // collision was missed and `save()` wrongly returned true. Fixed by dropping
   // the manual serialize (Rails lets `bind_attribute`/the type serialize once).
   it("validate uniqueness with scope", async () => {
-    Reply.validatesUniqueness("content", { scope: "parent_id" });
+    Reply.validatesUniquenessOf("content", { scope: "parent_id" });
 
     const t = await Topic.create({ title: "I'm unique!" });
 
@@ -259,7 +259,7 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with aliases", async () => {
     // Rails validates :new_content scope :new_parent_id (aliases of content /
     // parent_id, already declared on Reply).
-    Reply.validatesUniqueness("new_content", { scope: "new_parent_id" });
+    Reply.validatesUniquenessOf("new_content", { scope: "new_parent_id" });
 
     const t = await Topic.create({ title: "I'm unique!" });
 
@@ -275,7 +275,7 @@ describe("UniquenessValidationTest", () => {
 
   it("validate uniqueness with scope invalid syntax", () => {
     expect(() => {
-      Reply.validatesUniqueness("content", { scope: { parent_id: false } as any });
+      Reply.validatesUniquenessOf("content", { scope: { parent_id: false } as any });
     }).toThrow(ArgumentError);
   });
 
@@ -283,7 +283,7 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with object scope", async () => {
     // Rails `scope: :topic` — scope by the belongs_to association name, which
     // resolve_attributes/scope_relation expand to the parent_id foreign key.
-    Reply.validatesUniqueness("content", { scope: "topic" });
+    Reply.validatesUniquenessOf("content", { scope: "topic" });
 
     const t = await Topic.create({ title: "I'm unique!" });
 
@@ -295,7 +295,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with polymorphic object scope", async () => {
-    Essay.validatesUniqueness("name", { scope: ["writer_id", "writer_type"] });
+    Essay.validatesUniquenessOf("name", { scope: ["writer_id", "writer_type"] });
     try {
       const a = await Author.create({ name: "Sergey" });
       const p = await Person.create({ first_name: "Sergey" });
@@ -325,7 +325,7 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with object arg", async () => {
     // Rails `validates_uniqueness_of(:topic)` — uniqueness on the association
     // itself; the validator reads/compares the underlying parent_id FK.
-    Reply.validatesUniqueness("topic");
+    Reply.validatesUniquenessOf("topic");
 
     const t = await Topic.create({ title: "I'm unique!" });
 
@@ -364,7 +364,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with scope array", async () => {
-    Reply.validatesUniqueness("author_name", {
+    Reply.validatesUniquenessOf("author_name", {
       scope: ["author_email_address", "parent_id"],
     });
 
@@ -476,7 +476,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness with special sql like chars", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: true });
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
 
     const t = new Topic({ title: "I'm unique!" });
     expect(await t.save()).toBe(true);
@@ -489,7 +489,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness with special sql like chars", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: false });
+    Topic.validatesUniquenessOf("title", { caseSensitive: false });
 
     const t = new Topic({ title: "I'm unique!" });
     expect(await t.save()).toBe(true);
@@ -502,7 +502,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness by default database collation", async () => {
-    Topic.validatesUniqueness("author_email_address");
+    Topic.validatesUniquenessOf("author_email_address");
 
     const topic1 = new Topic({ author_email_address: "david@loudthinking.com" });
 
@@ -513,7 +513,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: true });
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
 
     const t = new Topic({ title: "I'm unique!" });
     expect(await t.save()).toBe(true);
@@ -531,7 +531,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness with attribute passed as integer", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: true });
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
     await Topic.createBang({ title: 101 as any });
 
     const t2 = new Topic({ title: 101 as any });
@@ -546,7 +546,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness inside scoping", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
 
     const t1 = new Topic({ title: "I'm unique!", author_name: "Mary" });
     expect(await t1.save()).toBe(true);
@@ -556,7 +556,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with columns which are sql keywords", async () => {
-    Guid.validatesUniqueness("key");
+    Guid.validatesUniquenessOf("key");
     try {
       const g = new Guid();
       g.writeAttribute("key", "foo");
@@ -620,7 +620,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with conditions", async () => {
-    Topic.validatesUniqueness("title", {
+    Topic.validatesUniquenessOf("title", {
       conditions: function (this: any) {
         return this.where({ approved: true });
       },
@@ -639,14 +639,14 @@ describe("UniquenessValidationTest", () => {
     // Rails instantiates the validator at declaration time (validates_with),
     // so a non-callable :conditions raises immediately, not at save.
     expect(() =>
-      Topic.validatesUniqueness("title", {
+      Topic.validatesUniquenessOf("title", {
         conditions: Topic.where({ approved: true }) as any,
       }),
     ).toThrow();
   });
 
   it("validate uniqueness with conditions with record arg", async () => {
-    Topic.validatesUniqueness("title", {
+    Topic.validatesUniquenessOf("title", {
       conditions: function (this: any, record: any) {
         return this.where({ author_name: record.readAttribute("author_name") });
       },
@@ -678,7 +678,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness of custom primary key", async () => {
-    Keyboard.validatesUniqueness("key_number");
+    Keyboard.validatesUniquenessOf("key_number");
     try {
       await Keyboard.createBang({ key_number: 10 });
       const key2 = await Keyboard.createBang({ key_number: 11 });
@@ -704,7 +704,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness ignores itself when primary key changed", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
 
     const t = new Topic({ title: "This is a unique title" });
     expect(await t.save()).toBe(true);
@@ -717,7 +717,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with after create performing save", async () => {
-    TopicWithAfterCreate.validatesUniqueness("title");
+    TopicWithAfterCreate.validatesUniquenessOf("title");
     try {
       const topic = await TopicWithAfterCreate.createBang({ title: "Title1" });
       expect((topic.readAttribute("author_name") as string).startsWith("Title1")).toBe(true);
@@ -771,7 +771,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("new record", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = new Topic({ title: "abc" });
@@ -781,7 +781,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("changing non unique attribute", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
@@ -792,7 +792,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("changing unique attribute", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
@@ -803,7 +803,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("changing non unique attribute and unique attribute is nil", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({});
@@ -815,7 +815,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("conditions", async () => {
-    Topic.validatesUniqueness("title", {
+    Topic.validatesUniquenessOf("title", {
       conditions: function (this: any) {
         return this.where().not({ author_name: null });
       },
@@ -830,7 +830,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("case sensitive", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: true });
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
     await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
@@ -841,7 +841,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   itIfSupports("partial_index", "partial index", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "title", {
       unique: true,
       where: "approved",
@@ -856,7 +856,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("non unique index", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "title", { name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
@@ -867,7 +867,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("scope", async () => {
-    Topic.validatesUniqueness("title", { scope: "author_name" });
+    Topic.validatesUniquenessOf("title", { scope: "author_name" });
     await Base.connection.addIndex("topics", ["author_name", "title"], {
       unique: true,
       name: "topics_index",
@@ -923,7 +923,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("index of sublist of columns", async () => {
-    Topic.validatesUniqueness("title", { scope: "author_name" });
+    Topic.validatesUniquenessOf("title", { scope: "author_name" });
     await Base.connection.addIndex("topics", "author_name", {
       unique: true,
       name: "topics_index",
@@ -942,7 +942,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("index of columns list and extra columns", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", ["title", "author_name"], {
       unique: true,
       name: "topics_index",
@@ -956,7 +956,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("expression index", async () => {
-    Topic.validatesUniqueness("title");
+    Topic.validatesUniquenessOf("title");
     await Base.connection.addIndex("topics", "LOWER(title)", {
       unique: true,
       name: "topics_index",
@@ -1024,7 +1024,7 @@ class BigIntReverseTest extends Base {
 class TopicWithEvent extends Topic {
   static {
     this.belongsTo("event", { foreignKey: "parent_id" });
-    this.validatesUniqueness("event");
+    this.validatesUniquenessOf("event");
   }
 }
 

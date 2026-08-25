@@ -103,17 +103,17 @@ async function withExtensionEnabled(
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let savedWarningsAction: typeof ActiveRecord.dbWarningsAction;
-  let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
+  let savedWarningsIgnore: typeof ActiveRecord.dbWarningsIgnore;
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     savedWarningsAction = ActiveRecord.dbWarningsAction;
-    savedWarningsIgnore = PostgreSQLAdapter.dbWarningsIgnore;
+    savedWarningsIgnore = ActiveRecord.dbWarningsIgnore;
   });
 
   afterEach(async () => {
     ActiveRecord.dbWarningsAction = savedWarningsAction ?? "ignore";
-    PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
+    ActiveRecord.dbWarningsIgnore = savedWarningsIgnore;
     vi.restoreAllMocks();
     if (adapter.isConnected()) {
       try {
@@ -877,7 +877,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("allowlist of warnings to ignore", async () => {
       ActiveRecord.dbWarningsAction = "raise";
-      PostgreSQLAdapter.dbWarningsIgnore = [/PostgreSQL SQL warning/];
+      ActiveRecord.dbWarningsIgnore = [/PostgreSQL SQL warning/];
       const rows = await adapter.execute(
         "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
       );
@@ -886,7 +886,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("allowlist of warning codes to ignore", async () => {
       ActiveRecord.dbWarningsAction = "raise";
-      PostgreSQLAdapter.dbWarningsIgnore = ["01000"];
+      ActiveRecord.dbWarningsIgnore = ["01000"];
       const rows = await adapter.execute(
         "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
       );

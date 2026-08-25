@@ -28,7 +28,7 @@ describe("UniquenessValidationContextTest", () => {
   });
 
   it("uniqueness honors on: :create context", async () => {
-    Topic.validatesUniqueness("title", { on: "create" });
+    Topic.validatesUniquenessOf("title", { on: "create" });
 
     await Topic.createBang({ title: "ctx-unique" });
 
@@ -46,7 +46,7 @@ describe("UniquenessValidationContextTest", () => {
   });
 
   it("uniqueness honors on: :update context", async () => {
-    Topic.validatesUniqueness("title", { on: "update" });
+    Topic.validatesUniquenessOf("title", { on: "update" });
 
     await Topic.createBang({ title: "upd-unique" });
 
@@ -67,7 +67,7 @@ describe("UniquenessValidationContextTest", () => {
     // errors.add, which raises. In trails, validatesWith's (async-aware) strict
     // wrapper awaits this DB-backed validator and raises StrictValidationFailed
     // when it flags a collision.
-    Topic.validatesUniqueness("title", { strict: true });
+    Topic.validatesUniquenessOf("title", { strict: true });
 
     await Topic.createBang({ title: "strict-dup" });
 
@@ -108,7 +108,7 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
 
   it("skips the existence check for a directly assigned adapter", async () => {
     DirectTopic.clearValidatorsBang();
-    DirectTopic.validatesUniqueness("title");
+    DirectTopic.validatesUniquenessOf("title");
 
     const t = await DirectTopic.createBang({ title: "direct-abc" });
     t.writeAttribute("author_name", "John");

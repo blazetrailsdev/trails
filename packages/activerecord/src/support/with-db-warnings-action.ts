@@ -1,5 +1,4 @@
 import { ActiveRecord } from "../ar-config.js";
-import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLWarning } from "../errors.js";
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void);
@@ -30,13 +29,13 @@ export async function withDbWarningsAction(
   ) as () => Promise<void> | void;
   const ignore = Array.isArray(warningsToIgnore) ? warningsToIgnore : [];
   const savedAction = ActiveRecord.dbWarningsAction;
-  const savedIgnore = AbstractAdapter.dbWarningsIgnore;
+  const savedIgnore = ActiveRecord.dbWarningsIgnore;
   ActiveRecord.dbWarningsAction = action;
-  AbstractAdapter.dbWarningsIgnore = ignore;
+  ActiveRecord.dbWarningsIgnore = ignore;
   try {
     await body();
   } finally {
     ActiveRecord.dbWarningsAction = savedAction ?? "ignore";
-    AbstractAdapter.dbWarningsIgnore = savedIgnore;
+    ActiveRecord.dbWarningsIgnore = savedIgnore;
   }
 }

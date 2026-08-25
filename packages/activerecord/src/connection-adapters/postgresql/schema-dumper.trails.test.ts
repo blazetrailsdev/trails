@@ -6,9 +6,9 @@ import { TypeMetadata } from "./type-metadata.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 
 const emptySource: SchemaSource = {
-  tables: () => [],
-  columns: () => [],
-  indexes: () => [],
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
   lookupCastTypeFromColumn: () => new ValueType(),
 };
 
@@ -132,9 +132,9 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("adds virtual column options when adapter supports virtual columns", () => {
       // Mirrors createSchemaDumper(adapter) — raw adapter passed as source
       const mockAdapter = {
-        tables: () => [],
-        columns: () => [],
-        indexes: () => [],
+        tables: async () => [],
+        columns: async () => [],
+        indexes: async () => [],
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
@@ -157,9 +157,9 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", () => {
       const mockAdapter = {
-        tables: () => [],
-        columns: () => [],
-        indexes: () => [],
+        tables: async () => [],
+        columns: async () => [],
+        indexes: async () => [],
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
@@ -181,9 +181,9 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("skips virtual options when adapter does not support virtual columns", () => {
       const mockAdapter = {
-        tables: () => [],
-        columns: () => [],
-        indexes: () => [],
+        tables: async () => [],
+        columns: async () => [],
+        indexes: async () => [],
         supportsVirtualColumns: () => false,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);

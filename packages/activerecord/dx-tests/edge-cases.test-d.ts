@@ -61,10 +61,10 @@ describe("edge cases — rough edges in current DX", () => {
     expectTypeOf<ReturnType<typeof Base.defaultScope>>().toEqualTypeOf<void>();
   });
 
-  it("validates + validatesAssociated + validatesUniqueness are void-returning", () => {
+  it("validates + validatesAssociated + validatesUniquenessOf are void-returning", () => {
     expectTypeOf<ReturnType<typeof Base.validates>>().toEqualTypeOf<void>();
     expectTypeOf<ReturnType<typeof Base.validatesAssociated>>().toEqualTypeOf<void>();
-    expectTypeOf<ReturnType<typeof Base.validatesUniqueness>>().toEqualTypeOf<void>();
+    expectTypeOf<ReturnType<typeof Base.validatesUniquenessOf>>().toEqualTypeOf<void>();
   });
 
   it("Base.find / Base.all / Base.where preserve the subclass via polymorphic `this`", async () => {

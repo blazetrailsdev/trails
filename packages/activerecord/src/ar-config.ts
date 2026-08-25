@@ -267,6 +267,14 @@ export const ActiveRecord = {
   },
 
   /**
+   * Allow-list of warning messages or codes to skip whatever
+   * `dbWarningsAction` is. Read once, by `AbstractAdapter#isWarningIgnored`
+   * (abstract_adapter.rb:1227-1231). Mirrors
+   * `ActiveRecord.db_warnings_ignore` (active_record.rb:259-263, default `[]`).
+   */
+  dbWarningsIgnore: [] as (string | RegExp)[],
+
+  /**
    * Determines whether to use UTC (`"utc"`) or the local zone (`"local"`) when
    * pulling dates and times from the database. Mirrors
    * `ActiveRecord.default_timezone` (active_record.rb:214-226, default :utc).
