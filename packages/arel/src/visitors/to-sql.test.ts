@@ -1873,6 +1873,8 @@ describe("the to_sql visitor", () => {
     });
   });
 
+  // Trails-only, same reason as the block above: `"` doubling is adapter
+  // quoting, which fake_record.rb:55-61 does not do.
   describe("identifier-escape consistency (helper-routed quoting)", () => {
     it("UPDATE SET column quotes embedded double-quotes", () => {
       const tbl = new Table('tab"le');
@@ -1895,7 +1897,7 @@ describe("the to_sql visitor", () => {
       hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean;
       bindBlock(): (index: number) => string;
     }
-    const make = () => new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
+    const make = () => new Visitors.ToSql(fakeRecordConnection) as unknown as ToSqlInternals;
 
     it("isUnboundable returns true only when the value reports unboundable", () => {
       const v = make();
@@ -1926,7 +1928,7 @@ describe("the to_sql visitor", () => {
         }
       }
       const tbl = new Table("users");
-      const v = new NumberedVisitor(testConnection);
+      const v = new NumberedVisitor(fakeRecordConnection);
       // Only BindParam routes through addBind (and therefore bindBlock); Casted
       // and Quoted values inline their quoted literal (Rails to_sql.rb:87-88).
       const [sql] = compileWithBinds(
@@ -1951,7 +1953,7 @@ describe("the to_sql visitor", () => {
           return (i: number) => `$${i}`;
         }
       }
-      const v = new NumberedVisitor(testConnection);
+      const v = new NumberedVisitor(fakeRecordConnection);
       const collector = new Collectors.SQLString();
       (
         v as unknown as { visitActiveModelAttribute(o: AMAttribute, c: Collectors.SQLString): void }
