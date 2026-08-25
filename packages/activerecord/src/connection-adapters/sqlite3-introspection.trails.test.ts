@@ -30,6 +30,22 @@ describe("SQLite3Adapter schema introspection", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it("shares one frozen Column instance between structurally identical columns", async () => {
+    // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) sends
+    // every `Column.new` through the registry (`deduplicable.rb:18`), so two
+    // columns equal by `Column#==`/`#hash` (`column.rb:75`/`:87`) reflect as one
+    // frozen object. trails fires that hook at `new_column_from_field`.
+    await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, label TEXT)");
+    await adapter.executeMutation("CREATE TABLE memberships (id INTEGER PRIMARY KEY, label TEXT)");
+
+    const widgetLabel = (await adapter.columns("widgets")).find((c) => c.name === "label");
+    const membershipLabel = (await adapter.columns("memberships")).find((c) => c.name === "label");
+
+    expect(widgetLabel).toBeDefined();
+    expect(membershipLabel).toBe(widgetLabel);
+    expect(Object.isFrozen(widgetLabel)).toBe(true);
+  });
+
   it("tables returns user-created tables, hiding sqlite_* internals", async () => {
     await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
     expect(await adapter.tables()).toEqual(["widgets"]);

@@ -38,8 +38,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const spec = super.prepareColumnOptions(column as any);
     if (column.array) spec["array"] = true;
 
-    const adapter = this.pgAdapter();
-    if (adapter?.supportsVirtualColumns?.() && this._isVirtual(column)) {
+    if (this.supportsVirtualColumns && this._isVirtual(column)) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
       // enum_type must be set before the early return — Rails adds it after the virtual
@@ -137,7 +136,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaTypeWithVirtual(column: ColumnInfo): string {
-    if (this._isVirtual(column)) return "virtual";
+    if (this.supportsVirtualColumns && this._isVirtual(column)) return "virtual";
     return this.schemaType(column);
   }
 

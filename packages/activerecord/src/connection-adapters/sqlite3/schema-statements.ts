@@ -228,6 +228,14 @@ export function newColumnFromField(
 
   const rowid = isColumnTheRowid(field, definitions);
 
+  // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) wraps
+  // `Column.new` itself, so every constructed column goes through the registry
+  // (`deduplicable.rb:18`). TS cannot mirror that on the class: a base
+  // constructor returning the deduplicated instance freezes it before the
+  // subclass assigns its own fields, so `new SQLite3::Column(...)` would throw
+  // `Cannot add property _generatedType, object is not extensible`. Ruby has no
+  // such split — `new` wraps allocate+initialize for the most-derived class —
+  // so the hook fires here instead, on the fully-built object.
   return new Column(
     String(field["name"]),
     defaultValue,
@@ -243,7 +251,7 @@ export function newColumnFromField(
       rowid,
       generatedType,
     },
-  );
+  ).deduplicate();
 }
 
 const INTEGER_REGEX = /integer/i;

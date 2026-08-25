@@ -138,6 +138,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
+      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "computed",
         null,
@@ -162,6 +163,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
+      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "status",
         null,
@@ -185,6 +187,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => false,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
+      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "computed",
         null,
@@ -216,6 +219,7 @@ describe("PostgreSQL::SchemaDumper", () => {
   describe("schemaTypeWithVirtual", () => {
     it("returns virtual for generated (stored) PG columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
+      dumper.supportsVirtualColumns = true;
       const col = new Column(
         "computed",
         null,

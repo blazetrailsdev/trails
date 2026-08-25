@@ -3743,6 +3743,14 @@ export class PostgreSQLAdapter
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
     }
 
+    // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) wraps
+    // `Column.new` itself, so every constructed column goes through the registry
+    // (`deduplicable.rb:18`). TS cannot mirror that on the class: a base
+    // constructor returning the deduplicated instance freezes it before the
+    // subclass assigns its own fields, so `new SQLite3::Column(...)` would throw
+    // `Cannot add property _generatedType, object is not extensible`. Ruby has no
+    // such split — `new` wraps allocate+initialize for the most-derived class —
+    // so the hook fires here instead, on the fully-built object.
     return new Column(columnName, defaultValue, typeMetadata, !notnull, {
       defaultFunction: defaultFunction ?? undefined,
       collation: collation ?? undefined,
@@ -3750,7 +3758,7 @@ export class PostgreSQLAdapter
       serial,
       identity: identity || null,
       generated: gen || null,
-    });
+    }).deduplicate();
   }
 
   /** @internal */

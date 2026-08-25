@@ -85,6 +85,18 @@ export class Column extends BaseColumn {
     return this.identity != null;
   }
 
+  /**
+   * Mirrors `PostgreSQL::Column#hash` (`postgresql/column.rb:72-77`), which
+   * folds `identity?` and `serial?` in on top of `super`.
+   * @internal
+   * Ruby's registry is a Hash keyed by the object itself, which works because
+   * Rails pairs `==`/`eql?` with `hash`; a JS `Map` keys by identity, so the
+   * port needs an explicit string key over exactly those attributes.
+   */
+  override deduplicateKey(): string {
+    return JSON.stringify([super.deduplicateKey(), this.isIdentity, this.isSerial]);
+  }
+
   // Mirrors: Column#auto_incremented_by_db?
   override isAutoIncrementedByDb(): boolean {
     return this.isSerial || this.isIdentity;
