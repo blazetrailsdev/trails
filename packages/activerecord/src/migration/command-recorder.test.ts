@@ -147,7 +147,7 @@ describe("Migration", () => {
         });
       });
 
-      expect(recorder.commands.map(([cmd, args]) => [cmd, args.slice(0, -1)])).toEqual([
+      expect(recorder.commands.map((command) => command.slice(0, -1))).toEqual([
         ["changeTable", ["fruits"]],
         ["changeTable", ["fruits"]],
       ]);
