@@ -19,7 +19,6 @@ import {
   Deadlocked,
   LockWaitTimeout,
   NotImplementedError,
-  type SQLWarning,
 } from "../errors.js";
 import {
   ActiveSupport,
@@ -836,19 +835,6 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
-
-  /**
-   * Behaviour when the database emits a warning. Mirrors the global
-   * `ActiveRecord.db_warnings_action` config: `"ignore"` (default) drops
-   * warnings, `"log"` logs them, `"raise"` escalates each warning to a
-   * `SQLWarning` exception, `"report"` reports it, and a function receives
-   * the `SQLWarning`. Declared on the base so every adapter shares one
-   * connection-level setting; concrete adapters that surface warnings
-   * (PostgreSQL, MySQL) dispatch on it. Adapters with no warning channel
-   * (e.g. SQLite) never trigger it, matching Rails.
-   */
-  static dbWarningsAction: "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void) =
-    "ignore";
 
   /**
    * Allow-list of warning messages or codes to skip even under `:raise`.

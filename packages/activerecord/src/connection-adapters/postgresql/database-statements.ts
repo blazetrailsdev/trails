@@ -7,7 +7,7 @@
 import type pg from "pg";
 import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";
-import { ActiveSupport } from "@blazetrails/activesupport";
+import { ActiveRecord } from "../../ar-config.js";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
 import { combineMultiStatements, type ExplainOption } from "../abstract/database-statements.js";
@@ -362,9 +362,6 @@ const ACTIONABLE_LEVELS = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);
 /** @internal */
 type SqlWarning = SQLWarning;
 
-/** Mirrors the values `ActiveRecord.db_warnings_action` accepts. */
-type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SqlWarning) => void);
-
 /** @internal */
 interface HandleWarningsHost {
   _noticeReceiverSqlWarnings?: SqlWarning[];
@@ -372,46 +369,31 @@ interface HandleWarningsHost {
   // PostgreSQL's own `warning_ignored?` override widens with the level check.
   /** @internal */
   isWarningIgnored(warning: { message?: string; code?: string | number }): boolean;
-  logger?: unknown;
 }
 
 /**
  * Iterates notice-receiver warnings accumulated during the query, attaches the
  * result object (Rails names the parameter `sql` but `perform_query` passes the
- * PG::Result, database_statements.rb:166), and dispatches each surviving
- * warning to the configured `db_warnings_action`.
+ * PG::Result, database_statements.rb:166), and calls the resolved
+ * `ActiveRecord.db_warnings_action` on each surviving warning.
  *
- * Rails' `ActiveRecord.db_warnings_action=` turns the symbol into a Proc once,
- * at config time (active_record.rb:236-252), and `handle_warnings` only
- * `.call`s it. trails stores the symbol itself on the adapter class, so the
- * symbol → behavior mapping lives here, at the one place that calls it.
+ * Rails' `.call(warning)` has no nil guard here — the notice receiver that
+ * fills `_noticeReceiverSqlWarnings` is only attached while
+ * `ActiveRecord.db_warnings_action` is set (postgresql_adapter.rb:965) — so the
+ * `!` carries that invariant rather than adding a branch. JS `Function#call`
+ * takes the receiver first, filling the slot Ruby's `Proc#call` has no argument
+ * for.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings
+ * (postgresql/database_statements.rb:216-223)
  * @internal
  */
 export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
-  const action = (this.constructor as { dbWarningsAction?: DbWarningsAction }).dbWarningsAction;
   for (const warning of this._noticeReceiverSqlWarnings ?? []) {
     if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
+
     warning.sql = sql;
-    if (!action || action === "ignore") continue;
-    if (action === "raise") throw warning;
-    if (action === "log") {
-      const codeSuffix = warning.code ? ` (${warning.code})` : "";
-      const message = `[ActiveRecord::SQLWarning] ${warning.message}${codeSuffix}`;
-      const logger = this.logger as { warn?: (msg: string) => void } | null | undefined;
-      if (logger?.warn) logger.warn(message);
-      else console.warn(message);
-    }
-    // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
-    // (active_record.rb:248-249).
-    if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
-    // Rails' `ActiveRecord.db_warnings_action.call(warning)` — the symbol arms
-    // above are the behaviors its setter bakes into that Proc, and a
-    // user-supplied callable is invoked here exactly as Rails invokes it. JS
-    // `Function#call` takes the receiver first, so the adapter fills the slot
-    // Ruby's `Proc#call` has no argument for.
-    if (typeof action === "function") action.call(this, warning);
+    ActiveRecord.dbWarningsAction!.call(this, warning as unknown as SQLWarning);
   }
 }
 

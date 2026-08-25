@@ -881,10 +881,12 @@ export class PostgreSQLAdapter
   /**
    * Attach the per-connection notice listener that feeds
    * `_noticeReceiverSqlWarnings`. Called once per pg.Client lifecycle
-   * from _doAcquire (matches Rails' single-slot set_notice_receiver).
+   * from _doAcquire (matches Rails' single-slot set_notice_receiver), under
+   * Rails' `unless ActiveRecord.db_warnings_action.nil?` guard
+   * (postgresql_adapter.rb:965).
    */
   private _attachNoticeListener(client: pg.Client): void {
-    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction === "ignore") return;
+    if (ActiveRecord.dbWarningsAction == null) return;
     client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
       // Rails' notice receiver buffers SQLWarning instances themselves
       // (postgresql_adapter.rb:970), so `handle_warnings` dispatches the very

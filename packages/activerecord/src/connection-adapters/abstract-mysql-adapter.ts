@@ -93,13 +93,13 @@ import {
   MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
 import {
-  ActiveSupport,
   compactBlank,
   include,
   isPresent,
   parameterize,
   presence,
 } from "@blazetrails/activesupport";
+import { ActiveRecord } from "../ar-config.js";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -1636,12 +1636,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * nullable for the disconnected adapter, so the guard joins the `.nil?`
    * early return rather than becoming a second branch Rails does not have.
    *
-   * `ActiveRecord.db_warnings_action` is `nil` by default in Rails; trails
-   * spells that default `"ignore"` on `AbstractAdapter` (abstract-adapter.ts),
-   * so both spellings of "unset" take Rails' `.nil?` early return. The symbol
-   * arms below are the behaviors Rails' `db_warnings_action=` bakes into the
-   * Proc it stores (active_record.rb:236-252), which its `handle_warnings`
-   * then reaches through a single `.call`.
+   * Rails' closing `ActiveRecord.db_warnings_action.call(warning)`
+   * (abstract_mysql_adapter.rb:782) is spelled `Function#call`, which takes the
+   * receiver first and so fills the slot Ruby's `Proc#call` has no argument for.
    *
    * Public rather than Ruby-private for the same reason PostgreSQL's is:
    * `perform_query` reaches it through a structurally-typed mixin host.
@@ -1653,8 +1650,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
     } | null;
-    const action = (this.constructor as typeof AbstractMysqlAdapter).dbWarningsAction;
-    if (action == null || action === "ignore" || rawConnection == null) return;
+    const action = ActiveRecord.dbWarningsAction;
+    if (action == null || rawConnection == null) return;
     const warningCount = await this.warningCount(rawConnection);
     if (warningCount === 0) return;
 
@@ -1677,16 +1674,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
-      if (action === "raise") throw warning;
-      if (action === "log") {
-        const codeSuffix = code ? ` (${code})` : "";
-        const line = `[ActiveRecord::SQLWarning] ${message}${codeSuffix}`;
-        const logger = this.logger as { warn?: (msg: string) => void } | null;
-        if (logger?.warn) logger.warn(line);
-        else console.warn(line);
-      }
-      if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
-      if (typeof action === "function") action.call(this, warning);
+      action.call(this, warning);
     }
   }
 

@@ -1,13 +1,15 @@
 /**
- * Mirrors: ActiveSupport::CurrentAttributes (current_attributes.rb). Rails keeps
- * the singletons in `IsolatedExecutionState`, which trails has no counterpart
- * for, so `currentInstances` is module-level and its entries process-wide.
+ * Mirrors: ActiveSupport::CurrentAttributes (current_attributes.rb). Abstract
+ * super class that provides an execution-isolated attributes singleton: the
+ * instances live in `IsolatedExecutionState` (:170-172), so each logical task
+ * gets its own, exactly as Rails gives each fiber/thread its own.
  */
 
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
 import { include, Module } from "./include.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
@@ -27,7 +29,7 @@ class ArgumentError extends Error {
 /** A `:reset` callback, instance-exec'd (Rails' `set_callback :reset`). */
 type ResetCallback = (this: CurrentAttributes) => void;
 
-/** Mirrors: ActiveSupport::CurrentAttributes::INVALID_ATTRIBUTE_NAMES (:95). */
+/** Mirrors: ActiveSupport::CurrentAttributes::INVALID_ATTRIBUTE_NAMES (:96). */
 const INVALID_ATTRIBUTE_NAMES = [
   "set",
   "reset",
@@ -39,7 +41,7 @@ const INVALID_ATTRIBUTE_NAMES = [
   "clearAll",
 ];
 
-/** Mirrors: ActiveSupport::CurrentAttributes::NOT_SET (current_attributes.rb:97). */
+/** Mirrors: ActiveSupport::CurrentAttributes::NOT_SET (current_attributes.rb:98). */
 const NOT_SET: unknown = Object.freeze({});
 
 /**
@@ -47,7 +49,7 @@ const NOT_SET: unknown = Object.freeze({});
  * `static attribute(name, options?)` to define attributes.
  */
 export abstract class CurrentAttributes {
-  /** Mirrors: `class_attribute :defaults` (current_attributes.rb:196). */
+  /** Mirrors: `class_attribute :defaults` (current_attributes.rb:195). */
   public static defaults: Record<string, AttributeValue> = {};
 
   static {
@@ -152,20 +154,21 @@ export abstract class CurrentAttributes {
     };
   }
 
-  /** Mirrors: CurrentAttributes.instance (current_attributes.rb:101-103) */
+  /**
+   * Returns singleton instance for this class in this execution context. If
+   * none exists, one is created.
+   *
+   * Mirrors: CurrentAttributes.instance (current_attributes.rb:102-104)
+   */
   static instance<T extends typeof CurrentAttributes>(this: T): InstanceType<T> {
     const key = (this as typeof CurrentAttributes).currentInstancesKey();
-    let instance = currentInstances.get(key);
+    const instances = (this as typeof CurrentAttributes).currentInstances();
+    let instance = instances.get(key);
     if (instance === undefined) {
       instance = new (this as unknown as new () => CurrentAttributes)();
-      currentInstances.set(key, instance);
+      instances.set(key, instance);
     }
     return instance as InstanceType<T>;
-  }
-
-  /** Mirrors: CurrentAttributes.current_instances_key (:176-178) @internal */
-  private static currentInstancesKey(): string {
-    return this.name;
   }
 
   /**
@@ -215,6 +218,39 @@ export abstract class CurrentAttributes {
     return this.instance().set(attributes, block);
   }
 
+  /** Mirrors: CurrentAttributes.reset_all (current_attributes.rb:156-158) @internal */
+  static resetAll(): void {
+    for (const instance of this.currentInstances().values()) instance.reset();
+  }
+
+  /** Mirrors: CurrentAttributes.clear_all (current_attributes.rb:160-163) @internal */
+  static clearAll(): void {
+    this.resetAll();
+    this.currentInstances().clear();
+  }
+
+  /** Mirrors: CurrentAttributes.current_instances (:170-172) @internal */
+  private static currentInstances(): Map<string, CurrentAttributes> {
+    return IsolatedExecutionState.fetch(
+      CURRENT_ATTRIBUTES_INSTANCES,
+      () => new Map<string, CurrentAttributes>(),
+    );
+  }
+
+  /**
+   * Mirrors: CurrentAttributes.current_instances_key (:174-176). Ruby memoizes
+   * `name.to_sym` in a per-class ivar, so the memo is read as an *own*
+   * property — a subclass keys on its own name, never its parent's.
+   *
+   * @internal
+   */
+  private static currentInstancesKey(): string {
+    if (!Object.prototype.hasOwnProperty.call(this, "_currentInstancesKey")) {
+      (this as CurrentAttributesClass)._currentInstancesKey = this.name;
+    }
+    return (this as CurrentAttributesClass)._currentInstancesKey!;
+  }
+
   // -------------------------------------------------------------------------
   // Instance-level API
   // -------------------------------------------------------------------------
@@ -260,13 +296,17 @@ function dup(value: unknown): unknown {
   return value;
 }
 
-/** Mirrors: CurrentAttributes.current_instances (:170-172) @internal */
-const currentInstances = new Map<string, CurrentAttributes>();
+/**
+ * The `IsolatedExecutionState[:current_attributes_instances]` slot key
+ * (current_attributes.rb:171).
+ */
+const CURRENT_ATTRIBUTES_INSTANCES = "current_attributes_instances";
 
 // Internal alias for static method use
 type CurrentAttributesClass = typeof CurrentAttributes & {
   defaults: Record<string, AttributeValue>;
   _generatedAttributeMethods?: Module;
+  _currentInstancesKey?: string;
 };
 
 /**
