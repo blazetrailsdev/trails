@@ -345,12 +345,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * (sqlite3_adapter.rb:803) and never exposes. trails' constructor
    * destructures the adapter-level keys out of the config hash, so the value is
    * held here — read by `buildStatementPool`, and declared before
-   * `_statementPool` so that field's initializer sees it.
+   * `_statements` so that field's initializer sees it.
    *
    * @internal
    */
   private _statementLimit = 1000;
-  private _statementPool = this.buildStatementPool();
+  override _statements = this.buildStatementPool();
 
   /**
    * Whether this connection was opened with strict-strings mode (DQS disabled).
@@ -429,7 +429,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       );
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
-      void this._statementPool.setMaxSize(
+      void this._statements.setMaxSize(
         SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
       );
     }
@@ -588,11 +588,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._maybeEnableReadBigInts(sql, stmt);
       return stmt;
     }
-    let stmt = this._statementPool.get(sql);
+    let stmt = this._statements.get(sql);
     if (!stmt) {
       stmt = await this.driver.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
-      void this._statementPool.set(sql, stmt);
+      void this._statements.set(sql, stmt);
     }
     return stmt;
   }
@@ -1344,15 +1344,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   isActive(): boolean {
     return this.driver?.isOpen() ?? false;
-  }
-
-  override clearCacheBang({ newConnection = false }: { newConnection?: boolean } = {}): void {
-    void super.clearCacheBang({ newConnection });
-    if (newConnection) {
-      this._statementPool.reset();
-    } else {
-      void this._statementPool.clear();
-    }
   }
 
   override disconnectBang(): void {

@@ -194,7 +194,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // down so the next connect re-configures — matching Rails' connect-time
   // `configure_connection`.
   private _connectionConfigured = false;
-  private _statementPool: Mysql2StatementPool | null = null;
+  override _statements: Mysql2StatementPool | null = null;
 
   /**
    * The timezone applied to result rows for the most recent query. Rails-private
@@ -271,10 +271,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * connection.
    */
   private _getStmtPool(conn: mysql.Connection): Mysql2StatementPool {
-    if (!this._statementPool) {
-      this._statementPool = new Mysql2StatementPool(conn, this._statementLimit);
+    if (!this._statements) {
+      this._statements = new Mysql2StatementPool(conn, this._statementLimit);
     }
-    return this._statementPool;
+    return this._statements;
   }
 
   /**
@@ -293,15 +293,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Test-only accessor for the statement pool on the persistent
-   * connection. Matches the PG adapter's equivalent hook.
-   * @internal
-   */
-  _statementPoolForTest(): Mysql2StatementPool | undefined {
-    return this._statementPool ?? undefined;
-  }
-
-  /**
    * Test-only accessor for the persistent raw connection. Mirrors the PG
    * adapter's `_rawConnectionForTest`.
    * @internal
@@ -310,19 +301,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this._client;
   }
 
-  /**
-   * Clear cached prepared statements on the persistent connection.
-   * Mirrors Rails' `Mysql2Adapter#clear_cache!` which calls `close` on
-   * each cached statement on the adapter's sole connection.
-   */
-  override clearCacheBang({ newConnection = false }: { newConnection?: boolean } = {}): void {
-    void super.clearCacheBang({ newConnection });
-    if (newConnection) {
-      this._statementPool?.reset();
-    } else {
-      void this._statementPool?.clear();
-    }
-  }
   private _database: string | undefined;
 
   /**
@@ -650,7 +628,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // is now satisfied, so connectBang fires once per connect rather than
         // on every withRawConnection call.
         this._client = conn;
-        this._statementPool = null;
+        this._statements = null;
         return conn;
       },
       (err) => {
@@ -1382,8 +1360,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _closeRawHandle(): void {
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statementPool?._detach();
-    this._statementPool = null;
+    this._statements?._detach();
+    this._statements = null;
     if (this._client) {
       const ending = this._client.end().catch(() => {});
       this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
@@ -1412,8 +1390,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.discardBang();
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statementPool?._detach();
-    this._statementPool = null;
+    this._statements?._detach();
+    this._statements = null;
     const conn = this._client;
     this._client = null;
     abandonRawSocket(conn);
@@ -1428,8 +1406,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectGeneration++;
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statementPool?._detach();
-    this._statementPool = null;
+    this._statements?._detach();
+    this._statements = null;
     if (this._client) {
       await this._client.end();
       this._client = null;

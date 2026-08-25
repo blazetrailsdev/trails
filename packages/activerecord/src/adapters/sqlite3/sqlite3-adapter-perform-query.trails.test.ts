@@ -289,15 +289,13 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   // raw_connection.prepare(sql)`, sqlite3/database_statements.rb:81-91). The
   // unprepared arm stays on `exec`, which never touches the pool.
   it("internalExecute prepares when prepare is true", async () => {
-    const pool = (adapter as unknown as { _statementPool: { get(sql: string): unknown } })
-      ._statementPool;
+    const pool = (adapter as unknown as { _statements: { get(sql: string): unknown } })._statements;
     await adapter.internalExecute(`SELECT 1`, "SQL", [], { prepare: true });
     expect(pool.get(`SELECT 1`)).toBeTruthy();
   });
 
   it("internalExecute does not prepare when prepare is false", async () => {
-    const pool = (adapter as unknown as { _statementPool: { get(sql: string): unknown } })
-      ._statementPool;
+    const pool = (adapter as unknown as { _statements: { get(sql: string): unknown } })._statements;
     await adapter.internalExecute(`SELECT 2`, "SQL", [], { prepare: false });
     expect(pool.get(`SELECT 2`)).toBeFalsy();
   });

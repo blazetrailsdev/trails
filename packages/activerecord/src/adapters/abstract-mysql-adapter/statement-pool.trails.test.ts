@@ -33,7 +33,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await adapter.execute("SELECT ? AS n", [1]);
         await adapter.execute("SELECT ? AS n", [2]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements!;
         expect(pool).toBeDefined();
         expect(pool.length).toBe(1);
 
@@ -48,7 +48,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.beginDbTransaction();
       try {
         await adapter.execute("SELECT ? AS n", [1]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements!;
         // Rails' matching test sets statement_limit = 1 and asserts
         // LRU eviction. With one cached statement, setMaxSize(1) just
         // records the new limit; eviction happens on the next insert
@@ -86,7 +86,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await adapter.executeMutation(`INSERT INTO \`sp_mut\` (\`name\`) VALUES (?)`, ["a"]);
         await adapter.executeMutation(`INSERT INTO \`sp_mut\` (\`name\`) VALUES (?)`, ["b"]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements!;
         expect(pool.length).toBe(1);
       } finally {
         await adapter.rollback();
@@ -99,7 +99,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       closable.preparedStatements = true;
       await closable.beginDbTransaction();
       await closable.execute("SELECT ? AS n", [1]);
-      const pool = closable._statementPoolForTest()!;
+      const pool = closable._statements!;
       await closable.rollback();
       await closable.close();
       expect(() => pool.clear()).not.toThrow();
@@ -159,11 +159,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await adapter.execute("SELECT ? AS n", [1]);
         await adapter.execute("SELECT ? AS s", ["a"]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements!;
         expect(pool.length).toBe(2);
-        adapter.clearCacheBang();
+        await adapter.clearCacheBang();
         expect(pool.length).toBe(0);
-        expect(adapter._statementPoolForTest()).toBe(pool);
+        expect(adapter._statements).toBe(pool);
       } finally {
         await adapter.rollback();
       }

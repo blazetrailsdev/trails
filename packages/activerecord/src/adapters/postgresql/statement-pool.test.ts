@@ -21,7 +21,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.execute("SELECT $1::int", [1]);
         await adapter.execute("SELECT $1::int", [2]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements;
         expect(pool).toBeDefined();
         expect(pool.length).toBe(1);
 
@@ -36,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.beginDbTransaction();
       try {
         await adapter.execute("SELECT $1::int", [1]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements;
         // Rails' matching test sets statement_limit = 1 and asserts
         // LRU eviction. setMaxSize immediately evicts excess entries.
         await pool.setMaxSize(1);
@@ -55,7 +55,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.executeMutation(`INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`, ["a"]);
         await adapter.executeMutation(`INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`, ["b"]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements;
         // Both INSERTs share the same SQL template → single cached
         // plan. Rails exec_cache backs exec_insert the same way.
         // The statement key is the RETURNING-rewritten form, so only
@@ -72,7 +72,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.execute("SELECT $1::int", [1]);
         await adapter.execute("SELECT $1::text", ["a"]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements;
         expect(pool.length).toBe(2);
         await pool.clear();
         expect(pool.length).toBe(0);
@@ -84,7 +84,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("dealloc does not raise on inactive connection", async () => {
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
-      const pool = adapter._statementPoolForTest()!;
+      const pool = adapter._statements;
       await adapter.rollback();
       await adapter.close();
       // After close the driver pool has ended the client, so DEALLOCATE
@@ -128,7 +128,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         statementLimit: 7,
       });
       await configured.execute("SELECT $1::int", [1]);
-      expect(configured._statementPoolForTest()!.maxSize).toBe(7);
+      expect(configured._statements.maxSize).toBe(7);
       await configured.close();
     });
 
@@ -180,11 +180,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.execute("SELECT $1::int", [1]);
         await adapter.execute("SELECT $1::text", ["a"]);
-        const pool = adapter._statementPoolForTest()!;
+        const pool = adapter._statements;
         expect(pool.length).toBe(2);
         await adapter.clearCacheBang();
         expect(pool.length).toBe(0);
-        expect(adapter._statementPoolForTest()).toBe(pool);
+        expect(adapter._statements).toBe(pool);
       } finally {
         await adapter.rollback();
       }
@@ -199,10 +199,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       await adapter.execute("SELECT $1::text", ["a"]);
-      const pool = adapter._statementPoolForTest()!;
+      const pool = adapter._statements;
       expect(pool.length).toBe(2);
       await adapter.rollback();
-      expect(adapter._statementPoolForTest()).toBe(pool);
+      expect(adapter._statements).toBe(pool);
       await adapter.clearCacheBang();
       expect(pool.length).toBe(0);
     });
@@ -240,13 +240,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
-      const failedPool = adapter._statementPoolForTest()!;
+      const failedPool = adapter._statements;
       expect(failedPool.length).toBe(1);
       await adapter.rollback();
       await adapter.beginDbTransaction();
       try {
         await adapter.execute("SELECT $1::int", [2]);
-        const newTxnPool = adapter._statementPoolForTest()!;
+        const newTxnPool = adapter._statements;
         expect(newTxnPool).toBe(failedPool);
         expect(newTxnPool.length).toBeGreaterThan(0);
         await adapter.clearCacheBang();

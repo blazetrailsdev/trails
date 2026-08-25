@@ -11,6 +11,8 @@ import {
   configurationsStore,
   setConfigurationsStore,
 } from "../database-configurations.js";
+import type { RawConfigurations } from "../database-configurations.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import {
@@ -1362,18 +1364,29 @@ export class DatabaseTasks {
   }
 
   /**
-   * @missingRailsCall new — PERMANENT: Verified per-site (RFC 0106):
-   *   `ActiveRecord::DatabaseConfigurations.new(databases)`
-   *   (`database_tasks.rb:144`) — the TS signature takes the already-built
-   *   `DatabaseConfigurations`, because the Rails caller is the railtie hash and
-   *   trails has no `Rails` constant to branch on at `:142`.
+   * Mirrors: DatabaseTasks#for_each (`tasks/database_tasks.rb:141-154`).
+   * `:142`'s `return {} unless defined?(Rails)` has no trails counterpart —
+   * there is no `Rails` constant to branch on — so the body always runs.
+   * `:150`'s `db_config.database_tasks?` is defined on `HashConfig`
+   * (`hash_config.rb:161`), not on the abstract `DatabaseConfig`, so the
+   * receiver is narrowed the same way `DatabaseConfigurations#configsFor`
+   * narrows it for the identical Ruby call.
    */
-  static forEach(databases: DatabaseConfigurations, fn: (name: string) => void): void {
-    const env = this.env;
-    const configs = databases.configsFor({ envName: env });
-    if (configs.length <= 1) return;
-    for (const cfg of configs) {
-      fn(cfg.name);
+  static forEach(
+    databases: RawConfigurations | DatabaseConfig[],
+    fn: (name: string) => void,
+  ): void {
+    const databaseConfigs = new DatabaseConfigurations(databases).configsFor({
+      envName: this.env,
+    });
+
+    // if this is a single database application we don't want tasks for each primary database
+    if (databaseConfigs.length === 1) return;
+
+    for (const dbConfig of databaseConfigs) {
+      if (dbConfig instanceof HashConfig && !dbConfig.databaseTasks()) continue;
+
+      fn(dbConfig.name);
     }
   }
 

@@ -113,7 +113,7 @@ export function buildColumnTypes(
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
   _lastId?: number;
-  _statements?: Map<string, unknown>;
+  _statements?: { delete(key: string): unknown } | null;
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
   preparedStatements?: boolean;
