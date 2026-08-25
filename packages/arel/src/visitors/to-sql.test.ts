@@ -35,14 +35,16 @@ describe("the to_sql visitor", () => {
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("first_name").isDistinctFrom(users.get("last_name"));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe(
         `CASE WHEN "users"."first_name" = "users"."last_name" OR ("users"."first_name" IS NULL AND "users"."last_name" IS NULL) THEN 0 ELSE 1 END = 1`,
       );
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isDistinctFrom(null);
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(`"users"."name" IS NOT NULL`);
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe(
+        `"users"."name" IS NOT NULL`,
+      );
     });
   });
 
@@ -117,26 +119,28 @@ describe("the to_sql visitor", () => {
     const unboundable = new Nodes.BindParam({ isUnboundable: () => 1 as const });
 
     it("drops an unboundable value from an IN list", () => {
-      const sql = new Visitors.ToSql(testConnection).compile(users.get("id").in([1, unboundable]));
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
+        users.get("id").in([1, unboundable]),
+      );
       expect(sql).toBe('"users"."id" IN (1)');
     });
 
     it("collapses an all-unboundable IN list to 1=0", () => {
-      const sql = new Visitors.ToSql(testConnection).compile(
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
         users.get("id").in([unboundable, unboundable]),
       );
       expect(sql).toBe("1=0");
     });
 
     it("drops an unboundable value from a NOT IN list", () => {
-      const sql = new Visitors.ToSql(testConnection).compile(
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
         users.get("id").notIn([1, unboundable]),
       );
       expect(sql).toBe('"users"."id" NOT IN (1)');
     });
 
     it("collapses an all-unboundable NOT IN list to 1=1", () => {
-      const sql = new Visitors.ToSql(testConnection).compile(
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
         users.get("id").notIn([unboundable, unboundable]),
       );
       expect(sql).toBe("1=1");
@@ -268,21 +272,21 @@ describe("the to_sql visitor", () => {
   describe("Nodes::IsNotDistinctFrom", () => {
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted("Aaron Patterson"));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe(
         `CASE WHEN "users"."name" = 'Aaron Patterson' OR ("users"."name" IS NULL AND 'Aaron Patterson' IS NULL) THEN 0 ELSE 1 END = 0`,
       );
     });
 
     it("should handle column names on both sides", () => {
       const node = users.get("first_name").isNotDistinctFrom(users.get("last_name"));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe(
         `CASE WHEN "users"."first_name" = "users"."last_name" OR ("users"."first_name" IS NULL AND "users"."last_name" IS NULL) THEN 0 ELSE 1 END = 0`,
       );
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(`"users"."name" IS NULL`);
     });
   });
@@ -324,8 +328,8 @@ describe("the to_sql visitor", () => {
     it("can handle ranges bounded by infinity", () => {
       const a = users.get("id").between(-Infinity, 10);
       const b = users.get("id").between(10, Infinity);
-      expect(new Visitors.ToSql(testConnection).compile(a)).toContain("<=");
-      expect(new Visitors.ToSql(testConnection).compile(b)).toContain(">=");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(a)).toContain("<=");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(b)).toContain(">=");
     });
 
     it("can handle three dot ranges", () => {
@@ -334,14 +338,14 @@ describe("the to_sql visitor", () => {
       const node = new Nodes.Grouping(
         new Nodes.And([users.get("id").gteq(begin), users.get("id").lt(end)]),
       );
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toContain(">=");
       expect(sql).toContain("<");
     });
 
     it("can handle two dot ranges", () => {
       const node = users.get("id").between([1, 10]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toContain("BETWEEN");
       expect(sql).toContain("1 AND 10");
     });
@@ -400,19 +404,19 @@ describe("the to_sql visitor", () => {
     it("handles CTEs with null materialized (tristate nil — no modifier)", () => {
       const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, null);
       const stmt = new SelectManager().with(cte).project("1");
-      const sql = new Visitors.ToSql(testConnection).compile(stmt.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(stmt.ast);
       expect(sql).not.toContain("MATERIALIZED");
     });
 
     it("wraps a bare SelectStatement body in exactly one set of parens", () => {
       const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
-      const sql = new Visitors.ToSql(testConnection).compile(cte);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(cte);
       expect(sql).toBe('"t" AS (SELECT "users"."id" FROM "users")');
     });
 
     it("does not double-wrap a Grouping body (SqlLiteral path)", () => {
       const cte = new Nodes.Cte("t", new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 1")));
-      const sql = new Visitors.ToSql(testConnection).compile(cte);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(cte);
       expect(sql).toBe('"t" AS (SELECT 1)');
     });
 
@@ -422,7 +426,7 @@ describe("the to_sql visitor", () => {
         new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 2")),
       );
       const cte = new Nodes.Cte("t", union);
-      const sql = new Visitors.ToSql(testConnection).compile(cte);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(cte);
       expect(sql).toBe('"t" AS ( (SELECT 1) UNION ALL (SELECT 2) )');
     });
   });
@@ -433,7 +437,7 @@ describe("the to_sql visitor", () => {
       const expr1 = new Table("bar").project(star).as("expr1");
       const expr2 = new Table("baz").project(star).as("expr2");
       manager.with(expr1, expr2);
-      const sql = new Visitors.ToSql(testConnection).compile(manager.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe(
         'WITH expr1 AS (SELECT * FROM "bar"), expr2 AS (SELECT * FROM "baz") SELECT * FROM expr2',
       );
@@ -446,7 +450,7 @@ describe("the to_sql visitor", () => {
         .with(cte)
         .from(cte.toTable())
         .where(cte.toTable().get("score").gt(5));
-      const sql = new Visitors.ToSql(testConnection).compile(manager.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe(
         'WITH "expr1" AS (SELECT * FROM "bar") SELECT * FROM "expr1" WHERE "expr1"."score" > 5',
       );
@@ -458,7 +462,7 @@ describe("the to_sql visitor", () => {
       const manager = new Table("foo").project(star).from(new Nodes.SqlLiteral("expr1"));
       const expr1 = new Table("bar").project(star).as("expr1");
       manager.withRecursive(expr1);
-      const sql = new Visitors.ToSql(testConnection).compile(manager.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe('WITH RECURSIVE expr1 AS (SELECT * FROM "bar") SELECT * FROM expr1');
     });
   });
@@ -466,7 +470,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::BoundSqlLiteral", () => {
     it("ignores excess named parameters", () => {
       const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1, extra: 2 });
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       // `:id` renders as a `?` placeholder (add_bind), `:extra` is unreferenced
       // and silently ignored — Rails to_sql_test.rb.
       expect(sql).toBe("id = ?");
@@ -477,7 +481,7 @@ describe("the to_sql visitor", () => {
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       const collector = new Collectors.SQLString();
-      new Visitors.ToSql(testConnection).accept(node, collector);
+      new Visitors.ToSql(fakeRecordConnection).accept(node, collector);
       expect(collector.preparable).toBe(false);
     });
   });
@@ -490,7 +494,7 @@ describe("the to_sql visitor", () => {
 
     it("interleaves a space between values", () => {
       const node = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("foo bar");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("foo bar");
     });
   });
 
@@ -504,7 +508,7 @@ describe("the to_sql visitor", () => {
       });
       const node = new Nodes.HomogeneousIn([1, 2, 3], castedUsers.get("id"), "in");
       const collector = new Collectors.SQLString();
-      new Visitors.ToSql(testConnection).accept(node, collector);
+      new Visitors.ToSql(fakeRecordConnection).accept(node, collector);
       expect(collector.preparable).toBe(false);
     });
   });
@@ -516,10 +520,10 @@ describe("the to_sql visitor", () => {
       // element (including a nested array) is a single `add_bind` → one `?`.
       const innerLiteral = new Nodes.BoundSqlLiteral("? * 2", [4], {});
       const node = new Nodes.BoundSqlLiteral("id IN (?)", [[1, [2, 3], innerLiteral]], {});
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("id IN (?, ?, ? * 2)");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("id IN (?, ?, ? * 2)");
 
       const node2 = new Nodes.BoundSqlLiteral("id IN (?)", [[1, [2, 3]]], {});
-      expect(new Visitors.ToSql(testConnection).compile(node2)).toBe("id IN (?, ?)");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node2)).toBe("id IN (?, ?)");
     });
   });
 
@@ -561,7 +565,7 @@ describe("the to_sql visitor", () => {
 
     for (const name of aliasNames) {
       it(`${name} raises UnsupportedVisitError`, () => {
-        const v = new Visitors.ToSql(testConnection);
+        const v = new Visitors.ToSql(fakeRecordConnection);
         const fn = (v as unknown as Record<string, (o: unknown, c: unknown) => never>)[name];
         const node = new Nodes.SqlLiteral("x");
         const collector = new Collectors.SQLString();
@@ -575,7 +579,7 @@ describe("the to_sql visitor", () => {
       // to `unsupported` and raises (to_sql.rb:828-845). Equality visits its
       // right (to_sql.rb:643), so a raw value placed there hits that dispatch.
       const compileRight = (right: unknown): string =>
-        new Visitors.ToSql(testConnection).compile(
+        new Visitors.ToSql(fakeRecordConnection).compile(
           new Nodes.Equality(new Table("users").get("id"), right as Nodes.NodeOrValue),
         );
 
@@ -615,15 +619,15 @@ describe("the to_sql visitor", () => {
         // here, even though visit_NilClass is aliased to `unsupported`.
         expect(compileRight(null)).toBe('"users"."id" IS NULL');
         const attr = new Table("users").get("id");
-        expect(new Visitors.ToSql(testConnection).compile(new Nodes.NotEqual(attr, null))).toBe(
-          '"users"."id" IS NOT NULL',
-        );
+        expect(
+          new Visitors.ToSql(fakeRecordConnection).compile(new Nodes.NotEqual(attr, null)),
+        ).toBe('"users"."id" IS NOT NULL');
       });
 
       it("raises UnsupportedVisitError for NilClass on a path that reaches dispatch", () => {
         // visit_NilClass is aliased to `unsupported` (to_sql.rb:840); visitArray
         // reaches it because there is no `nil?` guard on that path.
-        const v = new Visitors.ToSql(testConnection);
+        const v = new Visitors.ToSql(fakeRecordConnection);
         const visitArray = (
           v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
         ).visitArray;
@@ -647,7 +651,7 @@ describe("the to_sql visitor", () => {
         // (`alias :visit_Time :unsupported`, to_sql.rb:844) and a PlainDate
         // visit_Date (to_sql.rb:836) — not the generic no-handler tail.
         // Temporal exposes no toISOString, so the tag is what routes them.
-        const v = new Visitors.ToSql(testConnection);
+        const v = new Visitors.ToSql(fakeRecordConnection);
         const seen: string[] = [];
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
         spy.visitTime = () => {
@@ -674,7 +678,7 @@ describe("the to_sql visitor", () => {
         // ActiveSupport::Duration is a plain Object subclass, not a Numeric
         // (duration.rb:14), so Rails finds no handler (visitor.rb:39). They
         // must reach that same tail, not be mislabelled as a Ruby Time.
-        const v = new Visitors.ToSql(testConnection);
+        const v = new Visitors.ToSql(fakeRecordConnection);
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
         spy.visitTime = () => {
           throw new Error("visit_Time must not be reached");
@@ -697,7 +701,7 @@ describe("the to_sql visitor", () => {
       it("dispatches a bare Temporal.PlainDateTime on visit_DateTime", () => {
         // PlainDateTime is the DateTime analogue (`alias :visit_DateTime
         // :unsupported`, to_sql.rb:837), not the Time one.
-        const v = new Visitors.ToSql(testConnection);
+        const v = new Visitors.ToSql(fakeRecordConnection);
         const seen: string[] = [];
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
         spy.visitDateTime = () => {
@@ -728,14 +732,14 @@ describe("the to_sql visitor", () => {
         // The AR-facing path: `eq` wraps the raw value in a Casted node, which
         // routes through quote() (to_sql.rb:87-90) rather than raw dispatch.
         expect(
-          new Visitors.ToSql(testConnection).compile(new Table("users").get("id").eq("x")),
+          new Visitors.ToSql(fakeRecordConnection).compile(new Table("users").get("id").eq("x")),
         ).toBe('"users"."id" = \'x\'');
       });
     });
 
     it("visit_Set is aliased to visit_Array (joins with ', ')", () => {
       // Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861).
-      const v = new Visitors.ToSql(testConnection);
+      const v = new Visitors.ToSql(fakeRecordConnection);
       const collector = new Collectors.SQLString();
       const set = new Set<Nodes.NodeOrValue>([new Nodes.Quoted(1), new Nodes.Quoted(2)]);
       const out = (
@@ -754,7 +758,7 @@ describe("the to_sql visitor", () => {
     it("raises not implemented error", () => {
       const core = new Nodes.SelectCore();
       core.setQuantifier = new Nodes.DistinctOn(new Nodes.SqlLiteral("aaron"));
-      expect(() => new Visitors.ToSql(testConnection).compile(core)).toThrow(
+      expect(() => new Visitors.ToSql(fakeRecordConnection).compile(core)).toThrow(
         "DISTINCT ON not implemented for this db",
       );
     });
@@ -763,7 +767,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::Regexp", () => {
     it("raises not implemented error", () => {
       const node = new Nodes.Regexp(users.get("name"), new Nodes.Quoted("foo%"));
-      expect(() => new Visitors.ToSql(testConnection).compile(node)).toThrow(
+      expect(() => new Visitors.ToSql(fakeRecordConnection).compile(node)).toThrow(
         "~ not implemented for this db",
       );
     });
@@ -772,7 +776,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::NotRegexp", () => {
     it("raises not implemented error", () => {
       const node = new Nodes.NotRegexp(users.get("name"), new Nodes.Quoted("foo%"));
-      expect(() => new Visitors.ToSql(testConnection).compile(node)).toThrow(
+      expect(() => new Visitors.ToSql(fakeRecordConnection).compile(node)).toThrow(
         "!~ not implemented for this db",
       );
     });
@@ -844,12 +848,12 @@ describe("the to_sql visitor", () => {
 
     it("emits IS NULL for a BindParam wrapping a bare null", () => {
       const node = new Nodes.Equality(users.get("id"), new Nodes.BindParam(null));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS NULL");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toContain("IS NULL");
     });
 
     it("emits IS NOT NULL for a NotEqual BindParam wrapping a bare null", () => {
       const node = new Nodes.NotEqual(users.get("id"), new Nodes.BindParam(null));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS NOT NULL");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toContain("IS NOT NULL");
     });
   });
 
@@ -935,44 +939,62 @@ describe("the to_sql visitor", () => {
 
   it("should mark collector as non-retryable if SQL literal is marked as retryable", () => {
     const lit = new Nodes.SqlLiteral("1", { retryable: true });
-    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      lit,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(true);
   });
 
   it("should mark collector as non-retryable if SQL literal is not retryable", () => {
     const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      lit,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting SQL literal", () => {
     const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      lit,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting bound SQL literal", () => {
     const lit = new Nodes.BoundSqlLiteral("id = ?", [1]);
-    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      lit,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting delete statement node", () => {
     const stmt = new DeleteManager().from(users).ast;
-    const collector = new Visitors.ToSql(testConnection).accept(stmt, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      stmt,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting insert statement node", () => {
     const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
-    const collector = new Visitors.ToSql(testConnection).accept(stmt, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      stmt,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
   describe("Nodes::DeleteStatement", () => {
     it("renders DELETE FROM via the table visitor", () => {
       const stmt = new DeleteManager().from(users).ast;
-      const sql = new Visitors.ToSql(testConnection).compile(stmt);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(stmt);
       expect(sql).toBe('DELETE FROM "users"');
     });
 
@@ -981,7 +1003,7 @@ describe("the to_sql visitor", () => {
       // A bare JoinSource(table) renders via the plain `DELETE FROM` path,
       // identical to passing the table directly.
       const stmt = new Nodes.DeleteStatement(new Nodes.JoinSource(users));
-      const sql = new Visitors.ToSql(testConnection).compile(stmt);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(stmt);
       expect(sql).toBe('DELETE FROM "users"');
     });
 
@@ -993,7 +1015,7 @@ describe("the to_sql visitor", () => {
       );
       const stmt = new Nodes.DeleteStatement(new Nodes.JoinSource(aliased, [join]));
       stmt.wheres.push(new Nodes.Equality(users.get("id"), 1));
-      const sql = new Visitors.ToSql(testConnection).compile(stmt);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(stmt);
       expect(sql).toContain('DELETE "users" "u" FROM "users" "u"');
       expect(sql).toContain("INNER JOIN");
       expect(sql).toContain("WHERE");
@@ -1006,7 +1028,7 @@ describe("the to_sql visitor", () => {
       mgr.insert([[users.get("name"), "dean"]]);
       const sub = users.project(users.get("name"));
       mgr.ast.select = sub.ast;
-      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(mgr.ast);
       expect(sql).toContain("VALUES");
       expect(sql).toContain("'dean'");
       expect(sql).not.toContain("SELECT");
@@ -1015,20 +1037,26 @@ describe("the to_sql visitor", () => {
     it("routes column names through quoteColumnName", () => {
       const mgr = new InsertManager(users);
       mgr.insert([[users.get("name"), "dean"]]);
-      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(mgr.ast);
       expect(sql).toContain('("name")');
     });
   });
 
   it("should mark collector as non-retryable when visiting named function", () => {
     const fn = users.get("name").lower();
-    const collector = new Visitors.ToSql(testConnection).accept(fn, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      fn,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting update statement node", () => {
     const stmt = new UpdateManager().table(users).set([[users.get("name"), "sam"]]).ast;
-    const collector = new Visitors.ToSql(testConnection).accept(stmt, new Collectors.SQLString());
+    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
+      stmt,
+      new Collectors.SQLString(),
+    );
     expect(collector.retryable).toBe(false);
   });
 
@@ -1043,7 +1071,7 @@ describe("the to_sql visitor", () => {
 
   it("should not quote BindParams used as part of a ValuesList", () => {
     const values = new Nodes.ValuesList([[new Nodes.BindParam()]]);
-    const sql = new Visitors.ToSql(testConnection).compile(values);
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(values);
     expect(sql).toContain("(?)");
   });
 
@@ -1055,7 +1083,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::In", () => {
     it("should return 1=0 when empty right which is always false", () => {
       const node = users.get("id").in([]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe("1=0");
     });
 
@@ -1119,7 +1147,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::NotIn", () => {
     it("should return 1=1 when empty right which is always true", () => {
       const node = users.get("id").notIn([]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe("1=1");
     });
   });
@@ -1135,14 +1163,14 @@ describe("the to_sql visitor", () => {
       // visit_Arel_Nodes_TableAlias renders bare via quote_table_name's
       // SqlLiteral pass-through. Trails matches on the relation shape.
       const sub = users.project(users.get("id")).as("sub");
-      const sql = new Visitors.ToSql(testConnection).compile(sub);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(sub);
       expect(sql).toContain(") sub");
       expect(sql).not.toContain('"sub"');
     });
 
     it("keeps regular table aliases quoted", () => {
       const aliased = new Nodes.TableAlias(users, "u");
-      const sql = new Visitors.ToSql(testConnection).compile(aliased);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(aliased);
       expect(sql).toContain('"users" "u"');
     });
   });
@@ -1170,7 +1198,7 @@ describe("the to_sql visitor", () => {
       users.get("name"),
       AMAttribute.fromUser("name", "x", new ValueType()),
     );
-    expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."name" = ?');
+    expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe('"users"."name" = ?');
   });
 
   it("should visit_Arel_Nodes_Or", () => {
@@ -1216,6 +1244,8 @@ describe("the to_sql visitor", () => {
     );
   });
 
+  // Trails-only: the date cases below assert the adapter's `quoted_date` shape,
+  // microseconds and all, which fake_record.rb:73-76 does not produce.
   it("should visit_Date with fractional seconds retains microseconds", () => {
     const d = Temporal.Instant.from("2026-04-18T13:00:41.729Z");
     const sql = new Visitors.ToSql(testConnection).compile(new Nodes.Quoted(d));
@@ -1245,7 +1275,7 @@ describe("the to_sql visitor", () => {
     const users = new Table("users");
     const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
     const node = users.get("created_at").eq(new Nodes.Quoted(d));
-    const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
+    const [sql, binds] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), node);
     // Quoted(Date) inlines per Rails to_sql.rb — _extractBinds was removed by
     // collector threading; only BindParam/ActiveModel::Attribute go to addBind.
     expect(sql).toContain("2020-01-02");
@@ -1352,7 +1382,7 @@ describe("the to_sql visitor", () => {
       const a = users.project(star);
       const b = users.project(star).order(users.get("id"));
       const node = new Nodes.Union(a.ast, b.ast);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(
         '( SELECT * FROM "users" UNION (SELECT * FROM "users" ORDER BY "users"."id") )',
       );
@@ -1362,7 +1392,7 @@ describe("the to_sql visitor", () => {
       const a = users.project(star);
       const b = users.project(star).take(5);
       const node = new Nodes.Union(a.ast, b.ast);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe('( SELECT * FROM "users" UNION (SELECT * FROM "users" LIMIT 5) )');
     });
 
@@ -1370,7 +1400,7 @@ describe("the to_sql visitor", () => {
       const a = users.project(star);
       const b = users.project(star).skip(10);
       const node = new Nodes.Union(a.ast, b.ast);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe('( SELECT * FROM "users" UNION (SELECT * FROM "users" OFFSET 10) )');
     });
   });
@@ -1381,7 +1411,7 @@ describe("the to_sql visitor", () => {
       const b = users.project(star);
       const c = users.project(star);
       const node = new Nodes.Intersect(a.ast, new Nodes.Intersect(b.ast, c.ast));
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(
         '( SELECT * FROM "users" INTERSECT ( SELECT * FROM "users" INTERSECT SELECT * FROM "users" ) )',
       );
@@ -1394,7 +1424,7 @@ describe("the to_sql visitor", () => {
       const b = users.project(star);
       const c = users.project(star);
       const node = new Nodes.Except(a.ast, new Nodes.Except(b.ast, c.ast));
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(
         '( SELECT * FROM "users" EXCEPT ( SELECT * FROM "users" EXCEPT SELECT * FROM "users" ) )',
       );
@@ -1404,7 +1434,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::BoundSqlLiteral", () => {
     it("supports other bound literals as binds", () => {
       const node = sql("?", [1, 2, sql("?", 3)]);
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("?, ?, ?");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("?, ?, ?");
     });
   });
 
@@ -1440,7 +1470,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("compileWithBinds extracts bind values", () => {
-    const v = new Visitors.ToSql(testConnection);
+    const v = new Visitors.ToSql(fakeRecordConnection);
     const table = new Table("users");
     const mgr = table.project(star).where(table.get("id").eq(new Nodes.BindParam(42)));
     const [sql, binds] = compileWithBinds(v, mgr.ast);
@@ -1450,7 +1480,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("compileWithBinds handles multiple bind params", () => {
-    const v = new Visitors.ToSql(testConnection);
+    const v = new Visitors.ToSql(fakeRecordConnection);
     const table = new Table("users");
     const mgr = table
       .project(star)
@@ -1464,7 +1494,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("compileWithBinds with undefined BindParam", () => {
-    const v = new Visitors.ToSql(testConnection);
+    const v = new Visitors.ToSql(fakeRecordConnection);
     const node = new Nodes.BindParam();
     const [sql, binds] = compileWithBinds(v, node);
     expect(sql).toBe("?");
@@ -1472,7 +1502,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("accept accepts external collector", () => {
-    const v = new Visitors.ToSql(testConnection);
+    const v = new Visitors.ToSql(fakeRecordConnection);
     const table = new Table("users");
     const mgr = table.project(star).where(table.get("name").eq("alice"));
 
@@ -1574,7 +1604,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::BoundSqlLiteral", () => {
     it("works with positional binds", () => {
       const node = new Nodes.BoundSqlLiteral("id = ?", [1]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       // Rails: `add_bind` emits the placeholder (BIND_BLOCK = proc { "?" }) into
       // a plain SQLString collector, so `compile` renders `id = ?`, not the
       // inlined value (to_sql_test.rb).
@@ -1583,7 +1613,7 @@ describe("the to_sql visitor", () => {
 
     it("works with named binds", () => {
       const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1 });
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe("id = ?");
     });
 
@@ -1591,7 +1621,7 @@ describe("the to_sql visitor", () => {
       // Rails to_sql_test.rb: a single positional `?` bound to an array expands
       // through `add_binds` to one placeholder per element.
       const node = new Nodes.BoundSqlLiteral("id IN (?)", [[1, 2, 3]], {});
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe("id IN (?, ?, ?)");
     });
   });
@@ -1661,52 +1691,52 @@ describe("the to_sql visitor", () => {
 
     it("GreaterThan short-circuits to 1=0 for positive unboundable", () => {
       const node = new Nodes.GreaterThan(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("GreaterThan short-circuits to 1=1 for negative unboundable", () => {
       const node = new Nodes.GreaterThan(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
     it("GreaterThanOrEqual short-circuits to 1=0 for positive unboundable", () => {
       const node = new Nodes.GreaterThanOrEqual(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("GreaterThanOrEqual short-circuits to 1=1 for negative unboundable", () => {
       const node = new Nodes.GreaterThanOrEqual(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
     it("LessThan short-circuits to 1=1 for positive unboundable", () => {
       const node = new Nodes.LessThan(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
     it("LessThan short-circuits to 1=0 for negative unboundable", () => {
       const node = new Nodes.LessThan(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("LessThanOrEqual short-circuits to 1=1 for positive unboundable", () => {
       const node = new Nodes.LessThanOrEqual(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
     it("LessThanOrEqual short-circuits to 1=0 for negative unboundable", () => {
       const node = new Nodes.LessThanOrEqual(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("Equality short-circuits to 1=0 for any unboundable", () => {
       const node = new Nodes.Equality(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("NotEqual short-circuits to 1=1 for any unboundable", () => {
       const node = new Nodes.NotEqual(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
   });
 
@@ -1718,27 +1748,27 @@ describe("the to_sql visitor", () => {
 
     it("GreaterThan short-circuits to 1=0 for positive unboundable", () => {
       const node = new Nodes.GreaterThan(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("GreaterThan short-circuits to 1=1 for negative unboundable", () => {
       const node = new Nodes.GreaterThan(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
     it("LessThan short-circuits to 1=1 for positive unboundable", () => {
       const node = new Nodes.LessThan(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=1");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
 
     it("LessThan short-circuits to 1=0 for negative unboundable", () => {
       const node = new Nodes.LessThan(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("1=0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
     });
 
     it("an infinite-but-bounded BindParam does not short-circuit", () => {
       const node = new Nodes.GreaterThan(users.get("id"), new Nodes.BindParam(Infinity));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."id" > ?');
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe('"users"."id" > ?');
     });
   });
 
@@ -1750,6 +1780,8 @@ describe("the to_sql visitor", () => {
       quoteTableName(name: string | Nodes.SqlLiteral): string;
       quoteColumnName(name: string | Nodes.SqlLiteral): string;
     };
+    // Trails-only: asserts adapter quoting — comment stripping and `"` doubling —
+    // that fake_record.rb:55-65 does not do (verbatim name, unchanged comment).
     const make = (): ToSqlInternals =>
       new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
 
@@ -1801,10 +1833,11 @@ describe("the to_sql visitor", () => {
   describe("Nodes::OptimizerHints (visit)", () => {
     it("emits /*+ HINT */ for an OptimizerHints node with array expr", () => {
       const node = new Nodes.OptimizerHints(["IDX(t1)", "MAX_EXEC_TIME(1000)"]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe("/*+ IDX(t1) MAX_EXEC_TIME(1000) */");
     });
 
+    // Trails-only: `sanitize_as_sql_comment` is a no-op on fake_record.rb:63-65.
     it("strips embedded comment delimiters from each hint (Rails parity)", () => {
       // Mirrors Rails: sanitize_as_sql_comment removes /* and */ so a hint
       // can't escape the surrounding comment block. The literal SQL inside
@@ -1817,7 +1850,7 @@ describe("the to_sql visitor", () => {
 
     it("accepts SqlLiteral hints (passes through unchanged)", () => {
       const node = new Nodes.OptimizerHints([new Nodes.SqlLiteral("FORCE INDEX (t)")]);
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("/*+ FORCE INDEX (t) */");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("/*+ FORCE INDEX (t) */");
     });
   });
 
@@ -1830,6 +1863,8 @@ describe("the to_sql visitor", () => {
     });
   });
 
+  // Trails-only: adapter identifier quoting (schema splitting, `"` doubling),
+  // which fake_record.rb:55-61 does not do.
   describe("schema-qualified table identifier", () => {
     it("quotes each segment of a schema.table name in SELECT and column refs", () => {
       const tbl = new Table("schema.table");
@@ -1838,6 +1873,8 @@ describe("the to_sql visitor", () => {
     });
   });
 
+  // Trails-only, same reason as the block above: `"` doubling is adapter
+  // quoting, which fake_record.rb:55-61 does not do.
   describe("identifier-escape consistency (helper-routed quoting)", () => {
     it("UPDATE SET column quotes embedded double-quotes", () => {
       const tbl = new Table('tab"le');
@@ -1860,7 +1897,7 @@ describe("the to_sql visitor", () => {
       hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean;
       bindBlock(): (index: number) => string;
     }
-    const make = () => new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
+    const make = () => new Visitors.ToSql(fakeRecordConnection) as unknown as ToSqlInternals;
 
     it("isUnboundable returns true only when the value reports unboundable", () => {
       const v = make();
@@ -1891,7 +1928,7 @@ describe("the to_sql visitor", () => {
         }
       }
       const tbl = new Table("users");
-      const v = new NumberedVisitor(testConnection);
+      const v = new NumberedVisitor(fakeRecordConnection);
       // Only BindParam routes through addBind (and therefore bindBlock); Casted
       // and Quoted values inline their quoted literal (Rails to_sql.rb:87-88).
       const [sql] = compileWithBinds(
@@ -1916,7 +1953,7 @@ describe("the to_sql visitor", () => {
           return (i: number) => `$${i}`;
         }
       }
-      const v = new NumberedVisitor(testConnection);
+      const v = new NumberedVisitor(fakeRecordConnection);
       const collector = new Collectors.SQLString();
       (
         v as unknown as { visitActiveModelAttribute(o: AMAttribute, c: Collectors.SQLString): void }
@@ -1933,7 +1970,7 @@ describe("the to_sql visitor", () => {
       // which is invoked when the visitor encounters a SelectManager value.
       const tbl = new Table("users");
       const mgr = new SelectManager(tbl).project(tbl.get("id"));
-      const v = new Visitors.ToSql(testConnection);
+      const v = new Visitors.ToSql(fakeRecordConnection);
       const collector = new Collectors.SQLString();
       (
         v as unknown as { visitArelSelectManager(o: { ast: Nodes.Node }, c: unknown): void }
@@ -1944,7 +1981,7 @@ describe("the to_sql visitor", () => {
     it("visitArelNodesWhen / Else are reachable as standalone visits (Case still works)", () => {
       const tbl = new Table("users");
       const node = new Nodes.Case(tbl.get("status")).when("ok", 1).when("warn", 2)["else"](0);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toContain("CASE");
       expect(sql).toContain("WHEN");
       expect(sql).toContain("THEN");
@@ -1956,10 +1993,10 @@ describe("the to_sql visitor", () => {
       const tbl = new Table("users");
       const whenNode = new Nodes.When(tbl.get("status"), new Nodes.SqlLiteral("1"));
       const elseNode = new Nodes.Else(new Nodes.SqlLiteral("0"));
-      expect(new Visitors.ToSql(testConnection).compile(whenNode)).toBe(
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(whenNode)).toBe(
         'WHEN "users"."status" THEN 1',
       );
-      expect(new Visitors.ToSql(testConnection).compile(elseNode)).toBe("ELSE 0");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(elseNode)).toBe("ELSE 0");
     });
 
     // Mirrors Rails to_sql.rb#visit_Arel_Nodes_{Equality,NotEqual,GreaterThan,
@@ -1967,7 +2004,7 @@ describe("the to_sql visitor", () => {
     // when the right operand reports `unboundable?` (±Float::INFINITY).
     describe("unboundable short-circuits", () => {
       const tbl = new Table("users");
-      const compile = (n: Nodes.Node) => new Visitors.ToSql(testConnection).compile(n);
+      const compile = (n: Nodes.Node) => new Visitors.ToSql(fakeRecordConnection).compile(n);
       const id = tbl.get("id");
       // Rails' `unboundable?` is duck-typed (to_sql.rb:905-907) and only
       // BindParam / QueryAttribute answer it. A raw `Float::INFINITY` — or a
@@ -2046,7 +2083,7 @@ describe("the to_sql visitor", () => {
         unboundableSign(v: unknown): 1 | -1 | 0;
         isUnboundable(v: unknown): boolean;
       }
-      const v = () => new Visitors.ToSql(testConnection) as unknown as Internals;
+      const v = () => new Visitors.ToSql(fakeRecordConnection) as unknown as Internals;
 
       it("returns 0 for values that do not respond to isUnboundable", () => {
         // to_sql.rb:905 — `value.respond_to?(:unboundable?) && value.unboundable?`.
@@ -2097,7 +2134,7 @@ describe("the to_sql visitor", () => {
 
     it("visitArray handles a mix of Node and primitive entries", () => {
       const tbl = new Table("users");
-      const v = new Visitors.ToSql(testConnection);
+      const v = new Visitors.ToSql(fakeRecordConnection);
       const collector = new Collectors.SQLString();
       const visitArray = (
         v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
@@ -2115,12 +2152,12 @@ describe("the to_sql visitor", () => {
 
   describe("Quoted/Casted collapse", () => {
     it("Quoted inlines via quote(valueForDatabase) when not extracting binds", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       expect(visitor.compile(new Nodes.Quoted("hi"))).toBe("'hi'");
     });
 
     it("Quoted Temporal.Instant binds through unified addBind path under extractBinds", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
       const [sql, binds] = compileWithBinds(visitor, new Nodes.Quoted(instant));
       expect(sql).toContain("2026-04-30");
@@ -2129,13 +2166,13 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted non-Date inlines under extractBinds=false", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       expect(visitor.compile(new Nodes.Quoted(42))).toBe("42");
     });
 
     it("Quoted string binds raw under extractBinds", () => {
       const [sql, binds] = compileWithBinds(
-        new Visitors.ToSql(testConnection),
+        new Visitors.ToSql(fakeRecordConnection),
         new Nodes.Quoted("hi"),
       );
       expect(sql).toBe("'hi'");
@@ -2144,13 +2181,14 @@ describe("the to_sql visitor", () => {
 
     it("Quoted number binds raw under extractBinds", () => {
       const [sql, binds] = compileWithBinds(
-        new Visitors.ToSql(testConnection),
+        new Visitors.ToSql(fakeRecordConnection),
         new Nodes.Quoted(42),
       );
       expect(sql).toBe("42");
       expect(binds).toHaveLength(0);
     });
 
+    // Trails-only: asserts the adapter's `quoted_date` rendering (fake_record.rb:73-76).
     it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
       const value = Temporal.Instant.from("2026-04-30T00:00:00.000Z");
       const [sql, binds] = compileWithBinds(
@@ -2164,7 +2202,7 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Lock", () => {
     it("visits the inner expr (no FOR UPDATE fallback)", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const node = new Nodes.Lock(new Nodes.SqlLiteral("FOR SHARE"));
       expect(visitor.compile(node)).toBe("FOR SHARE");
     });
@@ -2180,19 +2218,19 @@ describe("the to_sql visitor", () => {
 
   describe("OuterJoin guard", () => {
     it("OuterJoin without an ON throws", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const node = new Nodes.OuterJoin(users, null);
       expect(() => visitor.compile(node)).toThrow();
     });
 
     it("RightOuterJoin without an ON throws", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const node = new Nodes.RightOuterJoin(users, null);
       expect(() => visitor.compile(node)).toThrow();
     });
 
     it("FullOuterJoin without an ON throws", () => {
-      const visitor = new Visitors.ToSql(testConnection);
+      const visitor = new Visitors.ToSql(fakeRecordConnection);
       const node = new Nodes.FullOuterJoin(users, null);
       expect(() => visitor.compile(node)).toThrow();
     });
@@ -2202,7 +2240,7 @@ describe("the to_sql visitor", () => {
     it("visits the Node when name is an Arel Node", () => {
       const tbl = new Table("ignored");
       (tbl as unknown as { name: Nodes.Node }).name = new Nodes.SqlLiteral("my_subq");
-      expect(new Visitors.ToSql(testConnection).compile(tbl)).toBe("my_subq");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(tbl)).toBe("my_subq");
     });
   });
 
@@ -2213,7 +2251,7 @@ describe("the to_sql visitor", () => {
       um.set([[users.get("name"), "x"]]);
       um.take(1);
       um.key = users.get("id");
-      const sql = new Visitors.ToSql(testConnection).compile(um.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(um.ast);
       expect(sql).toContain('IN (SELECT "users"."id"');
     });
   });
@@ -2224,13 +2262,17 @@ describe("the to_sql visitor", () => {
       dm.from(users);
       dm.take(1);
       dm.key = users.get("id");
-      const sql = new Visitors.ToSql(testConnection).compile(dm.ast);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(dm.ast);
       expect(sql).toContain('IN (SELECT "users"."id"');
     });
   });
 });
 
 describe("ArelQuoter / defaultQuoter wiring", () => {
+  // Trails-only: this block exercises `defaultQuoter` — the adapter quoting —
+  // rather than the FakeRecord double of fake_record.rb:55-90, so every visitor
+  // here, the `RecordingToSql` subclasses at the end included, keeps
+  // `testConnection`.
   const users = new Table("users");
 
   it("default quoter emits double-quoted identifiers", () => {

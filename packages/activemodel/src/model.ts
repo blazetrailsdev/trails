@@ -48,7 +48,7 @@ import type { AttrNameArg } from "./validations/helper-methods.js";
 import * as AttributeMethods from "./attribute-methods.js";
 import {
   AttributeMethodPattern,
-  type AttributeMethodMatch,
+  type AttributeMethod,
   defineMethodAttribute,
   _resurrectAttributeMethods,
 } from "./attribute-methods.js";
@@ -119,9 +119,9 @@ export interface Model extends Dirty, Access, Conversion, Serialization, Naming,
    * bottom of this file. Declared as methods, not properties, so a subclass
    * may override `attribute_missing` the way Rails' cascade expects.
    */
-  attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
+  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
   isAttributeMethod(attrName: string): boolean;
-  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
+  matchedAttributeMethod(methodName: string): AttributeMethod | null;
   missingAttribute(attrName: string, stack?: string): never;
   isRespondToWithoutAttributes(method: string): boolean;
   respondTo(method: string, includePrivateMethods?: boolean): boolean;
@@ -458,13 +458,8 @@ export class Model {
   declare static undefineAttributeMethods: () => void;
   declare static generatedAttributeMethods: () => Module;
   declare static isInstanceMethodAlreadyImplemented: (methodName: string) => boolean;
-  declare static attributeMethodPatternsCache: () => Map<
-    string,
-    Array<{ proxyTarget: string; attrName: string }>
-  >;
-  declare static attributeMethodPatternsMatching: (
-    methodName: string,
-  ) => Array<{ proxyTarget: string; attrName: string }>;
+  declare static attributeMethodPatternsCache: () => Map<string, Array<AttributeMethod>>;
+  declare static attributeMethodPatternsMatching: (methodName: string) => Array<AttributeMethod>;
 
   declare static lookupAncestors: () => Array<{
     new (...args: never[]): unknown;

@@ -19,20 +19,8 @@ import {
 } from "@blazetrails/activesupport";
 
 export interface AttributeMethods {
-  attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
+  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
   respondTo(method: string): boolean;
-}
-
-/**
- * Match record passed to `attribute_missing` when a generated
- * per-attribute method (like `name_changed?`, `name_was`, …) is
- * invoked. Mirrors the duck type of Rails'
- * `AttributeMethodMatcher::AttributeMethodMatch` (proxy_target +
- * attr_name fields used by attribute_methods.rb:520-522).
- */
-export interface AttributeMethodMatch {
-  proxyTarget: string;
-  attrName: string;
 }
 
 /**
@@ -74,6 +62,14 @@ export namespace AttrNames {
   }
 }
 
+/** Mirrors: `AttributeMethodPattern::AttributeMethod = Struct.new(:proxy_target, :attr_name)` */
+export class AttributeMethod {
+  constructor(
+    readonly proxyTarget: string,
+    readonly attrName: string,
+  ) {}
+}
+
 export class AttributeMethodPattern {
   readonly prefix: string;
   readonly suffix: string;
@@ -112,12 +108,18 @@ export class AttributeMethodPattern {
     }`;
   }
 
-  match(method: string): { attr: string } | null {
-    if (this.prefix && !method.startsWith(this.prefix)) return null;
-    if (this.suffix && !method.endsWith(this.suffix)) return null;
-    const attr = method.slice(this.prefix.length, this.suffix ? -this.suffix.length : undefined);
+  match(methodName: string): AttributeMethod | null {
+    if (this.prefix && !methodName.startsWith(this.prefix)) return null;
+    if (this.suffix && !methodName.endsWith(this.suffix)) return null;
+    const attr = methodName.slice(
+      this.prefix.length,
+      this.suffix ? -this.suffix.length : undefined,
+    );
     if (!attr) return null;
-    return { attr: this.camelJoined ? attr.charAt(0).toLowerCase() + attr.slice(1) : attr };
+    return new AttributeMethod(
+      this.proxyTarget,
+      this.camelJoined ? attr.charAt(0).toLowerCase() + attr.slice(1) : attr,
+    );
   }
 
   methodName(attrName: string): string {
@@ -184,10 +186,8 @@ type ClassMethods = AttributeMethodHost & {
   resolveAttributeName(name: string): string;
   generatedAttributeMethods(): Module;
   isInstanceMethodAlreadyImplemented(methodName: string): boolean;
-  attributeMethodPatternsCache(): Map<string, Array<{ proxyTarget: string; attrName: string }>>;
-  attributeMethodPatternsMatching(
-    methodName: string,
-  ): Array<{ proxyTarget: string; attrName: string }>;
+  attributeMethodPatternsCache(): Map<string, Array<AttributeMethod>>;
+  attributeMethodPatternsMatching(methodName: string): Array<AttributeMethod>;
 };
 
 /**
@@ -203,7 +203,7 @@ type ClassMethods = AttributeMethodHost & {
  */
 export function attributeMissing(
   this: Record<string, unknown>,
-  match: AttributeMethodMatch,
+  match: AttributeMethod,
   ...args: unknown[]
 ): unknown {
   const target = (this as Record<string, (...a: unknown[]) => unknown>)[match.proxyTarget];
@@ -249,7 +249,7 @@ export function isAttributeMethod(this: InstanceHost, attrName: string): boolean
 export function matchedAttributeMethod(
   this: InstanceMethods,
   methodName: string,
-): { proxyTarget: string; attrName: string } | null {
+): AttributeMethod | null {
   const matches = this.constructor.attributeMethodPatternsMatching(methodName);
   return matches.find((m) => this.isAttributeMethod(m.attrName)) ?? null;
 }
@@ -594,9 +594,9 @@ export function isInstanceMethodAlreadyImplemented(
  */
 export function attributeMethodPatternsCache(
   this: ClassMethods,
-): Map<string, Array<{ proxyTarget: string; attrName: string }>> {
+): Map<string, Array<AttributeMethod>> {
   const h = this as AttributeMethodHost & {
-    _attributeMethodPatternsCache?: Map<string, Array<{ proxyTarget: string; attrName: string }>>;
+    _attributeMethodPatternsCache?: Map<string, Array<AttributeMethod>>;
   };
   if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
     h._attributeMethodPatternsCache = new Map();
@@ -608,12 +608,12 @@ export function attributeMethodPatternsCache(
 export function attributeMethodPatternsMatching(
   this: ClassMethods,
   methodName: string,
-): Array<{ proxyTarget: string; attrName: string }> {
+): Array<AttributeMethod> {
   const cache = this.attributeMethodPatternsCache();
   if (cache.has(methodName)) return cache.get(methodName)!;
   const matches = this.attributeMethodPatterns.flatMap((pattern) => {
     const m = pattern.match(methodName);
-    return m ? [{ proxyTarget: pattern.proxyTarget, attrName: m.attr }] : [];
+    return m ? [m] : [];
   });
   cache.set(methodName, matches);
   return matches;
@@ -733,7 +733,7 @@ type InstanceMethods = InstanceHost & {
 /** The receiver `respond_to?` (attribute_methods.rb:528-539) self-sends to. */
 type RespondToHost = {
   isRespondToWithoutAttributes(method: string): boolean;
-  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
+  matchedAttributeMethod(methodName: string): AttributeMethod | null;
 };
 
 /**

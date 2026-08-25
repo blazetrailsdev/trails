@@ -58,8 +58,13 @@ export async function execExplain(
         msg += rubyInspect(binds.map((attr) => renderBind(c, attr)));
       }
       msg += "\n";
-      // `explain` is optional on AbstractAdapter (Rails' raises NotImplementedError
-      // instead); every adapter reaching here implements it.
+      // `explain` is required on the adapter in Rails (database_statements.rb:180-182
+      // raises NotImplementedError) and the base body here does raise; the TS
+      // interface member stays optional only because
+      // `interface SchemaStatements extends DatabaseAdapter`
+      // (abstract/schema-statements.ts:313) republishes every REQUIRED adapter
+      // member as public surface of a file schema_statements.rb has no `explain`
+      // in. Tracked by abstract-adapter-explain-required-not-implemented.
       msg += await c.explain!(sql, binds, options);
       msgs.push(msg);
     }

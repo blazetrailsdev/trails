@@ -5,7 +5,7 @@ import {
   AttrNames,
   attributeMissing,
   type AttributeMethodHost,
-  type AttributeMethodMatch,
+  type AttributeMethod,
   buildMangledName,
 } from "./attribute-methods.js";
 import {
@@ -204,7 +204,7 @@ export function freeze(this: AttributeInstanceHost): void {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export interface Attributes {
   /** Mirrors: attribute_methods.rb:520-522 — `attribute_missing(match, ...)`. */
-  attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
+  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
 }
 
 /**

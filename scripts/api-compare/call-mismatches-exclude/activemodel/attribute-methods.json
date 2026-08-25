@@ -9,13 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "match",
-    "call": "new",
-    "reason": "attribute_methods.rb:487 returns `AttributeMethod.new(proxy_target, $1)`, a two-member `Struct` (:474); trails' `match` returns the object literal `{ attr }` — porting the Struct is tracked separately, not closed here."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "resolve_attribute_name",
     "call": "fetch",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_methods.rb:396-398 uses `attribute_aliases.fetch(super, &:itself)`; trails attribute-methods.ts:461-463 reads `this._attributeAliases?.[name] ?? name`."

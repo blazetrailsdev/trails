@@ -1,3 +1,4 @@
+import type { AttributeMethod } from "./attribute-methods.js";
 import { UnknownAttributeError } from "./errors.js";
 
 /**
@@ -183,8 +184,8 @@ export interface AttributeAssignment {
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal Rails-private helper. */
   _assignAttribute(k: string, v: unknown): Promise<void> | void;
-  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
-  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
+  matchedAttributeMethod(methodName: string): AttributeMethod | null;
+  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
 }
 
 /**

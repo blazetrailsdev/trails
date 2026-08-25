@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import {
+  type AttributeMethod,
   defineAttributeMethod,
   generatedAttributeMethods,
   missingAttribute,
@@ -295,7 +296,7 @@ describe("AttributeMethodsTest", () => {
         this.attributeMethodSuffix("Test");
         this.attribute("foo", "string");
       }
-      override attributeMissing(match: { proxyTarget: string; attrName: string }): unknown {
+      override attributeMissing(match: AttributeMethod): unknown {
         return match;
       }
     }
@@ -417,7 +418,7 @@ describe("attributeMissing", () => {
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
-      override attributeMissing(match: { proxyTarget: string; attrName: string }): unknown {
+      override attributeMissing(match: AttributeMethod): unknown {
         return `intercepted:${match.proxyTarget}:${match.attrName}`;
       }
     }

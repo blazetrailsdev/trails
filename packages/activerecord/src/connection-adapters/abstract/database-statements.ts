@@ -489,12 +489,17 @@ export function execInsertAll(
 }
 
 /**
- * Returns an EXPLAIN plan for the query. Must be overridden by adapters.
- *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
+ * — database_statements.rb:180-182 raises `NotImplementedError`; every
+ * concrete adapter overrides it.
  */
-export function explain(_arel: unknown, _binds?: unknown[], _options?: unknown[]): Promise<string> {
-  throw new Error("explain must be implemented by adapter subclass");
+export function explain(
+  _arel: unknown,
+  _binds: unknown[] = [],
+  _options: ExplainOption[] = [],
+): Promise<string> {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:180
+  throw new NotImplementedError();
 }
 
 /**
