@@ -1518,8 +1518,7 @@ describe("BasicsTest", () => {
 
     const c2 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
-    expect(c2!.length).toBe(c1!.length);
-    c2!.forEach((col, i) => expect(col.equals(c1![i])).toBe(true));
+    expect(c2!.map((column, i) => column.equals(c1![i]))).toEqual(new Array(c1!.length).fill(true));
 
     // Restore the harness' always-warm invariant for the rest of the file:
     // trails cannot re-warm synchronously on read the way Rails' cold-DB-hit
