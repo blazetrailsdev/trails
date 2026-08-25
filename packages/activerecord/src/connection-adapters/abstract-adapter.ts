@@ -2683,7 +2683,7 @@ export class AbstractAdapter implements Quoting {
   /** @internal Mirrors: AbstractAdapter#column_for_attribute */
   async columnForAttribute(attribute: {
     relation: { name: string | Nodes.Node };
-    name: string | Nodes.SqlLiteral;
+    name: string | Nodes.Node;
   }): Promise<import("./column.js").Column | undefined> {
     const tableName = String(attribute.relation.name);
     // `schemaCache` is Rails' `schema_cache` (abstract_adapter.rb:298): the

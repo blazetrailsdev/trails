@@ -49,11 +49,11 @@ export class Attribute extends Node {
   // Rails stores whatever `Table#[]` was handed (table.rb:81-85), so
   // `table[Arel.star]` seats a `SqlLiteral` here and `quote_column_name`
   // passes it through unquoted (to_sql.rb:877-880).
-  readonly name: string | SqlLiteral;
+  readonly name: string | Node;
 
   // Rails' `Attribute.new(nil, nil)` is legal (attribute_test.rb:388); the
   // relation-dependent methods below simply raise NoMethodError if reached.
-  constructor(relation: RelationLike | null, name: string | SqlLiteral | null) {
+  constructor(relation: RelationLike | null, name: string | Node | null) {
     super();
     this.relation = relation as RelationLike;
     this.name = name as string;

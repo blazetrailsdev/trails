@@ -188,7 +188,7 @@ export class Table extends Node {
     // skips and the visitor renders as-is (table.rb:110-113).
     const resolved =
       name === null || name instanceof Node ? name : (this.klass?.attributeAliases?.[name] ?? name);
-    return new Attribute(table ?? this, resolved as string | SqlLiteral | null);
+    return new Attribute(table ?? this, resolved);
   }
 
   /**
