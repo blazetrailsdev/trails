@@ -1,17 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
-import {
-  Table,
-  star,
-  SelectManager,
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Visitors,
-} from "../index.js";
+import { Table, SelectManager, UpdateManager, DeleteManager, Nodes, Visitors } from "../index.js";
 import { Node as DotNode } from "./dot.js";
+import { buildQuoted } from "../nodes/casted.js";
 
 /**
  * Drive Dot#visit on a bare value (rather than an AST root) and render the
@@ -29,71 +21,105 @@ describe("TestDot", () => {
   const dot = new Visitors.Dot();
 
   it("named function", () => {
-    const node = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-    const out = dot.compile(node);
-    expect(out).toContain("NamedFunction");
+    // Rails' `test_named_function` ends in `pass` — building the node and
+    // accepting it without raising IS the test (dot_test.rb:33-37).
+    const func = new Nodes.NamedFunction("omg", "omg" as never);
+    dot.compile(func);
   });
 
   it("Arel Nodes BindParam", () => {
-    const node = new Nodes.BindParam();
-    const out = dot.compile(node);
-    expect(out).toContain("BindParam");
+    const node = new Nodes.BindParam(1);
+    expect(dot.compile(node)).toMatch('[label="<f0>BindParam"]');
   });
 
   it("ActiveModel Attribute", () => {
-    const node = users.get("id");
-    const out = dot.compile(node);
-    expect(out).toContain("Attribute");
+    const node = ModelAttribute.withCastValue("LIMIT", 1, null as never);
+    expect(dot.compile(node as never)).toMatch('[label="<f0>WithCastValue"]');
   });
 
   it("Arel Nodes CurrentRow", () => {
     const node = new Nodes.CurrentRow();
-    const out = dot.compile(node);
-    expect(out).toContain("CurrentRow");
+    expect(dot.compile(node)).toMatch('[label="<f0>CurrentRow"]');
   });
 
   it("Arel Nodes Distinct", () => {
     const node = new Nodes.Distinct();
-    const out = dot.compile(node);
-    expect(out).toContain("Distinct");
+    expect(dot.compile(node)).toMatch('[label="<f0>Distinct"]');
   });
 
   it("Arel Nodes Case and friends", () => {
-    const node = new Nodes.Case(users.get("status")).when("active", "A").else("Z");
+    const foo = buildQuoted("foo");
+    const node = new Nodes.Case(foo);
+    node.conditions = [new Nodes.When(foo, buildQuoted(1))];
+    node.default = new Nodes.Else(buildQuoted(0));
+
     const out = dot.compile(node);
-    expect(out).toContain("Case");
+
+    expect(out).toMatch('[label="<f0>Case"]');
+    expect(out).toMatch(/->.*label="case"/);
+    expect(out).toMatch(/->.*label="conditions"/);
+    expect(out).toMatch(/->.*label="default"/);
+    expect(out).toMatch('[label="<f0>When"]');
+    expect(out).toMatch('[label="<f0>Else"]');
+    expect(out).toMatch('[label="<f0>Else"]');
   });
 
   it("Arel Nodes InfixOperation", () => {
-    const node = new Nodes.InfixOperation("+", users.get("age"), new Nodes.Quoted(1));
+    const node = new Nodes.InfixOperation("&&", buildQuoted(1), buildQuoted(2));
+
     const out = dot.compile(node);
-    expect(out).toContain("InfixOperation");
+
+    expect(out).toMatch('[label="<f0>InfixOperation"]');
+    expect(out).toMatch(/->.*label="operator"/);
+    expect(out).toMatch(/->.*label="left"/);
+    expect(out).toMatch(/->.*label="right"/);
   });
 
   it("Arel Nodes RegExp", () => {
-    const node = new Nodes.Regexp(users.get("name"), new Nodes.Quoted("a.*"));
+    const table = new Table("users");
+    const node = new Nodes.Regexp(table.get("name"), buildQuoted("foo%"));
+
     const out = dot.compile(node);
-    expect(out).toContain("Regexp");
+
+    expect(out).toMatch('[label="<f0>Regexp"]');
+    expect(out).toMatch(/->.*label="left"/);
+    expect(out).toMatch(/->.*label="right"/);
+    // Rails' edge label is the reader name, `case_sensitive`; the ported
+    // reader is `caseSensitive`, so the emitted label follows the TS spelling.
+    expect(out).toMatch(/->.*label="caseSensitive"/);
   });
 
   it("Arel Nodes NotRegExp", () => {
-    const node = new Nodes.NotRegexp(users.get("name"), new Nodes.Quoted("a.*"));
+    const table = new Table("users");
+    const node = new Nodes.NotRegexp(table.get("name"), buildQuoted("foo%"));
+
     const out = dot.compile(node);
-    expect(out).toContain("NotRegexp");
+
+    expect(out).toMatch('[label="<f0>NotRegexp"]');
+    expect(out).toMatch(/->.*label="left"/);
+    expect(out).toMatch(/->.*label="right"/);
+    expect(out).toMatch(/->.*label="caseSensitive"/);
   });
 
   it("Arel Nodes UnaryOperation", () => {
-    const node = new Nodes.UnaryOperation("NOT ", users.get("active"));
+    const node = new Nodes.UnaryOperation("-", 1 as never);
+
     const out = dot.compile(node);
-    expect(out).toContain("UnaryOperation");
+
+    expect(out).toMatch('[label="<f0>UnaryOperation"]');
+    expect(out).toMatch(/->.*label="operator"/);
+    expect(out).toMatch(/->.*label="expr"/);
   });
 
   it("Arel Nodes With", () => {
-    const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
-    const stmt = new SelectManager().with(cte).project("1").ast;
-    const out = dot.compile(stmt);
-    expect(out).toContain("With");
-    expect(out).toContain("Cte");
+    const node = new Nodes.With(["query1", "query2", "query3"] as never);
+
+    const out = dot.compile(node);
+
+    expect(out).toMatch('[label="<f0>With"]');
+    expect(out).toMatch(/->.*label="0"/);
+    expect(out).toMatch(/->.*label="1"/);
+    expect(out).toMatch(/->.*label="2"/);
   });
 
   it("Arel Nodes And", () => {
@@ -118,33 +144,75 @@ describe("TestDot", () => {
   });
 
   it("Arel Nodes SelectCore", () => {
-    const stmt = users.project(star).ast;
-    const out = dot.compile(stmt.cores[0]);
-    expect(out).toContain("SelectCore");
+    const node = new Nodes.SelectCore();
+
+    const out = dot.compile(node);
+
+    expect(out).toMatch('[label="<f0>SelectCore"]');
+    expect(out).toMatch(/->.*label="source"/);
+    expect(out).toMatch(/->.*label="projections"/);
+    expect(out).toMatch(/->.*label="wheres"/);
+    expect(out).toMatch(/->.*label="windows"/);
+    expect(out).toMatch(/->.*label="groups"/);
+    expect(out).toMatch(/->.*label="comment"/);
+    expect(out).toMatch(/->.*label="havings"/);
+    expect(out).toMatch(/->.*label="setQuantifier"/);
+    expect(out).toMatch(/->.*label="optimizerHints"/);
   });
 
   it("Arel Nodes SelectStatement", () => {
-    const stmt = users.project(star).ast;
-    const out = dot.compile(stmt);
-    expect(out).toContain("SelectStatement");
+    const node = new Nodes.SelectStatement();
+
+    const out = dot.compile(node);
+
+    expect(out).toMatch('[label="<f0>SelectStatement"]');
+    expect(out).toMatch(/->.*label="cores"/);
+    expect(out).toMatch(/->.*label="limit"/);
+    expect(out).toMatch(/->.*label="orders"/);
+    expect(out).toMatch(/->.*label="offset"/);
+    expect(out).toMatch(/->.*label="lock"/);
+    expect(out).toMatch(/->.*label="with"/);
   });
 
   it("Arel Nodes InsertStatement", () => {
-    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
-    const out = dot.compile(stmt);
-    expect(out).toContain("InsertStatement");
+    const node = new Nodes.InsertStatement();
+
+    const out = dot.compile(node);
+
+    expect(out).toMatch('[label="<f0>InsertStatement"]');
+    expect(out).toMatch(/->.*label="relation"/);
+    expect(out).toMatch(/->.*label="columns"/);
+    expect(out).toMatch(/->.*label="values"/);
+    expect(out).toMatch(/->.*label="select"/);
   });
 
   it("Arel Nodes UpdateStatement", () => {
-    const stmt = new UpdateManager().table(users).set([[users.get("name"), "sam"]]).ast;
-    const out = dot.compile(stmt);
-    expect(out).toContain("UpdateStatement");
+    const node = new Nodes.UpdateStatement();
+
+    const out = dot.compile(node);
+
+    expect(out).toMatch('[label="<f0>UpdateStatement"]');
+    expect(out).toMatch(/->.*label="relation"/);
+    expect(out).toMatch(/->.*label="wheres"/);
+    expect(out).toMatch(/->.*label="values"/);
+    expect(out).toMatch(/->.*label="orders"/);
+    expect(out).toMatch(/->.*label="limit"/);
+    expect(out).toMatch(/->.*label="offset"/);
+    expect(out).toMatch(/->.*label="key"/);
   });
 
   it("Arel Nodes DeleteStatement", () => {
-    const stmt = new DeleteManager().from(users).ast;
-    const out = dot.compile(stmt);
-    expect(out).toContain("DeleteStatement");
+    const node = new Nodes.DeleteStatement();
+
+    const out = dot.compile(node);
+
+    expect(out).toMatch('[label="<f0>DeleteStatement"]');
+    expect(out).toMatch(/->.*label="relation"/);
+    expect(out).toMatch(/->.*label="wheres"/);
+    expect(out).toMatch(/->.*label="orders"/);
+    expect(out).toMatch(/->.*label="limit"/);
+    expect(out).toMatch(/->.*label="offset"/);
+    expect(out).toMatch(/->.*label="key"/);
   });
 
   describe("output structure (Rails parity)", () => {

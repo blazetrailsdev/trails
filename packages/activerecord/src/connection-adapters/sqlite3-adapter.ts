@@ -370,6 +370,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Rails-shaped hash-only constructor: a single config hash whose `database`
    * key names the file (or `:memory:`), merged with the adapter options.
    * Mirrors `SQLite3Adapter#initialize(config)`.
+   *
+   * @missingRailsCall merge — CONVERGEABLE: sqlite3_adapter.rb:128-132 builds
+   *   `@connection_parameters = @config.merge(database:, results_as_hash:,
+   *   default_transaction_mode:)` because the sqlite3 gem takes the whole config hash
+   *   as driver options. trails' constructor still carries the `(filename, options)`
+   *   form and holds no `@connection_parameters`, so there is nothing to merge into.
+   *   Retired by RFC 0094's construction convergence
+   *   (`retire-sqlite3-positional-constructor-overload`).
    */
   constructor(config: SQLite3Config);
   /**
@@ -1454,6 +1462,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows?.[0]?.encoding ?? "UTF-8";
   }
 
+  /**
+   * @missingRailsCall fetch — PERMANENT: sqlite3_adapter.rb:473 reads
+   *   `@config.fetch(:flags, 0).anybits?(::SQLite3::Constants::Open::SHAREDCACHE)`.
+   *   No JS SQLite driver exposes the `SQLITE_OPEN_*` open-flag bitmask, so there is
+   *   no `flags` config entry to fetch; the `cache=shared` URI query parameter is the
+   *   only way shared cache can be requested here.
+   */
   isSharedCache(): boolean {
     const qIdx = this._filename.indexOf("?");
     if (qIdx === -1) return false;
@@ -1532,6 +1547,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
+  /**
+   * @missingRailsCall include? — CONVERGEABLE: sqlite3_adapter.rb:36-41 rescues
+   *   `Errno::ENOENT` and re-raises `NoDatabaseError` only when
+   *   `error.message.include?("No such file or directory")`. trails' `newClient`
+   *   constructs an adapter rather than opening a file, so there is no open-time errno
+   *   to classify here and the missing-database mapping happens in `translateException`.
+   *   Moves back to open time with RFC 0094's construction convergence.
+   */
   static newClient(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     config: { database?: string; readonly?: boolean },
@@ -2738,7 +2761,15 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return def;
   }
 
-  /** @internal */
+  /**
+   * @missingRailsCall new_client — CONVERGEABLE: sqlite3_adapter.rb:807 is
+   *   `@raw_connection = self.class.new_client(@connection_parameters)`, handing the
+   *   sqlite3 gem the whole config hash. trails has no `@connection_parameters` hash
+   *   and `newClient` returns an adapter rather than a raw driver handle, so `connect()`
+   *   opens the driver directly from the expanded filename. Retired by RFC 0094's
+   *   construction convergence (`sqlite3-connection-parameters-never-built`).
+   * @internal
+   */
   private connect(): void {
     const openConfig = this.openConfig();
     try {
@@ -2943,6 +2974,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * for in-process drivers; for async-only drivers (no `openSync()`) returns a
    * Promise that awaits each PRAGMA — the base `attemptConfigureConnection()`
    * awaits it, so both the initial-open and reconnect paths apply pragmas.
+   *
+   * @missingRailsCall fetch — PERMANENT: sqlite3_adapter.rb:837 is
+   *   `@config.fetch(:pragmas, {}).stringify_keys`. A plain TS object has no `fetch`,
+   *   and Hash#fetch's stored-value-wins-over-default semantics have no JS call
+   *   analogue, so the pragmas option is read directly at Rails' site.
    * @internal
    */
   override configureConnection(): void | Promise<void> {

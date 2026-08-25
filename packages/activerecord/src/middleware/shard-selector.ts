@@ -32,6 +32,17 @@ export class ShardSelector {
     this.options = options;
   }
 
+  /**
+   * @missingRailsCall new — CONVERGEABLE: `ActionDispatch::Request.new(env)`
+   *   (`shard_selector.rb:41`) wraps the rack env before the resolver sees it.
+   *   `ActionDispatch::Request` lives in `@blazetrails/actionpack`, so `call()` is handed the
+   *   request object itself and constructs nothing. Ruby resolves the constant
+   *   when `call` runs, so activerecord takes no load-time dependency on
+   *   actionpack — `activerecord.gemspec` declares no actionpack dependency. An
+   *   ESM `import` is eager, so naming the constant here would make actionpack a
+   *   hard dependency of activerecord that Rails does not have. Convergeable once
+   *   the constant can be reached at call time (RFC 0106).
+   */
   async call(request: ShardRequest): Promise<unknown> {
     const shard = this.selectedShard(request);
     return this.setShard(shard, () => this.app(request));

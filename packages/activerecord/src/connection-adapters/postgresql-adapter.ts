@@ -128,6 +128,7 @@ import {
   affectedRows as pgAffectedRows,
   handleWarnings,
   isWarningIgnored as pgIsWarningIgnored,
+  lastInsertIdResult as pgLastInsertIdResult,
   performQuery as pgPerformQuery,
   returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
@@ -2314,9 +2315,7 @@ export class PostgreSQLAdapter
    * (postgresql/database_statements.rb:204-206) — the current id of a table's
    * sequence.
    */
-  private async lastInsertIdResult(sequenceName: string): Promise<Result> {
-    return this.internalExecQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
-  }
+  private lastInsertIdResult = pgLastInsertIdResult;
 
   /** Mirrors: PostgreSQL::DatabaseStatements#returning_column_values — the full
    *  first row of the RETURNING result (supports multi-column RETURNING). *
