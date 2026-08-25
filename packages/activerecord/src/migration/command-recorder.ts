@@ -136,6 +136,9 @@ export class CommandRecorder {
    * a single batched command (mirrors the Rails bulk alter path).
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#change_table
+   * (command_recorder.rb:141-152). The bulk path's recorded lambda reaches
+   * `bulkChangeTable` through the `methodMissingProxy`, as the Ruby lambda's
+   * `self` reaches it through `method_missing` (command_recorder.rb:142).
    */
   async changeTable(
     tableName: string,
@@ -161,9 +164,6 @@ export class CommandRecorder {
       recorder.reverting = this._reverting;
       await callback(delegate.updateTableDefinition(tableName, recorder));
       const commands = recorder.commands;
-      // `bulkChangeTable` is answered by the delegate through the
-      // `methodMissingProxy`, as the Ruby lambda's `self` answers it through
-      // `method_missing` (command_recorder.rb:142).
       this._commands.push([
         "changeTable",
         [tableName],
@@ -183,21 +183,15 @@ export class CommandRecorder {
    * Replay all recorded commands against the given migration.
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#replay
+   * (command_recorder.rb:148-152). TS has no block syntax: Ruby's `&block`
+   * passes nothing when the block is nil, so an absent block must not become a
+   * trailing `undefined` argument to a splat-taking method like
+   * `drop_table(*table_names)`.
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
     for (const [cmd, args, block] of this.commands) {
-      // TS has no block syntax: Ruby's `&block` passes nothing when the block
-      // is nil, so an absent block must not become a trailing `undefined`
-      // argument to a splat-taking method like `drop_table(*table_names)`.
       await migration[cmd](...args, ...(block === undefined ? [] : [block]));
     }
-  }
-
-  /** Returns the full inverse command list. */
-  inverse(): MigrationCommand[] {
-    return [...this._commands]
-      .reverse()
-      .map(([cmd, args, block]) => this.inverseOf(cmd, args, block));
   }
 
   // ---------------------------------------------------------------------------
@@ -230,13 +224,16 @@ export class CommandRecorder {
     return ["dropTable", a, block];
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * TS has no block syntax, so a recordable method's trailing callback rides
+   * inside `args` where Ruby carries it in the block seat (the `revert order`
+   * test's `create_table("bananas", &block)`); either position is Rails'
+   * `block` for the reversibility check (command_recorder.rb:214).
+   */
   invertDropTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
-    // TS has no block syntax, so a recordable method's trailing callback rides
-    // inside `args` where Ruby would carry it in the block seat (the
-    // `revert order` test's `create_table("bananas", &block)`); either position
-    // is Rails' `block`.
     let argsBlock: unknown;
     if (a.length > 0 && typeof a[a.length - 1] === "function") {
       argsBlock = a.pop();
