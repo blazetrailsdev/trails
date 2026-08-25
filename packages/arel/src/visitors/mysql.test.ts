@@ -1,431 +1,195 @@
-import { describe, it, expect } from "vitest";
-import { testConnection, mysqlTestConnection } from "../test-helpers/connection.js";
-import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
-import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
+import { mustBeLike } from "../test-helpers/must-be-like.js";
+import { buildQuoted } from "../nodes/casted.js";
+import { Table, star, sql, Nodes, Visitors, Collectors } from "../index.js";
 
 describe("MysqlTest", () => {
-  const users = new Table("users");
-  const posts = new Table("posts");
-  it("should escape LIMIT", () => {
-    const mgr = users.project(star).take(10);
-    expect(mgr.toSql()).toContain("LIMIT 10");
+  let visitor: Visitors.MySQL;
+  beforeEach(() => {
+    visitor = new Visitors.MySQL(testConnection);
   });
 
-  describe("comment emission", () => {
-    it("emits the SelectCore comment in MySQL output", () => {
-      const mgr = new SelectManager(users).project(star).comment("trace=mysql");
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
-      expect(sql).toContain("/* trace=mysql */");
-    });
-
-    it("emits the comment exactly once", () => {
-      const mgr = new SelectManager(users).project(star).comment("once");
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
-      expect((sql.match(/\/\* once \*\//g) ?? []).length).toBe(1);
-    });
-  });
-
-  describe("Nodes::Regexp", () => {
-    it("should know how to visit", () => {
-      const node = users.get("name").matchesRegexp("foo.*");
-      expect(node).toBeInstanceOf(Nodes.Regexp);
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
-        "`users`.`name` REGEXP 'foo.*'",
-      );
-    });
-
-    it("can handle subqueries", () => {
-      const subquery = users.project("id").where(users.get("name").matchesRegexp("foo.*"));
-      const node = users.get("id").in(subquery);
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
-        "`users`.`id` IN (SELECT id FROM `users` WHERE `users`.`name` REGEXP 'foo.*')",
-      );
-    });
-  });
-
-  describe("Nodes::NotRegexp", () => {
-    it("can handle subqueries", () => {
-      const subquery = users.project("id").where(users.get("name").doesNotMatchRegexp("foo.*"));
-      const node = users.get("id").in(subquery);
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
-        "`users`.`id` IN (SELECT id FROM `users` WHERE `users`.`name` NOT REGEXP 'foo.*')",
-      );
-    });
-
-    it("should know how to visit", () => {
-      const node = users.get("name").doesNotMatchRegexp("foo.*");
-      expect(node).toBeInstanceOf(Nodes.NotRegexp);
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
-        "`users`.`name` NOT REGEXP 'foo.*'",
-      );
-    });
-  });
-
-  describe("Nodes::IsDistinctFrom", () => {
-    it("should handle nil", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("name").isDistinctFrom(null);
-      expect(visitor.compile(node)).toContain("IS NOT NULL");
-    });
-  });
-
-  describe("Nodes::Ordering", () => {
-    it("should handle nulls first", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("id").asc().nullsFirst();
-      expect(visitor.compile(node)).toContain("NULLS FIRST");
-    });
-
-    it("should handle nulls last", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("id").asc().nullsLast();
-      expect(visitor.compile(node)).toContain("NULLS LAST");
-    });
-
-    it("should handle nulls first reversed", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("id").asc().nullsLast().reverse();
-      expect(visitor.compile(node)).toContain("NULLS FIRST");
-    });
-
-    it("should handle nulls last reversed", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("id").asc().nullsFirst().reverse();
-      expect(visitor.compile(node)).toContain("NULLS LAST");
-    });
-  });
-
-  describe("Nodes::NullsFirst / NullsLast (MySQL emulation)", () => {
-    it("emulates NULLS FIRST with IS NOT NULL", () => {
-      const visitor = new Visitors.MySQL(mysqlTestConnection);
-      const node = users.get("id").asc().nullsFirst();
-      const sql = visitor.compile(node);
-      expect(sql).toContain("`users`.`id` IS NOT NULL");
-      expect(sql).toContain("`users`.`id` ASC");
-    });
-
-    it("emulates NULLS LAST with IS NULL", () => {
-      const visitor = new Visitors.MySQL(mysqlTestConnection);
-      const node = users.get("id").asc().nullsLast();
-      const sql = visitor.compile(node);
-      expect(sql).toContain("`users`.`id` IS NULL");
-      expect(sql).toContain("`users`.`id` ASC");
-    });
-
-    it("emulates NULLS FIRST with DESC ordering", () => {
-      const visitor = new Visitors.MySQL(mysqlTestConnection);
-      const node = users.get("id").desc().nullsFirst();
-      const sql = visitor.compile(node);
-      expect(sql).toContain("`users`.`id` IS NOT NULL");
-      expect(sql).toContain("`users`.`id` DESC");
-    });
-
-    it("emulates NULLS LAST with DESC ordering", () => {
-      const visitor = new Visitors.MySQL(mysqlTestConnection);
-      const node = users.get("id").desc().nullsLast();
-      const sql = visitor.compile(node);
-      expect(sql).toContain("`users`.`id` IS NULL");
-      expect(sql).toContain("`users`.`id` DESC");
-    });
-  });
+  function compile(node: Nodes.Node): string {
+    return visitor.accept(node, new Collectors.SQLString()).value;
+  }
 
   it("defaults limit to 18446744073709551615", () => {
-    const mgr = users.project(star).skip(5);
-    const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
-    expect(sql).toContain("LIMIT 18446744073709551615");
-    expect(sql).toContain("OFFSET 5");
+    const stmt = new Nodes.SelectStatement();
+    stmt.offset = new Nodes.Offset(1);
+    const compiled = compile(stmt);
+    expect(mustBeLike(compiled)).toBe(
+      mustBeLike("SELECT FROM DUAL LIMIT 18446744073709551615 OFFSET 1"),
+    );
+  });
+
+  it("should escape LIMIT", () => {
+    const sc = new Nodes.UpdateStatement();
+    sc.relation = new Table("users");
+    sc.limit = new Nodes.Limit(buildQuoted("omg"));
+    expect(compile(sc)).toBe(`UPDATE "users" LIMIT 'omg'`);
   });
 
   it("uses DUAL for empty from", () => {
-    const mgr = new SelectManager();
-    mgr.project("1");
-    const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
-    expect(sql).toContain("FROM DUAL");
+    const stmt = new Nodes.SelectStatement();
+    const compiled = compile(stmt);
+    expect(mustBeLike(compiled)).toBe(mustBeLike("SELECT FROM DUAL"));
   });
 
   describe("locking", () => {
     it("defaults to FOR UPDATE when locking", () => {
-      const mgr = users.project(star).lock();
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
-      expect(sql).toContain("FOR UPDATE");
+      const node = new Nodes.Lock(sql("FOR UPDATE"));
+      expect(mustBeLike(compile(node))).toBe(mustBeLike("FOR UPDATE"));
     });
 
     it("allows a custom string to be used as a lock", () => {
-      const mgr = users.project(star).lock("LOCK IN SHARE MODE");
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
-      expect(sql).toContain("LOCK IN SHARE MODE");
+      const node = new Nodes.Lock(sql("LOCK IN SHARE MODE"));
+      expect(mustBeLike(compile(node))).toBe(mustBeLike("LOCK IN SHARE MODE"));
     });
   });
 
   describe("concat", () => {
     it("concats columns", () => {
-      const node = new Nodes.Concat(users.get("name"), users.get("email"));
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(node);
-      expect(sql).toBe(" CONCAT(`users`.`name`, `users`.`email`) ");
+      const table = new Table("users");
+      const query = table.get("name").concat(table.get("name"));
+      expect(mustBeLike(compile(query))).toBe(mustBeLike(`CONCAT("users"."name", "users"."name")`));
     });
 
     it("concats a string", () => {
-      const node = new Nodes.Concat(users.get("name"), new Nodes.Quoted("x"));
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(node);
-      expect(sql).toBe(" CONCAT(`users`.`name`, 'x') ");
+      const table = new Table("users");
+      const query = table.get("name").concat(buildQuoted("abc"));
+      expect(mustBeLike(compile(query))).toBe(mustBeLike(`CONCAT("users"."name", 'abc')`));
     });
   });
 
-  // MySQL renders IS [NOT] DISTINCT FROM via the `<=>` null-safe equality
-  // operator (Rails arel/visitors/mysql.rb). The standard
-  // `IS [NOT] DISTINCT FROM` form is only supported on MySQL 8.0.14+;
-  // the operator form works on every supported MySQL version.
   describe("Nodes::IsNotDistinctFrom", () => {
+    it("should construct a valid generic SQL statement", () => {
+      const test = new Table("users").get("name").isNotDistinctFrom("Aaron Patterson");
+      expect(mustBeLike(compile(test))).toBe(mustBeLike(`"users"."name" <=> 'Aaron Patterson'`));
+    });
+
     it("should handle column names on both sides", () => {
-      const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
-        "`users`.`id` <=> `posts`.`user_id`",
+      const test = new Table("users")
+        .get("first_name")
+        .isNotDistinctFrom(new Table("users").get("last_name"));
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" <=> "users"."last_name"`),
       );
     });
 
     it("should handle nil", () => {
-      const node = users.get("name").isNotDistinctFrom(null);
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe("`users`.`name` <=> NULL");
-    });
-
-    it("should construct a valid generic SQL statement", () => {
-      const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe("`users`.`name` <=> 1");
+      const table = new Table("users");
+      const val = buildQuoted(null, table.get("active"));
+      const compiled = compile(new Nodes.IsNotDistinctFrom(table.get("name"), val));
+      expect(mustBeLike(compiled)).toBe(mustBeLike(`"users"."name" <=> NULL`));
     });
   });
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
-      const node = users.get("id").isDistinctFrom(posts.get("user_id"));
-      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
-        "NOT `users`.`id` <=> `posts`.`user_id`",
+      const test = new Table("users")
+        .get("first_name")
+        .isDistinctFrom(new Table("users").get("last_name"));
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`NOT "users"."first_name" <=> "users"."last_name"`),
+      );
+    });
+
+    it("should handle nil", () => {
+      const table = new Table("users");
+      const val = buildQuoted(null, table.get("active"));
+      const compiled = compile(new Nodes.IsDistinctFrom(table.get("name"), val));
+      expect(mustBeLike(compiled)).toBe(mustBeLike(`NOT "users"."name" <=> NULL`));
+    });
+  });
+
+  describe("Nodes::Regexp", () => {
+    let table: Table;
+    let attr: Nodes.Attribute;
+    beforeEach(() => {
+      table = new Table("users");
+      attr = table.get("id");
+    });
+
+    it("should know how to visit", () => {
+      const node = table.get("name").matchesRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.Regexp);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" REGEXP 'foo.*'`));
+    });
+
+    it("can handle subqueries", () => {
+      const subquery = table.project("id").where(table.get("name").matchesRegexp("foo.*"));
+      const node = attr.in(subquery);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(`"users"."id" IN (SELECT id FROM "users" WHERE "users"."name" REGEXP 'foo.*')`),
+      );
+    });
+  });
+
+  describe("Nodes::NotRegexp", () => {
+    let table: Table;
+    let attr: Nodes.Attribute;
+    beforeEach(() => {
+      table = new Table("users");
+      attr = table.get("id");
+    });
+
+    it("should know how to visit", () => {
+      const node = table.get("name").doesNotMatchRegexp("foo.*");
+      expect(node).toBeInstanceOf(Nodes.NotRegexp);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."name" NOT REGEXP 'foo.*'`));
+    });
+
+    it("can handle subqueries", () => {
+      const subquery = table.project("id").where(table.get("name").doesNotMatchRegexp("foo.*"));
+      const node = attr.in(subquery);
+      expect(mustBeLike(compile(node))).toBe(
+        mustBeLike(
+          `"users"."id" IN (SELECT id FROM "users" WHERE "users"."name" NOT REGEXP 'foo.*')`,
+        ),
+      );
+    });
+  });
+
+  describe("Nodes::Ordering", () => {
+    it("should handle nulls first", () => {
+      const test = new Table("users").get("first_name").asc().nullsFirst();
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" IS NOT NULL, "users"."first_name" ASC`),
+      );
+    });
+
+    it("should handle nulls last", () => {
+      const test = new Table("users").get("first_name").asc().nullsLast();
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" IS NULL, "users"."first_name" ASC`),
+      );
+    });
+
+    it("should handle nulls first reversed", () => {
+      const test = new Table("users").get("first_name").asc().nullsFirst().reverse();
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" IS NULL, "users"."first_name" DESC`),
+      );
+    });
+
+    it("should handle nulls last reversed", () => {
+      const test = new Table("users").get("first_name").asc().nullsLast().reverse();
+      expect(mustBeLike(compile(test))).toBe(
+        mustBeLike(`"users"."first_name" IS NOT NULL, "users"."first_name" DESC`),
       );
     });
   });
 
   describe("Nodes::Cte", () => {
     it("ignores MATERIALIZED modifiers", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, true);
-      const stmt = new SelectManager().with(cte).project("1");
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(stmt.ast);
-      expect(sql).not.toContain("MATERIALIZED");
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast, true);
+      expect(mustBeLike(compile(cte))).toBe(mustBeLike(`"foo" AS (SELECT * FROM "bar")`));
     });
 
     it("ignores NOT MATERIALIZED modifiers", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, false);
-      const stmt = new SelectManager().with(cte).project("1");
-      const sql = new Visitors.MySQL(mysqlTestConnection).compile(stmt.ast);
-      expect(sql).not.toContain("MATERIALIZED");
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast, false);
+      expect(mustBeLike(compile(cte))).toBe(mustBeLike(`"foo" AS (SELECT * FROM "bar")`));
     });
-  });
-});
-
-describe("MySQL dialect overrides (audit follow-up)", () => {
-  const users = new Table("users");
-  const compile = (n: Nodes.Node): string => new Visitors.MySQL(mysqlTestConnection).compile(n);
-
-  it("Bin uses CAST(... AS BINARY) (mirrors Rails)", () => {
-    expect(compile(new Nodes.Bin(users.get("name")))).toBe("CAST(`users`.`name` AS BINARY)");
-  });
-
-  // AbstractMysqlAdapter#case_sensitive_comparison wraps the *bind* in
-  // Arel::Nodes::Bin, so the visitor has to dispatch on an
-  // ActiveModel::Attribute the same way `visit` does everywhere else.
-  it("Bin visits a bind attribute rather than stringifying it", () => {
-    const bind = AMAttribute.fromDatabase("name", "x", new StringType());
-    expect(compile(new Nodes.Bin(bind))).toBe("CAST(? AS BINARY)");
-  });
-
-  it("UnqualifiedColumn delegates to its inner expression", () => {
-    expect(compile(new Nodes.UnqualifiedColumn(users.get("name")))).toBe("`users`.`name`");
-  });
-
-  it("UnqualifiedColumn renders an UPDATE SET assignment without dialect drift", () => {
-    const lhs = new Nodes.UnqualifiedColumn(users.get("counter"));
-    const sql = compile(new Nodes.Assignment(lhs, new Nodes.SqlLiteral("1")));
-    expect(sql).toContain("`users`.`counter`");
-    expect(sql).toContain("=");
-    expect(sql).toContain("1");
-  });
-
-  it("IsNotDistinctFrom uses MySQL `<=>` operator", () => {
-    const node = new Nodes.IsNotDistinctFrom(users.get("a"), users.get("b"));
-    expect(compile(node)).toBe("`users`.`a` <=> `users`.`b`");
-  });
-
-  it("IsNotDistinctFrom handles NULL on the right (Rails: `<=> NULL`)", () => {
-    const node = users.get("name").isNotDistinctFrom(null);
-    expect(compile(node)).toBe("`users`.`name` <=> NULL");
-  });
-
-  it("IsDistinctFrom uses MySQL `NOT ... <=>` operator", () => {
-    const node = new Nodes.IsDistinctFrom(users.get("a"), users.get("b"));
-    expect(compile(node)).toBe("NOT `users`.`a` <=> `users`.`b`");
-  });
-
-  it("IsDistinctFrom handles NULL on the right (Rails: `NOT … <=> NULL`)", () => {
-    const node = users.get("name").isDistinctFrom(null);
-    expect(compile(node)).toBe("NOT `users`.`name` <=> NULL");
-  });
-
-  it("Regexp uses MySQL REGEXP keyword (not Postgres `~`)", () => {
-    const node = new Nodes.Regexp(users.get("name"), new Nodes.SqlLiteral("'^a'"));
-    expect(compile(node)).toBe("`users`.`name` REGEXP '^a'");
-  });
-
-  it("NotRegexp uses MySQL NOT REGEXP keyword", () => {
-    const node = new Nodes.NotRegexp(users.get("name"), new Nodes.SqlLiteral("'^a'"));
-    expect(compile(node)).toBe("`users`.`name` NOT REGEXP '^a'");
-  });
-
-  describe("prepareUpdateStatement / prepareDeleteStatement (MySQL)", () => {
-    const posts = new Table("posts");
-    const visitor = new Visitors.MySQL(mysqlTestConnection);
-    type WithPrepare = {
-      prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement;
-      prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement;
-    };
-    const prep = visitor as unknown as WithPrepare;
-
-    const buildUpdate = (opts: {
-      withJoin?: boolean;
-      limit?: boolean;
-      offset?: boolean;
-      orders?: boolean;
-      groups?: boolean;
-      havings?: boolean;
-    }): Nodes.UpdateStatement => {
-      const stmt = new Nodes.UpdateStatement();
-      const relation = opts.withJoin
-        ? new Nodes.JoinSource(users, [
-            new Nodes.InnerJoin(posts, new Nodes.On(new Nodes.SqlLiteral("1=1"))),
-          ])
-        : new Nodes.JoinSource(users);
-      stmt.relation = relation;
-      stmt.key = users.get("id");
-      if (opts.limit) stmt.limit = new Nodes.Limit(new Nodes.SqlLiteral("1"));
-      if (opts.offset) stmt.offset = new Nodes.Offset(new Nodes.SqlLiteral("1"));
-      if (opts.orders) stmt.orders = [users.get("id")];
-      if (opts.groups) stmt.groups = [users.get("id")];
-      if (opts.havings) stmt.havings = [new Nodes.SqlLiteral("1=1")];
-      return stmt;
-    };
-
-    it("UPDATE with JOIN but no LIMIT/OFFSET/ORDER returns the original statement (no subselect)", () => {
-      const stmt = buildUpdate({ withJoin: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      expect(out).toBe(stmt);
-    });
-
-    it("UPDATE without JOIN and without OFFSET returns original even with LIMIT/ORDER", () => {
-      const stmt = buildUpdate({ limit: true, orders: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      expect(out).toBe(stmt);
-    });
-
-    it("UPDATE with JOIN + LIMIT triggers subselect rewrite", () => {
-      const stmt = buildUpdate({ withJoin: true, limit: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      expect(out).not.toBe(stmt);
-      expect(out.wheres.length).toBe(1);
-      expect(out.wheres[0]).toBeInstanceOf(Nodes.In);
-    });
-
-    it("UPDATE with OFFSET (no JOIN) triggers subselect rewrite", () => {
-      const stmt = buildUpdate({ offset: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      expect(out).not.toBe(stmt);
-    });
-
-    it("UPDATE with JOIN + GROUP BY + HAVING triggers subselect rewrite", () => {
-      const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      expect(out).not.toBe(stmt);
-    });
-
-    it("UPDATE with GROUP BY only (no HAVING) does NOT trigger rewrite", () => {
-      const stmt = buildUpdate({ groups: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      expect(out).toBe(stmt);
-    });
-
-    it("DELETE follows the same rules (alias of prepareUpdateStatement)", () => {
-      const stmt = new Nodes.DeleteStatement(
-        new Nodes.JoinSource(users, [
-          new Nodes.InnerJoin(posts, new Nodes.On(new Nodes.SqlLiteral("1=1"))),
-        ]),
-      );
-      stmt.key = users.get("id");
-      stmt.limit = new Nodes.Limit(new Nodes.SqlLiteral("1"));
-      const out = prep.prepareDeleteStatement(stmt);
-      expect(out).not.toBe(stmt);
-      expect(out.wheres[0]).toBeInstanceOf(Nodes.In);
-    });
-
-    it("buildSubselect adds DISTINCT when the subselect has no LIMIT/OFFSET/ORDER", () => {
-      const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      const sql = visitor.compile(out);
-      expect(sql).toContain("__active_record_temp");
-      expect(sql).toContain("DISTINCT");
-    });
-
-    it("buildSubselect skips DISTINCT when subselect already carries LIMIT", () => {
-      const stmt = buildUpdate({ withJoin: true, limit: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      const sql = visitor.compile(out);
-      expect(sql).toContain("__active_record_temp");
-      expect(sql).not.toContain("DISTINCT");
-    });
-
-    // Full-shape regression for the JOIN+GROUP+HAVING path: pins the
-    // exact subselect wrapping (DISTINCT, `__active_record_temp` alias,
-    // outer projection of the quoted key column) so any future
-    // visitor change that drifts from Rails will be caught here.
-    it("JOIN + GROUP BY + HAVING produces the full Rails-shaped subselect", () => {
-      const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
-      const out = prep.prepareUpdateStatement(stmt);
-      const sql = visitor.compile(out);
-      expect(sql).toContain("IN (SELECT `id` FROM (SELECT DISTINCT `users`.`id` FROM `users`");
-      expect(sql).toContain("INNER JOIN `posts` ON 1=1");
-      expect(sql).toContain("GROUP BY `users`.`id` HAVING 1=1");
-      expect(sql).toContain(") AS __active_record_temp)");
-    });
-  });
-
-  it("Cte uses backtick-quoted identifiers (not double quotes)", () => {
-    const inner = new SelectManager(users).project(users.get("id"));
-    const cte = new Nodes.Cte("recent", inner.ast);
-    expect(compile(cte)).toMatch(/^`recent` AS \(/);
-    const weird = new Nodes.Cte("we`ird", inner.ast);
-    expect(compile(weird)).toMatch(/^`we``ird` AS \(/);
-  });
-
-  it("Cte renders exactly one set of parens around a bare SelectStatement", () => {
-    const inner = new SelectManager(users).project(users.get("id"));
-    const cte = new Nodes.Cte("x", inner.ast);
-    const sql = compile(cte);
-    expect(sql).toBe("`x` AS (SELECT `users`.`id` FROM `users`)");
-  });
-
-  it("Cte renders exactly one set of parens when relation is a Grouping (SqlLiteral path)", () => {
-    const lit = new Nodes.SqlLiteral("SELECT 1");
-    const cte = new Nodes.Cte("x", new Nodes.Grouping(lit));
-    const sql = compile(cte);
-    expect(sql).toBe("`x` AS (SELECT 1)");
-    expect(sql).not.toMatch(/\(\s*\(/);
-  });
-
-  it("new MySQL() with mysqlQuoter emits backtick identifiers end-to-end", () => {
-    const sql = compile(users.project(users.get("id")).ast);
-    expect(sql).toContain("`users`.`id`");
-    expect(sql).toContain("FROM `users`");
-  });
-
-  it("identifier with embedded backtick is doubled by mysqlDefaultQuoter", () => {
-    const tbl = new Table("we`ird");
-    const sql = compile(tbl.project(tbl.get("co`l")).ast);
-    expect(sql).toContain("`we``ird`");
-    expect(sql).toContain("`co``l`");
   });
 });

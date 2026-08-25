@@ -291,7 +291,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
     td.integer("price");
     td.checkConstraint("price > 0", { name: "price_positive" });
     const sql = await toSql(td);
-    expect(sql).toContain("CONSTRAINT `price_positive` CHECK (price > 0)");
+    expect(sql).toContain("CONSTRAINT price_positive CHECK (price > 0)");
   });
 
   it("appends MySQL COMMENT on table option", async () => {

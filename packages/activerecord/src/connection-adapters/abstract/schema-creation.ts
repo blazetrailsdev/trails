@@ -384,7 +384,7 @@ export class SchemaCreation {
   }
 
   protected visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
-    return `CONSTRAINT ${this.adapter.quoteColumnName(o.name)} CHECK (${o.expression})`;
+    return `CONSTRAINT ${o.name} CHECK (${o.expression})`;
   }
 
   async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
