@@ -1634,10 +1634,8 @@ export async function _createRecord(
   // arg overrides it (Persistence#_create_record(attribute_names)).
   const selfNames =
     attributeNames ??
-    // Rails' `self.attribute_names` is `@attributes.keys` — AttributeSet#keys,
-    // which selects the INITIALIZED names (attribute_set.rb:46-48). Reading the
-    // keys of `valuesForDatabase()` instead would include uninitialized
-    // attributes, which that reader emits as nil (attribute_set.rb:32-34).
+    // Rails' `self.attribute_names` is `@attributes.keys` — the INITIALIZED
+    // names (attribute_set.rb:46-48), not every key `valuesForDatabase` emits.
     (this._attributes.keys() as string[]).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
   // Rails AttributeMethods::Dirty#_create_record default arg:
   // attribute_names_for_partial_inserts (dirty.rb:207-217), which reads

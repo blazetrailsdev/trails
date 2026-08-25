@@ -323,12 +323,6 @@ describe("PersistenceTest (trails)", () => {
 describe("PersistenceTest (trails)", () => {
   fixtures(["posts"]);
 
-  // Rails' `becomes` merges the target class's default attributes UNDER this
-  // record's own (`@attributes.reverse_merge!(becoming.@attributes)`,
-  // persistence.rb:491). `Hash#reverse_merge!` keeps an entry whenever the KEY
-  // is present, and a partially-selected record's AttributeSet carries every
-  // column — the unselected ones as Uninitialized attributes — so the target's
-  // defaults do NOT fill them in and reading one still raises.
   it("becomes on a partially selected record keeps the missing attributes missing", async () => {
     const post = (await CanonicalPost.select("id").first())!;
     const special = post.becomes(SpecialPost);

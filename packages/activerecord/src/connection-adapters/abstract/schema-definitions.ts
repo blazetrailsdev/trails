@@ -1822,8 +1822,6 @@ export class Table {
       }
       return this._schema.foreignKeyExists(this.name, toTableOrOptions, options);
     }
-    // Ruby's `**options` collects the hash from either position, so an absent
-    // to_table with the options behind it keeps them.
     const opts = { ...toTableOrOptions, ...options };
     if (Object.keys(opts).length === 0) {
       return this._schema.foreignKeyExists(this.name);

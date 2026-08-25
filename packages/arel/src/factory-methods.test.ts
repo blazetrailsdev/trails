@@ -3,8 +3,6 @@ import { Table, Nodes } from "./index.js";
 import { FactoryMethods } from "./factory-methods.js";
 
 describe("TestFactoryMethods", () => {
-  // Rails defines a `Factory` class that `include Arel::FactoryMethods`
-  // (factory_methods_test.rb:8-14); the module object itself is the receiver here.
   const factory = FactoryMethods;
 
   it("create join", () => {
@@ -14,7 +12,7 @@ describe("TestFactoryMethods", () => {
   });
 
   it("create table alias", () => {
-    const tableAlias = factory.createTableAlias("one" as never, "two");
+    const tableAlias = factory.createTableAlias("one" as unknown as Nodes.Node, "two");
     expect(tableAlias).toBeInstanceOf(Nodes.TableAlias);
     expect(tableAlias.right).toBe("two");
   });
@@ -32,13 +30,13 @@ describe("TestFactoryMethods", () => {
   });
 
   it("grouping", () => {
-    const grouping = factory.grouping("one" as never);
+    const grouping = factory.grouping("one" as unknown as Nodes.Node);
     expect(grouping).toBeInstanceOf(Nodes.Grouping);
     expect(grouping.expr).toBe("one");
   });
 
   it("create on", () => {
-    const on = factory.createOn("one" as never);
+    const on = factory.createOn("one" as unknown as Nodes.Node);
     expect(on).toBeInstanceOf(Nodes.On);
     expect(on.expr).toBe("one");
   });

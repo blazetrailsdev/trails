@@ -138,15 +138,13 @@ describe("TableTest", () => {
     });
 
     it("should accept literal SQL", () => {
-      // Rails' Table.new takes any name object (table.rb:26-31); the trails
-      // constructor still types `name` as a string.
-      const rel = new Table(sql("generate_series(4, 2)") as never);
+      const rel = new Table(sql("generate_series(4, 2)") as unknown as string);
       expect(rel.name).toEqual(sql("generate_series(4, 2)"));
     });
 
     it("should accept Arel nodes", () => {
-      const node = new Nodes.NamedFunction("generate_series", [4, 2] as never);
-      const rel = new Table(node as never);
+      const node = new Nodes.NamedFunction("generate_series", [4, 2] as unknown as Nodes.Node[]);
+      const rel = new Table(node as unknown as string);
       expect(rel.name).toBe(node);
     });
   });
