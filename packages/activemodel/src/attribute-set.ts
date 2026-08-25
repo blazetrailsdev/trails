@@ -1,7 +1,29 @@
 import { Attribute, Uninitialized } from "./attribute.js";
+import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 
-const LAZY_ATTR = Symbol("lazyAttr");
+/**
+ * Ruby `Hash#transform_values` over the backing attribute map — the call every
+ * bulk reader in attribute_set.rb makes (`attributes.transform_values(&:type)`
+ * and friends). Not exported: Ruby gets it from Hash, so it is not part of
+ * AttributeSet's surface.
+ */
+function transformValues<T>(
+  attributes: Map<string, Attribute>,
+  block: (attr: Attribute) => T,
+): Map<string, T> {
+  const result = new Map<string, T>();
+  for (const [name, attr] of attributes) result.set(name, block(attr));
+  return result;
+}
+
+/**
+ * Ruby `Hash#each_key`, which `keys` and `accessed` iterate before `select`.
+ * Not exported, for the same reason as {@link transformValues}.
+ */
+function eachKey(attributes: Map<string, Attribute>): string[] {
+  return [...attributes.keys()];
+}
 
 /**
  * A set of Attribute instances keyed by name.
@@ -10,7 +32,6 @@ const LAZY_ATTR = Symbol("lazyAttr");
  */
 export class AttributeSet {
   protected _attributes: Map<string, Attribute>;
-  private _frozen = false;
 
   /**
    * Yield each underlying Attribute value.
@@ -57,19 +78,19 @@ export class AttributeSet {
     this._attributes = attributes;
   }
 
-  /**
-   * Get the Attribute instance for a name.
-   */
+  /** Mirrors: `def [](name)` (attribute_set.rb:16-18). */
   getAttribute(name: string): Attribute {
     return this._attributes.get(name) ?? this.defaultAttribute(name);
   }
 
-  castTypes(): Record<string, import("./type/value.js").Type> {
-    const result: Record<string, import("./type/value.js").Type> = {};
-    for (const [name, attr] of this.attributes()) {
-      result[name] = attr.type;
-    }
-    return result;
+  /** Mirrors: `def []=(name, value)` (attribute_set.rb:20-22). */
+  set(name: string, value: Attribute): void {
+    this.assertNotFrozen();
+    this._attributes.set(name, value);
+  }
+
+  castTypes(): Record<string, Type> {
+    return Object.fromEntries(transformValues(this.attributes(), (attr) => attr.type));
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {
@@ -107,11 +128,7 @@ export class AttributeSet {
   }
 
   keys(): string[] {
-    const result: string[] = [];
-    for (const [name, attr] of this.attributes()) {
-      if (attr.isInitialized()) result.push(name);
-    }
-    return result;
+    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).isInitialized());
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
@@ -146,13 +163,20 @@ export class AttributeSet {
       // `fromDatabase` is typed for the full `Type`, but only `deserialize` is
       // exercised for an unknown column — one localized cast here keeps the
       // public param structural and the call sites cast-free.
-      const colType = (type as import("./type/value.js").Type) ?? typeRegistry.lookup("value");
+      const colType = (type as Type) ?? typeRegistry.lookup("value");
       this._attributes.set(name, Attribute.fromDatabase(name, value, colType));
     }
   }
 
   writeFromUser(name: string, value: unknown): unknown {
-    this.assertNotFrozen();
+    // Mirrors attribute_set.rb:58 — `raise FrozenError, "can't modify frozen
+    // attributes" if frozen?`, ahead of the frozen-Hash raise every other
+    // writer gets from `attributes.freeze`.
+    if (Object.isFrozen(this)) {
+      const err = new Error("can't modify frozen attributes");
+      err.name = "FrozenError";
+      throw err;
+    }
     // Rails one-liner (attribute_set.rb:58-61):
     //   @attributes[name] = self[name].with_value_from_user(value)
     // An absent name resolves to the `Null` default attribute, whose
@@ -170,46 +194,36 @@ export class AttributeSet {
   }
 
   deepDup(): AttributeSet {
-    const newAttrs = new Map<string, Attribute>();
-    const cache = new Map<Attribute, Attribute>();
-
-    for (const [name, attr] of this.attributes()) {
-      newAttrs.set(name, this.cloneAttribute(attr, cache));
-    }
-
-    return new AttributeSet(newAttrs);
+    let cache: Map<Attribute, Attribute> | undefined;
+    const newAttributes = transformValues(this.attributes(), (attr) =>
+      this.cloneAttribute(attr, (cache ??= new Map())),
+    );
+    return new AttributeSet(newAttributes);
   }
 
   reset(key: string): void {
-    if (this.has(key)) {
+    if (this.isKey(key)) {
       this.writeFromDatabase(key, null);
     }
   }
 
   accessed(): string[] {
-    const result: string[] = [];
-    for (const [name, attr] of this.attributes()) {
-      if (attr.hasBeenRead()) result.push(name);
-    }
-    return result;
+    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).hasBeenRead());
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {
-    const newAttributes = new Map<string, Attribute>();
-    for (const [name, attr] of this.attributes()) {
-      newAttributes.set(name, fn(attr));
-    }
+    const newAttributes = transformValues(this.attributes(), fn);
     return new AttributeSet(newAttributes);
   }
 
   reverseMergeBang(target: AttributeSet): this {
     this.assertNotFrozen();
     const cache = new Map<Attribute, Attribute>();
-    target.forEach((attr, name) => {
+    for (const [name, attr] of target.attributes()) {
       if (!this.isKey(name)) {
         this._attributes.set(name, this.cloneAttribute(attr, cache));
       }
-    });
+    }
     return this;
   }
 
@@ -228,110 +242,28 @@ export class AttributeSet {
     return Attribute.null(name);
   }
 
-  /** Mirrors: attribute_set.rb:82-85 — `@attributes = @attributes.clone`. */
-  initializeClone(_other: AttributeSet): void {
-    this._attributes = new Map(this._attributes);
+  toHash(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const name of this.keys()) {
+      result[name] = this.getAttribute(name).value;
+    }
+    return result;
   }
 
   /**
-   * Force a database value to be cast through the supplied `type`, replacing any
-   * existing (schema-declared) attribute. Unlike {@link writeFromDatabase}, whose
-   * known-column path keeps the declared cast type, this always wins — mirroring
-   * how Rails' `LazyAttributeHash` resolves each name via
-   * `additional_types[name] || types[name]`, letting an explicit per-attribute
-   * `types` override supersede the schema type. Used only by the public
-   * `instantiate(attributes, types)` entry point; the result-set hydration path
-   * still ignores column types for known columns.
-   */
-  overrideFromDatabase(
-    name: string,
-    value: unknown,
-    type: { deserialize(value: unknown): unknown },
-  ): void {
-    this.assertNotFrozen();
-    this._attributes.set(
-      name,
-      Attribute.fromDatabase(name, value, type as import("./type/value.js").Type),
-    );
-  }
-
-  /**
-   * Rebind `name` to a `FromDatabase` attribute whose before-type-cast value is
-   * the already-cast `value` (not a re-serialized SQL string), preserving the
-   * existing type and skipping a deserialize round-trip.
-   *
-   * Mirrors Rails' `forgetting_assignment` for a freshly created record: the new
-   * `FromDatabase` carries `value_for_database`, which for the DateTime type is
-   * the cast Time itself. trails serializes to a DB string at value_for_database
-   * time, so the create path uses this to keep the create-time timestamp's
-   * before-type-cast a Time — matching Rails' observable in cache_version.
-   */
-  rebindFromDatabaseValue(name: string, value: unknown): void {
-    this.assertNotFrozen();
-    const existing = this._attributes.get(name);
-    const type = existing ? existing.type : typeRegistry.lookup("value");
-    this._attributes.set(name, Attribute.fromDatabase(name, value, type, value));
-  }
-
-  /**
-   * Freeze this set in place so subsequent mutations throw.
-   * Matches Ruby's `Hash#freeze` semantic used by `ActiveRecord::Core#freeze`.
+   * Mirrors: `def freeze; attributes.freeze; super; end` (attribute_set.rb:67-70).
+   * `Object.freeze(this)` is the `super` half, and is what `Object.isFrozen`
+   * (Ruby's `frozen?`) reads back; a JS `Map` ignores `Object.freeze`, so the
+   * frozen-Hash half is enforced by {@link assertNotFrozen} in every writer.
    */
   freeze(): this {
-    this._frozen = true;
+    Object.freeze(this);
     return this;
   }
 
-  /** Whether this set has been frozen via {@link freeze}. */
-  isFrozen(): boolean {
-    return this._frozen;
-  }
-
-  private assertNotFrozen(): void {
-    if (this._frozen) {
-      const err = new Error("can't modify frozen AttributeSet");
-      err.name = "FrozenError";
-      throw err;
-    }
-  }
-
-  /**
-   * Get the cast value of an attribute (backward-compatible with Map.get).
-   */
-  get(name: string): unknown {
-    const attr = this._attributes.get(name);
-    if (!attr) return undefined;
-    return attr.value;
-  }
-
-  set(name: string, attrOrValue: Attribute | unknown): void {
-    this.assertNotFrozen();
-    if (attrOrValue instanceof Attribute) {
-      this._attributes.set(name, attrOrValue);
-    } else {
-      const existing = this._attributes.get(name);
-      const type = existing ? existing.type : typeRegistry.lookup("value");
-      this._attributes.set(name, Attribute.withCastValue(name, attrOrValue, type));
-    }
-  }
-
-  /**
-   * Make AttributeSet iterable — yields [name, value] pairs for compatibility
-   * with code that iterates `for (const [k, v] of _attributes)`.
-   *
-   * @noRailsEquivalent PERMANENT (`vendor/rails/activemodel/lib/active_model/attribute_set.rb:10` —
-   *   `delegate :each_value, to: :attributes`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
-  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
-    for (const name of this.keys()) {
-      yield [name, this.fetchValue(name)];
-    }
-  }
-
-  has(name: string): boolean {
-    const attr = this._attributes.get(name);
-    return attr !== undefined && attr.isInitialized();
+  /** Mirrors: attribute_set.rb:82-85 — `@attributes = @attributes.clone`. */
+  initializeClone(_other: AttributeSet): void {
+    this._attributes = new Map(this._attributes);
   }
 
   /**
@@ -340,7 +272,7 @@ export class AttributeSet {
    *
    * Mirrors the effect of `AttributeSet::Builder#build_from_database` when a
    * SELECT projects only a subset of columns: unselected columns are absent
-   * from the materialized set, so `has`/`keys` no longer report them.
+   * from the materialized set, so `isKey`/`keys` no longer report them.
    *
    * `overrideTypes` threads the per-query `additional_types` (Rails' second
    * `build_from_database` arg): a narrowed column becomes
@@ -360,57 +292,30 @@ export class AttributeSet {
     const keep = names instanceof Set ? names : new Set(names);
     for (const [name, attr] of this._attributes) {
       if (keep.has(name)) continue;
-      const type = (overrideTypes?.[name] as import("./type/value.js").Type) ?? attr.type;
+      const type = (overrideTypes?.[name] as Type) ?? attr.type;
       this._attributes.set(name, Attribute.uninitialized(name, type));
     }
   }
 
-  toHash(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const name of this.keys()) {
-      result[name] = this.fetchValue(name);
+  /**
+   * The JS spelling of `attributes.freeze`: a `Map` is unaffected by
+   * `Object.freeze`, so each writer checks the frozen set explicitly and raises
+   * what Ruby's frozen Hash raises.
+   */
+  private assertNotFrozen(): void {
+    if (Object.isFrozen(this)) {
+      const err = new Error("can't modify frozen AttributeSet");
+      err.name = "FrozenError";
+      throw err;
     }
-    return result;
   }
 
   /**
-   * Capture current values for all initialized attributes.
-   * For already-read attributes, captures the cast value directly.
-   * For unread attributes, clones the Attribute so it can be lazily
-   * evaluated later without affecting the original.
+   * `Object#deep_dup` for one Attribute — `attributes.transform_values(&:deep_dup)`
+   * in `deep_dup` (attribute_set.rb:72-74). The cache keeps a shared
+   * `original_attribute` shared in the copy, as Ruby's object graph does.
    */
-  snapshotValues(): Map<string, unknown> {
-    const result = new Map<string, unknown>();
-    for (const [name, attr] of this._attributes) {
-      if (attr.isInitialized()) {
-        if (attr.hasBeenRead()) {
-          result.set(name, attr.value);
-        } else {
-          const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
-          result.set(name, { [LAZY_ATTR]: cloned });
-        }
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Resolve a snapshot value — handles both direct values and lazy Attribute clones.
-   */
-  static resolveSnapshotValue(value: unknown): unknown {
-    if (value && typeof value === "object" && LAZY_ATTR in value) {
-      const attr = (value as Record<symbol, unknown>)[LAZY_ATTR];
-      if (attr instanceof Attribute) return attr.value;
-    }
-    return value;
-  }
-
-  delete(name: string): boolean {
-    this.assertNotFrozen();
-    return this._attributes.delete(name);
-  }
-
-  protected cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
+  private cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
     const existing = cache.get(attr);
     if (existing) return existing;
 
@@ -432,28 +337,17 @@ export class AttributeSet {
     return cloned;
   }
 
-  forEach(fn: (attr: Attribute, name: string) => void): void {
-    for (const [name, attr] of this.attributes()) {
-      fn(attr, name);
-    }
-  }
-
-  entries(): IterableIterator<[string, unknown]> {
-    return this[Symbol.iterator]();
-  }
-
   /**
-   * Mirrors: `attributes[name] = attributes[name].forgetting_assignment`, the
-   * body of ActiveModel::AttributeMutationTracker#forget_change
-   * (attribute_mutation_tracker.rb:33-35).
+   * Make AttributeSet iterable — yields [name, value] pairs for compatibility
+   * with code that iterates `for (const [k, v] of _attributes)`.
    *
-   * @internal
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activemodel/lib/active_model/attribute_set.rb:10` —
+   *   `delegate :each_value, to: :attributes`).
+   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */
-  forgetAttributeAssignment(name: string): void {
-    this.assertNotFrozen();
-    const attr = this._attributes.get(name);
-    if (!attr) return;
-    const next = attr.forgettingAssignment();
-    if (next !== attr) this._attributes.set(name, next);
+  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
+    for (const name of this.keys()) {
+      yield [name, this.fetchValue(name)];
+    }
   }
 }

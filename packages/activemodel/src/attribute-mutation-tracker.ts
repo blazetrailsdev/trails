@@ -103,7 +103,7 @@ export class AttributeMutationTracker {
 
   forgetChange(attrName: string): void {
     this.forcedChanges.delete(attrName);
-    if (this.attributes.has(attrName)) {
+    if (this.attributes.isKey(attrName)) {
       const attr = this.attributes.getAttribute(attrName);
       this.attributes.set(attrName, attr.forgettingAssignment());
     }

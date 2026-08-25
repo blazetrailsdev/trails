@@ -43,9 +43,9 @@ export interface AttributeMethods {
 
 interface AttributeRecord {
   _attributes: {
-    has(name: string): boolean;
+    isKey(name: string): boolean;
     keys(): Iterable<string>;
-    get(name: string): unknown;
+    fetchValue(name: string): unknown;
     accessed(): string[];
   };
   readAttribute(name: string): unknown;
@@ -66,9 +66,8 @@ interface AttributeRecord {
  */
 interface InstanceMethodHost {
   _attributes?: {
-    has(name: string): boolean;
+    isKey(name: string): boolean;
     keys(): Iterable<string>;
-    get?(name: string): unknown;
     getAttribute?(name: string): { valueForDatabase?: unknown } | null;
     fetchValue?(name: string): unknown;
   };
@@ -92,7 +91,7 @@ export function hasAttribute(this: AttributeRecord, name: string): boolean {
     (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
       attrName
     ] ?? attrName;
-  return this._attributes.has(attrName);
+  return this._attributes.isKey(attrName);
 }
 
 /**
@@ -719,7 +718,7 @@ export function isAttributeMethod(
  * @internal
  */
 export function _hasAttribute(this: InstanceMethodHost, attrName: string): boolean {
-  return this._attributes?.has(attrName) ?? false;
+  return this._attributes?.isKey(attrName) ?? false;
 }
 
 // ---------------------------------------------------------------------------
@@ -727,7 +726,7 @@ export function _hasAttribute(this: InstanceMethodHost, attrName: string): boole
 // ---------------------------------------------------------------------------
 
 function attributeMethod(this: InstanceMethodHost, attrName: string): boolean {
-  return this._attributes != null && (this._attributes.has(attrName) ?? false);
+  return this._attributes != null && (this._attributes.isKey(attrName) ?? false);
 }
 
 /** @internal */
@@ -742,10 +741,10 @@ export function attributesWithValues(
     // Rails' `attribute_names.index_with { |name| @attributes[name] }` — the
     // map carries the `ActiveModel::Attribute` objects themselves, not their
     // values, so `_insert_record`/`_update_record` hand Arel a typed bind whose
-    // `value_for_database` the adapter's `type_casted_binds` reads. The `has`
+    // `value_for_database` the adapter's `type_casted_binds` reads. The `isKey`
     // guard keeps a name with no attribute out of the write entirely rather
     // than writing the uninitialized default's NULL.
-    if (attributes.has(name)) result[name] = attributes.getAttribute?.(name);
+    if (attributes.isKey(name)) result[name] = attributes.getAttribute?.(name);
   }
   return result;
 }

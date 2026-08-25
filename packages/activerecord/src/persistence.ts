@@ -689,7 +689,7 @@ interface SaveRecord {
   _destroyed: boolean;
   _readonly: boolean;
   _newRecord: boolean;
-  _attributes: { set(key: string, val: unknown): void };
+  _attributes: { writeCastValue(key: string, val: unknown): void };
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
   errors: { any: boolean };
@@ -786,7 +786,7 @@ export async function save<T extends SaveRecord>(
       if (this._newRecord && isStiSubclass(ctor)) {
         const col = getStiBase(ctor).inheritanceColumn;
         if (col && !this._readAttribute(col)) {
-          this._attributes.set(col, this.constructor.name);
+          this._attributes.writeCastValue(col, this.constructor.name);
         }
       }
 
@@ -937,8 +937,8 @@ export async function updateAttributeBang<T extends AttributeSingleSave>(
 interface UpdateColumnsRecord {
   isReadonly(): boolean;
   _attributes: {
-    get(name: string): unknown;
-    set(name: string, value: unknown): void;
+    fetchValue(name: string): unknown;
+    writeCastValue(name: string, value: unknown): void;
   };
   id: unknown;
   isPersisted(): boolean;
@@ -1064,7 +1064,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     }
     const attrType = known ? ctor.typeForAttribute(key) : undefined;
     const cast = attrType ? attrType.cast(value) : value;
-    this._attributes.set(key, cast);
+    this._attributes.writeCastValue(key, cast);
     // Bridge the in-memory cast value to its DB representation via the
     // faithful SerializeCastValue.serialize dispatcher — the same path
     // insertAll/upsertAll use (insert-all.ts valuesList). It only takes the

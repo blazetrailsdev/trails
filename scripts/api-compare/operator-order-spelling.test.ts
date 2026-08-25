@@ -9,19 +9,14 @@ import { OPERATORS } from "@blazetrails/parity/conventions";
 
 describe("operatorSpelling", () => {
   it("resolves `[]` to the class-specific spelling per fqn", () => {
-    // Same operator, different port: `get` vs the Map-compat invention's slot.
     expect(operatorSpelling("Arel::Table", "[]")).toEqual(["get"]);
     expect(operatorSpelling("ActiveModel::AttributeSet", "[]")).toEqual(["getAttribute"]);
     expect(operatorSpelling("ActiveModel::Errors", "[]")).toEqual(["get"]);
     expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]")).toEqual(["get"]);
   });
 
-  it("does NOT pull the AttributeSet `get` invention into the `[]` slot", () => {
-    expect(operatorSpelling("ActiveModel::AttributeSet", "[]")).not.toContain("get");
-  });
-
-  it("leaves the AttributeSet `[]=` Map-compat sibling unmapped", () => {
-    expect(operatorSpelling("ActiveModel::AttributeSet", "[]=")).toBeUndefined();
+  it("resolves the AttributeSet `[]=` port", () => {
+    expect(operatorSpelling("ActiveModel::AttributeSet", "[]=")).toEqual(["set"]);
     expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]=")).toEqual(["set"]);
   });
 

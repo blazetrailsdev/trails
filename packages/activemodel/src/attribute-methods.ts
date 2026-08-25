@@ -684,7 +684,7 @@ export function defineCall(
 // ---------------------------------------------------------------------------
 
 export type InstanceHost = {
-  _attributes?: { has(name: string): boolean };
+  _attributes?: { isKey(name: string): boolean };
   attributes: Record<string, unknown>;
   isRespondToWithoutAttributes(method: string): boolean;
   attributeMethodPatterns?: AttributeMethodPattern[];

@@ -54,11 +54,10 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // AttributeSet's `set` below). The class is declared at builder.rb:94 directly
   // under `module ActiveModel`, so its fqn is NOT nested under `AttributeSet`.
   "ActiveModel::LazyAttributeHash": { "[]": ["get"], "[]=": ["set"] },
-  // attribute_set.rb:16 `def [](name)` → attribute-set.ts `getAttribute` (NOT the
-  // Map-compat `get` invention in attribute-set.ts). `[]=` (attribute_set.rb:20)
-  // stays UNMAPPED: attribute-set.ts `set` accepts a bare value and wraps it in
-  // an `Attribute`, so it is the Map-compat sibling of `get`, not the `[]=` port.
-  "ActiveModel::AttributeSet": { "[]": ["getAttribute"] },
+  // attribute_set.rb:16 `def [](name)` → attribute-set.ts `getAttribute`, and
+  // :20 `def []=(name, value)` → `set`, which takes the `Attribute` Rails
+  // stores (RFC 0115 retired the bare-value Map-compat sibling it used to be).
+  "ActiveModel::AttributeSet": { "[]": ["getAttribute"], "[]=": ["set"] },
   // attribute.rb:115 `def ==(other)` → attribute.ts `equals`.
   "ActiveModel::Attribute": { "==": ["equals"] },
   // type/value.rb:121 `def ==(other)` → type/value.ts `equals`.

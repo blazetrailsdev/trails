@@ -182,7 +182,7 @@ describe("instantiate override types for absent keys (trails)", () => {
   interface AttrProbe {
     _attributes: {
       getAttribute(name: string): { isInitialized(): boolean; type: unknown };
-      has(name: string): boolean;
+      isKey(name: string): boolean;
       keys(): string[];
     };
   }
@@ -227,7 +227,7 @@ describe("instantiate override types for absent keys (trails)", () => {
     const topic = Topic.instantiate(attrs, {
       computed_col: new Typecast(),
     }) as unknown as AttrProbe;
-    expect(topic._attributes.has("computed_col")).toBe(false);
+    expect(topic._attributes.isKey("computed_col")).toBe(false);
     expect(topic._attributes.keys()).not.toContain("computed_col");
   });
 });
