@@ -8,7 +8,7 @@ import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
-import { Deadlocked, Rollback } from "../../errors.js";
+import { Deadlocked, Rollback, StatementInvalid } from "../../errors.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
 // Rails' `class Sample < ActiveRecord::Base` (nested_deadlock_test.rb:9-12) —
@@ -47,6 +47,19 @@ async function makeParentTransactionDirty(): Promise<void> {
 async function assertCurrentTransactionIsSavepointTransaction(): Promise<void> {
   const currentTransaction = (await Sample.leaseConnection()).currentTransaction();
   expect(currentTransaction).toBeInstanceOf(SavepointTransaction);
+}
+
+// nested_deadlock_test.rb:64-70 — the savepoint race surfaces as an opaque
+// StatementInvalid, so Rails flunks with a diagnosis rather than re-raising it.
+function flunkOnLostSavepoint(errors: unknown[]): void {
+  const lost = errors.find(
+    (e) =>
+      e instanceof StatementInvalid && /SAVEPOINT active_record_. does not exist/.test(String(e)),
+  );
+  if (lost === undefined) return;
+  expect.fail(
+    `ROLLBACK TO SAVEPOINT query issued for savepoint that no longer exists due to deadlock: ${String(lost)}`,
+  );
 }
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -108,6 +121,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       const outcomes = await Promise.allSettled([thread, main]);
       const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
+      flunkOnLostSavepoint(errors);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toBeInstanceOf(Deadlocked);
 
