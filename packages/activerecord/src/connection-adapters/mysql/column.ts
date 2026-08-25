@@ -6,17 +6,12 @@
 
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { TypeMetadata } from "./type-metadata.js";
 
 export class Column extends BaseColumn {
   unsigned: boolean;
   autoIncrement: boolean;
   virtual: boolean;
-  /** Raw MySQL `Extra` string (e.g. "VIRTUAL GENERATED", "STORED GENERATED",
-   *  "auto_increment"). Mirrors Rails' `MySQL::Column#extra` (delegated from
-   *  sql_type_metadata); the schema dumper reads it to distinguish stored from
-   *  virtual generated columns. */
-  extra: string;
 
   constructor(
     name: string,
@@ -27,6 +22,7 @@ export class Column extends BaseColumn {
       limit?: number | null;
       precision?: number | null;
       scale?: number | null;
+      extra?: string;
     } = {},
     null_: boolean = true,
     options: {
@@ -36,16 +32,18 @@ export class Column extends BaseColumn {
       unsigned?: boolean;
       autoIncrement?: boolean;
       virtual?: boolean;
-      extra?: string;
     } = {},
   ) {
-    const meta = new SqlTypeMetadata({
-      sqlType: sqlTypeMetadata.sqlType ?? undefined,
-      type: sqlTypeMetadata.type,
-      limit: sqlTypeMetadata.limit ?? null,
-      precision: sqlTypeMetadata.precision ?? null,
-      scale: sqlTypeMetadata.scale ?? null,
-    });
+    const meta = new TypeMetadata(
+      {
+        sqlType: sqlTypeMetadata.sqlType ?? undefined,
+        type: sqlTypeMetadata.type,
+        limit: sqlTypeMetadata.limit ?? null,
+        precision: sqlTypeMetadata.precision ?? null,
+        scale: sqlTypeMetadata.scale ?? null,
+      },
+      { extra: sqlTypeMetadata.extra },
+    );
     super(name, defaultValue, meta, null_, {
       collation: options.collation,
       comment: options.comment,
@@ -54,7 +52,16 @@ export class Column extends BaseColumn {
     this.unsigned = options.unsigned ?? false;
     this.autoIncrement = options.autoIncrement ?? false;
     this.virtual = options.virtual ?? false;
-    this.extra = options.extra ?? "";
+  }
+
+  /** Raw MySQL `Extra` string (e.g. "VIRTUAL GENERATED", "STORED GENERATED",
+   *  "auto_increment"); the schema dumper reads it to distinguish stored from
+   *  virtual generated columns.
+   *
+   *  Mirrors: `delegate :extra, to: :sql_type_metadata, allow_nil: true`
+   *  (mysql/column.rb:7). */
+  get extra(): string {
+    return this.sqlTypeMetadata instanceof TypeMetadata ? this.sqlTypeMetadata.extra : "";
   }
 
   /**
@@ -97,7 +104,6 @@ export class Column extends BaseColumn {
     this.unsigned = (coder["unsigned"] as boolean) ?? false;
     this.autoIncrement = (coder["auto_increment"] as boolean) ?? false;
     this.virtual = (coder["virtual"] as boolean) ?? false;
-    this.extra = (coder["extra"] as string) ?? "";
   }
 
   override encodeWith(coder: ColumnCoder): void {

@@ -50,6 +50,10 @@ export interface TagEntry {
   call: string;
   reason: string;
   rawLines: string[];
+  /** 1-based line in the declaring file this tag was written on, when
+   *  `parseJsdoc` was given an origin — so a consumer can report the tag at a
+   *  `file:line` the operator can open (RFC 0106). */
+  line?: number;
   /** Index in `parseJsdoc`'s `rest` this tag was lifted from, so `renderJsdoc`
    *  can put it back where it stood even when prose separates it from its
    *  same-family neighbours (RFC 0106). Absent on a newly minted entry. */
@@ -182,6 +186,7 @@ export function parseJsdoc(
         reason: (m[2] ?? "").trim(),
         rawLines: synthetic ? [] : [line],
         slot: rest.length,
+        line: origin ? origin.startLine + sourceIndex : undefined,
       };
       entries.push(open);
       tagLineOf.set(open, sourceIndex);

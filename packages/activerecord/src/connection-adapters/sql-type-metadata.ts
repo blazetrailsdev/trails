@@ -48,8 +48,12 @@ export class SqlTypeMetadata implements Deduplicable {
     );
   }
 
+  // Keyed off the serialized form, so a subclass' own state (PG's oid/fmod,
+  // MySQL's extra) is part of the key without an override — Rails gets the
+  // same from Deduplicable's `hash`/`eql?` reaching through `__getobj__`
+  // (postgresql/type_metadata.rb:24-31, mysql/type_metadata.rb:23-30).
   deduplicateKey(): string {
-    return JSON.stringify([this.sqlType, this.type, this.limit, this.precision, this.scale]);
+    return JSON.stringify(this.toJSON());
   }
 
   toJSON(): SqlTypeMetadataJSON {
@@ -62,7 +66,19 @@ export class SqlTypeMetadata implements Deduplicable {
     };
   }
 
+  /**
+   * Psych's restore step for the `sql_type_metadata` payload
+   * `Column#encodeWith` writes: allocate the class the document names, then
+   * fill it. Rails gets the class from YAML's `!ruby/object:` tag — an adapter
+   * `TypeMetadata` is a `DelegateClass(SqlTypeMetadata)` tagged with its own
+   * class, so `PostgreSQL::TypeMetadata` round-trips with its own ivars
+   * (postgresql/type_metadata.rb:7, mysql/type_metadata.rb:6). JSON carries no
+   * tag, so {@link TYPE_METADATA_CLASSES} dispatches on the `class` key, the
+   * same way `rehydrateColumn` (schema-cache.ts) dispatches the Column tag.
+   */
   static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
+    const klass = TYPE_METADATA_CLASSES[data.class ?? ""];
+    if (klass) return klass.fromJSON(data);
     return new SqlTypeMetadata({
       sqlType: data.sqlType,
       type: data.type,
@@ -87,9 +103,26 @@ export class SqlTypeMetadata implements Deduplicable {
 }
 
 export interface SqlTypeMetadataJSON {
+  /** JSON's stand-in for YAML's `!ruby/object:` tag. Absent on a base
+   *  `SqlTypeMetadata`, whose class is the fallback. */
+  class?: string;
   sqlType: string | null;
   type: string | undefined;
   limit: number | null;
   precision: number | null;
   scale: number | null;
 }
+
+/**
+ * The `SqlTypeMetadata` subclasses a dump can name, keyed by the `class` tag
+ * their `toJSON` writes. Each subclass module registers itself here, so this
+ * module takes no import on them and the `extends` edge stays acyclic.
+ *
+ * @noRailsEquivalent PERMANENT: YAML tags an object with its class and Psych
+ * looks it up; a JSON document carries no tag, so the tag is a key and its
+ * resolution a table. Mirrors `COLUMN_CLASSES` in schema-cache.ts.
+ */
+export const TYPE_METADATA_CLASSES: Record<
+  string,
+  { fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata }
+> = {};

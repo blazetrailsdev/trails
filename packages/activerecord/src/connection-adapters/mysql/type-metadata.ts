@@ -8,17 +8,30 @@
  * "VIRTUAL GENERATED", etc.
  */
 
-export class TypeMetadata {
-  readonly sqlType: string | null;
-  readonly type: string | undefined;
-  readonly limit: number | null;
-  readonly precision: number | null;
-  readonly scale: number | null;
+import {
+  SqlTypeMetadata,
+  TYPE_METADATA_CLASSES,
+  type SqlTypeMetadataJSON,
+} from "../sql-type-metadata.js";
+
+/** The `class`-tagged payload `toJSON` writes, so `extra` survives the
+ *  schema-cache round trip the way Ruby's YAML tag carries it. */
+export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
+  extra: string;
+}
+
+/**
+ * Rails' `DelegateClass(SqlTypeMetadata)` forwards every base reader to the
+ * wrapped metadata; TypeScript's equivalent of that forwarding is inheritance,
+ * so the wrapped object's state lives on `super` rather than in an
+ * `__getobj__`.
+ */
+export class TypeMetadata extends SqlTypeMetadata {
   readonly extra: string;
 
   constructor(
     typeMetadata: {
-      sqlType: string | null;
+      sqlType?: string | null;
       type?: string;
       limit?: number | null;
       precision?: number | null;
@@ -26,45 +39,25 @@ export class TypeMetadata {
     },
     options: { extra?: string } = {},
   ) {
-    this.sqlType = typeMetadata.sqlType;
-    // Rails' MySQL TypeMetadata delegates `type` to the wrapped SqlTypeMetadata
-    // (DelegateClass), which is nil for an unmapped sql_type — no sqlType
+    // Rails' MySQL TypeMetadata delegates `type` to the wrapped
+    // SqlTypeMetadata, which is nil for an unmapped sql_type — no sqlType
     // fallback. Keep it nil-faithful.
-    this.type = typeMetadata.type ?? undefined;
-    this.limit = typeMetadata.limit ?? null;
-    this.precision = typeMetadata.precision ?? null;
-    this.scale = typeMetadata.scale ?? null;
+    super(typeMetadata);
     this.extra = options.extra ?? "";
   }
 
-  equals(other: TypeMetadata): boolean {
-    return (
-      this.sqlType === other.sqlType &&
-      this.type === other.type &&
-      this.limit === other.limit &&
-      this.precision === other.precision &&
-      this.scale === other.scale &&
-      this.extra === other.extra
-    );
+  override equals(other: unknown): boolean {
+    return other instanceof TypeMetadata && super.equals(other) && this.extra === other.extra;
   }
 
-  hashKey(): string {
-    return JSON.stringify([
-      this.sqlType,
-      this.type,
-      this.limit,
-      this.precision,
-      this.scale,
-      this.extra,
-    ]);
-  }
-
-  deduplicate(): this {
-    return this.deduplicated();
-  }
-
-  /** @internal */
-  protected deduplicated(): this {
-    return this;
+  override toJSON(): TypeMetadataJSON {
+    return { ...super.toJSON(), class: "MySQL::TypeMetadata", extra: this.extra };
   }
 }
+
+TYPE_METADATA_CLASSES["MySQL::TypeMetadata"] = {
+  fromJSON(data: SqlTypeMetadataJSON): TypeMetadata {
+    const row = data as TypeMetadataJSON;
+    return new TypeMetadata(row, { extra: row.extra });
+  },
+};
