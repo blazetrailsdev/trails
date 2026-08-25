@@ -101,6 +101,28 @@ describe("_applyScopeAttributes — multiparameter path", () => {
       expect(e.readAttribute("role")).toBe("guest"); // explicit wins
     });
   });
+
+  it("explicit multiparameter attrs take precedence over a scope attr on the same column", async () => {
+    class Event extends Base {
+      static {
+        this._tableName = "events";
+        this.attribute("id", "integer");
+        this.attribute("role", "string");
+        this.attribute("starts_on", "date");
+      }
+    }
+    const rel = Event.where({ starts_on: "2020-01-01" });
+    await Event.scoping(rel, async () => {
+      // The scope names the same column the multiparameter trio assigns, so the
+      // explicit-key set has to carry `starts_on`, not `starts_on(1i)`.
+      const e = new Event({
+        "starts_on(1i)": "2024",
+        "starts_on(2i)": "6",
+        "starts_on(3i)": "15",
+      });
+      expect(String(e.readAttribute("starts_on"))).toContain("2024");
+    });
+  });
 });
 
 describe("_applyScopeAttributes — a scope that sets type wins over the STI default", () => {

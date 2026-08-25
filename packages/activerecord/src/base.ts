@@ -372,6 +372,7 @@ import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
 _registerSerializeFn(_serializeAttribute as any);
+import { extractMultiparameterCallstack } from "./multiparameter-attribute-assignment.js";
 
 /**
  * A single column of a primary key.
@@ -3022,7 +3023,16 @@ export class Base extends Model {
       inheritanceInitializeInternalsCallback.call(this as any);
       // Guard before allocating the Set — the no-scope case is the hot path.
       if (_shouldApplyScopeAttributes(ctor)) {
-        _applyScopeAttributes(ctor, this as any, new Set(Object.keys(attrs)));
+        // The explicit keys are the ATTRIBUTE names, so a `starts_on(1i)` trio
+        // has to collapse to `starts_on` before the scope default for that same
+        // attribute is tested against it — otherwise the scope wins over an
+        // explicit assignment, which Rails never lets it do.
+        const { multiparams, regular } = extractMultiparameterCallstack(attrs);
+        _applyScopeAttributes(
+          ctor,
+          this as any,
+          new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
+        );
       }
       // Assign store accessor keys after the clean baseline so they appear
       // as dirty on new records (mirrors Rails: new-record attrs are changed
