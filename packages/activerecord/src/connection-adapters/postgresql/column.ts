@@ -17,15 +17,7 @@ export class Column extends BaseColumn {
   constructor(
     name: string,
     defaultValue: unknown,
-    sqlTypeMetadata: {
-      sqlType?: string | null;
-      type?: string;
-      oid?: number;
-      fmod?: number;
-      limit?: number | null;
-      precision?: number | null;
-      scale?: number | null;
-    } = {},
+    sqlTypeMetadata: TypeMetadata | null = null,
     null_: boolean = true,
     options: {
       collation?: string | null;
@@ -36,17 +28,7 @@ export class Column extends BaseColumn {
       generated?: string | null;
     } = {},
   ) {
-    const meta = new TypeMetadata(
-      {
-        sqlType: sqlTypeMetadata.sqlType ?? undefined,
-        type: sqlTypeMetadata.type,
-        limit: sqlTypeMetadata.limit ?? undefined,
-        precision: sqlTypeMetadata.precision ?? undefined,
-        scale: sqlTypeMetadata.scale ?? undefined,
-      },
-      { oid: sqlTypeMetadata.oid, fmod: sqlTypeMetadata.fmod },
-    );
-    super(name, defaultValue, meta, null_, {
+    super(name, defaultValue, sqlTypeMetadata, null_, {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
       comment: options.comment,

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { Column } from "./mysql/column.js";
+import { TypeMetadata } from "./mysql/type-metadata.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -12,6 +13,7 @@ import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
+<<<<<<< HEAD
   return new Column(
     "id",
     null,
@@ -19,6 +21,17 @@ function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | 
     false,
     { defaultFunction: opts.defaultFunction ?? null },
   );
+||||||| parent of 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
+  return new Column("id", null, { sqlType: "bigint" }, false, {
+    autoIncrement: opts.autoIncrement ?? false,
+    defaultFunction: opts.defaultFunction ?? null,
+  });
+=======
+  return new Column("id", null, new TypeMetadata({ sqlType: "bigint" }), false, {
+    autoIncrement: opts.autoIncrement ?? false,
+    defaultFunction: opts.defaultFunction ?? null,
+  });
+>>>>>>> 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
 }
 
 describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
@@ -192,10 +205,16 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
   function makeTextColumn(
     opts: { collation?: string | null; defaultFunction?: string | null } = {},
   ) {
-    return new Column("body", "hello", { sqlType: "varchar(255)", type: "string" }, true, {
-      collation: opts.collation ?? "utf8mb4_unicode_ci",
-      defaultFunction: opts.defaultFunction ?? null,
-    });
+    return new Column(
+      "body",
+      "hello",
+      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      true,
+      {
+        collation: opts.collation ?? "utf8mb4_unicode_ci",
+        defaultFunction: opts.defaultFunction ?? null,
+      },
+    );
   }
 
   async function makeAdapter(column: Column) {
@@ -406,7 +425,7 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown 
   return new Column(
     "body",
     opts.default_ === undefined ? "hello" : opts.default_,
-    { sqlType: "varchar(255)", type: "string" },
+    new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
     opts.null_ ?? true,
   );
 }

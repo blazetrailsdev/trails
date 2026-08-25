@@ -1,5 +1,6 @@
 import { it, expect, beforeAll } from "vitest";
 import { SchemaCreation, type VisitorHostAdapter } from "./schema-creation.js";
+import { TypeMetadata } from "./type-metadata.js";
 import {
   AddColumnDefinition,
   ChangeColumnDefinition,
@@ -51,7 +52,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("visitAlterTable routes FK/check drops through the MySQL visitors", async () => {
-    const at = new AlterTable(new TableDefinition("posts", { adapter: mysqlConn() }));
+    const at = new AlterTable(new TableDefinition(mysqlConn(), "posts"));
     at.dropForeignKey("fk_name");
     at.checkConstraintDrops.push("chk");
     const sql = await (
@@ -70,7 +71,11 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition generates SET DEFAULT", async () => {
-    const col = new Column("status", null, { sqlType: "varchar(255)", type: "string" });
+    const col = new Column(
+      "status",
+      null,
+      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+    );
     const def = new ChangeColumnDefaultDefinition(col, "active");
     expect(await (sc as any).visitChangeColumnDefaultDefinition(def)).toMatch(
       /ALTER COLUMN `status` SET DEFAULT/,
@@ -78,7 +83,12 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition generates DROP DEFAULT when null:false + null value", async () => {
-    const col = new Column("status", null, { sqlType: "varchar(255)", type: "string" }, false);
+    const col = new Column(
+      "status",
+      null,
+      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      false,
+    );
     const def = new ChangeColumnDefaultDefinition(col, null);
     expect(await (sc as any).visitChangeColumnDefaultDefinition(def)).toBe(
       "ALTER COLUMN `status` DROP DEFAULT",
@@ -135,7 +145,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("addTableOptionsBang appends charset and collation", async () => {
-    const td = new TableDefinition("users", { adapter: mysqlConn(), adapterName: "mysql2" });
+    const td = new TableDefinition(mysqlConn(), "users");
     (td as any).charset = "utf8mb4";
     (td as any).collation = "utf8mb4_unicode_ci";
     const result = (sc as any).addTableOptionsBang("CREATE TABLE `users` ()", td);
@@ -213,7 +223,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
     new SchemaCreation(host).accept(td);
 
   it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", async () => {
-    const td = new MyTd("users", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "users");
     td.setPrimaryKey("users", true);
     td.string("name");
     expect(await toSql(td)).toBe(
@@ -222,7 +232,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
-    const td = new MyTd("t", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "t");
     td.column("full_name", "virtual" as any, { as: "CONCAT(a, b)" } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
@@ -232,15 +242,14 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("honors id: false (no primary key column)", async () => {
-    const td = new MyTd("logs", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "logs");
     td.setPrimaryKey("logs", false);
     td.string("body");
     expect(await toSql(td)).toBe("CREATE TABLE `logs` (`body` varchar(255))");
   });
 
   it("appends DEFAULT CHARSET and COLLATE from table options", async () => {
-    const td = new MyTd("posts", {
-      adapter: mysqlConn(),
+    const td = new MyTd(mysqlConn(), "posts", {
       charset: "utf8mb4",
       collation: "utf8mb4_unicode_ci",
     });
@@ -251,17 +260,13 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("emits IF NOT EXISTS and TEMPORARY modifiers", async () => {
-    const td = new MyTd("tmp", {
-      adapter: mysqlConn(),
-      temporary: true,
-      ifNotExists: true,
-    });
+    const td = new MyTd(mysqlConn(), "tmp", { temporary: true, ifNotExists: true });
     td.integer("n");
     expect(await toSql(td)).toBe("CREATE TEMPORARY TABLE IF NOT EXISTS `tmp` (`n` int)");
   });
 
   it("emits composite PRIMARY KEY clause", async () => {
-    const td = new MyTd("memberships", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "memberships");
     td.setPrimaryKey("memberships", true, ["user_id", "group_id"]);
     td.bigint("user_id", { null: false });
     td.bigint("group_id", { null: false });
@@ -270,7 +275,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("inlines indexes when supportsIndexesInCreate (MySQL)", async () => {
-    const td = new MyTd("users", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "users");
     td.string("email");
     td.index(["email"], { unique: true, name: "idx_users_email" });
     const sql = await toSql(td);
@@ -278,7 +283,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("inlines FOREIGN KEY constraints", async () => {
-    const td = new MyTd("posts", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "posts");
     td.bigint("author_id");
     td.foreignKey("authors", { column: "author_id" });
     const sql = await toSql(td);
@@ -287,7 +292,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("inlines CHECK constraints", async () => {
-    const td = new MyTd("products", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "products");
     td.integer("price");
     td.checkConstraint("price > 0", { name: "price_positive" });
     const sql = await toSql(td);
@@ -295,19 +300,19 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
   });
 
   it("appends MySQL COMMENT on table option", async () => {
-    const td = new MyTd("notes", { adapter: mysqlConn(), comment: "user-supplied" });
+    const td = new MyTd(mysqlConn(), "notes", { comment: "user-supplied" });
     td.string("body");
     expect(await toSql(td)).toContain("COMMENT 'user-supplied'");
   });
 
   it("emits AS clause after table options for CTAS", async () => {
-    const td = new MyTd("snapshot", { adapter: mysqlConn(), as: "SELECT 1" });
+    const td = new MyTd(mysqlConn(), "snapshot", { as: "SELECT 1" });
     expect(await toSql(td)).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
   });
 
   it("skips FK emission when host adapter has foreignKeys disabled", async () => {
     const host = mysqlConn({ supportsForeignKeys: () => true, _config: { foreignKeys: false } });
-    const td = new MyTd("posts", { adapter: host });
+    const td = new MyTd(host, "posts");
     td.bigint("author_id");
     td.foreignKey("authors", { column: "author_id" });
     expect(await toSql(td, host)).not.toContain("FOREIGN KEY");
@@ -315,7 +320,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
 
   it("skips CHECK emission when host adapter reports !supportsCheckConstraints", async () => {
     const host = mysqlConn({ supportsCheckConstraints: () => false });
-    const td = new MyTd("products", { adapter: host });
+    const td = new MyTd(host, "products");
     td.integer("price");
     td.checkConstraint("price > 0", { name: "p_pos" });
     expect(await toSql(td, host)).not.toContain("CHECK");
@@ -328,7 +333,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
   });
 
   it("defines one column per name, mirroring `names.each` in define_column_methods", () => {
-    const td = new MyTd("t", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "t");
     td.longtext("body", "summary");
     td.unsignedInteger("hits", "misses");
 
@@ -342,7 +347,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
   });
 
   it("applies the shared options and per-name sizing to every blob name", () => {
-    const td = new MyTd("t", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "t");
     td.blob("thumb", "preview", { limit: 300 });
 
     expect(td.columns.map((c) => c.name)).toEqual(["thumb", "preview"]);
@@ -350,7 +355,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
   });
 
   it("raises when called with no column name", () => {
-    const td = new MyTd("t", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "t");
 
     expect(() => (td.blob as () => unknown)()).toThrow("Missing column name(s) for blob");
     expect(() => (td.tinytext as () => unknown)()).toThrow("Missing column name(s) for tinytext");
@@ -374,7 +379,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation inline index options (trails)", ()
   });
 
   it("routes an inline index's length option through addIndexOptions", async () => {
-    const td = new MyTd("users", { adapter: mysqlConn() });
+    const td = new MyTd(mysqlConn(), "users");
     td.string("email");
     td.index(["email"], { length: 10 });
     expect(await sc.accept(td)).toContain("INDEX `index_users_on_email` (`email`(10))");

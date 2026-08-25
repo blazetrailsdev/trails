@@ -3704,7 +3704,7 @@ export class PostgreSQLAdapter
     const rest = options;
     const unlogged =
       (rest.unlogged as boolean | undefined) ?? PostgreSQLAdapter.createUnloggedTables;
-    return new PgTableDefinition(name, { ...rest, unlogged, adapter: this });
+    return new PgTableDefinition(this, name, { ...rest, unlogged });
   }
 
   /** @internal */
@@ -3768,28 +3768,14 @@ export class PostgreSQLAdapter
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
     }
 
-    return new Column(
-      columnName,
-      defaultValue,
-      {
-        sqlType: typeMetadata.sqlType,
-        type: typeMetadata.type,
-        oid: Number(oid),
-        fmod: Number(fmod),
-        limit: typeMetadata.limit,
-        precision: typeMetadata.precision,
-        scale: typeMetadata.scale,
-      },
-      !notnull,
-      {
-        defaultFunction: defaultFunction ?? undefined,
-        collation: collation ?? undefined,
-        comment: comment || null,
-        serial,
-        identity: identity || null,
-        generated: gen || null,
-      },
-    );
+    return new Column(columnName, defaultValue, typeMetadata, !notnull, {
+      defaultFunction: defaultFunction ?? undefined,
+      collation: collation ?? undefined,
+      comment: comment || null,
+      serial,
+      identity: identity || null,
+      generated: gen || null,
+    });
   }
 
   /** @internal */

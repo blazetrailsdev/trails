@@ -208,7 +208,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     name: string,
     options: Record<string, unknown> = {},
   ): SQLite3TableDefinition {
-    return new SQLite3TableDefinition(name, { ...options, adapter: this });
+    return new SQLite3TableDefinition(this, name, options);
   }
 
   /**

@@ -903,7 +903,7 @@ describe("buildCreateTableDefinition routing", () => {
   it("extracts _skipValidateOptions into the table definition options", () => {
     const createTableDefinition = vi.fn(
       (name: string, options: Record<string, unknown>) =>
-        new TableDefinition(name, { ...options, adapter: ss } as any),
+        new TableDefinition(ss, name, { ...options } as any),
     );
     const ss = makeStatements({ createTableDefinition });
 
@@ -921,7 +921,7 @@ describe("buildCreateTableDefinition routing", () => {
     const mysql = makeStatements({
       validPrimaryKeyOptions: () => ["limit", "unsigned", "autoIncrement"],
       createTableDefinition: (name: string, options: Record<string, unknown>) =>
-        new MysqlTableDefinition(name, { ...options, adapter: mysql } as any),
+        new MysqlTableDefinition(mysql as any, name, { ...options } as any),
     });
 
     expect(
@@ -967,7 +967,7 @@ describe("buildCreateTableDefinition routing", () => {
   it("builds the definition through the adapter's createTableDefinition", () => {
     const marker = Symbol("dialect-td");
     const createTableDefinition = vi.fn((name: string, options: Record<string, unknown>) => {
-      const td: any = new TableDefinition(name, { ...options, adapter: ss } as any);
+      const td: any = new TableDefinition(ss, name, { ...options } as any);
       td[marker] = true;
       return td;
     });

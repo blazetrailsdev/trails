@@ -116,7 +116,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema raises an error for invalid column type", () => {
-    const td = new TableDefinition("test_invalid", { adapter });
+    const td = new TableDefinition(adapter, "test_invalid");
     expect(() => (td as any).unknownType("col")).toThrow();
   });
 
@@ -148,7 +148,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("timestamps with and without zones", async () => {
-    const td = new TableDefinition("tz_test", { adapter });
+    const td = new TableDefinition(adapter, "tz_test");
     td.timestamps();
     const colNames = td.columns.map((c) => c.name);
     expect(colNames).toContain("created_at");
@@ -158,14 +158,14 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("timestamps with implicit default on create table", async () => {
-    const td = new TableDefinition("ts_default", { adapter });
+    const td = new TableDefinition(adapter, "ts_default");
     td.timestamps();
     const createdAt = td.columns.find((c) => c.name === "created_at");
     expect(createdAt!.options.null).toBe(false);
   });
 
   it("timestamps with custom options on create table", async () => {
-    const td = new TableDefinition("ts_custom", { adapter });
+    const td = new TableDefinition(adapter, "ts_custom");
     td.timestamps({ null: true, precision: 6 });
     const createdAt = td.columns.find((c) => c.name === "created_at");
     const updatedAt = td.columns.find((c) => c.name === "updated_at");

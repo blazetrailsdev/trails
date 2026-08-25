@@ -13,10 +13,11 @@ import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
   constructor(
-    tableName: string,
-    options: { id?: boolean | "uuid"; adapter: TableDefinitionConn; [key: string]: unknown },
+    conn: TableDefinitionConn,
+    name: string,
+    options: { id?: boolean | "uuid"; [key: string]: unknown } = {},
   ) {
-    super(tableName, { ...options, adapterName: "sqlite" });
+    super(conn, name, options);
   }
 
   override references(name: string, options: Record<string, unknown> = {}): this {

@@ -71,7 +71,8 @@ export class TableDefinition extends AbstractTableDefinition {
   readonly collation?: string;
 
   constructor(
-    tableName: string,
+    conn: VisitorHostAdapter,
+    name: string,
     options: {
       id?: boolean | PrimaryKeyType | IdHashOptions;
       charset?: string | null;
@@ -82,16 +83,10 @@ export class TableDefinition extends AbstractTableDefinition {
       as?: string;
       options?: string;
       comment?: string;
-      adapter: VisitorHostAdapter;
-      adapterName?: "sqlite" | "postgres" | "mysql2";
-    },
+    } = {},
   ) {
-    const { adapter, adapterName: _ignoredAdapterName, charset, collation, ...rest } = options;
-    super(tableName, {
-      ...rest,
-      adapterName: "mysql2",
-      adapter,
-    });
+    const { charset, collation, ...rest } = options;
+    super(conn, name, rest);
     this.charset = charset ?? undefined;
     this.collation = collation ?? undefined;
   }

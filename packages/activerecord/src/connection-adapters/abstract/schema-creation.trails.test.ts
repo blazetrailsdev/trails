@@ -70,10 +70,7 @@ describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
   }
 
   it("emits index_in_create for each index when supports_indexes_in_create? is true", async () => {
-    const td = new TableDefinition("users", {
-      adapter: conn,
-      adapterName: "sqlite",
-    });
+    const td = new TableDefinition(conn, "users");
     td.string("email");
     td.index("email");
 
@@ -82,10 +79,7 @@ describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
   });
 
   it("emits no inline index when supports_indexes_in_create? is false", async () => {
-    const td = new TableDefinition("users", {
-      adapter: conn,
-      adapterName: "sqlite",
-    });
+    const td = new TableDefinition(conn, "users");
     td.string("email");
     td.index("email");
 

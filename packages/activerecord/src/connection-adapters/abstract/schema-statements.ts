@@ -2007,11 +2007,7 @@ export class SchemaStatements {
 
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): TableDefinition {
-    return new TableDefinition(name, {
-      ...options,
-      adapterName: this.adapterName as any,
-      adapter: this,
-    });
+    return new TableDefinition(this, name, options);
   }
 
   /**

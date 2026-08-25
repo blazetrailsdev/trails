@@ -8,7 +8,13 @@ describe("MysqlColumn", () => {
     const original = new MysqlColumn(
       "id",
       null,
+<<<<<<< HEAD
       { sqlType: "bigint(20) unsigned", type: "integer", limit: 8, extra: "auto_increment" },
+||||||| parent of 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
+      { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
+=======
+      new TypeMetadata({ sqlType: "bigint(20) unsigned", type: "integer", limit: 8 }),
+>>>>>>> 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
       false,
     );
     const coder: Record<string, unknown> = {};
@@ -41,11 +47,11 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
   });
 
   it("delegates the Column reader to the metadata object", () => {
-    const col = new MysqlColumn("id", null, {
-      sqlType: "bigint(20)",
-      type: "integer",
-      extra: "auto_increment",
-    });
+    const col = new MysqlColumn(
+      "id",
+      null,
+      new TypeMetadata({ sqlType: "bigint(20)", type: "integer" }, { extra: "auto_increment" }),
+    );
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.extra).toBe("auto_increment");
 

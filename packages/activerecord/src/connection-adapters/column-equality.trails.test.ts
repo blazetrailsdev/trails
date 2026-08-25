@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Column as PostgreSQLColumn } from "./postgresql/column.js";
+import { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import { Column as SQLite3Column } from "./sqlite3/column.js";
 
 function meta(overrides: NonNullable<ConstructorParameters<typeof SqlTypeMetadata>[0]> = {}) {
@@ -54,7 +55,12 @@ describe("ColumnEqualityTrails", () => {
   });
 
   it("narrows the guard to the adapter class in PostgreSQL::Column", () => {
-    const pg = new PostgreSQLColumn("id", null, { sqlType: "integer", type: "integer" }, false);
+    const pg = new PostgreSQLColumn(
+      "id",
+      null,
+      new PgTypeMetadata({ sqlType: "integer", type: "integer" }),
+      false,
+    );
     const metadata = new SqlTypeMetadata({ sqlType: "integer", type: "integer" });
     const base = new Column("id", null, metadata, false);
     expect(pg.equals(base)).toBe(false);
@@ -62,7 +68,7 @@ describe("ColumnEqualityTrails", () => {
   });
 
   it("compares the PostgreSQL identity and serial flags", () => {
-    const opts = { sqlType: "integer", type: "integer" };
+    const opts = new PgTypeMetadata({ sqlType: "integer", type: "integer" });
     const plain = new PostgreSQLColumn("id", null, opts, false);
     expect(plain.equals(new PostgreSQLColumn("id", null, opts, false))).toBe(true);
     expect(plain.equals(new PostgreSQLColumn("id", null, opts, false, { serial: true }))).toBe(
@@ -85,7 +91,7 @@ describe("ColumnEqualityTrails", () => {
 
   it("does not equal a sibling adapter's column", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const pg = new PostgreSQLColumn("id", null, opts, false);
+    const pg = new PostgreSQLColumn("id", null, new PgTypeMetadata(opts), false);
     const sqlite = new SQLite3Column("id", null, opts, false);
     expect(pg.equals(sqlite)).toBe(false);
     expect(sqlite.equals(pg)).toBe(false);

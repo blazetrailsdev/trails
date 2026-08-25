@@ -225,7 +225,8 @@ export class TableDefinition extends AbstractTableDefinition {
   readonly unlogged: boolean;
 
   constructor(
-    tableName: string,
+    conn: TableDefinitionConn,
+    name: string,
     options: {
       id?: boolean | "uuid";
       unlogged?: boolean;
@@ -234,10 +235,9 @@ export class TableDefinition extends AbstractTableDefinition {
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
-      adapter: TableDefinitionConn;
-    },
+    } = {},
   ) {
-    super(tableName, { ...options, adapterName: "postgres" });
+    super(conn, name, options);
     this.unlogged = options.unlogged ?? false;
   }
 

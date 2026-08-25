@@ -309,9 +309,7 @@ export class SchemaCreation {
     if (o.algorithm) parts.push(o.algorithm);
     if (o.ifNotExists) parts.push("IF NOT EXISTS");
     if (index.type) parts.push(index.type.toUpperCase());
-    parts.push(
-      `${this.adapter.quoteColumnName(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
-    );
+    parts.push(this.quotedIndexNameAndTable(index));
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${await this.quotedColumns(index)})`);
     if ((await this.supportsIndexInclude()) && index.include && index.include.length > 0) {
@@ -321,6 +319,24 @@ export class SchemaCreation {
       parts.push("NULLS NOT DISTINCT");
     if (this.supportsPartialIndex() && index.where) parts.push(`WHERE ${index.where}`);
     return parts.join(" ");
+  }
+
+  /**
+   * The `<index name> ON <table>` fragment of `visit_CreateIndexDefinition`
+   * (abstract/schema_creation.rb:120), inlined there in Rails.
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT: SQLite spells an ATTACHed schema on the INDEX
+   *   name rather than on the table — `CREATE INDEX "aux"."by_name" ON
+   *   "widgets" (...)`, where qualifying the table is a syntax error. Rails has
+   *   no ATTACHed-schema notion in this adapter, so upstream never grew the
+   *   seam; trails does (`SQLite3Adapter#_splitTableName`, reached through
+   *   `alter_table` / `copy_table` with an `aux.posts` name). Keeping it a
+   *   one-line seam rather than a forked copy of the whole body means the arm
+   *   order and every capability gate live in one place.
+   */
+  protected quotedIndexNameAndTable(index: IndexDefinition): string {
+    return `${this.adapter.quoteColumnName(index.name)} ON ${this.adapter.quoteTableName(index.table)}`;
   }
 
   /**

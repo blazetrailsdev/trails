@@ -255,10 +255,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     name: string,
     options: Record<string, unknown> = {},
   ): MysqlTableDefinition {
-    return new MysqlTableDefinition(name, {
-      ...options,
-      adapter: this as unknown as VisitorHostAdapter,
-    });
+    return new MysqlTableDefinition(this as unknown as VisitorHostAdapter, name, options);
   }
 
   /**
