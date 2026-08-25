@@ -92,7 +92,7 @@ export function isRelationInstanceMethod(name: string): boolean {
 export function scope<T extends typeof Base>(
   this: T,
   name: string,
-  fn: (rel: Relation<InstanceType<T>>, ...args: any[]) => Relation<any>,
+  fn: (this: Relation<InstanceType<T>>, ...args: any[]) => Relation<any>,
   extension?: Record<string, (...args: any[]) => any>,
 ): void {
   const modelClass = this as any;

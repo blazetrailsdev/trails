@@ -188,41 +188,59 @@ export class Post extends Base {
     this.aliasAttribute("text", "body");
     this.aliasAttribute("comments_count", "legacy_comments_count");
 
-    this.scope("containingTheLetterA", (q: any) => q.where("body LIKE '%a%'"));
-    this.scope("titledWithAnApostrophe", (q: any) => q.where("title LIKE '%''%'"));
-    this.scope("rankedByComments", (q: any) =>
-      q.order(q.model.arelTable.get("comments_count").desc()),
-    );
-    this.scope("orderedByPostId", (q: any) => q.order("posts.post_id ASC"));
-    this.scope("limitBy", (q: any, l: number) => q.limit(l));
-    this.scope("locked", (q: any) => q.lock());
-    this.scope("mostCommented", (q: any, commentsCount: number) =>
-      q.joins(":comments").group("posts.id").having("count(comments.id) >= ?", commentsCount),
-    );
+    this.scope("containingTheLetterA", function (this: any) {
+      return this.where("body LIKE '%a%'");
+    });
+    this.scope("titledWithAnApostrophe", function (this: any) {
+      return this.where("title LIKE '%''%'");
+    });
+    this.scope("rankedByComments", function (this: any) {
+      return this.order(this.model.arelTable.get("comments_count").desc());
+    });
+    this.scope("orderedByPostId", function (this: any) {
+      return this.order("posts.post_id ASC");
+    });
+    this.scope("limitBy", function (this: any, l: number) {
+      return this.limit(l);
+    });
+    this.scope("locked", function (this: any) {
+      return this.lock();
+    });
+    this.scope("mostCommented", function (this: any, commentsCount: number) {
+      return this.joins(":comments")
+        .group("posts.id")
+        .having("count(comments.id) >= ?", commentsCount);
+    });
 
-    this.scope("noComments", (q: any) =>
-      q.leftJoins(":comments").where({ comments: { id: null } }),
-    );
-    this.scope("withSpecialComments", (q: any) =>
-      q.joins(":comments").where({ comments: { type: "SpecialComment" } }),
-    );
-    this.scope("withVerySpecialComments", (q: any) =>
-      q.joins(":comments").where({ comments: { type: "VerySpecialComment" } }),
-    );
-    this.scope("withPost", (q: any, postId: number) =>
-      q.joins(":comments").where({ comments: { post_id: postId } }),
-    );
-    this.scope("withComments", (q: any) => q.preload(":comments"));
-    this.scope("withTags", (q: any) => q.preload(":taggings"));
-    this.scope("withTagsCte", (q: any) =>
-      q.with({ posts_with_tags: q.model.where("tags_count > 0") }).from("posts_with_tags AS posts"),
-    );
-    this.scope("taggedWith", (q: any, id: number) =>
-      q.joins(":taggings").where({ taggings: { tag_id: id } }),
-    );
-    this.scope("taggedWithComment", (q: any, comment: string) =>
-      q.joins(":taggings").where({ taggings: { comment } }),
-    );
+    this.scope("noComments", function (this: any) {
+      return this.leftJoins(":comments").where({ comments: { id: null } });
+    });
+    this.scope("withSpecialComments", function (this: any) {
+      return this.joins(":comments").where({ comments: { type: "SpecialComment" } });
+    });
+    this.scope("withVerySpecialComments", function (this: any) {
+      return this.joins(":comments").where({ comments: { type: "VerySpecialComment" } });
+    });
+    this.scope("withPost", function (this: any, postId: number) {
+      return this.joins(":comments").where({ comments: { post_id: postId } });
+    });
+    this.scope("withComments", function (this: any) {
+      return this.preload(":comments");
+    });
+    this.scope("withTags", function (this: any) {
+      return this.preload(":taggings");
+    });
+    this.scope("withTagsCte", function (this: any) {
+      return this.with({ posts_with_tags: this.model.where("tags_count > 0") }).from(
+        "posts_with_tags AS posts",
+      );
+    });
+    this.scope("taggedWith", function (this: any, id: number) {
+      return this.joins(":taggings").where({ taggings: { tag_id: id } });
+    });
+    this.scope("taggedWithComment", function (this: any, comment: string) {
+      return this.joins(":taggings").where({ taggings: { comment } });
+    });
     // Rails: `-> { containing_the_letter_a.or(titled_with_an_apostrophe) }` —
     // each bare scope call resolves against the lambda's `self` (the current
     // relation), so both `or` branches inherit `q`'s accumulated scope. trails
@@ -234,9 +252,9 @@ export class Post extends Base {
     // to (`q.where(A)`) — which keeps the per-branch scoping `q.where(A).or(
     // q.where(B))` without evaluating the scopes from `Post.all()` (avoids
     // re-applying any future default scope).
-    this.scope("typographicallyInteresting", (q: any) =>
-      q.where("body LIKE '%a%'").or(q.where("title LIKE '%''%'")),
-    );
+    this.scope("typographicallyInteresting", function (this: any) {
+      return this.where("body LIKE '%a%'").or(this.where("title LIKE '%''%'"));
+    });
 
     this.belongsTo("author");
     this.belongsTo("readonlyAuthor", (q: any) => q.readonly(), {
@@ -825,8 +843,12 @@ export class SpecialPostWithDefaultScope extends Base {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
     this.defaultScope((q: any) => q.where({ id: [1, 5, 6] }));
-    this.scope("unscopedAll", (q: any) => q.model.unscoped(() => q.model.all()));
-    this.scope("authorless", (q: any) => q.model.unscoped(() => q.model.where({ author_id: 0 })));
+    this.scope("unscopedAll", function (this: any) {
+      return this.model.unscoped(() => this.model.all());
+    });
+    this.scope("authorless", function (this: any) {
+      return this.model.unscoped(() => this.model.where({ author_id: 0 }));
+    });
   }
 }
 

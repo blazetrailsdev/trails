@@ -31,7 +31,9 @@ class Post extends Base {
     this.attribute("title", "string");
     this.hasMany("comments");
     this.belongsTo("author");
-    this.scope("published", (rel) => rel.where({ published: true }));
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
   }
 }
 ```
@@ -117,7 +119,9 @@ class Post extends Base {
     this.attribute("title", "string");
     this.hasMany("comments");
     this.belongsTo("author");
-    this.scope("published", (rel) => rel.where({ published: true }));
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
   }
 }
 ```
@@ -133,7 +137,9 @@ class Post extends Base {
     this.attribute("title", "string");
     this.hasMany("comments");
     this.belongsTo("author");
-    this.scope("published", (rel) => rel.where({ published: true }));
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
   }
 }
 ```

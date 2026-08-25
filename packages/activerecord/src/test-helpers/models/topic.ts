@@ -51,33 +51,66 @@ export class Topic extends Base {
   declare written_on: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
-    this.scope("base", (q: any) => q.all());
-    this.scope("writtenBefore", (q: any, time: any) =>
-      time ? q.where("written_on < ?", time) : q,
-    );
-    this.scope("approved", (q: any) => q.where({ approved: true }));
-    this.scope("rejected", (q: any) => q.where({ approved: false }));
-    this.scope("children", (q: any) => q.where().not({ parent_id: null }));
-    this.scope("hasChildren", (q: any) => q.where({ id: q.model.children().select("parent_id") }));
-    this.scope("byLifo", (q: any) => q.where({ author_name: "lifo" }));
-    this.scope("replied", (q: any) => q.where("replies_count > 0"));
+    this.scope("base", function (this: any) {
+      return this.all();
+    });
+    this.scope("writtenBefore", function (this: any, time: any) {
+      return time ? this.where("written_on < ?", time) : this;
+    });
+    this.scope("approved", function (this: any) {
+      return this.where({ approved: true });
+    });
+    this.scope("rejected", function (this: any) {
+      return this.where({ approved: false });
+    });
+    this.scope("children", function (this: any) {
+      return this.where().not({ parent_id: null });
+    });
+    this.scope("hasChildren", function (this: any) {
+      return this.where({ id: this.model.children().select("parent_id") });
+    });
+    this.scope("byLifo", function (this: any) {
+      return this.where({ author_name: "lifo" });
+    });
+    this.scope("replied", function (this: any) {
+      return this.where("replies_count > 0");
+    });
     // "true"/"false" are reserved words; call via bracket notation: Topic["true"]()
-    this.scope("true", (q: any) => q.where({ approved: true }));
-    this.scope("false", (q: any) => q.where({ approved: false }));
-    this.scope("scopeWithLambda", (q: any) => q.all());
-    this.scope("approvedAsString", (q: any) => q.where({ approved: true }));
-    this.scope("anonymousExtension", (q: any) => q, { one: () => 1 });
+    this.scope("true", function (this: any) {
+      return this.where({ approved: true });
+    });
+    this.scope("false", function (this: any) {
+      return this.where({ approved: false });
+    });
+    this.scope("scopeWithLambda", function (this: any) {
+      return this.all();
+    });
+    this.scope("approvedAsString", function (this: any) {
+      return this.where({ approved: true });
+    });
+    this.scope(
+      "anonymousExtension",
+      function (this: any) {
+        return this;
+      },
+      { one: () => 1 },
+    );
     // Rails topic.rb: `scope :scope_stats, -> stats { stats[:count] = count; self }`.
     // The scope body mutates the passed stats hash with the relation's count and
     // returns the relation (`self`). trails relations count asynchronously, so the
     // body is async — the lone faithful divergence from Rails' sync `count`.
-    this.scope("scopeStats", ((q: any, stats: { count?: number }) =>
-      q.count().then((c: number) => {
+    this.scope("scopeStats", function (this: any, stats: { count?: number }) {
+      return this.count().then((c: number) => {
         stats.count = c;
-        return q;
-      })) as any);
-    this.scope("withObject", (q: any) => q.where({ approved: true }));
-    this.scope("withKwargs", (q: any, approved = false) => q.where({ approved }));
+        return this;
+      });
+    } as any);
+    this.scope("withObject", function (this: any) {
+      return this.where({ approved: true });
+    });
+    this.scope("withKwargs", function (this: any, approved = false) {
+      return this.where({ approved });
+    });
 
     this.hasMany("replies", { dependent: "destroy", autosave: true, inverseOf: "topic" });
     this.hasMany("approvedReplies", {

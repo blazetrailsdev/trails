@@ -114,10 +114,12 @@ class Post extends Base {
   static {
     this.attribute("title", "string");
     this.attribute("published", "boolean");
-    this.scope("published", (rel: Relation<Post>) => rel.where({ published: true }));
-    this.scope("recent", (rel: Relation<Post>, sinceDays: number) => {
+    this.scope("published", function (this: Relation<Post>) {
+      return this.where({ published: true });
+    });
+    this.scope("recent", function (this: Relation<Post>, sinceDays: number) {
       void sinceDays;
-      return rel.where({});
+      return this.where({});
     });
   }
 }
@@ -307,7 +309,9 @@ describe("declare patterns — typing runtime-attached members", () => {
       static {
         this.attribute("name", "string");
         this.hasMany("posts");
-        this.scope("active", (rel: Relation<Plain>) => rel);
+        this.scope("active", function (this: Relation<Plain>) {
+          return this;
+        });
       }
     }
     const p = new Plain({ name: "x" });

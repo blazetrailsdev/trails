@@ -30,7 +30,9 @@ class Post extends Base {
   static {
     this.belongsTo("author");
     this.hasMany("comments");
-    this.scope("published", (rel) => rel.where({ published: true }));
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
   }
 }
 
@@ -117,8 +119,12 @@ class Post extends Base {
     this.validates("title", { presence: true });
     this.validates("slug", { uniqueness: true });
 
-    this.scope("published", (rel) => rel.where({ published: true }));
-    this.scope("authoredBy", (rel, user: User) => rel.where({ author: user }));
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
+    this.scope("authoredBy", function (user: User) {
+      return this.where({ author: user });
+    });
 
     defineEnum(this, "status", { draft: 0, published: 1, archived: 2 });
   }

@@ -29,10 +29,9 @@ export class Owner extends Base {
     this.hasMany("toys", { through: "pets" });
     this.hasMany("persons", { through: "pets" });
     this.belongsTo("lastPet", { className: "Pet" });
-    this.scope("includingLastPet", (q: any) =>
-      q
-        .select(
-          `
+    this.scope("includingLastPet", function (this: any) {
+      return this.select(
+        `
           owners.*, (
             select p.pet_id from pets p
             where p.owner_id = owners.owner_id
@@ -40,9 +39,8 @@ export class Owner extends Base {
             limit 1
           ) as last_pet_id
         `,
-        )
-        .includes(":lastPet"),
-    );
+      ).includes(":lastPet");
+    });
     this.afterCommit(async (owner: Owner) => {
       await owner.executeBlocks();
     });

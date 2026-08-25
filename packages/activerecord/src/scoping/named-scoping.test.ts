@@ -83,7 +83,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("calling merge at first in scope", async () => {
-    Topic.scope("callingMergeAtFirstInScope", (q: any) => q.merge(Topic.replied()));
+    Topic.scope("callingMergeAtFirstInScope", function (this: any) {
+      return this.merge(Topic.replied());
+    });
     expect(ids(await (Topic as any).callingMergeAtFirstInScope().toArray())).toEqual(
       ids(await Topic.replied()),
     );
@@ -94,8 +96,12 @@ describe("NamedScopingTest", () => {
     // scopes in either order yields the same conjunction/result set.
     const epoch = Temporal.Instant.fromEpochMilliseconds(0);
     const now = Temporal.Now.instant();
-    Topic.scope("since", (q: any) => q.where("written_on >= ?", epoch));
-    Topic.scope("to", (q: any) => q.where("written_on <= ?", now));
+    Topic.scope("since", function (this: any) {
+      return this.where("written_on >= ?", epoch);
+    });
+    Topic.scope("to", function (this: any) {
+      return this.where("written_on <= ?", now);
+    });
     expect(sortedIds(await (Topic as any).to().since().toArray())).toEqual(
       sortedIds(await (Topic as any).since().to().toArray()),
     );
@@ -248,9 +254,11 @@ describe("NamedScopingTest", () => {
     const conflicts = ["records", "toArray", "toSql", "explain"];
     for (const name of conflicts) {
       const klass = class extends Post {};
-      expect(() => (klass as any).scope(name, (q: any) => q.where({ approved: true }))).toThrow(
-        new RegExp(`You tried to define a scope named "${name}" on the model`),
-      );
+      expect(() =>
+        (klass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
+      ).toThrow(new RegExp(`You tried to define a scope named "${name}" on the model`));
     }
   });
 
@@ -403,7 +411,9 @@ describe("NamedScopingTest", () => {
       static pri() {}
       static pro() {}
     }
-    (ReservedKlass as any).scope("approved", (q: any) => q.where({ approved: true }));
+    (ReservedKlass as any).scope("approved", function (this: any) {
+      return this.where({ approved: true });
+    });
     class ReservedSubklass extends ReservedKlass {}
 
     const conflicts = [
@@ -420,20 +430,28 @@ describe("NamedScopingTest", () => {
     for (const name of conflicts) {
       const re = new RegExp(`You tried to define a scope named "${name}" on the model`);
       expect(() =>
-        (ReservedKlass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedKlass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).toThrow(re);
       expect(() =>
-        (ReservedSubklass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedSubklass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).toThrow(re);
     }
 
     const nonConflicts = ["findByTitle", "approved", "pub", "pri", "pro", "open"];
     for (const name of nonConflicts) {
       expect(() =>
-        (ReservedKlass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedKlass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).not.toThrow();
       expect(() =>
-        (ReservedSubklass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedSubklass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).not.toThrow();
     }
   });
@@ -441,9 +459,9 @@ describe("NamedScopingTest", () => {
   it("spaces in scope names", async () => {
     // Rails defines `scope :"title containing space", ->(space: " ") { ... }`
     // and dispatches via `public_send(:"title containing space", space: " ")`.
-    Topic.scope("title containing space", (q: any, opts: { space?: string } = {}) =>
-      q.where(`title LIKE '%${opts.space ?? " "}%'`),
-    );
+    Topic.scope("title containing space", function (this: any, opts: { space?: string } = {}) {
+      return this.where(`title LIKE '%${opts.space ?? " "}%'`);
+    });
     const expected = sortedIds(await Topic.where("title LIKE '% %'"));
     const got = sortedIds(await (Topic as any)["title containing space"]({ space: " " }).toArray());
     expect(got).toEqual(expected);
@@ -730,7 +748,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope with annotation", async () => {
-    Topic.scope("includingAnnotateInScope", (q: any) => q.annotate("from-scope"));
+    Topic.scope("includingAnnotateInScope", function (this: any) {
+      return this.annotate("from-scope");
+    });
     const sql = (Topic as any).includingAnnotateInScope().toSql();
     expect(sql).toContain("from-scope");
     // Rails also asserts the annotation does not filter records.

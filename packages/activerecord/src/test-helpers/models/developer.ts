@@ -179,7 +179,9 @@ export class Developer extends Base {
     this.belongsTo("firm");
     this.hasMany("contractedProjects", { className: "Project" });
 
-    this.scope("jamises", (q: any) => q.where({ name: "Jamis" }));
+    this.scope("jamises", function (this: any) {
+      return this.where({ name: "Jamis" });
+    });
 
     this.validates("salary", {
       inclusion: { in: { includes: (v: unknown) => Number(v) >= 50000 && Number(v) <= 200000 } },
@@ -352,7 +354,9 @@ export class DeveloperOrderedBySalary extends Base {
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
     this.defaultScope((q: any) => q.order("salary DESC"));
-    this.scope("byName", (q: any) => q.order("name DESC"));
+    this.scope("byName", function (this: any) {
+      return this.order("name DESC");
+    });
   }
 }
 
@@ -401,7 +405,9 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
 
   static {
     this.tableName = "developers";
-    this.scope("david", (q: any) => q.where({ name: "David" }));
+    this.scope("david", function (this: any) {
+      return this.where({ name: "David" });
+    });
   }
 
   // Method-form override referencing a named scope (Rails: `def self.default_scope; david; end`).
@@ -415,7 +421,9 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
 
   static {
     this.tableName = "developers";
-    this.scope("david", (q: any) => q.where({ name: "David" }));
+    this.scope("david", function (this: any) {
+      return this.where({ name: "David" });
+    });
     this.defaultScope((q: any) => (LazyBlockReferencingScopeDeveloperCalledDavid as any).david());
   }
 }
@@ -432,9 +440,15 @@ export class DeveloperCalledJamis extends Base {
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
     this.defaultScope((q: any) => q.where({ name: "Jamis" }));
-    this.scope("poor", (q: any) => q.where("salary < 150000"));
-    this.scope("david", (q: any) => q.where({ name: "David" }));
-    this.scope("david2", (q: any) => q.unscoped().where({ name: "David" }));
+    this.scope("poor", function (this: any) {
+      return this.where("salary < 150000");
+    });
+    this.scope("david", function (this: any) {
+      return this.where({ name: "David" });
+    });
+    this.scope("david2", function (this: any) {
+      return this.unscoped().where({ name: "David" });
+    });
   }
 }
 

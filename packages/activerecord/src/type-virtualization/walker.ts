@@ -33,10 +33,12 @@ export interface AssociationCall {
 export interface ScopeCall {
   kind: "scope";
   name: string;
-  // Parameter list of the inline scope function, with the leading `rel`
-  // parameter removed. Each element is the raw source text of a parameter
+  // Parameter list of the inline scope function, with the leading `this`
+  // parameter removed — a scope body receives the relation as its receiver
+  // (`_exec_scope`'s `instance_exec`), so only the positionals after it are
+  // callable arguments. Each element is the raw source text of a parameter
   // (e.g. "limit: number", "name = \"draft\"").
-  paramsAfterRel: string[];
+  paramsAfterThis: string[];
 }
 
 export interface EnumCall {
@@ -396,15 +398,17 @@ function readAssociationCall(
 function readScopeCall(call: ts.CallExpression): ScopeCall | null {
   const [nameArg, fnArg] = call.arguments;
   if (!nameArg || !ts.isStringLiteralLike(nameArg)) return null;
-  if (!fnArg) return { kind: "scope", name: nameArg.text, paramsAfterRel: [] };
+  if (!fnArg) return { kind: "scope", name: nameArg.text, paramsAfterThis: [] };
   if (!ts.isArrowFunction(fnArg) && !ts.isFunctionExpression(fnArg)) {
-    return { kind: "scope", name: nameArg.text, paramsAfterRel: [] };
+    return { kind: "scope", name: nameArg.text, paramsAfterThis: [] };
   }
-  const [, ...rest] = fnArg.parameters;
+  // A leading `this` parameter is a type-position annotation, not an argument.
+  const params = fnArg.parameters;
+  const rest = params.length > 0 && params[0].name.getText() === "this" ? params.slice(1) : params;
   return {
     kind: "scope",
     name: nameArg.text,
-    paramsAfterRel: rest.map(renderScopeParam),
+    paramsAfterThis: rest.map(renderScopeParam),
   };
 }
 

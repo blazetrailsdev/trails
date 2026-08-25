@@ -1615,7 +1615,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // Called before createConnection so a validation throw doesn't leak a live connection.
   /** @internal */
   private _buildInitSql(): string {
-    const { strict, waitTimeout, variables: configVars } = this._poolConfig;
+    const { waitTimeout, variables: configVars } = this._poolConfig;
     const vars: Record<string, string | number | boolean | null | ":default" | "default"> = {
       ...(configVars ?? {}),
     };
@@ -1639,8 +1639,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // so null falls through to the strict-mode branch below.
       delete vars["sql_mode"];
       sqlMode = this.quote(String(varSqlMode));
-    } else if (!DEFAULTS.has(strict as string)) {
-      if (strict !== false) {
+    } else if (!DEFAULTS.has(this.isStrictMode() as string)) {
+      // abstract_mysql_adapter.rb:928-936 — the sql_mode decision reads
+      // `strict_mode?`, which is `@config.fetch(:strict, true)`, not the
+      // pool-config field.
+      if (isRubyTruthy(this.isStrictMode())) {
         sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
       } else {
         sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";

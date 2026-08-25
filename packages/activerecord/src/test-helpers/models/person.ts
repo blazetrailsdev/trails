@@ -133,7 +133,9 @@ export class Person extends Base {
     this.hasMany("agentsPostsAuthors", { through: "agentsPosts", source: "author" });
     this.hasMany("essays", { primaryKey: "first_name", foreignKey: "writer_id" });
 
-    this.scope("males", (q: any) => q.where({ gender: "M" }));
+    this.scope("males", function (this: any) {
+      return this.where({ gender: "M" });
+    });
 
     this.attrReadonly("born_at");
   }

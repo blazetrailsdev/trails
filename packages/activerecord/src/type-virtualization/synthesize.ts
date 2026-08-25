@@ -515,7 +515,7 @@ function renderSingularAssoc(
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
-  const argList = call.paramsAfterRel.length === 0 ? "" : call.paramsAfterRel.join(", ");
+  const argList = call.paramsAfterThis.length === 0 ? "" : call.paramsAfterThis.join(", ");
   return [
     line(
       `declare static ${call.name}: (${argList}) => ${AR_IMPORT}.Relation<${info.name}>;`,

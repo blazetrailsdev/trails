@@ -211,7 +211,9 @@ export function defineDelegatedTypeMethods(
     const predicateSuffix = camelize(singularSnake, true);
 
     // delegated_type.rb:263 `scope scope_name, -> { where(role_type => type) }`
-    (modelClass as any).scope(scopeName, (rel: any) => rel.where({ [roleType]: typeName }));
+    (modelClass as any).scope(scopeName, function (this: any) {
+      return this.where({ [roleType]: typeName });
+    });
 
     // Type predicate: isMessage(), isAccessNoticeMessage()
     // delegated_type.rb:265 `define_method(query) { public_send(role_type) == type }`

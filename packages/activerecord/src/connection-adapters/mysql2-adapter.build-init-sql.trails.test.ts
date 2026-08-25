@@ -40,6 +40,30 @@ describe("Mysql2Adapter#_buildInitSql", () => {
     await adapter.close();
   });
 
+  it("defaults to strict mode when no strict key is configured", async () => {
+    const adapter = new Mysql2Adapter({ host: "localhost" });
+    expect(adapter.isStrictMode()).toBe(true);
+    const sql = (adapter as unknown as { _buildInitSql(): string })._buildInitSql();
+    expect(sql).toContain("CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')");
+    await adapter.close();
+  });
+
+  it("honours a stored strict false", async () => {
+    const adapter = new Mysql2Adapter({ host: "localhost", strict: false } as never);
+    expect(adapter.isStrictMode()).toBe(false);
+    const sql = (adapter as unknown as { _buildInitSql(): string })._buildInitSql();
+    expect(sql).toContain("REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')");
+    await adapter.close();
+  });
+
+  it("leaves sql_mode alone when strict is :default", async () => {
+    const adapter = new Mysql2Adapter({ host: "localhost", strict: ":default" } as never);
+    expect(adapter.isStrictMode()).toBe(":default");
+    const sql = (adapter as unknown as { _buildInitSql(): string })._buildInitSql();
+    expect(sql).toContain("@@SESSION.sql_mode = @@GLOBAL.sql_mode");
+    await adapter.close();
+  });
+
   it("throws for invalid charset", () => {
     expect(
       () => new Mysql2Adapter({ host: "localhost", charset: "utf8'; DROP TABLE x; --" }),

@@ -33,6 +33,8 @@ export class Organization extends Base {
 
     this.hasMany("posts", { through: "author", source: "posts" });
 
-    this.scope("clubs", (q: any) => q.from("clubs"));
+    this.scope("clubs", function (this: any) {
+      return this.from("clubs");
+    });
   }
 }

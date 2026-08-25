@@ -26,7 +26,9 @@ export class Bulb extends Base {
     this.defaultScope((q: any) => q.where({ name: "defaulty" }));
     // Rails: counter_cache: { active: false } — object form not yet typed; cast as any
     this.belongsTo("car", { touch: true, counterCache: { active: false } as any });
-    this.scope("awesome", (q: any) => q.where({ frickinawesome: true }));
+    this.scope("awesome", function (this: any) {
+      return this.where({ frickinawesome: true });
+    });
 
     this.afterInitialize((record: Bulb) => {
       record.scopeAfterInitialize = (record.constructor as typeof Bulb).all();

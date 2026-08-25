@@ -661,9 +661,9 @@ describe("DefaultScopingTest", () => {
     class DeveloperWithByNameScope extends Developer {
       declare static byName: (name: string) => any;
       static {
-        this.scope("byName", (q: any, name: string) =>
-          q.unscope({ where: "name" }).where({ name }),
-        );
+        this.scope("byName", function (this: any, name: string) {
+          return this.unscope({ where: "name" }).where({ name });
+        });
       }
     }
     const expected = namesAndIds(
