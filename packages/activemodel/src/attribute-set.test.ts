@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
+import { Builder } from "./attribute-set/builder.js";
 import { typeRegistry } from "./type/registry.js";
 
 describe("AttributeSetTest", () => {
@@ -50,15 +51,23 @@ describe("AttributeSetTest", () => {
   });
 
   it("deep_duping creates a new hash and dups each attribute", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    const attrs = { ...p.attributes };
-    attrs.name = "Bob";
-    expect(p._readAttribute("name")).toBe("Alice");
+    const builder = new Builder(
+      new Map([
+        ["foo", typeRegistry.lookup("integer")],
+        ["bar", typeRegistry.lookup("string")],
+      ]),
+    );
+    const attributes = builder.buildFromDatabase({ foo: 1, bar: "foo" });
+
+    void attributes.getAttribute("foo").value;
+    void attributes.getAttribute("bar").value;
+
+    const duped = attributes.deepDup();
+    duped.writeFromDatabase("foo", 2);
+
+    expect(attributes.getAttribute("foo").value).toBe(1);
+    expect(duped.getAttribute("foo").value).toBe(2);
+    expect(attributes.getAttribute("bar").value).toBe("foo");
   });
 
   it("freezing cloned set does not freeze original", () => {

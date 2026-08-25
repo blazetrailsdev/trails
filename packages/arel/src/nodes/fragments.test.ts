@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
 
 describe("FragmentsTest", () => {
@@ -26,7 +26,7 @@ describe("FragmentsTest", () => {
     it("can be joined with other nodes", () => {
       const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo")]);
       const joined = a.join(new Nodes.SqlLiteral("bar"));
-      const sql = new Visitors.ToSql(testConnection).compile(joined);
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(joined);
       expect(sql).toBe("foo bar");
     });
   });

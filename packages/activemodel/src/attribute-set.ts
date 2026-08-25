@@ -193,12 +193,9 @@ export class AttributeSet {
     this._attributes.set(name, this.getAttribute(name).withCastValue(value));
   }
 
+  /** Mirrors: attribute_set.rb:72-74. */
   deepDup(): AttributeSet {
-    let cache: Map<Attribute, Attribute> | undefined;
-    const newAttributes = transformValues(this.attributes(), (attr) =>
-      this.cloneAttribute(attr, (cache ??= new Map())),
-    );
-    return new AttributeSet(newAttributes);
+    return new AttributeSet(transformValues(this.attributes(), (attr) => attr.deepDup()));
   }
 
   reset(key: string): void {
@@ -216,12 +213,16 @@ export class AttributeSet {
     return new AttributeSet(newAttributes);
   }
 
+  /**
+   * Mirrors: `attributes.reverse_merge!(target_attributes.attributes) && self`
+   * (attribute_set.rb:100-102) — Hash#reverse_merge! copies references and
+   * clones nothing.
+   */
   reverseMergeBang(target: AttributeSet): this {
     this.assertNotFrozen();
-    const cache = new Map<Attribute, Attribute>();
     for (const [name, attr] of target.attributes()) {
       if (!this.isKey(name)) {
-        this._attributes.set(name, this.cloneAttribute(attr, cache));
+        this._attributes.set(name, attr);
       }
     }
     return this;
@@ -308,33 +309,6 @@ export class AttributeSet {
       err.name = "FrozenError";
       throw err;
     }
-  }
-
-  /**
-   * `Object#deep_dup` for one Attribute — `attributes.transform_values(&:deep_dup)`
-   * in `deep_dup` (attribute_set.rb:72-74). The cache keeps a shared
-   * `original_attribute` shared in the copy, as Ruby's object graph does.
-   */
-  private cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
-    const existing = cache.get(attr);
-    if (existing) return existing;
-
-    // UserProvidedDefault needs a fresh construction so function defaults
-    // re-evaluate per instance — matching Rails' Proc-per-deep_dup behavior.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const asAny = attr as Record<string, any>;
-    const cloned =
-      typeof asAny.dupForDeepClone === "function"
-        ? asAny.dupForDeepClone()
-        : Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
-    cache.set(attr, cloned);
-
-    const orig = attr.getOriginalAttribute();
-    if (orig) {
-      cloned.setOriginalAttribute(this.cloneAttribute(orig, cache));
-    }
-
-    return cloned;
   }
 
   /**

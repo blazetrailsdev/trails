@@ -52,4 +52,14 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     restored.initWith(JSON.parse(JSON.stringify(coder)));
     expect(restored.extra).toBe("auto_increment");
   });
+
+  it("is null when no extra was given, mirroring `extra: nil` / `allow_nil: true`", () => {
+    const meta = new TypeMetadata({ sqlType: "varchar(255)", type: "string", limit: 255 });
+    expect(meta.extra).toBeNull();
+
+    const col = new MysqlColumn("name", null, { sqlType: "varchar(255)", type: "string" });
+    expect(col.extra).toBeNull();
+    expect(col.isAutoIncrement()).toBe(false);
+    expect(col.isVirtual()).toBe(false);
+  });
 });

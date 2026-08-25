@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, star, Nodes, Visitors } from "../index.js";
 import { Attribute } from "./attribute.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
-  const visitor = new Visitors.ToSql(testConnection);
+  const visitor = new Visitors.ToSql(fakeRecordConnection);
 
   // Mirrors Rails' private `quoted_range` (attribute_test.rb:1163-1169).
   function quotedRange(beginVal: unknown, endVal: unknown, exclude: boolean) {
@@ -1094,7 +1094,9 @@ describe("AttributeTest", () => {
       const condition = table.get("id").eq("1");
 
       expect(table.isAbleToTypeCast()).toBeFalsy();
-      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" = \'1\'');
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(condition)).toBe(
+        '"foo"."id" = \'1\'',
+      );
     });
 
     it("type casts when given an explicit caster", () => {
@@ -1107,7 +1109,7 @@ describe("AttributeTest", () => {
       const condition = table.get("id").eq("1").and(table.get("other_id").eq("2"));
 
       expect(table.isAbleToTypeCast()).toBe(true);
-      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe(
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(condition)).toBe(
         '"foo"."id" = 1 AND "foo"."other_id" = \'2\'',
       );
     });
@@ -1122,7 +1124,9 @@ describe("AttributeTest", () => {
       const condition = table.get("id").eq(new Nodes.SqlLiteral("(select 1)"));
 
       expect(table.isAbleToTypeCast()).toBe(true);
-      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" = (select 1)');
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(condition)).toBe(
+        '"foo"."id" = (select 1)',
+      );
     });
   });
 

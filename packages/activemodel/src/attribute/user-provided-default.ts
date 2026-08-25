@@ -8,8 +8,8 @@ import { Type } from "../type/value.js";
  *
  * Rails stores the raw Proc in @user_provided_value and lazily evaluates it
  * via value_before_type_cast. The class-level _default_attributes cache holds
- * unevaluated UserProvidedDefault instances; each deep_dup creates a fresh
- * copy that re-evaluates the Proc, giving each model instance its own default.
+ * unevaluated UserProvidedDefault instances, so each `deep_dup` copy memoizes
+ * the Proc's result for itself — Rails defines no `initialize_dup` here.
  *
  * We pass a sentinel to the super constructor so valueBeforeTypeCast is never
  * read from the base class — all access goes through our override.
@@ -51,22 +51,6 @@ export class UserProvidedDefault extends FromUser {
 
   static marshalLoad(data: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
     return new UserProvidedDefault(data[0], data[1], data[2], data[3]);
-  }
-
-  /**
-   * Create a fresh instance from the original function/value so function
-   * defaults re-evaluate — called by AttributeSet.deepDup.
-   */
-  dupForDeepClone(): UserProvidedDefault {
-    // Functions re-evaluate on each construction. Non-function objects need
-    // cloning to prevent cross-instance mutation (JS has no Ruby-style dup
-    // that copies value semantics for built-in types).
-    const val = this.userProvidedValue;
-    const clonedVal =
-      typeof val === "function" || val === null || typeof val !== "object"
-        ? val
-        : structuredClone(val);
-    return new UserProvidedDefault(this.name, clonedVal, this.type, this.originalAttribute);
   }
 }
 

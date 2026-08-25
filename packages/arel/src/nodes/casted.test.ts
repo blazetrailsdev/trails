@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors, Collectors } from "../index.js";
 import { buildQuoted } from "./casted.js";
 import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
@@ -60,7 +60,7 @@ describe("Arel::Nodes.build_quoted", () => {
 
     // compileWithBinds should collect it (not inline it) — matches Rails'
     // visit_ActiveModel_Attribute routing through add_bind.
-    const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
+    const [sql, binds] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), node);
     expect(sql).toBe("?");
     expect(binds).toEqual([amAttr]);
   });
@@ -146,7 +146,7 @@ describe("Arel::Nodes::Casted#nil?", () => {
     expect(new Nodes.Quoted(undefined).isNil()).toBe(true);
 
     const [sql] = compileWithBinds(
-      new Visitors.ToSql(testConnection),
+      new Visitors.ToSql(fakeRecordConnection),
       users.get("id").eq(undefined),
     );
     expect(sql).toBe('"users"."id" IS NULL');
@@ -156,7 +156,7 @@ describe("Arel::Nodes::Casted#nil?", () => {
   // identically to Casted's, so an undefined-valued Quoted spells IS NULL too.
   it("renders IS NULL for a Quoted(undefined) right-hand side", () => {
     const eq = new Nodes.Equality(users.get("id"), new Nodes.Quoted(undefined));
-    const [sql] = compileWithBinds(new Visitors.ToSql(testConnection), eq);
+    const [sql] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), eq);
     expect(sql).toBe('"users"."id" IS NULL');
   });
 
@@ -179,7 +179,7 @@ describe("Arel::Nodes::Casted#nil?", () => {
     const eq = attr.eq(null);
     expect(eq.right).toBeInstanceOf(Nodes.Casted);
     expect((eq.right as Nodes.Casted).attribute).toBe(attr);
-    const [sql] = compileWithBinds(new Visitors.ToSql(testConnection), eq);
+    const [sql] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), eq);
     expect(sql).toBe('"users"."id" IS NULL');
   });
 });

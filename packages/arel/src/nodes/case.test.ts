@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("NodesTest", () => {
@@ -20,7 +20,7 @@ describe("NodesTest", () => {
       const caseNode = new Nodes.Case(users.get("status"));
       const withDefault = caseNode.else("unknown");
       expect(withDefault.default).not.toBeNull();
-      expect(new Visitors.ToSql(testConnection).compile(withDefault)).toContain("ELSE");
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(withDefault)).toContain("ELSE");
     });
 
     it("clones case, conditions and default", () => {

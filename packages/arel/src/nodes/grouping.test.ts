@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("GroupingTest", () => {
@@ -21,7 +21,7 @@ describe("GroupingTest", () => {
 
   it("should create Equality nodes", () => {
     const grouped = new Nodes.Grouping(users.get("id").eq(1));
-    const sql = new Visitors.ToSql(testConnection).compile(grouped);
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(grouped);
     expect(sql).toBe('("users"."id" = 1)');
   });
 });

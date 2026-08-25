@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { testConnection, mysqlTestConnection } from "../test-helpers/connection.js";
+import { fakeRecordConnection, mysqlTestConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
 
 describe("TestBin", () => {
@@ -22,7 +22,7 @@ describe("TestBin", () => {
 
   it("default to sql", () => {
     const node = new Nodes.Bin(new Nodes.SqlLiteral("zomg"));
-    const sql = new Visitors.ToSql(testConnection).compile(node);
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
     expect(sql).toBe("zomg");
   });
 
