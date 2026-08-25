@@ -19,6 +19,7 @@ import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
+import { NullColumn } from "./connection-adapters/column.js";
 import {
   threadedConnectionFor,
   connectionPool,
@@ -770,13 +771,14 @@ export function yamlEncoder(this: SchemaHost): YAMLEncoder {
  * exist only for actual DB columns; user-declared `attribute :virtual,
  * :string` defs have no column. Callers needing the AM Type — for
  * casting, dirty tracking, comparison — should use `typeForAttribute`
- * instead. Returns a NullColumn-shaped object for unknown names so
- * `column.null`, `column.type`, etc. remain safely accessible.
+ * instead. Returns a NullColumn for unknown names (model_schema.rb:463-468)
+ * so `column.null`, `column.type`, etc. remain safely accessible.
  */
 export function columnForAttribute(this: SchemaHost, name: string): any {
   loadSchema.call(this);
   const hash = getColumnsHash(this);
-  return hash[name] ?? { name, null: true, type: null };
+  // `fetch` with a block, not `??`: a stored column wins even when falsy.
+  return name in hash ? hash[name] : new NullColumn(name);
 }
 
 /**

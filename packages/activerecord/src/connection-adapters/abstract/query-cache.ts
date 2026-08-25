@@ -86,7 +86,7 @@ export class Store {
     if (entry) {
       this._map.delete(key);
       this._map.set(key, entry);
-      return Promise.resolve(entry.map((row) => ({ ...row })));
+      return Promise.resolve(entry);
     }
 
     if (this._maxSize != null && this._map.size >= this._maxSize) {
@@ -101,9 +101,9 @@ export class Store {
       // value stored while this compute was in flight, so a second concurrent
       // miss on the same key does not overwrite the first one's result.
       const stored = this._map.get(key);
-      if (stored) return stored.map((row) => ({ ...row }));
+      if (stored) return stored;
       this._map.set(key, result);
-      return result.map((row) => ({ ...row }));
+      return result;
     });
   }
 
@@ -509,23 +509,7 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
           : FutureResult.wrap(result);
       }
       // Rails' sync path is `cache_sql { super }` (query_cache.rb:249), which
-      // itself tracks `hit` and instruments (query_cache.rb:283,291-296).
-      // INVARIANT: there must be no `await` between this lookupSqlCache
-      // and the cacheSql below — lookupSqlCache runs synchronously and cacheSql
-      // reaches `Store.computeIfAbsent`'s synchronous `get` immediately, so
-      // nothing can populate the key in between. That is why trails' cacheSql
-      // carries no `hit`/instrument branch of its own: a hit is always caught
-      // and instrumented here by lookupSqlCache; Rails' hit branch effectively
-      // lives in `Store.computeIfAbsent` (the dup-on-hit path). Break the
-      // no-await invariant and a concurrent write could turn the cacheSql call
-      // into a silent, uninstrumented cache hit.
-      const cached = this.lookupSqlCache(sql, name, binds ?? []);
-      if (cached !== undefined) {
-        // Resolved, not bare: Ruby's callers reach `select_all(...).then`
-        // through Kernel#then, which every object answers (database_statements
-        // .rb:85,102); a trails `Result` deliberately defines no `then`.
-        return Promise.resolve(Result.fromRowHashes(cached.map((r) => ({ ...r }))));
-      }
+      // itself tracks `hit`, instruments and dups (query_cache.rb:278-297).
       return this.cacheSql(sql, name, binds ?? [], async () => {
         const result = await original.call(this, sql, name, binds, forwardOpts);
         return result.toArray();
@@ -686,7 +670,16 @@ function lookupSqlCache(
   return result;
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#cache_sql
+ * (query_cache.rb:278-297) — key, `compute_if_absent` with the miss block,
+ * the hit-path `sql.active_record` instrumentation, and `result.dup`.
+ *
+ * `hit` is settled synchronously: `computeIfAbsent` reaches its `get` before
+ * returning, so the miss block has already run (or not) by the time the `then`
+ * reads the flag — the JS stand-in for Rails' `@lock.synchronize`.
+ * @internal
+ */
 function cacheSql(
   this: QueryCacheHost,
   sql: string,
@@ -697,7 +690,22 @@ function cacheSql(
   const qc = this._queryCache;
   if (!qc) return block();
   const key = sqlCacheKey(sql, binds);
-  return qc.computeIfAbsent(key, () => block());
+  let hit = true;
+
+  return qc
+    .computeIfAbsent(key, () => {
+      hit = false;
+      return block();
+    })
+    .then((result) => {
+      if (hit) {
+        Notifications.instrument(
+          "sql.active_record",
+          this.cacheNotificationInfoResult(sql, name, binds, result),
+        );
+      }
+      return [...result];
+    });
 }
 
 /**

@@ -59,7 +59,7 @@ import {
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
-import { rubyInspect } from "../../relation/ruby-inspect.js";
+import { rubyInspect, rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import {
   globalPluralizeTableNames,
@@ -2141,7 +2141,7 @@ export class SchemaStatements {
     const fk = await this.foreignKeyFor(fromTable, options);
     if (!fk) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${options.toTable ?? JSON.stringify(options)}`,
+        `Table '${fromTable}' has no foreign key for ${options.toTable ?? rubyInspectHash(options)}`,
       );
     }
     return fk;
@@ -2235,12 +2235,14 @@ export class SchemaStatements {
   /** @internal */
   async checkConstraintForBang(
     tableName: string,
-    options: { name?: string; expression?: string; validate?: boolean } = {},
+    { expression, ...options }: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition> {
-    const chk = await this.checkConstraintFor(tableName, options);
+    const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
+      // schema_statements.rb:1803-1806 interpolates the options Hash, so the
+      // message carries Ruby's `{name: "x"}` rendering, not JSON's.
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${options.expression ?? JSON.stringify(options)}`,
+        `Table '${tableName}' has no check constraint for ${expression ?? rubyInspectHash(options)}`,
       );
     }
     return chk;

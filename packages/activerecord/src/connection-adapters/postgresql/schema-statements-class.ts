@@ -1,6 +1,7 @@
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
+import { rubyInspectArray, rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {
@@ -1290,7 +1291,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${expression ?? JSON.stringify(options)}`,
+        `Table '${tableName}' has no exclusion constraint for ${expression ?? rubyInspectHash(options)}`,
       );
     return result;
   }
@@ -1425,7 +1426,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no unique constraint for ${column != null ? JSON.stringify(column) : JSON.stringify(options)}`,
+        `Table '${tableName}' has no unique constraint for ${column != null ? (Array.isArray(column) ? rubyInspectArray(column) : column) : rubyInspectHash(options)}`,
       );
     return result;
   }

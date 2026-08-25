@@ -28,6 +28,7 @@ import {
 } from "./test-helpers/models/company-in-module.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { NullColumn } from "./connection-adapters/column.js";
 import { create as createReflection } from "./reflection.js";
 import { Customer } from "./test-helpers/models/customer.js";
 import { UserWithInvalidRelation } from "./test-helpers/models/user-with-invalid-relation.js";
@@ -510,6 +511,13 @@ describe("ReflectionTest", () => {
         "updated_at",
       ].sort(),
     );
+  });
+  it("non existent columns return null object", () => {
+    const column = (CanonicalTopic as any).columnForAttribute("attribute_that_doesnt_exist");
+    expect(column).toBeInstanceOf(NullColumn);
+    expect(column.name).toBe("attribute_that_doesnt_exist");
+    expect(column.sqlType).toBeNull();
+    expect(column.type).toBeNull();
   });
   it("non existent types are identity types", () => {
     class Topic2 extends Base {

@@ -429,7 +429,7 @@ describe("Migration", () => {
       ).rejects.toThrow(ArgumentError);
 
       expect(error?.message).toBe(
-        `Table 'trades' has no check constraint for ${JSON.stringify({ name: "quantity_check" })}`,
+        `Table 'trades' has no check constraint for {name: "quantity_check"}`,
       );
 
       await assertNothingRaised(() =>
