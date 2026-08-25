@@ -7,18 +7,20 @@ import { isDuplicable } from "@blazetrails/activesupport";
 /**
  * Ruby `Object#dup` on the memoized cast value — the shallow copy
  * `@value = @value.dup` makes in `Attribute#initialize_dup`
- * (attribute.rb:155-157). Ruby's immutable-ish scalars are already immutable in
- * JS, so only the mutable built-ins need a copy. Not exported: Ruby gets `dup`
- * from Object, so it is not part of Attribute's surface.
+ * (attribute.rb:155-157). Not exported: Ruby gets `dup` from Object, so it is
+ * not part of Attribute's surface.
+ *
+ * Only Ruby's mutable built-ins need a copy here; the scalars are already
+ * immutable in JS. The generic-object arm is restricted to a plain object
+ * because a built-in carrying internal slots (Temporal) throws on a slot-less
+ * clone, and every such value in a cast attribute is immutable anyway, so
+ * Ruby's `dup` of it is unobservable.
  */
 function dupValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.slice();
   if (value instanceof Map) return new Map(value);
   if (value instanceof Set) return new Set(value);
   if (typeof value === "object" && value !== null) {
-    // A copy is only safe for a plain object: a built-in with internal slots
-    // (Temporal, BigDecimal) throws on a slot-less clone, and every such value
-    // in a cast attribute is immutable anyway, so Ruby's `dup` of it is unobservable.
     const proto = Object.getPrototypeOf(value) as object | null;
     if (proto === Object.prototype || proto === null) return { ...value };
   }
@@ -267,9 +269,13 @@ export abstract class Attribute {
     return dup;
   }
 
-  /** Mirrors: `def initialize_dup(other)` (attribute.rb:155-157). */
+  /**
+   * Mirrors: `def initialize_dup(other)` (attribute.rb:155-157). The guard
+   * reads the memo field rather than the `value` getter, because Ruby's
+   * `@value&.duplicable?` reads the ivar — nil until something forces the cast.
+   */
   private initializeDup(_other: Attribute): void {
-    if (this._hasValue && isDuplicable(this._value)) {
+    if (isDuplicable(this._value)) {
       this._value = dupValue(this._value);
     }
   }

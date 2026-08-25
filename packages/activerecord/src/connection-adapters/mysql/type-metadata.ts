@@ -27,6 +27,12 @@ export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
  * `__getobj__`.
  */
 export class TypeMetadata extends SqlTypeMetadata {
+  /**
+   * `attr_reader :extra`, whose `initialize` default is `extra: nil`
+   * (mysql/type_metadata.rb:12-16) — `null` where none was given, not a `""`
+   * stand-in. `fetch_type_metadata`'s own `extra = ""` default
+   * (mysql/schema_statements.rb:221-223) is what live introspection passes.
+   */
   readonly extra: string | null;
 
   constructor(
@@ -43,8 +49,6 @@ export class TypeMetadata extends SqlTypeMetadata {
     // SqlTypeMetadata, which is nil for an unmapped sql_type — no sqlType
     // fallback. Keep it nil-faithful.
     super(typeMetadata);
-    // `def initialize(type_metadata, extra: nil)` (mysql/type_metadata.rb:13-16) —
-    // `nil` where none was given, not a `""` stand-in.
     this.extra = options.extra ?? null;
   }
 

@@ -203,4 +203,33 @@ describe("Attribute — trails-only coverage", () => {
       expect(attr.valueForDatabase).toBe('{"x":99}');
     });
   });
+  describe("#deepDup", () => {
+    it("shares originalAttribute by reference, as Attribute#initialize_dup does", () => {
+      const type = typeRegistry.lookup("string");
+      const original = Attribute.fromDatabase("name", "Alice", type);
+      const assigned = original.withValueFromUser("Bob");
+
+      const duped = assigned.deepDup();
+
+      expect(duped).not.toBe(assigned);
+      expect(duped.getOriginalAttribute()).toBe(assigned.getOriginalAttribute());
+      expect(duped.originalValue).toBe("Alice");
+      expect(duped.isChanged()).toBe(true);
+    });
+
+    it("dups the memoized cast value so an in-place mutation does not bleed back", () => {
+      const type = Object.create(typeRegistry.lookup("value")) as {
+        deserialize(v: unknown): unknown;
+      };
+      type.deserialize = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
+
+      const attr = Attribute.fromDatabase("data", '["a"]', type as never);
+      void attr.value;
+      const duped = attr.deepDup();
+      (duped.value as string[]).push("b");
+
+      expect(attr.value).toEqual(["a"]);
+      expect(duped.value).toEqual(["a", "b"]);
+    });
+  });
 });
