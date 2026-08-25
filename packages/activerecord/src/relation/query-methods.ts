@@ -301,7 +301,7 @@ interface QueryMethodsHost {
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
   selectValues: any[];
-  groupValues: string[];
+  groupValues: Array<string | Nodes.Node>;
   orderValues: Array<string | Nodes.Node>;
   joinsValues: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoinsValues: AssociationSpec[];

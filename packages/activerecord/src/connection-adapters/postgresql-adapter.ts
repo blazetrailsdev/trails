@@ -2754,12 +2754,16 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Check if we're in a transaction.
+   * Mirrors: `PostgreSQLAdapter#in_transaction?`
+   * (`postgresql_adapter.rb:908-910`) — `open_transactions > 0`, so an open
+   * *lazy* (un-materialized) frame counts, exactly like `transaction_open?`.
+   * The physical-BEGIN marker is the private `_inTransaction` flag, which is a
+   * different question and deliberately not this one.
    *
    * @internal
    */
   get inTransaction(): boolean {
-    return this._inTransaction;
+    return this.openTransactions > 0;
   }
 
   /**

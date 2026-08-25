@@ -116,7 +116,8 @@ export interface PerformQueryHost extends HandleWarningsHost {
   updateTypemapForDefaultTimezone(): Promise<void>;
   prepareStatement(sql: string, binds: unknown[], rawConnection: pg.Client): Promise<string>;
   isCachedPlanFailure(pgerror: unknown): boolean;
-  openTransactions: number;
+  /** Mirrors `PostgreSQLAdapter#in_transaction?` (postgresql_adapter.rb:908-910). */
+  inTransaction: boolean;
   sqlKey(sql: string): string;
   /** Rails' `@statements` (abstract_adapter.rb:156). */
   _statements: { delete(key: string): unknown };
@@ -178,13 +179,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
         break;
       } catch (error) {
         if (this.isCachedPlanFailure(error)) {
-          // Nothing we can do if we are in a transaction because all commands
-          // will raise InFailedSQLTransaction
-          // `in_transaction?` is `open_transactions > 0`
-          // (postgresql_adapter.rb:908-910), so an open *lazy* (un-materialized)
-          // frame still counts — a read-only block (`transaction { record.reload }`)
-          // never emits a physical `BEGIN` because reads don't materialize.
-          if (this.openTransactions > 0) {
+          if (this.inTransaction) {
             throw new PreparedStatementCacheExpired(
               (error as { message?: string })?.message ?? "cached plan expired",
               { sql, binds, cause: error },

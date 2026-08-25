@@ -39,7 +39,7 @@ export {
   UnfilteredParameters,
   InvalidParameterKey,
 } from "../action-controller/metal/strong-parameters.js";
-export { urlFor, type UrlOptions } from "./url-for.js";
+export { type UrlOptions } from "./http/url.js";
 export {
   Cookies,
   CookieJar,

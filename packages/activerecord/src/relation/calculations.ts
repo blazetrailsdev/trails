@@ -154,7 +154,7 @@ interface CalculationRelation {
   /** Rails `@values` (relation.rb:86) — the hash behind every value method. */
   _values: Record<string, unknown>;
   /** Mirrors `Relation#group_values`. */
-  groupValues: string[];
+  groupValues: Array<string | Nodes.Node>;
   /**
    * Mirrors `Relation#order_values`; read by the count-column resolution and
    * cleared by `calculate`'s has_include? arm.
@@ -1309,7 +1309,7 @@ export async function executeGroupedCalculation(
     // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
     // `from(subquery)` group column stays unqualified instead of being re-pinned
     // to the model's table by `build_group`.
-    relation.groupValues = groupNodes as unknown as string[];
+    relation.groupValues = groupNodes;
     relation.selectValues = selectValues as (string | Nodes.Node)[];
 
     const [rawSql, binds] = compileManagerWithBinds(relation, relation.arel());
