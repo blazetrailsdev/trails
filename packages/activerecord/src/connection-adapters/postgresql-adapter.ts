@@ -142,7 +142,6 @@ import {
   type ExclusionConstraintOptions,
   type UniqueConstraintOptions,
 } from "./postgresql/schema-definitions.js";
-import { _setPostgreSQLAdapterClass } from "./postgresql/postgresql-adapter-slot.js";
 import { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import {
   CheckConstraintDefinition,
@@ -359,8 +358,6 @@ export class PostgreSQLAdapter
   }
 
   // Mirrors: PostgreSQLAdapter.create_unlogged_tables class_attribute (postgresql_adapter.rb:105).
-  // Read directly by PostgreSQL::TableDefinition's ctor
-  // (postgresql/schema_definitions.rb:254), via the zero-import slot.
   static createUnloggedTables = false;
 
   /** Mirrors: PostgreSQLAdapter.decode_dates class_attribute (postgresql_adapter.rb:132). */
@@ -4661,5 +4658,3 @@ PostgreSQLAdapter.prototype.performQuery = function (
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers
 // gate behavior on the postgresql adapter being loaded.
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
-
-_setPostgreSQLAdapterClass(PostgreSQLAdapter);

@@ -11,7 +11,7 @@
 import { NotImplementedError } from "../../errors.js";
 import { SchemaDumper, statelessTest } from "../../schema-dumper.js";
 import { pgDatetimeConfig } from "./pg-datetime-config.js";
-import { _PostgreSQLAdapterClass } from "./postgresql-adapter-slot.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -238,7 +238,7 @@ export class TableDefinition extends AbstractTableDefinition {
     } = {},
   ) {
     super(conn, name, options);
-    this.unlogged = _PostgreSQLAdapterClass?.createUnloggedTables ?? false;
+    this.unlogged = PostgreSQLAdapter.createUnloggedTables;
   }
 
   exclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): this {

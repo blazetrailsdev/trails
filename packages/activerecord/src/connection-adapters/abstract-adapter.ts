@@ -2779,22 +2779,19 @@ let abstractTypeMap: TypeMap | undefined;
 
 // Rails applies all of the wiring below as plain `include`s in the class body
 // (abstract_adapter.rb:50-56). trails defers it to the first `AbstractAdapter`
-// construction because applying it at module-evaluation time re-references the
-// mixin classes while they are still in their temporal dead zone, on this
-// cycle:
+// construction because at module-evaluation time this cycle leaves the mixin
+// classes in their temporal dead zone:
 //
 //   abstract/schema-statements.ts -> migration/join-table.ts -> model-schema.ts
 //     -> connection-handling.ts -> connection-adapters.ts -> abstract-adapter.ts
 //
 // Entered through `SchemaStatements`, `include(AbstractAdapter,
-// SchemaStatements)` below then sees `SchemaStatements` uninitialised.
-// PR #5775 removed the `... -> base.ts -> abstract-adapter.ts` leg this comment
-// used to cite (guarded by scripts/test-deps/base-import-cycle.test.ts), but
-// the leg above survives it: `Migration::JoinTable#join_table_name` delegates
-// to `ModelSchema.derive_join_table_name` (migration/join_table.rb:11-13), so
-// the edge is Rails' own structure, which Ruby resolves by autoloading at call
-// time. Tracked by `abstract-adapter-mixin-wiring-restore-module-eval`
-// (RFC 0119), blocked on that cycle.
+// SchemaStatements)` below then reads it uninitialised. PR #5775 removed the
+// `-> base.ts ->` leg this comment used to cite, but not this one:
+// `Migration::JoinTable#join_table_name` delegates to
+// `ModelSchema.derive_join_table_name` (migration/join_table.rb:11-13), so the
+// edge is Rails' own, resolved there by autoload at call time. Tracked by
+// `abstract-adapter-mixin-wiring-restore-module-eval` (RFC 0119).
 /** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
 function ensureAbstractAdapterMixinsApplied(): void {
   if (abstractAdapterMixinsApplied) return;
