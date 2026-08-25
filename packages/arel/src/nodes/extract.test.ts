@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("Arel::Nodes::ExtractTest", () => {
   const users = new Table("users");
@@ -55,16 +56,13 @@ describe("Arel::Nodes::ExtractTest", () => {
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const a = new Nodes.TableAlias(users, "u");
-      const b = new Nodes.TableAlias(users, "u");
-      expect(a.name).toBe(b.name);
-      expect(a.relation).toBe(b.relation);
+      const array = [users.get("attr").extract("foo"), users.get("attr").extract("foo")];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.Not(users.get("id").eq(1));
-      const b = new Nodes.Not(users.get("id").eq(2));
-      expect(a).not.toBe(b);
+      const array = [users.get("attr").extract("foo"), users.get("attr").extract("bar")];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });

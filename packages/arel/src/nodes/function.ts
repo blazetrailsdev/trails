@@ -1,4 +1,5 @@
 import { Node } from "./node.js";
+import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
 
@@ -6,7 +7,11 @@ import { SqlLiteral } from "./sql-literal.js";
 // FilterPredications. Runtime mixin wiring lives in ../index.ts.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
-  readonly expressions: Node[];
+  // Rails seats whatever the caller passed: `NamedFunction.new("generate_series",
+  // [4, 2])` (test/cases/arel/visitors/to_sql_test.rb:865) puts bare Integers
+  // here, and `visit_Integer` (to_sql.rb:824-826) renders them. The slot is
+  // `NodeOrValue`, not `Node`, for the same reason Math's operands are.
+  expressions: NodeOrValue[];
   // Rails' `count(nil)` stores nil (expressions.rb:5-7), which `must_be_nil`
   // asserts on (attribute_test.rb:377-381), so nil is part of the domain.
   distinct: boolean | null;
@@ -20,7 +25,7 @@ export class Function extends NodeExpression {
     this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
   }
 
-  constructor(expr: Node[], aliaz: Node | string | null = null) {
+  constructor(expr: NodeOrValue[], aliaz: Node | string | null = null) {
     super();
     this.expressions = expr;
     this._alias = typeof aliaz === "string" ? new SqlLiteral(aliaz) : aliaz;

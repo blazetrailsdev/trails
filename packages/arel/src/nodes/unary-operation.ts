@@ -15,7 +15,7 @@ import { Descending } from "./descending.js";
  */
 export class UnaryOperation extends Unary {
   readonly operator: string;
-  declare readonly expr: Node;
+  declare expr: Node;
 
   constructor(operator: string, operand: Node) {
     super(operand);

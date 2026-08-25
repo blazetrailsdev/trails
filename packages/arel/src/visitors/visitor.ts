@@ -34,7 +34,7 @@ export type NodeCtor = abstract new (...args: never[]) => object;
  * @noRailsEquivalent TypeScript-only ctor type; Ruby dispatches on the class object directly.
  */
 type VisitorCtor = (abstract new (...args: never[]) => Visitor) &
-  Pick<typeof Visitor, "dispatchCache">;
+  Pick<typeof Visitor, "dispatchCache"> & { registerDispatch?: () => void };
 
 const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
 
@@ -87,6 +87,14 @@ export abstract class Visitor {
           : undefined;
       cache = new Map(inherited);
       PER_CLASS_CACHE.set(this, cache);
+      // Seeded here, not from a `static {}` block, because Ruby fills its
+      // dispatch cache when a node is first visited (visitor.rb:28-30) — the
+      // class objects a subclass registers are read at call time, exactly
+      // where Ruby resolves the constant. A `static {}` block reads them at
+      // module-eval time instead, which throws inside an import cycle
+      // (`Cannot access 'TableAlias' before initialization` when
+      // `nodes/index.js` is the ESM entry module).
+      if (Object.hasOwn(this, "registerDispatch")) this.registerDispatch?.();
     }
     return cache;
   }

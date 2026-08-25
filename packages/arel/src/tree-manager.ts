@@ -1,6 +1,6 @@
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
+import { _Dot } from "./node-slots.js";
 import { PlainString } from "./collectors/plain-string.js";
-import { Dot } from "./visitors/dot.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
 
@@ -66,7 +66,12 @@ export abstract class TreeManager {
 
   toDot(): string {
     const collector = new PlainString();
-    const dot = new Dot();
+    if (!_Dot) {
+      throw new Error(
+        'TreeManager#toDot requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing tree-manager.',
+      );
+    }
+    const dot = new _Dot();
     dot.accept(this.ast, collector);
     return collector.value;
   }

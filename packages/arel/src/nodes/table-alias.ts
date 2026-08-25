@@ -22,10 +22,10 @@ interface TypeCastable {
 }
 
 export class TableAlias extends Binary {
-  readonly relation: Node;
+  relation: Node;
   // Rails: `SelectManager#as` stores the alias as a `Nodes::SqlLiteral` (rendered
   // bare), while `Table#alias` stores a plain string (quoted). Accept both.
-  readonly name: string | SqlLiteral;
+  name: string | SqlLiteral;
 
   constructor(relation: Node, name: string | SqlLiteral) {
     super(relation, name);

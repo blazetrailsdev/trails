@@ -379,115 +379,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  static {
-    const d = ToSql.dispatchCache();
-    const reg = (ctor: NodeCtor, m: string) => {
-      if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
-        throw new Error(`ToSql dispatch: method '${m}' is not defined on the prototype`);
-      }
-      d.set(ctor, m);
-    };
-    reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
-    reg(Nodes.SelectCore, "visitArelNodesSelectCore");
-    reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
-    reg(Nodes.UpdateStatement, "visitArelNodesUpdateStatement");
-    reg(Nodes.DeleteStatement, "visitArelNodesDeleteStatement");
-    reg(Nodes.UnionAll, "visitArelNodesUnionAll");
-    reg(Nodes.Union, "visitArelNodesUnion");
-    reg(Nodes.Intersect, "visitArelNodesIntersect");
-    reg(Nodes.Except, "visitArelNodesExcept");
-    reg(Nodes.WithRecursive, "visitArelNodesWithRecursive");
-    reg(Nodes.With, "visitArelNodesWith");
-    reg(Nodes.TableAlias, "visitArelNodesTableAlias");
-    reg(Nodes.Cte, "visitArelNodesCte");
-    reg(Nodes.JoinSource, "visitArelNodesJoinSource");
-    reg(Nodes.InnerJoin, "visitArelNodesInnerJoin");
-    reg(Nodes.OuterJoin, "visitArelNodesOuterJoin");
-    reg(Nodes.RightOuterJoin, "visitArelNodesRightOuterJoin");
-    reg(Nodes.FullOuterJoin, "visitArelNodesFullOuterJoin");
-    reg(Nodes.StringJoin, "visitArelNodesStringJoin");
-    reg(Nodes.On, "visitArelNodesOn");
-    reg(Nodes.Equality, "visitArelNodesEquality");
-    reg(Nodes.NotEqual, "visitArelNodesNotEqual");
-    reg(Nodes.GreaterThan, "visitArelNodesGreaterThan");
-    reg(Nodes.GreaterThanOrEqual, "visitArelNodesGreaterThanOrEqual");
-    reg(Nodes.LessThan, "visitArelNodesLessThan");
-    reg(Nodes.LessThanOrEqual, "visitArelNodesLessThanOrEqual");
-    reg(Nodes.Matches, "visitArelNodesMatches");
-    reg(Nodes.DoesNotMatch, "visitArelNodesDoesNotMatch");
-    reg(Nodes.In, "visitArelNodesIn");
-    reg(Nodes.NotIn, "visitArelNodesNotIn");
-    reg(Nodes.Between, "visitArelNodesBetween");
-    reg(Nodes.Regexp, "visitArelNodesRegexp");
-    reg(Nodes.NotRegexp, "visitArelNodesNotRegexp");
-    reg(Nodes.IsDistinctFrom, "visitArelNodesIsDistinctFrom");
-    reg(Nodes.IsNotDistinctFrom, "visitArelNodesIsNotDistinctFrom");
-    reg(Nodes.Assignment, "visitArelNodesAssignment");
-    reg(Nodes.As, "visitArelNodesAs");
-    reg(Nodes.Ascending, "visitArelNodesAscending");
-    reg(Nodes.Descending, "visitArelNodesDescending");
-    reg(Nodes.Offset, "visitArelNodesOffset");
-    reg(Nodes.Limit, "visitArelNodesLimit");
-    reg(Nodes.Lock, "visitArelNodesLock");
-    reg(Nodes.DistinctOn, "visitArelNodesDistinctOn");
-    reg(Nodes.Bin, "visitArelNodesBin");
-    reg(Nodes.NullsFirst, "visitArelNodesNullsFirst");
-    reg(Nodes.NullsLast, "visitArelNodesNullsLast");
-    reg(Nodes.UnaryOperation, "visitArelNodesUnaryOperation");
-    reg(Nodes.And, "visitArelNodesAnd");
-    reg(Nodes.Or, "visitArelNodesOr");
-    reg(Nodes.Not, "visitArelNodesNot");
-    reg(Nodes.Grouping, "visitArelNodesGrouping");
-    reg(Nodes.Over, "visitArelNodesOver");
-    reg(Nodes.NamedWindow, "visitArelNodesNamedWindow");
-    reg(Nodes.Window, "visitArelNodesWindow");
-    reg(Nodes.Rows, "visitArelNodesRows");
-    reg(Nodes.Range, "visitArelNodesRange");
-    reg(Nodes.Preceding, "visitArelNodesPreceding");
-    reg(Nodes.Following, "visitArelNodesFollowing");
-    reg(Nodes.CurrentRow, "visitArelNodesCurrentRow");
-    reg(Nodes.Filter, "visitArelNodesFilter");
-    reg(Nodes.Case, "visitArelNodesCase");
-    reg(Nodes.When, "visitArelNodesWhen");
-    reg(Nodes.Else, "visitArelNodesElse");
-    reg(Nodes.Extract, "visitArelNodesExtract");
-    reg(Nodes.Concat, "visitArelNodesConcat");
-    reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
-    reg(Nodes.BoundSqlLiteral, "visitArelNodesBoundSqlLiteral");
-    reg(Nodes.BindParam, "visitArelNodesBindParam");
-    // Not an Arel node, but Rails' dispatch is by class for every object it
-    // visits (visitor.rb:29-30) and to_sql.rb:756 defines a handler for it,
-    // so ValuesList/Assignment's visit branch resolves here rather than
-    // raising UnsupportedVisitError.
-    reg(ModelAttribute, "visitActiveModelAttribute");
-    reg(Nodes.Fragments, "visitArelNodesFragments");
-    reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
-    reg(Nodes.Exists, "visitArelNodesExists");
-    reg(Nodes.Count, "visitArelNodesCount");
-    reg(Nodes.Sum, "visitArelNodesSum");
-    reg(Nodes.Max, "visitArelNodesMax");
-    reg(Nodes.Min, "visitArelNodesMin");
-    reg(Nodes.Avg, "visitArelNodesAvg");
-    reg(Nodes.Cube, "visitArelNodesCube");
-    reg(Nodes.RollUp, "visitArelNodesRollUp");
-    reg(Nodes.GroupingSet, "visitArelNodesGroupingSet");
-    reg(Nodes.Group, "visitArelNodesGroup");
-    reg(Nodes.GroupingElement, "visitArelNodesGroupingElement");
-    reg(Nodes.Comment, "visitArelNodesComment");
-    reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
-    reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
-    reg(Nodes.True, "visitArelNodesTrue");
-    reg(Nodes.False, "visitArelNodesFalse");
-    reg(Nodes.Distinct, "visitArelNodesDistinct");
-    reg(Nodes.SqlLiteral, "visitArelNodesSqlLiteral");
-    reg(Nodes.Quoted, "visitArelNodesQuoted");
-    reg(Nodes.Casted, "visitArelNodesCasted");
-    reg(Nodes.UnqualifiedColumn, "visitArelNodesUnqualifiedColumn");
-    reg(Nodes.Attribute, "visitArelAttributesAttribute");
-    reg(Nodes.ValuesList, "visitArelNodesValuesList");
-    reg(Table, "visitArelTable");
-  }
-
   // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
   // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
   // an array); each hint is sanitized and the joined result wrapped in
@@ -1751,6 +1642,121 @@ export class ToSql extends Visitor {
       this.visit(child.toCte(), collector);
     });
     return collector;
+  }
+
+  /**
+   * Seeds this visitor's dispatch cache. Called once, lazily, the first time
+   * the cache is built — see the note in `Visitor.dispatchCache`.
+   *
+   * @internal
+   */
+  static registerDispatch(): void {
+    const d = ToSql.dispatchCache();
+    const reg = (ctor: NodeCtor, m: string) => {
+      if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
+        throw new Error(`ToSql dispatch: method '${m}' is not defined on the prototype`);
+      }
+      d.set(ctor, m);
+    };
+    reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
+    reg(Nodes.SelectCore, "visitArelNodesSelectCore");
+    reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
+    reg(Nodes.UpdateStatement, "visitArelNodesUpdateStatement");
+    reg(Nodes.DeleteStatement, "visitArelNodesDeleteStatement");
+    reg(Nodes.UnionAll, "visitArelNodesUnionAll");
+    reg(Nodes.Union, "visitArelNodesUnion");
+    reg(Nodes.Intersect, "visitArelNodesIntersect");
+    reg(Nodes.Except, "visitArelNodesExcept");
+    reg(Nodes.WithRecursive, "visitArelNodesWithRecursive");
+    reg(Nodes.With, "visitArelNodesWith");
+    reg(Nodes.TableAlias, "visitArelNodesTableAlias");
+    reg(Nodes.Cte, "visitArelNodesCte");
+    reg(Nodes.JoinSource, "visitArelNodesJoinSource");
+    reg(Nodes.InnerJoin, "visitArelNodesInnerJoin");
+    reg(Nodes.OuterJoin, "visitArelNodesOuterJoin");
+    reg(Nodes.RightOuterJoin, "visitArelNodesRightOuterJoin");
+    reg(Nodes.FullOuterJoin, "visitArelNodesFullOuterJoin");
+    reg(Nodes.StringJoin, "visitArelNodesStringJoin");
+    reg(Nodes.On, "visitArelNodesOn");
+    reg(Nodes.Equality, "visitArelNodesEquality");
+    reg(Nodes.NotEqual, "visitArelNodesNotEqual");
+    reg(Nodes.GreaterThan, "visitArelNodesGreaterThan");
+    reg(Nodes.GreaterThanOrEqual, "visitArelNodesGreaterThanOrEqual");
+    reg(Nodes.LessThan, "visitArelNodesLessThan");
+    reg(Nodes.LessThanOrEqual, "visitArelNodesLessThanOrEqual");
+    reg(Nodes.Matches, "visitArelNodesMatches");
+    reg(Nodes.DoesNotMatch, "visitArelNodesDoesNotMatch");
+    reg(Nodes.In, "visitArelNodesIn");
+    reg(Nodes.NotIn, "visitArelNodesNotIn");
+    reg(Nodes.Between, "visitArelNodesBetween");
+    reg(Nodes.Regexp, "visitArelNodesRegexp");
+    reg(Nodes.NotRegexp, "visitArelNodesNotRegexp");
+    reg(Nodes.IsDistinctFrom, "visitArelNodesIsDistinctFrom");
+    reg(Nodes.IsNotDistinctFrom, "visitArelNodesIsNotDistinctFrom");
+    reg(Nodes.Assignment, "visitArelNodesAssignment");
+    reg(Nodes.As, "visitArelNodesAs");
+    reg(Nodes.Ascending, "visitArelNodesAscending");
+    reg(Nodes.Descending, "visitArelNodesDescending");
+    reg(Nodes.Offset, "visitArelNodesOffset");
+    reg(Nodes.Limit, "visitArelNodesLimit");
+    reg(Nodes.Lock, "visitArelNodesLock");
+    reg(Nodes.DistinctOn, "visitArelNodesDistinctOn");
+    reg(Nodes.Bin, "visitArelNodesBin");
+    reg(Nodes.NullsFirst, "visitArelNodesNullsFirst");
+    reg(Nodes.NullsLast, "visitArelNodesNullsLast");
+    reg(Nodes.UnaryOperation, "visitArelNodesUnaryOperation");
+    reg(Nodes.And, "visitArelNodesAnd");
+    reg(Nodes.Or, "visitArelNodesOr");
+    reg(Nodes.Not, "visitArelNodesNot");
+    reg(Nodes.Grouping, "visitArelNodesGrouping");
+    reg(Nodes.Over, "visitArelNodesOver");
+    reg(Nodes.NamedWindow, "visitArelNodesNamedWindow");
+    reg(Nodes.Window, "visitArelNodesWindow");
+    reg(Nodes.Rows, "visitArelNodesRows");
+    reg(Nodes.Range, "visitArelNodesRange");
+    reg(Nodes.Preceding, "visitArelNodesPreceding");
+    reg(Nodes.Following, "visitArelNodesFollowing");
+    reg(Nodes.CurrentRow, "visitArelNodesCurrentRow");
+    reg(Nodes.Filter, "visitArelNodesFilter");
+    reg(Nodes.Case, "visitArelNodesCase");
+    reg(Nodes.When, "visitArelNodesWhen");
+    reg(Nodes.Else, "visitArelNodesElse");
+    reg(Nodes.Extract, "visitArelNodesExtract");
+    reg(Nodes.Concat, "visitArelNodesConcat");
+    reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
+    reg(Nodes.BoundSqlLiteral, "visitArelNodesBoundSqlLiteral");
+    reg(Nodes.BindParam, "visitArelNodesBindParam");
+    // Not an Arel node, but Rails' dispatch is by class for every object it
+    // visits (visitor.rb:29-30) and to_sql.rb:756 defines a handler for it,
+    // so ValuesList/Assignment's visit branch resolves here rather than
+    // raising UnsupportedVisitError.
+    reg(ModelAttribute, "visitActiveModelAttribute");
+    reg(Nodes.Fragments, "visitArelNodesFragments");
+    reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
+    reg(Nodes.Exists, "visitArelNodesExists");
+    reg(Nodes.Count, "visitArelNodesCount");
+    reg(Nodes.Sum, "visitArelNodesSum");
+    reg(Nodes.Max, "visitArelNodesMax");
+    reg(Nodes.Min, "visitArelNodesMin");
+    reg(Nodes.Avg, "visitArelNodesAvg");
+    reg(Nodes.Cube, "visitArelNodesCube");
+    reg(Nodes.RollUp, "visitArelNodesRollUp");
+    reg(Nodes.GroupingSet, "visitArelNodesGroupingSet");
+    reg(Nodes.Group, "visitArelNodesGroup");
+    reg(Nodes.GroupingElement, "visitArelNodesGroupingElement");
+    reg(Nodes.Comment, "visitArelNodesComment");
+    reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
+    reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
+    reg(Nodes.True, "visitArelNodesTrue");
+    reg(Nodes.False, "visitArelNodesFalse");
+    reg(Nodes.Distinct, "visitArelNodesDistinct");
+    reg(Nodes.SqlLiteral, "visitArelNodesSqlLiteral");
+    reg(Nodes.Quoted, "visitArelNodesQuoted");
+    reg(Nodes.Casted, "visitArelNodesCasted");
+    reg(Nodes.UnqualifiedColumn, "visitArelNodesUnqualifiedColumn");
+    reg(Nodes.Attribute, "visitArelAttributesAttribute");
+    reg(Nodes.ValuesList, "visitArelNodesValuesList");
+    reg(Table, "visitArelTable");
   }
 
   private subselectKey(key: Node): Node {

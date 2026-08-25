@@ -173,11 +173,15 @@ export class Table extends Node {
     return this.from().having(expr);
   }
 
-  get(name: string | null, table?: Attribute["relation"]): Attribute {
+  get(name: Node | string | null, table?: Attribute["relation"]): Attribute {
     // Rails' `Table#[]` accepts a nil name (`table[nil]` for a pkless model in
     // `Relation#delete_all`, relation.rb:1027-1031) and builds an Attribute
-    // whose name is nil; only a subquery-shaped statement ever renders it.
-    const resolved = name === null ? null : (this.klass?.attributeAliases?.[name] ?? name);
+    // whose name is nil; only a subquery-shaped statement ever renders it. It
+    // also takes a node name — `@table[Arel.star]`
+    // (test/cases/arel/visitors/to_sql_test.rb:50) — which the alias lookup
+    // skips and the visitor renders as-is (table.rb:110-113).
+    const resolved =
+      name === null || name instanceof Node ? name : (this.klass?.attributeAliases?.[name] ?? name);
     return new Attribute(table ?? this, resolved as string);
   }
 
