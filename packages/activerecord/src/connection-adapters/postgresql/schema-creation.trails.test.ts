@@ -138,7 +138,7 @@ describe("PostgreSQL SchemaCreation", () => {
     // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
     const col = new Column("id", null, new TypeMetadata({ sqlType: "uuid", type: "uuid" }));
     const host = s();
-    host.adapter.quoteDefaultExpression = (v: unknown, c: unknown) =>
+    host.conn.quoteDefaultExpression = (v: unknown, c: unknown) =>
       quoteDefaultExpression.call(null as never, v, c as never);
     expect(
       await host.visitChangeColumnDefaultDefinition(
