@@ -58,9 +58,7 @@ export async function execExplain(
         msg += rubyInspect(binds.map((attr) => renderBind(c, attr)));
       }
       msg += "\n";
-      // `explain` is optional on AbstractAdapter (Rails' raises NotImplementedError
-      // instead); every adapter reaching here implements it.
-      msg += await c.explain!(sql, binds, options);
+      msg += await c.explain(sql, binds, options);
       msgs.push(msg);
     }
     return msgs.join("\n");
