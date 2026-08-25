@@ -79,7 +79,7 @@ export class Column extends BaseColumn {
 
   /** Mirrors: MySQL::Column#virtual? (`mysql/column.rb:22-24`) */
   isVirtual(): boolean {
-    return /\b(?:VIRTUAL|STORED|PERSISTENT)\b/.test(this.extra);
+    return /\b(?:VIRTUAL|STORED|PERSISTENT)\b/.test(this.extra ?? "");
   }
 
   /**
