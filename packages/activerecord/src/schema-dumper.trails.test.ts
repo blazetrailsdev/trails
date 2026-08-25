@@ -45,6 +45,33 @@ describe("SchemaDumper trails-only cases", () => {
     expect(output).toContain(`() => "gen_random_uuid()"`);
   });
 
+  it("schema dump separates tables with one blank line and ends the last table without one", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
+    const columns = [{ name: "id", type: "integer", primaryKey: true }];
+
+    const one = (
+      await TopLevelDumper.dump({
+        tables: () => ["books"],
+        columns: () => columns,
+        indexes: () => [],
+        lookupCastTypeFromColumn: () => new ValueType(),
+      })
+    ).join("\n");
+    expect(one).not.toContain("});\n\n}");
+
+    const two = (
+      await TopLevelDumper.dump({
+        tables: () => ["authors", "books"],
+        columns: () => columns,
+        indexes: () => [],
+        lookupCastTypeFromColumn: () => new ValueType(),
+      })
+    ).join("\n");
+    expect(two).toContain('});\n\n  await ctx.createTable("books"');
+    expect(two).not.toContain("});\n\n}");
+  });
+
   it("schema dump round-trips PG range/network/bit-varying types via DSL helpers", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
