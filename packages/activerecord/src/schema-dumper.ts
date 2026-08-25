@@ -145,12 +145,15 @@ function conciseOptions<T>(
 }
 
 /**
- * Interface for sources that can provide schema information.
- * Database adapters (async) and the dumper's test mock sources (sync) both implement it.
+ * Interface for sources that can provide schema information. Rails' dumper
+ * holds `@connection` (`schema_dumper.rb:113`) and calls `.tables` /
+ * `.columns(table)` / `.indexes(table)` on it (`:135`, `:145`, `:158`); the
+ * connection is always the real adapter, so every member has exactly one arm
+ * here too.
  */
 export interface SchemaSource {
   /** @internal */
-  tables(): string[] | Promise<string[]>;
+  tables(): Promise<string[]>;
   /**
    * `pkNames` is the authoritative primary key for `tableName`, which the
    * dumper has already fetched (`@connection.primary_key(table)`). Columns
@@ -159,9 +162,9 @@ export interface SchemaSource {
    * than issuing the key query a second time. Optional: mock sources that
    * hand back `ColumnInfo` directly set `primaryKey` themselves.
    */
-  columns(tableName: string, pkNames?: readonly string[]): ColumnInfo[] | Promise<ColumnInfo[]>;
+  columns(tableName: string, pkNames?: readonly string[]): Promise<ColumnInfo[]>;
   /** @internal */
-  indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
+  indexes(tableName: string): Promise<IndexInfo[]>;
   /**
    * Rails' `@connection` in the dumper is always an adapter, so
    * `schema_default` calls `lookup_cast_type_from_column` unconditionally
@@ -643,16 +646,24 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  protected extensions(_stream: string[]): void | Promise<void> {}
+  protected extensions(_stream: string[]): Promise<void> {
+    return Promise.resolve();
+  }
 
   /** @internal */
-  protected types(_stream: string[]): void | Promise<void> {}
+  protected types(_stream: string[]): Promise<void> {
+    return Promise.resolve();
+  }
 
   /** @internal */
-  protected schemas(_stream: string[]): void | Promise<void> {}
+  protected schemas(_stream: string[]): Promise<void> {
+    return Promise.resolve();
+  }
 
   /** @internal */
-  protected virtualTables(_stream: string[]): void | Promise<void> {}
+  protected virtualTables(_stream: string[]): Promise<void> {
+    return Promise.resolve();
+  }
 
   private header(stream: string[]): void {
     stream.push("// This file is auto-generated from the current state of the database.");
@@ -909,10 +920,8 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  protected fetchTableOptions(
-    _tableName: string,
-  ): Record<string, unknown> | Promise<Record<string, unknown>> {
-    return {};
+  protected fetchTableOptions(_tableName: string): Promise<Record<string, unknown>> {
+    return Promise.resolve({});
   }
 
   /**

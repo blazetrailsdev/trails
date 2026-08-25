@@ -46,7 +46,7 @@ export class SillyReply extends Topic {
 export class UniqueReply extends Reply {
   static {
     this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true });
-    this.validatesUniqueness("content", { scope: "parent_id" });
+    this.validatesUniquenessOf("content", { scope: "parent_id" });
   }
 }
 

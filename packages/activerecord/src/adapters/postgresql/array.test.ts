@@ -607,7 +607,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         static tableName = "pg_arrays";
         static {
           this.attribute("id", "integer");
-          this.validatesUniqueness("tags");
+          this.validatesUniquenessOf("tags");
         }
       }
       await PgArrays.loadSchema();

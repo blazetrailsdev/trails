@@ -45,7 +45,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("case insensitive comparison for ci column", async () => {
       const CollationTest = collationTestModel();
-      CollationTest.validatesUniqueness("string_ci_column", { caseSensitive: false });
+      CollationTest.validatesUniquenessOf("string_ci_column", { caseSensitive: false });
       await CollationTest.create({ string_ci_column: "A" });
       const invalid = new CollationTest({ string_ci_column: "a" });
       const queries = await captureSql(async () => {
@@ -57,7 +57,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("case insensitive comparison for cs column", async () => {
       const CollationTest = collationTestModel();
-      CollationTest.validatesUniqueness("string_cs_column", { caseSensitive: false });
+      CollationTest.validatesUniquenessOf("string_cs_column", { caseSensitive: false });
       await CollationTest.create({ string_cs_column: "A" });
       const invalid = new CollationTest({ string_cs_column: "a" });
       const queries = await captureSql(async () => {
@@ -69,7 +69,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("case sensitive comparison for ci column", async () => {
       const CollationTest = collationTestModel();
-      CollationTest.validatesUniqueness("string_ci_column", { caseSensitive: true });
+      CollationTest.validatesUniquenessOf("string_ci_column", { caseSensitive: true });
       await CollationTest.create({ string_ci_column: "A" });
       const invalid = new CollationTest({ string_ci_column: "A" });
       const queries = await captureSql(async () => {
@@ -81,7 +81,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("case sensitive comparison for cs column", async () => {
       const CollationTest = collationTestModel();
-      CollationTest.validatesUniqueness("string_cs_column", { caseSensitive: true });
+      CollationTest.validatesUniquenessOf("string_cs_column", { caseSensitive: true });
       await CollationTest.create({ string_cs_column: "A" });
       const invalid = new CollationTest({ string_cs_column: "A" });
       const queries = await captureSql(async () => {
@@ -93,7 +93,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("case sensitive comparison for binary column", async () => {
       const CollationTest = collationTestModel();
-      CollationTest.validatesUniqueness("binary_column", { caseSensitive: true });
+      CollationTest.validatesUniquenessOf("binary_column", { caseSensitive: true });
       await CollationTest.create({ binary_column: "A" });
       const invalid = new CollationTest({ binary_column: "A" });
       const queries = await captureSql(async () => {

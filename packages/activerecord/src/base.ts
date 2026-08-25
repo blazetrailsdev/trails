@@ -3111,13 +3111,6 @@ export class Base extends Model {
   // signatures live on the merged `interface Base` at the bottom of this file.
 
   /**
-   * Register a uniqueness validation.
-   *
-   * Mirrors: validates uniqueness: true
-   */
-  declare static validatesUniqueness: typeof _Validations.validatesUniqueness;
-
-  /**
    * Register uniqueness validations for one or more attributes.
    *
    * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of

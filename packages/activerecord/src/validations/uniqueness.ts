@@ -11,7 +11,7 @@ import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
- * Shared scope option validation — called eagerly from validatesUniqueness (declaration time)
+ * Shared scope option validation — called eagerly from validatesUniquenessOf (declaration time)
  * and from UniquenessValidator#constructor (instantiation time). Mirrors Rails'
  * ArgumentError raised in UniquenessValidator#initialize for non-symbol :scope values.
  * @internal
@@ -31,46 +31,6 @@ function validateScopeOption(scope: unknown): void {
         "Pass a string or an array of strings instead.",
     );
   }
-}
-
-/**
- * Register a uniqueness validation. Now that the AR/AM validation chain is
- * async (RFC 0063), uniqueness runs inline in `valid?` like any other
- * validator: it registers via `validates_with UniquenessValidator` and the
- * validator's async `validateEach` issues the `SELECT 1 ... WHERE attr = ?`
- * existence check, awaited by the validate callback chain.
- *
- * The declaring class is threaded through as the `:class` option so the
- * validator reproduces Rails' `find_finder_class_for` (the existence query
- * must target the class the validation was declared on — e.g. an abstract STI
- * base — not the leaf subclass of the record being validated).
- *
- * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
- */
-export function validatesUniqueness(
-  this: {
-    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-  },
-  attribute: string,
-  options: {
-    scope?: string | string[];
-    message?: string;
-    conditions?: (this: any) => any;
-    caseSensitive?: boolean;
-    allowNil?: boolean;
-    on?: string | string[];
-    if?: unknown;
-    unless?: unknown;
-    strict?: boolean;
-  } = {},
-): void {
-  // Validate options eagerly to match Rails' ArgumentError at declaration time.
-  validateScopeOption(options.scope);
-  this.validatesWith(UniquenessValidator, {
-    ...options,
-    attributes: [attribute],
-    class: this,
-  });
 }
 
 /**
@@ -98,7 +58,7 @@ export function validatesUniquenessOf(
   // (the constructor validates too, but validatesWith reaches it only after
   // bucketing).
   validateScopeOption(merged.scope);
-  this.validatesWith(UniquenessValidator, { ...merged, class: this });
+  this.validatesWith(UniquenessValidator, merged);
 }
 
 export class UniquenessValidator extends EachValidator {

@@ -632,7 +632,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           static tableName = "uuid_uniqueness_validation_test";
           static {
             this.attribute("id", "integer");
-            this.validatesUniqueness("guid", { caseSensitive: false });
+            this.validatesUniquenessOf("guid", { caseSensitive: false });
           }
         }
         await UuidUniq.loadSchema();

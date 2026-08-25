@@ -13,9 +13,9 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { ValueType } from "@blazetrails/activemodel";
 
 const EMPTY_SOURCE = {
-  tables: () => [],
-  columns: () => [],
-  indexes: () => [],
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
   adapter: { defaultIndexType: AbstractAdapter.prototype.defaultIndexType },
 };
 
@@ -24,8 +24,8 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
-      tables: () => ["gen_defaults"],
-      columns: () => [
+      tables: async () => ["gen_defaults"],
+      columns: async () => [
         { name: "id", type: "integer", primaryKey: true },
         // A function default reflects as `default: null` + `defaultFunction`
         // (the literal default is null; the expression rides defaultFunction),
@@ -38,7 +38,7 @@ describe("SchemaDumper trails-only cases", () => {
           defaultFunction: "gen_random_uuid()",
         },
       ],
-      indexes: () => [],
+      indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (await TopLevelDumper.dump(source)).join("\n");
@@ -52,9 +52,9 @@ describe("SchemaDumper trails-only cases", () => {
 
     const one = (
       await TopLevelDumper.dump({
-        tables: () => ["books"],
-        columns: () => columns,
-        indexes: () => [],
+        tables: async () => ["books"],
+        columns: async () => columns,
+        indexes: async () => [],
         lookupCastTypeFromColumn: () => new ValueType(),
       })
     ).join("\n");
@@ -62,9 +62,9 @@ describe("SchemaDumper trails-only cases", () => {
 
     const two = (
       await TopLevelDumper.dump({
-        tables: () => ["authors", "books"],
-        columns: () => columns,
-        indexes: () => [],
+        tables: async () => ["authors", "books"],
+        columns: async () => columns,
+        indexes: async () => [],
         lookupCastTypeFromColumn: () => new ValueType(),
       })
     ).join("\n");
@@ -76,8 +76,8 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
-      tables: () => ["dsl_types"],
-      columns: () => [
+      tables: async () => ["dsl_types"],
+      columns: async () => [
         { name: "id", type: "integer", primaryKey: true },
         { name: "r1", type: "int4range" },
         { name: "r2", type: "int8range" },
@@ -96,7 +96,7 @@ describe("SchemaDumper trails-only cases", () => {
         // SQL_TYPE_MAP keys and emit helpers before and after this change.
         { name: "bv", type: "bitVarying" },
       ],
-      indexes: () => [],
+      indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (await TopLevelDumper.dump(source)).join("\n");
@@ -125,15 +125,15 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
-      tables: () => ["non_helper_types"],
-      columns: () => [
+      tables: async () => ["non_helper_types"],
+      columns: async () => [
         { name: "id", type: "integer", primaryKey: true },
         { name: "ts", type: "timestamptz" },
         { name: "guid", type: "uuid" },
         { name: "span", type: "interval" },
         { name: "obj_id", type: "oid" },
       ],
-      indexes: () => [],
+      indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (await TopLevelDumper.dump(source)).join("\n");
@@ -354,13 +354,15 @@ describe("SchemaDumperAdapterTest", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
-      tables: () => ["users"],
-      columns: () => [{ name: "id", type: "integer", primaryKey: true }],
-      indexes: () => [],
+      tables: async () => ["users"],
+      columns: async () => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     class CommentDumper extends TopLevelDumper {
-      protected override fetchTableOptions(_tableName: string): Record<string, unknown> {
+      protected override async fetchTableOptions(
+        _tableName: string,
+      ): Promise<Record<string, unknown>> {
         return { comment: "user accounts" };
       }
     }
@@ -374,13 +376,13 @@ describe("SchemaDumperAdapterTest", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
-      tables: () => ["t"],
-      columns: () => [{ name: "id", type: "integer", primaryKey: true }],
-      indexes: () => [],
+      tables: async () => ["t"],
+      columns: async () => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     class MysqlDumper extends TopLevelDumper {
-      protected override fetchTableOptions(_t: string): Record<string, unknown> {
+      protected override async fetchTableOptions(_t: string): Promise<Record<string, unknown>> {
         return { charset: "utf8mb4", collation: "utf8mb4_bin" };
       }
     }
@@ -397,12 +399,12 @@ describe("SchemaDumperAdapterTest", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
-      tables: () => ["t"],
-      columns: () => [
+      tables: async () => ["t"],
+      columns: async () => [
         { name: "id", type: "integer", primaryKey: true },
         { name: "account_id", type: "integer", primaryKey: true },
       ],
-      indexes: () => [],
+      indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     const dumper = TopLevelDumper.create(source as any);
@@ -450,7 +452,7 @@ describe("SchemaDumper async header ordering", () => {
         log.push("types");
       }
     }
-    const source = { tables: () => [], columns: () => [], indexes: () => [] };
+    const source = { tables: async () => [], columns: async () => [], indexes: async () => [] };
     const dumper = new (OrderedDumper as any)(source);
     const result = (await (dumper.dump() as Promise<string[]>)).join("\n");
     expect(log).toEqual(["schemas", "extensions", "types"]);
@@ -464,9 +466,9 @@ describe("SchemaDumper async header ordering", () => {
 
 describe("formatColspec", () => {
   const dumper = SchemaDumper.create({
-    tables: () => [],
-    columns: () => [],
-    indexes: () => [],
+    tables: async () => [],
+    columns: async () => [],
+    indexes: async () => [],
     lookupCastTypeFromColumn: () => new ValueType(),
   });
 

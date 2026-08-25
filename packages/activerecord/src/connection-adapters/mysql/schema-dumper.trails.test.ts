@@ -5,9 +5,9 @@ import type { SchemaSource } from "../../schema-dumper.js";
 import { Result } from "../../result.js";
 
 const stubSource: SchemaSource = {
-  tables: () => [],
-  columns: () => [],
-  indexes: () => [],
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
   lookupCastTypeFromColumn: () => new ValueType(),
 };
 const make = () => SchemaDumper.create(stubSource);

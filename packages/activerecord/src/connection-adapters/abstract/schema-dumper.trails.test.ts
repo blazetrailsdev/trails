@@ -5,9 +5,9 @@ import type { SchemaSource } from "../../schema-dumper.js";
 import { IntegerType, DecimalType, BooleanType, StringType } from "@blazetrails/activemodel";
 
 const emptySource: SchemaSource = {
-  tables: () => [],
-  columns: () => [],
-  indexes: () => [],
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
   lookupCastTypeFromColumn: () => new ValueType(),
 };
 
@@ -122,7 +122,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   // false, the per-column raise fires, and the whole create_table body is
   // discarded in favor of the "Could not dump table" comment.
   const source = {
-    tables: () => ["widgets"],
+    tables: async () => ["widgets"],
     columns: (_t: string) => [
       { name: "id", type: "integer", sqlType: "integer", primaryKey: true },
       { name: "kind", type: null, sqlType: "composite_type" },
@@ -141,7 +141,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
 
   it("still dumps the table normally when every column type is a valid native type", async () => {
     const validSource = {
-      tables: () => ["widgets"],
+      tables: async () => ["widgets"],
       columns: (_t: string) => [
         { name: "id", type: "integer", sqlType: "integer", primaryKey: true },
         { name: "name", type: "string", sqlType: "varchar(255)", limit: 255 },

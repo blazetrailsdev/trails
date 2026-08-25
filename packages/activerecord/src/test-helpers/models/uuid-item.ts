@@ -5,6 +5,6 @@ export class UuidItem extends Base {}
 
 export class UuidValidatingItem extends UuidItem {
   static {
-    this.validatesUniqueness("uuid");
+    this.validatesUniquenessOf("uuid");
   }
 }

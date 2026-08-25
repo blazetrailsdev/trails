@@ -1,28 +1,14 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import {
-  autoloadModel,
-  _preloadedHolderTarget,
-  _associateRecordsToOwner,
-} from "../associations.js";
+import { _preloadedHolderTarget, _associateRecordsToOwner } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
 import { parkNestedReaderLoad } from "../nested-attributes.js";
-import {
-  camelize,
-  constantize,
-  except,
-  safeConstantize,
-  singularize,
-} from "@blazetrails/activesupport";
-import {
-  AssociationTargetReplacedDuringLoad,
-  AssociationTypeMismatch,
-  NameError,
-} from "../errors.js";
+import { camelize, except, safeConstantize, singularize } from "@blazetrails/activesupport";
+import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
 
 /**
  * Back an ad-hoc definition with the registered reflection for its name, so an
@@ -221,34 +207,16 @@ export class Association {
    * raises synchronously for unknown classes. Skipped for polymorphic, through,
    * and anonymous-class associations (HABTM join model side).
    */
-  protected checkKlass(): void {
+  protected checkKlass(): typeof Base | undefined {
     const opts = this.reflection.options as AssociationOptions & { anonymousClass?: unknown };
-    if (opts.polymorphic || opts.through || opts.anonymousClass) return;
-    const name = this.reflection.name;
-    // Prefer the rich reflection's klass getter — it does Ruby-style
-    // namespace-relative resolution (compute_class → compute_type), so a
-    // convention `belongs_to :region` on Admin::RegionalUser resolves to
-    // Admin::Region rather than a bare top-level "Region". On failure fall
-    // through to the bare lookup below, which raises the faithful NameError
-    // Rails' check_validity! surfaces for a genuinely missing class.
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
-    };
-    try {
-      if (ctor._reflectOnAssociation?.(name)?.klass) return;
-    } catch (e) {
-      // Rails rescues only the missing-constant NameError from compute_class and
-      // re-raises anything else — notably the ArgumentError "resolved constant is
-      // not an ActiveRecord::Base subclass" guard (reflection.rb:495-508). Mirror
-      // that: a missing-class NameError falls through to the constant lookup
-      // below (which re-raises the same faithful NameError); every other error
-      // — config/reflection failures — propagates unchanged.
-      if (!(e instanceof NameError)) throw e;
-    }
-    const className =
-      opts.className ?? camelize(this.reflection.macro === "hasMany" ? singularize(name) : name);
-    autoloadModel(className);
-    constantize(className);
+    if (opts.polymorphic || opts.through || opts.anonymousClass) return undefined;
+    // One derivation, on the reflection: `klass` is `reflection.klass`
+    // (association.rb:36-38), whose `compute_class` raises the faithful
+    // NameError for an unknown class and the ArgumentError for a constant that
+    // is not an ActiveRecord::Base subclass (reflection.rb:495-508). Both
+    // propagate, exactly as they do out of Rails' `check_validity!`. Returned
+    // rather than discarded only so the resolve is a statement TS accepts.
+    return this.klass;
   }
 
   get name(): string {

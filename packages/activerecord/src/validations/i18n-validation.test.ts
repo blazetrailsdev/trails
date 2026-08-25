@@ -33,7 +33,7 @@ describe("I18nValidationTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.validatesUniqueness("title");
+        this.validatesUniquenessOf("title");
       }
     }
     registerModel("I18nUniquenessTopic", Topic);

@@ -837,12 +837,6 @@ export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
 
   /**
-   * Allow-list of warning messages or codes to skip even under `:raise`.
-   * Mirrors `ActiveRecord.db_warnings_ignore`.
-   */
-  static dbWarningsIgnore: (string | RegExp)[] = [];
-
-  /**
    * @missingRailsCall build_statement_pool — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: the base ctor takes no
    *   config (concrete adapters assign `_config`), so Rails' config-derived
    *   initialize tail has nowhere to run here; converging it is the constructor
@@ -2758,15 +2752,14 @@ export class AbstractAdapter implements Quoting {
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
-    const matchers: (string | RegExp)[] = (this.constructor as any).dbWarningsIgnore ?? [];
-    const msg = warning.message ?? "";
-    return matchers.some(
-      (m) =>
-        (typeof m === "string" ? msg.includes(m) : m.test(msg)) ||
-        (warning.code !== undefined &&
-          (typeof m === "string"
-            ? String(warning.code).includes(m)
-            : m.test(String(warning.code)))),
+    // Ruby's `String#match?` takes a Regexp OR a String, and a String argument
+    // is a regexp SOURCE, not a substring (abstract_adapter.rb:1229).
+    const matchP = (str: string, warningMatcher: string | RegExp): boolean =>
+      (typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher).test(str);
+    return ActiveRecord.dbWarningsIgnore.some(
+      (warningMatcher) =>
+        matchP(warning.message ?? "", warningMatcher) ||
+        matchP(String(warning.code ?? ""), warningMatcher),
     );
   }
 

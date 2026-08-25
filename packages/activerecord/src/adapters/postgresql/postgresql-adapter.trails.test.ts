@@ -816,14 +816,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     let savedWarningsAction: typeof ActiveRecord.dbWarningsAction;
-    let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
+    let savedWarningsIgnore: typeof ActiveRecord.dbWarningsIgnore;
     beforeEach(() => {
       savedWarningsAction = ActiveRecord.dbWarningsAction;
-      savedWarningsIgnore = PostgreSQLAdapter.dbWarningsIgnore;
+      savedWarningsIgnore = ActiveRecord.dbWarningsIgnore;
     });
     afterEach(() => {
       ActiveRecord.dbWarningsAction = savedWarningsAction ?? "ignore";
-      PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
+      ActiveRecord.dbWarningsIgnore = savedWarningsIgnore;
       vi.restoreAllMocks();
     });
   });
