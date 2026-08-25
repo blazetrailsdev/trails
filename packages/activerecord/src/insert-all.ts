@@ -45,9 +45,10 @@ export interface InsertAllOptions {
  * trails, so `InsertAll.execute` resolves them before constructing and the
  * constructor body stays the pure assignment Rails' is.
  *
- * @noRailsEquivalent A genuine TypeScript shortcoming: a constructor cannot
- *   await. Resolving in the async factory keeps the Rails-named constructor
- *   tail in place rather than deferring it to `execute`.
+ * @noRailsEquivalent PERMANENT: a genuine TypeScript shortcoming — a
+ *   constructor cannot await. Resolving in the async factory keeps the
+ *   Rails-named constructor tail in place rather than deferring it to
+ *   `execute`.
  * @internal
  */
 interface ResolvedConnectionFacts {
@@ -64,7 +65,8 @@ interface ResolvedConnectionFacts {
  * wrapper adapter that forgets to delegate cannot emit a bogus conflict
  * target.
  *
- * @noRailsEquivalent The async half of `ResolvedConnectionFacts` above.
+ * @noRailsEquivalent PERMANENT: the async half of `ResolvedConnectionFacts`
+ *   above, for the same constructor-cannot-await reason.
  * @internal
  */
 async function resolveConnectionFacts(
