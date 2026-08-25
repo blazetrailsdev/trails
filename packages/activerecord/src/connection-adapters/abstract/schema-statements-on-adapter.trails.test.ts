@@ -246,6 +246,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       static override quoteColumnName(name: string) {
         return `"${name}"`;
       }
+      // `change_column_default` resolves the column before quoting
+      // (postgresql/schema_statements.rb:490), and this stub has no live table.
+      override async columns(_tableName: string) {
+        return [{ name: "title", sqlType: "varchar" }] as any;
+      }
       async changeColumnDefault(tableName: string, columnName: string, options: any) {
         this.changeColumnDefaultCalls += 1;
         return super.changeColumnDefault(tableName, columnName, options);

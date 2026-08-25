@@ -214,7 +214,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 export async function quoteDefaultExpression(
   this: QuotingDispatchHost,
   value: unknown,
-  column?: DefaultExpressionColumn | null,
+  column: DefaultExpressionColumn,
   castTypeLookup?: CastTypeLookup | null,
 ): Promise<string> {
   if (value === undefined) return "";

@@ -98,4 +98,21 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Employee.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length + 1);
     expect(Model.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length);
   });
+
+  it("_read_attribute raises for a name with no reader, as __send__ does", () => {
+    // Ruby's `_read_attribute` is `__send__(attr)` (attribute_methods.rb:556),
+    // which raises NoMethodError for an undefined name; `method_missing`
+    // (:507-514) re-raises it through `super` when nothing matched.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const person = new Person({ name: "Alexander" });
+
+    expect(person._readAttribute("name")).toBe("Alexander");
+    expect(() => person._readAttribute("nope")).toThrow(
+      /undefined method 'nope' for an instance of Person/,
+    );
+  });
 });

@@ -278,19 +278,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Gate named-prepared-statement routing through our pool. Rails' gate is
-   * `prepared_statements && !binds.empty?` (the inverse of
-   * `without_prepared_statement?`, abstract_adapter.rb:1177) and nothing more.
-   * In particular it does not consult `statement_limit`: a limit of 0 is
-   * unsupported in Rails, whose `StatementPool#[]=` loop raises on the empty
-   * cache (statement_pool.rb:31-33), so there is nothing for this gate to
-   * degrade around.
-   */
-  _shouldPrepare(binds: unknown[]): boolean {
-    return this.preparedStatements && binds.length > 0;
-  }
-
-  /**
    * Track a SQL string in the statement pool BEFORE handing it to
    * `conn.execute()`. If the insert evicts an older entry, our pool's
    * `dealloc` sends COM_STMT_CLOSE via `unprepare` so the mysql2

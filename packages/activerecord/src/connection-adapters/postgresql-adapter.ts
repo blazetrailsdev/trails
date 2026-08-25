@@ -1133,7 +1133,10 @@ export class PostgreSQLAdapter
                   binds ?? [],
                   bindArray,
                   {
-                    prepare: options?.prepare === false ? false : this._shouldPrepare(bindArray),
+                    prepare:
+                      options?.prepare === false
+                        ? false
+                        : this.preparedStatements && bindArray.length > 0,
                     notificationPayload: payload,
                     rowMode: "array",
                   },
@@ -1423,22 +1426,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * True when the adapter should try a named prepared statement for
-   * this call. Rails' gate: `prepared_statements && !binds.empty?`
-   * (there's no point naming an unparameterized statement — the
-   * parse cost is the same either way and the name never gets
-   * reused without binds).
-   */
-  private _shouldPrepare(binds: unknown[]): boolean {
-    // Rails' gate and nothing more (the inverse of
-    // `without_prepared_statement?`, abstract_adapter.rb:1177). It does not
-    // consult `statement_limit`: a limit of 0 is unsupported in Rails, whose
-    // `StatementPool#[]=` loop raises on the empty cache
-    // (statement_pool.rb:31-33), so there is no zero-limit case to branch on.
-    return this.preparedStatements && binds.length > 0;
-  }
-
-  /**
    * Execute a SELECT query and return rows. Wrapped in a
    * `sql.active_record` notification — mirrors Rails'
    * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
@@ -1461,7 +1448,7 @@ export class PostgreSQLAdapter
           return await this.withRawConnection({ allowRetry }, async (conn) => {
             const client = conn as unknown as pg.Client;
             const result = await this._performQuery(client, rewritten, binds, bindArray, {
-              prepare: this._shouldPrepare(bindArray),
+              prepare: this.preparedStatements && bindArray.length > 0,
               notificationPayload: payload,
             });
             return result?.rows ?? [];
@@ -1581,7 +1568,7 @@ export class PostgreSQLAdapter
                 await client.query(`SAVEPOINT "${spName}"`);
               }
               const result = await this._performQuery(client, withReturning, originalBinds, binds, {
-                prepare: this._shouldPrepare(binds),
+                prepare: this.preparedStatements && binds.length > 0,
                 notificationPayload: payload,
               });
               if (useSavepoint) {
@@ -1614,7 +1601,7 @@ export class PostgreSQLAdapter
               }
               payload.sql = pgSql;
               const result = await this._performQuery(client, pgSql, originalBinds, binds, {
-                prepare: this._shouldPrepare(binds),
+                prepare: this.preparedStatements && binds.length > 0,
                 notificationPayload: payload,
               });
               const affected = this.affectedRows(result);
@@ -1625,7 +1612,7 @@ export class PostgreSQLAdapter
 
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
             const result = await this._performQuery(client, pgSql, originalBinds, binds, {
-              prepare: this._shouldPrepare(binds),
+              prepare: this.preparedStatements && binds.length > 0,
               notificationPayload: payload,
             });
             const affected = this.affectedRows(result);
@@ -1637,7 +1624,7 @@ export class PostgreSQLAdapter
           }
 
           const result = await this._performQuery(client, pgSql, originalBinds, binds, {
-            prepare: this._shouldPrepare(binds),
+            prepare: this.preparedStatements && binds.length > 0,
             notificationPayload: payload,
           });
           const affected = this.affectedRows(result);
@@ -2062,7 +2049,7 @@ export class PostgreSQLAdapter
           // Rails' internal_execute forwards `prepare:` to raw_execute →
           // perform_query (abstract/database_statements.rb:552-558, 589-591).
           const runResult = await this._performQuery(client, runSql, binds, bindArray, {
-            prepare: prepare === false ? false : this._shouldPrepare(bindArray),
+            prepare: prepare === false ? false : this.preparedStatements && bindArray.length > 0,
             notificationPayload: payload,
             rowMode: "array",
           });
@@ -3111,7 +3098,7 @@ export class PostgreSQLAdapter
    * correctly. Async: a ColumnDefinition (no OID) resolves its cast type via
    * `lookupCastType`'s live regtype query, as Rails does.
    */
-  override quoteDefaultExpression(value: unknown, column?: unknown): Promise<string> {
+  override quoteDefaultExpression(value: unknown, column: unknown): Promise<string> {
     const col = column as
       | {
           sqlType?: string | null;
@@ -3154,17 +3141,15 @@ export class PostgreSQLAdapter
     return pgQuoteDefaultExpression.call(
       this,
       value,
-      col != null
-        ? {
-            array: isArray,
-            sqlType: rawSqlType,
-            oid: col.oid ?? null,
-            fmod: col.fmod ?? null,
-            // Rails' uuid branch tests `column.type` (the AR type symbol), not
-            // sql_type, so forward it separately from `rawSqlType`.
-            type: col.type ?? null,
-          }
-        : null,
+      {
+        array: isArray,
+        sqlType: rawSqlType,
+        oid: col?.oid ?? null,
+        fmod: col?.fmod ?? null,
+        // Rails' uuid branch tests `column.type` (the AR type symbol), not
+        // sql_type, so forward it separately from `rawSqlType`.
+        type: col?.type ?? null,
+      },
       lookup,
     );
   }

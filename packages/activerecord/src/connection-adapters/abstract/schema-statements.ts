@@ -587,7 +587,7 @@ export class SchemaStatements {
       const defaultClause =
         options.default === undefined
           ? ""
-          : ` DEFAULT ${await this.quoteDefaultExpression(options.default)}`;
+          : ` DEFAULT ${await this.quoteDefaultExpression(options.default, { sqlType })}`;
       await this.execute(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
@@ -600,7 +600,7 @@ export class SchemaStatements {
       }
       if (options.default !== undefined) {
         clauses.push(
-          `ALTER COLUMN ${col} SET DEFAULT ${await this.quoteDefaultExpression(options.default)}`,
+          `ALTER COLUMN ${col} SET DEFAULT ${await this.quoteDefaultExpression(options.default, { sqlType })}`,
         );
       }
       await this.execute(`ALTER TABLE ${table} ${clauses.join(", ")}`);
@@ -609,7 +609,7 @@ export class SchemaStatements {
       const defaultClause =
         options.default === undefined
           ? ""
-          : ` DEFAULT ${await this.quoteDefaultExpression(options.default)}`;
+          : ` DEFAULT ${await this.quoteDefaultExpression(options.default, { sqlType })}`;
       await this.execute(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
@@ -689,7 +689,9 @@ export class SchemaStatements {
     // (extract_new_default_value, schema_statements.rb:1820); a bare structured
     // default like `{ to: 1 }` without :from is the literal default.
     const defaultVal = this.extractNewDefaultValue(defaultOrChanges);
-    const clause = await this.quoteDefaultExpression(defaultVal);
+    // Rails resolves the column before quoting (postgresql/schema_statements.rb:490).
+    const column = await this.columnFor(tableName, columnName);
+    const clause = await this.quoteDefaultExpression(defaultVal, column);
     await this.execute(
       `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} SET DEFAULT ${clause || "NULL"}`,
     );
@@ -703,7 +705,10 @@ export class SchemaStatements {
   ): Promise<void> {
     this.validateChangeColumnNullArgumentBang(allowNull);
     if (!allowNull && defaultValue !== undefined) {
-      const quoted = await this.quoteDefaultExpression(defaultValue);
+      // Rails: `column = column_for(table_name, column_name)` before quoting
+      // (postgresql/schema_statements.rb:502-503).
+      const column = await this.columnFor(tableName, columnName);
+      const quoted = await this.quoteDefaultExpression(defaultValue, column);
       await this.execute(
         `UPDATE ${this.quoteColumnName(tableName)} SET ${this.quoteColumnName(columnName)} = ${quoted} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
       );
