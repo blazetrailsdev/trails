@@ -54,7 +54,7 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     const adapter = track(new BetterSQLite3Adapter(":memory:"));
     await adapter.exec(`CREATE TABLE t (id INTEGER)`);
     await adapter.execute("SELECT * FROM t WHERE id = ?", [1]);
-    adapter.clearCacheBang();
+    await adapter.clearCacheBang();
     await adapter.execute("SELECT * FROM t WHERE id = ?", [2]);
     await adapter.exec(`DROP TABLE IF EXISTS t`);
   });

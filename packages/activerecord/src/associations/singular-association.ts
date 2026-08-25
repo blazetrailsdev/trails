@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition, AssociationOptions } from "../associations.js";
+import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
   _findTargetReachable,
@@ -15,12 +15,8 @@ import {
   validateInverseOf,
 } from "../associations.js";
 import { Association } from "./association.js";
-import { ownerForeignKeyColumns } from "./foreign-association.js";
-import { AssociationNotFoundError, CompositePrimaryKeyMismatchError } from "./errors.js";
-import {
-  routeThroughCheckValidity,
-  validateThroughReflection,
-} from "./validate-through-reflection.js";
+import { AssociationNotFoundError } from "./errors.js";
+import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
@@ -334,10 +330,6 @@ export class SingularAssociation extends Association {
         validateInverseOf(ctor, targetModel, assocName, options.inverseOf);
       }
 
-      if (!isBelongsTo) {
-        _validateHasOnePolymorphicKeys(owner, assocName, options);
-      }
-
       const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
       const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
         ? ownerSideReflection.joinForeignKey
@@ -434,37 +426,4 @@ export class SingularAssociation extends Association {
 /** @internal */
 function scopeForCreate(assoc: SingularAssociation): Record<string, unknown> {
   return (assoc as any).scope?.()?.scopeForCreate?.() ?? {};
-}
-
-/**
- * has_one's polymorphic `:as` key guard: a composite FK is always rejected, and
- * a composite owner PK collapses to "id" when present (matching Rails'
- * `join_id_for`); otherwise it is rejected too.
- *
- * @internal
- */
-function _validateHasOnePolymorphicKeys(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): void {
-  if (!options.as) return;
-  const ctor = record.constructor as typeof Base;
-  const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, options);
-  const foreignKey: string | string[] =
-    foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
-  if (!Array.isArray(foreignKey) && !(Array.isArray(primaryKey) && !primaryKey.includes("id"))) {
-    return;
-  }
-  // Route through the reflection's canonical checkValidityBang (Rails' single
-  // raise site) so the error carries the Rails-faithful message; it is a no-op
-  // for polymorphic `:as`, which Rails never allows a composite key on.
-  routeThroughCheckValidity(ctor, assocName);
-  throw new CompositePrimaryKeyMismatchError({
-    activeRecord: ctor.name,
-    name: assocName,
-    primaryKey,
-    foreignKey,
-  });
 }

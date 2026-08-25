@@ -923,6 +923,16 @@ export class AbstractAdapter implements Quoting {
    * the async chain — so the Fiber arm's monitor is the only one there is.
    */
   lock: LoadInterlockAwareMonitor = new LoadInterlockAwareMonitor();
+
+  /**
+   * Rails' `@statements`, assigned once from `build_statement_pool`
+   * (abstract_adapter.rb:156) and read under that name by every adapter and by
+   * `clear_cache!` (abstract_adapter.rb:739-748). Adapters that build no pool
+   * leave it unset, which is the `if @statements` guard's false arm.
+   *
+   * @internal
+   */
+  _statements?: { reset(): void; clear(): void | Promise<void> } | null;
   /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
   private _inspectId?: number;
   private static _inspectSeq?: number;
@@ -1422,13 +1432,26 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * Clear the connection's prepared-statement cache. Rails' `clear_cache!` is
-   * synchronous because `dealloc` blocks on libpq; node-pg's DEALLOCATE is a
-   * promise, so the PostgreSQL override hands back the pool's dealloc chain and
-   * every call site that can await does.
+   * synchronous because `dealloc` blocks on libpq; node's DEALLOCATE / finalize
+   * is a promise, so this hands back the pool's chain and every call site that
+   * can await does.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#clear_cache!
+   * (abstract_adapter.rb:739-748)
    */
-  clearCacheBang(_opts: { newConnection?: boolean } = {}): void | Promise<void> {}
+  clearCacheBang({
+    newConnection = false,
+  }: { newConnection?: boolean } = {}): void | Promise<void> {
+    if (this._statements) {
+      return this.lock.synchronize(() => {
+        if (newConnection) {
+          this._statements!.reset();
+        } else {
+          return this._statements!.clear();
+        }
+      });
+    }
+  }
 
   /**
    * The key under which `sql` is stored in the connection's statement pool.

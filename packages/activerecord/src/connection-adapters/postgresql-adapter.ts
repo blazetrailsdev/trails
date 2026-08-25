@@ -533,7 +533,7 @@ export class PostgreSQLAdapter
   // `postgresql/database-statements.ts` can reach the statement cache Rails
   // names `@statements`.
   /** @internal */
-  _statements!: StatementPool;
+  declare _statements: StatementPool;
   private _needsDeallocateAll = false;
   private _closed = false;
   private _closingDriver: Promise<void> | null = null;
@@ -2694,20 +2694,6 @@ export class PostgreSQLAdapter
     // discard!). So we drop the references above and call the no-op super
     // without running the disconnect/reset-transaction lifecycle.
     super.discardBang();
-  }
-
-  /**
-   * Test-only accessor for the adapter's `@statements` pool. Built in the
-   * constructor and never replaced: it survives commit/rollback, disconnect,
-   * and reconnect, because Rails' pool holds the ADAPTER and re-reads the raw
-   * connection at dealloc time. Mirrors Rails'
-   * `raw_connection.instance_variable_get(:@statement_pool)` escape
-   * hatch used by `PostgreSQL::StatementPoolTest`.
-   *
-   * @internal
-   */
-  _statementPoolForTest(): StatementPool | undefined {
-    return this._statements;
   }
 
   /** @internal — the currently-held txn client (always _rawConnection while in TX). */

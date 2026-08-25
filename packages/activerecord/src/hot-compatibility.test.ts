@@ -9,11 +9,9 @@ import { fixtures } from "./test-fixtures.js";
 
 // Rails' `get_prepared_statement_cache(connection)` reaches into
 // `@statements.@cache[Process.pid]`. The trails PG adapter owns a single
-// session-scoped StatementPool, surfaced for tests via `_statementPoolForTest`.
+// session-scoped StatementPool, held in `@statements` like Rails'.
 function preparedStatementCacheSize(adapter: DatabaseAdapter): number {
-  const pool = (
-    adapter as unknown as { _statementPoolForTest(): StatementPool | undefined }
-  )._statementPoolForTest();
+  const pool = (adapter as unknown as { _statements?: StatementPool })._statements;
   return pool?.length ?? 0;
 }
 
