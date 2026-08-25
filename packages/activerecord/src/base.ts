@@ -91,7 +91,6 @@ import {
   isValid as validationsIsValid,
   defaultValidationContext,
   _setSuperIsValid,
-  _setSuperValidates,
   type ValidationContextArg,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
@@ -1822,7 +1821,7 @@ export class Base extends Model {
   declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
 
   // --- Validations::ClassMethods (wired via extend() after class body) ---
-  declare static validates: typeof _Validations.validates;
+  declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
   // -- Enums (wired via extend() after class body) --
@@ -4531,6 +4530,22 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
+// `validates`' `const_get("#{key.to_s.camelize}Validator")`
+// (activemodel/lib/active_model/validations/validates.rb:121) resolves against
+// the model's ancestors, which include `ActiveRecord::Validations` — so an AR
+// model finds THAT module's column-aware validators. JS has no ancestry
+// constant lookup, so they ride on `Base` as statics, inherited the way Ruby
+// inherits the constant. Assigned, not extended: `extend()` skips constants
+// because Ruby's `extend` copies methods only.
+// Listed in the require order of validations.rb:96-101.
+Object.assign(Base, {
+  AssociatedValidator: _Validations.AssociatedValidator,
+  UniquenessValidator: _Validations.UniquenessValidator,
+  PresenceValidator: _Validations.PresenceValidator,
+  AbsenceValidator: _Validations.AbsenceValidator,
+  LengthValidator: _Validations.LengthValidator,
+  NumericalityValidator: _Validations.NumericalityValidator,
+});
 include(Base, CallbacksInstanceMethods);
 // Ruby `include ActiveRecord::Transactions` (transactions.rb:10-14).
 include(Base, TransactionsInstanceMethods);
@@ -4944,11 +4959,9 @@ for (const [name, fn] of [
   });
 }
 
-// Register Model's super methods for the Validations module.
-// Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid)
-// and on validates (AR's validates routes remaining rules through Model.validates).
+// Register Model's super method for the Validations module.
+// Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid).
 _setSuperIsValid(Model.prototype.isValid);
-_setSuperValidates(Model.validates);
 
 // Add attributes= setter (Rails: alias for assign_attributes) while preserving
 // the existing Model getter. Can't go through include() since object-literal
