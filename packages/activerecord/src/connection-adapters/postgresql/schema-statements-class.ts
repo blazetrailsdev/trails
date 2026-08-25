@@ -116,9 +116,19 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
   ): Promise<void> {
-    // TS has no kwargs, so Rails' `*table_names, **options`
-    // (abstract/schema_statements.rb:540) arrives as a trailing options object
-    // on the rest parameter.
+    // Ruby's `*table_names, **options` swallows neither an omitted argument nor
+    // a block into `table_names` (abstract/schema_statements.rb:540); TS spells
+    // both as trailing arguments, so they come off first — the block is only
+    // ever read by CommandRecorder, which keeps it so `drop_table` can invert
+    // to `create_table`.
+    const rest = [...args] as unknown[];
+    while (
+      rest.length > 0 &&
+      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
+    ) {
+      rest.pop();
+    }
+    args = rest as typeof args;
     const last = args[args.length - 1];
     const hasOptions = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];

@@ -81,23 +81,6 @@ export class CommandRecorder {
   }
 
   /**
-   * Mirrors the generated `transaction` forwarder (command_recorder.rb:125-132)
-   * together with the first half of `invert_transaction` (:186-188). Ruby's
-   * `inverse_of` runs the block inline because a Ruby block is synchronous; a
-   * TS block returns a promise, so the block runs — and its commands are
-   * recorded onto this recorder, inverted — here, before `record` appends the
-   * `transaction` command itself.
-   */
-  async transaction(...args: unknown[]): Promise<void> {
-    const block =
-      typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
-    if (this._reverting && block !== undefined) {
-      await (block as () => Promise<void>)();
-    }
-    this.record("transaction", args, block);
-  }
-
-  /**
    * Execute a block in reverting mode. Commands recorded inside the block
    * are collected, reversed, and their inverses are appended to the
    * command list.
@@ -794,6 +777,26 @@ const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "createVirtualTable",
   "dropVirtualTable",
 ] as const;
+
+/**
+ * `transaction` is generated like every other recordable command
+ * (command_recorder.rb:125-132), but it also carries the first half of
+ * `invert_transaction` (:186-188): Ruby's `inverse_of` runs the block inline
+ * because a Ruby block is synchronous, while a TS block returns a promise. So
+ * the block runs — recording its commands, already inverted, onto this
+ * recorder — before `record` appends the `transaction` command itself.
+ */
+(CommandRecorder.prototype as unknown as Record<string, unknown>)["transaction"] = async function (
+  this: CommandRecorder,
+  ...args: unknown[]
+): Promise<void> {
+  const block =
+    typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
+  if (this.reverting && block !== undefined) {
+    await (block as () => Promise<void>)();
+  }
+  this.record("transaction", args, block);
+};
 
 for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
   if (method in CommandRecorder.prototype) continue;

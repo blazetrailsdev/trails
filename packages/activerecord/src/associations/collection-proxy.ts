@@ -601,11 +601,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Rails' `@association` ivar (collection_proxy.rb:31-35), which every
    * mutation on the proxy delegates to — `target` (:33), `loaded?` (:53) and
-   * `delete_all` (:474) all read the same seat.
+   * `delete_all` (:474) all read the same seat. trails resolves it off the
+   * owner instead of holding it, because the proxy is built from the
+   * reflection, not handed the association object.
    * @internal
    */
   private _collectionAssociation(): CollectionAssociation {
-    return this._association;
+    return this._record.association(this._assocName) as unknown as CollectionAssociation;
   }
 
   /**
