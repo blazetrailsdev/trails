@@ -596,7 +596,7 @@ export abstract class SchemaDumper {
           (typeof createDialectDumper === "function"
             ? (createDialectDumper.call(pool, options) as SchemaDumper | undefined | null)
             : undefined) ?? this.create(source, options);
-        return dumper.dump(stream) as Promise<string[]>;
+        return dumper.dump(stream);
       })();
     }
     if (isConnectionPool(pool)) {
@@ -634,45 +634,13 @@ export abstract class SchemaDumper {
     return stream.join("\n");
   }
 
-  dump(stream: string[] = []): string[] | Promise<string[]> {
+  async dump(stream: string[] = []): Promise<string[]> {
     this.header(stream);
-    const schemasResult = this.schemas(stream);
-    // Run header sections sequentially to preserve deterministic output order
-    // (schemas → extensions → types). If any section is async, chain the rest.
-    if (schemasResult instanceof Promise) {
-      return schemasResult
-        .then(() => this.extensions(stream))
-        .then(() => this.types(stream))
-        .then(() => this._finalizeDump(stream));
-    }
-    const extensionsResult = this.extensions(stream);
-    if (extensionsResult instanceof Promise) {
-      return extensionsResult.then(() => this.types(stream)).then(() => this._finalizeDump(stream));
-    }
-    const typesResult = this.types(stream);
-    if (typesResult instanceof Promise) {
-      return typesResult.then(() => this._finalizeDump(stream));
-    }
-    return this._finalizeDump(stream);
-  }
-
-  /** @internal */
-  private _finalizeDump(stream: string[]): string[] | Promise<string[]> {
-    const result = this.tables(stream);
-    if (result instanceof Promise) {
-      return result.then(async () => {
-        await this.virtualTables(stream);
-        this.trailer(stream);
-        return stream;
-      });
-    }
-    const vtResult = this.virtualTables(stream);
-    if (vtResult instanceof Promise) {
-      return vtResult.then(() => {
-        this.trailer(stream);
-        return stream;
-      });
-    }
+    await this.schemas(stream);
+    await this.extensions(stream);
+    await this.types(stream);
+    await this.tables(stream);
+    await this.virtualTables(stream);
     this.trailer(stream);
     return stream;
   }
@@ -709,55 +677,26 @@ export abstract class SchemaDumper {
     stream.push("}");
   }
 
-  private tables(stream: string[]): void | Promise<void> {
-    const tableNames = this._source.tables();
-    if (tableNames instanceof Promise) {
-      return tableNames.then(async (raw) => {
-        const sortedTables = [...raw].sort();
+  private async tables(stream: string[]): Promise<void> {
+    const sortedTables = [...(await this._source.tables())].sort();
 
-        const notIgnoredTables = sortedTables.filter((tableName) => !this.isIgnored(tableName));
+    const notIgnoredTables = sortedTables.filter((tableName) => !this.isIgnored(tableName));
 
-        for (const tableName of notIgnoredTables) {
-          await this.table(tableName, stream);
-        }
-
-        // dump foreign keys at the end to make sure all dependent tables exist.
-        if (this._fkHookHost() !== undefined) {
-          const foreignKeysStream: string[] = [];
-          for (const tbl of notIgnoredTables) {
-            await this.foreignKeys(tbl, foreignKeysStream);
-          }
-
-          for (const line of foreignKeysStream) stream.push(line);
-        }
-      });
+    for (const [index, tableName] of notIgnoredTables.entries()) {
+      await this.table(tableName, stream);
+      if (index < notIgnoredTables.length - 1) stream.push("");
     }
-    const sorted = [...tableNames].sort();
-    for (const tableName of sorted) {
-      if (this.isIgnored(tableName)) continue;
-      const columns = this._source.columns(tableName);
-      const indexes = this._source.indexes(tableName);
-      if (columns instanceof Promise || indexes instanceof Promise) {
-        throw new TypeError(
-          "SchemaSource.columns()/indexes() returned a Promise while tables() was synchronous. " +
-            "Use the async schema dumper path (make tables() return a Promise) or ensure all schema methods are synchronous.",
-        );
+
+    // dump foreign keys at the end to make sure all dependent tables exist.
+    if (this._fkHookHost() !== undefined) {
+      const foreignKeysStream: string[] = [];
+      for (const tbl of notIgnoredTables) {
+        await this.foreignKeys(tbl, foreignKeysStream);
       }
-      const adapterTableOpts = this.fetchTableOptions(tableName);
-      if (adapterTableOpts instanceof Promise) {
-        void adapterTableOpts.catch(() => {});
-        throw new TypeError(
-          "fetchTableOptions() returned a Promise while tables() was synchronous. " +
-            "Use the async schema dumper path (make tables() return a Promise) or ensure all schema methods are synchronous.",
-        );
-      }
-      this.tableName = tableName;
-      try {
-        this.emitTable(stream, tableName, columns, indexes, adapterTableOpts);
-        stream.push("");
-      } finally {
-        this.tableName = undefined;
-      }
+
+      if (foreignKeysStream.length > 0) stream.push("");
+
+      for (const line of foreignKeysStream) stream.push(line);
     }
   }
 
@@ -880,7 +819,6 @@ export abstract class SchemaDumper {
       const remaining = await this.gatherInlineConstraints(table, inlineLines);
       this.emitTable(stream, table, columns, indexes, adapterTableOpts, inlineLines);
       if (remaining && remaining.length > 0) stream.push("", ...remaining);
-      stream.push("");
     } finally {
       this.tableName = undefined;
     }

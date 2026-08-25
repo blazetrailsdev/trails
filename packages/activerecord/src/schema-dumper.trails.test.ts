@@ -41,7 +41,7 @@ describe("SchemaDumper trails-only cases", () => {
       indexes: () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
-    const output = (TopLevelDumper.dump(source) as string[]).join("\n");
+    const output = (await TopLevelDumper.dump(source)).join("\n");
     expect(output).toContain(`() => "gen_random_uuid()"`);
   });
 
@@ -72,7 +72,7 @@ describe("SchemaDumper trails-only cases", () => {
       indexes: () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
-    const output = (TopLevelDumper.dump(source) as string[]).join("\n");
+    const output = (await TopLevelDumper.dump(source)).join("\n");
     for (const helper of [
       "int4range",
       "int8range",
@@ -109,7 +109,7 @@ describe("SchemaDumper trails-only cases", () => {
       indexes: () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
     };
-    const output = (TopLevelDumper.dump(source) as string[]).join("\n");
+    const output = (await TopLevelDumper.dump(source)).join("\n");
     // Regression guard against collapsing to the `enum` fallback. timestamptz/
     // interval/oid resolve to their TableDefinition helpers (`t.timestamptz`/
     // `t.interval`/`t.oid`); uuid has no helper and round-trips through the
