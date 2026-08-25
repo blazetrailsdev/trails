@@ -2469,7 +2469,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         columnOptions.as = column.defaultFunction;
         columnOptions.stored = column.isVirtualStored();
         columnOptions.type = column.type;
-      } else if (column.hasDefault && !column.autoIncrement) {
+      } else if (column.hasDefault && !column.isAutoIncrement()) {
         const defaultFunction = column.defaultFunction;
         const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
           column.default,

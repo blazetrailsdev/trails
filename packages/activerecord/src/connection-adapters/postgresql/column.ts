@@ -12,7 +12,7 @@ import { isPresent } from "@blazetrails/activesupport";
 export class Column extends BaseColumn {
   serial: boolean;
   identity: string | null;
-  generated: string | null;
+  private _generated: string | null;
 
   constructor(
     name: string,
@@ -35,7 +35,7 @@ export class Column extends BaseColumn {
     });
     this.serial = options.serial ?? false;
     this.identity = options.identity ?? null;
-    this.generated = options.generated ?? null;
+    this._generated = options.generated ?? null;
   }
 
   // Mirrors: `delegate :oid, :fmod, to: :sql_type_metadata` (postgresql/column.rb:7).
@@ -92,7 +92,7 @@ export class Column extends BaseColumn {
 
   /** Mirrors: PostgreSQL::Column#virtual? — `@generated.present?` (`postgresql/column.rb:27-30`) */
   override isVirtual(): boolean {
-    return isPresent(this.generated);
+    return isPresent(this._generated);
   }
 
   // Mirrors: Column#has_default? — virtual columns never have a user-visible default
@@ -137,7 +137,7 @@ export class Column extends BaseColumn {
   override initWith(coder: ColumnCoder): void {
     this.serial = (coder["serial"] as boolean) ?? false;
     this.identity = (coder["identity"] as string | null) ?? null;
-    this.generated = (coder["generated"] as string | null) ?? null;
+    this._generated = (coder["generated"] as string | null) ?? null;
     super.initWith(coder);
   }
 
@@ -145,7 +145,7 @@ export class Column extends BaseColumn {
   override encodeWith(coder: ColumnCoder): void {
     coder["serial"] = this.serial;
     coder["identity"] = this.identity;
-    coder["generated"] = this.generated;
+    coder["generated"] = this._generated;
     super.encodeWith(coder);
     coder["class"] = "PostgreSQL::Column";
   }
