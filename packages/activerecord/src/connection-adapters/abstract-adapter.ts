@@ -22,6 +22,7 @@ import {
   type SQLWarning,
 } from "../errors.js";
 import {
+  ActiveSupport,
   IsolatedExecutionState,
   LoadInterlockAwareMonitor,
   Notifications,
@@ -1906,12 +1907,14 @@ export class AbstractAdapter implements Quoting {
     this.resetTransaction();
     // Rails' `reset!` ends in `attempt_configure_connection`
     // (abstract_adapter.rb:725-731). `resetBang` is sync per the pool's
-    // contract, so the async hop is scheduled rather than awaited;
-    // `attemptConfigureConnection` already disconnects the connection on
-    // failure (abstract_adapter.rb:1216-1221) and a sync caller has nowhere to
-    // receive the re-raise, so the rejection is absorbed here instead of
-    // surfacing as an unhandled rejection.
-    void this.attemptConfigureConnection().catch(() => {});
+    // contract, so the async hop is scheduled rather than awaited, and a sync
+    // caller has nowhere to receive the re-raise
+    // (abstract_adapter.rb:1216-1221) — the connection is already disconnected
+    // by then, so the next lease reconnects and surfaces the real error. The
+    // rejection itself goes to the error reporter rather than being dropped.
+    void this.attemptConfigureConnection().catch((error: Error) => {
+      ActiveSupport.errorReporter.report(error, { handled: true });
+    });
   }
 
   supportsAdvisoryLocks(): boolean {

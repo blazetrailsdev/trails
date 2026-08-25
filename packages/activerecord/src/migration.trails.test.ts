@@ -170,7 +170,8 @@ describe("MigrationTest", () => {
     const m = new M();
     // Rails has no `Migration#change_table`: `method_missing` forwards to the
     // adapter, whose `change_table` yields `update_table_definition(table_name,
-    // self)` — the ADAPTER, not the migration (abstract/schema_statements.rb:729-737).
+    // base)` — the ADAPTER by default, not the migration
+    // (abstract/schema_statements.rb:510-518).
     const connection = {
       quoteColumnName: (n: string) => n,
       quoteTableName: (n: string) => n,
