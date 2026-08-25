@@ -143,17 +143,17 @@ describe("CommandRecorder", () => {
         await t.removeCheckConstraint();
       });
       expect(recorder.commands).toEqual([
-        ["removeColumns", ["fruits", "name"]],
-        ["addIndex", ["fruits", "kind"]],
-        ["addTimestamps", ["fruits"]],
-        ["removeTimestamps", ["fruits"]],
-        ["removeIndex", ["fruits", "kind"]],
-        ["addReference", ["fruits", "supplier"]],
-        ["removeReference", ["fruits", "supplier"]],
-        ["addForeignKey", ["fruits", "suppliers"]],
-        ["removeForeignKey", ["fruits"]],
-        ["addCheckConstraint", ["fruits", "qty > 0"]],
-        ["removeCheckConstraint", ["fruits"]],
+        ["removeColumns", ["fruits", "name"], undefined],
+        ["addIndex", ["fruits", "kind"], undefined],
+        ["addTimestamps", ["fruits"], undefined],
+        ["removeTimestamps", ["fruits"], undefined],
+        ["removeIndex", ["fruits", "kind"], undefined],
+        ["addReference", ["fruits", "supplier"], undefined],
+        ["removeReference", ["fruits", "supplier"], undefined],
+        ["addForeignKey", ["fruits", "suppliers"], undefined],
+        ["removeForeignKey", ["fruits"], undefined],
+        ["addCheckConstraint", ["fruits", "qty > 0"], undefined],
+        ["removeCheckConstraint", ["fruits"], undefined],
       ]);
     });
 
@@ -165,9 +165,9 @@ describe("CommandRecorder", () => {
         await t.removeCheckConstraint({ name: "chk" });
       });
       expect(recorder.commands).toEqual([
-        ["removeCheckConstraint", ["fruits", "qty > 0", { name: "chk" }]],
-        ["removeCheckConstraint", ["fruits", "qty > 0"]],
-        ["removeCheckConstraint", ["fruits", { name: "chk" }]],
+        ["removeCheckConstraint", ["fruits", "qty > 0", { name: "chk" }], undefined],
+        ["removeCheckConstraint", ["fruits", "qty > 0"], undefined],
+        ["removeCheckConstraint", ["fruits", { name: "chk" }], undefined],
       ]);
     });
 
