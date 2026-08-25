@@ -19,7 +19,7 @@ export class RoutesReloader {
   externalRoutes: string[] = [];
   eagerLoad = false;
   loaded = false;
-  /** @internal Rails `attr_writer :run_after_load_paths`. */
+  /** Mirrors: Rails `attr_writer :run_after_load_paths` (routes_reloader.rb:12). */
   runAfterLoadPaths: () => void | Promise<void> = () => {};
 
   async reload(

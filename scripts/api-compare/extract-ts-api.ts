@@ -725,7 +725,7 @@ export function extractFromProgram(
         const fnCallSeq = extractCallSeq(node.body);
         const fnCallArgs = extractCallArgs(node.body);
         const fnSkeleton = extractSkeleton(node.body);
-        const internal = hasInternalJsDocTag(node);
+        const internal = internalJsDocTagApplies(node);
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
         const fnMissingRailsArgs = missingRailsArgsTags(node);
@@ -821,7 +821,7 @@ export function extractFromProgram(
         const hasProtectedMod = hasModifier(decl, ts.SyntaxKind.ProtectedKeyword);
         const visibility: "public" | "private" | "protected" =
           isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
-        const internal = visibility !== "public" || hasInternalJsDocTag(decl);
+        const internal = visibility !== "public" || internalJsDocTagApplies(decl);
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
         const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
         // Only a member DECLARED in this file carries its tag into the mixin
@@ -875,7 +875,7 @@ export function extractFromProgram(
             ? { declaredIn: ctorDeclFile }
             : {}),
           ...(ctorVisibility !== "public" ||
-          (ctorDecl !== undefined && hasInternalJsDocTag(ctorDecl))
+          (ctorDecl !== undefined && internalJsDocTagApplies(ctorDecl))
             ? { internal: true }
             : {}),
           ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
@@ -968,7 +968,7 @@ export function extractFromProgram(
             const callSeq = extractCallSeq(body);
             const callArgs = extractCallArgs(body);
             const skeleton = extractSkeleton(body);
-            const internal = hasInternalJsDocTag(decl);
+            const internal = internalJsDocTagApplies(decl);
             // A renamed export (`export { withRoutesHelpers as with }`) is its
             // own surface entry: the declaration's tag justifies the DECLARED
             // spelling, and inheriting it would manufacture a stale tag on the
@@ -1740,6 +1740,21 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
 }
 
 /**
+ * Whether a declaration's `@internal` JSDoc tag confers `internal: true`.
+ *
+ * `@internal` keeps its TypeDoc meaning, but a declaration that ALSO carries
+ * `@noRailsEquivalent` has a receipt for being extra surface, and RFC 0121
+ * makes that receipt win: the member re-enters the measured surface so
+ * `parity:api:extra` scores it `Allowed` (PERMANENT / CONVERGEABLE) instead of
+ * dropping it unmeasured. Only the JSDoc tag yields — a real TS
+ * `private`/`protected` modifier or a `#` identifier still confers `internal`
+ * unconditionally, and every call site keeps that half of the disjunction.
+ */
+export function internalJsDocTagApplies(node: ts.Node): boolean {
+  return hasInternalJsDocTag(node) && noRailsEquivalentReason(node) === undefined;
+}
+
+/**
  * Reason prose of a declaration's `@noRailsEquivalent` tag, or undefined when
  * the tag is absent. Unlike `@internal` (which removes the method from the
  * compared surface), this tag keeps the method counted and justifies it as
@@ -1906,7 +1921,7 @@ function noRailsEquivalentOfSymbol(
 function isInternalSymbol(symbol: ts.Symbol | undefined, checker: ts.TypeChecker): boolean {
   let target = symbol;
   if (target && target.flags & ts.SymbolFlags.Alias) target = checker.getAliasedSymbol(target);
-  return (target?.declarations ?? []).some((d) => hasInternalJsDocTag(d));
+  return (target?.declarations ?? []).some((d) => internalJsDocTagApplies(d));
 }
 
 function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): boolean {
@@ -1916,7 +1931,7 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
   return checker
     .getTypeAtLocation(expr)
     .getCallSignatures()
-    .some((sig) => sig.declaration != null && hasInternalJsDocTag(sig.declaration));
+    .some((sig) => sig.declaration != null && internalJsDocTagApplies(sig.declaration));
 }
 
 /**
@@ -1996,7 +2011,7 @@ export function harvestObjectLiteralMethods(
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
     let writer = false;
-    let internal = hasInternalJsDocTag(prop);
+    let internal = internalJsDocTagApplies(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
@@ -2053,6 +2068,9 @@ export function harvestObjectLiteralMethods(
       }
     }
     if (!mname) continue;
+    // A reason reached through the checker (shorthand / `foo: NS.bar`) lands
+    // after the flag was computed, so apply the same precedence here.
+    if (noRailsEquivalent !== undefined) internal = false;
     const line = prop.getSourceFile().getLineAndCharacterOfPosition(prop.getStart()).line + 1;
     out.push({
       name: mname,
@@ -2205,7 +2223,7 @@ export function extractClass(
   for (const member of node.members) {
     const memberName = getMemberName(member);
     const visibility = memberVisibility(member);
-    const internal = visibility !== "public" || hasInternalJsDocTag(member);
+    const internal = visibility !== "public" || internalJsDocTagApplies(member);
     const noRailsEquivalent = noRailsEquivalentReason(member);
     const memberMissingRailsCalls = missingRailsCallTags(member);
     const memberMissingRailsArgs = missingRailsArgsTags(member);
@@ -2307,7 +2325,9 @@ export function extractClass(
           line: param.getSourceFile().getLineAndCharacterOfPosition(param.getStart()).line + 1,
           file,
           isStatic: false,
-          ...(paramVisibility !== "public" || hasInternalJsDocTag(param) ? { internal: true } : {}),
+          ...(paramVisibility !== "public" || internalJsDocTagApplies(param)
+            ? { internal: true }
+            : {}),
         });
       }
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
@@ -2501,7 +2521,7 @@ function extractInterface(
                   line: 0,
                   file,
                   ...(propVisibility !== "public" ||
-                  (propDecl !== undefined && hasInternalJsDocTag(propDecl))
+                  (propDecl !== undefined && internalJsDocTagApplies(propDecl))
                     ? { internal: true }
                     : {}),
                   ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),

@@ -99,18 +99,17 @@ export class EngineConfiguration extends RailtieConfiguration {
     return this._generators;
   }
 
-  /** @internal */
+  /** Mirrors: Rails `all_autoload_paths` (engine/configuration.rb:121). */
   allAutoloadPaths(): string[] {
     return [...this.autoloadPaths];
   }
-  /** @internal */
+  /** Mirrors: Rails `all_autoload_once_paths` (engine/configuration.rb:127). */
   allAutoloadOncePaths(): string[] {
     return [...this.autoloadOncePaths];
   }
   /** Mirrors Rails `all_eager_load_paths` (engine/configuration.rb:133-135):
    * `eager_load_paths + paths.eager_load`. Async because trails'
-   * `Paths::Root#eagerLoad` resolves existent paths via async fs.
-   * @internal */
+   * `Paths::Root#eagerLoad` resolves existent paths via async fs. */
   async allEagerLoadPaths(): Promise<string[]> {
     return [...this.eagerLoadPaths, ...(await this.paths().eagerLoad())];
   }

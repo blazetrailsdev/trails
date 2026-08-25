@@ -384,12 +384,35 @@ write.
    widening `GATED_PACKAGES` is a separate decision with its own burndown, not a
    mechanical step.
 
-4. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
+4. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
+   it holds a member out of the generated API reference — but it also drops the
+   member from the measured surface entirely, so an `@internal` with nothing
+   behind it hides extra surface for free. Two rules police the pair, both over
+   `eslint/rails-private-methods.json` (built by `pnpm rails-privates:manifest`
+   from `rails-api.json`, so both run in the `rails-comparison` CI job):
+   - `blazetrails/rails-private-jsdoc` **requires** `@internal` where the Rails
+     counterpart is private on every host in that Ruby file. Autofixable.
+   - `blazetrails/unbacked-internal-needs-receipt` (RFC 0121) is the reverse: a
+     public declaration carrying `@internal` whose (file, name) is absent from
+     the manifest must ALSO carry a `@noRailsEquivalent PERMANENT|CONVERGEABLE`
+     reason, which wins in the extractor so the member re-enters the measured
+     surface and is scored `Allowed` rather than vanishing. Not autofixable — the
+     remedies are a reviewed reason, or deleting a tag that was never earned.
+     (A real TS `private`/`protected`/`#` member still confers internal
+     unconditionally; only the JSDoc tag yields.)
+
+   The reverse rule ships behind a **per-package enrollment set** — its `files`
+   list in `eslint.config.mjs` and `eslint/rails-private-jsdoc.config.mjs`, which
+   must stay in sync. That set is **only-grow**: a package joins once its tags
+   are burnt down (one story per package under RFC 0121), and no package is ever
+   removed to turn a red run green.
+
+5. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
    `blazetrails/rails-file-structure-method-order` enforces Rails source order
    for class members and top-level functions and is autofixable, but it needs
    the manifest `pnpm parity:api` builds. Without a compare run it silently
    passes everything, then fails in the `Rails API/Test Comparison` CI job.
-5. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
+6. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
 
 ## Module mixins (Ruby `include` → TypeScript)
 

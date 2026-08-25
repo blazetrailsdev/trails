@@ -71,12 +71,26 @@ export class Configuration {
     Configuration._lifecycleBlocks.afterRoutesLoaded.push(block);
   }
 
-  /** @internal Run every block registered for `hook` with `args`. */
+  /**
+   * @internal Run every block registered for `hook` with `args`.
+   *
+   * @noRailsEquivalent CONVERGEABLE -- Rails runs each hook by iterating the
+   * matching `@@options` array at its one call site
+   * (railtie/configuration.rb:20-96); trails centralises the loop while the
+   * lifecycle callers are unported, and it folds back into them as they land.
+   */
   static runHook(hook: LifecycleHook, ...args: unknown[]): void {
     for (const block of Configuration._lifecycleBlocks[hook]) block(...args);
   }
 
-  /** @internal All lifecycle hook names, in Rails' documented order. */
+  /**
+   * @internal All lifecycle hook names, in Rails' documented order.
+   *
+   * @noRailsEquivalent CONVERGEABLE -- Rails needs no such list: each hook is
+   * its own method on `Railtie::Configuration` (railtie/configuration.rb:20-96)
+   * and nothing enumerates them. It exists only to drive `runHook` above and
+   * retires with it.
+   */
   static lifecycleHooks(): readonly LifecycleHook[] {
     return LIFECYCLE_HOOKS;
   }

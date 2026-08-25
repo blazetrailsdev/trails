@@ -23,7 +23,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = path.resolve(__dirname, "rails-private-methods.json");
 
 let manifestCache = null;
-function loadManifest() {
+
+/**
+ * Test seam. The manifest is gitignored and only exists after
+ * `pnpm rails-privates:manifest`, so a rule test has to supply its own. Writing
+ * one to the real path instead would not be hermetic: vitest runs the two rule
+ * tests in separate forked processes over one filesystem, and whichever restored
+ * last decided what the file held afterwards — which is how a fixture ends up
+ * parked on top of the real manifest for the rest of the session.
+ */
+export function setManifestForTests(manifest) {
+  manifestCache = manifest;
+}
+
+export function loadManifest() {
   if (manifestCache) return manifestCache;
   if (!fs.existsSync(MANIFEST_PATH)) {
     manifestCache = { files: {} };
@@ -48,11 +61,11 @@ function repoRoot() {
   return repoRootCache;
 }
 
-function relFromRepoRoot(filename) {
+export function relFromRepoRoot(filename) {
   return path.relative(repoRoot(), filename).split(path.sep).join("/");
 }
 
-function jsdocHasInternal(node, sourceCode) {
+export function attachedJsDoc(node, sourceCode) {
   // Only treat the closest preceding JSDoc as attached to `node`. A
   // file header `/** ... */` separated from the declaration by blank
   // lines must not be matched, otherwise the autofix would edit the
@@ -73,9 +86,14 @@ function jsdocHasInternal(node, sourceCode) {
     ) {
       continue;
     }
-    return { tag: c.value.includes("@internal"), comment: c };
+    return c;
   }
-  return { tag: false, comment: null };
+  return null;
+}
+
+function jsdocHasInternal(node, sourceCode) {
+  const comment = attachedJsDoc(node, sourceCode);
+  return { tag: comment !== null && comment.value.includes("@internal"), comment };
 }
 
 function indentOf(line) {
