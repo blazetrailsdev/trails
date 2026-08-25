@@ -61,7 +61,7 @@ export class Column extends BaseColumn {
    *  Mirrors: `delegate :extra, to: :sql_type_metadata, allow_nil: true`
    *  (mysql/column.rb:7). */
   get extra(): string {
-    return this.sqlTypeMetadata instanceof TypeMetadata ? this.sqlTypeMetadata.extra : "";
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? "";
   }
 
   /**

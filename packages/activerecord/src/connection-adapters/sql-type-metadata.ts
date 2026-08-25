@@ -48,10 +48,12 @@ export class SqlTypeMetadata implements Deduplicable {
     );
   }
 
-  // Keyed off the serialized form, so a subclass' own state (PG's oid/fmod,
-  // MySQL's extra) is part of the key without an override — Rails gets the
-  // same from Deduplicable's `hash`/`eql?` reaching through `__getobj__`
-  // (postgresql/type_metadata.rb:24-31, mysql/type_metadata.rb:23-30).
+  /**
+   * Keyed off the serialized form, so a subclass' own state (PG's `oid`/`fmod`,
+   * MySQL's `extra`) is in the key with no override — what Rails gets from
+   * `Deduplicable`'s `hash` / `eql?` reaching through `__getobj__`
+   * (postgresql/type_metadata.rb:24-31, mysql/type_metadata.rb:23-30).
+   */
   deduplicateKey(): string {
     return JSON.stringify(this.toJSON());
   }

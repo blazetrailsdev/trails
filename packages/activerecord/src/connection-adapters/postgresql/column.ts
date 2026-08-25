@@ -60,11 +60,11 @@ export class Column extends BaseColumn {
 
   // Mirrors: `delegate :oid, :fmod, to: :sql_type_metadata` (postgresql/column.rb:7).
   get oid(): number | null {
-    return this.sqlTypeMetadata instanceof TypeMetadata ? this.sqlTypeMetadata.oid : null;
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.oid ?? null;
   }
 
   get fmod(): number | null {
-    return this.sqlTypeMetadata instanceof TypeMetadata ? this.sqlTypeMetadata.fmod : null;
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
   }
 
   // Mirrors: Column#sql_type — strips the array suffix so callers get the
