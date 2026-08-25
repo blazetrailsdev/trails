@@ -6,7 +6,6 @@ import { Table as MysqlTable } from "./schema-definitions.js";
 import {
   isRowFormatDynamicByDefault,
   defaultRowFormat,
-  createTableDefinition,
   defaultType,
   newColumnFromField,
   type MysqlColumnReflectionHost,
@@ -103,7 +102,9 @@ describe("MySQL::SchemaStatements", () => {
 
   it("createTableDefinition returns MySQL TableDefinition", async () => {
     const conn = await Base.leaseConnection();
-    expect(createTableDefinition.call(conn as never, "users").name).toBe("users");
+    expect(
+      MysqlSchemaStatements.prototype.createTableDefinition.call(conn as never, "users").name,
+    ).toBe("users");
   });
 
   const reflectionHost = (

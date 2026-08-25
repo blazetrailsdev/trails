@@ -127,6 +127,39 @@ describe("CommandRecorder", () => {
       expect(recorder.commands[0][0]).toBe("addColumn");
     });
 
+    it("forwarders record no trailing options hash when the splat is empty", async () => {
+      // Ruby's `**options` passes no argument at all when the hash is empty
+      // (schema_definitions.rb:829, :756, :786, :852), and CommandRecorder
+      // stores the arguments verbatim.
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        await t.remove("name");
+        await t.index("kind");
+        await t.timestamps();
+        await t.removeTimestamps();
+        await t.removeIndex("kind");
+        await t.references("supplier");
+        await t.removeReferences("supplier");
+        await t.foreignKey("suppliers");
+        await t.removeForeignKey();
+        await t.checkConstraint("qty > 0");
+        await t.removeCheckConstraint();
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "removeColumns", args: ["fruits", "name"] },
+        { cmd: "addIndex", args: ["fruits", "kind"] },
+        { cmd: "addTimestamps", args: ["fruits"] },
+        { cmd: "removeTimestamps", args: ["fruits"] },
+        { cmd: "removeIndex", args: ["fruits", "kind"] },
+        { cmd: "addReference", args: ["fruits", "supplier"] },
+        { cmd: "removeReference", args: ["fruits", "supplier"] },
+        { cmd: "addForeignKey", args: ["fruits", "suppliers"] },
+        { cmd: "removeForeignKey", args: ["fruits"] },
+        { cmd: "addCheckConstraint", args: ["fruits", "qty > 0"] },
+        { cmd: "removeCheckConstraint", args: ["fruits"] },
+      ]);
+    });
+
     it("remove with multiple columns records a single removeColumns", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.changeTable("fruits", async (t) => {

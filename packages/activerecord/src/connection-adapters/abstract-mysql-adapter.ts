@@ -201,21 +201,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Override `SchemaStatements#createTableDefinition` to instantiate the
-   * MySQL-specific {@link MysqlTableDefinition} subclass, so its overrides
-   * (`newColumnDefinition` primary-key rewrite, `integerLikePrimaryKeyType`
-   * → `autoIncrement: true`, `aliasedTypes` identity, MySQL-only options)
-   * apply to `createTable` as well as `changeColumn`.
-   *
-   * Mirrors: `ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#create_table_definition`
-   * @internal
-   */
-  createTableDefinition(name: string, options: Record<string, unknown> = {}): MysqlTableDefinition {
-    const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
-    return new MysqlTableDefinition(name, { ...rest, adapter: this });
-  }
-
-  /**
    * RESTRICT is MySQL's default referential action, so `extractForeignKeyAction`
    * reflects it back as `undefined` and a lookup keyed on `onDelete: "restrict"`
    * could never match the live constraint. Drop those keys before resolving.
@@ -2036,6 +2021,9 @@ export interface AbstractMysqlAdapter {
 
   /** @internal */
   validPrimaryKeyOptions(): string[];
+
+  /** @internal */
+  createTableDefinition(name: string, options?: Record<string, unknown>): MysqlTableDefinition;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 

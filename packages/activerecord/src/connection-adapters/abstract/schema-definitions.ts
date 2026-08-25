@@ -1642,7 +1642,11 @@ export class Table {
   }
   async index(columns: string | string[], options: AddIndexOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.addIndex(this.name, columns, options);
+    if (Object.keys(options).length === 0) {
+      await this._schema.addIndex(this.name, columns);
+    } else {
+      await this._schema.addIndex(this.name, columns, options);
+    }
   }
   // Rails: `Table#remove_index(column_name = nil, **options)` forwards to
   // `@base.remove_index(table_name, column_name, **options)`.
@@ -1656,7 +1660,11 @@ export class Table {
     // nil column with the options behind it keeps them.
     options = isColumn ? options : { ...columnOrOptions, ...options };
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.removeIndex(this.name, columnName, options);
+    if (Object.keys(options).length === 0) {
+      await this._schema.removeIndex(this.name, columnName);
+    } else {
+      await this._schema.removeIndex(this.name, columnName, options);
+    }
   }
   async references(...refNames: string[]): Promise<void>;
   async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
@@ -1664,7 +1672,11 @@ export class Table {
     const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     for (const refName of names) {
-      await this._schema.addReference(this.name, refName, options);
+      if (Object.keys(options).length === 0) {
+        await this._schema.addReference(this.name, refName);
+      } else {
+        await this._schema.addReference(this.name, refName, options);
+      }
     }
   }
   async belongsTo(...refNames: string[]): Promise<void>;
@@ -1674,7 +1686,11 @@ export class Table {
   }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.addTimestamps(this.name, options);
+    if (Object.keys(options).length === 0) {
+      await this._schema.addTimestamps(this.name);
+    } else {
+      await this._schema.addTimestamps(this.name, options);
+    }
   }
 
   get name(): string {
@@ -1727,7 +1743,10 @@ export class Table {
     return this._schema.changeColumnNull(this.name, columnName, isNull, defaultValue);
   }
 
-  async removeTimestamps(options?: ColumnOptions): Promise<void> {
+  async removeTimestamps(options: ColumnOptions = {}): Promise<void> {
+    if (Object.keys(options).length === 0) {
+      return this._schema.removeTimestamps(this.name);
+    }
     return this._schema.removeTimestamps(this.name, options);
   }
 
@@ -1739,7 +1758,11 @@ export class Table {
     const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     for (const refName of names) {
-      await this._schema.removeReference(this.name, refName, options);
+      if (Object.keys(options).length === 0) {
+        await this._schema.removeReference(this.name, refName);
+      } else {
+        await this._schema.removeReference(this.name, refName, options);
+      }
     }
   }
   async removeBelongsTo(...refNames: string[]): Promise<void>;
@@ -1761,6 +1784,9 @@ export class Table {
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    if (Object.keys(options).length === 0) {
+      return this._schema.addForeignKey(this.name, toTable);
+    }
     return this._schema.addForeignKey(this.name, toTable, options);
   }
 
@@ -1770,6 +1796,9 @@ export class Table {
     this.raiseOnIfExistOptions(
       (typeof toTableOrOptions === "object" ? toTableOrOptions : {}) as Record<string, unknown>,
     );
+    if (typeof toTableOrOptions === "object" && Object.keys(toTableOrOptions).length === 0) {
+      return this._schema.removeForeignKey(this.name);
+    }
     return this._schema.removeForeignKey(this.name, toTableOrOptions);
   }
 
@@ -1777,7 +1806,10 @@ export class Table {
     return this._schema.foreignKeyExists(this.name, toTableOrOptions);
   }
 
-  async checkConstraint(expression: string, options?: Record<string, unknown>): Promise<void> {
+  async checkConstraint(expression: string, options: Record<string, unknown> = {}): Promise<void> {
+    if (Object.keys(options).length === 0) {
+      return this._schema.addCheckConstraint(this.name, expression);
+    }
     return this._schema.addCheckConstraint(this.name, expression, options);
   }
 
@@ -1790,6 +1822,9 @@ export class Table {
         this.name,
         options?.name ? options : expressionOrOptions,
       );
+    }
+    if (expressionOrOptions === undefined || Object.keys(expressionOrOptions).length === 0) {
+      return this._schema.removeCheckConstraint(this.name);
     }
     return this._schema.removeCheckConstraint(this.name, expressionOrOptions);
   }

@@ -244,6 +244,18 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   }
 
   /**
+   * Mirrors: MySQL::SchemaStatements#create_table_definition
+   * (mysql/schema_statements.rb:172-174)
+   * @internal
+   */
+  override createTableDefinition(
+    name: string,
+    options: Record<string, unknown> = {},
+  ): TableDefinition {
+    return new TableDefinition(name, { ...options, adapter: this as never });
+  }
+
+  /**
    * Mirrors: MySQL::SchemaStatements#add_index_length
    *
    * @internal
@@ -317,18 +329,6 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
   }
 
   return this._defaultRowFormat ?? null;
-}
-
-/**
- * Mirrors: MySQL::SchemaStatements#create_table_definition
- * @internal
- */
-export function createTableDefinition(
-  this: VisitorHostAdapter,
-  name: string,
-  options: { id?: boolean | "uuid"; charset?: string | null; collation?: string | null } = {},
-): TableDefinition {
-  return new TableDefinition(name, { ...options, adapter: this });
 }
 
 /**
