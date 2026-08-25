@@ -10,6 +10,9 @@
 
 import {
   quote as abstractQuote,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
+  isSqlLiteral,
+  type QuotingHost,
   quotedDate as abstractQuotedDate,
   typeCast as abstractTypeCast,
   toBytes,
@@ -174,24 +177,29 @@ export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): stri
 }
 
 export function quoteDefaultExpression(
-  this: QuotingDispatchHost,
+  this: QuotingDispatchHost & QuotingHost,
   value: unknown,
-  _column: unknown,
+  column: { sqlType?: string | null },
 ): string {
-  if (value === undefined) return "";
-  if (value === null) return "NULL";
+  // Rails' Proc arm (`sqlite3/quoting.rb:100-105`): call the Proc, and wrap a
+  // bare function call in parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`).
+  // In Ruby `SqlLiteral < String`, so a SqlLiteral result runs through the same
+  // `match?` regex — unwrap it rather than special-casing it.
   if (typeof value === "function") {
     const result = (value as () => unknown)();
-    if (result === undefined) return "";
-    if (result === null) return "NULL";
-    const str = String(result);
-    if (/^\w+\(.*\)$/.test(str)) return `(${str})`;
-    return str;
+    const str = typeof result === "string" ? result : isSqlLiteral(result) ? result.value : null;
+    if (str === null) {
+      throw new TypeError(
+        "quoteDefaultExpression expected function default to return a string or SqlLiteral",
+      );
+    }
+    return /^\w+\(.*\)$/.test(str) ? `(${str})` : str;
   }
-  // Rails: `quote(value)` — self-dispatched, so date/time defaults reach
-  // SQLite's quotedDate / quotedTime overrides and binary defaults its
-  // `x'..'` quotedBinary (the adapter binds `this`).
-  return quote.call(this, value);
+  // Rails: `else super` (`sqlite3/quoting.rb:107`) — the abstract body, which
+  // serializes through the column's cast type (`abstract/quoting.rb:161`) before
+  // quoting. `quote` is self-sent there, so binary / date / time defaults still
+  // reach SQLite's own quotedBinary / quotedDate overrides via this receiver.
+  return abstractQuoteDefaultExpression.call(this, value, column);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {

@@ -1,49 +1,40 @@
-import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./test-helper.js";
+/**
+ * Mirrors Rails
+ * activerecord/test/cases/adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb
+ */
+import { describe, it, expect } from "vitest";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { describeIfMysqlAdapter } from "./test-helper.js";
+import { fixtures } from "../../test-fixtures.js";
+import { Bulb } from "../../test-helpers/models/bulb.js";
+import { Author } from "../../test-helpers/models/author.js";
+// Rails' `require "models/car"` (count_deleted_rows_with_lock_test.rb:7) — Bulb
+// `belongs_to :car`, so the constant has to be loaded before Bulb.create.
+import { Car } from "../../test-helpers/models/car.js";
+import { registerModel } from "../../associations.js";
+
+// Rails' `require "models/..."` (count_deleted_rows_with_lock_test.rb:4-7) makes
+// each constant resolvable; the trails equivalent is registering them.
+registerModel([Bulb, Author, Car]);
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
-  let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = await leaseMysqlAdapter();
-  });
-
   describe("CountDeletedRowsWithLockTest", () => {
-    beforeEach(async () => {
-      await adapter.execute("DROP TABLE IF EXISTS `test_bulbs`");
-      await adapter.execute("DROP TABLE IF EXISTS `test_authors`");
-      await adapter.execute(
-        "CREATE TABLE `test_bulbs` (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), color VARCHAR(255))",
-      );
-      await adapter.execute(
-        "CREATE TABLE `test_authors` (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255))",
-      );
-    });
-    afterEach(async () => {
-      await adapter.execute("DROP TABLE IF EXISTS `test_bulbs`").catch(() => {});
-      await adapter.execute("DROP TABLE IF EXISTS `test_authors`").catch(() => {});
-    });
+    fixtures([]);
 
     it("delete and create in different threads synchronize correctly", async () => {
-      await adapter.executeMutation(
-        "INSERT INTO `test_bulbs` (name, color) VALUES ('Jimmy', 'blue')",
-      );
+      await Bulb.unscoped().deleteAll();
+      await Bulb.create({ name: "Jimmy", color: "blue" });
 
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
-      try {
-        const [deleteResult] = await Promise.all([
-          adapter.executeMutation("DELETE FROM `test_bulbs`"),
-          adapter2.executeMutation("INSERT INTO `test_authors` (name) VALUES ('Tommy')"),
-        ]);
+      // Rails' `Thread.new` (count_deleted_rows_with_lock_test.rb:14-20).
+      // `IsolatedExecutionState.run` is the trails analogue: it opens a fresh
+      // execution context, which is what the connection pool leases per
+      // (connection_pool.rb:711 `connection_lease`).
+      const deleteThread = IsolatedExecutionState.run(async () => Bulb.unscoped().deleteAll());
+      const createThread = IsolatedExecutionState.run(async () => Author.create({ name: "Tommy" }));
 
-        expect(deleteResult).toBe(1);
-      } finally {
-        await adapter2.close();
-      }
+      const [deleteValue] = await Promise.all([deleteThread, createThread]);
+
+      expect(deleteValue).toBe(1);
     });
   });
 });

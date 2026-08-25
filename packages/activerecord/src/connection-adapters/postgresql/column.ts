@@ -10,8 +10,8 @@ import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
 
 export class Column extends BaseColumn {
-  serial: boolean;
-  identity: string | null;
+  private _serial: boolean;
+  private _identity: string | null;
   private _generated: string | null;
 
   constructor(
@@ -33,8 +33,8 @@ export class Column extends BaseColumn {
       defaultFunction: options.defaultFunction,
       comment: options.comment,
     });
-    this.serial = options.serial ?? false;
-    this.identity = options.identity ?? null;
+    this._serial = options.serial ?? false;
+    this._identity = options.identity ?? null;
     this._generated = options.generated ?? null;
   }
 
@@ -72,7 +72,7 @@ export class Column extends BaseColumn {
   // PostgreSQLAdapter#newColumnFromField). An explicit
   // `default: -> { "nextval('some_seq')" }` is NOT serial.
   get isSerial(): boolean {
-    return this.serial;
+    return this._serial;
   }
 
   /**
@@ -82,7 +82,7 @@ export class Column extends BaseColumn {
    * key leaves it absent, which `!= null` reads the way Ruby reads nil.
    */
   get isIdentity(): boolean {
-    return this.identity != null;
+    return this._identity != null;
   }
 
   /**
@@ -147,16 +147,16 @@ export class Column extends BaseColumn {
    * and `array` is derived.
    */
   override initWith(coder: ColumnCoder): void {
-    this.serial = (coder["serial"] as boolean) ?? false;
-    this.identity = (coder["identity"] as string | null) ?? null;
+    this._serial = (coder["serial"] as boolean) ?? false;
+    this._identity = (coder["identity"] as string | null) ?? null;
     this._generated = (coder["generated"] as string | null) ?? null;
     super.initWith(coder);
   }
 
   /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
   override encodeWith(coder: ColumnCoder): void {
-    coder["serial"] = this.serial;
-    coder["identity"] = this.identity;
+    coder["serial"] = this._serial;
+    coder["identity"] = this._identity;
     coder["generated"] = this._generated;
     super.encodeWith(coder);
     coder["class"] = "PostgreSQL::Column";

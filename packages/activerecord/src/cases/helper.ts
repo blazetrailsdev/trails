@@ -10,6 +10,19 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
+// Zeitwerk autoloads `CollectionProxy` when `CollectionAssociation#reader`
+// names it (collection_association.rb `reader` -> `CollectionProxy.create`), so
+// Ruby never needs an explicit require. ESM has no call-time load, and
+// `associations.ts` MUST NOT import it — `collection-proxy.ts` extends
+// `Relation`, which closes the relation<->associations cycle (see CLAUDE.md,
+// "Call-time constant resolution"). The class self-registers into the
+// zero-import slot on load, so it is loaded here — a module outside that cycle
+// — exactly as `index.ts` does for package consumers.
+import "../associations/collection-proxy.js";
+// Same story for the other two `Relation` subclasses `associations.ts` used to
+// force-load: each self-registers into `associations/_scope-slots.ts` on load.
+import "../association-relation.js";
+import "../associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
 import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
