@@ -741,7 +741,7 @@ export function attributesWithValues(
     // Rails' `attribute_names.index_with { |name| @attributes[name] }` — the
     // map carries the `ActiveModel::Attribute` objects themselves, not their
     // values, so `_insert_record`/`_update_record` hand Arel a typed bind whose
-    // `value_for_database` the adapter's `type_casted_binds` reads. The `has`
+    // `value_for_database` the adapter's `type_casted_binds` reads. The `isKey`
     // guard keeps a name with no attribute out of the write entirely rather
     // than writing the uninitialized default's NULL.
     if (attributes.isKey(name)) result[name] = attributes.getAttribute?.(name);
