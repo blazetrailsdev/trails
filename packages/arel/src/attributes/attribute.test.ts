@@ -109,7 +109,7 @@ describe("AttributeTest", () => {
 
     it("should handle comparing with a subquery", () => {
       const avg = users.project(users.get("karma").average());
-      const mgr = users.project(star).where(users.get("karma").gt(avg));
+      const mgr = users.project(star()).where(users.get("karma").gt(avg));
 
       expect(mustBeLike(mgr.toSql())).toBe(
         mustBeLike(`

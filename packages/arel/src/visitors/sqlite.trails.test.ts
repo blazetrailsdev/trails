@@ -19,8 +19,8 @@ describe("SQLite visitor set operations", () => {
 
   // SQLite rejects parens around SELECT operands of UNION/INTERSECT/EXCEPT.
   // Mirrors `sqlite.rb#infix_value_with_paren` — strip Grouping wrappers.
-  const q1 = () => users.project(star);
-  const q2 = () => users.project(star);
+  const q1 = () => users.project(star());
+  const q2 = () => users.project(star());
 
   it("UNION strips Grouping wrapped operands", () => {
     const node = new Nodes.Union(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
@@ -55,7 +55,7 @@ describe("SQLite visitor set operations", () => {
   });
 
   it("nested unions are flattened (Rails-style)", () => {
-    const q3 = users.project(star);
+    const q3 = users.project(star());
     const node = new Nodes.Union(q1().ast, new Nodes.Union(q2().ast, q3.ast));
     const sql = new Visitors.SQLite(testConnection).compile(node);
     expect(sql).toBe(

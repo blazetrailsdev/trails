@@ -2682,15 +2682,15 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#column_for_attribute */
   async columnForAttribute(attribute: {
-    relation: { name: string | Nodes.SqlLiteral };
-    name: string;
+    relation: { name: string | Nodes.Node };
+    name: string | Nodes.SqlLiteral;
   }): Promise<import("./column.js").Column | undefined> {
     const tableName = String(attribute.relation.name);
     // `schemaCache` is Rails' `schema_cache` (abstract_adapter.rb:298): the
     // pool's BoundSchemaReflection, or one bound to this connection when the
     // adapter stands alone on a NullPool.
     const hash = await this.schemaCache.columnsHash(tableName);
-    return hash?.[attribute.name];
+    return hash?.[String(attribute.name)];
   }
 
   /** @internal Mirrors: AbstractAdapter#collector */

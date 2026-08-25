@@ -146,10 +146,10 @@ function translateQuery(
     )
     // tbl[:col] → tbl.get("col")
     .replace(/(\w+)\[:([\w_]+)\]/g, '$1.get("$2")')
-    // tbl[Arel.star] → tbl.star
-    .replace(/(\w+)\[Arel\.star\]/g, "$1.star")
-    // Arel.star → star (standalone)
-    .replace(/\bArel\.star\b/g, "star")
+    // tbl[Arel.star] → tbl.get(star())
+    .replace(/(\w+)\[Arel\.star\]/g, "$1.get(star())")
+    // Arel.star → star() (standalone)
+    .replace(/\bArel\.star\b/g, "star()")
     // Arel.sql(...) → sql(...)
     .replace(/Arel\.sql\(/g, "sql(")
     // .not_eq → .notEq
@@ -214,7 +214,7 @@ function translateQuery(
   const imports: string[] = ["Table"];
   if (tsExpr.includes("Nodes.")) imports.push("Nodes");
   if (tsExpr.includes("sql(")) imports.push("sql");
-  if (/\bstar\b/.test(tsExpr) && !tsExpr.includes(".star")) imports.push("star");
+  if (/\bstar\b/.test(tsExpr)) imports.push("star");
 
   return {
     rb: `${rbDecls}\n${query}`,

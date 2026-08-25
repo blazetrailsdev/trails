@@ -171,7 +171,7 @@ export class WhereClause {
       const attr = extractAttribute(node);
       if (attr === null) continue;
       if (tableName !== undefined && String(attr.relation.name) !== tableName) continue;
-      result[attr.name] = extractNodeValue((node as any).right);
+      result[String(attr.name)] = extractNodeValue((node as any).right);
     }
     return result;
   }
@@ -205,7 +205,7 @@ export class WhereClause {
         return true;
       }
       if (attrNodes.some((a) => a.eql(attr))) return false;
-      if (colStrings.has(attr.name)) return false;
+      if (colStrings.has(String(attr.name))) return false;
       const qualified = `${String(attr.relation.name)}.${attr.name}`;
       if (colStrings.has(qualified)) return false;
       return true;

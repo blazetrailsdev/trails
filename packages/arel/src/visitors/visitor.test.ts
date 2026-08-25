@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Node } from "../nodes/node.js";
 import { Visitor } from "./visitor.js";
-import { UnsupportedVisitError } from "../errors.js";
+import { UnsupportedVisitError } from "./to-sql.js";
 
 class A extends Node {}
 class B extends A {}

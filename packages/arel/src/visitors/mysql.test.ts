@@ -183,12 +183,12 @@ describe("MysqlTest", () => {
 
   describe("Nodes::Cte", () => {
     it("ignores MATERIALIZED modifiers", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast, true);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star()).ast, true);
       expect(mustBeLike(compile(cte))).toBe(mustBeLike(`"foo" AS (SELECT * FROM "bar")`));
     });
 
     it("ignores NOT MATERIALIZED modifiers", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast, false);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star()).ast, false);
       expect(mustBeLike(compile(cte))).toBe(mustBeLike(`"foo" AS (SELECT * FROM "bar")`));
     });
   });

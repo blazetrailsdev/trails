@@ -629,7 +629,7 @@ export class Builder implements InsertBuilder {
   }
 
   into(): string {
-    const tableName = this.quoteTable(this.model.arelTable.name);
+    const tableName = this.quoteTable(String(this.model.arelTable.name));
     const keys = [...this._insertAll.keysIncludingTimestamps()];
     if (keys.length === 0) {
       if (this._insertAll.inserts.length > 1) {
@@ -718,7 +718,7 @@ export class Builder implements InsertBuilder {
 
   /** @internal Mirrors Rails `insert.model.quoted_table_name`. */
   quotedTableName(): string {
-    return this.quoteTable(this.model.arelTable.name);
+    return this.quoteTable(String(this.model.arelTable.name));
   }
 
   rawUpdateSql(): Nodes.SqlLiteral | undefined {

@@ -6,13 +6,13 @@ import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
 describe("MySQL visitor comment emission", () => {
   const users = new Table("users");
   it("emits the SelectCore comment in MySQL output", () => {
-    const mgr = new SelectManager(users).project(star).comment("trace=mysql");
+    const mgr = new SelectManager(users).project(star()).comment("trace=mysql");
     const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
     expect(sql).toContain("/* trace=mysql */");
   });
 
   it("emits the comment exactly once", () => {
-    const mgr = new SelectManager(users).project(star).comment("once");
+    const mgr = new SelectManager(users).project(star()).comment("once");
     const sql = new Visitors.MySQL(mysqlTestConnection).compile(mgr.ast);
     expect((sql.match(/\/\* once \*\//g) ?? []).length).toBe(1);
   });

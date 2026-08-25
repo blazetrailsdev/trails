@@ -4,5 +4,5 @@ const currencyRates = new Table("currency_rates");
 export default products
   .join(currencyRates)
   .on(products.get("currency_id").eq(currencyRates.get("id")))
-  .project(star)
+  .project(star())
   .order(products.get("price").multiply(currencyRates.get("rate")));

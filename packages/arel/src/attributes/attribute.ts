@@ -29,7 +29,9 @@ import { Predications } from "../predications.js";
  * Mirrors: Arel::Attributes::Attribute
  */
 export interface RelationLike {
-  name: string | SqlLiteral;
+  // `Arel::Table#name` is whatever the table was constructed with — a String,
+  // a SqlLiteral, or a node (table.rb:16, table_test.rb:118-130).
+  name: string | Node;
   // `TableAlias#table_alias` aliases `:name`, which may be a `SqlLiteral`
   // (Arel::Nodes::TableAlias `alias :table_alias :name`, table_alias.rb); a
   // `Table#tableAlias` is a plain string-or-nil. Both flow through here as
@@ -44,18 +46,23 @@ export interface RelationLike {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attribute extends Node {
   readonly relation: RelationLike;
-  readonly name: string;
+  // Rails stores whatever `Table#[]` was handed (table.rb:81-85), so
+  // `table[Arel.star]` seats a `SqlLiteral` here and `quote_column_name`
+  // passes it through unquoted (to_sql.rb:877-880).
+  readonly name: string | SqlLiteral;
 
   // Rails' `Attribute.new(nil, nil)` is legal (attribute_test.rb:388); the
   // relation-dependent methods below simply raise NoMethodError if reached.
-  constructor(relation: RelationLike | null, name: string | null) {
+  constructor(relation: RelationLike | null, name: string | SqlLiteral | null) {
     super();
     this.relation = relation as RelationLike;
     this.name = name as string;
   }
 
   get typeCaster(): unknown {
-    return this.relation.typeForAttribute(this.name);
+    // Ruby passes `name` along untyped; only a String name ever reaches a
+    // type caster, since `table[Arel.star]` is never type-cast.
+    return this.relation.typeForAttribute(this.name as string);
   }
 
   // Mirrors: Arel::Attributes::Attribute#lower — `relation.lower self`. The
@@ -65,7 +72,7 @@ export class Attribute extends Node {
   }
 
   typeCastForDatabase(value: unknown): unknown {
-    return this.relation.typeCastForDatabase(this.name, value);
+    return this.relation.typeCastForDatabase(this.name as string, value);
   }
 
   isAbleToTypeCast(): boolean {

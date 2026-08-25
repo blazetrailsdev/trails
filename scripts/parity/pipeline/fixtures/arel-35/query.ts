@@ -1,3 +1,3 @@
-import { Table } from "@blazetrails/arel";
+import { Table, star } from "@blazetrails/arel";
 const posts = new Table("posts");
-export default posts.project(posts.star).distinct();
+export default posts.project(posts.get(star())).distinct();

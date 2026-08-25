@@ -406,7 +406,7 @@ describe("RelationTest", () => {
   // (`"comments".*`), NOT the `t0_r0…` aliased column list a standalone eager
   // `toSql()` emits. This is Rails-correct, and shared with the where-subquery
   // path (`relation-handler`); converging to `t0_r*` here would diverge.
-  it("eager from() subquery projects the table star, not column aliases", async () => {
+  it("eager from() subquery projects the table star(), not column aliases", async () => {
     const relation = Comment.includes(":post").where({ "posts.type": "Post" }).order(":id");
     const sql = await (Comment.select("*").from(relation) as any).toSql();
     // Adapter-agnostic: strip identifier quoting (`"` on sqlite/postgres,

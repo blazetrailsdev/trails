@@ -787,7 +787,7 @@ describe("CalculationsTest", () => {
   });
 
   it("count with arel star", async () => {
-    expect(await Account.count(arelStar)).toBe(6);
+    expect(await Account.count(arelStar())).toBe(6);
   });
 
   it("count with aliased attribute", async () => {

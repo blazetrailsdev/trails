@@ -52,7 +52,7 @@ describe("TableTest", () => {
     it("should produce LEFT OUTER JOIN … ON SQL", () => {
       const onClause = new Nodes.On(users.get("id").eq(posts.get("user_id")));
       const join = users.createJoin(posts, onClause, Nodes.OuterJoin);
-      const mgr = users.project(star);
+      const mgr = users.project(star());
       mgr.joinSources().push(join);
       const sql = mgr.toSql();
       expect(sql).toContain('LEFT OUTER JOIN "posts" ON "users"."id" = "posts"."user_id"');
@@ -138,13 +138,13 @@ describe("TableTest", () => {
     });
 
     it("should accept literal SQL", () => {
-      const rel = new Table(sql("generate_series(4, 2)") as unknown as string);
+      const rel = new Table(sql("generate_series(4, 2)"));
       expect(rel.name).toEqual(sql("generate_series(4, 2)"));
     });
 
     it("should accept Arel nodes", () => {
-      const node = new Nodes.NamedFunction("generate_series", [4, 2] as unknown as Nodes.Node[]);
-      const rel = new Table(node as unknown as string);
+      const node = new Nodes.NamedFunction("generate_series", [4, 2]);
+      const rel = new Table(node);
       expect(rel.name).toBe(node);
     });
   });
@@ -224,30 +224,32 @@ describe("TableTest", () => {
   });
 
   it("star returns an Attribute that compiles to table.*", () => {
-    expect(users.star).toBeInstanceOf(Nodes.Attribute);
-    expect(users.star.toSql()).toBe('"users".*');
+    expect(users.get(star())).toBeInstanceOf(Nodes.Attribute);
+    expect(users.get(star()).toSql()).toBe('"users".*');
   });
 
   it("star splits schema-qualified name", () => {
-    expect(new Visitors.ToSql(testConnection).compile(new Table("test_schema.things").star)).toBe(
-      '"test_schema"."things".*',
-    );
+    expect(
+      new Visitors.ToSql(testConnection).compile(new Table("test_schema.things").get(star())),
+    ).toBe('"test_schema"."things".*');
   });
 
   it("star preserves quoted table name with dot", () => {
     expect(
-      new Visitors.ToSql(testConnection).compile(new Table('test_schema."things.table"').star),
+      new Visitors.ToSql(testConnection).compile(
+        new Table('test_schema."things.table"').get(star()),
+      ),
     ).toBe('"test_schema"."things.table".*');
   });
 
   it("star preserves quoted schema name with dot", () => {
-    expect(new Visitors.ToSql(testConnection).compile(new Table('"my.schema".articles').star)).toBe(
-      '"my.schema"."articles".*',
-    );
+    expect(
+      new Visitors.ToSql(testConnection).compile(new Table('"my.schema".articles').get(star())),
+    ).toBe('"my.schema"."articles".*');
   });
 
   it("star routes table-name quoting through the adapter visitor (MySQL=backticks)", () => {
-    const sql = new Visitors.MySQL(mysqlTestConnection).compile(users.star);
+    const sql = new Visitors.MySQL(mysqlTestConnection).compile(users.get(star()));
     expect(sql).toBe("`users`.*");
   });
 
@@ -260,7 +262,7 @@ describe("TableTest", () => {
   it("returns a SelectManager with the table as source", () => {
     const mgr = users.from();
     expect(mgr).toBeInstanceOf(SelectManager);
-    mgr.project(star);
+    mgr.project(star());
     expect(mgr.toSql()).toBe('SELECT * FROM "users"');
   });
 

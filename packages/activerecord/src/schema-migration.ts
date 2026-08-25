@@ -142,7 +142,7 @@ export class SchemaMigration {
    */
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
-    sm.project(new Nodes.Count([star]));
+    sm.project(new Nodes.Count([star()]));
     const values = await this._withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );

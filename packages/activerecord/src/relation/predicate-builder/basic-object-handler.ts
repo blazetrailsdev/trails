@@ -23,7 +23,7 @@ export class BasicObjectHandler {
   }
 
   call(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
-    const bind = this._predicateBuilder.buildBindAttribute(attribute.name, value);
+    const bind = this._predicateBuilder.buildBindAttribute(String(attribute.name), value);
     return attribute.eq(bind);
   }
 

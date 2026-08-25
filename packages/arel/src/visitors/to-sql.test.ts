@@ -176,9 +176,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should not quote sql literals", () => {
-    // Rails is `@table[Arel.star]`; trails' `Table#get` is typed to the string
-    // name, so the star node is seated on the Attribute directly.
-    const node = table.get(star);
+    const node = table.get(star());
     expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users".*`));
   });
 
@@ -262,11 +260,11 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit built-in functions", () => {
-    expect(compile(new Nodes.Count([star]))).toBe("COUNT(*)");
-    expect(compile(new Nodes.Sum([star]))).toBe("SUM(*)");
-    expect(compile(new Nodes.Max([star]))).toBe("MAX(*)");
-    expect(compile(new Nodes.Min([star]))).toBe("MIN(*)");
-    expect(compile(new Nodes.Avg([star]))).toBe("AVG(*)");
+    expect(compile(new Nodes.Count([star()]))).toBe("COUNT(*)");
+    expect(compile(new Nodes.Sum([star()]))).toBe("SUM(*)");
+    expect(compile(new Nodes.Max([star()]))).toBe("MAX(*)");
+    expect(compile(new Nodes.Min([star()]))).toBe("MIN(*)");
+    expect(compile(new Nodes.Avg([star()]))).toBe("AVG(*)");
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
@@ -325,29 +323,30 @@ describe("the to_sql visitor", () => {
   });
 
   describe("Nodes::Between", () => {
-    it("can handle ranges bounded by infinity", () => {
-      const a = users.get("id").between(-Infinity, 10);
-      const b = users.get("id").between(10, Infinity);
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(a)).toContain("<=");
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(b)).toContain(">=");
+    const compileNode = (n: Nodes.Node): string =>
+      new Visitors.ToSql(fakeRecordConnection).compile(n);
+
+    it("can handle two dot ranges", () => {
+      const node = users.get("id").between([1, 3]);
+      expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" BETWEEN 1 AND 3'));
     });
 
     it("can handle three dot ranges", () => {
-      const begin = 1;
-      const end = 10;
-      const node = new Nodes.Grouping(
-        new Nodes.And([users.get("id").gteq(begin), users.get("id").lt(end)]),
+      const node = users.get("id").between({ begin: 1, end: 3, excludeEnd: true });
+      expect(mustBeLike(compileNode(node))).toBe(
+        mustBeLike('"users"."id" >= 1 AND "users"."id" < 3'),
       );
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
-      expect(sql).toContain(">=");
-      expect(sql).toContain("<");
     });
 
-    it("can handle two dot ranges", () => {
-      const node = users.get("id").between([1, 10]);
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
-      expect(sql).toContain("BETWEEN");
-      expect(sql).toContain("1 AND 10");
+    it("can handle ranges bounded by infinity", () => {
+      let node = users.get("id").between([1, Infinity]);
+      expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" >= 1'));
+      node = users.get("id").between([-Infinity, 3]);
+      expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" <= 3'));
+      node = users.get("id").between({ begin: -Infinity, end: 3, excludeEnd: true });
+      expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" < 3'));
+      node = users.get("id").between([-Infinity, Infinity]);
+      expect(mustBeLike(compileNode(node))).toBe(mustBeLike("1=1"));
     });
   });
 
@@ -383,21 +382,21 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Cte", () => {
     it("handles CTEs with a MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star), true);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star()), true);
       expect(mustBeLike(compile(cte))).toBe(
         mustBeLike(`"foo" AS MATERIALIZED (SELECT * FROM "bar")`),
       );
     });
 
     it("handles CTEs with a NOT MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star), false);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star()), false);
       expect(mustBeLike(compile(cte))).toBe(
         mustBeLike(`"foo" AS NOT MATERIALIZED (SELECT * FROM "bar")`),
       );
     });
 
     it("handles CTEs with no MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star));
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star()));
       expect(mustBeLike(compile(cte))).toBe(mustBeLike(`"foo" AS (SELECT * FROM "bar")`));
     });
 
@@ -433,9 +432,9 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::With", () => {
     it("handles table aliases", () => {
-      const manager = new Table("foo").project(star).from(new Nodes.SqlLiteral("expr2"));
-      const expr1 = new Table("bar").project(star).as("expr1");
-      const expr2 = new Table("baz").project(star).as("expr2");
+      const manager = new Table("foo").project(star()).from(new Nodes.SqlLiteral("expr2"));
+      const expr1 = new Table("bar").project(star()).as("expr1");
+      const expr2 = new Table("baz").project(star()).as("expr2");
       manager.with(expr1, expr2);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe(
@@ -444,9 +443,9 @@ describe("the to_sql visitor", () => {
     });
 
     it("handles Cte nodes", () => {
-      const cte = new Nodes.Cte("expr1", new Table("bar").project(star).ast);
+      const cte = new Nodes.Cte("expr1", new Table("bar").project(star()).ast);
       const manager = new Table("foo")
-        .project(star)
+        .project(star())
         .with(cte)
         .from(cte.toTable())
         .where(cte.toTable().get("score").gt(5));
@@ -459,8 +458,8 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::WithRecursive", () => {
     it("handles table aliases", () => {
-      const manager = new Table("foo").project(star).from(new Nodes.SqlLiteral("expr1"));
-      const expr1 = new Table("bar").project(star).as("expr1");
+      const manager = new Table("foo").project(star()).from(new Nodes.SqlLiteral("expr1"));
+      const expr1 = new Table("bar").project(star()).as("expr1");
       manager.withRecursive(expr1);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe('WITH RECURSIVE expr1 AS (SELECT * FROM "bar") SELECT * FROM expr1');
@@ -807,7 +806,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should chain predications on named functions", () => {
-    const fn = new Nodes.NamedFunction("omg", [star]);
+    const fn = new Nodes.NamedFunction("omg", [star()]);
     expect(mustBeLike(compile(fn.eq(2)))).toBe(mustBeLike("omg(*) = 2"));
   });
 
@@ -899,7 +898,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should handle nil with named functions", () => {
-    const fn = new Nodes.NamedFunction("omg", [star]);
+    const fn = new Nodes.NamedFunction("omg", [star()]);
     expect(mustBeLike(compile(fn.eq(null)))).toBe(mustBeLike("omg(*) IS NULL"));
   });
 
@@ -1314,7 +1313,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit named functions", () => {
-    const fn = new Nodes.NamedFunction("omg", [star]);
+    const fn = new Nodes.NamedFunction("omg", [star()]);
     expect(compile(fn)).toBe("omg(*)");
   });
 
@@ -1329,19 +1328,19 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit built-in functions operating on distinct values", () => {
-    const count = new Nodes.Count([star]);
+    const count = new Nodes.Count([star()]);
     count.distinct = true;
     expect(compile(count)).toBe("COUNT(DISTINCT *)");
-    const sum = new Nodes.Sum([star]);
+    const sum = new Nodes.Sum([star()]);
     sum.distinct = true;
     expect(compile(sum)).toBe("SUM(DISTINCT *)");
-    const max = new Nodes.Max([star]);
+    const max = new Nodes.Max([star()]);
     max.distinct = true;
     expect(compile(max)).toBe("MAX(DISTINCT *)");
-    const min = new Nodes.Min([star]);
+    const min = new Nodes.Min([star()]);
     min.distinct = true;
     expect(compile(min)).toBe("MIN(DISTINCT *)");
-    const avg = new Nodes.Avg([star]);
+    const avg = new Nodes.Avg([star()]);
     avg.distinct = true;
     expect(compile(avg)).toBe("AVG(DISTINCT *)");
   });
@@ -1379,8 +1378,8 @@ describe("the to_sql visitor", () => {
     // Mirrors Rails `grouping_parentheses(..., false)` + `require_parentheses?`:
     // SELECTs that carry orders/limit/offset are wrapped to disambiguate.
     it("wraps a SELECT operand with ORDER BY", () => {
-      const a = users.project(star);
-      const b = users.project(star).order(users.get("id"));
+      const a = users.project(star());
+      const b = users.project(star()).order(users.get("id"));
       const node = new Nodes.Union(a.ast, b.ast);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(
@@ -1389,16 +1388,16 @@ describe("the to_sql visitor", () => {
     });
 
     it("wraps a SELECT operand with LIMIT", () => {
-      const a = users.project(star);
-      const b = users.project(star).take(5);
+      const a = users.project(star());
+      const b = users.project(star()).take(5);
       const node = new Nodes.Union(a.ast, b.ast);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe('( SELECT * FROM "users" UNION (SELECT * FROM "users" LIMIT 5) )');
     });
 
     it("wraps a SELECT operand with OFFSET", () => {
-      const a = users.project(star);
-      const b = users.project(star).skip(10);
+      const a = users.project(star());
+      const b = users.project(star()).skip(10);
       const node = new Nodes.Union(a.ast, b.ast);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe('( SELECT * FROM "users" UNION (SELECT * FROM "users" OFFSET 10) )');
@@ -1407,9 +1406,9 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Intersect", () => {
     it("flattens nested intersects", () => {
-      const a = users.project(star);
-      const b = users.project(star);
-      const c = users.project(star);
+      const a = users.project(star());
+      const b = users.project(star());
+      const c = users.project(star());
       const node = new Nodes.Intersect(a.ast, new Nodes.Intersect(b.ast, c.ast));
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(
@@ -1420,9 +1419,9 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Except", () => {
     it("flattens nested excepts", () => {
-      const a = users.project(star);
-      const b = users.project(star);
-      const c = users.project(star);
+      const a = users.project(star());
+      const b = users.project(star());
+      const c = users.project(star());
       const node = new Nodes.Except(a.ast, new Nodes.Except(b.ast, c.ast));
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe(
@@ -1472,7 +1471,7 @@ describe("the to_sql visitor", () => {
   it("compileWithBinds extracts bind values", () => {
     const v = new Visitors.ToSql(fakeRecordConnection);
     const table = new Table("users");
-    const mgr = table.project(star).where(table.get("id").eq(new Nodes.BindParam(42)));
+    const mgr = table.project(star()).where(table.get("id").eq(new Nodes.BindParam(42)));
     const [sql, binds] = compileWithBinds(v, mgr.ast);
     expect(sql).toContain("?");
     expect(sql).not.toContain("42");
@@ -1483,7 +1482,7 @@ describe("the to_sql visitor", () => {
     const v = new Visitors.ToSql(fakeRecordConnection);
     const table = new Table("users");
     const mgr = table
-      .project(star)
+      .project(star())
       .where(table.get("name").eq(new Nodes.BindParam("alice")))
       .where(table.get("age").gt(new Nodes.BindParam(21)));
     const [sql, binds] = compileWithBinds(v, mgr.ast);
@@ -1504,7 +1503,7 @@ describe("the to_sql visitor", () => {
   it("accept accepts external collector", () => {
     const v = new Visitors.ToSql(fakeRecordConnection);
     const table = new Table("users");
-    const mgr = table.project(star).where(table.get("name").eq("alice"));
+    const mgr = table.project(star()).where(table.get("name").eq("alice"));
 
     const parts: unknown[] = [];
     const binds: unknown[] = [];
@@ -1534,7 +1533,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("works with lists", () => {
-    const fn = new Nodes.NamedFunction("omg", [star, star]);
+    const fn = new Nodes.NamedFunction("omg", [star(), star()]);
     expect(compile(fn)).toBe("omg(*, *)");
   });
 
@@ -2208,11 +2207,13 @@ describe("the to_sql visitor", () => {
     });
 
     it("SelectManager#lock wraps default in SqlLiteral", () => {
-      expect(users.project(star).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+      expect(users.project(star()).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
     });
 
     it("SelectManager#lock with custom string wraps in SqlLiteral", () => {
-      expect(users.project(star).lock("FOR SHARE").toSql()).toBe('SELECT * FROM "users" FOR SHARE');
+      expect(users.project(star()).lock("FOR SHARE").toSql()).toBe(
+        'SELECT * FROM "users" FOR SHARE',
+      );
     });
   });
 
@@ -2282,14 +2283,14 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
 
   it("default quoter: schema-qualified name is split and each part double-quoted", () => {
     const t = new Table("test_schema.things");
-    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.star).ast);
+    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.get(star())).ast);
     expect(sql).toContain('"test_schema"."things".*');
     expect(sql).toContain('FROM "test_schema"."things"');
   });
 
   it("default quoter: quoted table name with dot is preserved as single identifier", () => {
     const t = new Table('test_schema."things.table"');
-    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.star).ast);
+    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.get(star())).ast);
     expect(sql).toContain('"test_schema"."things.table".*');
     expect(sql).toContain('FROM "test_schema"."things.table"');
   });

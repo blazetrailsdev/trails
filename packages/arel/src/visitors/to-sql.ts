@@ -4,15 +4,20 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { SelectManager } from "../select-manager.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
-import { UnsupportedVisitError, BindError } from "../errors.js";
+import { BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
-// Mirrors Arel::Visitors::UnsupportedVisitError (defined in to_sql.rb:5
-// in Rails as `class UnsupportedVisitError < StandardError`). Trails
-// declares the class in ../errors.ts so it can sit on the ArelError
-// hierarchy alongside BindError/EmptyJoinError, but re-exports it from
-// here so parity:api finds it where Rails defines it.
-export { UnsupportedVisitError };
+/**
+ * Mirrors Arel::Visitors::UnsupportedVisitError (to_sql.rb:5-9) — a
+ * `StandardError`, not an `ArelError`, declared in this file exactly as Rails
+ * declares it, and built from the offending object.
+ */
+export class UnsupportedVisitError extends Error {
+  constructor(object: unknown) {
+    super(`Unsupported argument type: ${constructorName(object)}. Construct an Arel node instead.`);
+    this.name = "UnsupportedVisitError";
+  }
+}
 
 /**
  * Mirrors Ruby's core `NotImplementedError`, which `to_sql.rb` raises from the
@@ -427,11 +432,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else if (o.expr !== null) {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     return collector;
   }
 
@@ -631,35 +632,31 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesAscending(o: Nodes.Ascending, collector: SQLString): SQLString {
-    if (o.expr instanceof Node) this.visit(o.expr, collector);
+    this.visit(o.expr, collector);
     collector.append(" ASC");
     return collector;
   }
 
   private visitArelNodesDescending(o: Nodes.Descending, collector: SQLString): SQLString {
-    if (o.expr instanceof Node) this.visit(o.expr, collector);
+    this.visit(o.expr, collector);
     collector.append(" DESC");
     return collector;
   }
 
   protected visitArelNodesNullsFirst(o: Nodes.NullsFirst, collector: SQLString): SQLString {
-    if (o.expr instanceof Node) this.visit(o.expr, collector);
+    this.visit(o.expr, collector);
     collector.append(" NULLS FIRST");
     return collector;
   }
 
   protected visitArelNodesNullsLast(o: Nodes.NullsLast, collector: SQLString): SQLString {
-    if (o.expr instanceof Node) this.visit(o.expr, collector);
+    this.visit(o.expr, collector);
     collector.append(" NULLS LAST");
     return collector;
   }
 
   private visitArelNodesGroup(o: Nodes.Group, collector: SQLString): SQLString {
-    if (o.expr instanceof Node) {
-      return this.visit(o.expr, collector);
-    }
-    collector.append(String(o.expr));
-    return collector;
+    return this.visit(o.expr, collector);
   }
 
   private visitArelNodesNamedFunction(o: Nodes.NamedFunction, collector: SQLString): SQLString {
@@ -678,13 +675,7 @@ export class ToSql extends Visitor {
 
   private visitArelNodesExtract(o: Nodes.Extract, collector: SQLString): SQLString {
     collector.append(`EXTRACT(${String(o.field).toUpperCase()} FROM `);
-    if (Array.isArray(o.expr)) {
-      this.visitArray(o.expr, collector);
-    } else if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else if (o.expr !== null && o.expr !== undefined) {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     collector.append(")");
     return collector;
   }
@@ -855,9 +846,7 @@ export class ToSql extends Visitor {
 
   private visitArelNodesOn(o: Nodes.On, collector: SQLString): SQLString {
     collector.append("ON ");
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    }
+    this.visit(o.expr, collector);
     return collector;
   }
 
@@ -1082,13 +1071,10 @@ export class ToSql extends Visitor {
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    // Mirrors Arel's visit_Arel_Nodes_UnqualifiedColumn — strips the table
-    // qualifier so `SET col = col + 1` works in UPDATE statements.
-    const attr = o.attribute as Partial<Nodes.Attribute> | undefined;
-    if (!attr || typeof attr.name !== "string") {
-      throw new UnsupportedVisitError("UnqualifiedColumn must wrap an Attribute o with a name");
-    }
-    collector.append(this.quoteColumnName(attr.name));
+    // Rails strips the table qualifier so `SET col = col + 1` works in UPDATE
+    // statements: `collector << quote_column_name(o.name)` (to_sql.rb:728-730),
+    // where `UnqualifiedColumn#name` delegates to `@expr.name`.
+    collector.append(this.quoteColumnName(o.name as string | Node));
     return collector;
   }
 
@@ -1126,10 +1112,7 @@ export class ToSql extends Visitor {
     const joinName = o.relation.tableAlias || o.relation.name;
     collector.append(this.quoteTableName(joinName));
     collector.append(".");
-    // Rails: `quote_column_name(Arel.star)` returns the `SqlLiteral("*")`
-    // unchanged. We model `Arel.star` as the string sentinel `"*"` on the
-    // Attribute, so short-circuit identifier quoting here.
-    collector.append(o.name === "*" ? "*" : this.quoteColumnName(o.name));
+    collector.append(this.quoteColumnName(o.name));
     return collector;
   }
 
@@ -1233,14 +1216,12 @@ export class ToSql extends Visitor {
   }
 
   /**
-   * Mirrors `to_sql.rb#unsupported` (to_sql.rb:828) — `collector` is required
-   * to match the Rails signature even though it's unused after the raise. The
-   * message mirrors `UnsupportedVisitError.new(o)` (to_sql.rb:5-8).
+   * Mirrors `to_sql.rb#unsupported` (to_sql.rb:828-830) — `collector` is
+   * required to match the Rails signature even though it's unused after the
+   * raise.
    */
   protected unsupported(o: unknown, _collector: SQLString): never {
-    throw new UnsupportedVisitError(
-      `Unsupported argument type: ${constructorName(o)}. Construct an Arel o instead.`,
-    );
+    throw new UnsupportedVisitError(o);
   }
 
   // Rails aliases every Ruby value class with no SQL rendering to
@@ -1372,7 +1353,7 @@ export class ToSql extends Visitor {
   }
 
   /** @internal */
-  protected quoteTableName(name: string | Nodes.SqlLiteral): string {
+  protected quoteTableName(name: string | Node): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
     // `toS` is Ruby's implicit `name.to_s` inside `quote_table_name`: trails
     // reaches here with an Array name for a composite primary key, which Ruby
@@ -1381,7 +1362,7 @@ export class ToSql extends Visitor {
   }
 
   /** @internal */
-  protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
+  protected quoteColumnName(name: string | Node): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
     // See `quoteTableName` — `toS` is Ruby's implicit `name.to_s`.
     return this.connection.quoteColumnName(toS(name));

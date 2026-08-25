@@ -32,7 +32,7 @@ describe("Dot (trails-only)", () => {
   });
 
   it("walks a projected SelectCore", () => {
-    const stmt = users.project(star).ast;
+    const stmt = users.project(star()).ast;
     const out = dot.compile(stmt.cores[0]);
     expect(out).toMatch('[label="<f0>SelectCore"]');
     expect(out).toMatch(/->.*label="projections"/);
