@@ -108,10 +108,13 @@ export class AttributeMethodPattern {
     }`;
   }
 
-  match(method: string): AttributeMethod | null {
-    if (this.prefix && !method.startsWith(this.prefix)) return null;
-    if (this.suffix && !method.endsWith(this.suffix)) return null;
-    const attr = method.slice(this.prefix.length, this.suffix ? -this.suffix.length : undefined);
+  match(methodName: string): AttributeMethod | null {
+    if (this.prefix && !methodName.startsWith(this.prefix)) return null;
+    if (this.suffix && !methodName.endsWith(this.suffix)) return null;
+    const attr = methodName.slice(
+      this.prefix.length,
+      this.suffix ? -this.suffix.length : undefined,
+    );
     if (!attr) return null;
     return new AttributeMethod(
       this.proxyTarget,

@@ -1244,11 +1244,8 @@ describe("the to_sql visitor", () => {
     );
   });
 
-  // Trails-only date-rendering coverage (the four cases below plus the bind-param
-  // one): they assert the ActiveRecord abstract adapter's `quoted_date` shape,
-  // microseconds and all, which FakeRecord's `quote` does not produce —
-  // fake_record.rb:73-76 strftimes `%Y-%m-%d %H:%M:%S` with no fraction. They
-  // stay on `testConnection` for that reason.
+  // Trails-only: the date cases below assert the adapter's `quoted_date` shape,
+  // microseconds and all, which fake_record.rb:73-76 does not produce.
   it("should visit_Date with fractional seconds retains microseconds", () => {
     const d = Temporal.Instant.from("2026-04-18T13:00:41.729Z");
     const sql = new Visitors.ToSql(testConnection).compile(new Nodes.Quoted(d));
@@ -1783,11 +1780,8 @@ describe("the to_sql visitor", () => {
       quoteTableName(name: string | Nodes.SqlLiteral): string;
       quoteColumnName(name: string | Nodes.SqlLiteral): string;
     };
-    // Trails-only: these assert the ActiveRecord abstract-adapter quoting
-    // (`sanitize_as_sql_comment` strips delimiters, identifier escaping doubles
-    // an embedded `"`), which FakeRecord deliberately does not do —
-    // fake_record.rb:63-65 returns the comment unchanged and :55-61 interpolates
-    // the name verbatim. They stay on `testConnection` for that reason.
+    // Trails-only: asserts adapter quoting — comment stripping and `"` doubling —
+    // that fake_record.rb:55-65 does not do (verbatim name, unchanged comment).
     const make = (): ToSqlInternals =>
       new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
 
@@ -1843,9 +1837,7 @@ describe("the to_sql visitor", () => {
       expect(sql).toBe("/*+ IDX(t1) MAX_EXEC_TIME(1000) */");
     });
 
-    // Trails-only: `sanitize_as_sql_comment` is a no-op on FakeRecord
-    // (fake_record.rb:63-65), so the stripping this asserts only happens on the
-    // adapter quoter.
+    // Trails-only: `sanitize_as_sql_comment` is a no-op on fake_record.rb:63-65.
     it("strips embedded comment delimiters from each hint (Rails parity)", () => {
       // Mirrors Rails: sanitize_as_sql_comment removes /* and */ so a hint
       // can't escape the surrounding comment block. The literal SQL inside
@@ -1871,9 +1863,8 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  // Trails-only: adapter identifier quoting — splitting `schema.table` and
-  // doubling an embedded `"` — which FakeRecord does not do (fake_record.rb:55-61
-  // interpolates the name verbatim). These stay on `testConnection`.
+  // Trails-only: adapter identifier quoting (schema splitting, `"` doubling),
+  // which fake_record.rb:55-61 does not do.
   describe("schema-qualified table identifier", () => {
     it("quotes each segment of a schema.table name in SELECT and column refs", () => {
       const tbl = new Table("schema.table");
@@ -2195,8 +2186,7 @@ describe("the to_sql visitor", () => {
       expect(binds).toHaveLength(0);
     });
 
-    // Trails-only: asserts the adapter's `quoted_date` rendering of an Instant,
-    // which FakeRecord's `quote` does not produce (fake_record.rb:73-76).
+    // Trails-only: asserts the adapter's `quoted_date` rendering (fake_record.rb:73-76).
     it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
       const value = Temporal.Instant.from("2026-04-30T00:00:00.000Z");
       const [sql, binds] = compileWithBinds(
