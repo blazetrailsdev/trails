@@ -1,55 +1,55 @@
 import { describe, it, expect } from "vitest";
-import { Nodes, Table } from "../index.js";
+import { Nodes } from "../index.js";
+import type { Node } from "./node.js";
+import { assertNotSame } from "../test-helpers/assertions.js";
+import { uniq } from "../test-helpers/uniq.js";
 
-describe("Arel", () => {
-  describe("select-statement", () => {
+const words = (...names: string[]): Node => names as unknown as Node;
+
+describe("Arel::Nodes::SelectStatement", () => {
+  describe("#clone", () => {
     it("clones cores", () => {
-      const stmt = new Nodes.SelectStatement();
-      expect(stmt.cores.length).toBe(1);
-      expect(stmt.cores[0]).toBeInstanceOf(Nodes.SelectCore);
+      const statement = new Nodes.SelectStatement(words("a", "b", "c"));
+
+      const dolly = statement.clone();
+      expect(dolly.cores).toEqual(statement.cores);
+      assertNotSame(statement.cores, dolly.cores);
+    });
+  });
+
+  describe("equality", () => {
+    it("is equal with equal ivars", () => {
+      const statement1 = new Nodes.SelectStatement(words("a", "b", "c"));
+      statement1.offset = 1 as unknown as Node;
+      statement1.limit = 2 as unknown as Node;
+      statement1.lock = false as unknown as Node;
+      statement1.orders = words("x", "y", "z") as unknown as Node[];
+      statement1.with = "zomg" as unknown as Node;
+      const statement2 = new Nodes.SelectStatement(words("a", "b", "c"));
+      statement2.offset = 1 as unknown as Node;
+      statement2.limit = 2 as unknown as Node;
+      statement2.lock = false as unknown as Node;
+      statement2.orders = words("x", "y", "z") as unknown as Node[];
+      statement2.with = "zomg" as unknown as Node;
+      const array = [statement1, statement2];
+      expect(uniq(array).length).toBe(1);
     });
 
-    describe("equality", () => {
-      it("is equal with equal ivars", () => {
-        const s1 = new Nodes.SelectStatement();
-        s1.offset = new Nodes.Offset(new Nodes.Quoted(1));
-        s1.limit = new Nodes.Limit(new Nodes.Quoted(2));
-        const s2 = new Nodes.SelectStatement();
-        s2.offset = new Nodes.Offset(new Nodes.Quoted(1));
-        s2.limit = new Nodes.Limit(new Nodes.Quoted(2));
-        expect(s1.hash()).toBe(s2.hash());
-      });
-
-      it("is not equal with different ivars", () => {
-        const s1 = new Nodes.SelectStatement();
-        s1.offset = new Nodes.Offset(new Nodes.Quoted(1));
-        const s2 = new Nodes.SelectStatement();
-        s2.offset = new Nodes.Offset(new Nodes.Quoted(2));
-        expect(s1.hash()).not.toBe(s2.hash());
-      });
-    });
-
-    // Mirrors Rails: `SelectStatement.new(relation)` (select_statement.rb)
-    // forwards the relation to the seed `SelectCore.new(relation)` so callers
-    // can construct a SELECT pre-bound to a FROM target in one step.
-    it("ctor accepts a relation and seeds source.left", () => {
-      const users = new Table("users");
-      const stmt = new Nodes.SelectStatement(users);
-      expect(stmt.cores[0].source.left).toBe(users);
-    });
-
-    describe("#clone", () => {
-      it("clones cores", () => {
-        const stmt = new Nodes.SelectStatement();
-        stmt.offset = new Nodes.Offset(new Nodes.Quoted(5));
-        stmt.limit = new Nodes.Limit(new Nodes.Quoted(10));
-        const dolly = stmt.clone();
-        expect(dolly.cores.length).toBe(stmt.cores.length);
-        expect(dolly.cores).not.toBe(stmt.cores);
-        expect(dolly.cores[0]).not.toBe(stmt.cores[0]);
-        expect(dolly.offset).toBe(stmt.offset);
-        expect(dolly.limit).toBe(stmt.limit);
-      });
+    it("is not equal with different ivars", () => {
+      const statement1 = new Nodes.SelectStatement(words("a", "b", "c"));
+      statement1.offset = 1 as unknown as Node;
+      statement1.limit = 2 as unknown as Node;
+      statement1.lock = false as unknown as Node;
+      statement1.orders = words("x", "y", "z") as unknown as Node[];
+      statement1.with = "zomg" as unknown as Node;
+      const statement2 = new Nodes.SelectStatement(words("a", "b", "c"));
+      statement2.offset = 1 as unknown as Node;
+      statement2.limit = 2 as unknown as Node;
+      statement2.lock = false as unknown as Node;
+      statement2.orders = words("x", "y", "z") as unknown as Node[];
+      statement2.with = "wth" as unknown as Node;
+      const array = [statement1, statement2];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });

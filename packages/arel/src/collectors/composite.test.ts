@@ -1,17 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { Collectors } from "../index.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
+import { Collectors, Nodes, SelectManager, Table, Visitors } from "../index.js";
 
 describe("TestComposite", () => {
+  const visitor = new Visitors.ToSql(fakeRecordConnection);
+  const compile = (node: Nodes.Node): [string, unknown[]] => {
+    const sqlCollector = new Collectors.SQLString();
+    const bindCollector = new Collectors.Bind();
+    const collector = new Collectors.Composite(sqlCollector, bindCollector);
+    return visitor.accept(node, collector).value as [string, unknown[]];
+  };
+
+  const astWithBinds = (bvs: unknown[]): Nodes.Node => {
+    const table = new Table("users");
+    const manager = new SelectManager(table);
+    manager.where(table.get("age").eq(new Nodes.BindParam(bvs.shift())));
+    manager.where(table.get("name").eq(new Nodes.BindParam(bvs.shift())));
+    return manager.ast;
+  };
+
   it("composite collector performs multiple collections at once", () => {
-    const sql = new Collectors.SQLString();
-    const binds = new Collectors.Bind();
-    const composite = new Collectors.Composite(sql, binds);
+    let [sql, binds] = compile(astWithBinds(["hello", "world"]));
+    expect(sql).toBe('SELECT FROM "users" WHERE "users"."age" = ? AND "users"."name" = ?');
+    expect(binds).toEqual(["hello", "world"]);
 
-    composite.append("SELECT ");
-    composite.addBind(123);
-
-    expect(sql.value).toBe("SELECT ?");
-    expect(binds.value).toEqual([123]);
+    [sql, binds] = compile(astWithBinds(["hello2", "world3"]));
+    expect(sql).toBe('SELECT FROM "users" WHERE "users"."age" = ? AND "users"."name" = ?');
+    expect(binds).toEqual(["hello2", "world3"]);
   });
 
   it("addBind forwards block to both collectors", () => {
@@ -52,15 +67,12 @@ describe("TestComposite", () => {
   });
 
   it("retryable on composite collector propagates", () => {
-    const sql = new Collectors.SQLString();
-    const binds = new Collectors.Bind();
-    const composite = new Collectors.Composite(sql, binds);
+    const sqlCollector = new Collectors.SQLString();
+    const bindCollector = new Collectors.Bind();
+    const collector = new Collectors.Composite(sqlCollector, bindCollector);
+    collector.retryable = true;
 
-    expect(composite.retryable).toBe(true);
-    sql.retryable = false;
-    expect(composite.retryable).toBe(false);
-
-    composite.retryable = true;
-    expect(sql.retryable).toBe(true);
+    expect(sqlCollector.retryable).toBeTruthy();
+    expect(bindCollector.retryable).toBeTruthy();
   });
 });

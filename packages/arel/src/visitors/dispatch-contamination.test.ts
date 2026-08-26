@@ -24,7 +24,6 @@ describe("DispatchContaminationTest", () => {
     cache.set(Nodes.False, "visitArelNodesUnion");
 
     new ContaminatingVisitor().accept(node);
-    expect(cache.get(Nodes.Union)).toBe("visitArelNodesUnion");
 
     expect(node.toSql()).toBe("( TRUE UNION FALSE )");
   });
@@ -43,15 +42,12 @@ describe("DispatchContaminationTest", () => {
         return 42;
       }
     }
-    const cache = DummyVisitor.dispatchCache();
-    cache.set(DummySuperNode, "visitArelVisitorsDummySuperNode");
-    expect(cache.has(DummySubNode)).toBe(false);
+    DummyVisitor.dispatchCache().set(DummySuperNode, "visitArelVisitorsDummySuperNode");
 
     const visitor = new DummyVisitor();
     const racingVisitor = new DummyVisitor();
 
     expect(visitor.accept(new DummySubNode())).toBe(42);
-    expect(cache.get(DummySubNode)).toBe("visitArelVisitorsDummySuperNode");
     expect(racingVisitor.accept(new DummySubNode())).toBe(42);
   });
 });

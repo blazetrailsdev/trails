@@ -533,6 +533,24 @@ describe("Ruby extractor assertion-value collection", () => {
     expect(v["literals"]).toEqual(["n:5", "s:hi", "b:true", "s:sym", null]);
   });
 
+  it("names an operator-named symbol by its operator text", () => {
+    const v = rubyAssertionValues({
+      "cases/ops_test.rb": `
+        class OpsTest < ActiveSupport::TestCase
+          def test_operators
+            assert_equal :+, a
+            assert_equal :-, b
+            assert_equal :<=>, c
+          end
+        end
+      `,
+    });
+    // `:+` lexes as [:@op, "+"], which the ident-name path cannot name — it
+    // used to yield the empty token `s:` and read as a value divergence
+    // against a port asserting "+".
+    expect(v["operators"]).toEqual(["s:+", "s:-", "s:<=>"]);
+  });
+
   it("captures negative numeric literals and the parenthesized form", () => {
     const v = rubyAssertionValues({
       "cases/paren_test.rb": `

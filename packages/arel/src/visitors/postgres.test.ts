@@ -37,7 +37,7 @@ describe("PostgresTest", () => {
   it("should support DISTINCT ON", () => {
     const core = new Nodes.SelectCore();
     core.setQuantifier = new Nodes.DistinctOn(sql("aaron"));
-    expect(compile(core)).toContain("DISTINCT ON ( aaron )");
+    expect(compile(core)).toMatch("DISTINCT ON ( aaron )");
   });
 
   it("should support DISTINCT", () => {

@@ -159,17 +159,21 @@ describe("SelectManagerTest", () => {
 
   describe("clone", () => {
     it("creates new cores", () => {
-      const mgr = new SelectManager(users);
-      expect(mgr.ast.cores.length).toBe(1);
+      const table = new Table("users", { as: "foo" });
+      const mgr = table.from();
+      const m2 = mgr.clone();
+      m2.project("foo");
+      expect(mgr.toSql()).not.toEqual(m2.toSql());
     });
 
     it("makes updates to the correct copy", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star());
-      mgr.where(users.get("id").eq(1));
-      const sql = mgr.toSql();
-      expect(sql).toContain("WHERE");
-      expect(sql).toContain("*");
+      const table = new Table("users", { as: "foo" });
+      const mgr = table.from();
+      const m2 = mgr.clone();
+      const m3 = m2.clone();
+      m2.project("foo");
+      expect(mgr.toSql()).not.toEqual(m2.toSql());
+      expect(m3.toSql()).toEqual(mgr.toSql());
     });
   });
 

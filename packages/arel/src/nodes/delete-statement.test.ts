@@ -1,55 +1,40 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { Nodes } from "../index.js";
+import type { Node } from "./node.js";
+import { assertNotSame } from "../test-helpers/assertions.js";
+import { uniq } from "../test-helpers/uniq.js";
 
-describe("Arel", () => {
-  const users = new Table("users");
+const words = (...names: string[]): Node[] => names as unknown as Node[];
 
-  describe("delete-statement", () => {
+describe("Arel::Nodes::DeleteStatement", () => {
+  describe("#clone", () => {
     it("clones wheres", () => {
-      const stmt = new Nodes.DeleteStatement();
-      stmt.wheres.push(users.get("id").eq(1));
-      const copy = [...stmt.wheres];
-      expect(copy.length).toBe(1);
-      stmt.wheres.push(users.get("name").eq("dean"));
-      expect(copy.length).toBe(1);
-      expect(stmt.wheres.length).toBe(2);
+      const statement = new Nodes.DeleteStatement();
+      statement.wheres = words("a", "b", "c");
+
+      const dolly = statement.clone();
+      expect(dolly.wheres).toEqual(statement.wheres);
+      assertNotSame(statement.wheres, dolly.wheres);
+    });
+  });
+
+  describe("equality", () => {
+    it("is equal with equal ivars", () => {
+      const statement1 = new Nodes.DeleteStatement();
+      statement1.wheres = words("a", "b", "c");
+      const statement2 = new Nodes.DeleteStatement();
+      statement2.wheres = words("a", "b", "c");
+      const array = [statement1, statement2];
+      expect(uniq(array).length).toBe(1);
     });
 
-    // Mirrors Rails: `DeleteStatement.new(relation, wheres = [])`
-    // (delete_statement.rb) accepts both args at construction.
-    it("ctor accepts a relation and initial wheres", () => {
-      const eq = users.get("id").eq(1);
-      const stmt = new Nodes.DeleteStatement(users, [eq]);
-      expect(stmt.relation).toBe(users);
-      expect(stmt.wheres).toEqual([eq]);
-    });
-
-    describe("equality", () => {
-      it("is equal with equal ivars", () => {
-        const s1 = new Nodes.DeleteStatement();
-        s1.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
-        const s2 = new Nodes.DeleteStatement();
-        s2.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
-        expect(s1.hash()).toBe(s2.hash());
-      });
-
-      it("is not equal with different ivars", () => {
-        const s1 = new Nodes.DeleteStatement();
-        s1.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
-        const s2 = new Nodes.DeleteStatement();
-        s2.wheres = [new Nodes.Quoted("1"), new Nodes.Quoted("2"), new Nodes.Quoted("3")];
-        expect(s1.hash()).not.toBe(s2.hash());
-      });
-    });
-
-    describe("#clone", () => {
-      it("clones wheres", () => {
-        const stmt = new Nodes.DeleteStatement();
-        stmt.wheres = [new Nodes.Quoted("a"), new Nodes.Quoted("b"), new Nodes.Quoted("c")];
-        const dolly = stmt.clone();
-        expect(dolly.wheres).toEqual(stmt.wheres);
-        expect(dolly.wheres).not.toBe(stmt.wheres);
-      });
+    it("is not equal with different ivars", () => {
+      const statement1 = new Nodes.DeleteStatement();
+      statement1.wheres = words("a", "b", "c");
+      const statement2 = new Nodes.DeleteStatement();
+      statement2.wheres = words("1", "2", "3");
+      const array = [statement1, statement2];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });

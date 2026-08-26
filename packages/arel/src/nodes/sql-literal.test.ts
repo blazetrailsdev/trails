@@ -1,80 +1,60 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Nodes, Visitors } from "../index.js";
+import { sql, Nodes, Visitors } from "../index.js";
+import { mustBeLike } from "../test-helpers/must-be-like.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("SqlLiteralTest", () => {
+  const visitor = new Visitors.ToSql(fakeRecordConnection);
+  const compile = (node: Nodes.Node): string => visitor.compile(node);
+
   describe("sql", () => {
     it("makes a sql literal node", () => {
-      const node = new Nodes.SqlLiteral("NOW()");
-      expect(node).toBeInstanceOf(Nodes.SqlLiteral);
-      expect(node.value).toBe("NOW()");
+      const literal = sql("foo");
+      expect(literal).toBeInstanceOf(Nodes.SqlLiteral);
     });
   });
 
   describe("count", () => {
     it("makes a count node", () => {
-      const lit = new Nodes.SqlLiteral("*");
-      const count = new Nodes.NamedFunction("COUNT", [lit]);
-      const visitor = new Visitors.ToSql(fakeRecordConnection);
-      expect(visitor.compile(count)).toBe("COUNT(*)");
+      const node = new Nodes.SqlLiteral("*").count();
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(` COUNT(*) `));
     });
 
     it("makes a distinct node", () => {
-      const lit = new Nodes.SqlLiteral("zomg");
-      const count = new Nodes.NamedFunction("COUNT", [lit], undefined, true);
-      const visitor = new Visitors.ToSql(fakeRecordConnection);
-      expect(visitor.compile(count)).toBe("COUNT(DISTINCT zomg)");
+      const node = new Nodes.SqlLiteral("*").count(true);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(` COUNT(DISTINCT *) `));
     });
   });
 
   describe("equality", () => {
     it("makes an equality node", () => {
-      const lit = new Nodes.SqlLiteral("foo");
-      const eq = new Nodes.Equality(lit, new Nodes.Quoted(1));
-      const visitor = new Visitors.ToSql(fakeRecordConnection);
-      expect(visitor.compile(eq)).toBe("foo = 1");
+      const node = new Nodes.SqlLiteral("foo").eq(1);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(` foo = 1 `));
     });
 
     it("is equal with equal contents", () => {
-      const a = new Nodes.SqlLiteral("NOW()");
-      const b = new Nodes.SqlLiteral("NOW()");
-      expect(a.value).toBe(b.value);
+      const array = [new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("foo")];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different contents", () => {
-      const a = new Nodes.SqlLiteral("NOW()");
-      const b = new Nodes.SqlLiteral("CURRENT_TIMESTAMP");
-      expect(a.value).not.toBe(b.value);
+      const array = [new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")];
+      expect(uniq(array).length).toBe(2);
     });
   });
 
   describe('grouped "or" equality', () => {
     it("makes a grouping node with an or node", () => {
-      const lit1 = new Nodes.SqlLiteral("foo");
-      const lit2 = new Nodes.SqlLiteral("bar");
-      const eq1 = new Nodes.Equality(lit1, new Nodes.Quoted(1));
-      const eq2 = new Nodes.Equality(lit2, new Nodes.Quoted(2));
-      const orNode = eq1.or(eq2);
-      expect(orNode).toBeInstanceOf(Nodes.Grouping);
+      const node = new Nodes.SqlLiteral("foo").eqAny([1, 2]);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(` (foo = 1 OR foo = 2) `));
     });
   });
 
   describe('grouped "and" equality', () => {
     it("makes a grouping node with an and node", () => {
-      const lit1 = new Nodes.SqlLiteral("foo");
-      const lit2 = new Nodes.SqlLiteral("bar");
-      const eq1 = new Nodes.Equality(lit1, new Nodes.Quoted(1));
-      const eq2 = new Nodes.Equality(lit2, new Nodes.Quoted(2));
-      const andNode = eq1.and(eq2);
-      expect(andNode).toBeInstanceOf(Nodes.And);
-    });
-  });
-
-  describe("addition", () => {
-    it("fails if joined with something that is not an Arel node", () => {
-      const lit = new Nodes.SqlLiteral("foo");
-      expect(lit.value).toBe("foo");
-      expect(lit).toBeInstanceOf(Nodes.Node);
+      const node = new Nodes.SqlLiteral("foo").eqAll([1, 2]);
+      expect(mustBeLike(compile(node))).toBe(mustBeLike(` (foo = 1 AND foo = 2) `));
     });
   });
 
@@ -88,20 +68,16 @@ describe("SqlLiteralTest", () => {
 
   describe("addition", () => {
     it("generates a Fragments node", () => {
-      const a = new Nodes.SqlLiteral("foo");
-      const b = new Nodes.SqlLiteral("bar");
-      const fragments = a.join(b);
+      const sql1 = sql("SELECT *");
+      const sql2 = sql("FROM users");
+      const fragments = sql1.plus(sql2);
       expect(fragments).toBeInstanceOf(Nodes.Fragments);
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(fragments);
-      expect(sql).toBe("foo bar");
+      expect(fragments.values).toEqual([sql1, sql2]);
     });
 
-    it("plus is an alias for join (Rails sql_literal.rb #+)", () => {
-      const a = new Nodes.SqlLiteral("foo");
-      const b = new Nodes.SqlLiteral("bar");
-      const fragments = a.plus(b);
-      expect(fragments).toBeInstanceOf(Nodes.Fragments);
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(fragments)).toBe("foo bar");
+    it("fails if joined with something that is not an Arel node", () => {
+      const literal = sql("SELECT *");
+      expect(() => literal.plus("Not a node")).toThrow(TypeError);
     });
   });
 });

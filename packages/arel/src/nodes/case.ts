@@ -15,13 +15,15 @@ import { Unary } from "./unary.js";
 export class Case extends NodeExpression {
   case: Node | null;
   conditions: When[];
-  default: Else | null;
+  default: Node | null;
 
   constructor(operand?: Node, defaultValue?: Node) {
     super();
     this.case = operand ?? null;
     this.conditions = [];
-    this.default = defaultValue ? new Else(defaultValue) : null;
+    // case.rb:11 stores the second argument raw — only `#else` wraps in an
+    // Else node (case.rb:25-28).
+    this.default = defaultValue ?? null;
   }
 
   // Property-form override (vs. `when(...) {}`): Predications.when is
@@ -74,12 +76,24 @@ export class Case extends NodeExpression {
     return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
+  // Mirrors Arel::Nodes::Case#initialize_copy (case.rb:29-33), which Ruby runs
+  // for `#clone`: each of the three slots is itself cloned, so a cloned Case
+  // shares no sub-node with the original.
   clone(): Case {
-    const c = new Case(this.case ?? undefined);
-    c.conditions.push(...this.conditions);
-    c.default = this.default;
-    return c;
+    const copy = new Case();
+    if (this.case) copy.case = cloneShallow(this.case);
+    copy.conditions = this.conditions.map((x) => x.clone());
+    if (this.default) copy.default = cloneShallow(this.default);
+    return copy;
   }
+}
+
+// Ruby `Object#clone` on the `@case` and `@default` slots — the same narrowing
+// `cloneSlot` in binary.ts makes, for the same reason.
+function cloneShallow<T extends object>(node: T): T {
+  const cloneable = node as { clone?: () => T };
+  if (typeof cloneable.clone === "function") return cloneable.clone();
+  return Object.assign(Object.create(Object.getPrototypeOf(node) as object) as object, node);
 }
 
 export class When extends Binary {}

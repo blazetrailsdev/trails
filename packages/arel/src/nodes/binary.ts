@@ -104,6 +104,21 @@ export const FetchAttribute = {
   },
 };
 
+// Ruby `Object#clone` on whatever occupies a Binary slot: a node that defines
+// its own `clone` runs it (Ruby would run its `initialize_copy` the same way),
+// an Array copies, and anything else gets the shallow same-class copy Ruby's
+// `Object#clone` is. Note the shallow arm carries over an own property holding
+// a bound function — the trails idiom for a Ruby `include` override, e.g.
+// `NamedFunction#over` — still bound to the ORIGINAL; give such a node its own
+// `clone` before putting it through here.
+function cloneSlot(value: NodeOrValue): NodeOrValue {
+  if (Array.isArray(value)) return [...value] as NodeOrValue;
+  const cloneable = value as { clone?: () => NodeOrValue };
+  if (typeof cloneable.clone === "function") return cloneable.clone();
+  if (typeof value !== "object" || value === null) return value;
+  return Object.assign(Object.create(Object.getPrototypeOf(value) as object) as object, value);
+}
+
 export class Binary extends NodeExpression {
   left: NodeOrValue;
   right: NodeOrValue;
@@ -112,6 +127,16 @@ export class Binary extends NodeExpression {
     super();
     this.left = left;
     this.right = right;
+  }
+
+  // Mirrors Arel::Nodes::Binary#initialize_copy (binary.rb:14-18), which Ruby
+  // runs for `#clone` — the two slots are duplicated so a cloned node's array
+  // or node halves are not shared with the original.
+  clone(): this {
+    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
+    if (this.left != null && this.left !== false) copy.left = cloneSlot(this.left);
+    if (this.right != null && this.right !== false) copy.right = cloneSlot(this.right);
+    return copy;
   }
 
   as(aliasName: string): As {

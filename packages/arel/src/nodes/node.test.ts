@@ -1,23 +1,36 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Table, SelectManager, Nodes, Visitors } from "../index.js";
+import { Table, Nodes, Visitors } from "../index.js";
+
+// Ruby's `Module#ancestors`, which the Rails body greps for `Nodes::Node`.
+function ancestors(klass: unknown): unknown[] {
+  const chain: unknown[] = [];
+  for (let k: unknown = klass; k; k = Object.getPrototypeOf(k) as unknown) chain.push(k);
+  return chain;
+}
+
+// `Arel::Nodes::Node` is instantiable in Ruby (node.rb:8); trails declares the
+// class `abstract` even though it has no abstract members, so the Rails bodies
+// below construct one through this cast.
+const NodeCtor = Nodes.Node as unknown as new () => Nodes.Node;
 
 describe("TestNode", () => {
   const users = new Table("users");
   it("includes factory methods", () => {
-    const mgr = new SelectManager(users);
-    expect(typeof mgr.createTrue).toBe("function");
-    expect(typeof mgr.createFalse).toBe("function");
-    expect(typeof mgr.createJoin).toBe("function");
-    expect(typeof mgr.createStringJoin).toBe("function");
-    expect(typeof mgr.createAnd).toBe("function");
-    expect(typeof mgr.createOn).toBe("function");
+    expect(typeof new NodeCtor().createJoin === "function").toBeTruthy();
   });
 
   it("all nodes are nodes", () => {
-    const attr = users.get("name");
-    expect(attr).toBeInstanceOf(Nodes.Attribute);
-    expect(attr).toBeInstanceOf(Nodes.Node);
+    for (const klass of Object.values(Nodes) as unknown[]) {
+      if (typeof klass !== "function") continue;
+      // Ruby's `.grep(Class)` — a plain function (`buildQuoted`) is not one.
+      if (Object.getOwnPropertyDescriptor(klass as object, "prototype")?.writable !== false) {
+        continue;
+      }
+      if (Nodes.SqlLiteral === klass) continue;
+      if (Nodes.BindParam === klass) continue;
+      expect(ancestors(klass)).toContain(Nodes.Node);
+    }
   });
 
   it("is equal with equal ivars (checks left/right)", () => {

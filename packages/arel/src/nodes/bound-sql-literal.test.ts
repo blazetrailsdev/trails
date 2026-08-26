@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 import { BindError } from "../errors.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("BoundSqlLiteralTest", () => {
   describe("#plus", () => {
@@ -20,16 +21,22 @@ describe("BoundSqlLiteralTest", () => {
 
   describe("equality", () => {
     it("is equal with equal components", () => {
-      const a = new Nodes.BoundSqlLiteral("id = ?", [1], null);
-      const b = new Nodes.BoundSqlLiteral("id = ?", [1], null);
-      expect(a.eql(b)).toBe(true);
-      expect(a.hash()).toBe(b.hash());
+      const node1 = new Nodes.BoundSqlLiteral("foo + ?", [2], {});
+      const node2 = new Nodes.BoundSqlLiteral("foo + ?", [2], {});
+
+      const array = [node1, node2];
+
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different components", () => {
-      const a = new Nodes.BoundSqlLiteral("id = ?", [1], null);
-      const b = new Nodes.BoundSqlLiteral("id = ?", [2], null);
-      expect(a.eql(b)).toBe(false);
+      const node1 = new Nodes.BoundSqlLiteral("foo + ?", [2], {});
+      const node2 = new Nodes.BoundSqlLiteral("foo + ?", [3], {});
+      const node3 = new Nodes.BoundSqlLiteral("foo + :bar", [], { bar: 2 });
+
+      const array = [node1, node2, node3];
+
+      expect(uniq(array).length).toBe(3);
     });
   });
 

@@ -38,7 +38,7 @@ const UNION_NODE_CLASSES: Record<
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectManager extends TreeManager {
-  readonly ast: SelectStatement;
+  ast: SelectStatement;
 
   constructor(table?: Table | null) {
     super();
@@ -483,6 +483,16 @@ export class SelectManager extends TreeManager {
       .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);
+  }
+
+  // Mirrors Arel::TreeManager#initialize_copy (tree_manager.rb:60-63) and
+  // Arel::SelectManager#initialize_copy (select_manager.rb:14-17), which Ruby
+  // runs for `#clone`: the copy gets its own AST, and `core` re-reads the
+  // copied cores rather than pointing back at the original's.
+  clone(): SelectManager {
+    const copy = new SelectManager();
+    copy.ast = this.ast.clone();
+    return copy;
   }
 
   private get core(): SelectCore {
