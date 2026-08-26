@@ -68,8 +68,14 @@ export class UniquenessValidator extends EachValidator {
     const scopes =
       options.scope == null ? [] : Array.isArray(options.scope) ? options.scope : [options.scope];
     if (!scopes.every((scope) => typeof scope === "string")) {
+      let scopeRepr: string;
+      try {
+        scopeRepr = JSON.stringify(options.scope) ?? String(options.scope);
+      } catch {
+        scopeRepr = String(options.scope);
+      }
       throw new ArgumentError(
-        `${String(options.scope)} is not a supported format for :scope option. ` +
+        `${scopeRepr} is not a supported format for :scope option. ` +
           "Pass a string or an array of strings instead.",
       );
     }
