@@ -204,6 +204,185 @@ describe("buildGlobalRubyCandidates", () => {
   });
 });
 
+describe("buildReport — ActiveSupport::Concern allow-set", () => {
+  /**
+   * Rails: `mixin.rb` defines `module Mixin; extend ActiveSupport::Concern;
+   * included do extend Namer end; module ClassMethods; def validates; end; end;
+   * end`, and `host.rb` does `include Mixin`. Ruby's Concern hook
+   * (activesupport/lib/active_support/concern.rb:139-143) gives the host both
+   * `Mixin::ClassMethods#validates` and `Namer#model_name` as CLASS methods,
+   * neither of which appears in the host's own `includes`.
+   */
+  function makeManifests(hostIncludes: string[]): { ruby: ApiManifest; ts: ApiManifest } {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Host": rubyClass({
+              name: "Host",
+              file: "host.rb",
+              includes: hostIncludes,
+            }),
+          },
+          modules: {
+            "ActiveModel::Mixin": {
+              name: "Mixin",
+              file: "mixin.rb",
+              includes: [],
+              extends: ["ActiveSupport::Concern", "ActiveModel::Namer"],
+              instanceMethods: [],
+              classMethods: [],
+            },
+            "ActiveModel::Mixin::ClassMethods": {
+              name: "ClassMethods",
+              file: "mixin.rb",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("validates")],
+              classMethods: [],
+            },
+            "ActiveModel::Namer": {
+              name: "Namer",
+              file: "naming.rb",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("model_name")],
+              classMethods: [],
+            },
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Host: {
+              name: "Host",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("validates"), method("modelName")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return { ruby, ts };
+  }
+
+  const run = (hostIncludes: string[]): string[] => {
+    const { ruby, ts } = makeManifests(hostIncludes);
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    return (report.packages[0]?.extraFiles[0]?.extras ?? []).map((e) => e.name);
+  };
+
+  it("allows a Concern's ClassMethods and its included-block extends on the includer", () => {
+    expect(run(["ActiveModel::Mixin"])).toEqual([]);
+  });
+
+  it("does not allow them on a class that does not include the Concern", () => {
+    expect(run([]).sort()).toEqual(["modelName", "validates"]);
+  });
+});
+
+describe("buildReport — hook-injected mixins", () => {
+  /**
+   * `ActiveModel::Callbacks.extended(base)` runs
+   * `base.class_eval { include ActiveSupport::Callbacks }`
+   * (activemodel/lib/active_model/callbacks.rb:66-70) — a `self.extended` body
+   * the static extractor cannot follow.
+   */
+  it("credits ActiveSupport::Callbacks against a host that extends ActiveModel::Callbacks", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Host": {
+              name: "Host",
+              file: "host.rb",
+              includes: [],
+              extends: ["ActiveModel::Callbacks"],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+          modules: {
+            "ActiveModel::Callbacks": {
+              name: "Callbacks",
+              file: "callbacks.rb",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+        },
+        activesupport: {
+          classes: {},
+          modules: {
+            "ActiveSupport::Callbacks": {
+              name: "Callbacks",
+              file: "callbacks.rb",
+              includes: [],
+              extends: ["Concern"],
+              instanceMethods: [method("run_callbacks")],
+              classMethods: [],
+            },
+            "ActiveSupport::Callbacks::ClassMethods": {
+              name: "ClassMethods",
+              file: "callbacks.rb",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("set_callback")],
+              classMethods: [],
+            },
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Host: {
+              name: "Host",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("runCallbacks")],
+              classMethods: [method("setCallback")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activemodel",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0]?.extraFiles ?? []).toEqual([]);
+  });
+});
+
 describe("buildReport — novel vs moved classification", () => {
   function makeManifests(): { ruby: ApiManifest; ts: ApiManifest } {
     // Rails: foo.rb defines `bar`; baz.rb defines `quux`.

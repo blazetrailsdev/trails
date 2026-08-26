@@ -161,6 +161,24 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
 };
 
 /**
+ * Mixins a module injects into its host from a `self.extended` / `self.included`
+ * hook body rather than a lexical `include` in the host's own source — the same
+ * blind spot as `AMBIENT_RAILTIE_MIXINS`, one level closer in.
+ *
+ *   - `ActiveModel::Callbacks.extended(base)` runs
+ *     `base.class_eval { include ActiveSupport::Callbacks }`
+ *     (activemodel/lib/active_model/callbacks.rb:66-70), so every host that
+ *     `extend`s it answers `run_callbacks` / `set_callback` / `skip_callback` /
+ *     `reset_callbacks`. `ActiveModel::Validations`' `included` block extends it
+ *     (validations.rb:42), which is how `ActiveModel::Model` gets them.
+ */
+const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
+  "ActiveModel::Callbacks": {
+    includes: ["ActiveSupport::Callbacks"],
+  },
+};
+
+/**
  * Methods a Rails file's host class/module gains by including a mixin whose
  * SOURCE file is on `UNPORTED_FILES` — so `collectAllowedNames`'s `walkMixin`
  * skips the mixin (mirroring `compare.flattenIncludedMethodInfos` at
@@ -1214,6 +1232,8 @@ function collectAllowedNames(
     for (const c of candidates) allowed.add(c);
   };
 
+  const CONCERN = "ActiveSupport::Concern";
+
   // Ruby-side walk: a duplicated short name is disambiguated by the enclosing
   // namespace inside `resolveModuleName`, so this needs no declaring-file hint
   // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
@@ -1226,6 +1246,7 @@ function collectAllowedNames(
     // because the same name can ALSO be a vendored core_ext reopening, which
     // contributes its own `def`s through the walk below.
     for (const name of CORE_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
+    for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn);
     // Fall back to the cross-package map: a railtie-injected mixin (see
     // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
     // in another package's modules, not this package's.
@@ -1246,8 +1267,22 @@ function collectAllowedNames(
     // methods on the module itself stay on the module (Ruby `include`
     // semantics; matches compare.flattenIncludedMethodInfos).
     addMethods(mod.instanceMethods, fqn);
-    // Chain `include`s only — a module's own `extend` doesn't propagate
-    // (Ruby singleton-class semantics).
+    // `include M` where `M extend ActiveSupport::Concern` also runs
+    // `base.extend M::ClassMethods` and the `included` block
+    // (activesupport/lib/active_support/concern.rb:139-143), so the includer
+    // answers both as class methods. Neither reaches the host through its own
+    // `includes` — the static extractor files `M::ClassMethods` as a separate
+    // entity, and it flattens `included do extend X end` into `M`'s `extends`.
+    // Both are gated on the Concern: a plain module's body `extend` really is
+    // singleton-only and must not propagate.
+    // Spelled `ActiveSupport::Concern` from another gem and bare `Concern` from
+    // inside `module ActiveSupport` (callbacks.rb:65); `moduleFqnByShort` is the
+    // HOST package's map, so it cannot requalify the bare one.
+    const isConcern = (ext: string): boolean => ext === CONCERN || ext === "Concern";
+    if ((mod.extends ?? []).some(isConcern)) {
+      walkMixin(`${fqn}::ClassMethods`, fqn);
+      for (const ext of mod.extends ?? []) if (!isConcern(ext)) walkMixin(ext, fqn);
+    }
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
