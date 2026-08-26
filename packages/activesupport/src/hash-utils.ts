@@ -153,20 +153,12 @@ export function except<T extends AnyObject, K extends keyof T>(obj: T, ...keys: 
 }
 
 /**
- * Recursively transform all keys using the provided function.
+ * Returns a new hash with all keys converted by the block operation, through
+ * the root hash and every nested hash and array — Ruby's
+ * `Hash#deep_transform_keys` (core_ext/hash/keys.rb:64-66).
  */
-export function deepTransformKeys(obj: unknown, fn: (key: string) => string): unknown {
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepTransformKeys(item, fn));
-  }
-  if (obj !== null && typeof obj === "object" && isPlainObject(obj)) {
-    const result: AnyObject = {};
-    for (const key of Object.keys(obj)) {
-      result[fn(key)] = deepTransformKeys(obj[key], fn);
-    }
-    return result;
-  }
-  return obj;
+export function deepTransformKeys(obj: unknown, block: (key: string) => string): unknown {
+  return _deepTransformKeysInObject(obj, block);
 }
 
 /**
@@ -285,9 +277,13 @@ export const toOptionsBang = symbolizeKeysBang;
 
 /**
  * Recursively convert all keys to symbols (strings in TS).
+ *
+ * @missingRailsArgs deep_transform_keys — PERMANENT: keys.rb:104 calls it on
+ * the receiver with only a block; the Ruby receiver becomes the first TS
+ * argument here, as it does everywhere in this file.
  */
 export function deepSymbolizeKeys(obj: unknown): unknown {
-  return deepStringifyKeys(obj);
+  return deepTransformKeys(obj, (key) => key);
 }
 
 /**
@@ -310,7 +306,7 @@ export function deepStringifyKeysBang(hash: AnyObject): AnyObject {
  * Ruby's `Hash#deep_symbolize_keys!` (core_ext/hash/keys.rb:110-112).
  */
 export function deepSymbolizeKeysBang(hash: AnyObject): AnyObject {
-  return deepTransformKeysBang(hash, (key) => String(key));
+  return deepTransformKeysBang(hash, (key) => key);
 }
 
 /**

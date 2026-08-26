@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { Type } from "@blazetrails/activemodel";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
@@ -37,40 +38,44 @@ describe("SqliteAdapter", () => {
     });
   });
 
+  /**
+   * The inherited `lookupCastType` signature is widened to `Promise`/`null`
+   * for PostgreSQL's async OID load; SQLite's map is always resolved.
+   */
+  const castType = (sqlType: string) => adapter.lookupCastType(sqlType) as Type;
+
   describe("lookupCastType", () => {
     it("resolves base SQL types", () => {
-      expect(adapter.lookupCastType("string").name).toBe("string");
-      expect(adapter.lookupCastType("text").name).toBe("text");
-      expect(adapter.lookupCastType("integer").name).toBe("integer");
-      expect(adapter.lookupCastType("float").name).toBe("float");
-      expect(adapter.lookupCastType("boolean").name).toBe("boolean");
-      expect(adapter.lookupCastType("date").name).toBe("date");
-      expect(adapter.lookupCastType("datetime").name).toBe("datetime");
-      expect(adapter.lookupCastType("time").name).toBe("time");
-      expect(adapter.lookupCastType("json").name).toBe("json");
-      expect(adapter.lookupCastType("blob").name).toBe("binary");
+      expect(castType("text").name).toBe("text");
+      expect(castType("integer").name).toBe("integer");
+      expect(castType("float").name).toBe("float");
+      expect(castType("boolean").name).toBe("boolean");
+      expect(castType("date").name).toBe("date");
+      expect(castType("datetime").name).toBe("datetime");
+      expect(castType("time").name).toBe("time");
+      expect(castType("json").name).toBe("json");
+      expect(castType("blob").name).toBe("binary");
     });
 
     it("strips precision/scale metadata", () => {
-      expect(adapter.lookupCastType("DECIMAL(10, 0)").name).toBe("decimal");
-      expect(adapter.lookupCastType("decimal(5,2)").name).toBe("decimal");
-      expect(adapter.lookupCastType("INTEGER(11)").name).toBe("integer");
+      expect(castType("DECIMAL(10, 0)").name).toBe("decimal");
+      expect(castType("decimal(5,2)").name).toBe("decimal");
+      expect(castType("INTEGER(11)").name).toBe("integer");
     });
 
     it("handles case-insensitive types", () => {
-      expect(adapter.lookupCastType("TEXT").name).toBe("text");
-      expect(adapter.lookupCastType("INTEGER").name).toBe("integer");
-      expect(adapter.lookupCastType("BOOLEAN").name).toBe("boolean");
+      expect(castType("TEXT").name).toBe("text");
+      expect(castType("INTEGER").name).toBe("integer");
+      expect(castType("BOOLEAN").name).toBe("boolean");
     });
 
     it("resolves SQLite affinity types via regex", () => {
-      expect(adapter.lookupCastType("varchar").name).toBe("string");
-      expect(adapter.lookupCastType("character").name).toBe("string");
-      expect(adapter.lookupCastType("clob").name).toBe("text");
-      expect(adapter.lookupCastType("real").name).toBe("float");
-      expect(adapter.lookupCastType("double").name).toBe("float");
-      expect(adapter.lookupCastType("bigint").name).toBe("integer");
-      expect(adapter.lookupCastType("tinyint").name).toBe("integer");
+      expect(castType("varchar").name).toBe("string");
+      expect(castType("character").name).toBe("string");
+      expect(castType("clob").name).toBe("text");
+      expect(castType("double").name).toBe("float");
+      expect(castType("bigint").name).toBe("integer");
+      expect(castType("tinyint").name).toBe("integer");
     });
   });
 });

@@ -49,23 +49,11 @@ import {
 import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
-import { Date as DateType } from "../type/date.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
-import { Time as TimeType } from "../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import type { DateTimeCastResult } from "@blazetrails/activemodel";
 import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
-import { Text as TextType } from "../type/text.js";
-import { Json as JsonType } from "../type/json.js";
-import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
-import {
-  StringType,
-  IntegerType,
-  FloatType,
-  BooleanType,
-  BinaryType,
-  DecimalType,
-} from "@blazetrails/activemodel";
+import { IntegerType, FloatType } from "@blazetrails/activemodel";
 import {
   getFs,
   getPath,
@@ -191,6 +179,8 @@ function _isSqliteMissingDbError(error: unknown): boolean {
     (typeof e.message === "string" && /unable to open database file/i.test(e.message))
   );
 }
+
+let sqlite3TypeMap: TypeMap | undefined;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
@@ -336,7 +326,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
   _lastAffectedRows = 0;
   _lastInsertRowid: number | bigint = 0;
-  private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
   /**
@@ -435,7 +424,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     this.connect();
     if (!this._asyncConnectPending) void this.configureConnection();
-    this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
   }
 
   /**
@@ -1141,25 +1129,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Resolve a SQL column type string to an ActiveRecord Type instance.
-   *
-   * A divergent override, NOT a port: `sqlite3_adapter.rb` only *calls*
-   * `lookup_cast_type_from_column` (:628) and defines no `sqlite3/quoting.rb`,
-   * so the inherited `Quoting#lookup_cast_type` (abstract/quoting.rb:234-236)
-   * is what Rails runs here. This override — and the `_nativeTypeMap`
-   * fetch-full-then-lookup-normalized pair behind it — is a trails invention,
-   * like MySQL's. Deliberately left flagged rather than tagged: converging it
-   * is `sqlite3-native-type-map-converges-onto-type-map`.
-   */
-  lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
-    const lower = sqlType?.toLowerCase().trim() ?? null;
-    const full = this._nativeTypeMap.fetch(lower);
-    if (full.type() != null) return full;
-    const normalized = lower?.replace(/\(.*\)/, "").trim() ?? null;
-    return this._nativeTypeMap.lookup(normalized);
-  }
-
-  /**
    * Build a SqlTypeMetadata from a raw SQLite column type string. Used by
    * `newColumnFromField` (the Rails `new_column_from_field` flow) so `columns()`
    * and the schema-statements column path share one type-reflection routine.
@@ -1180,7 +1149,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
-    const castType = this.lookupCastType(raw);
+    const castType = this.lookupCastType(raw) as import("@blazetrails/activemodel").Type;
     return new SqlTypeMetadata({
       sqlType: raw,
       type: castType.type(),
@@ -1188,24 +1157,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       precision: castType.precision,
       scale: castType.scale,
     });
-  }
-
-  lookupCastTypeFromColumn(column: {
-    sqlType?: string | null;
-    precision?: number | null;
-  }): import("@blazetrails/activemodel").Type {
-    // Precision (temporal/decimal) and limit both flow through the type-map
-    // factories at lookup time now, so — like Rails' SQLite3Adapter — no override
-    // beyond `lookup_cast_type(column.sql_type)` is needed.
-    return this.lookupCastType(column.sqlType ?? "");
-  }
-
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
-  // INTEGER in SQLite can store up to 8 bytes; default _limit to 8 when none given.
-  private static _buildTypeMap(): TypeMap {
-    const map = new TypeMap();
-    SQLite3Adapter.initializeTypeMap(map);
-    return map;
   }
 
   // --- Capability overrides (Rails: SQLite3Adapter returns true for these) ---
@@ -2462,9 +2413,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         columnOptions.type = column.type;
       } else if (column.hasDefault && !column.isAutoIncrement()) {
         const defaultFunction = column.defaultFunction;
-        const deserialized: unknown = this.lookupCastTypeFromColumn(column).deserialize(
-          column.default,
-        );
+        const deserialized: unknown = (
+          this.lookupCastTypeFromColumn(column) as import("@blazetrails/activemodel").Type
+        ).deserialize(column.default);
         columnOptions.default =
           deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
       }
@@ -2919,55 +2870,52 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return checked;
   }
 
-  /** @internal */
+  /** @internal Mirrors: SQLite3Adapter.initialize_type_map (sqlite3_adapter.rb:499-502) */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
+    this.registerClassWithLimit(m, /int/i, SQLite3Integer);
 
-    const sqlite3Int = (limit?: number) => new SQLite3Integer({ limit });
-    m.registerType("string", new StringType());
-    m.registerType("text", new TextType());
-    m.registerType("integer", sqlite3Int());
-    m.registerType("float", new FloatType());
-    m.registerType(/decimal|numeric/i, undefined, (sqlType) => {
-      const precisionMatch = /\(\s*(\d+)/.exec(sqlType);
-      const precision = precisionMatch ? parseInt(precisionMatch[1], 10) : undefined;
-      const scaleMatch = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
-      const scale = scaleMatch
-        ? parseInt(scaleMatch[1], 10)
-        : precision !== undefined
-          ? 0
-          : undefined;
-      if (scale === 0) return new DecimalWithoutScale({ precision });
-      return new DecimalType({ precision, scale });
-    });
-    m.registerType("decimal", new DecimalType());
-    m.registerType("boolean", new BooleanType());
-    this.registerClassWithPrecision(m, /date/i, DateType);
-    this.registerClassWithPrecision(m, /time/i, TimeType);
+    // Not Rails: the SQLite drivers trails supports hand back a DATETIME column
+    // as the TEXT it is stored as, where the Ruby sqlite3 gem has already
+    // parsed it, so the base `Type::DateTime` registration cannot cast it.
+    // `SQLite3DateTime` is that parse; it has to be re-registered after `super`
+    // and after the `/timestamp/i` alias so both spellings resolve to it.
     this.registerClassWithPrecision(m, /datetime/i, SQLite3DateTime);
     m.aliasType(/timestamp/i, "datetime");
-    m.registerType("blob", new BinaryType());
-    m.registerType("binary", new BinaryType());
-    m.registerType("json", new JsonType());
-    m.registerType("numeric", new DecimalWithoutScale());
-    // SQLite type affinity — regex matches for flexible type names. Limit-bearing
-    // families recover the limit from the matched `sql_type` via
-    // `registerClassWithLimit`, mirroring Rails' `register_class_with_limit`
-    // (abstract_adapter.rb:919). `int` is registered separately because SQLite
-    // integers carry an 8-byte default limit (SQLite3Integer#_limit) when the
-    // `sql_type` supplies none, and `blob`/`clob` are aliases to
-    // `binary`/`text` (abstract_adapter.rb:899-900).
-    m.registerType(/int/i, undefined, (k) => sqlite3Int(this.extractLimit(k)));
-    // Explicit "bigint" registered after /int/i so it takes priority on exact
-    // matches. Like `/int/i`, it carries no explicit limit — the 8-byte default
-    // lives on `SQLite3Integer#_limit`, so the public `limit` stays nil and
-    // reflected `bigint` columns dump bare (Rails resolves "bigint" via the same
-    // `%r(int)i` → `SQLite3Integer` registration with a nil `limit`).
-    m.registerType("bigint", sqlite3Int());
-    this.registerClassWithLimit(m, /char/i, StringType);
-    this.registerClassWithLimit(m, /text/i, TextType);
-    this.registerClassWithLimit(m, /binary/i, BinaryType);
-    this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
+  }
+
+  /**
+   * @internal Mirrors: SQLite3Adapter::TYPE_MAP (sqlite3_adapter.rb:505)
+   *
+   * Declared here, as in Rails, so `self::TYPE_MAP` inside `extended_type_map`
+   * resolves to the SQLite map rather than the abstract one. Built on first
+   * read for the same temporal-dead-zone reason `AbstractAdapter::TYPE_MAP` is.
+   */
+  static override get TYPE_MAP(): TypeMap {
+    return (sqlite3TypeMap ??= (() => {
+      const m = new TypeMap();
+      SQLite3Adapter.initializeTypeMap(m);
+      return m;
+    })());
+  }
+
+  /** @internal Mirrors: SQLite3Adapter::EXTENDED_TYPE_MAPS (sqlite3_adapter.rb:506) */
+  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+
+  /**
+   * @internal Mirrors: AbstractAdapter.extended_type_map — inherited in Rails.
+   *
+   * The base body re-registers `%r(\A[^\(]*datetime)i` on `Type::DateTime` to
+   * carry the timezone, which would undo the `SQLite3DateTime` registration
+   * above; restore it, for the same driver reason.
+   */
+  static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
+    const m = super.extendedTypeMap(options);
+    this.registerClassWithPrecision(m, /^[^(]*datetime/i, SQLite3DateTime, {
+      timezone: options.defaultTimezone,
+    });
+    m.aliasType(/^[^(]*timestamp/i, "datetime");
+    return m;
   }
 }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { Type } from "@blazetrails/activemodel";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
@@ -27,7 +28,7 @@ describe("SQLite3Adapter type-map limit threading", () => {
   });
 
   const castType = (sqlType: string) =>
-    adapter.lookupCastTypeFromColumn(adapter.fetchTypeMetadata(sqlType));
+    adapter.lookupCastTypeFromColumn(adapter.fetchTypeMetadata(sqlType)) as Type;
 
   it("keeps the full sql_type for limit-bearing families", () => {
     expect(adapter.fetchTypeMetadata("varchar(255)").sqlType).toBe("varchar(255)");

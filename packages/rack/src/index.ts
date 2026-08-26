@@ -64,3 +64,6 @@ export {
 export { BodyProxy } from "./body-proxy.js";
 export { Request } from "./request.js";
 export { CONTENT_TYPE, CONTENT_LENGTH, RACK_SESSION, RACK_SESSION_OPTIONS } from "./constants.js";
+export { Files } from "./files.js";
+export * as Mime from "./mime.js";
+export * as Utils from "./utils.js";
