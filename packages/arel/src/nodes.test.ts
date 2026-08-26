@@ -1,22 +1,45 @@
-import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "./index.js";
+import { describe, it } from "vitest";
+import { Nodes } from "./index.js";
+import { assertEmpty } from "./test-helpers/assertions.js";
+
+type ClassRef = { prototype?: object };
+
+// The class that declares `name` on a prototype chain — the JS reading of
+// Ruby's `instance_method(:x).owner`.
+function owner(klass: ClassRef, name: string): unknown {
+  for (let k: unknown = klass; k; k = Object.getPrototypeOf(k) as unknown) {
+    const proto = (k as ClassRef).prototype;
+    if (proto && Object.prototype.hasOwnProperty.call(proto, name)) return k;
+  }
+  return null;
+}
 
 describe("TestNodes", () => {
-  const users = new Table("users");
   it("every arel nodes have hash eql eqeq from same class", () => {
-    const a = new Nodes.SqlLiteral("NOW()");
-    const b = new Nodes.SqlLiteral("NOW()");
-    const c = new Nodes.SqlLiteral("LATER()");
+    const nodeDescendants = (Object.values(Nodes) as unknown[]).filter(
+      (k): k is ClassRef =>
+        typeof k === "function" &&
+        (k as ClassRef).prototype instanceof Nodes.Node &&
+        k !== Nodes.NodeExpression &&
+        // Ruby's ObjectSpace walk over `Arel::Nodes::Node`'s singleton class
+        // never yields SqlLiteral: it is a String subclass upstream
+        // (sql_literal.rb:5), and `#==`/`#eql?`/`#hash` all arrive from String.
+        // trails has to extend Node instead — TypeScript cannot subclass the
+        // string primitive — so the Ruby population is reproduced here rather
+        // than in the class hierarchy. `nodes/node_test.rb:14` skips it for the
+        // same reason.
+        k !== Nodes.SqlLiteral,
+    );
 
-    expect(typeof a.hash()).toBe("number");
-    expect(a.eql(b)).toBe(true);
-    expect(a.hash()).toBe(b.hash());
-    expect(a.eql(c)).toBe(false);
+    const badNodeDescendants = nodeDescendants.filter((subnode) => {
+      const eqlOwner = owner(subnode, "eql");
+      const hashOwner = owner(subnode, "hash");
+      return eqlOwner !== hashOwner;
+    });
 
-    const eq1 = users.get("id").eq(1);
-    const eq2 = users.get("id").eq(1);
-    const neq = users.get("id").notEq(1);
-    expect(eq1.eql(eq2)).toBe(true);
-    expect(eq1.eql(neq)).toBe(false);
+    const problemMsg =
+      "Some subclasses of Arel::Nodes::Node do not have a" +
+      " #== or #eql? or #hash defined from the same class as the others";
+    assertEmpty(badNodeDescendants, problemMsg);
   });
 });

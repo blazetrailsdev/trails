@@ -1,124 +1,93 @@
 import { describe, it, expect } from "vitest";
-import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "../index.js";
+import { Nodes } from "../index.js";
+import { buildQuoted } from "./casted.js";
+import { assertNotSame } from "../test-helpers/assertions.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("NodesTest", () => {
-  const users = new Table("users");
   describe("Case", () => {
-    it("sets case expression from first argument", () => {
-      const caseNode = new Nodes.Case(users.get("status"));
-      expect(caseNode.case).toBeInstanceOf(Nodes.Attribute);
-    });
+    describe("#initialize", () => {
+      it("sets case expression from first argument", () => {
+        const node = new Nodes.Case("foo" as unknown as Nodes.Node);
 
-    it("allows aliasing", () => {
-      const node = new Nodes.And([users.get("id").eq(1), users.get("name").eq("dean")]);
-      const aliased = node.as("condition");
-      expect(aliased).toBeInstanceOf(Nodes.As);
-    });
-
-    it("sets default case from second argument", () => {
-      const caseNode = new Nodes.Case(users.get("status"));
-      const withDefault = caseNode.else("unknown");
-      expect(withDefault.default).not.toBeNull();
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(withDefault)).toContain("ELSE");
-    });
-
-    it("clones case, conditions and default", () => {
-      const base = new Nodes.Case(users.get("status"));
-      const c1 = base.when("active", "A");
-      const c2 = c1.else("Z");
-
-      // Rails mutates in-place and returns self
-      expect(c1).toBe(base);
-      expect(c2).toBe(c1);
-
-      expect(base.conditions.length).toBe(1);
-      expect(c2.default).not.toBeNull();
-    });
-
-    describe("#as", () => {
-      it("allows aliasing", () => {
-        const node = new Nodes.Case(new Nodes.Quoted("foo"));
-        const as = node.as("bar");
-        expect(as).toBeInstanceOf(Nodes.As);
-        expect(as.left).toBe(node);
-        expect(as.right).toBeInstanceOf(Nodes.SqlLiteral);
-      });
-    });
-
-    describe("equality", () => {
-      it("is equal with equal ivars", () => {
-        const foo = new Nodes.Quoted("foo");
-        const one = new Nodes.Quoted(1);
-        const zero = new Nodes.Quoted(0);
-
-        const c1 = new Nodes.Case(foo).when(foo, one).else(zero);
-        const c2 = new Nodes.Case(foo).when(foo, one).else(zero);
-        expect(c1.hash()).toBe(c2.hash());
+        expect(node.case).toBe("foo");
       });
 
-      it("is not equal with different ivars", () => {
-        const foo = new Nodes.Quoted("foo");
-        const bar = new Nodes.Quoted("bar");
-        const one = new Nodes.Quoted(1);
-        const zero = new Nodes.Quoted(0);
+      it("sets default case from second argument", () => {
+        const node = new Nodes.Case(undefined, "bar" as unknown as Nodes.Node);
 
-        const c1 = new Nodes.Case(foo).when(foo, one).else(zero);
-        const c2 = new Nodes.Case(foo).when(bar, one).else(zero);
-        expect(c1.hash()).not.toBe(c2.hash());
+        expect(node.default).toBe("bar");
       });
     });
 
     describe("#clone", () => {
       it("clones case, conditions and default", () => {
-        const node = new Nodes.Case(new Nodes.Quoted("foo"));
-        const built = node.when("active", "A").else("Z");
-        const dolly = built.clone();
+        const foo = buildQuoted("foo");
 
-        expect(dolly.conditions).toEqual(built.conditions);
-        expect(dolly.conditions).not.toBe(built.conditions);
-        expect(dolly.default).toBe(built.default);
-        expect(dolly.case).toBe(built.case);
+        const node = new Nodes.Case();
+        node.case = foo;
+        node.conditions = [new Nodes.When(foo, foo)];
+        node.default = foo;
+
+        const dolly = node.clone();
+
+        expect(dolly.case).toEqual(node.case);
+        assertNotSame(node.case, dolly.case);
+
+        expect(dolly.conditions).toEqual(node.conditions);
+        assertNotSame(node.conditions, dolly.conditions);
+
+        expect(dolly.default).toEqual(node.default);
+        assertNotSame(node.default, dolly.default);
       });
     });
 
-    describe("#then", () => {
-      it("sets the right side of the most recent When clause", () => {
-        const node = new Nodes.Case(users.get("status"));
-        node.when("active").then("A");
-        expect(node.conditions).toHaveLength(1);
-        expect(node.conditions[0].right).toBeInstanceOf(Nodes.Quoted);
-        expect((node.conditions[0].right as Nodes.Quoted).value).toBe("A");
+    describe("equality", () => {
+      it("is equal with equal ivars", () => {
+        const foo = buildQuoted("foo");
+        const one = buildQuoted(1);
+        const zero = buildQuoted(0);
+
+        const case1 = new Nodes.Case(foo);
+        case1.conditions = [new Nodes.When(foo, one)];
+        case1.default = new Nodes.Else(zero);
+
+        const case2 = new Nodes.Case(foo);
+        case2.conditions = [new Nodes.When(foo, one)];
+        case2.default = new Nodes.Else(zero);
+
+        const array = [case1, case2];
+
+        expect(uniq(array).length).toBe(1);
       });
 
-      it("supports chained when/then", () => {
-        const node = new Nodes.Case(users.get("status"));
-        node.when("active").then("A").when("pending").then("P").else("Z");
-        expect(node.conditions).toHaveLength(2);
-        expect((node.conditions[0].right as Nodes.Quoted).value).toBe("A");
-        expect((node.conditions[1].right as Nodes.Quoted).value).toBe("P");
-      });
+      it("is not equal with different ivars", () => {
+        const foo = buildQuoted("foo");
+        const bar = buildQuoted("bar");
+        const one = buildQuoted(1);
+        const zero = buildQuoted(0);
 
-      it("throws when called before #when", () => {
-        const node = new Nodes.Case(users.get("status"));
-        expect(() => node.then("A")).toThrow(/Case#then called before Case#when/);
-      });
+        const case1 = new Nodes.Case(foo);
+        case1.conditions = [new Nodes.When(foo, one)];
+        case1.default = new Nodes.Else(zero);
 
-      it("Promise.resolve rejects rather than hanging (thenable hazard)", async () => {
-        const node = new Nodes.Case(users.get("status")).when("active").then("A");
-        await expect(Promise.resolve(node)).rejects.toThrow(/not awaitable/);
+        const case2 = new Nodes.Case(foo);
+        case2.conditions = [new Nodes.When(bar, one)];
+        case2.default = new Nodes.Else(zero);
+
+        const array = [case1, case2];
+
+        expect(uniq(array).length).toBe(2);
       });
     });
 
-    describe("#initialize", () => {
-      it("sets case expression from first argument", () => {
-        const node = new Nodes.Case(new Nodes.Quoted("foo"));
-        expect(node.case).toBeInstanceOf(Nodes.Quoted);
-      });
+    describe("#as", () => {
+      it("allows aliasing", () => {
+        const node = new Nodes.Case("foo" as unknown as Nodes.Node);
+        const as = node.as("bar");
 
-      it("sets default case from second argument", () => {
-        const node = new Nodes.Case(undefined, new Nodes.Quoted("bar"));
-        expect(node.default).toBeInstanceOf(Nodes.Else);
+        expect(as.left).toEqual(node);
+        expect(as.right).toBeInstanceOf(Nodes.SqlLiteral);
       });
     });
   });

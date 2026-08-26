@@ -1,24 +1,29 @@
 import { describe, it, expect } from "vitest";
-import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "../index.js";
+import { Table, Nodes } from "../index.js";
 import type { Node } from "./node.js";
+import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { uniq } from "../test-helpers/uniq.js";
 
 describe("Arel::Nodes::CountTest", () => {
-  const users = new Table("users");
   describe("as", () => {
     it("should alias the count", () => {
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
-        users.get("id").count().as("foo"),
+      const table = new Table("users");
+      expect(mustBeLike(table.get("id").count().as("foo").toSql())).toBe(
+        mustBeLike(`
+        COUNT("users"."id") AS foo
+      `),
       );
-      expect(sql).toBe('COUNT("users"."id") AS foo');
     });
   });
 
   describe("eq", () => {
     it("should compare the count", () => {
-      const count = users.get("id").count();
-      expect(count).toBeInstanceOf(Nodes.Count);
+      const table = new Table("users");
+      expect(mustBeLike(table.get("id").count().eq(2).toSql())).toBe(
+        mustBeLike(`
+        COUNT("users"."id") = 2
+      `),
+      );
     });
   });
 

@@ -1316,7 +1316,13 @@ class TestExtractor
       content ? "s:#{unescape_string_literal(content, double_quoted_literal?(node))}" : nil
     when :symbol_literal
       sym = node[1]
-      sym.is_a?(Array) && sym[0] == :symbol && sym[1].is_a?(Array) ? "s:#{ident_name(sym[1])}" : nil
+      return nil unless sym.is_a?(Array) && sym[0] == :symbol && sym[1].is_a?(Array)
+      # An operator-named Symbol (`:+`, `:-`, `:<=>`) lexes as `[:@op, "+"]`,
+      # which `ident_name` does not name — its name IS the operator text.
+      # Without this arm `assert_equal :+, op.operator` yielded the EMPTY token
+      # `s:`, which read as a value divergence against a port asserting `"+"`.
+      name = sym[1][0] == :@op ? sym[1][1] : ident_name(sym[1])
+      name ? "s:#{name}" : nil
     when :var_ref
       kw = node[1]
       if kw.is_a?(Array) && kw[0] == :@kw

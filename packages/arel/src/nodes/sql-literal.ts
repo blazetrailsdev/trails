@@ -86,8 +86,14 @@ export class SqlLiteral extends Node {
     return new Fragments([this, other]);
   }
 
+  // Mirrors Arel::Nodes::SqlLiteral#+ (sql_literal.rb:25-29), including the
+  // `Arel.arel_node?` guard. `unknown` keeps that guard reachable from typed
+  // callers, as on BoundSqlLiteral#plus.
   /** @internal */
-  plus(other: Node): Fragments {
+  plus(other: unknown): Fragments {
+    if (!(other instanceof Node)) {
+      throw new TypeError("Expected Arel node");
+    }
     return this.join(other);
   }
 }

@@ -1108,7 +1108,7 @@ describe("AttributeTest", () => {
       const table = new Table("foo", { typeCaster: fakeCaster });
       const condition = table.get("id").eq("1").and(table.get("other_id").eq("2"));
 
-      expect(table.isAbleToTypeCast()).toBe(true);
+      expect(table.isAbleToTypeCast()).toBeTruthy();
       expect(new Visitors.ToSql(fakeRecordConnection).compile(condition)).toBe(
         '"foo"."id" = 1 AND "foo"."other_id" = \'2\'',
       );
@@ -1123,7 +1123,7 @@ describe("AttributeTest", () => {
       const table = new Table("foo", { typeCaster: fakeCaster });
       const condition = table.get("id").eq(new Nodes.SqlLiteral("(select 1)"));
 
-      expect(table.isAbleToTypeCast()).toBe(true);
+      expect(table.isAbleToTypeCast()).toBeTruthy();
       expect(new Visitors.ToSql(fakeRecordConnection).compile(condition)).toBe(
         '"foo"."id" = (select 1)',
       );

@@ -974,7 +974,7 @@ export class ToSql extends Visitor {
     }
     if (o.default) {
       collector.append(" ");
-      this.visitArelNodesElse(o.default, collector);
+      this.visit(o.default, collector);
     }
     collector.append(" END");
     return collector;

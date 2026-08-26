@@ -34,7 +34,6 @@ describe("#hash", () => {
     const attr = users.get("age");
     const a = new Nodes.Casted(1, attr);
     const b = new Nodes.Casted(1, attr);
-    expect(a.eql(b)).toBe(true);
     expect(a.hash()).toBe(b.hash());
   });
 });

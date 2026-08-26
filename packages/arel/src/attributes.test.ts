@@ -1,26 +1,33 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "./index.js";
+import { uniq } from "./test-helpers/uniq.js";
+
+// Rails builds `Attribute.new("foo", "bar")` with bare Strings in both slots
+// (attributes_test.rb:16); the TS relation slot is typed to a real relation.
+const attribute = (relation: string, name: string): Nodes.Attribute =>
+  new Nodes.Attribute(
+    relation as unknown as ConstructorParameters<typeof Nodes.Attribute>[0],
+    name,
+  );
 
 describe("Attributes", () => {
-  const users = new Table("users");
   it("responds to lower", () => {
-    const name = users.get("name");
-    const fn = name.lower();
-    expect(fn.name).toBe("LOWER");
-    expect(fn.expressions).toEqual([name]);
+    const relation = new Table("users");
+    const attribute = relation.get("foo");
+    const node = attribute.lower();
+    expect(node.name).toBe("LOWER");
+    expect(node.expressions).toEqual([attribute]);
   });
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      expect(c1.name).toBe(c2.name);
+      const array = [attribute("foo", "bar"), attribute("foo", "bar")];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      const b = new Nodes.NamedFunction("COUNT", [users.get("name")]);
-      expect(a).not.toEqual(b);
+      const array = [attribute("foo", "bar"), attribute("foo", "baz")];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });

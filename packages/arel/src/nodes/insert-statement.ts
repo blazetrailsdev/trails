@@ -12,6 +12,14 @@ import { Node } from "./node.js";
  */
 export type InsertSelectSource = Node | { ast: Node; toSql: () => string } | null;
 
+// Ruby `Object#clone` on whatever occupies a statement slot: an Array copies,
+// any other object copies shallowly with its class.
+function cloneSlotValue<T>(value: T): T {
+  if (Array.isArray(value)) return [...value] as T;
+  if (typeof value !== "object" || value === null) return value;
+  return Object.assign(Object.create(Object.getPrototypeOf(value) as object) as object, value) as T;
+}
+
 export class InsertStatement extends Node {
   relation: Node | null;
   columns: Node[];
@@ -30,8 +38,10 @@ export class InsertStatement extends Node {
     const copy = new InsertStatement();
     copy.relation = this.relation;
     copy.columns = [...this.columns];
-    copy.values = this.values;
-    copy.select = this.select;
+    // insert_statement.rb:16-21 clones both slots when present — a cloned
+    // statement must not share its values/select node with the original.
+    copy.values = this.values ? cloneSlotValue(this.values) : this.values;
+    copy.select = this.select ? cloneSlotValue(this.select) : this.select;
     return copy;
   }
 }

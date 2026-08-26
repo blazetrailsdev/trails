@@ -1,33 +1,38 @@
 import { describe, it, expect } from "vitest";
-import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Nodes, Visitors } from "../index.js";
+import { sql, Nodes } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("FragmentsTest", () => {
   describe("equality", () => {
-    it("fails if joined with something that is not an Arel node", () => {
-      const lit = new Nodes.SqlLiteral("foo");
-      expect(lit.value).toBe("foo");
-      expect(lit).toBeInstanceOf(Nodes.Node);
-    });
-
     it("is equal with equal values", () => {
-      const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
-      const b = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
-      expect(a.eql(b)).toBe(true);
-      expect(a.hash()).toBe(b.hash());
+      const array = [
+        new Nodes.Fragments(["foo", "bar"] as unknown as Node[]),
+        new Nodes.Fragments(["foo", "bar"] as unknown as Node[]),
+      ];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different values", () => {
-      const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo")]);
-      const b = new Nodes.Fragments([new Nodes.SqlLiteral("bar")]);
-      expect(a.eql(b)).toBe(false);
+      const array = [
+        new Nodes.Fragments(["foo"] as unknown as Node[]),
+        new Nodes.Fragments(["bar"] as unknown as Node[]),
+      ];
+      expect(uniq(array).length).toBe(2);
     });
 
     it("can be joined with other nodes", () => {
-      const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo")]);
-      const joined = a.join(new Nodes.SqlLiteral("bar"));
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(joined);
-      expect(sql).toBe("foo bar");
+      const fragments = new Nodes.Fragments(["foo", "bar"] as unknown as Node[]);
+      const literal = sql("SELECT");
+      const joinedFragments = fragments.plus(literal);
+
+      expect(fragments.values).toEqual(["foo", "bar"]);
+      expect(joinedFragments.values).toEqual(["foo", "bar", literal]);
+    });
+
+    it("fails if joined with something that is not an Arel node", () => {
+      const fragments = new Nodes.Fragments();
+      expect(() => fragments.plus("Not a node")).toThrow(TypeError);
     });
   });
 });

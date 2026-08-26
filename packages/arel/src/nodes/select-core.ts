@@ -54,7 +54,7 @@ export class SelectCore extends Node {
 
   clone(): SelectCore {
     const c = new SelectCore();
-    c.source = new JoinSource(this.source.left, [...this.source.right]);
+    c.source = this.source.clone();
     c.projections = [...this.projections];
     c.wheres = [...this.wheres];
     c.groups = [...this.groups];
