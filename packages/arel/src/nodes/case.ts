@@ -88,10 +88,12 @@ export class Case extends NodeExpression {
   }
 }
 
-// Ruby `Object#clone`: a shallow copy carrying the same class, which is what
-// `Case#initialize_copy` calls on its `@case` and `@default` slots.
+// Ruby `Object#clone` on the `@case` and `@default` slots — the same narrowing
+// `cloneSlot` in binary.ts makes, for the same reason.
 function cloneShallow<T extends object>(node: T): T {
-  return Object.assign(Object.create(Object.getPrototypeOf(node) as object) as T, node);
+  const cloneable = node as { clone?: () => T };
+  if (typeof cloneable.clone === "function") return cloneable.clone();
+  return Object.assign(Object.create(Object.getPrototypeOf(node) as object) as object, node);
 }
 
 export class When extends Binary {}

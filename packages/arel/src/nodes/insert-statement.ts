@@ -12,10 +12,13 @@ import { Node } from "./node.js";
  */
 export type InsertSelectSource = Node | { ast: Node; toSql: () => string } | null;
 
-// Ruby `Object#clone` on whatever occupies a statement slot: an Array copies,
-// any other object copies shallowly with its class.
+// Ruby `Object#clone` on whatever occupies a statement slot — the same
+// narrowing `Binary`'s own slot copy makes, for the same reason (see
+// `cloneSlot` in binary.ts).
 function cloneSlotValue<T>(value: T): T {
   if (Array.isArray(value)) return [...value] as T;
+  const cloneable = value as { clone?: () => T };
+  if (typeof cloneable?.clone === "function") return cloneable.clone();
   if (typeof value !== "object" || value === null) return value;
   return Object.assign(Object.create(Object.getPrototypeOf(value) as object) as object, value) as T;
 }
