@@ -35,35 +35,39 @@ describe("DatabaseConfigurationsTest", () => {
 
   it("configs for getter with name", () => {
     // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), so key the hash on it.
-    DatabaseConfigurations.defaultEnv = "development";
+    // (database_configurations.rb:99), which Rails sets by assigning
+    // ENV["RAILS_ENV"] = "arunit2" (database_configurations_test.rb:32).
+    DatabaseConfigurations.defaultEnv = "arunit2";
     const configs = new DatabaseConfigurations({
-      development: {
+      arunit2: {
         primary: { adapter: "sqlite3", database: "primary.db" },
         animals: { adapter: "sqlite3", database: "animals.db" },
       },
     });
-    const animals = configs.configsFor({ name: "animals" });
-    expect(animals!.database).toBe("animals.db");
+    const config = configs.configsFor({ name: "primary" });
+    expect(config!.envName).toBe("arunit2");
+    expect(config!.name).toBe("primary");
   });
 
   it("configs for with name symbol", () => {
     // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), so key the hash on it.
-    DatabaseConfigurations.defaultEnv = "development";
+    // (database_configurations.rb:99), which Rails sets by assigning
+    // ENV["RAILS_ENV"] = "arunit2" (database_configurations_test.rb:43).
+    DatabaseConfigurations.defaultEnv = "arunit2";
     const configs = new DatabaseConfigurations({
-      development: {
+      arunit2: {
         primary: { adapter: "sqlite3", database: "primary.db" },
         animals: { adapter: "sqlite3", database: "animals.db" },
       },
     });
-    const animals = configs.configsFor({ name: "animals" });
-    expect(animals!.name).toBe("animals");
+    const config = configs.configsFor({ name: "primary" });
+    expect(config!.envName).toBe("arunit2");
+    expect(config!.name).toBe("primary");
   });
 
   it("configs for getter with env and name", () => {
     const configs = new DatabaseConfigurations({
-      development: {
+      arunit: {
         primary: { adapter: "sqlite3", database: "dev_primary.db" },
         animals: { adapter: "sqlite3", database: "dev_animals.db" },
       },
@@ -71,8 +75,9 @@ describe("DatabaseConfigurationsTest", () => {
         primary: { adapter: "sqlite3", database: "test_primary.db" },
       },
     });
-    const result = configs.configsFor({ envName: "development", name: "animals" });
-    expect(result!.database).toBe("dev_animals.db");
+    const config = configs.configsFor({ envName: "arunit", name: "primary" });
+    expect(config!.envName).toBe("arunit");
+    expect(config!.name).toBe("primary");
   });
 
   it("find db config returns first config for env", () => {
@@ -136,6 +141,7 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const cache = configs.configsFor({ name: "cache" });
+    expect(cache).toBeDefined();
     expect(cache!.database).toBe("cache.db");
   });
 

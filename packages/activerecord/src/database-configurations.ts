@@ -110,7 +110,16 @@ export class DatabaseConfigurations {
    * @internal
    */
   static get defaultEnv(): string {
-    return getEnv("TRAILS_ENV") || this._defaultEnv || getEnv("NODE_ENV") || "development";
+    const trailsEnv = getEnv("TRAILS_ENV");
+    if (trailsEnv) return trailsEnv;
+    // `RAILS_ENV = -> { ENV["RAILS_ENV"].presence || ENV["RACK_ENV"].presence }`
+    // (connection_handling.rb:6): a BLANK value is nil, so `DEFAULT_ENV`'s
+    // `|| "default_env"` fires rather than the next lookup. An assignment here
+    // stands in for that whole lambda's result, so an assigned "" means "both
+    // env vars are blank" and falls straight to the literal — never on to
+    // `NODE_ENV`, which is the `RACK_ENV` bridge the lambda already consumed.
+    if (this._defaultEnv !== null) return this._defaultEnv || "default";
+    return getEnv("NODE_ENV") || "development";
   }
 
   /** @internal Assign null to clear the override and fall back to the process env. */
