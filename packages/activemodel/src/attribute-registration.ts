@@ -134,12 +134,13 @@ export function attribute(
   }
   const typeProvided = typeName !== undefined;
   // Rails' `attribute(name, type = nil, default: (no_default = true), **options)`
-  // forwards `**options` straight to the type registry
-  // (attribute_registration.rb:13); the two keys trails names explicitly —
-  // `default` and `virtual` — are consumed here, so only the rest reach it.
+  // (attribute_registration.rb:12) forwards `**options` straight to
+  // `resolve_type_name`; the two keys trails names explicitly — `default` and
+  // `virtual` — are consumed here, so only the rest reach it.
   const { default: _default, virtual: _virtual, ...typeOptions } = options ?? {};
-  // attribute_registration.rb:14-15 — `type = resolve_type_name(type, **options)
-  // if type.is_a?(Symbol)` then `type = hook_attribute_type(name, type) if type`.
+  // attribute_registration.rb:14-15:
+  //   type = resolve_type_name(type, **options) if type.is_a?(Symbol)
+  //   type = hook_attribute_type(name, type) if type
   let type: Type | null = null;
   if (typeProvided) {
     type =
@@ -154,7 +155,7 @@ export function attribute(
     type = this.hookAttributeType(name, type);
   }
 
-  // Mirrors: ActiveModel::AttributeRegistration#attribute (attribute_registration.rb:16-18)
+  // attribute_registration.rb:17-18:
   //   pending_attribute_modifications << PendingType.new(name, type) if type || no_default
   //   pending_attribute_modifications << PendingDefault.new(name, default) unless no_default
   // A bare re-declaration (no type, no default) still pushes a PendingType with
@@ -184,8 +185,7 @@ export function attribute(
  *   end
  *
  * The decoration itself is applied when `_default_attributes` next
- * materializes (attribute_registration.rb:32-36) — nothing is written to
- * the pending-modification queue here.
+ * materializes (attribute_registration.rb:32-36).
  */
 export function decorateAttributes(
   this: AttributeHostInternals,

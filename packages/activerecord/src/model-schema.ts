@@ -335,9 +335,8 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
  *
  * Rails never needs this: `columns_hash` is a DB read, so a model with no table
  * simply has no columns. trails supports table-less attribute-only models, whose
- * `columnsHash` is synthesized from what they declared, and that is the only
- * thing this feeds. It cannot go through `_defaultAttributes()`, which re-enters
- * `columnsHash()` on an unreflected class.
+ * `columnsHash` is synthesized from what they declared. It cannot go through
+ * `_defaultAttributes()`, which re-enters `columnsHash()` on an unreflected class.
  */
 function declaredAttributes(host: SchemaHost): AttributeSet {
   const attributeSet = new AttributeSet(new Map<string, Attribute>());
@@ -360,9 +359,8 @@ function applyDeclarations(cls: SchemaHost, attributeSet: AttributeSet): void {
     applyDeclarations(superclass, attributeSet);
   }
   if (!Object.hasOwn(cls, "_pendingAttributeModifications")) return;
-  const pending = (cls as { _pendingAttributeModifications?: unknown[] })
-    ._pendingAttributeModifications;
-  for (const modification of pending ?? []) {
+  for (const modification of (cls as unknown as { _pendingAttributeModifications: unknown[] })
+    ._pendingAttributeModifications) {
     if (modification instanceof PendingType || modification instanceof PendingDefault) {
       modification.applyTo(attributeSet);
     }
@@ -392,7 +390,7 @@ function ownVirtualAttributes(host: SchemaHost): Set<string> {
 }
 
 /**
- * `columnsHash`-shaped metadata for one declared attribute.
+ * One declared attribute in the shape `columnsHash`' readers expect of a column.
  */
 function synthesizedColumn(name: string, attribute: Attribute): Record<string, unknown> {
   const type = attribute.type as Type & { limit?: number | null };
@@ -1023,7 +1021,7 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  * (no I/O), and reflects columns into `columnsHash`. For
  * models without a backing table (test fixtures with only user
  * `attribute()` declarations), falls back to synthesizing `_columnsHash`
- * from existing defs so downstream readers continue to work.
+ * from the declarations so downstream readers continue to work.
  *
  * For a full async reflection (fetching from the adapter if the cache
  * isn't populated), call `Base.loadSchema()` (base.ts).

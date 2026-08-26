@@ -1320,9 +1320,9 @@ export class Base extends Model {
   }
 
   /**
-   * Await schema reflection — ensures `columnsHash` is populated
-   * from the adapter's schema cache before proceeding. Idempotent; cheap
-   * to call repeatedly.
+   * Await schema reflection — ensures `columnsHash` is populated from the
+   * adapter's schema cache before proceeding. Idempotent; cheap to call
+   * repeatedly.
    *
    * Mirrors: ActiveRecord::ModelSchema#load_schema (explicit variant).
    */
@@ -2776,7 +2776,7 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-    // Ensure schema reflection has populated columnsHash with
+    // Ensure schema reflection has populated `columns_hash` with
     // adapter-resolved cast types before hydrating from the row — otherwise
     // `attributes_builder`'s `attribute_types` falls back to ValueType and PG
     // OID casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
