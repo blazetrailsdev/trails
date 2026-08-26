@@ -153,7 +153,7 @@ describe("RelationTest", () => {
 
   it("scope for create", () => {
     const rel = CanonPost.where({ title: "scoped" });
-    const attrs = (rel as any)._scopeAttributes ? (rel as any)._scopeAttributes() : {};
+    const attrs = rel.scopeForCreate();
     expect(attrs.title).toBe("scoped");
   });
 

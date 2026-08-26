@@ -45,19 +45,20 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("statement pool max evicts LRU via unprepare", async () => {
+      // Rails' matching test sets statement_limit = 1 and asserts LRU
+      // eviction. The limit is constructor-only (statement_pool.rb:10-13), so
+      // the adapter is built at the limit under test; eviction happens on the
+      // second insert via Mysql2StatementPool#dealloc (conn.unprepare).
+      const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 1 });
+      adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
         await adapter.execute("SELECT ? AS n", [1]);
-        const pool = adapter._statements!;
-        // Rails' matching test sets statement_limit = 1 and asserts
-        // LRU eviction. With one cached statement, setMaxSize(1) just
-        // records the new limit; eviction happens on the next insert
-        // via our Mysql2StatementPool#dealloc (conn.unprepare).
-        await pool.setMaxSize(1);
         await adapter.execute("SELECT ? AS s", ["a"]);
-        expect(pool.length).toBe(1);
+        expect(adapter._statements!.length).toBe(1);
       } finally {
         await adapter.rollback();
+        await adapter.close();
       }
     });
 
@@ -107,7 +108,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("reads statementLimit from the config hash (database.yml shape)", async () => {
       const configured = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 7 });
-      expect(configured.buildStatementPool().maxSize).toBe(7);
+      const pool = configured.buildStatementPool();
+      expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
       await configured.close();
     });
 

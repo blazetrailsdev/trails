@@ -896,10 +896,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return sql;
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#text_type? */
+  /**
+   * @internal Mirrors: Mysql2Adapter#text_type? (mysql2_adapter.rb:140-142) —
+   * `TYPE_MAP.lookup(type)`, resolved off the concrete adapter class so the
+   * mysql2 map (mysql2_adapter.rb:53) is the one consulted.
+   */
   isTextType(type: string): boolean {
-    const t = this._nativeTypeMap.lookup(type.toLowerCase().trim());
-    return t instanceof StringType || t instanceof TextType;
+    const TYPE_MAP = (this.constructor as typeof AbstractMysqlAdapter).TYPE_MAP;
+    return TYPE_MAP.lookup(type) instanceof StringType || TYPE_MAP.lookup(type) instanceof TextType;
   }
 
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
@@ -1246,26 +1250,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return args;
   }
 
-  /**
-   * Rails builds the adapter's type map with `initialize_type_map(m)` on a
-   * fresh `TypeMap` (abstract_mysql_adapter.rb:711). trails keeps that Rails
-   * name for the registration pass and puts the allocate-then-register wrapper
-   * behind the Rails-private `_` prefix, matching the already-converged
-   * spelling on `SQLite3Adapter._buildTypeMap`.
-   */
-  protected static _buildTypeMap(
-    this: typeof AbstractMysqlAdapter,
-    options: { emulateBooleans?: boolean } = {},
-  ): TypeMap {
-    const map = new TypeMap();
-    this.initializeTypeMap(map);
-    if (options.emulateBooleans) {
-      map.registerType(/^tinyint\(1\)/i, undefined, () => new BooleanType());
-    }
-    return map;
-  }
-
-  private _typeMap: TypeMap | null = null;
   private _emulateBooleans = true;
 
   get emulateBooleans(): boolean {
@@ -1274,50 +1258,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   set emulateBooleans(value: boolean) {
     this._emulateBooleans = value;
-    // Rails' `emulate_booleans=` is a plain class_attribute; its type map is
-    // memoized per emulate_booleans value (EXTENDED_TYPE_MAPS). trails caches a
-    // single map, so drop it here to rebuild against the new setting. Reflected
-    // columns are invalidated separately by `resetColumnInformation` (the
-    // table-scoped `clear_data_source_cache!` Rails calls there) — the toggle's
-    // caller pairs the two, mirroring `mysql_boolean_test.rb`'s
-    // `emulate_booleans` helper.
-    this._typeMap = null;
-  }
-
-  /**
-   * The memoized native type map. Rails reaches it through the adapter's own
-   * `type_map` (abstract_adapter.rb) and never exposes a separate public
-   * accessor, so this stays Rails-private (`_` prefix) — the same spelling
-   * `SQLite3Adapter` uses for its `_nativeTypeMap` slot.
-   */
-  get _nativeTypeMap(): TypeMap {
-    if (!this._typeMap) {
-      this._typeMap = (this.constructor as typeof AbstractMysqlAdapter)._buildTypeMap({
-        emulateBooleans: this._emulateBooleans,
-      });
-    }
-    return this._typeMap;
-  }
-
-  /**
-   * A divergent override, NOT a port: Rails defines `lookup_cast_type` only at
-   * `abstract/quoting.rb:234-236` and `postgresql/quoting.rb:195` — never on a
-   * MySQL adapter — so the inherited one is what Rails runs here. This
-   * override and the `_nativeTypeMap` / `_buildTypeMap` slots behind it are a
-   * trails invention, as is `lookupCastTypeFromColumn`'s null return for an
-   * empty sql_type. Deliberately left flagged rather than tagged: converging
-   * them is `mysql-native-type-map-converges-onto-type-map`.
-   */
-  lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
-    return this._nativeTypeMap.lookup(sqlType?.toLowerCase().trim() ?? null);
-  }
-
-  lookupCastTypeFromColumn(column: {
-    sqlType?: string | null;
-  }): import("@blazetrails/activemodel").Type | null {
-    const sqlType = column.sqlType?.trim();
-    if (!sqlType) return null;
-    return this.lookupCastType(sqlType);
   }
 
   /** @internal Mirrors: AbstractMysqlAdapter::EXTENDED_TYPE_MAPS (abstract_mysql_adapter.rb:754) */

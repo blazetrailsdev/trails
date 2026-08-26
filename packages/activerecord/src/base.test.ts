@@ -236,7 +236,7 @@ describe("BasicsTest", () => {
       }
     }
     const rel = User.where({ name: "test" });
-    const attrs = (rel as any)._scopeAttributes ? (rel as any)._scopeAttributes() : {};
+    const attrs = rel.scopeForCreate();
     expect(attrs.name).toBe("test");
   });
 

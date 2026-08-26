@@ -288,7 +288,6 @@ interface FinderRelation {
   offsetValue: number | string | null;
   orderValues: unknown[];
   createWithValue: Record<string, unknown>;
-  _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
   clone(): any;
   whereClause: { isEmpty(): boolean; isContradiction(): boolean };
