@@ -10,6 +10,8 @@ import { Temporal } from "@blazetrails/date";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
+import { Array as ArrayType } from "../connection-adapters/postgresql/oid/array.js";
+import { Range, RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 
 fixtures({});
@@ -159,5 +161,34 @@ describe("TimeZoneConverter#isChanged", () => {
 
   it("null vs TimeWithZone is changed", () => {
     expect(converter().isChanged(null, twz(MS1))).toBe(true);
+  });
+});
+
+describe("TimeZoneConverter#serialize containers", () => {
+  const zone = new TimeZone("Europe/Paris");
+  const instant = Temporal.Instant.from("2020-06-15T10:00:00Z");
+  const twz = () => new TimeWithZone(instant, zone);
+
+  it("extracts TimeWithZone bounds out of a range", () => {
+    const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
+    const serialized = converter.serialize(new Range(twz(), twz(), true)) as Range;
+    expect(serialized.begin).toBeInstanceOf(Temporal.Instant);
+    expect((serialized.begin as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
+  });
+
+  it("extracts TimeWithZone bounds out of an array of ranges", () => {
+    const converter = TimeZoneConverter.wrap(
+      new ArrayType(new RangeType(new Types.DateTimeType({}))),
+    );
+    const serialized = converter.serialize([new Range(twz(), twz(), true)]) as { values: Range[] };
+    const begin = serialized.values[0].begin;
+    expect(begin).toBeInstanceOf(Temporal.Instant);
+    expect((begin as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
+  });
+
+  it("leaves an infinite range bound untouched", () => {
+    const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
+    const serialized = converter.serialize(new Range(-Infinity, twz(), false)) as Range;
+    expect(serialized.begin).toBe(-Infinity);
   });
 });

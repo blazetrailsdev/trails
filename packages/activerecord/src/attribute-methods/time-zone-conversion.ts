@@ -178,10 +178,10 @@ export class TimeZoneConverter extends ValueType<unknown> {
   // `convert_time_to_time_zone` end in (value.rb:117-119, oid/range.rb:50-54,
   // oid/array.rb:67-69).
   private _resolveForSerialize(value: unknown): unknown {
-    const extractUtc = (v: unknown): unknown =>
-      v instanceof TimeWithZone ? v.utc().toTime().toInstant() : v;
-    if (value instanceof TimeWithZone) return extractUtc(value);
-    return this.map(value, extractUtc);
+    if (value instanceof TimeWithZone) return value.utc().toTime().toInstant();
+    if (value instanceof Temporal.Instant) return value;
+    if (typeof value === "number" && !Number.isFinite(value)) return value;
+    return this.map(value, (v) => this._resolveForSerialize(v));
   }
 
   override equals(other: Type): boolean {
