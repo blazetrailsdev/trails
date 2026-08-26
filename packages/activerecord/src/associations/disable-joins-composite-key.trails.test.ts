@@ -70,9 +70,9 @@ describe("DJAS — composite key support", () => {
     registerModel("CkShop", CkShop);
     registerModel("CkOrder", CkOrder);
     registerModel("CkLineItem", CkLineItem);
-    (CkShop as any)._associations = [];
-    (CkOrder as any)._associations = [];
-    (CkLineItem as any)._associations = [];
+    (CkShop as any)._reflections = {};
+    (CkOrder as any)._reflections = {};
+    (CkLineItem as any)._reflections = {};
     Associations.hasMany.call(CkShop, "ckOrders", {
       className: "CkOrder",
       foreignKey: "shop_id",

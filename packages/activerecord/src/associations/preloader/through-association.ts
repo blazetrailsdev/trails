@@ -388,7 +388,7 @@ export class ThroughAssociation extends Association {
     if (refl) return refl;
 
     const model = (this.reflection as any).activeRecord;
-    const assocDef = model?._associations?.find((a: any) => a.name === this.reflection.name);
+    const assocDef = model?._reflectOnAssociation?.(this.reflection.name);
     if (assocDef?.options?.through) {
       return model._reflectOnAssociation(
         assocDef.options.through,
@@ -404,7 +404,7 @@ export class ThroughAssociation extends Association {
     const throughRefl = this.throughReflection;
     if (!throughRefl) return null;
     const model = (this.reflection as any).activeRecord;
-    const assocDef = model?._associations?.find((a: any) => a.name === this.reflection.name);
+    const assocDef = model?._reflectOnAssociation?.(this.reflection.name);
     // `source_reflection_names` (reflection.rb:1108-1110) is the candidate list
     // Rails scans. Unlike `source_reflection_name` it never touches
     // `through_reflection.klass`, so it cannot raise NameError while the model

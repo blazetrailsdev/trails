@@ -1,5 +1,4 @@
 import type { Base } from "./base.js";
-import type { AssociationDefinition } from "./associations.js";
 import { upcaseFirst } from "@blazetrails/activesupport";
 import { association } from "./associations/instance-methods.js";
 
@@ -30,14 +29,13 @@ export function delegate(
     Object.defineProperty(modelClass.prototype, delegatedName, {
       value: async function (this: Base) {
         const ctor = this.constructor as typeof Base;
-        const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-        const assocDef = associations.find((a) => a.name === assocName);
+        const assocDef = (ctor as any)._reflectOnAssociation?.(assocName);
         if (!assocDef) {
           throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
         }
 
         let target: Base | null = null;
-        if (assocDef.type === "belongsTo" || assocDef.type === "hasOne") {
+        if (assocDef.macro === "belongsTo" || assocDef.macro === "hasOne") {
           target = (await association.call(this, assocName).loadTarget()) as Base | null;
         }
 

@@ -1503,7 +1503,7 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
-    const assoc = (Author as any)._associations.find((a: any) => a.name === "posts");
+    const assoc = (Author as any)._reflectOnAssociation("posts");
     expect(assoc).toBeDefined();
   });
 
@@ -1914,7 +1914,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm);
 
     const firm = new DepFirm({ name: "Test" });
-    const proxy = new CollectionProxy(firm, "stiCompanies", (DepFirm as any)._associations[0]);
+    const proxy = new CollectionProxy(
+      firm,
+      "stiCompanies",
+      (DepFirm as any)._reflectOnAssociation("stiCompanies"),
+    );
     const company = proxy.build();
     expect(company).toBeInstanceOf(StiCompany);
   });
@@ -1952,7 +1956,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm2);
 
     const firm = new DepFirm2({ name: "Test" });
-    const proxy = new CollectionProxy(firm, "stiCompany2s", (DepFirm2 as any)._associations[0]);
+    const proxy = new CollectionProxy(
+      firm,
+      "stiCompany2s",
+      (DepFirm2 as any)._reflectOnAssociation("stiCompany2s"),
+    );
     const company = proxy.build({ type: "StiCompany2" });
     expect(company).toBeInstanceOf(StiCompany2);
   });
@@ -1990,7 +1998,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm3);
 
     const firm = new DepFirm3({ name: "Test" });
-    const proxy = new CollectionProxy(firm, "stiCompany3s", (DepFirm3 as any)._associations[0]);
+    const proxy = new CollectionProxy(
+      firm,
+      "stiCompany3s",
+      (DepFirm3 as any)._reflectOnAssociation("stiCompany3s"),
+    );
     const company = proxy.build({ type: "StiClient3" });
     expect(company).toBeInstanceOf(StiClient3);
   });
@@ -2025,7 +2037,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm4);
 
     const firm = new DepFirm4({ name: "Test" });
-    const proxy = new CollectionProxy(firm, "stiCompany4s", (DepFirm4 as any)._associations[0]);
+    const proxy = new CollectionProxy(
+      firm,
+      "stiCompany4s",
+      (DepFirm4 as any)._reflectOnAssociation("stiCompany4s"),
+    );
     expect(() => proxy.build({ type: "Invalid" })).toThrow(SubclassNotFound);
   });
 
@@ -2067,7 +2083,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm5);
 
     const firm = new DepFirm5({ name: "Test" });
-    const proxy = new CollectionProxy(firm, "stiCompany5s", (DepFirm5 as any)._associations[0]);
+    const proxy = new CollectionProxy(
+      firm,
+      "stiCompany5s",
+      (DepFirm5 as any)._reflectOnAssociation("stiCompany5s"),
+    );
     expect(() => proxy.build({ type: "UnrelatedModel" })).toThrow(SubclassNotFound);
   });
   it("build the association with an array", async () => {
@@ -6900,7 +6920,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("has many without counter cache option", async () => {
     const ship = (await HmShip.create({ name: "Countless", treasures_count: 10 })) as any;
-    const assoc = (HmShip as any)._associations.find((a: any) => a.name === "treasures");
+    const assoc = (HmShip as any)._reflectOnAssociation("treasures");
     expect(assoc).toBeDefined();
     expect(assoc.options.counterCache).toBeUndefined();
     // Count comes from SQL, not the cached attribute

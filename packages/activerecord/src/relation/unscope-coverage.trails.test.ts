@@ -26,8 +26,8 @@ describe("Relation#unscope — full Rails key coverage", () => {
   beforeEach(() => {
     registerModel("UscAuthor", UscAuthor);
     registerModel("UscPost", UscPost);
-    (UscAuthor as any)._associations = [];
-    (UscPost as any)._associations = [];
+    (UscAuthor as any)._reflections = {};
+    (UscPost as any)._reflections = {};
     Associations.hasMany.call(UscAuthor, "uscPosts", {
       className: "UscPost",
       foreignKey: "usc_author_id",

@@ -63,9 +63,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     registerModel("CpcAuthor", CpcAuthor);
     registerModel("CpcPost", CpcPost);
     registerModel("CpcComment", CpcComment);
-    (CpcAuthor as any)._associations = [];
-    (CpcPost as any)._associations = [];
-    (CpcComment as any)._associations = [];
+    (CpcAuthor as any)._reflections = {};
+    (CpcPost as any)._reflections = {};
+    (CpcComment as any)._reflections = {};
     Associations.hasMany.call(CpcAuthor, "cpcPosts", {
       className: "CpcPost",
       foreignKey: "author_id",

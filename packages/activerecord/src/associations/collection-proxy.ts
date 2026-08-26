@@ -261,9 +261,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors Rails' `Association#reflection` (association.rb:16), which is the
    * rich `AssociationReflection` the constructor was handed off the owner's
    * class (`associations.rb:290-296`). Every macro declaration registers one
-   * (`associations.ts:704,723,742,813`, beside the `_associations` push the
-   * proxy is built from), so there is no reflection-less association to fall
-   * back for.
+   * (`associations.ts`'s `belongsTo`/`hasOne`/`hasMany`/HABTM macros each end
+   * in `Reflection.addReflection`), so there is no reflection-less association
+   * to fall back for.
    * @internal
    */
   get reflection(): AssociationDefinition {

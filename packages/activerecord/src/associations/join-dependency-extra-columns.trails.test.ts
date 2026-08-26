@@ -30,7 +30,7 @@ describe("JoinDependency extra columns in instantiate", () => {
 
   beforeEach(() => {
     for (const m of [Post, Comment]) {
-      m._associations = [];
+      m._reflections = {};
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });

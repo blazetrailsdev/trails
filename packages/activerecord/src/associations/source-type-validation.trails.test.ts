@@ -70,11 +70,11 @@ registerModel("StvPost", StvPost);
 registerModel("StvMember", StvMember);
 
 function freshAssociations() {
-  (StvAuthor as any)._associations = [];
   (StvAuthor as any)._reflections = {};
-  (StvComment as any)._associations = [];
+  (StvAuthor as any)._reflections = {};
   (StvComment as any)._reflections = {};
-  (StvPost as any)._associations = [];
+  (StvComment as any)._reflections = {};
+  (StvPost as any)._reflections = {};
   (StvPost as any)._reflections = {};
 }
 

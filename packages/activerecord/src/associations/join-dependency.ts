@@ -620,9 +620,9 @@ export class JoinDependency {
     );
 
     const inverseMap = new Map<string, string | undefined>();
-    const modelAssocs: any[] = (this._baseModel as any)._associations ?? [];
-    for (const assoc of modelAssocs) {
-      inverseMap.set(assoc.name, assoc.options?.inverseOf);
+    const modelReflections: Record<string, any> = (this._baseModel as any)._reflections ?? {};
+    for (const [assocName, reflection] of Object.entries(modelReflections)) {
+      inverseMap.set(assocName, reflection.options?.inverseOf);
     }
 
     for (const parent of parents) {

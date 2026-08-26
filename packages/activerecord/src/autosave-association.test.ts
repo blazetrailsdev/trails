@@ -4418,13 +4418,7 @@ describe("ChangedForAutosaveTest", () => {
     class Parent extends Base {
       static {
         this.attribute("id", "integer");
-        (this as any)._associations = [
-          {
-            name: "children",
-            type: "hasMany",
-            options: { autosave: true, className: "ChangedChild" },
-          },
-        ];
+        this.hasMany("children", { autosave: true, className: "ChangedChild" });
       }
     }
     registerModel("ChangedParent", Parent);
@@ -4451,13 +4445,7 @@ describe("ChangedForAutosaveTest", () => {
     class Parent2 extends Base {
       static {
         this.attribute("id", "integer");
-        (this as any)._associations = [
-          {
-            name: "child",
-            type: "hasOne",
-            options: { autosave: true, className: "ChangedChild2" },
-          },
-        ];
+        this.hasOne("child", { autosave: true, className: "ChangedChild2" });
       }
     }
     registerModel("ChangedParent2", Parent2);
@@ -4478,17 +4466,13 @@ describe("ChangedForAutosaveTest", () => {
     class A extends Base {
       static {
         this.attribute("id", "integer");
-        (this as any)._associations = [
-          { name: "b", type: "hasOne", options: { autosave: true, className: "CycleB" } },
-        ];
+        this.hasOne("b", { autosave: true, className: "CycleB" });
       }
     }
     class B extends Base {
       static {
         this.attribute("id", "integer");
-        (this as any)._associations = [
-          { name: "a", type: "belongsTo", options: { autosave: true, className: "CycleA" } },
-        ];
+        this.belongsTo("a", { autosave: true, className: "CycleA" });
       }
     }
     registerModel("CycleA", A);

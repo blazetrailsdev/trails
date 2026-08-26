@@ -49,7 +49,7 @@ describe("JoinDependency#build", () => {
 
   beforeEach(() => {
     for (const m of [Post, Comment, Author, Tag]) {
-      (m as any)._associations = [];
+      (m as any)._reflections = {};
       (m as any)._reflections = {};
       clearReflectionsCache(m);
       registerModel(m);

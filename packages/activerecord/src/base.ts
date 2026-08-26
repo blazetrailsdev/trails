@@ -345,7 +345,6 @@ import {
   registerModelConstant,
   initInternals as _associationsInitInternals,
   initializeDup as _associationsInitializeDup,
-  type AssociationDefinition,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
@@ -678,7 +677,7 @@ function _applyScopeAttributes(
 /** @internal An association definition as `_extractAssociationAttrs` reads it. */
 interface _AssociationDefLike {
   name: string;
-  type: string;
+  macro: string;
 }
 
 /**
@@ -708,7 +707,7 @@ function _collectionIdsKeyOwner(
   if (!key.endsWith("Ids")) return undefined;
   return defs.find(
     (a) =>
-      (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
+      (a.macro === "hasMany" || a.macro === "hasAndBelongsToMany") &&
       `${_singularize(a.name)}Ids` === key,
   );
 }
@@ -731,8 +730,11 @@ function _extractAssociationAttrs(
   rest: Record<string, unknown>;
   assocs: _PendingAssociationAttr[];
 } | null {
-  const defs = (ctor as { _associations?: _AssociationDefLike[] } | undefined)?._associations;
-  if (!defs || defs.length === 0) return null;
+  const reflections = (ctor as { _reflections?: Record<string, _AssociationDefLike> } | undefined)
+    ?._reflections;
+  if (!reflections) return null;
+  const defs = Object.values(reflections);
+  if (defs.length === 0) return null;
   // Common case: models that declare associations but receive only regular
   // attrs at construction (`new Post({title})`). First pass detects whether
   // any key matches an association; only then do we allocate `rest` and
@@ -784,14 +786,14 @@ function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr
     if (!proxy) continue;
     if (idsKey) {
       proxy.syncIdsWrite?.(value as unknown[]);
-    } else if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
+    } else if (assoc.macro === "hasMany" || assoc.macro === "hasAndBelongsToMany") {
       // Rails fidelity: pass the value through unchanged. `replace` calls
       // `.each` on the argument and raises on nil / scalars, so an `Array.wrap`
       // here would silently accept inputs the writer rejects.
       proxy.syncWrite?.(value as unknown[]);
-    } else if (assoc.type === "hasOne") {
+    } else if (assoc.macro === "hasOne") {
       proxy.syncWrite?.(value);
-    } else if (assoc.type === "belongsTo") {
+    } else if (assoc.macro === "belongsTo") {
       proxy.writer?.(value);
     }
   }
@@ -848,8 +850,6 @@ export class Base extends Model {
   declare static _primaryKey?: string | string[];
   static readonly _isActiveRecordBase = true;
 
-  /** @internal */
-  declare static _associations: AssociationDefinition[];
   /** @internal */
   declare static _registryKeys: string[];
   /**
@@ -4581,14 +4581,9 @@ extend(Base, _Reflection.ClassMethods);
 // Mirrors `class_attribute :_reflections, instance_writer: false, default: {}`
 // (reflection.rb:11): reads walk the constructor chain, writes are local to the
 // class, so `add_reflection`'s reassignment is the whole copy-on-write
-// mechanism. `_associations` has no `class_attribute` of its own upstream —
-// reflection.rb:11-14 declares only `_reflections`, `aggregate_reflections`,
-// `automatic_scope_inversing` and `automatically_invert_plural_associations` —
-// it is trails-only registry bookkeeping carried on the same mechanism as the
-// `_reflections` it shadows, so the two cannot drift apart.
+// mechanism.
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
-classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "defaultScopes", {

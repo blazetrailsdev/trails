@@ -76,23 +76,20 @@ function assertSingularAssociation(
   expected: "belongsTo" | "hasOne",
 ): AssocDef {
   const ctor = this.constructor as typeof Base;
-  const assocDef = ctor._associations
-    ?.slice()
-    .reverse()
-    .find((a) => a.name === name);
+  const assocDef = ctor._reflectOnAssociation?.(name) as unknown as AssocDef | null;
   if (!assocDef) {
     throw _associationNotFound(this, name);
   }
-  if (assocDef.type !== expected) {
-    if (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany") {
+  if (assocDef.macro !== expected) {
+    if (assocDef.macro === "hasMany" || assocDef.macro === "hasAndBelongsToMany") {
       throw new Error(
         `load${expected === "belongsTo" ? "BelongsTo" : "HasOne"} is for singular associations. ` +
-          `\`${ctor.name}.${name}\` is a ${assocDef.type} — await the reader: \`await record.${name}\`.`,
+          `\`${ctor.name}.${name}\` is a ${assocDef.macro} — await the reader: \`await record.${name}\`.`,
       );
     }
-    const right = assocDef.type === "belongsTo" ? "loadBelongsTo" : "loadHasOne";
+    const right = assocDef.macro === "belongsTo" ? "loadBelongsTo" : "loadHasOne";
     throw new Error(
-      `\`${ctor.name}.${name}\` is a ${assocDef.type}, not ${expected}. Use \`record.${right}("${name}")\` instead.`,
+      `\`${ctor.name}.${name}\` is a ${assocDef.macro}, not ${expected}. Use \`record.${right}("${name}")\` instead.`,
     );
   }
   return assocDef;
@@ -122,22 +119,14 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const ctor = this.constructor as typeof Base;
-  const assocDef = ctor._associations
-    ?.slice()
-    .reverse()
-    .find((a) => a.name === name);
+  // Rails constructs from the reflection (`associations.rb:290-296`:
+  // `reflection.association_class.new(self, reflection)`).
+  const assocDef = ctor._reflectOnAssociation?.(name) as unknown as AssocDef | undefined;
   if (!assocDef) {
     throw _associationNotFound(this, name);
   }
 
-  // Rails constructs from the reflection (`associations.rb:290-296`:
-  // `reflection.association_class.new(self, reflection)`); the `_associations`
-  // scan above stays only because it carries the subclass-override ordering
-  // and the macro `_buildAssociationInstance` dispatches on.
-  const instance = _buildAssociationInstance.call(
-    this,
-    (ctor._reflectOnAssociation?.(name) as unknown as AssocDef | undefined) ?? assocDef,
-  );
+  const instance = _buildAssociationInstance.call(this, assocDef);
   this._associationInstances.set(name, instance);
   syncAssociationInstance.call(this, name, instance);
   return instance;

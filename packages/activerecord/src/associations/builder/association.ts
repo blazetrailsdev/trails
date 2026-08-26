@@ -134,22 +134,7 @@ export class Association {
     scope = this.buildScope(scope);
 
     const macro = this.macro();
-    const reflection = Reflection.create(macro as any, name, scope, options, model);
-
-    model._associations = [
-      ...model._associations,
-      {
-        type: macro,
-        name,
-        scope,
-        options: { ...options },
-        get foreignType(): string | null {
-          return (reflection as { foreignType?: string | null }).foreignType ?? null;
-        },
-      },
-    ];
-
-    return reflection;
+    return Reflection.create(macro as any, name, scope, options, model);
   }
 
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {

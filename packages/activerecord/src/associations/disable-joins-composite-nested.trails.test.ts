@@ -94,11 +94,11 @@ describe("DJAS composite-key + nested-through", () => {
     registerModel("CknOrder", CknOrder);
     registerModel("CknLineItem", CknLineItem);
     registerModel("CknTag", CknTag);
-    (CknShop as any)._associations = [];
     (CknShop as any)._reflections = {};
-    (CknOrder as any)._associations = [];
+    (CknShop as any)._reflections = {};
     (CknOrder as any)._reflections = {};
-    (CknLineItem as any)._associations = [];
+    (CknOrder as any)._reflections = {};
+    (CknLineItem as any)._reflections = {};
     (CknLineItem as any)._reflections = {};
 
     Associations.hasMany.call(CknShop, "cknOrders", {

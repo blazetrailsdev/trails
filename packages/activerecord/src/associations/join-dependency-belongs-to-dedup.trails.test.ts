@@ -29,7 +29,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
 
   beforeEach(() => {
     for (const m of [Author, Post]) {
-      m._associations = [];
+      m._reflections = {};
       registerModel(m);
     }
 

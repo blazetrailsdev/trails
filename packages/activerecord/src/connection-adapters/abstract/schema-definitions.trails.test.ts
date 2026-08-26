@@ -166,6 +166,29 @@ describe("ReferenceDefinition#add", () => {
     expect(calls[2][3]).toMatchObject({ name: "index_taggings_on_taggable" });
   });
 
+  // `polymorphic_options` forwards `options.slice(:null, :first, :after)`
+  // (schema_definitions.rb:259), so MySQL positioning applies to BOTH halves of
+  // the pair rather than splitting them.
+  it("forwards first/after positioning onto the polymorphic type column", async () => {
+    const { calls, connection } = recorder();
+    await new ReferenceDefinition("taggable", { polymorphic: true, after: "id" }).add(
+      "taggings",
+      connection,
+    );
+
+    expect(calls[0][4]).toMatchObject({ after: "id" });
+    expect(calls[1][4]).toMatchObject({ after: "id" });
+
+    const first = recorder();
+    await new ReferenceDefinition("taggable", { polymorphic: true, first: true }).add(
+      "taggings",
+      first.connection,
+    );
+
+    expect(first.calls[0][4]).toMatchObject({ first: true });
+    expect(first.calls[1][4]).toMatchObject({ first: true });
+  });
+
   it("merges an index options hash", async () => {
     const { calls, connection } = recorder();
     await new ReferenceDefinition("user", { index: { unique: true, name: "my_index" } }).add(

@@ -10,6 +10,7 @@ import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vite
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
+import { clearReflectionsCache } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
@@ -2288,7 +2289,7 @@ describe("AssociationsTest", () => {
     // than silently exempting composite-PK owners.
     const originalList = (ShardedBlogPost as any)._queryConstraintsList;
     const originalPk = (ShardedBlogPost as any)._primaryKey;
-    const originalAssociations = [...((ShardedBlogPost as any)._associations ?? [])];
+    const originalReflections = { ...((ShardedBlogPost as any)._reflections ?? {}) };
     try {
       (ShardedBlogPost as any)._primaryKey = ["blog_id", "id"];
       (ShardedBlogPost as any)._queryConstraintsList = ["blog_id", "id"];
@@ -2309,7 +2310,8 @@ describe("AssociationsTest", () => {
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = originalList;
       (ShardedBlogPost as any)._primaryKey = originalPk;
-      (ShardedBlogPost as any)._associations = originalAssociations;
+      (ShardedBlogPost as any)._reflections = originalReflections;
+      clearReflectionsCache(ShardedBlogPost as any);
     }
   });
 

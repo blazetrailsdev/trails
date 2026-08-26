@@ -85,21 +85,20 @@ export function acceptsNestedAttributesFor(
   }
 
   // Validate that the association exists
-  const associations: any[] = (modelClass as any)._associations ?? [];
-  const assocExists = associations.find((a: any) => a.name === associationName);
-  if (!assocExists) {
+  const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
+  if (!reflection) {
     throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
   }
 
   // Rails sets `reflection.autosave = true` for every nested-attributes
   // association (nested_attributes.rb:359), so the parent's save cascades into
-  // the in-memory target. trails checks `options.autosave` dynamically at save
-  // time, so flipping the flag on the association definition is sufficient — and
-  // is what makes the synchronous in-memory target population in
+  // the in-memory target. The setter writes `options[:autosave]`
+  // (reflection.rb:399-405), which is what the save path reads — and is what
+  // makes the synchronous in-memory target population in
   // `assignNestedAttributesForCollectionAssociation` reachable for plain
   // `acceptsNestedAttributesFor(Model, "assoc")` callers, not only those who
   // also pass `{ autosave: true }` to `hasMany`.
-  assocExists.options = { ...assocExists.options, autosave: true };
+  reflection.autosave = true;
 
   // Rails accepts_nested_attributes_for calls `define_autosave_validation_callbacks`
   // after flipping autosave (nested_attributes.rb:368-370). The association's
@@ -107,14 +106,7 @@ export function acceptsNestedAttributesFor(
   // callback is gated on `reflection.validate?` — false at declaration time for a
   // plain belongs_to/has_one (autosave not yet set). Re-running it here wires the
   // nested-record validator so a singular nested association is validated.
-  const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
-  if (reflection) {
-    // Rails `reflection.autosave = true` — flip it on the rich reflection too
-    // (not just the `_associations` entry the save path reads) so
-    // `reflection.validate?` sees it and the validation callback is wired.
-    reflection.autosave = true;
-    defineAutosaveValidationCallbacks.call(modelClass, reflection);
-  }
+  defineAutosaveValidationCallbacks.call(modelClass, reflection);
 
   // Rails does NOT reject polymorphic belongs_to at declaration time — the
   // check is deferred to build time (the writer raises when it tries to build
@@ -127,10 +119,9 @@ export function acceptsNestedAttributesFor(
   nestedAttributesOptions[associationName] = options;
   modelClass.nestedAttributesOptions = nestedAttributesOptions;
 
-  const type =
-    assocExists.type === "hasMany" || assocExists.type === "hasAndBelongsToMany"
-      ? "collection"
-      : "one_to_one";
+  // `type = (reflection.collection? ? :collection : :one_to_one)`
+  // (nested_attributes.rb:361).
+  const type = reflection.isCollection() ? "collection" : "one_to_one";
   modelClass.generateAssociationWriter(associationName, type);
 
   // Wrap save to flush pending nested attributes after the parent is persisted
@@ -213,12 +204,11 @@ async function processNestedAttributes(record: Base): Promise<void> {
     const config = ctor.nestedAttributesOptions[assocName];
     if (!config) continue;
 
-    const associations: any[] = (ctor as any)._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === assocName);
+    const assocDef = (ctor as any)._reflectOnAssociation?.(assocName);
     if (!assocDef) continue;
 
     // Resolve target model
-    const className = collectionAssociationClassName(assocDef, assocName);
+    const className = assocDef.className;
 
     const targetModel = modelRegistry.get(className);
     if (!targetModel) continue;
@@ -470,8 +460,7 @@ export function raiseNestedAttributesRecordNotFoundBang(
   recordId: unknown,
 ): never {
   const ctor = record.constructor as typeof Base;
-  const associations: any[] = (ctor as any)._associations ?? [];
-  const assocDef = associations.find((a: any) => a.name === associationName);
+  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
   const modelName = assocDef?.options?.className ?? camelize(singularize(associationName));
   throw new RecordNotFound(
     `Couldn't find ${modelName} with ID=${recordId} for ${ctor.name} with ID=${record.id}`,
@@ -560,9 +549,8 @@ export function generateAssociationWriter(
 
 /** @internal */
 export function isPolymorphicBelongsTo(record: Base, associationName: string): boolean {
-  const associations: any[] = (record.constructor as any)._associations ?? [];
-  const assocDef = associations.find((a: any) => a.name === associationName);
-  return assocDef?.type === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
+  const assocDef = (record.constructor as any)._reflectOnAssociation?.(associationName);
+  return assocDef?.macro === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
 }
 
 /**
@@ -932,8 +920,7 @@ export function assignNestedAttributesForCollectionAssociation(
   // For non-autosave associations there is no autosave cascade to persist the
   // change, so existing records stay in the pending map for the trails-specific
   // post-save flush (`processNestedAttributes`).
-  const associations: any[] = (ctor as any)._associations ?? [];
-  const assocDef = associations.find((a: any) => a.name === associationName);
+  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
   const isAutosave = assocDef?.options?.autosave === true;
 
   // Rails collects the assignment's result records into `nested_attributes_target`
@@ -943,9 +930,9 @@ export function assignNestedAttributesForCollectionAssociation(
   // The `else` (non-autosave existing-record) branch does NOT append to
   // `nestedTarget`, which would break that 1:1 ordering — but it is unreachable
   // for any `accepts_nested_attributes_for` collection: `acceptsNestedAttributesFor`
-  // unconditionally sets `assocExists.options.autosave = true` (above), and
-  // `assocDef` is re-read from the live `_associations` array on every call, so
-  // `isAutosave` is always true here. The branch remains only as a guard for a
+  // unconditionally sets `reflection.autosave = true` (above), and `assocDef` is
+  // re-read from the live reflection registry on every call, so `isAutosave` is
+  // always true here. The branch remains only as a guard for a
   // hypothetical direct caller on a non-autosave collection (which never sets a
   // nestedAttributesTarget and defers everything to the post-save flush).
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
@@ -1029,8 +1016,7 @@ function populateInMemoryExistingRecord(
   attrs: Record<string, unknown>,
 ): Base | null {
   const ctor = record.constructor as typeof Base;
-  const associations: any[] = (ctor as any)._associations ?? [];
-  const assocDef = associations.find((a: any) => a.name === associationName);
+  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
   const targetModel = resolveCollectionTargetModel(record, associationName);
   if (!targetModel || !assocDef) return null;
 
@@ -1110,23 +1096,8 @@ function loadedCollectionTarget(record: Base, associationName: string): Base[] {
 }
 
 /**
- * Class name backing a collection association: explicit `className` option, else
- * the camelized singular of the association name. Single source of truth for
- * `processNestedAttributes` and `resolveCollectionTargetModel`.
- * @internal
- */
-function collectionAssociationClassName(assocDef: any, associationName: string): string {
-  return (
-    assocDef.options.className ??
-    (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany"
-      ? camelize(singularize(associationName))
-      : camelize(associationName))
-  );
-}
-
-/**
- * Resolve the model class backing a collection association via the registry,
- * mirroring the className resolution in `processNestedAttributes`.
+ * Resolve the model class backing a collection association via the registry —
+ * the trails stand-in for Rails' `reflection.klass` constant lookup.
  * @internal
  */
 function resolveCollectionTargetModel(
@@ -1134,10 +1105,9 @@ function resolveCollectionTargetModel(
   associationName: string,
 ): typeof Base | undefined {
   const ctor = record.constructor as typeof Base;
-  const associations: any[] = (ctor as any)._associations ?? [];
-  const assocDef = associations.find((a: any) => a.name === associationName);
+  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
   if (!assocDef) return undefined;
-  return modelRegistry.get(collectionAssociationClassName(assocDef, associationName));
+  return modelRegistry.get(assocDef.className);
 }
 
 export const InstanceMethods = {

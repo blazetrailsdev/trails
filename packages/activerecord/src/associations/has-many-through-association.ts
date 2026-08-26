@@ -99,9 +99,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * (has_many_through_association.rb:121).
    */
   protected targetReflectionHasAssociatedRecord(): boolean {
-    const associations: AssociationDefinition[] =
-      (this.owner.constructor as typeof Base)._associations ?? [];
-    const throughAssoc = associations.find((a) => a.name === this.reflection.options.through);
+    const throughAssoc = (this.owner.constructor as typeof Base)._reflectOnAssociation(
+      this.reflection.options.through!,
+    ) as unknown as AssociationDefinition | null;
     // A missing through reflection is Rails' `check_validity!` failure, not
     // this predicate's: leave it to the loader below, which raises
     // HasManyThroughAssociationNotFoundError with the Rails message.
@@ -864,7 +864,7 @@ function targetReflectionHasAssociatedRecord(
   record: Base,
   throughAssoc: AssociationDefinition,
 ): boolean {
-  if (throughAssoc.type !== "belongsTo") return true;
+  if (throughAssoc.macro !== "belongsTo") return true;
   const fk = throughAssoc.options.foreignKey ?? `${underscore(throughAssoc.name)}_id`;
   const columns = Array.isArray(fk) ? fk : [fk];
   return !columns.every((column) => isBlank(record._readAttribute(String(column))));
@@ -902,8 +902,9 @@ async function loadHasManyThrough(
 ): Promise<Base[]> {
   const options = assocDef.options;
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const throughAssoc = associations.find((a) => a.name === options.through);
+  const throughAssoc = ctor._reflectOnAssociation(
+    options.through!,
+  ) as unknown as AssociationDefinition | null;
   if (!throughAssoc) {
     throw _hmtNotFound(ctor, assocName, options.through!);
   }
@@ -917,14 +918,13 @@ async function loadHasManyThrough(
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
   const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
-  const throughModelAssocs: AssociationDefinition[] = throughModel._associations ?? [];
   const sourceAssoc =
-    throughModelAssocs.find((a) => a.name === sourceName) ??
-    throughModelAssocs.find((a) => a.name === pluralize(sourceName));
-  const sourceAssocKind = sourceAssoc?.type ?? "belongsTo";
+    throughModel._reflectOnAssociation(sourceName) ??
+    throughModel._reflectOnAssociation(pluralize(sourceName));
+  const sourceAssocKind = sourceAssoc?.macro ?? "belongsTo";
 
   let throughRecords: Base[];
-  if (throughAssoc.type === "hasMany") {
+  if (throughAssoc.macro === "hasMany") {
     if (
       options.sourceType &&
       sourceAssoc?.options?.polymorphic &&
@@ -949,10 +949,10 @@ async function loadHasManyThrough(
     } else {
       throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc);
     }
-  } else if (throughAssoc.type === "hasOne") {
+  } else if (throughAssoc.macro === "hasOne") {
     const one = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
     throughRecords = one ? [one] : [];
-  } else if (throughAssoc.type === "belongsTo") {
+  } else if (throughAssoc.macro === "belongsTo") {
     const one = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
     throughRecords = one ? [one] : [];
   } else {
@@ -989,7 +989,7 @@ async function loadHasManyThrough(
     );
     return rel.toArray();
   } else {
-    const sourceAsName = sourceAssoc?.options?.as;
+    const sourceAsName = sourceAssoc?.options?.as as string | undefined;
     const sourceFk = sourceAsName
       ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
       : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);

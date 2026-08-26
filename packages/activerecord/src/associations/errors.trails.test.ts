@@ -33,7 +33,9 @@ describe("AssociationErrors", () => {
     // Mirrors Rails AssociationNotFoundError#corrections, which feeds
     // `record.class.reflections.keys` into DidYouMean::SpellChecker.
     const record = {
-      constructor: { _associations: [{ name: "tagging" }, { name: "comments" }] },
+      constructor: {
+        _reflections: { tagging: { name: "tagging" }, comments: { name: "comments" } },
+      },
     } as any;
     const err = _associationNotFound(record, "taggingz");
     expect(err).toBeInstanceOf(AssociationNotFoundError);

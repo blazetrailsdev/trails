@@ -46,9 +46,9 @@ describe("DisableJoinsAssociationScope", () => {
     registerModel("DjsAuthor", DjsAuthor);
     registerModel("DjsPost", DjsPost);
     registerModel("DjsComment", DjsComment);
-    (DjsAuthor as any)._associations = [];
-    (DjsPost as any)._associations = [];
-    (DjsComment as any)._associations = [];
+    (DjsAuthor as any)._reflections = {};
+    (DjsPost as any)._reflections = {};
+    (DjsComment as any)._reflections = {};
     Associations.hasMany.call(DjsAuthor, "djsPosts", {
       className: "DjsPost",
       foreignKey: "djs_author_id",
