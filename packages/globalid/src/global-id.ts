@@ -156,7 +156,14 @@ export class GlobalID {
     return this.toString();
   }
 
-  /** Mirrors: GlobalID#== */
+  /**
+   * Mirrors: GlobalID#== — `other.is_a?(GlobalID) && uri == other.uri`.
+   *
+   * Rails compares the two `URI::GID`s through `URI::Generic#==`, which is
+   * component-wise. `GID` has no structural equality yet, so the comparison
+   * goes through the string form — the same partition `URI::Generic#==`
+   * induces for a GID, since every component is recoverable from `to_s`.
+   */
   equals(other: GlobalID): boolean {
     return other instanceof GlobalID && this.uri.toString() === other.uri.toString();
   }
