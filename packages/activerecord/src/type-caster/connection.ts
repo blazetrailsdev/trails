@@ -1,4 +1,5 @@
 import type { Type } from "@blazetrails/activemodel";
+import { toS } from "@blazetrails/activesupport";
 import { defaultValue } from "../type.js";
 
 /**
@@ -16,12 +17,12 @@ export class Connection {
     this._tableName = tableName;
   }
 
-  typeCastForDatabase(attrName: string, value: unknown): unknown {
+  typeCastForDatabase(attrName: unknown, value: unknown): unknown {
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
   }
 
-  typeForAttribute(attrName: string): Type {
+  typeForAttribute(attrName: unknown): Type {
     // `@klass.schema_cache` (type_caster/connection.rb:17) reads the pool's cache
     // without leasing a connection (connection_handling.rb:368-369). trails'
     // `Base.schemaCache()` is that pool handle, but every read on it is async and
@@ -35,7 +36,7 @@ export class Connection {
     // `getCachedColumnsHash` is a plain map read that never triggers the async
     // cache-miss path. Converging the gate waits on RFC 0023.
     const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
-    const column = columnsHash?.[attrName];
+    const column = columnsHash?.[toS(attrName)];
     // Rails scopes the lookup to a leased connection —
     // `@klass.with_connection { |c| c.lookup_cast_type_from_column(column) }`
     // (type_caster/connection.rb:21). trails' `withConnection` returns a Promise

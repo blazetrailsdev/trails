@@ -1033,30 +1033,13 @@ export function dbCommand(): Command {
     .description("Show migration status")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
-        const mDirs = await migrationsDirsForConfig(raw);
-        const migrationContext = migrationContextFor(adapter, mDirs);
-
-        // `DatabaseTasks.migrate_status` aborts before reading
-        // schema_migrations when the table is not there yet
-        // (`tasks/database_tasks.rb:303-305`) — `Kernel.abort` writes the
-        // message to stderr and exits non-zero.
-        if (!(await migrationContext.schemaMigration.tableExists())) {
-          console.error(`${prefix}Schema migrations table does not exist yet.`);
-          setExitCode(1);
-          return;
-        }
-
-        const statuses = await migrationContext.migrationsStatus();
-
-        console.log("");
-        console.log(`${prefix}Status   Migration ID    Migration Name`);
-        console.log(`${prefix}--------------------------------------------------`);
-        for (const s of statuses) {
-          const statusStr = s.status === "up" ? "  up  " : " down ";
-          console.log(`${prefix}${statusStr}   ${s.version.padEnd(16)}${s.name}`);
-        }
-        console.log("");
+      // Rails' `db:migrate:status` is a bare delegation to
+      // `DatabaseTasks.migrate_status` inside `with_temporary_pool_for_each`
+      // (`railties/databases.rake:229-233`) — the missing-table abort, the
+      // `database:` header and the column widths all live in
+      // `tasks/database_tasks.rb:302-315`.
+      await forEachDatabase(opts, async (ctx) => {
+        await withPrefixedStdout(ctx.prefix, () => DatabaseTasks.migrateStatus());
       });
     });
 

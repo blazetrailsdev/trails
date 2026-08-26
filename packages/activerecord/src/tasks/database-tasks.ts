@@ -25,6 +25,7 @@ import {
   stdout,
   stderr,
   abort,
+  trailsRoot,
 } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
@@ -539,7 +540,14 @@ export class DatabaseTasks {
     // No blank-string special case — Rails only does File.exist?, so "" flows through
     // the same path (existsSync("") === false) and aborts with the filename in the message.
     if (!getFs().existsSync(filename)) {
-      const message = `${filename} doesn't exist yet. Run \`db:migrate\` to create it, then try again.`;
+      let message = `${filename} doesn't exist yet. Run \`bin/rails db:migrate\` to create it, then try again.`;
+      // Rails appends the second sentence `if defined?(::Rails.root)`
+      // (database_tasks.rb:485); trails' `Rails.root` seam is `trailsRoot()`,
+      // which is null when unset.
+      const root = trailsRoot();
+      if (root != null) {
+        message += ` If you do not intend to use a database, you should instead alter ${root}/config/application.rb to limit the frameworks that will be loaded.`;
+      }
       abort(message);
     }
   }

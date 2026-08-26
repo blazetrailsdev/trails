@@ -533,7 +533,7 @@ export class Migration {
    *   scope for the port, so the wrapper is not ported and the base
    *   `create_table` is what pairs here.
    */
-  async createTable(
+  async createTable<TD extends TableDefinition = TableDefinition>(
     name: string,
     optionsOrFn?:
       | {
@@ -548,11 +548,23 @@ export class Migration {
           collation?: string;
           as?: string;
         }
-      | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void,
+      | ((t: TD) => void),
+    fn?: (t: TD) => void,
   ): Promise<void> {
     const tname = this._pt(name);
-    await this.connection.createTable(tname, optionsOrFn, fn);
+    // Ruby yields whatever `create_table_definition` built and resolves
+    // `t.enum` / `t.citext` on it at call time (migration.rb:1024-1036), so a
+    // PG migration block reaches `PostgreSQL::ColumnMethods` with no
+    // declaration. `Migration` names only the abstract `DatabaseAdapter`, whose
+    // block parameter is the abstract `TableDefinition`; under
+    // `strictFunctionTypes` a narrower block is contravariantly rejected here,
+    // which is why the forward is cast and the caller's own annotation (`TD`)
+    // is what types the block.
+    await this.connection.createTable(
+      tname,
+      optionsOrFn as Parameters<DatabaseAdapter["createTable"]>[1],
+      fn as Parameters<DatabaseAdapter["createTable"]>[2],
+    );
   }
 
   /**
@@ -908,14 +920,20 @@ export class Migration {
    *   scope for the port, so the wrapper is not ported and the base
    *   `create_join_table` is what pairs here.
    */
-  async createJoinTable(
+  async createJoinTable<TD extends TableDefinition = TableDefinition>(
     table1: string,
     table2: string,
-    options?: JoinTableOptions | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void,
+    options?: JoinTableOptions | ((t: TD) => void),
+    fn?: (t: TD) => void,
   ): Promise<void> {
     table1 = this._pt(table1);
-    await this.connection.createJoinTable(table1, table2, options, fn);
+    // Same call-time resolution as `createTable` above.
+    await this.connection.createJoinTable(
+      table1,
+      table2,
+      options as Parameters<DatabaseAdapter["createJoinTable"]>[2],
+      fn as Parameters<DatabaseAdapter["createJoinTable"]>[3],
+    );
   }
 
   async dropJoinTable(

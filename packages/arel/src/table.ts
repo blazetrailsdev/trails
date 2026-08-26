@@ -34,8 +34,8 @@ export interface TableKlass {
  * already has at `activerecord/src/type-caster/` — does not remove it.
  */
 export interface TypeCaster {
-  typeCastForDatabase(attrName: string, value: unknown): unknown;
-  typeForAttribute(name: string): unknown;
+  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
+  typeForAttribute(name: string | Node | null): unknown;
 }
 
 /**
@@ -221,11 +221,7 @@ export class Table extends Node {
   }
 
   typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
-    // Rails' `name` is untyped all the way down (table.rb:100-107 hands it to a
-    // duck-typed caster). `TypeCaster` is where the string boundary lives: only
-    // a String name ever reaches a caster, since `table[Arel.star]` — the one
-    // Node-named attribute — is never type-cast.
-    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName as string, value);
+    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
   }
 
   /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
@@ -234,7 +230,7 @@ export class Table extends Node {
   private readonly typeCaster: unknown;
 
   typeForAttribute(name: string | Node | null): unknown {
-    return (this.typeCaster as TypeCaster).typeForAttribute(name as string);
+    return (this.typeCaster as TypeCaster).typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {

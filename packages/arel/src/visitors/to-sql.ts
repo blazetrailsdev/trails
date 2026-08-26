@@ -3,7 +3,6 @@ import { SQLString } from "../collectors/sql-string.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
-import { BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 /**
@@ -1075,16 +1074,12 @@ export class ToSql extends Visitor {
     if (o.positionalBinds) {
       const positionalBinds = o.positionalBinds;
       const segments = sql.split("?");
-      const expected = segments.length - 1;
-      if (positionalBinds.length !== expected) {
-        throw new BindError(
-          `wrong number of bind variables (${positionalBinds.length} for ${expected})`,
-          sql,
-        );
-      }
       for (let i = 0; i < segments.length; i++) {
         if (segments[i]) collector.append(segments[i]);
-        if (i < positionalBinds.length) this.visitBindValue(positionalBinds[i], collector);
+        // Rails reads `o.positional_binds[bind_index]` (to_sql.rb:805) with no
+        // count check — validation belongs to the constructor
+        // (bound_sql_literal.rb:11-29) — and an out-of-range index is `nil`.
+        if (i < segments.length - 1) this.visitBindValue(positionalBinds[i] ?? null, collector);
       }
     } else {
       const namedBinds = o.namedBinds ?? {};
@@ -1094,11 +1089,9 @@ export class ToSql extends Visitor {
         if (m[2] !== undefined) {
           collector.append(m[2]);
         } else {
-          const name = m[1];
-          if (!(name in namedBinds)) {
-            throw new BindError(`missing value for :${name}`, sql);
-          }
-          this.visitBindValue(namedBinds[name], collector);
+          // `o.named_binds[$1.to_sym]` (to_sql.rb:815) is `nil` for an absent
+          // key, and `new_bind` binds it (to_sql.rb:794-795).
+          this.visitBindValue(namedBinds[m[1]] ?? null, collector);
         }
       }
     }

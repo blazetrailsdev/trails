@@ -11,7 +11,13 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/activesupport";
+import {
+  stdout,
+  stderr,
+  setEnv,
+  getProcessAdapter,
+  setTrailsRoot,
+} from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -1499,7 +1505,19 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
     );
     expect(() => DatabaseTasks.checkSchemaFile("")).toThrow(/doesn't exist yet/);
     expect(stderrWrites.join("")).toMatch(/nonexistent-awesome-file\.sql/);
+    expect(stderrWrites.join("")).toMatch(/Run `bin\/rails db:migrate`/);
+    // `defined?(::Rails.root)` is false with the seam unset (database_tasks.rb:485).
+    expect(stderrWrites.join("")).not.toMatch(/config\/application\.rb/);
     expect(exitCodes).toEqual([1, 1]);
+
+    setTrailsRoot("/apps/blog");
+    try {
+      expect(() => DatabaseTasks.checkSchemaFile("nonexistent-awesome-file.sql")).toThrow(
+        /alter \/apps\/blog\/config\/application\.rb to limit the frameworks that will be loaded\./,
+      );
+    } finally {
+      setTrailsRoot(null);
+    }
   });
 });
 
