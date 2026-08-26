@@ -64,9 +64,9 @@ function isActiveModelAttribute(v: unknown): boolean {
 // `UpdateManager#set` sits on the ActiveRecord edge and cannot be (see the note
 // at its call site). The primary normalization is
 // `rubyClassName` (ruby-class.ts:32), which maps `undefined` to `"NilClass"` at
-// the dispatch boundary so it routes to `visitNilClass`; this helper and
-// `rubyInspect` below just keep the downstream message consistent with that.
-// Removing them would be strictly less faithful — an `undefined` would read its
+// the dispatch boundary so it routes to `visitNilClass`; this helper just keeps
+// the downstream message consistent with that.
+// Removing it would be strictly less faithful — an `undefined` would read its
 // `.constructor` off nothing and surface as a "Cannot visit" TypeError instead
 // of Rails' NilClass UnsupportedVisitError.
 function constructorName(v: unknown): string {
@@ -76,75 +76,6 @@ function constructorName(v: unknown): string {
 
 /** Default placeholder block; mirrors Rails' module-level `BIND_BLOCK`. */
 const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
-
-/**
- * Ruby `Object#to_s`, as applied by every adapter's `quote_column_name` /
- * `quote_table_name` (`name.to_s`, sqlite3/quoting.rb:45, mysql/quoting.rb:47,
- * postgresql/quoting.rb:47). Rails does that coercion inside the adapter, which
- * receives the raw name; trails' `Connection` quoting surface is typed to take
- * a string, so the visitor is where the name is stringified and therefore where
- * Ruby's semantics have to be reproduced.
- *
- * `String(value)` agrees with Ruby for the String/Symbol names that every valid
- * query produces. It diverges for an Array: Ruby's `Array#to_s` is
- * inspect-style (`["shop_id", "id"]`), JS comma-joins (`shop_id,id`). An
- * Array-named `Attribute` arises on the composite-primary-key default order
- * path (`table[primaryKey].desc`); the column reference it yields is invalid in
- * Rails too, so this exists to keep the emitted text identical to Rails, not to
- * make such a query work.
- */
-function toS(value: unknown): string {
-  if (Array.isArray(value)) return rubyInspect(value);
-  return String(value);
-}
-
-function rubyInspect(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(rubyInspect).join(", ")}]`;
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return rubyStringInspect(value);
-  return String(value);
-}
-
-/** Ruby's named single-character escapes, in `String#inspect` order. */
-const RUBY_STRING_ESCAPES: ReadonlyMap<string, string> = new Map([
-  ["\\", "\\\\"],
-  ['"', '\\"'],
-  ["\n", "\\n"],
-  ["\t", "\\t"],
-  ["\r", "\\r"],
-  ["\f", "\\f"],
-  ["\v", "\\v"],
-  ["\x07", "\\a"],
-  ["\b", "\\b"],
-  ["\x1b", "\\e"],
-]);
-
-/**
- * Ruby `String#inspect`. Beyond `\` and `"`, Ruby emits named escapes for the
- * usual control characters, `\uXXXX` (uppercase, four digits) for any other
- * non-printable, and escapes a `#` only when it would start an interpolation
- * (`#{`, `#$`, `#@`). Printable non-ASCII passes through literally.
- */
-function rubyStringInspect(value: string): string {
-  let out = '"';
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    const escape = RUBY_STRING_ESCAPES.get(ch);
-    if (escape !== undefined) {
-      out += escape;
-    } else if (ch === "#" && "{$@".includes(value[i + 1] ?? "")) {
-      out += "\\#";
-    } else {
-      const code = ch.charCodeAt(0);
-      out += code < 0x20 || code === 0x7f ? `\\u${hex4(code)}` : ch;
-    }
-  }
-  return out + '"';
-}
-
-function hex4(code: number): string {
-  return code.toString(16).toUpperCase().padStart(4, "0");
-}
 
 /**
  * ToSql visitor — walks the AST and produces SQL strings.
@@ -564,7 +495,7 @@ export class ToSql extends Visitor {
       // renders bare — `over("foo")` is `OVER "foo"` but
       // `over(Arel.sql("foo"))` is `OVER foo`.
       this.visit(o.left, collector);
-      collector.append(` OVER ${this.quoteColumnName(toS(o.right))}`);
+      collector.append(` OVER ${this.quoteColumnName(o.right)}`);
       return collector;
     } else {
       return this.infixValue(o as { left: Node; right: Node }, collector, " OVER ");
@@ -1072,7 +1003,7 @@ export class ToSql extends Visitor {
     // Rails strips the table qualifier so `SET col = col + 1` works in UPDATE
     // statements: `collector << quote_column_name(o.name)` (to_sql.rb:728-730),
     // where `UnqualifiedColumn#name` delegates to `@expr.name`.
-    collector.append(this.quoteColumnName(o.name as string | Node));
+    collector.append(this.quoteColumnName(o.name as string | Node | null));
     return collector;
   }
 
@@ -1333,20 +1264,22 @@ export class ToSql extends Visitor {
     return this.connection.quote(value);
   }
 
-  /** @internal */
-  protected quoteTableName(name: string | Node): string {
+  /**
+   * Mirrors: to_sql.rb:872-875 `def quote_table_name(name)`.
+   * @internal
+   */
+  protected quoteTableName(name: string | Node | null): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    // `toS` is Ruby's implicit `name.to_s` inside `quote_table_name`: trails
-    // reaches here with an Array name for a composite primary key, which Ruby
-    // renders as `["a", "b"]`, not `a,b`.
-    return this.connection.quoteTableName(toS(name));
+    return this.connection.quoteTableName(name);
   }
 
-  /** @internal */
-  protected quoteColumnName(name: string | Node): string {
+  /**
+   * Mirrors: to_sql.rb:877-880 `def quote_column_name(name)`.
+   * @internal
+   */
+  protected quoteColumnName(name: string | Node | null): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    // See `quoteTableName` — `toS` is Ruby's implicit `name.to_s`.
-    return this.connection.quoteColumnName(toS(name));
+    return this.connection.quoteColumnName(name);
   }
 
   /**

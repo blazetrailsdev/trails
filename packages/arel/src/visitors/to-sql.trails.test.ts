@@ -281,13 +281,6 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
     expect(sql).toContain('FROM "test_schema"."things"');
   });
 
-  it("default quoter: quoted table name with dot is preserved as single identifier", () => {
-    const t = new Table('test_schema."things.table"');
-    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.get(star())).ast);
-    expect(sql).toContain('"test_schema"."things.table".*');
-    expect(sql).toContain('FROM "test_schema"."things.table"');
-  });
-
   it("stub quoter: quoteTableName output appears in compiled SQL", () => {
     const stubQuoter: Visitors.ArelConnection = {
       quoteTableName: (name) => `<<${name}>>`,

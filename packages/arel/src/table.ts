@@ -220,7 +220,7 @@ export class Table extends Node {
     return sameName && this.tableAlias === other.tableAlias;
   }
 
-  typeCastForDatabase(attrName: string | Node, value: unknown): unknown {
+  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
     // Rails' `name` is untyped all the way down (table.rb:100-107 hands it to a
     // duck-typed caster). `TypeCaster` is where the string boundary lives: only
     // a String name ever reaches a caster, since `table[Arel.star]` — the one
@@ -233,7 +233,7 @@ export class Table extends Node {
    *  (table_alias.rb:22-24), so no external reader is needed. */
   private readonly typeCaster: unknown;
 
-  typeForAttribute(name: string | Node): unknown {
+  typeForAttribute(name: string | Node | null): unknown {
     return (this.typeCaster as TypeCaster).typeForAttribute(name as string);
   }
 

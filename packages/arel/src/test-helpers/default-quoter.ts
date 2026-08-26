@@ -1,6 +1,10 @@
 import type { ArelConnection } from "../visitors/connection.js";
-import { quoteSchemaQualifiedName } from "../visitors/split-schema-qualified-name.js";
 import { Temporal } from "@blazetrails/date";
+// Ruby `Object#to_s`, which every adapter's `quote_column_name` /
+// `quote_table_name` applies to the raw name (sqlite3/quoting.rb:48,
+// mysql/quoting.rb:51, postgresql/quoting.rb:47,59) — `nil.to_s` is "" and
+// `Array#to_s` is inspect-style, neither of which `String(x)` gives.
+import { toS } from "@blazetrails/activesupport";
 
 // Standalone comment sanitize for these test hosts: strips block-comment
 // delimiters (leaving `--` alone, like Rails' abstract sanitize). Real
@@ -170,15 +174,15 @@ function quoteScalar(this: ArelConnection, value: unknown): string {
  * visitor falls back to it.
  */
 export const mysqlDefaultQuoter: ArelConnection = {
-  quoteTableName(name: string): string {
-    return String(name)
+  quoteTableName(name: unknown): string {
+    return toS(name)
       .split(".")
       .map((p) => "`" + p.replace(/`/g, "``") + "`")
       .join(".");
   },
 
-  quoteColumnName(name: string): string {
-    return "`" + String(name).replace(/`/g, "``") + "`";
+  quoteColumnName(name: unknown): string {
+    return "`" + toS(name).replace(/`/g, "``") + "`";
   },
 
   quoteString(s: string): string {
@@ -240,12 +244,13 @@ export const mysqlDefaultQuoter: ArelConnection = {
  * always passes a real connection (RFC 0007) — no visitor defaults to this.
  */
 export const defaultQuoter: ArelConnection = {
-  quoteTableName(name: string): string {
-    return quoteSchemaQualifiedName(String(name));
+  // Mirrors sqlite3/quoting.rb:48-50 — `"#{name.to_s.gsub('"', '""').gsub(".", "\".\"")}"`.
+  quoteTableName(name: unknown): string {
+    return `"${toS(name).replace(/"/g, '""').replace(/\./g, '"."')}"`;
   },
 
-  quoteColumnName(name: string): string {
-    return `"${String(name).replace(/"/g, '""')}"`;
+  quoteColumnName(name: unknown): string {
+    return `"${toS(name).replace(/"/g, '""')}"`;
   },
 
   quoteString(s: string): string {

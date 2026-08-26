@@ -16,8 +16,8 @@ import { Table } from "../table.js";
  *  which calls Rails protects. */
 interface TypeCastable {
   name?: string;
-  typeCastForDatabase(attrName: string | Node, value: unknown): unknown;
-  typeForAttribute(name: string | Node): unknown;
+  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
+  typeForAttribute(name: string | Node | null): unknown;
   isAbleToTypeCast?: () => boolean;
 }
 
@@ -58,11 +58,11 @@ export class TableAlias extends Binary {
     return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
-  typeCastForDatabase(attrName: string | Node, value: unknown): unknown {
+  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
     return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
   }
 
-  typeForAttribute(name: string | Node): unknown {
+  typeForAttribute(name: string | Node | null): unknown {
     return (this.relation as unknown as TypeCastable).typeForAttribute(name);
   }
 

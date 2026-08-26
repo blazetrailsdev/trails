@@ -25,6 +25,10 @@ import {
 import { Temporal } from "@blazetrails/date";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";
+// Ruby `Object#to_s`, the coercion mysql/quoting.rb:51 applies to the raw name:
+// `nil.to_s` is "" and `Array#to_s` is inspect-style, neither of which
+// `String(x)` gives.
+import { toS } from "@blazetrails/activesupport";
 
 // Rails MySQL overrides unquoted_true/false (1/0) but NOT quoted_true/false,
 // which inherit the abstract "TRUE"/"FALSE" (mysql/quoting.rb).
@@ -41,8 +45,8 @@ export function unquotedFalse(): number {
  * (mysql/quoting.rb:11-12) — the `Concurrent::Map`s the class-side quoters memoize
  * through. Keyed on the name exactly as passed, as in Ruby (mysql/quoting.rb:46-52).
  */
-const QUOTED_COLUMN_NAMES = new Map<string, string>();
-const QUOTED_TABLE_NAMES = new Map<string, string>();
+const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
+const QUOTED_TABLE_NAMES = new Map<unknown, string>();
 
 /**
  * Mirrors: MySQL::Quoting#quote_table_name —
@@ -50,19 +54,19 @@ const QUOTED_TABLE_NAMES = new Map<string, string>();
  * backticks with `.` rewritten as `` `.` `` so `foo.bar` → `` `foo`.`bar` ``
  * (mysql/quoting.rb:41-43).
  */
-export function quoteTableName(name: string): string {
+export function quoteTableName(name: unknown): string {
   let quoted = QUOTED_TABLE_NAMES.get(name);
   if (quoted === undefined) {
-    quoted = `\`${name.replace(/`/g, "``").replace(/\./g, "`.`")}\``;
+    quoted = `\`${toS(name).replace(/`/g, "``").replace(/\./g, "`.`")}\``;
     QUOTED_TABLE_NAMES.set(name, quoted);
   }
   return quoted;
 }
 
-export function quoteColumnName(name: string): string {
+export function quoteColumnName(name: unknown): string {
   let quoted = QUOTED_COLUMN_NAMES.get(name);
   if (quoted === undefined) {
-    quoted = `\`${name.replace(/`/g, "``")}\``;
+    quoted = `\`${toS(name).replace(/`/g, "``")}\``;
     QUOTED_COLUMN_NAMES.set(name, quoted);
   }
   return quoted;

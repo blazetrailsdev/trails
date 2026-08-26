@@ -18,10 +18,13 @@
  * which is why this declares no surface of its own.
  */
 export interface ArelConnection {
+  // Ruby's adapters take the raw name and apply `to_s` themselves
+  // (sqlite3/quoting.rb:48, mysql/quoting.rb:51, postgresql/quoting.rb:47,59),
+  // so the visitor hands over whatever `Attribute#name` / `Table#name` holds.
   /** @internal */
-  quoteTableName(name: string): string;
+  quoteTableName(name: unknown): string;
   /** @internal */
-  quoteColumnName(name: string): string;
+  quoteColumnName(name: unknown): string;
   /** @internal */
   quoteString(s: string): string;
   /** @internal */

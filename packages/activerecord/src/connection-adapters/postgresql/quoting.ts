@@ -28,7 +28,11 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
 import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
-import { Visitors as ArelVisitors } from "@blazetrails/arel";
+import { Utils } from "./utils.js";
+// Ruby `Object#to_s`, the coercion postgresql/quoting.rb:47,59 applies to the raw name:
+// `nil.to_s` is "" and `Array#to_s` is inspect-style, neither of which
+// `String(x)` gives.
+import { toS } from "@blazetrails/activesupport";
 
 // Rails inherits from StandardError — use plain Error in TS for
 // parity. JS's `RangeError` is a built-in that extends Error; it
@@ -82,29 +86,26 @@ export interface CastTypeLookup {
  * (postgresql/quoting.rb:9-10) — the `Concurrent::Map`s the class-side quoters memoize
  * through. Keyed on the name exactly as passed, as in Ruby (postgresql/quoting.rb:46-56).
  */
-const QUOTED_COLUMN_NAMES = new Map<string, string>();
-const QUOTED_TABLE_NAMES = new Map<string, string>();
+const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
+const QUOTED_TABLE_NAMES = new Map<unknown, string>();
 
 /**
- * @missingRailsCall extract_schema_qualified_name — PERMANENT: Per-site verified
- *   (RFC 0106 wave 4b): postgresql/quoting.rb's `quote_table_name` memoizes
- *   `Utils.extract_schema_qualified_name(name.to_s).quoted`; trails'
- *   quoteTableName splits and quotes the schema/table pair inline — the
- *   Utils::Name object it would allocate is used for nothing else on this path.
+ * Mirrors: PostgreSQL::Quoting#quote_table_name (postgresql/quoting.rb:58-60) —
+ * `QUOTED_TABLE_NAMES[name] ||= Utils.extract_schema_qualified_name(name.to_s).quoted`.
  */
-export function quoteTableName(name: string): string {
+export function quoteTableName(name: unknown): string {
   let quoted = QUOTED_TABLE_NAMES.get(name);
   if (quoted === undefined) {
-    quoted = ArelVisitors.quoteSchemaQualifiedName(name);
+    quoted = Utils.extractSchemaQualifiedName(toS(name)).quoted();
     QUOTED_TABLE_NAMES.set(name, quoted);
   }
   return quoted;
 }
 
-export function quoteColumnName(name: string): string {
+export function quoteColumnName(name: unknown): string {
   let quoted = QUOTED_COLUMN_NAMES.get(name);
   if (quoted === undefined) {
-    quoted = `"${name.replace(/"/g, '""')}"`;
+    quoted = `"${toS(name).replace(/"/g, '""')}"`;
     QUOTED_COLUMN_NAMES.set(name, quoted);
   }
   return quoted;

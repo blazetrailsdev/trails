@@ -37,8 +37,9 @@ export interface RelationLike {
   // `Table#tableAlias` is a plain string-or-nil. Both flow through here as
   // `o.relation.table_alias`.
   tableAlias?: string | SqlLiteral | null;
-  typeCastForDatabase: (attrName: string | Node, value: unknown) => unknown;
-  typeForAttribute: (name: string | Node) => unknown;
+  // Ruby passes `name` through untouched, nil included (attribute.rb:12,23).
+  typeCastForDatabase: (attrName: string | Node | null, value: unknown) => unknown;
+  typeForAttribute: (name: string | Node | null) => unknown;
   isAbleToTypeCast: () => boolean;
   lower: (column: unknown) => NamedFunction;
 }
@@ -48,15 +49,17 @@ export class Attribute extends Node {
   readonly relation: RelationLike;
   // Rails stores whatever `Table#[]` was handed (table.rb:81-85), so
   // `table[Arel.star]` seats a `SqlLiteral` here and `quote_column_name`
-  // passes it through unquoted (to_sql.rb:877-880).
-  readonly name: string | Node;
+  // passes it through unquoted (to_sql.rb:877-880) — and `table[nil]`, which
+  // `Relation#delete_all` builds for a pkless model (relation.rb:1027-1031),
+  // seats nil.
+  readonly name: string | Node | null;
 
   // Rails' `Attribute.new(nil, nil)` is legal (attribute_test.rb:388); the
   // relation-dependent methods below simply raise NoMethodError if reached.
   constructor(relation: RelationLike | null, name: string | Node | null) {
     super();
     this.relation = relation as RelationLike;
-    this.name = name as string | Node;
+    this.name = name;
   }
 
   get typeCaster(): unknown {

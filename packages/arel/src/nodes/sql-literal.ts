@@ -32,6 +32,22 @@ export class SqlLiteral extends Node {
     return undefined;
   }
 
+  /**
+   * `Arel::Nodes::SqlLiteral < String` (sql_literal.rb:5), so equality is
+   * `String#==` on the SQL text: `retryable` (sql_literal.rb:11) plays no part,
+   * and a literal is `==` to a bare String carrying the same text. `Node#eql`
+   * would compare serialized fields and match neither.
+   *
+   * @noRailsEquivalent PERMANENT: the same shortcoming `isBlank` below records —
+   * `==` / `eql?` arrive by inheritance from String, so no `sql_literal.rb`
+   * method declares them, and TypeScript cannot subclass the string primitive.
+   * No amount of porting removes this name.
+   */
+  override eql(other: unknown): boolean {
+    if (typeof other === "string") return this.value === other;
+    return other instanceof SqlLiteral && this.value === other.value;
+  }
+
   /** Mirrors: `encode_with(coder)` (sql_literal.rb:18-20). */
   encodeWith(coder: { scalar: string }): void {
     coder.scalar = this.toString();
