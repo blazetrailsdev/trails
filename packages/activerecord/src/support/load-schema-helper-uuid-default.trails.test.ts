@@ -57,9 +57,9 @@ describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
                   name: string,
                   options: Record<string, unknown>,
                   definer: (t: unknown) => void,
-                ): unknown;
+                ): Promise<unknown>;
               };
-              const td = builder.buildCreateTableDefinition(
+              const td = await builder.buildCreateTableDefinition(
                 name,
                 { ...options, force: false },
                 definer,
