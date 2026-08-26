@@ -105,7 +105,7 @@ jobs:
           fi
           # Gate rationale: scripts/ci-suite-coverage.test.ts ("Gate reference").
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
-          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references)(\.test)?\.ts$)'
+          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
           AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activemodel|activesupport|globalid|date|did-you-mean|trails-tsc)/'
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|date|did-you-mean)/'
@@ -475,6 +475,23 @@ jobs:
           fi
           echo "No new or modified docs/activerecord trackers."
 
+      # Closing-story citations. `stale-story-references` judges a landed
+      # story's citations, but a story lands only after the merge — so a PR that
+      # closes a story is blind to the check that reds main seconds later
+      # (#7083, #5976). Gate it here instead: a PR declaring `Closes-story: <id>`
+      # must carry no pending citation of `<id>`. Same scan, same extractor, so
+      # a finding is a guaranteed red on main.
+      - name: Set up pnpm (closing-story citations)
+        # !cancelled() as above, so an earlier step's failure can't skip it.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        uses: ./.github/actions/setup-pnpm
+      - name: Closing-story citations
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm check:closing-story-refs --pr "$PR_NUMBER"
+
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
@@ -631,6 +648,7 @@ jobs:
           scripts/mixin-declaration-drift.test.ts
           scripts/mysql-grant-namespaces.test.ts
           scripts/stale-story-references.test.ts
+          scripts/closing-story-references.test.ts
           scripts/non-transactional-row-writes.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts

@@ -223,7 +223,7 @@ describe("MigrationContext connected surface", () => {
   });
 
   it("currentEnvironment answers the resolved default env", () => {
-    expect(context.currentEnvironment).toBe(DatabaseConfigurations.currentEnv());
+    expect(context.currentEnvironment).toBe(DatabaseConfigurations.defaultEnv);
   });
 
   it("lastStoredEnvironment is null until a version has been recorded", async () => {

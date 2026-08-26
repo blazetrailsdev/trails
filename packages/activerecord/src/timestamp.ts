@@ -186,14 +186,11 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
     }
   }
 
+  // `c.update(um, "#{self} Update")` (persistence.rb:277-279) — touch routes
+  // through `_update_record`, so it reaches the public statement method
+  // `dirties_query_cache` is wired on (query_cache.rb:13-15).
   const adapter = ctor.connection as any;
-  let affected: number;
-  if (typeof adapter.update === "function") {
-    affected = await adapter.update(um);
-  } else {
-    const sql = adapter.toSql(um);
-    affected = await ctor.connection.execUpdate(sql, `${ctor.name} Touch`);
-  }
+  const affected: number = await adapter.update(um, `${ctor.name} Touch`);
   if (ctor.lockingEnabled && affected === 0) {
     // Mirrors Rails _update_row rescue Exception: restore the attribute snapshot so
     // the in-memory record is not left with an incorrect lock_version after a stale touch.

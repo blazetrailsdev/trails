@@ -35,7 +35,7 @@ export async function dbCreate(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   const configs = all
     ? DatabaseTasks.eachLocalConfiguration()
     : DatabaseTasks.configsFor({ envName: env });
@@ -59,7 +59,7 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   const configs = all
     ? DatabaseTasks.eachLocalConfiguration()
     : DatabaseTasks.configsFor({ envName: env });
@@ -153,7 +153,7 @@ export async function dbSchemaLoad(cwd: string, _args: string[]): Promise<number
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   try {
     await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     await DatabaseTasks.loadSchemaCurrent(undefined, undefined, env);
@@ -172,7 +172,7 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   if (DatabaseTasks.configsFor({ envName: env }).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -250,7 +250,7 @@ export async function dbSetup(cwd: string, _args: string[]): Promise<number> {
   await tryLoadModels(cwd);
   installSeedLoader(cwd);
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   const configs = DatabaseTasks.configsFor({ envName: env });
   if (configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
@@ -293,7 +293,7 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   if (DatabaseTasks.configsFor({ envName: env }).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -323,7 +323,7 @@ export async function dbVersion(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])
     : DatabaseTasks.configsFor({ envName: env });
@@ -364,7 +364,7 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
   }
   await tryLoadModels(cwd);
 
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
 
   // Rails: `with_temporary_pool_for_each` (no name) iterates all configs for the env.
   // --all extends this to every configured env/database, through `configs_for`

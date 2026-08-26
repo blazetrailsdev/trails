@@ -35,7 +35,7 @@ describe("ConnectionHandlerTest", () => {
 
   it("default env fall back to default env when rails env or rack env is empty string", async () => {
     DatabaseConfigurations.defaultEnv = "";
-    expect(DatabaseConfigurations.defaultEnv).toBe("default");
+    expect(DatabaseConfigurations.defaultEnv).toBe("default_env");
     DatabaseConfigurations.defaultEnv = "development";
     expect(DatabaseConfigurations.defaultEnv).toBe("development");
   });

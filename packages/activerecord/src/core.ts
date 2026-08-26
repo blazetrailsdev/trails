@@ -522,12 +522,12 @@ export function configurations(
   config?: RawConfigurations | DatabaseConfigurations | DatabaseConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {
+    // `@@configurations = ActiveRecord::DatabaseConfigurations.new(config)`
+    // (core.rb:71-73). Rails' `new` also passes an existing
+    // `DatabaseConfigurations` straight through (`build_configs` returns it
+    // untouched); TS types the arms apart.
     setConfigurationsStore(
-      config instanceof DatabaseConfigurations
-        ? config
-        : Array.isArray(config)
-          ? new DatabaseConfigurations(config)
-          : DatabaseConfigurations.fromEnv(config),
+      config instanceof DatabaseConfigurations ? config : new DatabaseConfigurations(config),
     );
   }
   return configurationsStore();

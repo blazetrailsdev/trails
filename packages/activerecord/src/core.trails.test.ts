@@ -165,7 +165,7 @@ describe("configurations is a single process-global registry", () => {
 
     class OverridingModel extends Base {
       static configurations(): DatabaseConfigurations {
-        return DatabaseConfigurations.fromEnv({
+        return new DatabaseConfigurations({
           global_registry_env: { primary: { adapter: "sqlite3", database: "db/hijacked.sqlite3" } },
         });
       }

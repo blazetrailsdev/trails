@@ -21,10 +21,7 @@ function installConfig(
   raw: Record<string, { adapter: string; database: string }>,
   root: string,
 ): void {
-  DatabaseTasks.databaseConfiguration = normalizeSqlitePaths(
-    DatabaseConfigurations.fromEnv(raw),
-    root,
-  );
+  DatabaseTasks.databaseConfiguration = normalizeSqlitePaths(new DatabaseConfigurations(raw), root);
   DatabaseTasks.root = root;
 }
 
@@ -57,7 +54,7 @@ describe("ArEnvironmentTest", () => {
 
   function normalizeUrl(url: string): DatabaseConfig | null {
     DatabaseTasks.databaseConfiguration = normalizeSqlitePaths(
-      DatabaseConfigurations.fromEnv({ test: { adapter: "sqlite3", url } }),
+      new DatabaseConfigurations({ test: { adapter: "sqlite3", url } }),
       "/project",
     );
     return environmentDbConfig("test");

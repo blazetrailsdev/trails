@@ -3388,8 +3388,10 @@ export class Base extends Model {
         // `.connection` getter (see `_createRecord` in persistence.ts); resolved here, at the
         // actual DELETE, so a connectionless model never touches `.connection`.
         const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
-        const [deleteSql, deleteBinds] = adapter.toSqlAndBinds(dm);
-        const affected = await adapter.execDelete(deleteSql, `${ctor.name} Destroy`, deleteBinds);
+        // `c.delete(dm, "#{self} Destroy")` (persistence.rb:294-296) — the
+        // public statement method, which is where `dirties_query_cache` is
+        // wired (query_cache.rb:13-15).
+        const affected = await adapter.delete(dm, `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");
         }

@@ -50,13 +50,13 @@ function resolveConfig(
   config: RawConfigurations,
   envName: string = DEFAULT_ENV,
 ): Record<string, unknown> | null {
-  const configs = DatabaseConfigurations.fromRaw(config);
-  const found = configs.configsFor({ envName, name: "primary" })[0];
+  const configs = new DatabaseConfigurations(config);
+  const found = configs.configsFor({ envName, name: "primary" });
   return found?.configurationHash ?? null;
 }
 
 function resolveDbConfig(spec: string, config: RawConfigurations) {
-  const configs = DatabaseConfigurations.fromRaw(config);
+  const configs = new DatabaseConfigurations(config);
   return configs.resolve(spec);
 }
 
@@ -360,12 +360,12 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
       },
     };
 
-    let configs = DatabaseConfigurations.fromRaw(config);
-    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0].configurationHash;
+    let configs = new DatabaseConfigurations(config);
+    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })!.configurationHash;
     expect(actual).toEqual({ adapter: "postgresql", database: "foo", host: "localhost", pool: 5 });
 
-    configs = DatabaseConfigurations.fromRaw(config);
-    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0].configurationHash;
+    configs = new DatabaseConfigurations(config);
+    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })!.configurationHash;
     expect(actual).toEqual({ adapter: "abstract", pool: 5 });
   });
 
@@ -381,12 +381,12 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
       },
     };
 
-    let configs = DatabaseConfigurations.fromRaw(config);
-    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0].configurationHash;
+    let configs = new DatabaseConfigurations(config);
+    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })!.configurationHash;
     expect(actual.database).toBe("primary");
 
-    configs = DatabaseConfigurations.fromRaw(config);
-    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0].configurationHash;
+    configs = new DatabaseConfigurations(config);
+    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })!.configurationHash;
     expect(actual.database).toBe("animals");
   });
 

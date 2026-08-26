@@ -627,8 +627,7 @@ interface DeleteRecord {
       constraints: Record<string, unknown>,
     ): Parameters<DeleteManager["where"]>[0];
     connection: {
-      execDelete(sql: string, name: string): Promise<number>;
-      toSql(arel: unknown): string;
+      delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
     };
   };
 }
@@ -651,11 +650,13 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
     const dm = new DeleteManager()
       .from(ctor.arelTable)
       .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
-    // The SQL is arel-built via `connection.toSql(dm)`; the "Delete" string is
-    // the operation-name label (Rails' log subscriber name), not raw SQL.
+    // `c.delete(dm, "#{self} Destroy")` (persistence.rb:294-296) — the public
+    // statement method, which is where `dirties_query_cache` is wired
+    // (query_cache.rb:13-15). "Delete" is the operation-name label (Rails' log
+    // subscriber name), not raw SQL.
     const adapter =
       threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) ?? ctor.connection;
-    await adapter.execDelete(adapter.toSql(dm), "Delete");
+    await adapter.delete(dm, "Delete");
   }
   this._destroyed = true;
   this._previouslyNewRecord = false;
@@ -948,8 +949,7 @@ interface UpdateColumnsRecord {
     };
     _buildPkWhereNode(id: unknown): Parameters<UpdateManager["where"]>[0];
     connection: {
-      execUpdate(sql: string, name?: string, binds?: unknown[]): Promise<number>;
-      update?(arel: InstanceType<typeof UpdateManager>): Promise<number>;
+      update(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
       quote?(value: unknown): string;
       quoteColumnName?(name: string): string;
       quoteTableName?(name: string): string;
@@ -1099,15 +1099,9 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     (threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) as
       | typeof ctor.connection
       | null) ?? ctor.connection;
-  let affectedRows: number;
-  if (typeof adapter.update === "function") {
-    affectedRows = await adapter.update(um);
-  } else {
-    const sql = adapter.toSql(um);
-    // The SQL is arel-built via `adapter.toSql(um)`; the "Update Columns" string
-    // is the operation-name label (Rails' log subscriber name), not raw SQL.
-    affectedRows = await adapter.execUpdate(sql, "Update Columns");
-  }
+  // `c.update(um, "#{self} Update")` (persistence.rb:277-279) — the public
+  // statement method `dirties_query_cache` is wired on (query_cache.rb:13-15).
+  const affectedRows = await adapter.update(um, "Update Columns");
 
   // Rails clears the change only for the updated columns (`clear_attribute_change(k)`),
   // leaving any other pending in-memory changes dirty — not a whole-record
@@ -1381,7 +1375,7 @@ interface PersistencePrivateHost {
     defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
     readonlyAttributeQ?(name: string): boolean;
     withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
-    connection: { execDelete(sql: string, name: string): Promise<number> };
+    connection: { delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number> };
   };
 }
 

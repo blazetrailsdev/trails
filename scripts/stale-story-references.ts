@@ -35,7 +35,10 @@ const FROZEN_MARKDOWN_TREES = [path.join("docs", "activerecord")];
 
 // Its test states a stale promise verbatim as a fixture, and the line-based
 // scan reads that template literal as a real comment.
-const SKIP_FILES = new Set([path.join("scripts", "stale-story-references.test.ts")]);
+const SKIP_FILES = new Set([
+  path.join("scripts", "stale-story-references.test.ts"),
+  path.join("scripts", "closing-story-references.test.ts"),
+]);
 
 export interface StoryReference {
   file: string;

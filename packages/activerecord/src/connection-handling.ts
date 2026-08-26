@@ -693,14 +693,16 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
 /**
  * Mirrors: ActiveRecord::ConnectionHandling::DEFAULT_ENV
  * (connection_handling.rb:7) — `-> { RAILS_ENV.call || "default_env" }`.
- * `DatabaseConfigurations.currentEnv()` is trails' `RAILS_ENV` chain plus that
+ * `DatabaseConfigurations.defaultEnv` is trails' `RAILS_ENV` chain plus that
  * literal fallback; the three other Rails `DEFAULT_ENV.call` sites
  * (`database_configurations.rb:188`, `database_config.rb:91`,
- * `migration.rb:1341`) still reach it through `currentEnv()` because a static
+ * `migration.rb:1341`) still reach it through `defaultEnv` because a static
  * import edge from those modules back into this one would close a module-eval
- * cycle.
+ * cycle. Rails runs the delegation the other way — `default_env` is
+ * `DEFAULT_ENV.call.to_s` (`database_configurations.rb:188-190`) — so the
+ * resolution body lives at `defaultEnv` and this lambda delegates to it.
  */
-export const DEFAULT_ENV = (): string => DatabaseConfigurations.currentEnv();
+export const DEFAULT_ENV = (): string => DatabaseConfigurations.defaultEnv;
 
 /**
  * @missingRailsCall call — PERMANENT: Rails defaults the argument through
@@ -887,7 +889,7 @@ async function establishWithConfig(
   // discrete fields (database/host/port/...) rather than the verbatim string.
   // This matches the resolver path (database-configurations.ts:246) and the
   // "url removed from hash" parity test.
-  const env = DatabaseConfigurations.currentEnv();
+  const env = DatabaseConfigurations.defaultEnv;
   let dbConfig: DatabaseConfig;
   if (dbConfigOverride) {
     dbConfig = dbConfigOverride;

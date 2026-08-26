@@ -409,29 +409,47 @@ describe("PostgreSQLAdapter#execInsert query cache", () => {
     if (adapter) await adapter.close().catch(() => undefined);
   });
 
-  // The multi-column RETURNING read-back runs through internalExecQuery, not
-  // executeMutation, so only `dirtiesQueryCache(PostgreSQLAdapter, "execInsert")`
-  // clears the cache on that path — matching MySQL/SQLite. Rails dirties the
-  // query cache on every write; without the execInsert registration a cached
-  // SELECT after such an INSERT would be served stale.
-  it("clears the query cache on a multi-column RETURNING insert", async () => {
+  function adapterWithPrimedCache(useInsertReturning: boolean): Store {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
     const qc = new Store();
     qc.enabled = true;
     qc.dirties = true;
+    (adapter as unknown as { _queryCache: Store })._queryCache = qc;
+    (adapter as unknown as { _useInsertReturning: boolean })._useInsertReturning =
+      useInsertReturning;
+    return qc;
+  }
+
+  // Rails wires `dirties_query_cache` on the PUBLIC `insert`/`create`
+  // (query_cache.rb:13-15), which sits above both arms of PostgreSQL's
+  // `exec_insert` override (postgresql/database_statements.rb:46-59). The
+  // wrapper clears before delegating; the delegated read-back has no live
+  // connection and rejects, but the cache is already cleared by then.
+  it("clears the query cache on a multi-column RETURNING insert", async () => {
+    const qc = adapterWithPrimedCache(true);
     await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);
     expect(qc.empty).toBe(false);
-    (adapter as unknown as { _queryCache: Store })._queryCache = qc;
-    (adapter as unknown as { _useInsertReturning: boolean })._useInsertReturning = true;
 
-    // The dirtiesQueryCache wrapper clears before delegating to the original
-    // execInsert; the delegated read-back has no live connection and rejects,
-    // but the cache is already cleared by then.
     await adapter
-      .execInsert("INSERT INTO posts (title) VALUES ('t')", "SQL", [], "id", null, [
-        "id",
-        "created_at",
-      ])
+      .insert("INSERT INTO posts (title) VALUES ('t')", "SQL", "id", undefined, null, [], {
+        returning: ["id", "created_at"],
+      })
+      .catch(() => undefined);
+
+    expect(qc.empty).toBe(true);
+  });
+
+  // The `use_insert_returning? == false` arm calls `internal_exec_query`
+  // directly (postgresql/database_statements.rb:48-59) and never reaches
+  // `AbstractAdapter#exec_insert`, so wiring the clear on `exec_insert` leaves
+  // this arm uncleared. Rails clears on `insert`, above both arms.
+  it("clears the query cache on a non-returning insert", async () => {
+    const qc = adapterWithPrimedCache(false);
+    await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);
+    expect(qc.empty).toBe(false);
+
+    await adapter
+      .insert("INSERT INTO posts (title) VALUES ('t')", "SQL", "id", undefined, "posts_id_seq", [])
       .catch(() => undefined);
 
     expect(qc.empty).toBe(true);

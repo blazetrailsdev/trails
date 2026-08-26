@@ -95,7 +95,7 @@ export class DatabaseTasks {
   }
 
   static set databaseConfiguration(value: DatabaseConfigurations | null) {
-    setConfigurationsStore(value ?? DatabaseConfigurations.fromEnv({}));
+    setConfigurationsStore(value ?? new DatabaseConfigurations({}));
   }
 
   static dbDir: string = "db";
@@ -458,9 +458,11 @@ export class DatabaseTasks {
     envName: string = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
+    // `db_config = configs_for(env_name: env_name, name: db_name); charset(db_config)`
+    // (database_tasks.rb:327-330) — a single config passes straight through.
     const dbConfig = this.configsFor({ envName, name: dbName });
-    if (dbConfig.length === 0) return null;
-    return this.charset(dbConfig[0]);
+    if (!dbConfig) return null;
+    return this.charset(dbConfig);
   }
 
   /**
@@ -486,9 +488,11 @@ export class DatabaseTasks {
     envName: string = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
+    // `db_config = configs_for(env_name: env_name, name: db_name); collation(db_config)`
+    // (database_tasks.rb:337-340).
     const dbConfig = this.configsFor({ envName, name: dbName });
-    if (dbConfig.length === 0) return null;
-    return this.collation(dbConfig[0]);
+    if (!dbConfig) return null;
+    return this.collation(dbConfig);
   }
 
   /**
@@ -574,11 +578,25 @@ export class DatabaseTasks {
   }
 
   /** @internal */
+  static configsFor(options: {
+    envName?: string;
+    name: string;
+    includeHidden?: boolean;
+  }): DatabaseConfig | undefined;
+  /** @internal */
+  static configsFor(options?: {
+    envName?: string;
+    name?: undefined;
+    includeHidden?: boolean;
+  }): DatabaseConfig[];
+  /** @internal */
   static configsFor(
     options: { envName?: string; name?: string; includeHidden?: boolean } = {},
-  ): DatabaseConfig[] {
+  ): DatabaseConfig[] | DatabaseConfig | undefined {
     // database_tasks.rb:551-553 — `Base.configurations.configs_for(**options)`.
-    return baseClass().configurations().configsFor(options);
+    return baseClass()
+      .configurations()
+      .configsFor(options as { name: string });
   }
 
   /**
@@ -637,22 +655,18 @@ export class DatabaseTasks {
     dbConfig: DatabaseConfig,
     options?: { schemaCachePath?: string },
   ): string {
-    const explicit = options?.schemaCachePath;
-    if (explicit) return explicit;
-
-    const configPath =
-      typeof (dbConfig as any).schemaCachePath === "function"
-        ? (dbConfig as any).schemaCachePath()
-        : (dbConfig as any).schemaCachePath;
-    if (configPath) return configPath;
-
-    const configDefault =
-      typeof (dbConfig as any).defaultSchemaCachePath === "function"
-        ? (dbConfig as any).defaultSchemaCachePath(this.dbDir)
-        : null;
-    if (configDefault) return configDefault;
-
-    return `${this.dbDir}/schema_cache.json`;
+    // `schema_cache_path || db_config.schema_cache_path ||
+    //  db_config.default_schema_cache_path(DatabaseTasks.db_dir)`
+    // (database_tasks.rb:468-471). `default_schema_cache_path` is defined on
+    // `HashConfig` (hash_config.rb:117-123), not on the abstract
+    // `DatabaseConfig` (database_config.rb:95 declares only
+    // `schema_cache_path`), so the receiver is narrowed the same way
+    // `DatabaseTasks.forEach` narrows it for the identical Ruby call.
+    return (
+      options?.schemaCachePath ||
+      dbConfig.schemaCachePath ||
+      (dbConfig as HashConfig).defaultSchemaCachePath(this.dbDir)
+    );
   }
 
   /**
@@ -1220,9 +1234,11 @@ export class DatabaseTasks {
   ): Promise<void> {
     env = this._normalizeEnv(env);
     if (name != null) {
-      const dbConfig = this.migrationClass().configurations().configsFor({ envName: env, name })[0];
+      const dbConfig = this.migrationClass().configurations().configsFor({ envName: env, name });
       if (dbConfig) await this.withTemporaryPool(dbConfig, block, { clobber });
     } else {
+      // `configs_for(env_name: env, name: name)` — `name` is nil in this arm,
+      // which is the array arm of `configs_for`.
       for (const dbConfig of this.migrationClass()
         .configurations()
         .configsFor({ envName: env, name })) {
