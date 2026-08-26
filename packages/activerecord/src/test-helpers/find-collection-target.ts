@@ -15,10 +15,10 @@ import { camelize, singularize } from "@blazetrails/activesupport";
  * inverse wiring the load must not disturb) while the load runs on a holder
  * built fresh, which is what these tests want when they drive the loader
  * directly. A `name` the owner never declared has no such holder, so the gate
- * is read off the fresh one instead — its ad hoc reflection resolves `klass`
- * from `className` the way the loaders do (`resolveAssocClass`,
- * `associations.ts`), so `find_target?`'s trailing `&& klass`
- * (`association.rb:320-321`) is answerable there too rather than being skipped.
+ * is read off the fresh one instead: its reflection resolves `klass` from
+ * `className` the way the loaders do (`resolveAssocClass`, `associations.ts`),
+ * so `find_target?`'s trailing `&& klass` (`association.rb:320-321`) is
+ * answerable on every path rather than skipped for that shape.
  *
  * Test-only sugar: every call site would otherwise repeat the same cast.
  * `async` so `check_validity!` — run when
@@ -46,21 +46,12 @@ export async function findCollectionTarget(
   } else if (scope !== null) {
     options = scope;
   }
-  const declared = (
-    record.constructor as unknown as {
-      _reflectOnAssociation?: (n: string) => unknown;
-    }
-  )._reflectOnAssociation?.(name);
   const assoc = _buildAssociationInstance.call(record, {
     name,
     type: "hasMany",
     scope: positionalScope,
     options,
-    ...(declared
-      ? {}
-      : {
-          klass: resolveAssocClass(record, name, options.className ?? camelize(singularize(name))),
-        }),
+    klass: resolveAssocClass(record, name, options.className ?? camelize(singularize(name))),
   } as never);
   const holder =
     (
