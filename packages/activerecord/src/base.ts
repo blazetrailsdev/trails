@@ -152,6 +152,7 @@ import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesup
 import {
   getVerboseQueryLogs as _getVerboseQueryLogs,
   setVerboseQueryLogs as _setVerboseQueryLogs,
+  setBaseResolver as _setBaseResolverWithLogSubscriber,
 } from "./log-subscriber.js";
 import { registerMigrationArConfig } from "./migration/ar-config-source.js";
 import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
@@ -5087,3 +5088,4 @@ _registerBaseWithNamedScoping(Base);
 _registerBaseWithConnectionHandler(Base);
 _registerBaseWithAsynchronousQueriesTracker(Base);
 _registerBaseWithDatabaseStatements(Base);
+_setBaseResolverWithLogSubscriber(() => Base);

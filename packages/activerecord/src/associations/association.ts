@@ -182,41 +182,16 @@ export class Association {
     this.reflection = _richReflectionFor(owner, reflection);
     this.disableJoins = this.reflection.options.disableJoins || false;
 
-    // Rails' `check_validity! → klass → compute_class` raises NameError
-    // synchronously in the constructor, so `record.association(:name)` itself
-    // throws rather than `load_target`. Mirrors association.rb:41-42. This runs
-    // first because in Rails the *first* `klass` access inside `check_validity!`
-    // is what raises NameError for an unknown class — our reflection-level
-    // validity checks reach `klass` too but surface a less specific error, so
-    // resolve the class (and raise the faithful NameError) up front.
-    this.checkKlass();
     // Rails' `Association#initialize` runs `reflection.check_validity!`
     // for EVERY macro (association.rb:39), so every Rails-named
     // misconfiguration surfaces at first use: missing/recursive inverse-of,
     // composite-PK/FK length mismatch, polymorphic-through, missing source,
     // source-type shape, has-one-through-collection, and out-of-order
-    // declaration. Delegates to the reflection's `checkValidityBang` (the
-    // macro-specific override) via a memoized helper.
+    // declaration — as does the NameError `check_validity!`'s own
+    // `klass` access raises for an unknown class (reflection.rb:620).
+    // Delegates to the reflection's `checkValidityBang` (the macro-specific
+    // override) via a memoized helper.
     validateReflectionValidity(owner.constructor as typeof Base, reflection.name);
-  }
-
-  /**
-   * Resolve the target class name eagerly — mirrors the Rails path
-   * `check_validity!` (association.rb:42) → `klass` → `compute_class`
-   * (reflection.rb). Called from the constructor so `record.association(:name)`
-   * raises synchronously for unknown classes. Skipped for polymorphic, through,
-   * and anonymous-class associations (HABTM join model side).
-   */
-  protected checkKlass(): typeof Base | undefined {
-    const opts = this.reflection.options as AssociationOptions & { anonymousClass?: unknown };
-    if (opts.polymorphic || opts.through || opts.anonymousClass) return undefined;
-    // One derivation, on the reflection: `klass` is `reflection.klass`
-    // (association.rb:36-38), whose `compute_class` raises the faithful
-    // NameError for an unknown class and the ArgumentError for a constant that
-    // is not an ActiveRecord::Base subclass (reflection.rb:495-508). Both
-    // propagate, exactly as they do out of Rails' `check_validity!`. Returned
-    // rather than discarded only so the resolve is a statement TS accepts.
-    return this.klass;
   }
 
   get name(): string {

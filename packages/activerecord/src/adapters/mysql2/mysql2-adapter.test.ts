@@ -39,6 +39,8 @@ import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-a
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
+import { Base } from "../../base.js";
+import { Logger } from "@blazetrails/activesupport";
 import * as Arel from "@blazetrails/arel";
 
 describeIfMysqlAdapter("Mysql2AdapterTest", () => {
@@ -360,6 +362,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     // up front and restore it in `finally` (mirrors Rails' ensure): session
     // variables are NOT transactional, so rollback() would otherwise leak the
     // weakened sql_mode onto the pooled connection.
+    const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
     await adapter.beginTransaction();
@@ -369,8 +372,8 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       );
       await adapter.executeMutation(`SET SESSION sql_mode=''`);
       await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
-      vi.spyOn(console, "warn").mockImplementation(() => {});
       await withDbWarningsAction("log", async () => {
+        Base.logger = new Logger(null);
         const affected = await adapter.executeMutation(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );
@@ -380,12 +383,14 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      Base.logger = previousLogger;
     }
   });
 
   it("warnings do not change returned value of exec delete", async () => {
     // Capture/restore sql_mode (mirrors Rails' ensure) — session variables are
     // not transactional, so rollback() does not revert SET SESSION.
+    const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);
     await adapter.beginTransaction();
@@ -395,8 +400,8 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       );
       await adapter.executeMutation(`SET SESSION sql_mode=''`);
       await adapter.executeMutation(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
-      vi.spyOn(console, "warn").mockImplementation(() => {});
       await withDbWarningsAction("log", async () => {
+        Base.logger = new Logger(null);
         const affected = await adapter.executeMutation(
           `DELETE FROM warn_posts_d WHERE id > (0+'foo') LIMIT 1`,
         );
@@ -406,6 +411,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
+      Base.logger = previousLogger;
     }
   });
 });

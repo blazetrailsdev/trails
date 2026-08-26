@@ -9,6 +9,7 @@ import {
   withDbWarningsAction,
 } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
+import { Base } from "../../base.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -48,11 +49,16 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action :log on warning", async () => {
       await withDbWarningsAction("log", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-        await adapter.execute(`SELECT 1 + 'foo'`);
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining(`[ActiveRecord::SQLWarning] Truncated incorrect DOUBLE value`),
-        );
+        const mysqlWarning = `[ActiveRecord::SQLWarning] Truncated incorrect DOUBLE value: 'foo' (1292)`;
+        const logger = { warn: vi.fn() };
+        const previousLogger = Base.logger;
+        Base.logger = logger as never;
+        try {
+          await adapter.execute(`SELECT 1 + 'foo'`);
+          expect(logger.warn).toHaveBeenCalledWith(mysqlWarning);
+        } finally {
+          Base.logger = previousLogger;
+        }
       });
     });
 
