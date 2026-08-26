@@ -53,11 +53,6 @@ export class Cube extends Unary {}
 export class RollUp extends Unary {}
 export class GroupingSet extends Unary {}
 
-/** @deprecated Use RollUp (Rails casing) */
-export const Rollup = RollUp;
-/** @deprecated Use RollUp (Rails casing) */
-export type Rollup = RollUp;
-
 export class Group extends Unary {}
 /**
  * Mirrors: `OptimizerHints` (unary.rb:38) — the hint list lives in the

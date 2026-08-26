@@ -2309,7 +2309,7 @@ export function buildNamedBoundSqlLiteral(
     namedBinds[key] = normalizeBoundValue.call(this, value);
   }
   try {
-    return new Nodes.BoundSqlLiteral(`(${statement})`, [], namedBinds);
+    return new Nodes.BoundSqlLiteral(`(${statement})`, null, namedBinds);
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }
@@ -2323,7 +2323,7 @@ export function buildBoundSqlLiteral(
 ): Nodes.BoundSqlLiteral {
   const positionalBinds = values.map((value) => normalizeBoundValue.call(this, value));
   try {
-    return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, {});
+    return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, null);
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }

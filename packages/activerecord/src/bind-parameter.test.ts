@@ -438,6 +438,7 @@ describe("BindParameterTest", () => {
     const arelNode = new Nodes.BoundSqlLiteral(
       `SELECT ${table}.* FROM ${table} WHERE ${pk} IN (?)`,
       [[1, 2, 3]],
+      null,
     );
     expect(conn.toSql(arelNode)).toBe(sql);
     expect((await conn.selectAll(arelNode)).length).toBe(3);

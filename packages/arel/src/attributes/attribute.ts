@@ -37,8 +37,8 @@ export interface RelationLike {
   // `Table#tableAlias` is a plain string-or-nil. Both flow through here as
   // `o.relation.table_alias`.
   tableAlias?: string | SqlLiteral | null;
-  typeCastForDatabase: (attrName: string, value: unknown) => unknown;
-  typeForAttribute: (name: string) => unknown;
+  typeCastForDatabase: (attrName: string | Node, value: unknown) => unknown;
+  typeForAttribute: (name: string | Node) => unknown;
   isAbleToTypeCast: () => boolean;
   lower: (column: unknown) => NamedFunction;
 }
@@ -60,9 +60,7 @@ export class Attribute extends Node {
   }
 
   get typeCaster(): unknown {
-    // Ruby passes `name` along untyped; only a String name ever reaches a
-    // type caster, since `table[Arel.star]` is never type-cast.
-    return this.relation.typeForAttribute(this.name as string);
+    return this.relation.typeForAttribute(this.name);
   }
 
   // Mirrors: Arel::Attributes::Attribute#lower — `relation.lower self`. The
@@ -72,7 +70,7 @@ export class Attribute extends Node {
   }
 
   typeCastForDatabase(value: unknown): unknown {
-    return this.relation.typeCastForDatabase(this.name as string, value);
+    return this.relation.typeCastForDatabase(this.name, value);
   }
 
   isAbleToTypeCast(): boolean {

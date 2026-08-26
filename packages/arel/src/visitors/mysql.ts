@@ -1,7 +1,6 @@
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { SelectManager } from "../select-manager.js";
 import { ToSql } from "./to-sql.js";
 import { sql } from "../arel.js";
 
@@ -114,27 +113,11 @@ export class MySQL extends ToSql {
   protected override visitArelNodesCte(o: Nodes.Cte, collector: SQLString): SQLString {
     // MySQL identifiers are backtick-quoted, not double-quoted, and the
     // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
-    // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte which calls
-    // `quote_table_name` (which emits backticks on the MySQL adapter).
-    // Parens: Trails stores a bare SelectStatement in Cte.relation (not a
-    // SelectManager as Rails does), so we add them explicitly. But a
-    // Grouping (SqlLiteral path) or a set-operation node (array CTE → UnionAll)
-    // visits with its own parens — skip the explicit wrap in that case.
+    // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte (mysql.rb:72-76),
+    // which calls `quote_table_name` (which emits backticks on the MySQL
+    // adapter) and lets the relation supply its own parens.
     collector.append(`${this.quoteTableName(o.name)} AS `);
-    if (
-      (o.relation as unknown) instanceof SelectManager ||
-      o.relation instanceof Nodes.Grouping ||
-      o.relation instanceof Nodes.Union ||
-      o.relation instanceof Nodes.UnionAll ||
-      o.relation instanceof Nodes.Intersect ||
-      o.relation instanceof Nodes.Except
-    ) {
-      this.visit(o.relation, collector);
-    } else {
-      collector.append("(");
-      this.visit(o.relation, collector);
-      collector.append(")");
-    }
+    this.visit(o.relation, collector);
     return collector;
   }
 

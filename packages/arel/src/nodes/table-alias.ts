@@ -16,21 +16,36 @@ import { Table } from "../table.js";
  *  which calls Rails protects. */
 interface TypeCastable {
   name?: string;
-  typeCastForDatabase(attrName: string, value: unknown): unknown;
-  typeForAttribute(name: string): unknown;
+  typeCastForDatabase(attrName: string | Node, value: unknown): unknown;
+  typeForAttribute(name: string | Node): unknown;
   isAbleToTypeCast?: () => boolean;
 }
 
 export class TableAlias extends Binary {
-  relation: Node;
-  // Rails: `SelectManager#as` stores the alias as a `Nodes::SqlLiteral` (rendered
-  // bare), while `Table#alias` stores a plain string (quoted). Accept both.
-  name: string | SqlLiteral;
-
   constructor(relation: Node, name: string | SqlLiteral) {
     super(relation, name);
-    this.relation = relation;
-    this.name = name;
+  }
+
+  // Rails: `SelectManager#as` stores the alias as a `Nodes::SqlLiteral` (rendered
+  // bare), while `Table#alias` stores a plain string (quoted). Accept both.
+  get name(): string | SqlLiteral {
+    return this.right as string | SqlLiteral;
+  }
+
+  set name(value: string | SqlLiteral) {
+    this.right = value;
+  }
+
+  // Mirrors `alias :relation :left` / `alias :name :right` (table_alias.rb:6-7):
+  // these are the Binary slots under another spelling, not fields beside them,
+  // so a write through either name is the same write — which is what
+  // `Binary#eql` reads (binary.rb:19-27).
+  get relation(): Node {
+    return this.left as Node;
+  }
+
+  set relation(value: Node) {
+    this.left = value;
   }
 
   // Mirrors Rails `alias :table_alias :name` (table_alias.rb).
@@ -43,11 +58,11 @@ export class TableAlias extends Binary {
     return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
-  typeCastForDatabase(attrName: string, value: unknown): unknown {
+  typeCastForDatabase(attrName: string | Node, value: unknown): unknown {
     return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
   }
 
-  typeForAttribute(name: string): unknown {
+  typeForAttribute(name: string | Node): unknown {
     return (this.relation as unknown as TypeCastable).typeForAttribute(name);
   }
 

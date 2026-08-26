@@ -228,17 +228,10 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
 
   it("Cte uses backtick-quoted identifiers (not double quotes)", () => {
     const inner = new SelectManager(users).project(users.get("id"));
-    const cte = new Nodes.Cte("recent", inner.ast);
+    const cte = new Nodes.Cte("recent", inner);
     expect(compile(cte)).toMatch(/^`recent` AS \(/);
-    const weird = new Nodes.Cte("we`ird", inner.ast);
+    const weird = new Nodes.Cte("we`ird", inner);
     expect(compile(weird)).toMatch(/^`we``ird` AS \(/);
-  });
-
-  it("Cte renders exactly one set of parens around a bare SelectStatement", () => {
-    const inner = new SelectManager(users).project(users.get("id"));
-    const cte = new Nodes.Cte("x", inner.ast);
-    const sql = compile(cte);
-    expect(sql).toBe("`x` AS (SELECT `users`.`id` FROM `users`)");
   });
 
   it("Cte renders exactly one set of parens when relation is a Grouping (SqlLiteral path)", () => {

@@ -133,13 +133,12 @@ describe("Relation#where — composite-key form", () => {
     const rel = (CpkBook as any).all();
     const nodes: any = rel.predicateBuilder.buildComposite(["author_id", "id"], [[1, 100]]);
     // Single-tuple path returns the predicates flat ([eq, eq]), like Rails'
-    // grouping_queries. Arel wraps QueryAttribute in BindParam at
-    // `attribute.eq()`, so the first Eq's right-hand side is
-    // BindParam(QueryAttribute(name, value, type)).
+    // grouping_queries. `build_quoted` seats an ActiveModel::Attribute
+    // unwrapped (casted.rb:50-51), so the first Eq's right-hand side is the
+    // QueryAttribute(name, value, type) itself.
     const rhs = nodes[0].right;
-    expect(rhs?.constructor?.name).toBe("BindParam");
-    expect(rhs?.value?.name).toBe("author_id");
-    expect(rhs?.value?.constructor?.name).toBe("QueryAttribute");
+    expect(rhs?.name).toBe("author_id");
+    expect(rhs?.constructor?.name).toBe("QueryAttribute");
   });
 
   it("single-tuple composite returns flat predicates (no wrapping Grouping/parens) — Rails grouping_queries one? path", () => {
@@ -168,7 +167,7 @@ describe("Relation#where — composite-key form", () => {
     );
     const [left, right] = nodes;
     expect(right.left.relation.name).toBe("comments");
-    const bind = right.right.value;
+    const bind = right.right;
     expect(bind.name).toBe("post_id");
     expect(bind.valueForDatabase).toBe(2);
     expect(left.left.relation.name).toBe("posts");
@@ -194,7 +193,7 @@ describe("Relation#where — composite-key form", () => {
     let eq: any;
     const walk = (n: any) => {
       if (!n || typeof n !== "object") return;
-      if (n.right?.value?.name === "metadata") eq = n;
+      if (n.right?.name === "metadata") eq = n;
       for (const k of ["expr", "left", "right", "children"]) {
         const c = n[k];
         if (Array.isArray(c)) c.forEach(walk);
@@ -203,7 +202,7 @@ describe("Relation#where — composite-key form", () => {
     };
     rel.whereClause.predicates.forEach(walk);
     expect(eq.left.relation.name).toBe("contracts");
-    expect(eq.right.value.valueForDatabase).toBe('"x"');
+    expect(eq.right.valueForDatabase).toBe('"x"');
   });
 
   it("qualified single-column composite resolves its IN(...) attribute on the joined table", () => {

@@ -55,8 +55,7 @@ describe("Arel::Nodes.build_quoted", () => {
   it("wraps ActiveModel::Attribute in BindParam so it participates in bind extraction", () => {
     const amAttr = AMAttribute.withCastValue("id", 7, new ValueType());
     const node = buildQuoted(amAttr);
-    expect(node).toBeInstanceOf(Nodes.BindParam);
-    expect((node as Nodes.BindParam).value).toBe(amAttr);
+    expect(node).toBe(amAttr as unknown as Nodes.Node);
 
     // compileWithBinds should collect it (not inline it) — matches Rails'
     // visit_ActiveModel_Attribute routing through add_bind.
@@ -102,21 +101,13 @@ describe("Arel::Nodes.build_quoted", () => {
     expect((node as Nodes.Quoted).value).toBeNull();
   });
 
-  // KNOWN DEVIATION, not the target shape: casted.rb:50-51's `when` arm returns
-  // `other` UNWRAPPED, so Rails' AST holds the ActiveModel::Attribute itself;
-  // trails wraps it in BindParam. Output SQL agrees (rb:756's `add_bind(o)` vs
-  // rb:760's `add_bind(o.value)` land the same payload), but the AST shape does
-  // not, for callers that inspect the node.
-  //
-  // Tracked by story `converge-arel-build-quoted-model-attribute-unwrapped`,
-  // which owns the convergence to Rails' unwrapped shape. This test pins
-  // today's shape so that change is visible in the diff — it records the
-  // deviation, it does not endorse it.
+  // casted.rb:50-51's `when` arm returns `other` UNWRAPPED, so the AST holds
+  // the ActiveModel::Attribute itself and `visit_ActiveModel_Attribute`
+  // (to_sql.rb:756) is what lands its value as a bind.
   it("wraps an ActiveModel::Attribute in BindParam", () => {
     const attr = AMAttribute.fromUser("age", 42, new ValueType());
     const node = buildQuoted(attr);
-    expect(node).toBeInstanceOf(Nodes.BindParam);
-    expect((node as Nodes.BindParam).value).toBe(attr);
+    expect(node).toBe(attr as unknown as Nodes.Node);
   });
 
   // Rails dispatches casted.rb:50's `when` arm on the class, so an object that

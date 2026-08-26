@@ -923,25 +923,6 @@ describe("SelectManagerTest", () => {
     });
   });
 
-  describe("where_sql", () => {
-    it("gives me back the where sql", () => {
-      const manager = new SelectManager();
-      manager.from(users);
-      manager.where(users.get("id").eq(10));
-      expect(mustBeLike(manager.whereSql()!.value)).toBe(mustBeLike(`WHERE "users"."id" = 10`));
-    });
-
-    it("joins wheres with AND", () => {
-      const manager = new SelectManager();
-      manager.from(users);
-      manager.where(users.get("id").eq(10));
-      manager.where(users.get("id").eq(11));
-      expect(mustBeLike(manager.whereSql()!.value)).toBe(
-        mustBeLike(`WHERE "users"."id" = 10 AND "users"."id" = 11`),
-      );
-    });
-  });
-
   describe("update", () => {
     it("creates an update statement", () => {
       const mgr = new SelectManager();
@@ -1504,9 +1485,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager();
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
-      const sql = mgr.whereSql();
-      expect(sql).toBeInstanceOf(Nodes.SqlLiteral);
-      expect(sql?.value).toBe('WHERE "users"."id" = 10');
+      expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10');
     });
 
     it("joins wheres with AND", () => {

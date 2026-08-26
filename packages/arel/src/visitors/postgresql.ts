@@ -59,7 +59,7 @@ export class PostgreSQL extends ToSql {
   // Mirrors: Arel::Visitors::PostgreSQL#visit_Arel_Nodes_GroupingElement
   // (postgresql.rb:44-47) — `( expr )` with spaces inside the parens, where
   // the base ToSql renders `(expr)` without them.
-  protected override visitArelNodesGroupingElement(
+  protected visitArelNodesGroupingElement(
     o: Nodes.GroupingElement,
     collector: SQLString,
   ): SQLString {
@@ -72,20 +72,17 @@ export class PostgreSQL extends ToSql {
   // Cube/Rollup/GroupingSet: emit `CUBE` / `ROLLUP` / `GROUPING SETS`
   // followed by `grouping_array_or_grouping_element` formatting. Mirrors
   // Rails Postgres ([postgresql.rb](https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/arel/visitors/postgresql.rb)).
-  protected override visitArelNodesCube(o: Nodes.Cube, collector: SQLString): SQLString {
+  protected visitArelNodesCube(o: Nodes.Cube, collector: SQLString): SQLString {
     collector.append("CUBE");
     return this.groupingArrayOrGroupingElement(o, collector);
   }
 
-  protected override visitArelNodesRollUp(o: Nodes.RollUp, collector: SQLString): SQLString {
+  protected visitArelNodesRollUp(o: Nodes.RollUp, collector: SQLString): SQLString {
     collector.append("ROLLUP");
     return this.groupingArrayOrGroupingElement(o, collector);
   }
 
-  protected override visitArelNodesGroupingSet(
-    o: Nodes.GroupingSet,
-    collector: SQLString,
-  ): SQLString {
+  protected visitArelNodesGroupingSet(o: Nodes.GroupingSet, collector: SQLString): SQLString {
     collector.append("GROUPING SETS");
     return this.groupingArrayOrGroupingElement(o, collector);
   }
@@ -147,5 +144,13 @@ export class PostgreSQL extends ToSql {
    */
   static registerDispatch(): void {
     PostgreSQL.dispatchCache().set(Nodes.Lateral, "visitArelNodesLateral");
+    // Rails' base ToSql visitor has no handler for these four — they are
+    // defined only on the PostgreSQL visitor (postgresql.rb:44-62), so a
+    // non-PG visitor handed one raises `Visitor#visit`'s TypeError terminal
+    // (visitor.rb:36-39).
+    PostgreSQL.dispatchCache().set(Nodes.GroupingElement, "visitArelNodesGroupingElement");
+    PostgreSQL.dispatchCache().set(Nodes.Cube, "visitArelNodesCube");
+    PostgreSQL.dispatchCache().set(Nodes.RollUp, "visitArelNodesRollUp");
+    PostgreSQL.dispatchCache().set(Nodes.GroupingSet, "visitArelNodesGroupingSet");
   }
 }

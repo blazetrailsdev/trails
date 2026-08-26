@@ -74,7 +74,7 @@ describe("ToSql Array-named identifiers", () => {
   it("the MySQL CTE visitor routes its name through the ToSql quoteTableName helper", () => {
     const cte = new Nodes.Cte(
       ["a", "b"] as unknown as string,
-      new Table("t").from().project(new Nodes.SqlLiteral("1")).ast,
+      new Table("t").from().project(new Nodes.SqlLiteral("1")),
     );
     expect(new Visitors.MySQL(mysqlTestConnection).compile(cte)).toContain('`["a", "b"]` AS ');
   });
@@ -98,5 +98,33 @@ describe("ToSql raw scalars in quoting slots", () => {
   it("quotes a bare string in an Assignment right instead of raising", () => {
     const node = new Nodes.Assignment(users.get("name"), "x");
     expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."name" = \'x\'');
+  });
+});
+
+describe("ToSql grouping-set nodes are PostgreSQL-only", () => {
+  const users = new Table("users");
+  const compile = (n: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(n);
+
+  // `visit_Arel_Nodes_Cube` / `RollUp` / `GroupingElement` / `GroupingSet` are
+  // defined only on the PostgreSQL visitor (postgresql.rb:44-62); the base
+  // ToSql has no handler, so each falls out of `Visitor#visit`'s TypeError
+  // terminal (visitor.rb:36-39).
+  it("raises rather than emitting SQL for Cube/RollUp/GroupingElement/GroupingSet", () => {
+    expect(() => compile(new Nodes.Cube([users.get("a")]))).toThrow(TypeError);
+    expect(() => compile(new Nodes.RollUp([users.get("a")]))).toThrow(TypeError);
+    expect(() => compile(new Nodes.GroupingElement([users.get("a")]))).toThrow(TypeError);
+    expect(() => compile(new Nodes.GroupingSet([users.get("a")]))).toThrow(TypeError);
+  });
+});
+
+describe("ToSql build_quoted Table arm", () => {
+  const users = new Table("users");
+  const posts = new Table("posts");
+
+  // casted.rb:47-51 passes an `Arel::Table` through unchanged, so
+  // `visit_Arel_Table` renders it rather than `Quoted` quoting it as a value.
+  it("renders a Table reached through quotedNode as a table reference", () => {
+    const node = users.get("id").eq(posts);
+    expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."id" = "posts"');
   });
 });

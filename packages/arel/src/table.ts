@@ -1,6 +1,7 @@
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
 import { _engine, ArelEngine, Node } from "./nodes/node.js";
+import { _setTable } from "./node-slots.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
@@ -219,8 +220,12 @@ export class Table extends Node {
     return sameName && this.tableAlias === other.tableAlias;
   }
 
-  typeCastForDatabase(attrName: string, value: unknown): unknown {
-    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
+  typeCastForDatabase(attrName: string | Node, value: unknown): unknown {
+    // Rails' `name` is untyped all the way down (table.rb:100-107 hands it to a
+    // duck-typed caster). `TypeCaster` is where the string boundary lives: only
+    // a String name ever reaches a caster, since `table[Arel.star]` — the one
+    // Node-named attribute — is never type-cast.
+    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName as string, value);
   }
 
   /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
@@ -228,8 +233,8 @@ export class Table extends Node {
    *  (table_alias.rb:22-24), so no external reader is needed. */
   private readonly typeCaster: unknown;
 
-  typeForAttribute(name: string): unknown {
-    return (this.typeCaster as TypeCaster).typeForAttribute(name);
+  typeForAttribute(name: string | Node): unknown {
+    return (this.typeCaster as TypeCaster).typeForAttribute(name as string);
   }
 
   isAbleToTypeCast(): boolean {
@@ -261,3 +266,5 @@ type _AliasPredication = import("./alias-predication.js").AliasPredicationModule
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Table extends _FactoryMethodsModule, _AliasPredication {}
+
+_setTable(Table);
