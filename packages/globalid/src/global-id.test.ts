@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
 import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
+import { GID } from "./uri/gid.js";
 import { type LocatorModel } from "./locator.js";
 
 // Synthetic GlobalIDModel — overrides `constructor.name` without building
@@ -286,12 +287,13 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("as URI", () => {
-    // Rails compares URI objects; GlobalID#uri is its string form here.
-    expect(personGid.uri).toBe("gid://bcx/Person/5");
-    expect(personUuidGid.uri).toBe(`gid://bcx/PersonUuid/${uuid}`);
-    expect(personNamespacedGid.uri).toBe("gid://bcx/Person::Child/4");
-    expect(personModelGid.uri).toBe("gid://bcx/PersonModel/1");
-    expect(cpkModelGid.uri).toBe("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value");
+    expect(personGid.uri).toEqual(GID.parse("gid://bcx/Person/5"));
+    expect(personUuidGid.uri).toEqual(GID.parse(`gid://bcx/PersonUuid/${uuid}`));
+    expect(personNamespacedGid.uri).toEqual(GID.parse("gid://bcx/Person::Child/4"));
+    expect(personModelGid.uri).toEqual(GID.parse("gid://bcx/PersonModel/1"));
+    expect(cpkModelGid.uri).toEqual(
+      GID.parse("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value"),
+    );
   });
 
   it("as JSON", () => {

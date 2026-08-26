@@ -24,28 +24,28 @@ class NoMethodError extends NameError {
   }
 }
 
-export class StringInquirer {
-  private readonly _value: string;
-
+/** Mirrors: `class StringInquirer < String` (string_inquirer.rb:21). */
+export class StringInquirer extends String {
   constructor(value: string) {
-    this._value = value;
+    super(value);
     return new Proxy(this, {
       get(target, prop: string | symbol, receiver) {
-        if (typeof prop === "symbol" || Reflect.has(target, prop)) {
-          return Reflect.get(target, prop, receiver);
+        // `super` — a String method resolves before `method_missing` does.
+        if (Reflect.has(target, prop)) {
+          const value = Reflect.get(target, prop, receiver);
+          // A String.prototype method demands a String receiver and the Proxy
+          // is not one, so those bind to the target; anything a subclass
+          // defines keeps `this` as the Proxy, where its own state lives.
+          return typeof value === "function" &&
+            value === (String.prototype as unknown as Record<string | symbol, unknown>)[prop]
+            ? value.bind(target)
+            : value;
         }
-        // `class StringInquirer < String` (string_inquirer.rb:21): a String
-        // method resolves before `method_missing` does. TS cannot subclass the
-        // String primitive, so the superclass is the wrapped string itself.
-        const stringSelf = Object(target._value) as Record<string, unknown>;
-        if (prop in stringSelf) {
-          const value = stringSelf[prop];
-          return typeof value === "function" ? value.bind(target._value) : value;
-        }
+        if (typeof prop === "symbol") return Reflect.get(target, prop, receiver);
         // `self == method_name[0..-2]` when the name ends in `?`.
         if (prop.endsWith("?")) {
           const methodName = prop;
-          return () => target._value === methodName.slice(0, -1);
+          return () => target.valueOf() === methodName.slice(0, -1);
         }
         // `else super`. A `get` trap cannot raise — `"foo" in x` and
         // `typeof x.foo` both route through it — so the raise moves to the
@@ -58,25 +58,10 @@ export class StringInquirer {
       },
       // `respond_to_missing?`: `method_name.end_with?("?") || super`.
       has(target, prop) {
-        if (typeof prop === "string" && (prop.endsWith("?") || prop in Object(target._value))) {
-          return true;
-        }
+        if (typeof prop === "string" && prop.endsWith("?")) return true;
         return Reflect.has(target, prop);
       },
     });
-  }
-
-  toString(): string {
-    return this._value;
-  }
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activesupport/lib/active_support/string_inquirer.rb:21` — `class
-   *   StringInquirer < String`, so Ruby coerces through String itself).
-   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
-   */
-  valueOf(): string {
-    return this._value;
   }
 }
 

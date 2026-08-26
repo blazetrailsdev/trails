@@ -194,7 +194,7 @@ export class SignedGlobalID extends GlobalID {
   toString(): string {
     if (this._cached) return this._cached;
     const payload: SgidPayload = {
-      gid: this.uri,
+      gid: this.uri.toString(),
       purpose: this.purpose,
       expires_at: this.expiresAt ? this.expiresAt.toString({ smallestUnit: "millisecond" }) : null,
     };
@@ -219,7 +219,11 @@ export class SignedGlobalID extends GlobalID {
    * different across module boundaries.
    */
   equals(other: SignedGlobalID): boolean {
-    return other != null && this.uri === other.uri && this.purpose === other.purpose;
+    return (
+      other != null &&
+      this.uri.toString() === other.uri.toString() &&
+      this.purpose === other.purpose
+    );
   }
 
   /** Mirrors: SignedGlobalID#inspect — `#<SignedGlobalID:0x...>` (stable per instance). */

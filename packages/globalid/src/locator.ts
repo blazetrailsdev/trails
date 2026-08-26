@@ -303,7 +303,7 @@ export class Locator {
       verifier: options.verifier,
     });
     if (!parsed) return null;
-    return Locator.locate(parsed.uri, options);
+    return Locator.locate(parsed.uri.toString(), options);
   }
 
   /** Mirrors: Locator.locate_many_signed */

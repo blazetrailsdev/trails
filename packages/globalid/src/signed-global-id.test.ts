@@ -43,7 +43,7 @@ describe("SignedGlobalIDTest", () => {
     // Rails asserts the exact signed token produced by the vendored test
     // verifier secret. Trails builds a verifier per test, so the token bytes
     // differ; assert the round-trip instead.
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier })!.uri).toBe(sgid.uri);
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier })!.uri).toEqual(sgid.uri);
   });
 
   it("model id", () => {
@@ -88,7 +88,7 @@ describe("SignedGlobalIDPurposeTest", () => {
     const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like-button" });
     // Rails asserts the exact signed token; trails' per-test verifier secret
     // differs, so assert the round-trip URI instead.
-    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "login" })!.uri).toBe(
+    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "login" })!.uri).toEqual(
       loginSgid.uri,
     );
     expect(loginSgid.equals(likeSgid)).not.toBe(true);
@@ -406,7 +406,7 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
   it("includes app in URI when provided", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, app: "MyApp" });
-    expect(sgid.uri).toBe("gid://MyApp/Person/5");
+    expect(sgid.uri.toString()).toBe("gid://MyApp/Person/5");
   });
 
   describe("getApp() integration", () => {
@@ -417,7 +417,7 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
       setApp("ConfiguredApp");
       const verifier = makeVerifier();
       const sgid = SignedGlobalID.create(person(5), { verifier });
-      expect(sgid.uri).toBe("gid://ConfiguredApp/Person/5");
+      expect(sgid.uri.toString()).toBe("gid://ConfiguredApp/Person/5");
     });
 
     it("throws when no app configured and no app option", () => {
@@ -436,7 +436,7 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
       // Token verifies with the class-level verifier (no option needed).
       const parsed = SignedGlobalID.parse(sgid.toString());
       expect(parsed).not.toBeNull();
-      expect(parsed!.uri).toBe("gid://bcx/Person/5");
+      expect(parsed!.uri.toString()).toBe("gid://bcx/Person/5");
     });
 
     it("pickVerifier throws when neither option nor class-level is set", () => {
