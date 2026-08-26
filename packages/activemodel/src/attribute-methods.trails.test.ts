@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  attributeMethodPatternsCache,
-  attributeMethodPatternsMatching,
-} from "./attribute-methods.js";
+import { ClassMethods } from "./attribute-methods.js";
 import { Model } from "./index.js";
 
 describe("AttributeMethodsTest (trails)", () => {
@@ -14,12 +11,12 @@ describe("AttributeMethodsTest (trails)", () => {
       }
     }
     Person.attributeMethodSuffix("Short");
-    attributeMethodPatternsMatching.call(Person, "nameShort");
-    expect(attributeMethodPatternsCache.call(Person).size).toBeGreaterThan(0);
+    ClassMethods.attributeMethodPatternsMatching.call(Person, "nameShort");
+    expect(ClassMethods.attributeMethodPatternsCache.call(Person).size).toBeGreaterThan(0);
 
     Person.aliasAttribute("nickname", "name");
 
-    expect(attributeMethodPatternsCache.call(Person).size).toBe(0);
+    expect(ClassMethods.attributeMethodPatternsCache.call(Person).size).toBe(0);
   });
 
   it("alias attribute overrides a method inherited from a parent class", () => {

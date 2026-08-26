@@ -3,10 +3,10 @@ import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
-  attributeMissing,
+  ClassMethods as AttributeMethodsClassMethods,
+  InstanceMethods as AttributeMethodsInstanceMethods,
   type AttributeMethodHost,
   type AttributeMethod,
-  buildMangledName,
 } from "./attribute-methods.js";
 import {
   attribute as registrationAttribute,
@@ -129,7 +129,7 @@ export function setDefineMethodAttribute(
   const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
     writer: true,
   });
-  const tempMethodName = buildMangledName(methodName);
+  const tempMethodName = AttributeMethodsClassMethods.buildMangledName(methodName);
   owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as: `${as}=` }, (batch) => {
     batch.push((mod) => {
       Object.defineProperty(mod, tempMethodName, {
@@ -276,4 +276,4 @@ export class Attributes {
 // Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8) — the module
 // brings `attribute_missing` with it; the interface merge above is its type
 // side.
-include(Attributes, { attributeMissing });
+include(Attributes, { attributeMissing: AttributeMethodsInstanceMethods.attributeMissing });

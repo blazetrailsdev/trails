@@ -12,7 +12,7 @@ import {
   Model,
   MissingAttributeError,
   AttrNames,
-  buildMangledName,
+  AttributeMethods,
 } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
 import { completeHalfAccessor } from "./read.js";
@@ -112,7 +112,7 @@ export function setDefineMethodAttribute(
   const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
     writer: true,
   });
-  const tempMethodName = buildMangledName(methodName);
+  const tempMethodName = AttributeMethods.ClassMethods.buildMangledName(methodName);
   completeHalfAccessor(this, as, "set", function (this: Model, value: unknown) {
     this._writeAttribute(canonicalName, value);
   });

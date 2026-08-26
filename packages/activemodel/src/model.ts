@@ -27,8 +27,6 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
   type Extended,
-  type CodeGenerator,
-  Module,
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -91,6 +89,9 @@ import { Naming } from "./naming.js";
  * by the `extend()` at the bottom of this file.
  *
  */
+/** The class half of `include ActiveModel::AttributeMethods` (attribute_methods.rb:75-501). */
+type AttributeMethodsClassMethods = Extended<typeof AttributeMethods.ClassMethods>;
+
 const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeNames };
 
 /**
@@ -101,8 +102,27 @@ const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeN
  */
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
+/**
+ * The instance side of every module `Model` includes, including the instance
+ * half of Ruby `include ActiveModel::AttributeMethods` (attribute_methods.rb:73)
+ * that the `include(Model, …)` at the bottom of this file installs.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface Model extends Dirty, Access, Conversion, Serialization, Naming, SerializersJSON {
+export interface Model
+  extends
+    Dirty,
+    Access,
+    Conversion,
+    Serialization,
+    Naming,
+    SerializersJSON,
+    Included<typeof AttributeMethods.InstanceMethods> {
+  /**
+   * Redeclared as a method, not the property `Included<>` derives, so a
+   * subclass may override `attribute_missing` the way Rails' cascade expects.
+   */
+  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
+
   /**
    * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
    * mixed on by the `include(Model, …)` at the bottom of this file.
@@ -111,21 +131,6 @@ export interface Model extends Dirty, Access, Conversion, Serialization, Naming,
 
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
-
-  /**
-   * The instance half of Ruby `include ActiveModel::AttributeMethods`
-   * (attribute_methods.rb:73), installed by the `include(Model, …)` at the
-   * bottom of this file. Declared as methods, not properties, so a subclass
-   * may override `attribute_missing` the way Rails' cascade expects.
-   */
-  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
-  isAttributeMethod(attrName: string): boolean;
-  matchedAttributeMethod(methodName: string): AttributeMethod | null;
-  missingAttribute(attrName: string, stack?: string): never;
-  isRespondToWithoutAttributes(method: string): boolean;
-  respondTo(method: string, includePrivateMethods?: boolean): boolean;
-  /** @internal */
-  _readAttribute(attr: string): unknown;
 
   /**
    * The private instance reader `ActiveModel::Attributes` defines
@@ -467,33 +472,29 @@ export class Model {
 
   // Ruby `include ActiveModel::AttributeMethods` (attribute_methods.rb:73)
   // brings the whole ClassMethods surface along; the `extend(Model, …)` at the
-  // bottom of this file installs it, and these declarations are its type side.
-  declare static attributeMethodPrefix: (
-    ...prefixes: Array<string | { parameters?: string | null | false }>
-  ) => void;
-  declare static attributeMethodSuffix: (
-    ...suffixes: Array<string | { parameters?: string | null | false }>
-  ) => void;
-  declare static attributeMethodAffix: (
-    ...affixes: Array<{ prefix: string; suffix: string; parameters?: string | null | false }>
-  ) => void;
-  declare static aliasAttribute: (newName: string, oldName: string) => void;
-  declare static eagerlyGenerateAliasAttributeMethods: (newName: string, oldName: string) => void;
-  declare static defineAttributeMethods: (...attrNames: string[]) => void;
-  declare static defineAttributeMethod: (
-    attrName: string,
-    options?: { _owner?: Module | CodeGenerator; as?: string },
-  ) => void;
-  declare static defineAttributeMethodPattern: (
-    pattern: AttributeMethodPattern,
-    attrName: string,
-    options: { owner: CodeGenerator; as: string; override?: boolean },
-  ) => void;
-  declare static undefineAttributeMethods: () => void;
-  declare static generatedAttributeMethods: () => Module;
-  declare static isInstanceMethodAlreadyImplemented: (methodName: string) => boolean;
-  declare static attributeMethodPatternsCache: () => Map<string, Array<AttributeMethod>>;
-  declare static attributeMethodPatternsMatching: (methodName: string) => Array<AttributeMethod>;
+  // bottom of this file installs it, and these declarations are its type side,
+  // read off the module object rather than restated here.
+  declare static attributeMethodPrefix: AttributeMethodsClassMethods["attributeMethodPrefix"];
+  declare static attributeMethodSuffix: AttributeMethodsClassMethods["attributeMethodSuffix"];
+  declare static attributeMethodAffix: AttributeMethodsClassMethods["attributeMethodAffix"];
+  declare static aliasAttribute: AttributeMethodsClassMethods["aliasAttribute"];
+  declare static eagerlyGenerateAliasAttributeMethods: AttributeMethodsClassMethods["eagerlyGenerateAliasAttributeMethods"];
+  declare static generateAliasAttributeMethods: AttributeMethodsClassMethods["generateAliasAttributeMethods"];
+  declare static aliasAttributeMethodDefinition: AttributeMethodsClassMethods["aliasAttributeMethodDefinition"];
+  declare static isAttributeAlias: AttributeMethodsClassMethods["isAttributeAlias"];
+  declare static attributeAlias: AttributeMethodsClassMethods["attributeAlias"];
+  declare static defineAttributeMethods: AttributeMethodsClassMethods["defineAttributeMethods"];
+  declare static defineAttributeMethod: AttributeMethodsClassMethods["defineAttributeMethod"];
+  declare static defineAttributeMethodPattern: AttributeMethodsClassMethods["defineAttributeMethodPattern"];
+  declare static undefineAttributeMethods: AttributeMethodsClassMethods["undefineAttributeMethods"];
+  declare static aliasesByAttributeName: AttributeMethodsClassMethods["aliasesByAttributeName"];
+  declare static generatedAttributeMethods: AttributeMethodsClassMethods["generatedAttributeMethods"];
+  declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassMethods["isInstanceMethodAlreadyImplemented"];
+  declare static attributeMethodPatternsCache: AttributeMethodsClassMethods["attributeMethodPatternsCache"];
+  declare static attributeMethodPatternsMatching: AttributeMethodsClassMethods["attributeMethodPatternsMatching"];
+  declare static defineProxyCall: AttributeMethodsClassMethods["defineProxyCall"];
+  declare static buildMangledName: AttributeMethodsClassMethods["buildMangledName"];
+  declare static defineCall: AttributeMethodsClassMethods["defineCall"];
 
   declare static lookupAncestors: () => Array<{
     new (...args: never[]): unknown;
@@ -681,22 +682,7 @@ extend(Model, {
 // (attribute_methods.rb:396-398) wins over the registration one. The module's
 // ClassMethods land on the class and its instance methods on instances, which
 // is what lets every ported body self-send them.
-extend(Model, {
-  attributeMethodPrefix: AttributeMethods.attributeMethodPrefix,
-  attributeMethodSuffix: AttributeMethods.attributeMethodSuffix,
-  attributeMethodAffix: AttributeMethods.attributeMethodAffix,
-  aliasAttribute: AttributeMethods.aliasAttribute,
-  eagerlyGenerateAliasAttributeMethods: AttributeMethods.eagerlyGenerateAliasAttributeMethods,
-  defineAttributeMethods: AttributeMethods.defineAttributeMethods,
-  defineAttributeMethod: AttributeMethods.defineAttributeMethod,
-  defineAttributeMethodPattern: AttributeMethods.defineAttributeMethodPattern,
-  undefineAttributeMethods: AttributeMethods.undefineAttributeMethods,
-  resolveAttributeName: AttributeMethods.resolveAttributeName,
-  generatedAttributeMethods: AttributeMethods.generatedAttributeMethods,
-  isInstanceMethodAlreadyImplemented: AttributeMethods.isInstanceMethodAlreadyImplemented,
-  attributeMethodPatternsCache: AttributeMethods.attributeMethodPatternsCache,
-  attributeMethodPatternsMatching: AttributeMethods.attributeMethodPatternsMatching,
-});
+extend(Model, AttributeMethods.ClassMethods);
 // Its `included do` block (attribute_methods.rb:70-73) rides along, issued from
 // the module's own `[included]` hook.
 include(Model, AttributeMethods.InstanceMethods);

@@ -164,21 +164,7 @@ interface DirtyModel extends Dirty {
 
 // `include ActiveModel::AttributeMethods`, which `define_attribute_methods`
 // and every `*_will_change!` come from (attribute_methods.rb:73).
-extend(DirtyModel, {
-  attributeMethodPrefix: AttributeMethods.attributeMethodPrefix,
-  attributeMethodSuffix: AttributeMethods.attributeMethodSuffix,
-  attributeMethodAffix: AttributeMethods.attributeMethodAffix,
-  aliasAttribute: AttributeMethods.aliasAttribute,
-  defineAttributeMethods: AttributeMethods.defineAttributeMethods,
-  defineAttributeMethod: AttributeMethods.defineAttributeMethod,
-  defineAttributeMethodPattern: AttributeMethods.defineAttributeMethodPattern,
-  undefineAttributeMethods: AttributeMethods.undefineAttributeMethods,
-  resolveAttributeName: AttributeMethods.resolveAttributeName,
-  generatedAttributeMethods: AttributeMethods.generatedAttributeMethods,
-  isInstanceMethodAlreadyImplemented: AttributeMethods.isInstanceMethodAlreadyImplemented,
-  attributeMethodPatternsCache: AttributeMethods.attributeMethodPatternsCache,
-  attributeMethodPatternsMatching: AttributeMethods.attributeMethodPatternsMatching,
-});
+extend(DirtyModel, AttributeMethods.ClassMethods);
 include(DirtyModel, AttributeMethods.InstanceMethods);
 
 // `include ActiveModel::Dirty` (dirty_test.rb:8) and its `included do` block
