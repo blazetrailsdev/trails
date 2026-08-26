@@ -9,7 +9,15 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import * as AttributeMethods from "./attribute-methods.js";
-import { Dirty, asJson as dirtyAsJson } from "./dirty.js";
+import { Dirty, asJson as dirtyAsJson, initializeDup as dirtyInitializeDup } from "./dirty.js";
+
+/**
+ * The ivar table Ruby's `@name` / `@color` / `@size` / `@status` live in. A JS
+ * `Symbol` key, the sanctioned spelling for a private slot: `Object.keys`
+ * skips it, so `instance_values` (core_ext/object/json.rb:58-66) sees only the
+ * four readers, while `Reflect.ownKeys` carries it through `dup`.
+ */
+const ivars = Symbol("ivars");
 
 /**
  * Rails' `DirtyTest::DirtyModel` (dirty_test.rb:6-43) includes
@@ -18,64 +26,106 @@ import { Dirty, asJson as dirtyAsJson } from "./dirty.js";
  * of `mutations_from_database` (dirty.rb:382-388) and tracks through
  * `ActiveModel::ForcedMutationTracker`, which is what this file exercises.
  *
+ * The `include ActiveModel::API` half (dirty_test.rb:7) is not wired below:
+ * the fixture's `initialize` (dirty_test.rb:11-17) overrides API's
+ * (api.rb:78-81) and never calls `super`, so API contributes no behaviour to
+ * this model, and trails' `api.ts` is not an includable module — `Model`
+ * carries that surface. What IS wired is `AttributeMethods`, which Ruby gets
+ * from `Dirty`'s own `include ActiveModel::AttributeMethods` (dirty.rb:125);
+ * trails' `include()` copies a module's own members, not its nested includes.
+ *
  * Ruby's `@name` + `attr_reader :name` + a hand-written `name=` port to one
  * own, enumerable accessor property per ivar: `Object#as_json` serializes an
  * object through `instance_values` (core_ext/object/json.rb:58-66), i.e. its
  * own properties, so the ivar has to be spelled with the reader's name — and a
  * data property of that name would shadow the writer the Ruby model defines.
- * The values live in `#ivars`, which no `instance_values` can see.
+ * The values live in the `ivars` table below, which no `instance_values` sees.
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (dirty_test.rb:7-8); the class/interface merge is how `include()` surfaces on the type side.
 class DirtyModel {
-  #ivars: Record<string, unknown> = {};
-
   constructor() {
+    Object.defineProperty(this, ivars, { value: {}, writable: true, configurable: true });
+
     Object.defineProperty(this, "name", {
       enumerable: true,
       configurable: true,
-      get: () => this.#ivars["name"],
-      set: (val: unknown) => {
+      get(this: DirtyModel): unknown {
+        return this[ivars]["name"];
+      },
+      set(this: DirtyModel, val: unknown) {
         this.nameWillChange();
-        this.#ivars["name"] = val;
+        this[ivars]["name"] = val;
       },
     });
     Object.defineProperty(this, "color", {
       enumerable: true,
       configurable: true,
-      get: () => this.#ivars["color"],
-      set: (val: unknown) => {
-        if (val !== this.#ivars["color"]) this.colorWillChange();
-        this.#ivars["color"] = val;
+      get(this: DirtyModel): unknown {
+        return this[ivars]["color"];
+      },
+      set(this: DirtyModel, val: unknown) {
+        if (val !== this[ivars]["color"]) this.colorWillChange();
+        this[ivars]["color"] = val;
       },
     });
     Object.defineProperty(this, "size", {
       enumerable: true,
       configurable: true,
-      get: () => this.#ivars["size"],
-      set: (val: unknown) => {
-        if (val !== this.#ivars["size"]) this.attributeWillChangeBang("size");
-        this.#ivars["size"] = val;
+      get(this: DirtyModel): unknown {
+        return this[ivars]["size"];
+      },
+      set(this: DirtyModel, val: unknown) {
+        if (val !== this[ivars]["size"]) this.attributeWillChangeBang("size");
+        this[ivars]["size"] = val;
       },
     });
     Object.defineProperty(this, "status", {
       enumerable: true,
       configurable: true,
-      get: () => this.#ivars["status"],
-      set: (val: unknown) => {
-        if (val !== this.#ivars["status"]) this.statusWillChange();
-        this.#ivars["status"] = val;
+      get(this: DirtyModel): unknown {
+        return this[ivars]["status"];
+      },
+      set(this: DirtyModel, val: unknown) {
+        if (val !== this[ivars]["status"]) this.statusWillChange();
+        this[ivars]["status"] = val;
       },
     });
 
-    this.#ivars["name"] = null;
-    this.#ivars["color"] = null;
-    this.#ivars["size"] = null;
-    this.#ivars["status"] = "initialized";
+    this[ivars]["name"] = null;
+    this[ivars]["color"] = null;
+    this[ivars]["size"] = null;
+    this[ivars]["status"] = "initialized";
   }
 
   save(): void {
     this.changesApplied();
   }
+
+  /**
+   * `Object#dup`, which Ruby's DirtyModel inherits and TypeScript cannot:
+   * allocate, copy the ivars, dispatch `initialize_dup`, without re-entering
+   * the constructor. Same body as `Model#dup` (model.ts), plus the copy of the
+   * ivar table `Reflect.ownKeys` carries but Ruby splits across ivar slots.
+   */
+  dup(): this {
+    const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
+    const descriptors = Object.getOwnPropertyDescriptors(this);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key as string];
+      descriptor.configurable = true;
+      if (!descriptor.get && !descriptor.set) descriptor.writable = true;
+    }
+    Object.defineProperties(duped, descriptors);
+    duped[ivars] = { ...this[ivars] };
+    duped.initializeDup(this);
+    return duped;
+  }
+
+  /**
+   * The root of the `initialize_dup` chain: Ruby's `Object#initialize_dup`,
+   * where `Dirty#initialize_dup`'s `super` (dirty.rb:248-251) lands.
+   */
+  initializeDup(_other: this): void {}
 
   /**
    * `Object#as_json` (core_ext/object/json.rb:58-66), which Ruby's DirtyModel
@@ -89,6 +139,7 @@ class DirtyModel {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface DirtyModel extends Dirty {
+  [ivars]: Record<string, unknown>;
   name: unknown;
   color: unknown;
   size: unknown;
@@ -147,7 +198,10 @@ include(DirtyModel, ToJsonWithActiveSupportEncoder);
 
 // `Dirty#as_json` (dirty.rb:264-268) sits above the `Object#as_json` in the
 // class body, as Ruby's `include ActiveModel::Dirty` puts it above `Object`.
-prepend(DirtyModel.prototype, { asJson: dirtyAsJson });
+prepend(DirtyModel.prototype, {
+  asJson: dirtyAsJson,
+  initializeDup: dirtyInitializeDup,
+});
 
 // dirty_test.rb:9
 DirtyModelClass.defineAttributeMethods("name", "color", "size", "status");
@@ -203,15 +257,19 @@ describe("DirtyTest", () => {
   });
 
   it("attribute mutation", () => {
-    // Rails sets `@name` behind the writer, mutates the String in place, and
-    // asserts neither shows as a change — `ForcedMutationTracker#changed_in_place?`
-    // is a flat `false` (attribute_mutation_tracker.rb:95-97). JS strings have
-    // no in-place mutation, so the ivar write stands in for both steps.
-    // Ruby's `instance_variable_set("@name", …)` writes past the writer; the
-    // JS analogue replaces the accessor with the value it would have read.
+    // Rails writes `@name` past the writer and then mutates that String in
+    // place (`name.replace(...)`), asserting neither shows as a change —
+    // `ForcedMutationTracker#changed_in_place?` is a flat `false`
+    // (attribute_mutation_tracker.rb:95-97). JS strings are immutable, so each
+    // `replace` is spelled as the value the ivar would then hold; both
+    // `instance_variable_set` and `replace` write past the writer, which is a
+    // property redefinition here.
     Object.defineProperty(model, "name", { value: "Yam", enumerable: true, configurable: true });
     expect(model.nameChanged()).toBe(false);
+    Object.defineProperty(model, "name", { value: "Hadad", enumerable: true, configurable: true });
+    expect(model.nameChanged()).toBe(false);
     model.nameWillChange();
+    Object.defineProperty(model, "name", { value: "Baal", enumerable: true, configurable: true });
     expect(model.nameChanged()).toBe(true);
   });
 
@@ -351,7 +409,7 @@ describe("DirtyTest", () => {
   });
 
   it("model can be dup-ed without Attributes", () => {
-    expect(model).toBeTruthy();
+    expect(model.dup()).toBeTruthy();
   });
 
   it("to_json should work on model", () => {
