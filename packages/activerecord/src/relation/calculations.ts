@@ -590,16 +590,10 @@ export async function pluck(
   }
 
   return this.withConnection(async () => {
-    // Resolve any deferred distinct-PK subquery markers to a literal id list
-    // before compiling, so pluck (like Rails) emits `pk IN (ids)` rather than
-    // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
-    await this._materializeDeferredDistinctPkPredicates();
     // Mirrors Calculations#pluck: a contradictory where-clause (`where(col: [])`,
     // an empty `IN`) returns `ActiveRecord::Result.empty` without issuing SQL.
-    // Checked after materialization so a deferred distinct-PK
-    // predicate that resolves to an empty id set also short-circuits.
     if (this.whereClause.isContradiction()) {
-      return typeCastPluckValues(Result.empty(), columnNames, this as any);
+      return await typeCastPluckValues(Result.empty(), columnNames, this as any);
     }
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
@@ -624,12 +618,6 @@ export async function pluck(
       // recursive `pluck` takes the plain branch below — no infinite loop.
       return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
     }
-
-    // Reflect the schema before casting results so the model's attribute
-    // types are available — Rails' type_cast_pluck_values reads
-    // model.attribute_types, which runs load_schema first. pluck issues a
-    // raw query (no toArray()), so it must trigger the load itself.
-    await this._model.ensureSchemaLoaded();
 
     this._model.disallowRawSqlBang(
       this.flattenedArgs(columnNames) as (string | symbol | Nodes.Node)[],
@@ -694,7 +682,7 @@ export async function pluck(
     // Type-cast results positionally through each result column's type
     // (model attribute type → join dependency → driver OID → identity),
     // mirroring Rails' Calculations#type_cast_pluck_values.
-    return typeCastPluckValues(result, columns, this as any);
+    return await typeCastPluckValues(result, columns, this as any);
   });
 }
 
@@ -783,19 +771,12 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     ? Result.empty()
     : await this.skipQueryCacheIfNecessary(() =>
         this.withConnection(async (c) => {
-          // trails preliminaries the Rails body has no counterpart for,
-          // carried over from the delegation this replaces:
-          // `type_cast_pluck_values` reads `model.attribute_types`, and a
-          // deferred distinct-PK marker must resolve to a literal id list
-          // before the arel compiles.
-          await this._model.ensureSchemaLoaded();
-          await relation._materializeDeferredDistinctPkPredicates();
           const manager = relation.arel();
           return c.selectAll(manager, `${this.model.name} Ids`);
         }),
       );
 
-  return typeCastPluckValues(result, columns, this as any);
+  return await typeCastPluckValues(result, columns, this as any);
 }
 
 /**
@@ -866,22 +847,40 @@ export interface CalculationMethods {
  * {@link withConnection}. Releases the connection afterwards instead of
  * permanently leasing it via the deprecated `.connection` getter under
  * `permanent_connection_checkout = :deprecated | :disallowed`.
+ *
+ * It also carries {@link withDeferredDistinctPkPredicates}, so no aggregate
+ * body spells the materialization Rails has no counterpart for.
  */
 function inQueryConnection<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
+  const materialized = withDeferredDistinctPkPredicates(fn);
   return function (this: CalculationRelation, ...args: A): Promise<R> {
     const modelClass = (this as { _model?: unknown })._model as typeof Base;
-    return modelClass.withConnection(async () => {
-      // Resolve any deferred distinct-PK subquery markers to a literal id list
-      // before the calculation compiles its where clause, so count/sum/avg/min/
-      // max emit `pk IN (ids)` rather than the inline `IN (SELECT … LIMIT n)`
-      // MySQL rejects (Rails materializes these at `.where()`-build time).
-      await (
-        this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> }
-      )._materializeDeferredDistinctPkPredicates?.();
-      return fn.apply(this, args);
-    });
+    return modelClass.withConnection(() => materialized.apply(this, args));
+  };
+}
+
+/**
+ * Resolve any deferred distinct-PK subquery marker to a literal id list before
+ * the wrapped method compiles its where clause, so the query emits
+ * `pk IN (ids)` rather than the inline `IN (SELECT … LIMIT n)` MySQL rejects.
+ *
+ * Rails materializes these at `.where()`-build time
+ * (finder_methods.rb:463) and so has no counterpart in any calculation body;
+ * trails' `.where()` is sync, so the marker resolves in this wrap instead of in
+ * the ported bodies. It leases nothing and issues no query when the where
+ * clause carries no marker, which is what keeps `pluck`/`ids`' pre-query fast
+ * paths (calculations.rb:293-304/373-382) as connection-free as Rails'.
+ */
+function withDeferredDistinctPkPredicates<A extends unknown[], R>(
+  fn: (this: CalculationRelation, ...args: A) => Promise<R>,
+): (this: CalculationRelation, ...args: A) => Promise<R> {
+  return async function (this: CalculationRelation, ...args: A): Promise<R> {
+    await (
+      this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> }
+    )._materializeDeferredDistinctPkPredicates?.();
+    return fn.apply(this, args);
   };
 }
 
@@ -897,15 +896,11 @@ export const Calculations = {
   sum: inQueryConnection(performSum),
   asyncSum,
   calculate: inQueryConnection(calculate),
-  // `pluck` / `ids` do their own `with_connection` (and `skip_query_cache_if_necessary`)
-  // around the one query they issue, exactly as calculations.rb:316/396 does —
-  // so they are NOT wrapped in `inQueryConnection`, which is the seam for the
-  // aggregate methods whose query is built inside `calculate`.
-  pluck,
+  pluck: withDeferredDistinctPkPredicates(pluck),
   asyncPluck,
   pick,
   asyncPick,
-  ids,
+  ids: withDeferredDistinctPkPredicates(ids),
   asyncIds,
 } as const;
 
@@ -1487,6 +1482,10 @@ function castTypeFromKlass(klass: any, name: string): unknown {
  * array for a single column and an array-of-rows for several, matching
  * `pluck`'s contract.
  *
+ * Ruby resolves `model.attribute_types` (calculations.rb:611) lazily through
+ * `load_schema` on the very read below; trails' load is async, so this awaits
+ * it at that same point rather than having `pluck`/`ids` pre-load it.
+ *
  * APPROXIMATION: Arel attribute `type_caster`s are not consulted — our
  * projection nodes don't carry one, and the model-attribute-type path covers
  * the same columns.
@@ -1502,11 +1501,12 @@ function castTypeFromKlass(klass: any, name: string): unknown {
  *   columns.size` (calculations.rb:611) — Ruby `Array#size` on two plain Arrays,
  *   spelled `.length` in TS.
  */
-export function typeCastPluckValues(
+export async function typeCastPluckValues(
   result: Result,
   columns: Array<string | Nodes.Node | unknown>,
   rel: CalculationRelation,
-): unknown[] {
+): Promise<unknown[]> {
+  await rel.model.ensureSchemaLoaded();
   if (result.columns.length !== columns.length) {
     // Rails: `model.attribute_types` wholesale (calculations.rb:611-612). Its
     // unknown-name default never reaches `Result#column_type`, which asks with

@@ -55,6 +55,18 @@ export interface SetCookieOptions {
   sameSite?: "strict" | "lax" | "none" | null;
 }
 
+/**
+ * The `Rack::Response` shape {@link CookieJar.write} writes onto. Ruby passes
+ * the response itself; TS names the structural minimum.
+ *
+ * @noRailsEquivalent PERMANENT — structural stand-in for `Rack::Response`,
+ * whose `set_cookie` / `delete_cookie` are the only members `write` calls.
+ */
+export interface CookieResponse {
+  setCookie(name: string, value: SetCookieOptions): void;
+  deleteCookie(name: string, options: { path?: string; domain?: string }): void;
+}
+
 export class CookieJar implements Iterable<[string, string]> {
   private _cookies: Map<string, string> = new Map();
   private _setCookies: Map<string, SetCookieOptions> = new Map();
@@ -98,19 +110,22 @@ export class CookieJar implements Iterable<[string, string]> {
   /**
    * Build a CookieJar seeded with `cookies` from a request. Mirrors
    * `Cookies::CookieJar.build(request, cookies)` used by
-   * `ActionDispatch::TestProcess#cookies`.
+   * `ActionDispatch::TestProcess#cookies`. Ruby's `new` inside a class method
+   * resolves to the receiving subclass, so `NullCookieJar.build` builds a
+   * `NullCookieJar`.
    *
    * @internal
    */
-  static build(
+  static build<T extends CookieJar>(
+    this: new (options?: CookieJarOptions) => T,
     request: RequestCookieMethodsHost | { cookiesAppOptions?: CookieJarOptions } | null | undefined,
     cookies: Record<string, string>,
-  ): CookieJar {
+  ): T {
     // Rails: `jar = new(req); jar.update(cookies); jar` — the request stores
     // the options used by signed/encrypted jars. We forward
     // `request.cookiesAppOptions` if the host exposes it so signed/encrypted
     // accessors can find their secrets in test setups.
-    const jar = new CookieJar(request?.cookiesAppOptions ?? {});
+    const jar = new this(request?.cookiesAppOptions ?? {});
     if (request && "env" in request) jar._request = request;
     for (const [k, v] of Object.entries(cookies ?? {})) {
       jar._cookies.set(k, v);
@@ -246,6 +261,46 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 
   // --- Response headers ---
+
+  /**
+   * Mirrors `CookieJar#write` (cookies.rb:429-439) — flushes the accumulated
+   * set/delete sets onto a `Rack::Response`.
+   *
+   * trails' `Cookies` middleware still flushes through
+   * {@link CookieJar.getSetCookieHeaders} (it merges into a header tuple rather
+   * than a `Rack::Response`), so this is the Rails seam
+   * {@link NullCookieJar} overrides rather than the only writer; converging the
+   * middleware onto it is story
+   * `converge-cookies-middleware-onto-cookie-jar-write`.
+   */
+  write(response: CookieResponse): void {
+    for (const [name, value] of this._setCookies) {
+      if (this.isWriteCookie(value)) {
+        response.setCookie(name, value);
+      }
+    }
+
+    for (const [name, value] of this._deletedCookies) {
+      response.deleteCookie(name, value);
+    }
+  }
+
+  /**
+   * Mirrors `mattr_accessor :always_write_cookie, default: false`
+   * (cookies.rb:441).
+   */
+  static alwaysWriteCookie = false;
+
+  /** Mirrors `CookieJar#write_cookie?` (cookies.rb:448-450). @internal */
+  private isWriteCookie(cookie: SetCookieOptions): boolean {
+    const request = this._request as unknown as { isSsl?(): boolean; host?: string } | undefined;
+    return (
+      request?.isSsl?.() === true ||
+      !cookie.secure ||
+      CookieJar.alwaysWriteCookie ||
+      (request?.host ?? "").endsWith(".onion")
+    );
+  }
 
   getSetCookieHeaders(): string[] {
     const headers: string[] = [];

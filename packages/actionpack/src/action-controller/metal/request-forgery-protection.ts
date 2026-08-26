@@ -6,6 +6,12 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import {
+  CookieJar,
+  cookieJar,
+  type RequestCookieMethodsHost,
+} from "../../action-dispatch/middleware/cookies.js";
+import { Session, type Req } from "../../action-dispatch/request/session.js";
 import { ActionControllerError } from "./exceptions.js";
 
 export class InvalidAuthenticityToken extends ActionControllerError {
@@ -26,72 +32,90 @@ export interface ProtectionMethods {
   handleUnverifiedRequest(): void;
 }
 
-export class NullSessionHash {
-  /** Rails: `NullSessionHash#initialize(req)` (request_forgery_protection.rb:271-275). */
-  constructor(_req: unknown) {}
+/**
+ * The `ActionDispatch::Request` shape `NullSession#handle_unverified_request`
+ * writes (request_forgery_protection.rb:261-267). Ruby names none — it just
+ * calls the writers on the request.
+ *
+ * @noRailsEquivalent PERMANENT — structural stand-in for
+ * `ActionDispatch::Request`, which this file must not import (it would close a
+ * module cycle).
+ */
+export type NullSessionRequest = Req &
+  RequestCookieMethodsHost & {
+    session: unknown;
+    flash: unknown;
+    sessionOptions: Record<string, unknown>;
+  };
 
-  get(_key: string): unknown {
-    return undefined;
+/**
+ * Mirrors `NullSession::NullSessionHash`
+ * (request_forgery_protection.rb:270-287). Rails subclasses
+ * `Rack::Session::Abstract::SessionHash`; trails' analogue is
+ * `ActionDispatch::Request::Session`, which is the session object a trails
+ * request carries.
+ */
+export class NullSessionHash extends Session {
+  /** Mirrors `NullSessionHash#initialize` (rb:271-275). */
+  constructor(req: Req) {
+    super(null, req);
+    this.delegate = {};
+    this.loaded = true;
   }
-  set(_key: string, _value: unknown): void {}
-  has(_key: string): boolean {
-    return false;
-  }
-  delete(_key: string): boolean {
-    return false;
-  }
-  clear(): void {}
-  exists(): boolean {
-    return false;
-  }
-  enabled(): boolean {
-    return false;
-  }
-  destroy(): void {}
 
-  [key: string]: unknown;
+  /** Mirrors `NullSessionHash#destroy` (rb:278) — no-op. */
+  override destroy(): void {}
+
+  /** Mirrors `NullSessionHash#exists?` (rb:280-282). */
+  override isExists(): boolean {
+    return true;
+  }
+
+  /** Mirrors `NullSessionHash#enabled?` (rb:284-286). */
+  override isEnabled(): boolean {
+    return false;
+  }
 }
 
-export class NullCookieJar {
-  get(_key: string): undefined {
-    return undefined;
-  }
-  set(_key: string, _value: string): void {}
-  has(_key: string): boolean {
-    return false;
-  }
-  delete(_key: string): boolean {
-    return false;
-  }
-  get signed(): NullCookieJar {
-    return this;
-  }
-  get encrypted(): NullCookieJar {
-    return this;
-  }
+/**
+ * Mirrors `NullSession::NullCookieJar`
+ * (request_forgery_protection.rb:289-293).
+ */
+export class NullCookieJar extends CookieJar {
+  /** Mirrors `NullCookieJar#write(*)` (rb:290-292) — nothing. */
+  override write(): void {}
 
-  [key: string]: unknown;
+  /**
+   * trails' `Cookies` middleware flushes a jar through `getSetCookieHeaders`
+   * rather than Rails' `write(response)`, so the no-op above does not reach
+   * the emit path on its own; suppress there too until the middleware
+   * converges (story `converge-cookies-middleware-onto-cookie-jar-write`).
+   */
+  override getSetCookieHeaders(): string[] {
+    return [];
+  }
 }
 
 type Controller = Record<string, unknown>;
 
+/** Mirrors `ProtectionMethods::NullSession` (request_forgery_protection.rb:254-294). */
 export class NullSession implements ProtectionMethods {
   private _controller: Controller;
   constructor(controller: Controller) {
     this._controller = controller;
   }
+  /**
+   * Mirrors `NullSession#handle_unverified_request` (rb:261-267). Rails'
+   * `request.cookie_jar =` writer is the `RequestCookieMethods` mixin, which
+   * trails spells as a `this`-typed function whose optional argument is the
+   * write arm (cookies.ts `cookieJar`).
+   */
   handleUnverifiedRequest(): void {
-    const request = this._controller.request;
-    this._controller.session = new NullSessionHash(request);
-    this._controller.cookies = new NullCookieJar();
-    const flash = this._controller.flash;
-    if (
-      flash &&
-      typeof flash === "object" &&
-      typeof (flash as Record<string, unknown>).clear === "function"
-    ) {
-      (flash as { clear(): void }).clear();
-    }
+    const request = this._controller.request as NullSessionRequest;
+    request.session = new NullSessionHash(request);
+    request.flash = null;
+    request.sessionOptions = { skip: true };
+    cookieJar.call(request, NullCookieJar.build(request, {}));
   }
 }
 
