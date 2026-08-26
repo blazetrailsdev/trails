@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TypeMapInitializer
  */
 
-import type { Type } from "@blazetrails/activemodel";
+import { ArgumentError, type Type } from "@blazetrails/activemodel";
 
 import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
 import { Array as OidArray } from "./array.js";
@@ -155,7 +155,7 @@ export class TypeMapInitializer {
   }
 
   private assertValidRegistration(oid: number | string, oidType: unknown): number {
-    if (oidType == null) throw new Error(`can't register nil type for OID ${oid}`);
+    if (oidType == null) throw new ArgumentError(`can't register nil type for OID ${oid}`);
     return toInt(oid);
   }
 }
