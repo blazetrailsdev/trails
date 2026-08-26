@@ -1076,9 +1076,6 @@ export class ToSql extends Visitor {
       const segments = sql.split("?");
       for (let i = 0; i < segments.length; i++) {
         if (segments[i]) collector.append(segments[i]);
-        // Rails reads `o.positional_binds[bind_index]` (to_sql.rb:805) with no
-        // count check — validation belongs to the constructor
-        // (bound_sql_literal.rb:11-29) — and an out-of-range index is `nil`.
         if (i < segments.length - 1) this.visitBindValue(positionalBinds[i] ?? null, collector);
       }
     } else {
@@ -1089,8 +1086,6 @@ export class ToSql extends Visitor {
         if (m[2] !== undefined) {
           collector.append(m[2]);
         } else {
-          // `o.named_binds[$1.to_sym]` (to_sql.rb:815) is `nil` for an absent
-          // key, and `new_bind` binds it (to_sql.rb:794-795).
           this.visitBindValue(namedBinds[m[1]] ?? null, collector);
         }
       }

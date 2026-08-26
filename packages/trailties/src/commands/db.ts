@@ -1033,11 +1033,6 @@ export function dbCommand(): Command {
     .description("Show migration status")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      // Rails' `db:migrate:status` is a bare delegation to
-      // `DatabaseTasks.migrate_status` inside `with_temporary_pool_for_each`
-      // (`railties/databases.rake:229-233`) — the missing-table abort, the
-      // `database:` header and the column widths all live in
-      // `tasks/database_tasks.rb:302-315`.
       await forEachDatabase(opts, async (ctx) => {
         await withPrefixedStdout(ctx.prefix, () => DatabaseTasks.migrateStatus());
       });

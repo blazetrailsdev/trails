@@ -2397,10 +2397,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const rename = options.rename ?? {};
 
     let definition!: SQLite3TableDefinition;
-    // Rails forwards the WHOLE options hash, `:rename` included
-    // (sqlite3_adapter.rb:601-602): SQLite3 widens `valid_table_definition_options`
-    // with `:rename` (sqlite3/schema_statements.rb:131-133) so it survives
-    // `validate_create_table_options!` and reaches SQLite3::TableDefinition.
     await this.createTable(to, { ...options, id: false }, async (td) => {
       definition = td as SQLite3TableDefinition;
       if (Array.isArray(fromPrimaryKey)) definition.primaryKeys(fromPrimaryKey);

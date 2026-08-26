@@ -532,6 +532,14 @@ export class Migration {
    *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
    *   scope for the port, so the wrapper is not ported and the base
    *   `create_table` is what pairs here.
+   *
+   * Ruby resolves `t.enum` / `t.citext` on the yielded definition when the
+   * block runs (migration.rb:1024-1036), so a PG migration block reaches
+   * `PostgreSQL::ColumnMethods` with nothing declared. `Migration` names only
+   * the abstract `DatabaseAdapter`, whose block parameter is the abstract
+   * `TableDefinition`, and under `strictFunctionTypes` a narrower block is
+   * contravariantly rejected at the forward — so the caller's own annotation
+   * (`TD`) types the block and the forward carries the cast.
    */
   async createTable<TD extends TableDefinition = TableDefinition>(
     name: string,
@@ -552,14 +560,6 @@ export class Migration {
     fn?: (t: TD) => void,
   ): Promise<void> {
     const tname = this._pt(name);
-    // Ruby yields whatever `create_table_definition` built and resolves
-    // `t.enum` / `t.citext` on it at call time (migration.rb:1024-1036), so a
-    // PG migration block reaches `PostgreSQL::ColumnMethods` with no
-    // declaration. `Migration` names only the abstract `DatabaseAdapter`, whose
-    // block parameter is the abstract `TableDefinition`; under
-    // `strictFunctionTypes` a narrower block is contravariantly rejected here,
-    // which is why the forward is cast and the caller's own annotation (`TD`)
-    // is what types the block.
     await this.connection.createTable(
       tname,
       optionsOrFn as Parameters<DatabaseAdapter["createTable"]>[1],
@@ -919,6 +919,9 @@ export class Migration {
    *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
    *   scope for the port, so the wrapper is not ported and the base
    *   `create_join_table` is what pairs here.
+   *
+   * Same call-time block resolution as `createTable` above: the caller's own
+   * annotation (`TD`) types the block and the forward carries the cast.
    */
   async createJoinTable<TD extends TableDefinition = TableDefinition>(
     table1: string,
@@ -927,7 +930,6 @@ export class Migration {
     fn?: (t: TD) => void,
   ): Promise<void> {
     table1 = this._pt(table1);
-    // Same call-time resolution as `createTable` above.
     await this.connection.createJoinTable(
       table1,
       table2,

@@ -541,9 +541,6 @@ export class DatabaseTasks {
     // the same path (existsSync("") === false) and aborts with the filename in the message.
     if (!getFs().existsSync(filename)) {
       let message = `${filename} doesn't exist yet. Run \`bin/rails db:migrate\` to create it, then try again.`;
-      // Rails appends the second sentence `if defined?(::Rails.root)`
-      // (database_tasks.rb:485); trails' `Rails.root` seam is `trailsRoot()`,
-      // which is null when unset.
       const root = trailsRoot();
       if (root != null) {
         message += ` If you do not intend to use a database, you should instead alter ${root}/config/application.rb to limit the frameworks that will be loaded.`;

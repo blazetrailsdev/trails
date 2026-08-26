@@ -1506,7 +1506,6 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
     expect(() => DatabaseTasks.checkSchemaFile("")).toThrow(/doesn't exist yet/);
     expect(stderrWrites.join("")).toMatch(/nonexistent-awesome-file\.sql/);
     expect(stderrWrites.join("")).toMatch(/Run `bin\/rails db:migrate`/);
-    // `defined?(::Rails.root)` is false with the seam unset (database_tasks.rb:485).
     expect(stderrWrites.join("")).not.toMatch(/config\/application\.rb/);
     expect(exitCodes).toEqual([1, 1]);
 
