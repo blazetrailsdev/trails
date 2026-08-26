@@ -237,7 +237,7 @@ export class Version {
 export interface AbstractAdapter {
   createTable(
     tableName: string,
-    optionsOrFn?:
+    kwargsOrFn?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
@@ -525,10 +525,14 @@ export interface AbstractAdapter {
   createJoinTable(
     table1: string,
     table2: string,
-    optionsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
+    kwargsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void>;
-  dropJoinTable(table1: string, table2: string, options?: { tableName?: string }): Promise<void>;
+  dropJoinTable(
+    table1: string,
+    table2: string,
+    options?: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" },
+  ): Promise<void>;
   changeTable(
     tableName: string,
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
