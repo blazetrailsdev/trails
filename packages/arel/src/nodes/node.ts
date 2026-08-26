@@ -23,7 +23,7 @@ export const _engine: { current: ArelEngine | null } = { current: null };
  * (factory-methods.ts imports concrete node subclasses).
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class Node {
+export class Node {
   not(): Node {
     return new (assertRegistered(_Not, "Not"))(this);
   }

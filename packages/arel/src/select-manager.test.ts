@@ -54,7 +54,7 @@ describe("SelectManagerTest", () => {
     describe("as", () => {
       it("makes an AS node by grouping the AST", () => {
         const mgr = new SelectManager();
-        const as = mgr.as("foo");
+        const as = mgr.as(sql("foo"));
         expect(as.left).toBeInstanceOf(Nodes.Grouping);
         expect((as.left as Nodes.Grouping).expr).toBe(mgr.ast);
         expect(String(as.right)).toBe("foo");
@@ -70,7 +70,7 @@ describe("SelectManagerTest", () => {
         const mgr = new SelectManager();
         mgr.project(star());
         mgr.from(sql("zomg"));
-        const as = mgr.as("foo");
+        const as = mgr.as(sql("foo"));
         const outer = new SelectManager();
         outer.project(sql("name"));
         outer.from(as);
@@ -1188,30 +1188,6 @@ describe("SelectManagerTest", () => {
     );
   });
 
-  describe("joins", () => {
-    it("returns inner join sql", () => {
-      expect(
-        users
-          .project(users.get("name"), posts.get("title"))
-          .join(posts)
-          .on(users.get("id").eq(posts.get("user_id")))
-          .toSql(),
-      ).toBe(
-        'SELECT "users"."name", "posts"."title" FROM "users" INNER JOIN "posts" ON "users"."id" = "posts"."user_id"',
-      );
-    });
-
-    it("returns outer join sql", () => {
-      expect(
-        users
-          .project(star())
-          .outerJoin(posts)
-          .on(users.get("id").eq(posts.get("user_id")))
-          .toSql(),
-      ).toBe('SELECT * FROM "users" LEFT OUTER JOIN "posts" ON "users"."id" = "posts"."user_id"');
-    });
-  });
-
   it("group by and having", () => {
     expect(
       users
@@ -1270,12 +1246,6 @@ describe("SelectManagerTest", () => {
   it("comment ctor stores the values array", () => {
     const c = new Nodes.Comment(["hello", "world"]);
     expect(c.values).toEqual(["hello", "world"]);
-  });
-
-  describe("lock", () => {
-    it("adds a lock node", () => {
-      expect(users.project(star()).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
-    });
   });
 
   it("chaining returns the manager", () => {
@@ -1342,18 +1312,6 @@ describe("SelectManagerTest", () => {
     const froms = manager.froms;
     expect(froms.length).toBe(1);
     expect(froms[0]).toBe(users);
-  });
-
-  describe("window definition", () => {
-    it("takes a range frame, current row", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(users.get("id"));
-      const win = mgr.window("w");
-      win.frame(new Nodes.Range(new Nodes.CurrentRow()));
-      const sql = mgr.toSql();
-      expect(sql).toContain("RANGE");
-      expect(sql).toContain("CURRENT ROW");
-    });
   });
 
   it("should take an order", () => {
@@ -1470,17 +1428,6 @@ describe("SelectManagerTest", () => {
       expect(mgr.toSql()).toBe(
         'SELECT FROM "users" WINDOW "a_window" AS (RANGE UNBOUNDED FOLLOWING)',
       );
-    });
-  });
-
-  describe("delete", () => {
-    it("copies where", () => {
-      const mgr = new SelectManager(users);
-      mgr.project(star()).where(users.get("id").eq(1)).where(users.get("name").eq("Alice"));
-      const whereSql = mgr.whereSql()?.value;
-      expect(whereSql).toContain("WHERE");
-      expect(whereSql).toContain("AND");
-      expect(mgr.constraints.length).toBe(2);
     });
   });
 

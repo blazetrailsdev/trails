@@ -9,15 +9,10 @@ function ancestors(klass: unknown): unknown[] {
   return chain;
 }
 
-// `Arel::Nodes::Node` is instantiable in Ruby (node.rb:8); trails declares the
-// class `abstract` even though it has no abstract members, so the Rails bodies
-// below construct one through this cast.
-const NodeCtor = Nodes.Node as unknown as new () => Nodes.Node;
-
 describe("TestNode", () => {
   const users = new Table("users");
   it("includes factory methods", () => {
-    expect(typeof new NodeCtor().createJoin === "function").toBeTruthy();
+    expect(typeof new Nodes.Node().createJoin === "function").toBeTruthy();
   });
 
   it("all nodes are nodes", () => {

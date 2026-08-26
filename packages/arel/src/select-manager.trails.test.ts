@@ -68,4 +68,35 @@ describe("SelectManagerTest (trails)", () => {
       expect(mgr.lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
     });
   });
+
+  // `join`/`outerJoin` + `on` builder chain. Rails' select_manager_test.rb
+  // "joins" describe exercises the join SQL by handing `from` a pre-built
+  // Nodes::InnerJoin/OuterJoin instead, so the fluent path has no Rails
+  // counterpart test and is pinned here rather than under a Rails test name.
+  describe("join builder chain", () => {
+    const posts = new Table("posts");
+    const star = new Nodes.SqlLiteral("*");
+
+    it("builds INNER JOIN sql through join().on()", () => {
+      expect(
+        users
+          .project(users.get("name"), posts.get("title"))
+          .join(posts)
+          .on(users.get("id").eq(posts.get("user_id")))
+          .toSql(),
+      ).toBe(
+        'SELECT "users"."name", "posts"."title" FROM "users" INNER JOIN "posts" ON "users"."id" = "posts"."user_id"',
+      );
+    });
+
+    it("builds LEFT OUTER JOIN sql through outerJoin().on()", () => {
+      expect(
+        users
+          .project(star)
+          .outerJoin(posts)
+          .on(users.get("id").eq(posts.get("user_id")))
+          .toSql(),
+      ).toBe('SELECT * FROM "users" LEFT OUTER JOIN "posts" ON "users"."id" = "posts"."user_id"');
+    });
+  });
 });

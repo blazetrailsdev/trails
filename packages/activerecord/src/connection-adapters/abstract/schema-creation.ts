@@ -308,7 +308,7 @@ export class SchemaCreation {
     parts.push("INDEX");
     if (o.algorithm) parts.push(o.algorithm);
     if (o.ifNotExists) parts.push("IF NOT EXISTS");
-    if (index.type) parts.push(index.type.toUpperCase());
+    if (index.type) parts.push(index.type);
     parts.push(
       `${this.conn.quoteColumnName(index.name)} ON ${this.conn.quoteTableName(index.table)}`,
     );
