@@ -1,4 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
+import { toS } from "@blazetrails/activesupport";
 
 /**
  * Handles basic scalar values (strings, numbers, booleans) in where
@@ -23,7 +24,7 @@ export class BasicObjectHandler {
   }
 
   call(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
-    const bind = this._predicateBuilder.buildBindAttribute(String(attribute.name), value);
+    const bind = this._predicateBuilder.buildBindAttribute(toS(attribute.name), value);
     return attribute.eq(bind);
   }
 
