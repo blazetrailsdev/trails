@@ -274,9 +274,8 @@ export const Predications = {
     } else if (other.excludeEnd) {
       return this.gteq(other.begin).and(this.lt(other.end));
     } else if (rbEqual(other.begin, other.end)) {
-      // predications.rb:56 — Ruby `==`, a value comparison: two equal Dates or
-      // two equal bind attributes collapse to `eq` there. `rbEqual` is that
-      // send; JS `===` would only ever cover its identity arm.
+      // predications.rb:56's `==` is a value comparison; `===` covers only its
+      // identity arm, so two equal Dates would not collapse.
       return this.eq(other.begin);
     } else {
       const left = this.quotedNode(other.begin);
