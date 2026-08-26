@@ -590,14 +590,8 @@ export async function pluck(
   }
 
   return this.withConnection(async () => {
-    // Resolve any deferred distinct-PK subquery markers to a literal id list
-    // before compiling, so pluck (like Rails) emits `pk IN (ids)` rather than
-    // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
-    await this._materializeDeferredDistinctPkPredicates();
     // Mirrors Calculations#pluck: a contradictory where-clause (`where(col: [])`,
     // an empty `IN`) returns `ActiveRecord::Result.empty` without issuing SQL.
-    // Checked after materialization so a deferred distinct-PK
-    // predicate that resolves to an empty id set also short-circuits.
     if (this.whereClause.isContradiction()) {
       return typeCastPluckValues(Result.empty(), columnNames, this as any);
     }
@@ -624,12 +618,6 @@ export async function pluck(
       // recursive `pluck` takes the plain branch below — no infinite loop.
       return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
     }
-
-    // Reflect the schema before casting results so the model's attribute
-    // types are available — Rails' type_cast_pluck_values reads
-    // model.attribute_types, which runs load_schema first. pluck issues a
-    // raw query (no toArray()), so it must trigger the load itself.
-    await this._model.ensureSchemaLoaded();
 
     this._model.disallowRawSqlBang(
       this.flattenedArgs(columnNames) as (string | symbol | Nodes.Node)[],
@@ -783,13 +771,6 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     ? Result.empty()
     : await this.skipQueryCacheIfNecessary(() =>
         this.withConnection(async (c) => {
-          // trails preliminaries the Rails body has no counterpart for,
-          // carried over from the delegation this replaces:
-          // `type_cast_pluck_values` reads `model.attribute_types`, and a
-          // deferred distinct-PK marker must resolve to a literal id list
-          // before the arel compiles.
-          await this._model.ensureSchemaLoaded();
-          await relation._materializeDeferredDistinctPkPredicates();
           const manager = relation.arel();
           return c.selectAll(manager, `${this.model.name} Ids`);
         }),
@@ -866,6 +847,18 @@ export interface CalculationMethods {
  * {@link withConnection}. Releases the connection afterwards instead of
  * permanently leasing it via the deprecated `.connection` getter under
  * `permanent_connection_checkout = :deprecated | :disallowed`.
+ *
+ * It also carries the two preliminaries no Rails calculation body has a
+ * counterpart for, so none of the ported bodies spells them:
+ *
+ * - `load_schema` runs lazily off `model.attribute_types` in Ruby
+ *   (`type_cast_pluck_values`, calculations.rb:333); trails' load is async, so
+ *   it is awaited here — inside the lease, so `reflectionAdapter` reuses the
+ *   threaded connection rather than falling back to `leaseConnectionSync`.
+ * - Rails materializes a `distinct_relation_for_primary_key` subquery into a
+ *   literal id list at `.where()`-build time (finder_methods.rb:463); trails'
+ *   `.where()` is sync, so the deferred marker resolves here, before the
+ *   calculation compiles its where clause.
  */
 function inQueryConnection<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
@@ -873,10 +866,7 @@ function inQueryConnection<A extends unknown[], R>(
   return function (this: CalculationRelation, ...args: A): Promise<R> {
     const modelClass = (this as { _model?: unknown })._model as typeof Base;
     return modelClass.withConnection(async () => {
-      // Resolve any deferred distinct-PK subquery markers to a literal id list
-      // before the calculation compiles its where clause, so count/sum/avg/min/
-      // max emit `pk IN (ids)` rather than the inline `IN (SELECT … LIMIT n)`
-      // MySQL rejects (Rails materializes these at `.where()`-build time).
+      await modelClass.ensureSchemaLoaded();
       await (
         this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> }
       )._materializeDeferredDistinctPkPredicates?.();
@@ -898,14 +888,14 @@ export const Calculations = {
   asyncSum,
   calculate: inQueryConnection(calculate),
   // `pluck` / `ids` do their own `with_connection` (and `skip_query_cache_if_necessary`)
-  // around the one query they issue, exactly as calculations.rb:316/396 does —
-  // so they are NOT wrapped in `inQueryConnection`, which is the seam for the
-  // aggregate methods whose query is built inside `calculate`.
-  pluck,
+  // around the one query they issue, exactly as calculations.rb:316/396 does;
+  // the outer wrap here is re-entrant and adds no second lease — it is only
+  // the seam carrying the two non-Rails preliminaries off their ported bodies.
+  pluck: inQueryConnection(pluck),
   asyncPluck,
   pick,
   asyncPick,
-  ids,
+  ids: inQueryConnection(ids),
   asyncIds,
 } as const;
 

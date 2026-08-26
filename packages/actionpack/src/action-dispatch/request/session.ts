@@ -135,8 +135,10 @@ function objectIdHex(object: object): string {
 export class Session {
   private by: SessionStore | null;
   private req: Req;
-  private delegate: Record<string, unknown>;
-  private loaded: boolean;
+  /** Rails' `@delegate` — `protected` so `NullSessionHash` can seed it. */
+  protected delegate: Record<string, unknown>;
+  /** Rails' `@loaded` — `protected` so `NullSessionHash` can seed it. */
+  protected loaded: boolean;
   private exists: boolean | null;
   private enabled: boolean;
   private _idWas: unknown;
