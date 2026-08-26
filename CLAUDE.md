@@ -162,11 +162,13 @@ tasks repo enumerates these as convergence classes.
 - Do NOT use subagents unless explicitly requested.
 - **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
-  `activerecord` plan doc. `docs/activerecord/` is frozen (RFC 0011 Phase 4);
+  `activerecord` plan doc, and never by hand-editing a story's `status:` or
+  `pr:` (see "Task state vs. task prose" below — that edit does nothing and
+  fails CI). `docs/activerecord/` is frozen (RFC 0011 Phase 4);
   CI's `Docs ActiveRecord Freeze` job fails any PR that adds or modifies a
   file there (allowlist: `docs/activerecord/parity-verification.md`). Other
   `docs/` trees are not policed and stay live until their own cutover.
-- **The `tasks` CLI itself lives in the tasks repo** (`scripts/cli.ts`, entered
+- **The `tasks` CLI itself lives in the tasks repo** (`src/cli.ts`, entered
   through its `bin/tasks`). trails' `pnpm tasks` is a shim,
   `scripts/tasks/tasks.sh`, that finds a tasks checkout and hands off; it does
   not set `$TASKS_DIR`, so the CLI still resolves the working tree it acts on
@@ -191,6 +193,57 @@ tasks repo enumerates these as convergence classes.
   `pnpm vitest run -t "specific test name"`. The full AR suite forks 6
   workers per invocation; multiple parallel agents running it concurrently
   saturate the host (load avg 100+).
+
+### Task state vs. task prose
+
+The tasks repo is a **SQLite database plus markdown**, not git-as-database. A
+story's _prose and structure_ live in the `.md` file and change by PR; a story's
+_state_ lives in the DB and changes only through a `tasks` verb. Every
+frontmatter field has exactly one authority, and the two sets are disjoint —
+which is why `tasks ingest` (git → DB) and `tasks export` (DB → git) can both
+run without ever fighting over a field.
+
+| Owner        | Fields                                                                                       | Changed by                     |
+| ------------ | -------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Markdown** | `title`, `rfc`, `cluster`, `deps`, `deps-rfc`, `est-loc`, `priority`, `packages`, body prose | edit the file, open a PR       |
+| **Database** | `status`, `pr`, `claim`, `assignee`, `blocked-by`, `closed-reason`, `updated`                | a `tasks` verb — never by hand |
+
+Two rules of thumb cover every field, including ones this table forgets:
+
+- **Rewriting what the work IS** — retitling, resizing `est-loc`, adding a
+  dependency, rewriting acceptance criteria — is a markdown edit. Edit the file,
+  commit, open a PR; ingest picks it up when the PR merges.
+- **Recording what HAPPENED to the work** — claimed, in progress, done, blocked,
+  closed — is a verb: `tasks claim <id>` (`--assignee <name>` for `assignee`),
+  `tasks in-progress <id> --pr N`, `tasks done <id> --pr N`,
+  `tasks block <id> <reason>`, `tasks close <id> <reason>`,
+  `tasks status-set <id> <status>` for anything else. `updated` is stamped by
+  whichever verb you ran.
+
+**Hand-editing a DB-owned field is the one failure worth spelling out**, because
+it is silent rather than loud: ingest skips DB-owned columns by design, so
+`status: done` typed into a story file reads correctly to a human, merges
+cleanly, and marks nothing done. `tsx scripts/check-owned-fields.ts` in the
+tasks repo turns that into a CI red naming the verb to use instead — but the
+rule is the point, not the guard.
+
+Two traps follow from the DB being a real, _shared_ database:
+
+- **`tasks ingest` is a sync verb, not an inspection verb.** It publishes what
+  is on your branch into the shared DB. Do not reach for it to check that a
+  branch's stories parse — that is `pnpm tasks show` / `pnpm tasks list` /
+  `pnpm validate`. Running ingest from a worktree published 10 unmerged stories
+  into the shared DB once already.
+- **A worktree's `.git` is a pointer file into the main checkout**, so the
+  `.git/tasks.db` your worktree resolves IS the shared database — every other
+  agent reads and writes the same rows. Gitignored does not mean local.
+
+**Creating a story is authoring, so it is markdown**: `pnpm tasks new <rfc>
+<slug> --body-file <path>` writes the file, commits it, and ingests it to create
+the row. Do not insert a row any other way. The `status:` in a _brand-new_ file
+is honored as a birth seed on insert only and ignored by every later ingest — a
+seed value, not a sync value, which is why the CI guard judges modified stories
+and not added ones.
 
 ## Conventions
 
