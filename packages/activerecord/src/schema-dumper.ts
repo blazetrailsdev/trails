@@ -21,7 +21,7 @@
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/abstract/schema-dumper.js";
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type { Type } from "@blazetrails/activemodel";
@@ -441,7 +441,7 @@ export abstract class SchemaDumper {
 
   /**
    * Per-table primary-key column order from `@connection.primary_key(table)`.
-   * Populated by `table()` before column iteration so `emitTable` can render
+   * Populated by `table()` before column iteration so it can render
    * `primaryKey: [...]` (and pick the single-PK column) in PK definition order
    * rather than introspection/declaration order. Mirrors Rails' reliance on
    * `@connection.primary_key(table)`, which already returns columns in key order.
@@ -563,7 +563,7 @@ export abstract class SchemaDumper {
     // (PostgreSQLAdapter, SQLite3Adapter) implement `tables()` /
     // `columns()` / `indexes()` and so also satisfy the SchemaSource
     // duck type. The adapter-bridging path (AdapterSchemaSource)
-    // does the column normalization expected by emitTable — skipping
+    // does the column normalization expected by `table` — skipping
     // it would leak raw adapter column shapes (e.g. `scale: null`)
     // into dumps.
     if (isDatabaseAdapter(pool)) {
@@ -619,7 +619,7 @@ export abstract class SchemaDumper {
     // Instantiate the adapter-specific subclass when the adapter exposes
     // createSchemaDumper() (PostgreSQLAdapter and Mysql2Adapter). Otherwise
     // `create` resolves to the ConnectionAdapters subclass via its redirect —
-    // the single emitTable/columnSpec dispatch, never the bare base.
+    // the single columnSpec dispatch, never the bare base.
     let dumper: SchemaDumper;
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
       dumper = (source as any).createSchemaDumper({}) as SchemaDumper;
@@ -739,76 +739,24 @@ export abstract class SchemaDumper {
   }
 
   /**
+   * Mirrors `def table(table, stream)` (schema_dumper.rb:157-229) — the whole
+   * `create_table` block is emitted here, as in Rails: the header and primary
+   * key, `format_options(table_options)`, the per-column loop, then the
+   * in-create index/constraint calls.
+   *
    * @internal
    *
-   * @missingRailsCall column_spec — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
-   *   Rails' `table` emits the columns inline; the port's `table` hands that
-   *   half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall column_spec_for_primary_key — CONVERGEABLE: verified at
-   *   schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the
-   *   port's `table` hands that half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall exclusion_constraints_in_create — CONVERGEABLE: verified at
-   *   schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the
-   *   port's `table` hands that half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall format_colspec — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
-   *   Rails' `table` emits the columns inline; the port's `table` hands that
-   *   half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall format_options — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
-   *   Rails' `table` emits the columns inline; the port's `table` hands that
-   *   half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall indexes_in_create — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
-   *   Rails' `table` emits the columns inline; the port's `table` hands that
-   *   half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall table_options — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
-   *   Rails' `table` emits the columns inline; the port's `table` hands that
-   *   half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall unique_constraints_in_create — CONVERGEABLE: verified at
-   *   schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the
-   *   port's `table` hands that half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
-   * @missingRailsCall valid_type? — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
-   *   Rails' `table` emits the columns inline; the port's `table` hands that
-   *   half to `emitTable`
-   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
-   *   call. The gate credits same-FILE helpers only, so the delegation reads as
-   *   an omission. Convergence is RFC 0051 story
-   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsArgs indexes_in_create — PERMANENT: `indexes_in_create` reads
+   *   `@connection.indexes(table)` itself (schema_dumper.rb:245); that read is
+   *   async in trails while `indexesInCreate` is sync, so the list is awaited
+   *   here and passed as a third argument.
    */
   async table(table: string, stream: string[]): Promise<void> {
-    // Mirrors Rails' reliance on `@connection.primary_key(table)`: capture the
-    // authoritative PK column order before iterating columns so `emitTable` /
-    // `resolvePrimaryKeyColumns` render composite/promoted keys in key order.
+    // Rails reads `@connection.supports_virtual_columns?` and
+    // `@connection.primary_key(table)` inline (schema_dumper.rb:164,
+    // abstract/schema_dumper.rb:47). Both are async in trails while the
+    // column-spec chain below is sync, so they are resolved here — the one
+    // async point above the emission — and read back synchronously.
     const adapter = this._adapter();
     if (adapter && typeof adapter.supportsVirtualColumns === "function") {
       try {
@@ -824,32 +772,122 @@ export abstract class SchemaDumper {
         // Live introspection is best-effort; fall through to declaration order.
       }
     }
-    this.tableName = table;
+
+    const columns = await this._source.columns(table, this.primaryKeyOrderCache[table]);
+
     try {
-      const columns = await this._source.columns(table, this.primaryKeyOrderCache[table]);
-      const rawIndexes = await this._source.indexes(table);
-      const indexes = await this.filterIndexesForDump(table, rawIndexes);
-      const adapterTableOpts = await this.fetchTableOptions(table);
-      const inlineLines: string[] = [];
-      const remaining = await this.gatherInlineConstraints(table, inlineLines);
-      this.emitTable(stream, table, columns, indexes, adapterTableOpts, inlineLines);
-      if (remaining && remaining.length > 0) stream.push("", ...remaining);
+      this.tableName = table;
+
+      // Rails calls `@connection.table_options(table)` at schema_dumper.rb:187,
+      // AFTER `column_spec_for_primary_key`. trails has to read it before the
+      // column-spec chain: MySQL's `schemaCollation` compares against the table
+      // collation, which Rails fetches lazily inside `schema_collation`
+      // (mysql/schema_dumper.rb:66-71) — an async query here, so `tableOptions`
+      // is what prefills that cache, and the primary key's own collation would
+      // otherwise be compared against a cold one. It stays inside the `begin`,
+      // where Rails makes the call, so a failing options query still degrades to
+      // the one-table "Could not dump" comment (`:220-224`).
+      const tableOptions = await this.tableOptions(table);
+
+      const tbl: string[] = [];
+
+      // first dump primary key column
+      const pk = this.resolvePrimaryKeyColumns(table, columns);
+
+      const stripped = this.removePrefixAndSuffix(table);
+      const opts: string[] = [];
+      if (pk.length > 1) {
+        // Rails' Array case (schema_dumper.rb:181-182).
+        opts.push(`primaryKey: ${JSON.stringify(pk.map((c) => c.name))}`);
+      } else if (pk.length === 1) {
+        // Rails' String case (schema_dumper.rb:170-179).
+        const pkcol = pk[0];
+        if (pkcol.name !== "id") opts.push(`primaryKey: ${JSON.stringify(pkcol.name)}`);
+        let pkcolspec = this.columnSpecForPrimaryKey(pkcol as Column);
+        if (Object.keys(pkcolspec).length > 0) {
+          if (!Object.keys(pkcolspec).every((k) => k === "id" || k === "default")) {
+            const { id: type, ...rest } = pkcolspec;
+            pkcolspec = { id: { ...(type != null ? { type } : {}), ...rest } };
+          }
+          opts.push(this.formatColspec(pkcolspec));
+        }
+      } else {
+        opts.push("id: false");
+      }
+
+      if (isPresent(tableOptions)) {
+        opts.push(this.formatOptions(tableOptions));
+      }
+
+      opts.push('force: "cascade"');
+      tbl.push(
+        `  await ctx.createTable(${JSON.stringify(stripped)}, { ${opts.join(", ")} }, (t) => {`,
+      );
+
+      // The single-PK column name Rails skips in the column loop
+      // (`next if column.name == pk`). Composite PKs (Rails' Array case) and
+      // PK-less tables never skip a column.
+      const singlePkName = pk.length === 1 ? pk[0].name : undefined;
+
+      // then dump all non-primary key columns
+      for (const column of columns) {
+        if (!this.validType(column.type))
+          throw new Error(
+            `Unknown type '${(column as Column).sqlType ?? ""}' for column '${column.name}'`,
+          );
+        if (column.name === singlePkName) continue;
+
+        const [type, colspec] = this.columnSpec(column as Column);
+        const optStr =
+          Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
+        if (this._isDslHelper(type)) {
+          tbl.push(`    t.${type}(${JSON.stringify(column.name)}${optStr});`);
+        } else if ((column as { isEnum?: boolean }).isEnum && type === "enum") {
+          tbl.push(`    t.enum(${JSON.stringify(column.name)}${optStr});`);
+        } else {
+          const colType = type === "enum" ? ((column as Column).sqlType ?? type) : type;
+          tbl.push(
+            `    t.column(${JSON.stringify(column.name)}, ${JSON.stringify(colType)}${optStr});`,
+          );
+        }
+      }
+
+      // Rails emits the in-create index/constraint calls inside the block, on
+      // the `t` builder (schema_dumper.rb:209-212). trails' DSL exposes
+      // `addIndex` / `addExclusionConstraint` / `addUniqueConstraint` on `ctx`
+      // rather than on the `TableDefinition` the callback receives, so those
+      // three land after the block. They are called here, in Rails' order, and
+      // write into their own buffers; only the emission point moves.
+      const indexLines: string[] = [];
+      const indexes = await this.filterIndexesForDump(table, await this._source.indexes(table));
+      this.indexesInCreate(table, indexLines, indexes);
+
+      const remaining = await this.checkConstraintsInCreate(table, tbl);
+
+      const constraintLines: string[] = [];
+      if (adapter?.supportsExclusionConstraints?.())
+        await this.exclusionConstraintsInCreate?.(table, constraintLines);
+      if (adapter?.supportsUniqueConstraints?.())
+        await this.uniqueConstraintsInCreate?.(table, constraintLines);
+
+      tbl.push("  });");
+      tbl.push(...indexLines);
+      if (remaining && remaining.length > 0) tbl.push("", ...remaining);
+      tbl.push(...constraintLines);
+
+      stream.push(...tbl);
+    } catch (e) {
+      // Rails prints `e.class` (schema_dumper.rb:221). The raise above is a bare
+      // `raise StandardError` (`:196`), and JS' root `Error` is the analogue of
+      // Ruby's rescuable root, so an unnamed Error prints as StandardError; a
+      // subclass that carries its own Rails class name on `name` keeps it.
+      const cls = e instanceof Error && e.name !== "Error" ? e.name : "StandardError";
+      const message = e instanceof Error ? e.message : String(e);
+      stream.push(`# Could not dump table ${JSON.stringify(table)} because of following ${cls}`);
+      stream.push(`#   ${message}`);
     } finally {
       this.tableName = undefined;
     }
-  }
-
-  /**
-   * Collect inline constraint lines (check / exclusion / unique) to emit
-   * inside the createTable block. Subclasses override to add adapter-specific
-   * constraints. Base implementation handles check constraints.
-   * @internal
-   */
-  protected async gatherInlineConstraints(
-    tableName: string,
-    stream: string[],
-  ): Promise<string[] | undefined> {
-    return this.checkConstraintsInCreate(tableName, stream);
   }
 
   /**
@@ -926,8 +964,13 @@ export abstract class SchemaDumper {
     return indexes;
   }
 
-  /** @internal */
-  protected fetchTableOptions(_tableName: string): Promise<Record<string, unknown>> {
+  /**
+   * Mirrors the `@connection.table_options(table)` read at schema_dumper.rb:185.
+   * Dialects whose adapter exposes table options override this; the default is
+   * Rails' `AbstractAdapter#table_options`, which returns nothing.
+   * @internal
+   */
+  protected tableOptions(_tableName: string): Promise<Record<string, unknown>> {
     return Promise.resolve({});
   }
 
@@ -988,25 +1031,19 @@ export abstract class SchemaDumper {
    */
   protected abstract validType(type: string | null | undefined): boolean;
 
-  /** @internal */
-  protected abstract emitTable(
-    stream: string[],
-    tableName: string,
-    columns: ColumnInfo[],
-    indexes: IndexInfo[],
-    adapterTableOpts?: Record<string, unknown>,
-    inlineConstraints?: string[],
-  ): void;
+  /**
+   * Rails defines `exclusion_constraints_in_create` / `unique_constraints_in_create`
+   * only on the PostgreSQL dumper and calls them from this base's `table`, behind
+   * `@connection.supports_exclusion_constraints?` / `supports_unique_constraints?`
+   * (schema_dumper.rb:211-212). The optional declarations are the TS spelling of
+   * that: no base implementation, resolved by dynamic dispatch when the dialect
+   * has one.
+   * @internal
+   */
+  protected exclusionConstraintsInCreate?(table: string, stream: string[]): Promise<void>;
 
   /** @internal */
-  protected abstract emitTableBody(
-    stream: string[],
-    tableName: string,
-    columns: ColumnInfo[],
-    indexes: IndexInfo[],
-    adapterTableOpts?: Record<string, unknown>,
-    inlineConstraints?: string[],
-  ): void;
+  protected uniqueConstraintsInCreate?(table: string, stream: string[]): Promise<void>;
 
   /** @internal */
   protected abstract columnSpec(column: Column): [string, Record<string, unknown>];
@@ -1028,10 +1065,10 @@ export abstract class SchemaDumper {
    * inside `schema_type_with_virtual` (abstract/schema_dumper.rb:47).
    *
    * trails' predicate is async (it awaits `databaseVersion`) while the
-   * column-spec chain below it is synchronous — `emitTable` is also reached from
-   * the sync mock-source dump path, which raises on any Promise. So the answer
-   * is resolved once in `table()`, the one async point above the emitter, and
-   * read synchronously where Ruby reads the connection.
+   * column-spec chain below it is synchronous, and the emission is also reached
+   * from the sync mock-source dump path, which raises on any Promise. So the
+   * answer is resolved once at the top of `table()`, the one async point above
+   * the emission, and read synchronously where Ruby reads the connection.
    * @internal
    */
   protected supportsVirtualColumns = false;
@@ -1235,7 +1272,7 @@ export abstract class SchemaDumper {
   /**
    * Returns true when `dslType` is a TableDefinition helper method
    * (e.g. `"string"`, `"integer"`, `"virtual"`, `"serial"`). Used by the
-   * adapter subclass's `emitTable` override to dispatch column lines.
+   * `table`'s column loop to dispatch column lines.
    * @internal
    */
   protected _isDslHelper(dslType: string): boolean {

@@ -83,7 +83,7 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
 });
 
 // Story 3.3-U1: columnSpec must emit directly-emittable TypeScript-DSL text
-// (not Ruby schema.rb syntax) so a later story (3.3-U3) can route emitTable
+// (not Ruby schema.rb syntax) so the base `table` can route its column loop
 // through it via formatColspec. These pin the prerequisite.
 describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
   const dumper = SchemaDumper.create(emptySource) as any;
