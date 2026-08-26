@@ -22,7 +22,8 @@ import {
   toBytes,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/date";
+import { Rational, Temporal } from "@blazetrails/date";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { toS } from "@blazetrails/activesupport";
@@ -126,9 +127,29 @@ export function unquoteIdentifier(identifier: string | null | undefined): string
   return identifier ?? null;
 }
 
-/** @internal */
+/**
+ * Mirrors: MySQL::Quoting#cast_bound_value (mysql/quoting.rb:54-69).
+ *
+ * Ruby's `Rational` and `BigDecimal` are both `Numeric`, so `when Rational`
+ * (rb:56-57) has to precede it, and a `BigDecimal` lands on `when Numeric`
+ * (rb:58-59) — leaving `when BigDecimal` (rb:60-61) shadowed and unreachable in
+ * Ruby too. The reachable arm is `Numeric#to_s`, which for a BigDecimal is
+ * Ruby's engineering-notation default, NOT the `"F"` form the dead arm asks
+ * for: `BigDecimal("123456.789").to_s` is `0.123456789e6` (verified on MRI).
+ * `toString` defaults to `"F"` here, so the format is passed explicitly.
+ *
+ * @internal
+ */
 export function castBoundValue(value: unknown): unknown {
+  if (value instanceof Rational) {
+    // `Rational#to_f` is a Ruby Float, and `Float#to_s` always carries a
+    // fractional part — `Rational(0).to_f.to_s` is "0.0" where `String(0)`
+    // is "0". JS has one numeric type, so the ".0" is restored here.
+    const f = value.toF();
+    return Number.isInteger(f) ? `${f}.0` : String(f);
+  }
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (value instanceof BigDecimal) return value.toString("E");
   if (value === true) return "1";
   if (value === false) return "0";
   return value;

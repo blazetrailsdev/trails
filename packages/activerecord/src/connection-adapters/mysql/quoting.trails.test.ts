@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
+import { Rational, Temporal } from "@blazetrails/date";
+import { BigDecimal } from "@blazetrails/activesupport";
 import {
   quoteColumnName,
   typeCast as typeCastFn,
@@ -210,6 +211,24 @@ describe("MySQL quoting — castBoundValue", () => {
 
   it("passes strings through unchanged", () => {
     expect(castBoundValue("hello")).toBe("hello");
+  });
+
+  // A BigDecimal is Numeric in Ruby, so it lands on `when Numeric` (rb:58-59)
+  // and renders through `to_s` with no format — engineering notation, not the
+  // fixed form `when BigDecimal` (rb:60-61) asks for and never reaches. MRI:
+  // `BigDecimal("123456.789").to_s` => "0.123456789e6".
+  it("renders a BigDecimal in Ruby's engineering-notation default", () => {
+    expect(castBoundValue(new BigDecimal("123456.789"))).toBe("0.123456789e6");
+    expect(castBoundValue(new BigDecimal("1234.5"))).toBe("0.12345e4");
+    expect(castBoundValue(new BigDecimal(0))).toBe("0.0");
+  });
+
+  // rb:56-57 `when Rational then value.to_f.to_s`. Ruby's Float#to_s always
+  // carries a fractional part, so an integral value keeps its ".0".
+  it("renders a Rational as its Float to_s", () => {
+    expect(castBoundValue(new Rational(0, 1))).toBe("0.0");
+    expect(castBoundValue(new Rational(3, 2))).toBe("1.5");
+    expect(castBoundValue(new Rational(1, 3))).toBe("0.3333333333333333");
   });
 });
 

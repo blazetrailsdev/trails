@@ -127,8 +127,8 @@ export async function indexes(
 
     const cols = (
       await adapter.internalExecQuery(`PRAGMA index_info(${adapter.quote(idx.name)})`, "SCHEMA")
-    ).toArray() as Array<{ name: string | null; seqno: number }>;
-    const columnNames = cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name);
+    ).toArray() as Array<{ name: string | null }>;
+    const columnNames = cols.map((c) => c.name);
 
     const orders: Record<string, string> = {};
     let columns: string[] | string;
