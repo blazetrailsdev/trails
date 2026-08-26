@@ -34,6 +34,7 @@ import {
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
+import { Base } from "../../base.js";
 
 describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   let adapter: Mysql2Adapter;
@@ -293,6 +294,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     // extension asserts the warning was actually surfaced (regression catch).
     // Capture/restore sql_mode (mirrors Rails' ensure) — session variables are
     // not transactional, so rollback() does not revert SET SESSION.
+    const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
     await adapter.beginTransaction();
@@ -302,17 +304,19 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       );
       await adapter.executeMutation(`SET SESSION sql_mode=''`);
       await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const logger = { warn: vi.fn() };
+      Base.logger = logger as never;
       await withDbWarningsAction("log", async () => {
         await adapter.executeMutation(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );
       });
-      expect(warnSpy).toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
     } finally {
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      Base.logger = previousLogger;
     }
   });
 });

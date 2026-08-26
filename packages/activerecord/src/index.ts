@@ -79,11 +79,6 @@ export { ExplainSubscriber } from "./explain-subscriber.js";
 export { ExplainRegistry } from "./explain-registry.js";
 export { collectingQueriesForExplain, execExplain } from "./explain.js";
 
-// Wire LogSubscriber's Base resolver so it can delegate logger/filter
-// to ActiveRecord::Base without circular imports.
-import { setBaseResolver as _setBaseResolver } from "./log-subscriber.js";
-_setBaseResolver(() => _Base);
-
 // Same wiring for Migrator#execute_migration_in_transaction's "Migrating to"
 // log line (migration.rb:1532), which names Base at call time in Ruby.
 import { _registerBase as _registerBaseWithMigration } from "./migration.js";
