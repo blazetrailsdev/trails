@@ -23,45 +23,6 @@ interface CoderLike {
 }
 
 /**
- * Per-class registry mapping store-attribute name to its IndifferentCoder.
- * Populated by store() to wire implicit serialize semantics.
- *
- * @internal
- */
-const _storeCoders = new WeakMap<typeof Base, Map<string, IndifferentCoder>>();
-
-/**
- * Trails-only seam with no Rails counterpart. Rails gets implicit store
- * serialization inside `ActiveRecord::Store::ClassMethods#store`
- * (store.rb:106-109), which builds the coder and hands it straight to
- * `serialize store_attribute, coder: IndifferentCoder.new(...)` (store.rb:108),
- * installing it as the attribute's type; trails resolves the coder separately
- * at read time, so the mapping needs its own per-class registry. Not a writer
- * for any Ruby attribute.
- *
- * @internal
- */
-export function setStoreCoder(klass: typeof Base, attr: string, coder: IndifferentCoder): void {
-  let map = _storeCoders.get(klass);
-  if (!map) {
-    map = new Map();
-    _storeCoders.set(klass, map);
-  }
-  map.set(attr, coder);
-}
-
-/** @internal */
-export function getStoreCoder(klass: typeof Base, attr: string): IndifferentCoder | undefined {
-  let cls: typeof Base | null = klass;
-  while (cls && typeof cls === "function" && cls !== Function.prototype) {
-    const coder = _storeCoders.get(cls)?.get(attr);
-    if (coder) return coder;
-    cls = Object.getPrototypeOf(cls) as typeof Base | null;
-  }
-  return undefined;
-}
-
-/**
  * Wraps a column coder to ensure the deserialized value is a
  * HashWithIndifferentAccess and the serialized form is a plain hash.
  *
@@ -449,13 +410,6 @@ function dig(obj: unknown, key: string): unknown {
  *   store(User, 'settings', { accessors: ['theme', 'language'] })
  *   store(User, 'settings', { accessors: ['theme'], prefix: true })
  *   store(User, 'settings', { accessors: ['theme'], coder: JSON })
- *
- * @missingRailsArgs serialize — CONVERGEABLE: store.rb:108 passes the coder
- * inline as `coder: IndifferentCoder.new(store_attribute, coder)`. trails has to
- * hoist it into a local because the same instance is also handed to the
- * trails-only `_storeCoders` registry (see `setStoreCoder`), which exists only
- * because the read path resolves the coder separately from the attribute type.
- * Converges once that registry goes away.
  */
 export function store(
   modelClass: typeof Base,
@@ -475,21 +429,15 @@ export function store(
         `but got ${typeof coder}.`,
     );
   }
-  const indifferentCoder = new IndifferentCoder(storeAttribute, coder as CoderLike | null);
-  setStoreCoder(modelClass, storeAttribute, indifferentCoder);
-  // Structured column types (json/jsonb/hstore) have a type-level accessor and
-  // handle their own cast/serialize. Only patch readAttribute for plain text/string
-  // columns that have no type-level accessor.
-  const colType = (modelClass as any).typeForAttribute?.(storeAttribute);
-  if (!colType || typeof colType.accessor !== "function") {
-    if (!serialize) {
-      throw new ConfigurationError(
-        `store() requires serialize() to be registered before use. ` +
-          `Ensure base.ts (or the activerecord index) is imported before calling store().`,
-      );
-    }
-    serialize(modelClass, storeAttribute, { coder: indifferentCoder as any });
+  if (!serialize) {
+    throw new ConfigurationError(
+      `store() requires serialize() to be registered before use. ` +
+        `Ensure base.ts (or the activerecord index) is imported before calling store().`,
+    );
   }
+  serialize(modelClass, storeAttribute, {
+    coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
+  });
 
   if (options.accessors !== undefined) {
     storeAccessor(modelClass, storeAttribute, {
@@ -502,31 +450,22 @@ export function store(
 
 /**
  * Returns the HashAccessor class for a given store attribute column.
- * Raises ConfigurationError if the column is not a declared store and the
- * attribute type has no accessor.
+ * Raises ConfigurationError unless the attribute's type responds to `accessor`.
  *
  * Mirrors: ActiveRecord::Store#store_accessor_for (private)
  *
  * @internal
  */
 export function storeAccessorFor(this: Base, storeAttribute: string): typeof HashAccessor {
-  const modelClass = this.constructor as typeof Base;
-  // Rails dispatches via type_for_attribute(attr).accessor — check the type first.
-  const type = (modelClass as any).typeForAttribute?.(storeAttribute);
-  if (type && typeof type.accessor === "function") {
-    const accessor = type.accessor();
-    if (accessor && typeof accessor.read === "function" && typeof accessor.write === "function") {
-      return accessor as typeof HashAccessor;
-    }
+  const type = this.typeForAttribute(storeAttribute) as { accessor?: () => unknown };
+  if (typeof type?.accessor !== "function") {
+    throw new ConfigurationError(
+      `the column '${storeAttribute}' has not been configured as a store. ` +
+        `Please make sure the column is declared serializable via 'ActiveRecord.store' or, ` +
+        `if your database supports it, use a structured column type like hstore or json.`,
+    );
   }
-  // Check IndifferentCoder registered by store() (covers both standalone and Base.store()) — returns IndifferentHashAccessor.
-  const coder = getStoreCoder(modelClass, storeAttribute);
-  if (coder) return coder.accessor();
-  throw new ConfigurationError(
-    `the column '${storeAttribute}' has not been configured as a store. ` +
-      `Please make sure the column is declared serializable via 'ActiveRecord.store' or, ` +
-      `if your database supports it, use a structured column type like hstore or json.`,
-  );
+  return type.accessor() as typeof HashAccessor;
 }
 
 /**

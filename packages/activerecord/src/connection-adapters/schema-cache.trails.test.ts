@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaCache, FakePool } from "./schema-cache.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
+import { Column } from "./column.js";
+import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -105,5 +107,44 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     expect(index).toBeInstanceOf(IndexDefinition);
     expect(index.orders).toBe("desc");
     expect(index.columnOptions()).toEqual(live.columnOptions());
+  });
+});
+
+describe("SchemaCacheDeepDeduplicateTest", () => {
+  function makeColumn(name: string, sqlType: string): Column {
+    return new Column(name, null, new SqlTypeMetadata({ sqlType, type: sqlType }), true);
+  }
+
+  it("the derive step shares structurally identical columns between tables", () => {
+    // `derive_columns_hash_and_deduplicate_values` (`schema_cache.rb:440-446`)
+    // runs every cache through `deep_deduplicate`, whose `Deduplicable` arm is
+    // `-value` — the registry lookup that collapses equal value objects onto
+    // one frozen instance (`deduplicable.rb:18`).
+    const cache = new SchemaCache();
+    cache.initWith({
+      columns: new Map([
+        ["people", [makeColumn("id", "integer")]],
+        ["places", [makeColumn("id", "integer")]],
+      ]),
+    });
+
+    const columns = (cache as unknown as { _columns: Map<string, Column[]> })._columns;
+    expect(columns.get("people")![0]).toBe(columns.get("places")![0]);
+    expect(Object.isFrozen(columns.get("people")![0])).toBe(true);
+  });
+
+  it("deduplication leaves indexes as IndexDefinition instances", () => {
+    const cache = new SchemaCache();
+    cache.initWith({
+      indexes: new Map([
+        ["people", [new IndexDefinition("people", "index_people_on_id", true, ["id"])]],
+      ]),
+    });
+
+    const [index] = (cache as unknown as { _indexes: Map<string, IndexDefinition[]> })._indexes.get(
+      "people",
+    )!;
+    expect(index).toBeInstanceOf(IndexDefinition);
+    expect(index.name).toBe("index_people_on_id");
   });
 });

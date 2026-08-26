@@ -8,6 +8,8 @@
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
+import { deduplicate } from "./deduplicable.js";
+import type { Deduplicable } from "./deduplicable.js";
 import type { ColumnCoder } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { Column as PostgresqlColumn } from "./postgresql/column.js";
@@ -224,7 +226,10 @@ export class SchemaCache {
 
     this._version = (coder["version"] as string | number) ?? null;
 
-    this.deriveColumnsHashAndDeduplicateValues();
+    // `unless coder["deduplicated"]` (`schema_cache.rb:289-291`).
+    if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
+      this.deriveColumnsHashAndDeduplicateValues();
+    }
   }
 
   isCached(tableName: string): boolean {
@@ -425,8 +430,8 @@ export class SchemaCache {
     return withConnection(pool, async (connection) => {
       if (typeof connection.indexes === "function") {
         if (await this.dataSourceExists(connection, tableName)) {
-          const idx = await connection.indexes(tableName);
-          this._indexes.set(tableName, idx);
+          const idx = deepDeduplicate(await connection.indexes(tableName));
+          this._indexes.set(deepDeduplicate(tableName), idx);
           return idx;
         }
       }
@@ -565,16 +570,12 @@ export class SchemaCache {
   }
 
   /**
-   * Rebuild `_columnsHash` from `_columns`, the tail of both load paths
-   * (`initWith` and `marshalLoad`).
-   *
-   * @missingRailsCall deep_deduplicate — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_cache.rb:441-445 calls `deep_deduplicate` to intern strings with
-   *   Ruby's `-@`; JS has no string-interning primitive and identical string
-   *   literals are already shared, so trails derives `columnsHash` only
-   *   (schema-cache.ts:617-627).
+   * Mirrors `SchemaCache#derive_columns_hash_and_deduplicate_values`
+   * (`schema_cache.rb:440-446`), the tail of both load paths (`initWith` and
+   * `marshalLoad`).
    */
   private deriveColumnsHashAndDeduplicateValues(): void {
+    this._columns = deepDeduplicate(this._columns);
     this._columnsHash.clear();
     for (const [table, cols] of this._columns) {
       const hash: Record<string, Column> = {};
@@ -583,6 +584,9 @@ export class SchemaCache {
       }
       this._columnsHash.set(table, hash);
     }
+    this._primaryKeys = deepDeduplicate(this._primaryKeys);
+    this._dataSourceExists = deepDeduplicate(this._dataSourceExists);
+    this._indexes = deepDeduplicate(this._indexes);
   }
 
   clear(): void {
@@ -996,22 +1000,30 @@ export class FakePool {
 }
 
 /**
- * Recursively deep-clone arrays and plain objects. Rails uses `-value` (String#+@)
- * to intern strings; TS has no string interning, so primitives are returned as-is
- * and only arrays/objects are cloned (no identity preservation).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#deep_deduplicate (private)
+ * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#deep_deduplicate
+ * (`schema_cache.rb:448-459`, private). Ruby's Hash arm is a `Map` here — the
+ * shape every cache in this file uses. Ruby's `-value` on a String is
+ * interning, which JS strings already have, so only the `Deduplicable` arm has
+ * work to do: it routes through the registry so structurally identical values
+ * become one shared, frozen object. A value that is neither (an
+ * `IndexDefinition`, say — not `Deduplicable` in Rails either) falls through
+ * `else` and is returned untouched, class and all.
  *
  * @internal
  */
 export function deepDeduplicate<T>(value: T): T {
+  if (value instanceof Map) {
+    return new Map(
+      [...value].map(([k, v]) => [deepDeduplicate(k), deepDeduplicate(v)]),
+    ) as unknown as T;
+  }
   if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[deepDeduplicate(k)] = deepDeduplicate(v);
-    }
-    return out as unknown as T;
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as unknown as Deduplicable).deduplicateKey === "function"
+  ) {
+    return deduplicate(value as unknown as Deduplicable) as unknown as T;
   }
   return value;
 }
