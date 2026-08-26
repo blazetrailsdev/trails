@@ -10,7 +10,7 @@ import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./inde
 import { registerSubclass } from "./inheritance.js";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
-import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
+import { loadSchema } from "./model-schema.js";
 import { Firm } from "./test-helpers/models/company.js";
 
 describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => {
@@ -453,20 +453,10 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     expect(cache.getCachedColumnsHash("companies")).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(Company, "_schemaLoaded")).toBe(true);
 
-    await (reconcileVirtualAttributes as (this: unknown, reflect: boolean) => Promise<void>).call(
-      Company,
-      true,
-    );
-
-    const base = Company as unknown as {
-      _columnsHash?: unknown;
-      _columns?: unknown;
-      _schemaLoaded?: boolean;
-    };
-    expect(base._schemaLoaded).toBe(false);
-    expect(base._columnsHash).toBeUndefined();
-    expect(base._columns).toBeUndefined();
-    expect(Object.prototype.hasOwnProperty.call(Company, "_columnNamesMemo")).toBe(false);
+    // The async load re-warms the cleared cache; before re-reflecting it drops
+    // the stale view the way Rails nils its schema ivars — recursively, so the
+    // subclass memo below goes with it (model_schema.rb:553-568).
+    await Company.loadSchema();
 
     expect(Company.columnNames()).toContain("rating");
 

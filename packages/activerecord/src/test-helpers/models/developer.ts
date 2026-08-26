@@ -197,7 +197,7 @@ export class Developer extends Base {
     // Rails `attribute :last_name, :string` — there is no `last_name` column
     // (the developers table has only `first_name`), so it's a virtual attribute
     // and must be excluded from `SELECT developers.*`.
-    this.attribute("lastName", "string", { virtual: true });
+    this.attribute("lastName", "string");
 
     this.afterFind(function (this: Developer) {
       Developer.instanceCount = (Developer.instanceCount ?? 0) + 1;
@@ -232,7 +232,7 @@ export class SymbolIgnoredDeveloper extends Base {
   static {
     this.tableName = "developers";
     this.ignoredColumns = ["first_name", "last_name"];
-    this.attribute("lastName", "string", { virtual: true });
+    this.attribute("lastName", "string");
   }
 }
 

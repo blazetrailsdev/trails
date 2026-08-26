@@ -210,7 +210,7 @@ describe("PersistenceTest (trails)", () => {
     class MinimalisticAircraft extends Minimalistic {
       static _tableName = "aircraft";
       static {
-        this.attribute("wingspan", "integer", { virtual: true });
+        this.attribute("wingspan", "integer");
       }
     }
     registerModel(MinimalisticAircraft);

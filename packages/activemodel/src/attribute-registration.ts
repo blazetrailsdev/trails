@@ -131,9 +131,9 @@ export function attribute(
   const typeProvided = typeName !== undefined;
   // Rails' `attribute(name, type = nil, default: (no_default = true), **options)`
   // (attribute_registration.rb:12) forwards `**options` straight to
-  // `resolve_type_name`; the two keys trails names explicitly — `default` and
-  // `virtual` — are consumed here, so only the rest reach it.
-  const { default: _default, virtual: _virtual, ...typeOptions } = options ?? {};
+  // `resolve_type_name`; `default`, the one key trails names explicitly, is
+  // consumed here, so only the rest reach it.
+  const { default: _default, ...typeOptions } = options ?? {};
   // attribute_registration.rb:14-15:
   //   type = resolve_type_name(type, **options) if type.is_a?(Symbol)
   //   type = hook_attribute_type(name, type) if type

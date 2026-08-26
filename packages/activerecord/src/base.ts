@@ -852,29 +852,6 @@ export class Base extends Model {
 
   /** @internal */
   declare static _registryKeys: string[];
-  /**
-   * One-shot guard for virtual-attribute reconciliation (model-schema.ts
-   * reconcileVirtualAttributes). Cleared on `attribute()` and
-   * `resetColumnInformation` so a re-declare/reset re-runs it.
-   * @internal
-   */
-  declare static _virtualAttributesReconciled?: boolean;
-
-  /**
-   * Names declared with trails' `attribute(..., { virtual: true })` — an
-   * attribute with no backing DB column. Rails has no such option: its
-   * `columns_hash` is a DB read, so a declared-but-column-less attribute is
-   * simply absent from it. trails synthesizes `columnsHash` for table-less
-   * models, so it has to be told which declarations are not columns.
-   * Copy-on-write per class, like every other inherited registry here.
-   *
-   * Retired together with the virtual flag by RFC 0115
-   * `retire-virtual-attribute-reconciliation`.
-   *
-   * @internal
-   */
-  declare static _virtualAttributes?: Set<string>;
-
   /** Mirrors: ActiveRecord.writing_role */
   static writingRole = WRITING_ROLE;
   /** Mirrors: ActiveRecord.reading_role */
@@ -1165,19 +1142,9 @@ export class Base extends Model {
       typeName = undefined;
     }
     super.attribute(name, typeName, options);
-    if (options?.virtual) {
-      const virtual = Object.prototype.hasOwnProperty.call(this, "_virtualAttributes")
-        ? this._virtualAttributes!
-        : (this._virtualAttributes = new Set(this._virtualAttributes));
-      virtual.add(name);
-    }
     // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
     // `@attribute_names` recursively.
     ModelSchema.clearAttributeNamesMemo(this as never);
-    // A newly declared attribute may be virtual (no DB column); force the next
-    // ensureSchemaLoaded to re-run virtual reconciliation (model-schema.ts
-    // reconcileVirtualAttributes) instead of skipping it via the one-shot guard.
-    this._virtualAttributesReconciled = false;
     // If we just defined an "id" accessor on a subclass prototype, remove it
     // so Base.prototype.id (which handles CPK) is used instead.
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
@@ -1349,50 +1316,20 @@ export class Base extends Model {
   }
 
   /**
-   * Lazily reflect the schema from the configured adapter the first time
-   * the query/persistence path needs it, so consumers can drop the
-   * explicit `loadSchema` step. Only reflects when the model has no
-   * *concrete* (non-virtual) attribute definitions yet — a model that
-   * declared a real `attribute()` or already reflected once knows its schema,
-   * so this is a no-op for it (matching the pre-lazy-reflection behavior and
-   * avoiding a needless schema round-trip on the hot query path). A model
-   * whose only declared attributes are virtual (Rails' `attribute :foo` on an
-   * ignored column) still reflects, since it relies on the schema for its real
-   * columns. Idempotent.
+   * Reflect the schema from the configured adapter the first time the
+   * query/persistence path needs it — the async analogue of Rails' synchronous
+   * `method_missing` schema load (activemodel/attribute_methods.rb:474-486).
+   * Every declaration reaching here is a user `attribute()`; whether it also
+   * names a real column is decided by `columns_hash`, which is DB-sourced
+   * (model_schema.rb:437-441), so nothing has to be classified first.
    *
-   * Async analogue of Rails' synchronous `method_missing` schema load —
-   * queries are already async, so awaiting here is fully contained. The
-   * residual gap is attribute access on a record that was never queried
-   * and never loaded (e.g. `new User().handle` before any DB hit), which
-   * a getter can't await without wrapping instances in a `Proxy`.
+   * The residual gap is attribute access on a record that was never queried and
+   * never loaded (e.g. `new User().handle` before any DB hit), which a getter
+   * can't await without wrapping instances in a `Proxy`.
    *
    * @internal
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
-    // A model whose declared attributes are all virtual (e.g. Rails'
-    // `attribute :last_name` on an ignored column) still needs to reflect its
-    // real DB columns from the schema cache — the sync fallback in loadSchema
-    // would otherwise synthesize a columnsHash containing only the virtual
-    // attrs and mark the model schema-loaded, hiding every real column.
-    //
-    // The pending-modification queue holds user `attribute()` declarations only
-    // — reflected columns live in `columns_hash` — so a concrete (non-virtual)
-    // declaration means the model spelled its own schema out and needs no DB
-    // reflection. Enum-declared attrs (registered by `_enum` via
-    // `this.attribute()`) must NOT block reflection: they are type overlays,
-    // not full schema declarations, and the model still needs the DB to
-    // discover its other columns.
-    const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
-    const virtual = this._virtualAttributes;
-    for (const name of ModelSchema.declaredAttributeNames.call(this as never)) {
-      if (!virtual?.has(name) && !enumNames?.has(name)) {
-        // Some declared attributes may be virtual (no backing DB column).
-        // Rails' `column_names` is always DB-sourced, so reconcile against the
-        // real columns and flag those as virtual — keeping `columnNames()`
-        // correct without a full re-reflection. One-shot.
-        return (ModelSchema.reconcileVirtualAttributes as () => Promise<void>).call(this);
-      }
-    }
     return this.loadSchema();
   }
 

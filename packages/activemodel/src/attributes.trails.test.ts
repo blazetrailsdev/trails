@@ -5,7 +5,7 @@ describe("Attributes#attribute_names", () => {
   class User extends Model {
     static {
       this.attribute("name", "string");
-      this.attribute("token", "string", { virtual: true });
+      this.attribute("token", "string");
     }
   }
 

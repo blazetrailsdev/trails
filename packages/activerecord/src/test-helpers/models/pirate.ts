@@ -68,7 +68,7 @@ export class Pirate extends Base {
 
   static {
     // Rails: `attr_accessor :cancel_save_from_callback, :parrots_limit`
-    this.attribute("parrotsLimit", "integer", { virtual: true });
+    this.attribute("parrotsLimit", "integer");
 
     this.belongsTo("parrot", { validate: true });
     this.belongsTo("nonValidatedParrot", { className: "Parrot" });

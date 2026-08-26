@@ -93,13 +93,13 @@ describe("LengthValidationTest", () => {
 
   it("validates length of virtual attribute on model", async () => {
     // Rails `Pet.attr_accessor(:nickname)` — an in-memory, non-column attribute.
-    // The TS mirror is `attribute(..., { virtual: true })`: it installs the
+    // The TS mirror is `attribute(...)`: it installs the
     // name accessor and is read for validation like any attribute, but is
     // excluded from `column_names` so it is never persisted.
     const pet = class extends Pet {
       static name = "Pet";
       static {
-        this.attribute("nickname", "string", { virtual: true });
+        this.attribute("nickname", "string");
         this.validatesLengthOf("name", { minimum: 1 });
         this.validatesLengthOf("nickname", { minimum: 1 });
       }

@@ -539,8 +539,8 @@ describe("TimestampsWithoutTransactionTest", () => {
       static {
         this.tableName = "timestamp_attribute_posts";
         // created_at and updated_at are virtual (mirrors Ruby attr_accessor)
-        this.attribute("created_at", "datetime", { virtual: true });
-        this.attribute("updated_at", "datetime", { virtual: true });
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
       }
       created_at: unknown = null;
       updated_at: unknown = null;

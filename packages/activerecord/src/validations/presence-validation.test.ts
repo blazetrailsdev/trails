@@ -116,7 +116,7 @@ describe("PresenceValidationTest", () => {
 
   it("validates presence of virtual attribute on model", async () => {
     await repairValidations(Interest, async () => {
-      Interest.attribute("abbreviation", "string", { virtual: true });
+      Interest.attribute("abbreviation", "string");
       Interest.validatesPresenceOf("topic");
       Interest.validatesPresenceOf("abbreviation");
 

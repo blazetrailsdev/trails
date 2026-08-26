@@ -4,7 +4,6 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "./index.js";
-import { reconcileVirtualAttributes } from "./model-schema.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueriesMatch } from "./testing/query-assertions.js";
@@ -12,21 +11,20 @@ import { assertNoQueriesMatch } from "./testing/query-assertions.js";
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 // A model declared entirely via `attribute()` under AR_NO_AUTO_SCHEMA never
-// reflects its schema, so the shared schema cache is cold. The write path's
-// `reconcileVirtualAttributes(reflect: true)` resolves the real columns to flag
-// virtual attributes; doing so through the shared schema cache (rather than a
-// raw `connection.columns`) memoizes the reflection so later cold-cache work is
-// query-free. There is no upstream Rails counterpart — this guards a trails-only
-// cold-cache write-path optimization.
-describe("virtual attribute reconciliation warms the schema cache", () => {
+// reflects its schema, so the shared schema cache is cold and `load_schema!`
+// falls back to a `columns_hash` synthesized from those declarations alone.
+// Rails never has this state — `columns_hash` is a blocking DB read
+// (model_schema.rb:437-441) — so the async load has to drop the synthesized
+// view once the cache is warm. There is no upstream Rails counterpart.
+describe("the async schema load warms the shared cache and replaces a synthesized view", () => {
   fixtures([]);
-  it("populates the shared schema cache when reconciling on a cold cache", async () => {
+  it("populates the shared schema cache when loading on a cold cache", async () => {
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "text");
-        this.attribute("virtual_field", "string", { default: "v" });
+        this.attribute("declared_field", "string", { default: "v" });
       }
     }
     const conn = Post.connection;
@@ -35,17 +33,17 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
 
     await Post.create({ title: "hello", body: "b" });
 
-    // reconcile reflected through the shared cache, so it is now warm
+    // the load reflected through the shared cache, so it is now warm
     expect(conn.internalSchemaCache.getCachedColumnsHash("posts")).toBeDefined();
   });
 
-  it("warm-cache reconciliation invalidates a columnNames memo taken off the synthesized fallback", async () => {
+  it("a warm-cache load invalidates a columnNames memo taken off the synthesized fallback", async () => {
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "text");
-        this.attribute("virtual_field", "string", { default: "v" });
+        this.attribute("declared_field", "string", { default: "v" });
       }
     }
     const conn = Post.connection;
@@ -56,20 +54,19 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
     const cold = Post.columnNames();
     expect(cold).not.toContain("tags_count");
 
-    // The write path's reconciliation warms the shared cache and clears
-    // `_schemaLoaded` — the memo must be dropped with it, not keep serving the
-    // pre-warm synthesized list until some later `loadSchema` re-reflects.
-    await reconcileVirtualAttributes.call(Post as never, true);
+    // The async load warms the shared cache and reloads from it — the memo must
+    // be dropped with the synthesized view, not keep serving the pre-warm list.
+    await Post.loadSchema();
     expect(Post.columnNames()).toContain("tags_count");
   });
 
-  it("a second save on a cold-cache virtual-attribute model issues no schema-introspection query", async () => {
+  it("a second save on a cold-cache declared-attribute model issues no schema-introspection query", async () => {
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "text");
-        this.attribute("virtual_field", "string", { default: "v" });
+        this.attribute("declared_field", "string", { default: "v" });
       }
     }
     const conn = Post.connection;

@@ -189,7 +189,7 @@ describe("ValidationsTest", () => {
     class Klass extends Topic {
       static name = "Topic";
     }
-    Klass.attribute("wibble", "string", { virtual: true });
+    Klass.attribute("wibble", "string");
     Klass.validatesNumericalityOf("wibble", { onlyInteger: true });
 
     const topic = Klass.new({ wibble: "123-4567" });
@@ -205,7 +205,7 @@ describe("ValidationsTest", () => {
     class Klass extends Topic {
       static name = "Topic";
     }
-    Klass.attribute("wibble", new DecimalType({ scale: 2, precision: 9 }), { virtual: true });
+    Klass.attribute("wibble", new DecimalType({ scale: 2, precision: 9 }));
     Klass.validatesNumericalityOf("wibble", { greaterThanOrEqualTo: new BigDecimal("97.18") });
 
     for (const rawValue of ["97.179", 97.179, new BigDecimal("97.179")]) {
