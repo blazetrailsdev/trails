@@ -20,8 +20,8 @@ const yaml = await import("yaml").catch(() => {
   return { parse: missing, stringify: missing } as unknown as typeof import("yaml");
 });
 
-// The annotations are load-bearing, not decoration: inferring these types from
-// `yaml` names `yaml/dist/parse/cst` through a non-portable `node_modules` path,
-// which TS2883 rejects outright and 5.9.3 emitted into `yaml.d.ts` anyway.
+// The annotations are load-bearing: inferred, these types name
+// `yaml/dist/parse/cst` through a non-portable `node_modules` path, and TS2883
+// then suppresses `yaml.d.ts` entirely.
 export const parse: typeof import("yaml").parse = yaml.parse;
 export const stringify: typeof import("yaml").stringify = yaml.stringify;
