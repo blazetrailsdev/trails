@@ -5,6 +5,31 @@ import { ValueType } from "@blazetrails/activemodel";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 
+/**
+ * Ruby `Hash#==` / `Array#==` over decoded JSON, which JS has no operator for:
+ * two hashes with the same pairs are equal whatever order the keys were
+ * written in. Re-encoding both sides and comparing strings is NOT the same
+ * test — it reports a key reordering as a change.
+ */
+function jsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (globalThis.Array.isArray(a) || globalThis.Array.isArray(b)) {
+    if (!globalThis.Array.isArray(a) || !globalThis.Array.isArray(b)) return false;
+    return a.length === b.length && a.every((el, i) => jsonEqual(el, b[i]));
+  }
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  return (
+    aKeys.length === bKeys.length &&
+    aKeys.every(
+      (k) =>
+        Object.prototype.hasOwnProperty.call(b, k) &&
+        jsonEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+    )
+  );
+}
+
 export class Json extends ValueType<unknown> {
   // Widened to string (not literal) so Jsonb can override to "jsonb".
   readonly name: string = "json";
@@ -51,6 +76,6 @@ export class Json extends ValueType<unknown> {
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    return this.serialize(this.deserialize(rawOldValue)) !== this.serialize(newValue);
+    return !jsonEqual(this.deserialize(rawOldValue), newValue);
   }
 }

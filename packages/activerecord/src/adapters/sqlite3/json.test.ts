@@ -1,54 +1,47 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/json_test.rb
- * (plus the JSONSharedTestCases it includes).
  */
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
+import { jsonSharedTestCases, JsonDataType as klass } from "../../cases/json-shared-test-cases.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
-let adapter: SQLite3Adapter;
-
-class JsonDataType extends Base {
-  static {
-    this.tableName = "json_data_type";
-  }
-}
+// Rails: private def column_type; :json; end
+const columnType = "json";
 
 describeIfSqlite("SQLite3JSONTest", () => {
   fixtures([]);
 
+  let connection: SQLite3Adapter;
+
+  // Rails: def setup; super; @connection.create_table("json_data_type") { ... }; end
+  // Registered before the shared module's own setup so the table exists by the
+  // time that hook reflects the columns (Ruby reflects lazily, per test).
   beforeEach(async () => {
-    adapter = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
-    // Mirrors Rails JSONSharedTestCases#setup creating the table ad-hoc:
-    //   t.json "payload", default: {}
-    //   t.json "settings"
-    await adapter.createTable("json_data_type", {}, (t: any) => {
+    connection = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
+    // Teardown lives in the shared module's afterEach (Rails: JSONSharedTestCases#teardown).
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await connection.createTable("json_data_type", {}, (t: any) => {
       t.json("payload", { default: {} });
       t.json("settings");
     });
   });
 
-  afterEach(async () => {
-    // Mirrors Rails JSONSharedTestCases#teardown: drop_table :json_data_type.
-    await adapter.dropTable("json_data_type", { ifExists: true });
-    void JsonDataType.resetColumnInformation();
-  });
-
-  it("test_assigning_string_literal", async () => {
-    await JsonDataType.loadSchema();
-    const json = await JsonDataType.create({ payload: "foo" });
-    expect((json as any).payload).toBe("foo");
-  });
+  // Rails: include JSONSharedTestCases
+  jsonSharedTestCases({ columnType });
 
   it("test_default", async () => {
     const defaultVal = { users: "read", posts: ["read", "write"] };
-    await adapter.addColumn("json_data_type", "permissions", "json", { default: defaultVal });
-    await JsonDataType.loadSchema();
+    await connection.addColumn("json_data_type", "permissions", columnType, {
+      default: defaultVal,
+    });
+    await klass.resetColumnInformation();
+    await klass.loadSchema();
 
-    expect(JsonDataType.columnDefaults["permissions"]).toEqual(defaultVal);
-    expect((new JsonDataType() as any).permissions).toEqual(defaultVal);
+    expect(klass.columnDefaults["permissions"]).toEqual(defaultVal);
+    expect((new klass() as any).permissions).toEqual(defaultVal);
   });
 });
