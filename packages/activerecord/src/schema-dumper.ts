@@ -774,6 +774,15 @@ export abstract class SchemaDumper {
     }
 
     const columns = await this._source.columns(table, this.primaryKeyOrderCache[table]);
+
+    // Rails calls `@connection.table_options(table)` at schema_dumper.rb:187,
+    // AFTER `column_spec_for_primary_key`. trails has to read it before the
+    // column-spec chain: MySQL's `schemaCollation` compares against the table
+    // collation, which Rails fetches lazily inside `schema_collation`
+    // (mysql/schema_dumper.rb:66-71) — an async query here, so `tableOptions`
+    // is what prefills that cache, and the primary key's own collation would
+    // otherwise be compared against a cold one.
+    const tableOptions = await this.tableOptions(table);
     try {
       this.tableName = table;
 
@@ -803,7 +812,6 @@ export abstract class SchemaDumper {
         opts.push("id: false");
       }
 
-      const tableOptions = await this.tableOptions(table);
       if (isPresent(tableOptions)) {
         opts.push(this.formatOptions(tableOptions));
       }
