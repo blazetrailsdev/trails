@@ -94,8 +94,6 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     registerModel("DpNonIdPhoto", DpNonIdPhoto);
     registerModel("DpNonIdArticle", DpNonIdArticle);
     (DpAuthor as any)._reflections = {};
-    (DpAuthor as any)._reflections = {};
-    (DpGallery as any)._reflections = {};
     (DpGallery as any)._reflections = {};
 
     Associations.hasMany.call(DpAuthor, "dpGalleries", {

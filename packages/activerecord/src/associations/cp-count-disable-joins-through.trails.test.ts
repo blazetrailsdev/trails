@@ -68,10 +68,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
     registerModel("CdPost", CdPost);
     registerModel("CdComment", CdComment);
     (CdAuthor as any)._reflections = {};
-    (CdAuthor as any)._reflections = {};
     (CdPost as any)._reflections = {};
-    (CdPost as any)._reflections = {};
-    (CdComment as any)._reflections = {};
     (CdComment as any)._reflections = {};
 
     Associations.hasMany.call(CdAuthor, "cdPosts", {
@@ -133,7 +130,6 @@ describe("CollectionProxy#count — disable_joins through", () => {
       }
     }
     registerModel("CdRating", CdRating);
-    (CdRating as any)._reflections = {};
     (CdRating as any)._reflections = {};
 
     Associations.hasMany.call(CdComment, "cdRatings", {

@@ -71,10 +71,7 @@ registerModel("StvMember", StvMember);
 
 function freshAssociations() {
   (StvAuthor as any)._reflections = {};
-  (StvAuthor as any)._reflections = {};
   (StvComment as any)._reflections = {};
-  (StvComment as any)._reflections = {};
-  (StvPost as any)._reflections = {};
   (StvPost as any)._reflections = {};
 }
 

@@ -47,7 +47,6 @@ describe("JoinDependency walk() deduplication", () => {
   beforeEach(() => {
     for (const m of [Post, Comment, Author, Like]) {
       (m as any)._reflections = {};
-      (m as any)._reflections = {};
       clearReflectionsCache(m);
       registerModel(m);
     }
@@ -101,7 +100,6 @@ describe("JoinDependency walk() deduplication", () => {
         this.attribute("post_id", "integer");
       }
     }
-    (Tag as any)._reflections = {};
     (Tag as any)._reflections = {};
     clearReflectionsCache(Tag);
     registerModel(Tag);
