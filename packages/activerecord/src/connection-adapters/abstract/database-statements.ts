@@ -540,10 +540,12 @@ export async function truncateTables(
 
   if (filtered.length === 0) return;
 
-  const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(this, filtered);
-
   const exec = this.execute ?? execute;
   const doTruncate = async () => {
+    const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(
+      this,
+      filtered,
+    );
     if (this.executeBatch) {
       await this.executeBatch(statements, "Truncate Tables");
     } else {
