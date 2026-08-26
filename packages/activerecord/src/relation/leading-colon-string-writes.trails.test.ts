@@ -51,8 +51,26 @@ describe("leading-colon string writes", () => {
       const created = await Topic.create({ title: sent });
       expect((await Topic.find(created.id)).title).toBe(stored);
 
-      await Topic.insertAll([{ title: sent, author_name: "colon" }]);
+      const insertResult = await Topic.insertAll([{ title: sent, author_name: "colon" }]);
       const inserted = await Topic.where({ author_name: "colon" }).first();
+      if (inserted == null) {
+        const conn = Topic.connection as unknown as {
+          selectAll(sql: string): Promise<{ rows: unknown[] }>;
+        };
+        const raw = await conn.selectAll(
+          "SELECT id, title, author_name, type, approved FROM topics",
+        );
+        const scoped = Topic as unknown as { currentScope?(): { toSql?(): string } | null };
+        const result = insertResult as unknown as { rows?: unknown[] };
+        console.log(
+          "DIAG sent=%s insertResult=%s currentScope=%s rows=%s sql=%s",
+          sent,
+          JSON.stringify(result?.rows ?? insertResult),
+          JSON.stringify(String(scoped.currentScope?.()?.toSql?.() ?? "none")),
+          JSON.stringify(raw?.rows ?? raw),
+          await Topic.where({ author_name: "colon" }).toSql(),
+        );
+      }
       expect(inserted!.title).toBe(stored);
       await Topic.where({ author_name: "colon" }).deleteAll();
     }
