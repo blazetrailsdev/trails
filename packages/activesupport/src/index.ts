@@ -445,6 +445,14 @@ export {
 } from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
+// `class Time`'s calculations reopening (`core_ext/time/calculations.rb`) is
+// imported for its effect only: it is a reopening, so what it publishes is the
+// methods it lands on `Time`, and its `current`/`change`/`advance`/`ago`/
+// `since`/`beginning_of_*` spellings would collide in a flat ESM namespace with
+// the `Date`-receiver arm below and with `time-ext.js`'s, exactly as
+// core-ext/date's calculations do. It is reached by name through the subpath
+// `@blazetrails/activesupport/core-ext/time/calculations`.
+import "./core-ext/time/calculations.js";
 export * from "./core-ext/time/conversions.js";
 // Two Ruby methods, one TS spelling: the class-side parser `Time.rfc3339(str)`
 // (`core_ext/time/calculations.rb:69-83`) lives in `time-ext.js`, and the

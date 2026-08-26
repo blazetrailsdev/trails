@@ -180,17 +180,20 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `date_time/acts_like.rb:6` — so the three `calculations.rb` reopenings
   // (`time/calculations.rb:11`, `date/calculations.rb:10`,
   // `date_time/calculations.rb:5`) contribute 129 methods to buckets named
-  // after files that define none of them. trails ports the `Time` and `DateTime`
-  // reopenings onto the one `time-ext.ts`, the same one-TS-file-for-several-
-  // reopenings shape as `inflector.ts` above; the `Date` reopening has its own
-  // receiver and its own file (see below).
+  // after files that define none of them. Each has its own receiver and its own
+  // file at the path the default rule already produces, and the three entries
+  // below are what split those buckets off the first reopenings.
   // `ActiveSupport::JSON` is defined by `json/decoding.rb:12` first, so the
   // module's whole singleton surface — `encode`/`dump` from
   // `json/encoding.rb:16-43` included — buckets there. trails splits the two
   // Ruby modules the way Rails documents them: `ActiveSupport::JSON` on
   // `json.ts`, `ActiveSupport::JSON::Encoding` on `json/encoding.ts`.
   "activesupport:json/decoding.rb": "json.ts",
-  "activesupport:core_ext/time/calculations.rb": "time-ext.ts",
+  // The `Time` arm is the reopening of `Time` itself, ported onto trails'
+  // `Time` (`packages/date/src/time.ts`) by the mixin idiom, so it has its own
+  // file; the entry splits the bucket off `object/blank.rb` (Time's first
+  // reopening).
+  "activesupport:core_ext/time/calculations.rb": "core-ext/time/calculations.ts",
   // The `Date` arm widens through `in_time_zone` before delegating to the
   // `Time` arm (`date/calculations.rb:55-87`), so it has its own receiver —
   // `Temporal.PlainDate` — and its own file. The entry is what splits the

@@ -706,7 +706,7 @@ export class Time {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    usec?: number,
+    usec?: number | Rational,
   ): Time {
     return new Time(
       year,
@@ -717,7 +717,10 @@ export class Time {
       usec === undefined
         ? sec
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
-            new Rational(Math.round(usec * 1_000), 1_000_000_000),
+            // MRI takes the microsecond through `num_exact` (`time.c`
+            // `time_arg`), so a Rational one — `Time.local(..., 59,
+            // Rational(999999999, 1000))` — keeps its full precision.
+            numExact(usec).quo(1_000_000),
           ),
       "UTC",
     );
@@ -746,7 +749,7 @@ export class Time {
           hour?: number | string | null,
           min?: number | string | null,
           sec?: number | string | Rational | null,
-          usec?: number,
+          usec?: number | Rational,
         ]
       | [
           sec: number | string | Rational | null,
@@ -775,7 +778,10 @@ export class Time {
       usec === undefined
         ? (sec ?? 0)
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
-            new Rational(Math.round(usec * 1_000), 1_000_000_000),
+            // MRI takes the microsecond through `num_exact` (`time.c`
+            // `time_arg`), so a Rational one — `Time.local(..., 59,
+            // Rational(999999999, 1000))` — keeps its full precision.
+            numExact(usec).quo(1_000_000),
           ),
     );
   }
@@ -1013,6 +1019,18 @@ export class Time {
   /** Ruby `Time#dst?`, the `isdst` alias (`ruby/time.c` `time_isdst`). */
   isDst(): boolean {
     return this.isdst;
+  }
+
+  /**
+   * Ruby `Time#to_i` (`ruby/time.c` `time_to_i`), the number of whole seconds
+   * since the epoch. MRI truncates towards negative infinity — the sub-second
+   * is held as a non-negative `Rational` off a floored second — so a pre-epoch
+   * time answers the floor rather than the truncation.
+   */
+  toI(): number {
+    const nanoseconds = this.#instant.epochNanoseconds;
+    const seconds = nanoseconds / 1_000_000_000n - (nanoseconds % 1_000_000_000n < 0n ? 1n : 0n);
+    return Number(seconds);
   }
 
   /**
