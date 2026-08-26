@@ -1,8 +1,10 @@
 /**
  * The bare `Arel.*` module functions (arel.rb:31-72).
  *
- * This file deliberately imports nothing at runtime beyond
- * `nodes/sql-literal.js` and `nodes/bound-sql-literal.js`, both leaves. Ruby
+ * This file deliberately imports nothing at runtime beyond `nodes/node.js`,
+ * `nodes/sql-literal.js`, `nodes/bound-sql-literal.js` and the zero-import
+ * `node-slots.js` — `node.ts` reaches only `node-slots.js` and
+ * `collectors/sql-string.js`, so all four are leaves. Ruby
  * resolves `Arel.sql` when the calling method runs, so a Rails body anywhere in the package may name it;
  * in ESM every import is eager, and re-importing them from `index.ts` — which
  * re-exports `select-manager.js`, `visitors/index.js` and friends — would
