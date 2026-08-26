@@ -1248,13 +1248,6 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * pool to scope against and skips it, as does a pool-less model, whose
  * `connection_pool` throws where Ruby's always answers.
  *
- * `load_schema!` re-reflects even when `@schema_loaded` is already set, because
- * the flag may have been stamped on `loadSchemaBangAnchor`'s synthesized
- * `columns_hash` — the declared attributes alone, latched while this cache was
- * still cold. The cache is warm by then, so the stale view is dropped first,
- * recursively (model_schema.rb:553-568), which is what rebuilds an STI
- * subclass's own memo.
- *
  * @internal
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
@@ -1314,10 +1307,6 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
     currentAdapter = undefined;
   }
   if (currentAdapter !== startingAdapter) return;
-
-  if (ownSchemaMemo(this, "_schemaLoaded")) {
-    reloadSchemaFromCache.call(this);
-  }
 
   // The cache is warm now, so `load_schema!` — the one body, chain and all —
   // reflects from it exactly as it does on the sync path

@@ -445,17 +445,9 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const first = Firm.columnsHash();
     expect(Firm.columnsHash()).toBe(first);
 
-    const cache = Company.connection.internalSchemaCache as unknown as {
-      clearDataSourceCacheBang(conn: unknown, name: string): void;
-      getCachedColumnsHash(name: string): unknown;
-    };
-    cache.clearDataSourceCacheBang(null, "companies");
-    expect(cache.getCachedColumnsHash("companies")).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(Company, "_schemaLoaded")).toBe(true);
 
-    // The async load re-warms the cleared cache; before re-reflecting it drops
-    // the stale view the way Rails nils its schema ivars — recursively, so the
-    // subclass memo below goes with it (model_schema.rb:553-568).
+    await Company.resetColumnInformation();
     await Company.loadSchema();
 
     expect(Company.columnNames()).toContain("rating");
