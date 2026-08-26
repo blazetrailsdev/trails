@@ -2419,9 +2419,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
           columnOptions.stored = column.isVirtualStored();
           columnOptions.type = column.type;
         } else if (column.hasDefault) {
-          const type = (await this.lookupCastTypeFromColumn(
-            column,
-          )) as import("@blazetrails/activemodel").Type;
+          const type = await this.lookupCastTypeFromColumn(column);
           let defaultValue: unknown = type.deserialize(column.default);
           if (defaultValue == null) defaultValue = () => column.defaultFunction;
 
