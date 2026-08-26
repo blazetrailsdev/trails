@@ -64,7 +64,7 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle two dot ranges", () => {
-      const node = attr.notBetween([1, 3]);
+      const node = attr.notBetween({ begin: 1, end: 3 });
       expect(compile(node)).toBe(`("users"."id" < 1 OR "users"."id" > 3)`);
     });
 
@@ -74,16 +74,18 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle ranges bounded by infinity", () => {
-      expect(mustBeLike(compile(attr.notBetween([1, Infinity])))).toBe(
+      expect(mustBeLike(compile(attr.notBetween({ begin: 1, end: Infinity })))).toBe(
         mustBeLike(`"users"."id" < 1`),
       );
-      expect(mustBeLike(compile(attr.notBetween([-Infinity, 3])))).toBe(
+      expect(mustBeLike(compile(attr.notBetween({ begin: -Infinity, end: 3 })))).toBe(
         mustBeLike(`"users"."id" > 3`),
       );
       expect(
         mustBeLike(compile(attr.notBetween({ begin: -Infinity, end: 3, excludeEnd: true }))),
       ).toBe(mustBeLike(`"users"."id" >= 3`));
-      expect(mustBeLike(compile(attr.notBetween([-Infinity, Infinity])))).toBe(mustBeLike("1=0"));
+      expect(mustBeLike(compile(attr.notBetween({ begin: -Infinity, end: Infinity })))).toBe(
+        mustBeLike("1=0"),
+      );
     });
 
     it("is not preparable when an array", () => {
@@ -327,7 +329,7 @@ describe("the to_sql visitor", () => {
       new Visitors.ToSql(fakeRecordConnection).compile(n);
 
     it("can handle two dot ranges", () => {
-      const node = users.get("id").between([1, 3]);
+      const node = users.get("id").between({ begin: 1, end: 3 });
       expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" BETWEEN 1 AND 3'));
     });
 
@@ -339,13 +341,13 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle ranges bounded by infinity", () => {
-      let node = users.get("id").between([1, Infinity]);
+      let node = users.get("id").between({ begin: 1, end: Infinity });
       expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" >= 1'));
-      node = users.get("id").between([-Infinity, 3]);
+      node = users.get("id").between({ begin: -Infinity, end: 3 });
       expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" <= 3'));
       node = users.get("id").between({ begin: -Infinity, end: 3, excludeEnd: true });
       expect(mustBeLike(compileNode(node))).toBe(mustBeLike('"users"."id" < 3'));
-      node = users.get("id").between([-Infinity, Infinity]);
+      node = users.get("id").between({ begin: -Infinity, end: Infinity });
       expect(mustBeLike(compileNode(node))).toBe(mustBeLike("1=1"));
     });
   });
@@ -1086,7 +1088,7 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle two dot ranges", () => {
-      const node = attr.between([1, 3]);
+      const node = attr.between({ begin: 1, end: 3 });
       expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users"."id" BETWEEN 1 AND 3`));
     });
 
@@ -1096,16 +1098,18 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle ranges bounded by infinity", () => {
-      expect(mustBeLike(compile(attr.between([1, Infinity])))).toBe(
+      expect(mustBeLike(compile(attr.between({ begin: 1, end: Infinity })))).toBe(
         mustBeLike(`"users"."id" >= 1`),
       );
-      expect(mustBeLike(compile(attr.between([-Infinity, 3])))).toBe(
+      expect(mustBeLike(compile(attr.between({ begin: -Infinity, end: 3 })))).toBe(
         mustBeLike(`"users"."id" <= 3`),
       );
       expect(
         mustBeLike(compile(attr.between({ begin: -Infinity, end: 3, excludeEnd: true }))),
       ).toBe(mustBeLike(`"users"."id" < 3`));
-      expect(mustBeLike(compile(attr.between([-Infinity, Infinity])))).toBe(mustBeLike("1=1"));
+      expect(mustBeLike(compile(attr.between({ begin: -Infinity, end: Infinity })))).toBe(
+        mustBeLike("1=1"),
+      );
     });
 
     it("can handle subqueries", () => {

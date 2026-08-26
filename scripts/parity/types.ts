@@ -239,6 +239,14 @@ export interface MethodInfo {
    * other). See extract-ts-api.ts `delegationTargetName`.
    */
   delegatesTo?: string;
+  /**
+   * TS-side only: for a top-level function that reaches this file through a
+   * NAMED re-export (`export { buildQuoted } from "./casted.js"`), the
+   * `<file>:<name>` key of the declaration site. A barrel is a re-export site,
+   * never a port location (compare.ts:2346), so extra-surface scores such a
+   * name where it is DECLARED when the barrel itself has no Rails counterpart.
+   */
+  reExportedFrom?: string;
 }
 
 export interface ClassInfo {

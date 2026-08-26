@@ -19,6 +19,7 @@ import { And, Or } from "./nodes/nary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
+import { rbEqual } from "@blazetrails/activesupport";
 
 /**
  * Stands in for Rails' `when Arel::SelectManager` arm (predications.rb:65-74
@@ -145,34 +146,15 @@ interface UnboundableLike {
 /** The receiver `between` / `notBetween` dispatch their whole tree through. */
 type BetweenHost = Node & PredicationHost & RangePredicates;
 
-/** The `begin` / `end` / `exclude_end?` trio Ruby's Range answers. */
-interface RangeLike {
+/**
+ * The JS analogue of the Ruby Range `between` / `not_between` take
+ * (predications.rb:36, :84): the `begin` / `end` / `exclude_end?` trio, and
+ * nothing else — those bodies read no other member off `other`.
+ */
+export interface RangeLike {
   begin: unknown;
   end: unknown;
-  excludeEnd: boolean;
-}
-
-// Ruby's `between(other)` takes one Range and reads `other.begin` /
-// `other.end` / `other.exclude_end?` off it — a language protocol with no JS
-// equivalent, so the three call shapes trails accepts (`[begin, end]`,
-// `{ begin, end, excludeEnd? }`, `(begin, end, excludeEnd?)`) are normalized
-// to that trio here before the Rails decision tree runs on it.
-function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boolean): RangeLike {
-  if (Array.isArray(beginOrRange) && end === undefined) {
-    return { begin: beginOrRange[0], end: beginOrRange[1], excludeEnd: false };
-  }
-  if (
-    typeof beginOrRange === "object" &&
-    beginOrRange !== null &&
-    !(beginOrRange instanceof Node) &&
-    end === undefined &&
-    "begin" in (beginOrRange as Record<string, unknown>) &&
-    "end" in (beginOrRange as Record<string, unknown>)
-  ) {
-    const r = beginOrRange as { begin: unknown; end: unknown; excludeEnd?: boolean };
-    return { begin: r.begin, end: r.end, excludeEnd: r.excludeEnd === true };
-  }
-  return { begin: beginOrRange, end, excludeEnd: excludeEnd === true };
+  excludeEnd?: boolean;
 }
 
 // Build the `expr → Node` callback used by groupingAny / groupingAll.
@@ -271,17 +253,8 @@ export const Predications = {
     return new NotIn(this, this.quotedNode(other));
   },
 
-  // Mirrors Arel::Predications#between (predications.rb:36-61). `other` is a
-  // Ruby Range there; here it is the trio `parseRange` normalizes the three
-  // accepted call shapes onto, and the decision tree below is Rails' own,
-  // branch for branch.
-  between: function (
-    this: BetweenHost,
-    beginOrRange: unknown,
-    end?: unknown,
-    excludeEnd?: boolean,
-  ): Node {
-    const other = parseRange(beginOrRange, end, excludeEnd);
+  // Mirrors Arel::Predications#between (predications.rb:36-61).
+  between(this: BetweenHost, other: RangeLike): Node {
     if (this.isUnboundable(other.begin) === 1 || this.isUnboundable(other.end) === -1) {
       return this.in([]);
     } else if (this.isOpenEnded(other.begin)) {
@@ -300,27 +273,19 @@ export const Predications = {
       return this.gteq(other.begin);
     } else if (other.excludeEnd) {
       return this.gteq(other.begin).and(this.lt(other.end));
-    } else if (other.begin === other.end) {
+    } else if (rbEqual(other.begin, other.end)) {
+      // predications.rb:56's `==` is a value comparison; `===` covers only its
+      // identity arm, so two equal Dates would not collapse.
       return this.eq(other.begin);
     } else {
       const left = this.quotedNode(other.begin);
       const right = this.quotedNode(other.end);
       return new Between(this, new And([left, right]));
     }
-  } as {
-    (this: BetweenHost, range: readonly [unknown, unknown]): Node;
-    (this: BetweenHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-    (this: BetweenHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   },
 
   // Mirrors Arel::Predications#not_between (predications.rb:84-110).
-  notBetween: function (
-    this: BetweenHost,
-    beginOrRange: unknown,
-    end?: unknown,
-    excludeEnd?: boolean,
-  ): Node {
-    const other = parseRange(beginOrRange, end, excludeEnd);
+  notBetween(this: BetweenHost, other: RangeLike): Node {
     if (this.isUnboundable(other.begin) === 1 || this.isUnboundable(other.end) === -1) {
       return this.notIn([]);
     } else if (this.isOpenEnded(other.begin)) {
@@ -342,10 +307,6 @@ export const Predications = {
       const right = other.excludeEnd ? this.gteq(other.end) : this.gt(other.end);
       return left.or(right);
     }
-  } as {
-    (this: BetweenHost, range: readonly [unknown, unknown]): Node;
-    (this: BetweenHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-    (this: BetweenHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   },
 
   eqAny(

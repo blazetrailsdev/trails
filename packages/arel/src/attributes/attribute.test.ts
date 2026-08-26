@@ -615,7 +615,7 @@ describe("AttributeTest", () => {
   describe("#between", () => {
     it("can be constructed with a standard range", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.between([1, 3]);
+      const node = attribute.between({ begin: 1, end: 3 });
 
       expect(node).toEqual(
         new Nodes.Between(
@@ -627,7 +627,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with a range starting from -Infinity", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.between([-Infinity, 3]);
+      const node = attribute.between({ begin: -Infinity, end: 3 });
 
       expect(node).toEqual(new Nodes.LessThanOrEqual(attribute, new Nodes.Casted(3, attribute)));
     });
@@ -655,7 +655,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with an infinite range", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.between([-Infinity, Infinity]);
+      const node = attribute.between({ begin: -Infinity, end: Infinity });
 
       expect(node).toEqual(new Nodes.NotIn(attribute, []));
     });
@@ -669,7 +669,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with a range ending at Infinity", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.between([0, Infinity]);
+      const node = attribute.between({ begin: 0, end: Infinity });
 
       expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(0, attribute)));
     });
@@ -730,7 +730,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with a range where the begin and end are equal", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.between([1, 1]);
+      const node = attribute.between({ begin: 1, end: 1 });
 
       expect(node).toEqual(new Nodes.Equality(attribute, new Nodes.Casted(1, attribute)));
     });
@@ -739,7 +739,7 @@ describe("AttributeTest", () => {
   describe("#not_between", () => {
     it("can be constructed with a standard range", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.notBetween([1, 3]);
+      const node = attribute.notBetween({ begin: 1, end: 3 });
 
       expect(node).toEqual(
         new Nodes.Grouping(
@@ -753,7 +753,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with a range starting from -Infinity", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.notBetween([-Infinity, 3]);
+      const node = attribute.notBetween({ begin: -Infinity, end: 3 });
 
       expect(node).toEqual(new Nodes.GreaterThan(attribute, new Nodes.Casted(3, attribute)));
     });
@@ -781,7 +781,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with an infinite range", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.notBetween([-Infinity, Infinity]);
+      const node = attribute.notBetween({ begin: -Infinity, end: Infinity });
 
       expect(node).toEqual(new Nodes.In(attribute, []));
     });
@@ -795,7 +795,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with a range ending at Infinity", () => {
       const attribute = new Attribute(null, null);
-      const node = attribute.notBetween([0, Infinity]);
+      const node = attribute.notBetween({ begin: 0, end: Infinity });
 
       expect(node).toEqual(new Nodes.LessThan(attribute, new Nodes.Casted(0, attribute)));
     });

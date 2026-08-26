@@ -21,7 +21,7 @@ import {
 } from "../nodes/infix-operation.js";
 import { BitwiseNot } from "../nodes/unary-operation.js";
 import type { NodeOrValue } from "../nodes/binary.js";
-import { Predications } from "../predications.js";
+import { Predications, type RangeLike } from "../predications.js";
 
 /**
  * Attribute — represents a column on a table.
@@ -187,10 +187,6 @@ export class Attribute extends Node {
 // quoted_array / grouping_any / infinity? helpers — comes from the mixin and
 // dispatches back through this class's `quotedNode`, which is the only piece
 // Attribute supplies (the type-casting variant).
-//
-// `between` / `notBetween` are re-declared rather than inherited from
-// `Included<>`: the mixin types them with an overload set, and `Included<>`'s
-// signature inference keeps only the last overload.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Attribute extends Omit<
   Included<typeof Predications>,
@@ -206,12 +202,8 @@ export interface Attribute extends Omit<
   isUnboundable(value: unknown): 1 | -1 | 0;
   /** @internal */
   isOpenEnded(value: unknown): boolean;
-  between(range: readonly [unknown, unknown]): Node;
-  between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-  between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
-  notBetween(range: readonly [unknown, unknown]): Node;
-  notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-  notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+  between(other: RangeLike): Node;
+  notBetween(other: RangeLike): Node;
 }
 
 include(Attribute, Predications);

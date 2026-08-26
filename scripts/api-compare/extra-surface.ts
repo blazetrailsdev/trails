@@ -1590,6 +1590,9 @@ function buildPackageReport(
     }
   }
 
+  const rubyFileByTsFile = new Map<string, string>();
+  for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
+
   const scoreTargets: { tsFile: string; rubyFile: string | null }[] = [
     ...[...rubyFileNames].map((rubyFile) => ({
       tsFile: rubyFileToTs(rubyFile, pkg),
@@ -1631,6 +1634,33 @@ function buildPackageReport(
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
             rubyFile,
           );
+
+    // A NAMED re-export (`export { buildQuoted } from "./casted.js"`) is a
+    // re-export site, not a port location (compare.ts:2346). When the barrel
+    // itself has no Rails counterpart — `nodes/index.ts` mirrors `arel/nodes.rb`,
+    // which declares nothing — the name is still Rails': `Arel::Nodes.build_quoted`
+    // lives in `arel/nodes/casted.rb` (casted.rb:47-58), which `nodes/casted.ts`
+    // already matches. Score it there, so passing it through a barrel does not
+    // re-charge it as extra surface.
+    if (rubyFile === null) {
+      for (const fn of fileFns ?? []) {
+        if (fn.reExportedFrom === undefined) continue;
+        const sourceTs = fn.reExportedFrom.slice(0, fn.reExportedFrom.lastIndexOf(":"));
+        const sourceRuby = rubyFileByTsFile.get(sourceTs);
+        if (sourceRuby === undefined) continue;
+        const sourceAllowed = collectAllowedNames(
+          rubyFiles.get(sourceRuby) ?? [],
+          pkg,
+          rubyPkg.modules,
+          moduleFqnByShort,
+          crossPackageModules,
+          crossPackagePkgByFqn,
+          Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
+          sourceRuby,
+        );
+        if (sourceAllowed.has(fn.name)) allowed.add(fn.name);
+      }
+    }
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized
     // from the FILENAME is a name nobody wrote (see `synthesizedFileModule`).
