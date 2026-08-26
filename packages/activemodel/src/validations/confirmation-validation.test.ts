@@ -142,7 +142,7 @@ describe("ConfirmationValidationTest", () => {
         this.validates("email", { confirmation: true });
       }
     }
-    expect(Person._attributeDefinitions.has("emailConfirmation")).toBe(true);
+    expect(Person.attributeNames()).toContain("emailConfirmation");
   });
 });
 describe("ConfirmationValidator caseSensitive", () => {

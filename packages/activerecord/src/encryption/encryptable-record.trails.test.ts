@@ -26,7 +26,7 @@ import { BinaryType } from "@blazetrails/activemodel";
  * TS-only extras for EncryptableRecord. Rails has no equivalent test: its
  * `serialized binary data can be encrypted` asserts only the round-trip, which
  * a doubly-wrapped type can still satisfy for some coders. trails eagerly bakes
- * decorations into `_attributeDefinitions[name].type` (a back-compat
+ * decorations into a per-class type registry (a back-compat
  * convenience Rails lacks), so seeding `_defaultAttributes` from that decorated
  * type silently double-applied every decorator that also lives in the pending
  * queue. These assert the resolved chain directly so a re-introduced wrapper

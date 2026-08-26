@@ -13,14 +13,6 @@ import {
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
 
-export interface AttributeDefinition {
-  name: string;
-  type: Type;
-  defaultValue: unknown;
-  virtual?: boolean;
-  limit?: number | null;
-}
-
 /**
  * Return all attributes as a plain hash.
  *

@@ -945,7 +945,7 @@ describe("ReflectionTest", () => {
 
       static {
         // Use a table absent from the canonical schema so columnsHash() falls
-        // back to _attributeDefinitions instead of the DB schema cache.
+        // back to the declared attributes instead of the DB schema cache.
         this._tableName = "refl_articles";
         this.attribute("title", "string");
       }

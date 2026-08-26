@@ -234,7 +234,7 @@ describe("ReflectionTest", () => {
   it("columns reports the column's own type, not the decorated cast type", async () => {
     // Rails' `columns` is `columns_hash.values` (model_schema.rb:432-434) —
     // schema-sourced, never attribute-decorated. trails previously built it
-    // from `_attributeDefinitions[].type.constructor.name`, so a decorated
+    // from the declared attribute's `type.constructor.name`, so a decorated
     // column (serialize + encrypts here) reported the wrapper class instead
     // of the column's own type.
     const configSnapshot = snapshotEncryptionConfig();

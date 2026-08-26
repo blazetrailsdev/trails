@@ -172,9 +172,9 @@ export function installEnumAttribute(
     return enumTypeFrom(name, mapping, subtype, raiseOnInvalidValues);
   });
 
-  // Define the getter after attribute() so the EnumType is already in
-  // _attributeDefinitions / the pending-type queue when we overwrite whatever
-  // accessor attribute() installed.
+  // Define the getter after attribute() so the EnumType is already in the
+  // pending-type queue when we overwrite whatever accessor attribute()
+  // installed.
   Object.defineProperty(klass.prototype, name, {
     get(this: Base) {
       // `readAttribute`, not a direct `_attributes` read: an aliased enum is
@@ -962,11 +962,10 @@ export function raiseConflictError(
  * Fetch the single registered EnumType for an enum attribute — the one source
  * of truth built lazily from the reflected column type via the
  * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
- * (`_defaultAttributes`), NOT `_attributeDefinitions`: reflection skips a
- * user-provided enum def, so its `type` stays the pre-reflection (mapping-shape-
- * inferred) EnumType, whereas the replayed decorator rebuilds the EnumType from
- * the reflected column subtype. Returns null when the attribute isn't an enum
- * on this class.
+ * (`_defaultAttributes`), NOT the pending `PendingType` the declaration pushed:
+ * that type is the pre-reflection (mapping-shape-inferred) EnumType, whereas the
+ * replayed decorator rebuilds the EnumType from the reflected column subtype.
+ * Returns null when the attribute isn't an enum on this class.
  *
  * @internal
  */

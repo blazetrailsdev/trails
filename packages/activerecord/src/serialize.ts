@@ -171,6 +171,6 @@ export function serialize(
   // `_defaultAttributes` rebuild, so the query-side lookup (`type_for_attribute` /
   // `TypeCaster::Map`), which now resolves through `attribute_types` (the decorated
   // default attribute set), sees the `Serialized` cast type once columns reflect —
-  // no per-feature `_attributeDefinitions` replay needed.
+  // no per-feature post-reflection replay needed.
   modelClass.decorateAttributes([attribute], decorator);
 }

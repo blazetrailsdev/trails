@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
+import { declaredAttributeNames } from "./model-schema.js";
+/** The names a class declared with `attribute()`, read off the
+ * pending-modification queue the way `columnsHash`' synthesis does. */
+const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
 
 describe("STI subclass attribute() registration", () => {
   it("keeps subclass attribute() calls on the subclass, not the STI base", () => {
@@ -15,10 +19,10 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    expect(Circle._attributeDefinitions.has("radius")).toBe(true);
-    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
+    expect(declared(Circle)).toContain("radius");
+    expect(declared(Shape)).not.toContain("radius");
 
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_attributeDefinitions")).toBe(true);
+    expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
   it("still forks the STI base itself (non-subclass) on attribute() — unchanged", () => {
@@ -31,8 +35,8 @@ describe("STI subclass attribute() registration", () => {
     }
 
     // Shape IS the STI base (not a subclass), so its map is its own.
-    expect(Object.prototype.hasOwnProperty.call(Shape, "_attributeDefinitions")).toBe(true);
-    expect(Shape._attributeDefinitions.has("name")).toBe(true);
+    expect(Object.hasOwn(Shape, "_pendingAttributeModifications")).toBe(true);
+    expect(declared(Shape)).toContain("name");
   });
 
   it("non-STI classes are unaffected", () => {
@@ -42,8 +46,8 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    expect(Object.prototype.hasOwnProperty.call(Widget, "_attributeDefinitions")).toBe(true);
-    expect(Widget._attributeDefinitions.has("price")).toBe(true);
+    expect(Object.hasOwn(Widget, "_pendingAttributeModifications")).toBe(true);
+    expect(declared(Widget)).toContain("price");
   });
 
   it("STI subclass attribute declared AFTER base inherits the base's attrs too", () => {
@@ -60,9 +64,9 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    expect(Triangle._attributeDefinitions.get("name")?.type.name).toBe("string");
-    expect(Triangle._attributeDefinitions.get("sides")?.type.name).toBe("integer");
-    expect(Shape._attributeDefinitions.has("sides")).toBe(false);
+    expect(Triangle.typeForAttribute("name").name).toBe("string");
+    expect(Triangle.typeForAttribute("sides").name).toBe("integer");
+    expect(declared(Shape)).not.toContain("sides");
   });
 
   it("STI subclass encrypts() stays on the subclass, unlike attribute()", async () => {
@@ -133,8 +137,8 @@ describe("STI subclass attribute() registration", () => {
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
 
     expect(Shape.typeForAttribute("guid").name).toBe("uuid");
-    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
-    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
+    expect(declared(Shape)).not.toContain("radius");
+    expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
     expect(Circle.typeForAttribute("radius").name).toBe("integer");
     expect(Circle.typeForAttribute("guid").name).toBe("uuid");
   });
@@ -160,17 +164,17 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    expect(Object.prototype.hasOwnProperty.call(Ticket, "_attributeDefinitions")).toBe(true);
-    expect(Ticket._attributeDefinitions.get("priority")?.type.name).toBe("integer");
-    expect(Shape._attributeDefinitions.has("priority")).toBe(false);
-    expect(Circle._attributeDefinitions.has("priority")).toBe(false);
+    expect(Object.hasOwn(Ticket, "_pendingAttributeModifications")).toBe(true);
+    expect(Ticket.typeForAttribute("priority").name).toBe("integer");
+    expect(declared(Shape)).not.toContain("priority");
+    expect(declared(Circle)).not.toContain("priority");
 
-    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
-    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
-    expect(Circle._attributeDefinitions.get("radius")?.type.name).toBe("integer");
+    expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
+    expect(declared(Shape)).not.toContain("radius");
+    expect(Circle.typeForAttribute("radius").name).toBe("integer");
 
     // Inherited (shared-ancestor) declarations remain visible on the descendant.
-    expect(Ticket._attributeDefinitions.get("radius")?.type.name).toBe("integer");
+    expect(Ticket.typeForAttribute("radius").name).toBe("integer");
   });
   it("own-table descendant does not clobber the STI base's attributesBuilder cache", () => {
     class Shape extends Base {

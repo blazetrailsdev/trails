@@ -39,10 +39,12 @@ export {
 } from "./attribute-mutation-tracker.js";
 export {
   applyPendingAttributeModifications,
+  PendingDefault,
+  PendingType,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
-export type { AttributeDefinition, AttributeOptions } from "./attributes.js";
+export type { AttributeOptions } from "./attributes.js";
 export {
   Attribute,
   FromDatabase,
