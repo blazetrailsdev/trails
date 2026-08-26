@@ -12,7 +12,11 @@ export function findJoinTableName(
   table2: string,
   options: { tableName?: string } = {},
 ): string {
-  return options.tableName ?? joinTableName(table1, table2);
+  // join_table.rb:7-9 — `options.delete(:table_name)`, which REMOVES the key so
+  // the caller can splat the rest straight into create_table/drop_table.
+  const tableName = options.tableName;
+  delete options.tableName;
+  return tableName ?? joinTableName(table1, table2);
 }
 
 /**

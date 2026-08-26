@@ -407,7 +407,6 @@ export class ConnectionPool implements ReapablePool {
   private _checkedOut = new Set<DatabaseAdapter>();
   private _leases: LeaseRegistry | null = new LeaseRegistry();
   private _idleTimeout: number | null;
-  private _lastCheckinAt = new Map<DatabaseAdapter, number>();
   /**
    * Async `driver.close()` calls fired by synchronous discard paths that cannot
    * await them under their `void`/throwing contract — currently the
@@ -821,26 +820,36 @@ export class ConnectionPool implements ReapablePool {
     // await, so without the lock a second unpin enters while the pin is half
     // torn down and rolls the same transaction back again.
     const block = async () => {
-      try {
-        if (isTransactionAware(connection)) {
-          if (connection.transactionManager.currentTransaction.open) {
-            await connection.transactionManager.rollbackTransaction();
-          } else {
-            clean = false;
-            connection.resetBang();
-          }
+      // connection_pool.rb:345-347 — the depth is decremented and the pin
+      // cleared BEFORE the transaction is inspected, so anything re-entering
+      // during the rollback sees an already-unpinned pool.
+      pin.depth--;
+      if (pin.depth === 0) {
+        if (fromFixture) {
+          this._fixturePin = null;
+        } else {
+          this._pinnedConnections.delete(ctxId);
         }
-      } finally {
-        pin.depth--;
-        if (pin.depth === 0) {
-          if (fromFixture) {
-            this._fixturePin = null;
-          } else {
-            this._pinnedConnections.delete(ctxId);
-          }
-          this._cacheConfig.decrementPinnedCount();
-          this.checkin(connection);
+        this._cacheConfig.decrementPinnedCount();
+      }
+
+      // connection_pool.rb:349-355 — the `else` arm is Rails' "something
+      // committed or rolled back the transaction" case.
+      if (isTransactionAware(connection)) {
+        if (connection.transactionManager.currentTransaction.open) {
+          await connection.transactionManager.rollbackTransaction();
+        } else {
+          clean = false;
+          connection.resetBang();
         }
+      }
+
+      // connection_pool.rb:357-361 — a plain trailing statement, NOT an
+      // ensure: a raising rollback propagates with the connection left checked
+      // out. `steal!` / `lock_thread = nil` have no trails counterpart
+      // (single-threaded runtime), so only the checkin survives that arm.
+      if (pin.depth === 0) {
+        this.checkin(connection);
       }
     };
 
@@ -961,7 +970,6 @@ export class ConnectionPool implements ReapablePool {
         QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
       }
       this._available?.add(conn);
-      this._lastCheckinAt.set(conn, Date.now());
     }
   }
 
@@ -1075,7 +1083,6 @@ export class ConnectionPool implements ReapablePool {
       this._available?.clear();
       this._checkedOut.clear();
       this._leases?.clear();
-      this._lastCheckinAt.clear();
     });
     return draining;
   }
@@ -1139,7 +1146,6 @@ export class ConnectionPool implements ReapablePool {
     this._available = null;
     this._leases = null;
     this._checkedOut.clear();
-    this._lastCheckinAt.clear();
     return draining;
   }
 
@@ -1184,7 +1190,6 @@ export class ConnectionPool implements ReapablePool {
           (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
           const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
           if (drain) draining.push(drain);
-          this._lastCheckinAt.delete(conn);
         }
       }
       if (this._connections) {
@@ -1226,12 +1231,6 @@ export class ConnectionPool implements ReapablePool {
    * drivers. The `Promise` return is an intentional, documented divergence from
    * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
-   *
-   * @missingRailsCall select — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   connection_pool.rb:653-660 is `@connections.select { ... }.each { ... }`;
-   *   trails' _flush partitions in one `for..of` over `_available.clear()`
-   *   because eviction and re-add must happen under the same synchronous pass.
-   *   Same predicate (`!in_use?` and idle >= minimum_idle).
    */
   async flush(minimumIdle?: number | null): Promise<void> {
     await Promise.all(this._flush(minimumIdle));
@@ -1249,26 +1248,21 @@ export class ConnectionPool implements ReapablePool {
     if (this.isDiscarded()) return [];
     if (!this._connections || !this._available) return [];
 
-    const now = Date.now();
-    const minimumIdleMs = minimumIdle * 1000;
-
-    const idle: DatabaseAdapter[] = [];
-    const all = this._available.clear();
-    for (const conn of all) {
-      const lastCheckin = this._lastCheckinAt.get(conn) ?? 0;
-      const idleMs = now - lastCheckin;
-      if (idleMs >= minimumIdleMs) {
-        const connIdx = this._connections.indexOf(conn);
-        if (connIdx >= 0) this._connections.splice(connIdx, 1);
-        this._lastCheckinAt.delete(conn);
-        idle.push(conn);
-      } else {
-        this._available.add(conn);
-      }
+    // connection_pool.rb:651-661 — select the idle connections off
+    // `@connections`, then lease each and remove it from `@available` and
+    // `@connections`.
+    const idleConnections = this._connections.filter(
+      (conn) => !conn.inUse && conn.secondsIdle >= minimumIdle,
+    );
+    for (const conn of idleConnections) {
+      conn.lease();
+      this._available.delete(conn);
+      const connIdx = this._connections.indexOf(conn);
+      if (connIdx >= 0) this._connections.splice(connIdx, 1);
     }
 
     const draining: Array<Promise<void>> = [];
-    for (const conn of idle) {
+    for (const conn of idleConnections) {
       (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
       const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
       if (drain) draining.push(drain);
@@ -1459,7 +1453,6 @@ export class ConnectionPool implements ReapablePool {
   remove(conn: DatabaseAdapter): void {
     this.connectionLease().clear(conn);
     this._checkedOut.delete(conn);
-    this._lastCheckinAt.delete(conn);
     this._available?.delete(conn);
 
     for (const [ctxId, pin] of this._pinnedConnections) {
@@ -1485,7 +1478,6 @@ export class ConnectionPool implements ReapablePool {
     ) {
       const newConn = this.newConnection();
       this._connections.push(newConn);
-      this._lastCheckinAt.set(newConn, Date.now());
       this._available?.add(newConn);
     }
   }

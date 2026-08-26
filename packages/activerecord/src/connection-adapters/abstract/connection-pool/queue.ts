@@ -239,11 +239,9 @@ export class Queue {
     return synchronize(this, () => this.internalPoll(timeout));
   }
 
-  clear(): DatabaseAdapter[] {
-    return synchronize(this, () => {
-      const items = [...this._queue];
+  clear(): void {
+    synchronize(this, () => {
       this._queue = [];
-      return items;
     });
   }
 

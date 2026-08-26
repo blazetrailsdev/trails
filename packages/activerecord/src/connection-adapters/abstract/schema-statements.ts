@@ -338,7 +338,7 @@ export class SchemaStatements {
 
   async createTable(
     tableName: string,
-    optionsOrFn?:
+    kwargsOrFn?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
@@ -376,17 +376,18 @@ export class SchemaStatements {
     } = {};
     let definer: ((t: TableDefinitionOf<this>) => void | Promise<void>) | undefined;
 
-    if (typeof optionsOrFn === "function") {
-      definer = optionsOrFn;
-    } else if (optionsOrFn) {
-      kwargs = optionsOrFn;
+    if (typeof kwargsOrFn === "function") {
+      definer = kwargsOrFn;
+    } else if (kwargsOrFn) {
+      kwargs = kwargsOrFn;
       definer = fn;
     }
 
     // Rails takes `id:`, `primary_key:` and `force:` as their own kwargs, so
     // they never reach `validate_create_table_options!(options)`
-    // (schema_statements.rb:293-294). We bundle every kwarg into one object, so
-    // they are split back out here — `options` is then Rails' `**options`.
+    // (schema_statements.rb:293-294). TS has no `**rest` in a signature, so
+    // every kwarg arrives in one object and is split back out here — `options`
+    // is then Rails' `**options`.
     const { id, primaryKey, force, ...options } = kwargs;
     this.validateCreateTableOptionsBang(options);
 
@@ -914,25 +915,31 @@ export class SchemaStatements {
   async createJoinTable(
     table1: string,
     table2: string,
-    optionsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
+    kwargsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let options: JoinTableOptions = {};
+    let kwargs: JoinTableOptions = {};
     let definer: ((t: TableDefinition) => void) | undefined;
-    if (typeof optionsOrFn === "function") {
-      definer = optionsOrFn;
-    } else if (optionsOrFn) {
-      options = optionsOrFn;
+    if (typeof kwargsOrFn === "function") {
+      definer = kwargsOrFn;
+    } else if (kwargsOrFn) {
+      kwargs = kwargsOrFn;
       definer = fn;
     }
-    const tableName = this.findJoinTableName(table1, table2, options);
-    const { columnOptions = {}, tableName: _t, ...tableOpts } = options;
-    const mergedColOpts = { null: false, index: false, ...columnOptions };
+    // Rails takes `column_options:` as its own kwarg, so `options` is the rest
+    // (schema_statements.rb:389); `find_join_table_name` then deletes
+    // `:table_name` out of it (:390).
+    const options: JoinTableOptions = { ...kwargs };
+    let columnOptions = options.columnOptions ?? {};
+    delete options.columnOptions;
+    const joinTableName = this.findJoinTableName(table1, table2, options);
+    // schema_statements.rb:391 — `column_options.reverse_merge!`.
+    columnOptions = { null: false, index: false, ...columnOptions };
     const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
-    await this.createTable(tableName, { ...tableOpts, id: false }, (t) => {
-      t.references(t1Ref, mergedColOpts);
-      t.references(t2Ref, mergedColOpts);
+    await this.createTable(joinTableName, { ...options, id: false }, (t) => {
+      t.references(t1Ref, columnOptions);
+      t.references(t2Ref, columnOptions);
       if (definer) definer(t);
     });
   }
@@ -940,10 +947,10 @@ export class SchemaStatements {
   async dropJoinTable(
     table1: string,
     table2: string,
-    options?: { tableName?: string },
+    options: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" } = {},
   ): Promise<void> {
-    const tableName = this.findJoinTableName(table1, table2, options ?? {});
-    await this.dropTable(tableName);
+    const joinTableName = this.findJoinTableName(table1, table2, options);
+    await this.dropTable(joinTableName, options);
   }
 
   /**
@@ -1329,7 +1336,7 @@ export class SchemaStatements {
 
   async buildCreateTableDefinition(
     tableName: string,
-    options: {
+    kwargs: {
       id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
@@ -1337,21 +1344,24 @@ export class SchemaStatements {
     } = {},
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
-    const { id = true, primaryKey, force: _force, ...rest } = options;
+    // schema_statements.rb:331 — `id:`, `primary_key:` and `force:` are named
+    // kwargs, so `options` is the `**options` rest the two `extract!` calls
+    // below consume.
+    const { id = true, primaryKey, force: _force, ...options } = kwargs;
     // Rails uses `options.extract!`, which *deletes* what it returns — so
     // `_skipValidateOptions` only ever reaches the first extraction.
     const tdOptions: Record<string, unknown> = {};
     for (const key of [...this.validTableDefinitionOptions(), "_skipValidateOptions"]) {
-      if (key in rest) {
-        tdOptions[key] = rest[key];
-        delete rest[key];
+      if (key in options) {
+        tdOptions[key] = options[key];
+        delete options[key];
       }
     }
     const pkOptions: Record<string, unknown> = {};
     for (const key of [...this.validPrimaryKeyOptions(), "_skipValidateOptions"]) {
-      if (key in rest) {
-        pkOptions[key] = rest[key];
-        delete rest[key];
+      if (key in options) {
+        pkOptions[key] = options[key];
+        delete options[key];
       }
     }
 
@@ -1369,22 +1379,25 @@ export class SchemaStatements {
   async buildCreateJoinTableDefinition(
     table1: string,
     table2: string,
-    options: {
+    kwargs: {
       columnOptions?: Record<string, unknown>;
       tableName?: string;
       [key: string]: unknown;
     } = {},
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
+    // schema_statements.rb:408-410, as in `create_join_table` above.
+    const options: Record<string, unknown> = { ...kwargs };
+    let columnOptions = (options.columnOptions as Record<string, unknown>) ?? {};
+    delete options.columnOptions;
     const joinTableName = this.findJoinTableName(table1, table2, options);
-    const { columnOptions = {}, tableName: _, ...rest } = options;
-    const mergedColOpts = { null: false, index: false, ...columnOptions };
+    columnOptions = { null: false, index: false, ...columnOptions };
 
     const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
-    return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, async (td) => {
-      td.references(t1Ref, mergedColOpts);
-      td.references(t2Ref, mergedColOpts);
+    return this.buildCreateTableDefinition(joinTableName, { ...options, id: false }, async (td) => {
+      td.references(t1Ref, columnOptions);
+      td.references(t2Ref, columnOptions);
       if (fn) await fn(td);
     });
   }
