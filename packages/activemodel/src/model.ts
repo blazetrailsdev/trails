@@ -50,9 +50,6 @@ import {
   defineMethodAttribute,
   _resurrectAttributeMethods,
 } from "./attribute-methods.js";
-
-/** The class half of `include ActiveModel::AttributeMethods` (attribute_methods.rb:75-501). */
-type AttributeMethodsClassMethods = Extended<typeof AttributeMethods.ClassMethods>;
 import * as AttributeAssignment from "./attribute-assignment.js";
 import {
   ClassMethods as ValidationsCallbacksClassMethods,
@@ -92,6 +89,9 @@ import { Naming } from "./naming.js";
  * by the `extend()` at the bottom of this file.
  *
  */
+/** The class half of `include ActiveModel::AttributeMethods` (attribute_methods.rb:75-501). */
+type AttributeMethodsClassMethods = Extended<typeof AttributeMethods.ClassMethods>;
+
 const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeNames };
 
 /**
@@ -102,6 +102,11 @@ const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeN
  */
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
+/**
+ * The instance side of every module `Model` includes, including the instance
+ * half of Ruby `include ActiveModel::AttributeMethods` (attribute_methods.rb:73)
+ * that the `include(Model, …)` at the bottom of this file installs.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model
   extends
@@ -111,9 +116,6 @@ export interface Model
     Serialization,
     Naming,
     SerializersJSON,
-    // The instance half of Ruby `include ActiveModel::AttributeMethods`
-    // (attribute_methods.rb:73), installed by the `include(Model, …)` at the
-    // bottom of this file.
     Included<typeof AttributeMethods.InstanceMethods> {
   /**
    * Redeclared as a method, not the property `Included<>` derives, so a
