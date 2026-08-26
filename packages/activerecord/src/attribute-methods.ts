@@ -6,13 +6,8 @@
 import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
-  aliasesByAttributeName,
-  missingAttribute,
+  AttributeMethods,
   type AttributeMethodPattern,
-  isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
-  aliasAttribute as amAliasAttribute,
-  defineAttributeMethods as amDefineAttributeMethods,
-  undefineAttributeMethods as amUndefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
   type DirtyOptions,
 } from "@blazetrails/activemodel";
@@ -347,7 +342,7 @@ export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldN
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
-  amAliasAttribute.call(this as never, newName, oldName);
+  AttributeMethods.ClassMethods.aliasAttribute.call(this as never, newName, oldName);
 
   if (
     Object.prototype.hasOwnProperty.call(this, "_aliasAttributesMassGenerated") &&
@@ -500,7 +495,10 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
       Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
       this._attributeMethodsGenerated;
     if (!generatedByNestedLoad) {
-      amDefineAttributeMethods.call(this as never, ...this.attributeNames());
+      AttributeMethods.ClassMethods.defineAttributeMethods.call(
+        this as never,
+        ...this.attributeNames(),
+      );
       if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
     }
   }
@@ -540,7 +538,9 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
     return;
   }
   CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
-    for (const [oldName, newNames] of aliasesByAttributeName(this as never)) {
+    for (const [oldName, newNames] of AttributeMethods.ClassMethods.aliasesByAttributeName.call(
+      this as never,
+    )) {
       for (const newName of newNames) {
         generateAliasAttributeMethods.call(this, codeGenerator, newName, oldName);
       }
@@ -564,7 +564,7 @@ export function undefineAttributeMethods(this: AttributeMethodsHost): void {
     Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
     this._attributeMethodsGenerated
   ) {
-    amUndefineAttributeMethods.call(this as never);
+    AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
   }
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
@@ -636,14 +636,20 @@ export function isInstanceMethodAlreadyImplemented(
 
   const superclass = Object.getPrototypeOf(this);
   if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
-    return _amInstanceMethodAlreadyImplemented.call(this as any, methodName);
+    return AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(
+      this as any,
+      methodName,
+    );
   } else {
     const base = frameworkBase(this);
     const defined =
       base != null &&
       isMethodDefinedWithin.call(this, methodName, superclass, base) &&
       !isOwnedByGeneratedAttributeMethods(superclass, methodName);
-    return defined || _amInstanceMethodAlreadyImplemented.call(this as any, methodName);
+    return (
+      defined ||
+      AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(this as any, methodName)
+    );
   }
 }
 
@@ -883,7 +889,10 @@ export function attributeForInspect(this: InstanceMethodHost, attr: string): str
  */
 export function get(this: InstanceMethodHost, attrName: string): unknown {
   return this.readAttribute(attrName, (n) =>
-    missingAttribute.call(this as unknown as AttributeMethodsInstanceHost, n),
+    AttributeMethods.InstanceMethods.missingAttribute.call(
+      this as unknown as AttributeMethodsInstanceHost,
+      n,
+    ),
   );
 }
 

@@ -41,6 +41,11 @@ describe("ReadTest", () => {
       static generatedAttributeMethods = Base.generatedAttributeMethods;
       static isInstanceMethodAlreadyImplemented = Base.isInstanceMethodAlreadyImplemented;
       static attributeMethodPatternsCache = Base.attributeMethodPatternsCache;
+      static aliasesByAttributeName = Base.aliasesByAttributeName;
+      static generateAliasAttributeMethods = Base.generateAliasAttributeMethods;
+      static defineProxyCall = Base.defineProxyCall;
+      static buildMangledName = Base.buildMangledName;
+      static defineCall = Base.defineCall;
     }
     return Klass;
   }

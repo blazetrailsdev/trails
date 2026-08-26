@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
-import {
-  type AttributeMethod,
-  defineAttributeMethod,
-  generatedAttributeMethods,
-  missingAttribute,
-} from "./attribute-methods.js";
+import { type AttributeMethod, ClassMethods, InstanceMethods } from "./attribute-methods.js";
 
 describe("AttributeMethodsTest", () => {
   it("#missing_attribute applies the supplied stack to the raised error", () => {
@@ -17,11 +12,13 @@ describe("AttributeMethodsTest", () => {
     const p = new Person({ name: "test" });
     const stack = "custom backtrace line";
     const call = () =>
-      (missingAttribute as (this: unknown, attrName: string, stack?: string) => never).call(
-        p,
-        "title",
-        stack,
-      );
+      (
+        InstanceMethods.missingAttribute as (
+          this: unknown,
+          attrName: string,
+          stack?: string,
+        ) => never
+      ).call(p, "title", stack);
     let caught: Error | undefined;
     try {
       call();
@@ -42,14 +39,14 @@ describe("AttributeMethodsTest", () => {
     // `foo` reader over it. trails skips the bare pattern (readers are real
     // accessor properties), so a suffix pattern's method stands in for it.
     Person.attributeMethodSuffix("Short");
-    generatedAttributeMethods.call(Person).moduleEval((mod) => {
+    ClassMethods.generatedAttributeMethods.call(Person).moduleEval((mod) => {
       Object.defineProperty(mod, "nameShort", {
         value: () => "<3",
         writable: true,
         configurable: true,
       });
     });
-    defineAttributeMethod.call(Person, "name");
+    ClassMethods.defineAttributeMethod.call(Person, "name");
 
     expect((new Person({ name: "Alice" }) as unknown as { nameShort(): string }).nameShort()).toBe(
       "<3",

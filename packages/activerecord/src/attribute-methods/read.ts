@@ -5,7 +5,7 @@
  */
 
 import type { AttributeSet } from "@blazetrails/activemodel";
-import { AttrNames, buildMangledName } from "@blazetrails/activemodel";
+import { AttrNames, AttributeMethods } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
 
 /**
@@ -98,7 +98,7 @@ export function defineMethodAttribute(
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
   const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
-  const tempMethodName = buildMangledName(methodName);
+  const tempMethodName = AttributeMethods.ClassMethods.buildMangledName(methodName);
   completeHalfAccessor(this, as, "get", function (this: ReadRecord) {
     return readGeneratedAttribute(this, canonicalName);
   });

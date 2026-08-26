@@ -2,6 +2,13 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
+    "rubyName": "attribute_method?",
+    "call": "include?",
+    "reason": "attribute_methods.rb:542 is `attributes.include?(attr_name)` over a Ruby Hash; trails' `attributes` returns a plain object, so key existence is `Object.hasOwn` and there is no `include?` to send. Surfaced by grouping the file into module objects, which restored the pairing this method had lost."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-methods.ts",
     "rubyName": "define_call",
     "call": "match?",
     "reason": "attribute_methods.rb:457 guards the `send(...)` arm with `CALL_COMPILABLE_REGEXP.match?(target_name)`; trails emits a JS property descriptor rather than compiled source, and a property lookup needs no name to be compilable, so the arm the regexp selects has no counterpart to guard (see the JSDoc on defineCall)."
