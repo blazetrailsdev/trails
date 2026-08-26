@@ -209,7 +209,7 @@ describe("buildReport — ActiveSupport::Concern allow-set", () => {
    * Rails: `mixin.rb` defines `module Mixin; extend ActiveSupport::Concern;
    * included do extend Namer end; module ClassMethods; def validates; end; end;
    * end`, and `host.rb` does `include Mixin`. Ruby's Concern hook
-   * (activesupport/lib/active_support/concern.rb:139-143) gives the host both
+   * (activesupport/lib/active_support/concern.rb:137-138) gives the host both
    * `Mixin::ClassMethods#validates` and `Namer#model_name` as CLASS methods,
    * neither of which appears in the host's own `includes`.
    */

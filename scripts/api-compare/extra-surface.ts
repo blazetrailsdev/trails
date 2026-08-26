@@ -1269,7 +1269,7 @@ function collectAllowedNames(
     addMethods(mod.instanceMethods, fqn);
     // `include M` where `M extend ActiveSupport::Concern` also runs
     // `base.extend M::ClassMethods` and the `included` block
-    // (activesupport/lib/active_support/concern.rb:139-143), so the includer
+    // (activesupport/lib/active_support/concern.rb:137-138), so the includer
     // answers both as class methods. Neither reaches the host through its own
     // `includes` — the static extractor files `M::ClassMethods` as a separate
     // entity, and it flattens `included do extend X end` into `M`'s `extends`.
@@ -1277,8 +1277,11 @@ function collectAllowedNames(
     // singleton-only and must not propagate.
     // Spelled `ActiveSupport::Concern` from another gem and bare `Concern` from
     // inside `module ActiveSupport` (callbacks.rb:65); `moduleFqnByShort` is the
-    // HOST package's map, so it cannot requalify the bare one.
-    const isConcern = (ext: string): boolean => ext === CONCERN || ext === "Concern";
+    // HOST package's map, so it cannot requalify the bare one. Ruby's own
+    // lexical lookup is the guard on the bare spelling: it only resolves to
+    // `ActiveSupport::Concern` inside `ActiveSupport`.
+    const isConcern = (ext: string): boolean =>
+      ext === CONCERN || (ext === "Concern" && fqn.startsWith("ActiveSupport::"));
     if ((mod.extends ?? []).some(isConcern)) {
       walkMixin(`${fqn}::ClassMethods`, fqn);
       for (const ext of mod.extends ?? []) if (!isConcern(ext)) walkMixin(ext, fqn);
