@@ -859,6 +859,10 @@ export interface CalculationMethods {
  *   literal id list at `.where()`-build time (finder_methods.rb:463); trails'
  *   `.where()` is sync, so the deferred marker resolves here, before the
  *   calculation compiles its where clause.
+ *
+ * `pluck` and `ids` are wrapped too: they keep their own `with_connection`
+ * around the one query they issue (calculations.rb:316/396) and this wrap is
+ * re-entrant, so it adds no second lease — it only carries the preliminaries.
  */
 function inQueryConnection<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
@@ -887,10 +891,6 @@ export const Calculations = {
   sum: inQueryConnection(performSum),
   asyncSum,
   calculate: inQueryConnection(calculate),
-  // `pluck` / `ids` do their own `with_connection` (and `skip_query_cache_if_necessary`)
-  // around the one query they issue, exactly as calculations.rb:316/396 does;
-  // the outer wrap here is re-entrant and adds no second lease — it is only
-  // the seam carrying the two non-Rails preliminaries off their ported bodies.
   pluck: inQueryConnection(pluck),
   asyncPluck,
   pick,

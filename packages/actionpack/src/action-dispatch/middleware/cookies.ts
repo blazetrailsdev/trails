@@ -110,7 +110,9 @@ export class CookieJar implements Iterable<[string, string]> {
   /**
    * Build a CookieJar seeded with `cookies` from a request. Mirrors
    * `Cookies::CookieJar.build(request, cookies)` used by
-   * `ActionDispatch::TestProcess#cookies`.
+   * `ActionDispatch::TestProcess#cookies`. Ruby's `new` inside a class method
+   * resolves to the receiving subclass, so `NullCookieJar.build` builds a
+   * `NullCookieJar`.
    *
    * @internal
    */
@@ -123,8 +125,6 @@ export class CookieJar implements Iterable<[string, string]> {
     // the options used by signed/encrypted jars. We forward
     // `request.cookiesAppOptions` if the host exposes it so signed/encrypted
     // accessors can find their secrets in test setups.
-    // Ruby's `new` inside a class method resolves to the receiving subclass —
-    // `NullCookieJar.build` must build a `NullCookieJar`.
     const jar = new this(request?.cookiesAppOptions ?? {});
     if (request && "env" in request) jar._request = request;
     for (const [k, v] of Object.entries(cookies ?? {})) {

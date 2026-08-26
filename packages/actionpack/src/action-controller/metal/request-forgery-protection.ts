@@ -104,15 +104,17 @@ export class NullSession implements ProtectionMethods {
   constructor(controller: Controller) {
     this._controller = controller;
   }
-  /** Mirrors `NullSession#handle_unverified_request` (rb:261-267). */
+  /**
+   * Mirrors `NullSession#handle_unverified_request` (rb:261-267). Rails'
+   * `request.cookie_jar =` writer is the `RequestCookieMethods` mixin, which
+   * trails spells as a `this`-typed function whose optional argument is the
+   * write arm (cookies.ts `cookieJar`).
+   */
   handleUnverifiedRequest(): void {
     const request = this._controller.request as NullSessionRequest;
     request.session = new NullSessionHash(request);
     request.flash = null;
     request.sessionOptions = { skip: true };
-    // Rails' `request.cookie_jar =` writer; trails spells the
-    // `RequestCookieMethods` mixin as a `this`-typed function whose optional
-    // argument is the write arm (cookies.ts `cookieJar`).
     cookieJar.call(request, NullCookieJar.build(request, {}));
   }
 }
