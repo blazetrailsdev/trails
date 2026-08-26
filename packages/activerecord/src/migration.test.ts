@@ -5,12 +5,12 @@
  */
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, Logger } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
 import { ActiveRecord } from "./ar-config.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
-import { ConcurrentMigrationError, MigrationContext } from "./migration.js";
+import { CheckPending, ConcurrentMigrationError, MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
@@ -2259,19 +2259,15 @@ describe("MigrationTest", () => {
     });
 
     it("check pending with stdlib logger", async () => {
-      const cpAdapter = await freshAdapter();
-      class CPM1 extends Migration {
-        async change() {
-          await this.createTable("pend_t", (t) => {
-            t.string("x");
-          });
-        }
+      // `Logger.new($stdout)` (`migration_test.rb:1797`); `quietly` is the
+      // stdout capture, which vitest already gives the run.
+      const old = Base.logger;
+      Base.logger = new Logger() as unknown as typeof Base.logger;
+      try {
+        await expect(new CheckPending(async () => {}).call({})).resolves.toBeUndefined();
+      } finally {
+        Base.logger = old;
       }
-      const { MigrationRunner } = await import("./migrator.js");
-      const runner = new MigrationRunner(cpAdapter, [new CPM1(undefined, 1)]);
-      const status = await runner.status();
-      expect(status.length).toBe(1);
-      expect(status[0].status).toBe("down");
     });
 
     it("unknown migration version should raise an argument error", () => {

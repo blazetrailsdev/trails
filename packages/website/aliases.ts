@@ -14,7 +14,6 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/activemodel", "../activemodel/src/index.ts"],
   ["@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"],
   ["@blazetrails/activerecord/base", "../activerecord/src/base.ts"],
-  ["@blazetrails/activerecord/migrator", "../activerecord/src/migrator.ts"],
   ["@blazetrails/activerecord/schema", "../activerecord/src/schema.ts"],
   ["@blazetrails/activerecord", "../activerecord/src/index.ts"],
   ["@blazetrails/rack", "../rack/src/index.ts"],

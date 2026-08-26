@@ -1093,44 +1093,18 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
+  /**
+   * Mirrors: PostgreSQL::SchemaStatements#add_foreign_key
+   * (`postgresql/schema_statements.rb:578-582`) — the deferrable assertion,
+   * then `super`.
+   */
   override async addForeignKey(
     fromTable: string,
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    // Rails: assert_valid_deferrable runs before `super` (the abstract
-    // add_foreign_key, where the if_not_exists short-circuit lives).
     this.assertValidDeferrable(options.deferrable);
-    // Rails PG `add_foreign_key` is `assert_valid_deferrable(deferrable); super`,
-    // and the abstract `super` begins with `return unless use_foreign_keys?`.
-    // We replicate the abstract body inline here, so replicate the guard too.
-    if (!this.useForeignKeys()) return;
-    if (options.ifNotExists === true) {
-      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
-      // compares `column` element-wise, so composite (array) columns match by
-      // value rather than by array identity (a bare `===` is always false for
-      // distinct array instances). Mirrors the abstract addForeignKey guard.
-      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
-        return;
-      }
-    }
-    // Rails PG `add_foreign_key` is `assert_valid_deferrable(deferrable); super`,
-    // and the abstract `super` runs foreign_key_options then
-    // schema_creation.accept(AlterTable + ForeignKeyDefinition). We replicate
-    // that abstract body here (rather than delegating to our own `super`, which
-    // would recurse through the self-delegation guard — tracked by
-    // pg-add-foreign-key-delegate-to-abstract-body). The PG
-    // schema_creation (visitAlterTable/visitForeignKeyDefinition) emits the
-    // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
-    // bespoke inline SQL is needed here.
-    const fkOptions = this.foreignKeyOptions(
-      fromTable,
-      toTable,
-      options as Record<string, unknown>,
-    );
-    const at = this.createAlterTable(fromTable);
-    at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
-    await this.execute(await this.schemaCreation.accept(at));
+    await super.addForeignKey(fromTable, toTable, options);
   }
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {

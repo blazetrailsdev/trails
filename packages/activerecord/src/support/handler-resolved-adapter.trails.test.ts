@@ -38,7 +38,9 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   // Base.connectionHandler, the Rails-shape resolution path D-1..N files use.
   beforeAll(async () => {
     const adapter = Base.connection;
-    await adapter.createTable("handler_resolved_comments", (t) => t.string("body"));
+    await adapter.createTable("handler_resolved_comments", (t) => {
+      t.string("body");
+    });
     await HandlerResolvedComment.loadSchema();
   });
 

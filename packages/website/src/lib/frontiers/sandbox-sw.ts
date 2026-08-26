@@ -20,7 +20,6 @@ import { resolveVfsPath } from "./vfs-resolve.js";
 import { Base } from "@blazetrails/activerecord/base";
 import { Migration, Migrator } from "@blazetrails/activerecord/migration";
 import type { MigrationProxy } from "@blazetrails/activerecord/migration";
-import { MigrationRunner } from "@blazetrails/activerecord/migrator";
 import { Schema } from "@blazetrails/activerecord/schema";
 import { ActionController } from "@blazetrails/actionpack";
 
@@ -48,7 +47,6 @@ async function executeCode(code: string): Promise<unknown> {
   const fn = new Function(
     "Base",
     "Migration",
-    "MigrationRunner",
     "Migrator",
     "Schema",
     "ActionController",
@@ -56,16 +54,7 @@ async function executeCode(code: string): Promise<unknown> {
     "app",
     `return (async () => { ${code} })();`,
   );
-  return fn(
-    Base,
-    Migration,
-    MigrationRunner,
-    Migrator,
-    Schema,
-    ActionController,
-    adapter,
-    appServer,
-  );
+  return fn(Base, Migration, Migrator, Schema, ActionController, adapter, appServer);
 }
 
 // ── Migration registry ─────────────────────────────────────────────────

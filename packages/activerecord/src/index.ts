@@ -52,7 +52,6 @@ export type {
 } from "./connection-adapters/abstract/schema-definitions.js";
 export { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 export { Schema } from "./schema.js";
-export { MigrationRunner } from "./migrator.js";
 export {
   Associations,
   registerModel,

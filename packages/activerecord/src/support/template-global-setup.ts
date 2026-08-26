@@ -287,7 +287,11 @@ const mysqlAdapter: DbTemplateAdapter = {
     for (let slot = 1; slot <= n; slot++) {
       const slotDb = slotDatabaseName(baseDb, runToken, slot);
       await admin.query(
-        `CREATE DATABASE ${quoteMysqlDatabaseName(slotDb)} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`,
+        // `arunit`'s charset/collation (`config.example.yml:3-6`), which is what
+        // Rails' own test database is built with and what `MySQLDatabaseTasks#purge`
+        // now recreates it as (`mysql_database_tasks.rb:26-30`). A slot laid with a
+        // different default would drift from the purged one worker-by-worker.
+        `CREATE DATABASE ${quoteMysqlDatabaseName(slotDb)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
       );
     }
     await admin.end();

@@ -100,7 +100,9 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("raw_fixture_users", (t) => t.string("name"));
+    await adapter.createTable("raw_fixture_users", (t) => {
+      t.string("name");
+    });
   });
 
   afterAll(async () => {

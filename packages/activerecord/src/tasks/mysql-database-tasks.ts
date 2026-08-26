@@ -39,23 +39,10 @@ export class MySQLDatabaseTasks {
   }
 
   async purge(): Promise<void> {
-    // Deviation, tracked as RFC 0051's `mysql-purge-does-not-call-recreate-database`:
-    // Rails is `establish_connection(configuration_hash_without_database)` /
-    // `recreate_database(db_config.database, creation_options)` /
-    // `establish_connection` (mysql_database_tasks.rb:26-30). trails drops and
-    // creates by hand so it can carry the existing database's charset/collation
-    // across: the test slot databases are made `CHARACTER SET utf8mb4 COLLATE
-    // utf8mb4_bin` (support/template-global-setup.ts), which is neither the
-    // server default nor present in the config hash `creation_options` reads,
-    // so recreating on `creation_options` alone silently changes collation and
-    // breaks the case-sensitivity tests. The preservation lives here rather
-    // than on `create`, whose signature is Rails' (mysql_database_tasks.rb:15-19).
-    const saved = await this.savedCharset();
-    await this.drop();
     await this.establishConnection(this.configurationHashWithoutDatabase());
     await (
       await this.connection()
-    ).createDatabase(this.dbConfig.database as string, { ...this.creationOptions(), ...saved });
+    ).recreateDatabase(this.dbConfig.database as string, this.creationOptions());
     await this.establishConnection();
   }
 
@@ -160,24 +147,6 @@ export class MySQLDatabaseTasks {
       options.collation = this.configurationHash.collation as string;
     }
     return options;
-  }
-
-  private async savedCharset(): Promise<{ charset?: string; collation?: string }> {
-    const dbName = this.dbConfig.database as string;
-    // Connect without selecting a database: information_schema.SCHEMATA is
-    // server-global, and connecting to the target DB would fail with error 1049
-    // if it doesn't exist yet (e.g. purge() called before create() on a clean env).
-    await this.establishConnection(this.configurationHashWithoutDatabase());
-    const rows = (await (
-      await this.connection()
-    ).execute(
-      "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
-        "FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
-      [dbName],
-    )) as Array<{ DEFAULT_CHARACTER_SET_NAME?: string; DEFAULT_COLLATION_NAME?: string }>;
-    const row = rows[0];
-    if (!row) return {};
-    return { charset: row.DEFAULT_CHARACTER_SET_NAME, collation: row.DEFAULT_COLLATION_NAME };
   }
 
   /**

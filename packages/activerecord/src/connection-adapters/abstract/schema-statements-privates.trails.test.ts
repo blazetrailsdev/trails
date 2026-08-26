@@ -870,10 +870,10 @@ describe("buildCreateTableDefinition routing", () => {
     return td.columns.find((c) => c.options.primaryKey);
   }
 
-  it("carries valid_primary_key_options through to the primary key column", () => {
+  it("carries valid_primary_key_options through to the primary key column", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", {
+    const td = await ss.buildCreateTableDefinition("users", {
       id: "integer",
       limit: 8,
       default: 0,
@@ -883,10 +883,10 @@ describe("buildCreateTableDefinition routing", () => {
     expect(pkColumn(td)?.options).toMatchObject({ limit: 8, default: 0, precision: 3 });
   });
 
-  it("carries valid_table_definition_options through to the table definition", () => {
+  it("carries valid_table_definition_options through to the table definition", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", {
+    const td = await ss.buildCreateTableDefinition("users", {
       temporary: true,
       ifNotExists: true,
       as: undefined,
@@ -900,14 +900,14 @@ describe("buildCreateTableDefinition routing", () => {
     expect(td.options).toBe("ENGINE=InnoDB");
   });
 
-  it("extracts _skipValidateOptions into the table definition options", () => {
+  it("extracts _skipValidateOptions into the table definition options", async () => {
     const createTableDefinition = vi.fn(
       (name: string, options: Record<string, unknown>) =>
         new TableDefinition(ss, name, { ...options } as any),
     );
     const ss = makeStatements({ createTableDefinition });
 
-    const td = ss.buildCreateTableDefinition("users", {
+    const td = await ss.buildCreateTableDefinition("users", {
       id: "integer",
       _skipValidateOptions: true,
     });
@@ -916,7 +916,7 @@ describe("buildCreateTableDefinition routing", () => {
     expect(pkColumn(td)?.options).not.toHaveProperty("_skipValidateOptions");
   });
 
-  it("carries autoIncrement to the primary key only where valid_primary_key_options lists it", () => {
+  it("carries autoIncrement to the primary key only where valid_primary_key_options lists it", async () => {
     const abstract = makeStatements();
     const mysql = makeStatements({
       validPrimaryKeyOptions: () => ["limit", "unsigned", "autoIncrement"],
@@ -925,19 +925,21 @@ describe("buildCreateTableDefinition routing", () => {
     });
 
     expect(
-      pkColumn(abstract.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }))
-        ?.options,
+      pkColumn(
+        await abstract.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }),
+      )?.options,
     ).not.toHaveProperty("autoIncrement");
     expect(
-      pkColumn(mysql.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }))
-        ?.options,
+      pkColumn(
+        await mysql.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }),
+      )?.options,
     ).toMatchObject({ autoIncrement: true });
   });
 
-  it("expands the hash form of id onto the primary key column", () => {
+  it("expands the hash form of id onto the primary key column", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", {
+    const td = await ss.buildCreateTableDefinition("users", {
       id: { type: "string", limit: 36, collation: "utf8mb4_bin" },
     });
 
@@ -946,25 +948,25 @@ describe("buildCreateTableDefinition routing", () => {
     expect(pk?.options).toMatchObject({ limit: 36, collation: "utf8mb4_bin" });
   });
 
-  it("names the primary key column from the primaryKey option", () => {
+  it("names the primary key column from the primaryKey option", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", { id: "uuid", primaryKey: "guid" });
+    const td = await ss.buildCreateTableDefinition("users", { id: "uuid", primaryKey: "guid" });
 
     expect(pkColumn(td)?.name).toBe("guid");
     expect(pkColumn(td)?.type).toBe("uuid");
   });
 
-  it("records a composite primaryKey array instead of a primary key column", () => {
+  it("records a composite primaryKey array instead of a primary key column", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("orders", { primaryKey: ["shopId", "id"] });
+    const td = await ss.buildCreateTableDefinition("orders", { primaryKey: ["shopId", "id"] });
 
     expect(td.primaryKeys()?.name).toEqual(["shopId", "id"]);
     expect(pkColumn(td)).toBeUndefined();
   });
 
-  it("builds the definition through the adapter's createTableDefinition", () => {
+  it("builds the definition through the adapter's createTableDefinition", async () => {
     const marker = Symbol("dialect-td");
     const createTableDefinition = vi.fn((name: string, options: Record<string, unknown>) => {
       const td: any = new TableDefinition(ss, name, { ...options } as any);
@@ -973,7 +975,7 @@ describe("buildCreateTableDefinition routing", () => {
     });
     const ss = makeStatements({ createTableDefinition });
 
-    const td = ss.buildCreateTableDefinition("users", { id: "bigint" });
+    const td = await ss.buildCreateTableDefinition("users", { id: "bigint" });
 
     expect(createTableDefinition).toHaveBeenCalledTimes(1);
     expect((td as any)[marker]).toBe(true);
@@ -991,37 +993,37 @@ describe("buildCreateTableDefinition routing", () => {
     });
 
     expect(spy).toHaveBeenCalledTimes(1);
-    const td = spy.mock.results[0].value as TableDefinition;
+    const td = (await spy.mock.results[0].value) as TableDefinition;
     expect(pkColumn(td)?.name).toBe("guid");
     expect(pkColumn(td)?.options).toMatchObject({ limit: 8 });
   });
 });
 
 describe("buildCreateTableDefinition primaryKey: false", () => {
-  it("still builds the conventional primary key column", () => {
+  it("still builds the conventional primary key column", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", { primaryKey: false });
+    const td = await ss.buildCreateTableDefinition("users", { primaryKey: false });
 
     const pk = td.columns.find((c) => c.options.primaryKey);
     expect(pk?.name).toBe("id");
     expect(pk?.type).toBe("primary_key");
   });
 
-  it("emits no primary key column when id is false", () => {
+  it("emits no primary key column when id is false", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", { id: false, primaryKey: false });
+    const td = await ss.buildCreateTableDefinition("users", { id: false, primaryKey: false });
 
     expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
   });
 });
 
 describe("buildCreateTableDefinition hash-form id type fetch", () => {
-  it("passes an explicitly supplied falsy type through instead of defaulting", () => {
+  it("passes an explicitly supplied falsy type through instead of defaulting", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", {
+    const td = await ss.buildCreateTableDefinition("users", {
       id: { type: "" as unknown as ColumnType, limit: 4 },
     });
 
@@ -1030,10 +1032,10 @@ describe("buildCreateTableDefinition hash-form id type fetch", () => {
     expect(pk?.options).toMatchObject({ limit: 4 });
   });
 
-  it("defaults to primary_key only when the type key is absent", () => {
+  it("defaults to primary_key only when the type key is absent", async () => {
     const ss = makeStatements();
 
-    const td = ss.buildCreateTableDefinition("users", { id: { limit: 4 } });
+    const td = await ss.buildCreateTableDefinition("users", { id: { limit: 4 } });
 
     expect(td.columns.find((c) => c.options.primaryKey)?.type).toBe("primary_key");
   });
@@ -1149,11 +1151,11 @@ describe("SchemaStatements#createTable statement ordering", () => {
 
   it("reads the table comment from the definition rather than the options hash", async () => {
     class AdapterSettingTheCommentOnTheDefinition extends SchemaStatements {
-      override buildCreateTableDefinition(
+      override async buildCreateTableDefinition(
         tableName: string,
         options: Parameters<SchemaStatements["buildCreateTableDefinition"]>[1] = {},
-        fn?: (td: TableDefinitionOf<this>) => void,
-      ): TableDefinitionOf<this> {
+        fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
+      ): Promise<TableDefinitionOf<this>> {
         return super.buildCreateTableDefinition(
           tableName,
           { ...options, comment: "from the definition" },
