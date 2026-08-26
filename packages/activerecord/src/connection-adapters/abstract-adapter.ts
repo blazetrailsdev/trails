@@ -253,8 +253,8 @@ export interface AbstractAdapter {
           limit?: number;
           precision?: number;
         }
-      | ((t: TableDefinitionOf<this>) => void),
-    fn?: (t: TableDefinitionOf<this>) => void,
+      | ((t: TableDefinitionOf<this>) => void | Promise<void>),
+    fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<void>;
   dropTable(
     ...args:

@@ -232,13 +232,59 @@ describeIfMysqlAdapter("MySQLDBDropTest", () => {
 });
 
 describeIfMysqlAdapter("MySQLPurgeTest", () => {
-  // All three assert on `recreate_database` (`mysql_database_tasks.rb:29-31`),
-  // which trails' `purge` does not call — it drops and re-creates, preserving
-  // the live charset/collation (`mysql-database-tasks.ts:75-83`). That is a
-  // production divergence to converge, not a test-porting gap.
-  it.skip("establishes connection without database", () => {});
-  it.skip("recreates database with no default options", () => {});
-  it.skip("recreates database with the given options", () => {});
+  // `@configuration` here is Rails' own (`mysql2_rake_test.rb:181-184`) —
+  // "test-db", not the `my-app-db` the create/drop cases use.
+  let connection: { recreateDatabase: ReturnType<typeof vi.fn> };
+  const purgeConfiguration = (overrides: Record<string, unknown> = {}): HashConfig =>
+    new HashConfig("default_env", "primary", {
+      adapter: "mysql2",
+      database: "test-db",
+      ...overrides,
+    });
+
+  beforeEach(() => {
+    connection = { recreateDatabase: vi.fn(async () => {}) };
+    MySQLDatabaseTasks.register();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("establishes connection without database", async () => {
+    const establishConnection = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(
+        undefined as unknown as Awaited<ReturnType<typeof Base.establishConnection>>,
+      );
+
+    await withStubbedConnection(connection, async () => {
+      await DatabaseTasks.purge(purgeConfiguration());
+    });
+
+    expect(establishConnection).toHaveBeenCalledTimes(2);
+  });
+
+  it("recreates database with no default options", async () => {
+    await withStubbedConnectionEstablishConnection(connection, async () => {
+      await DatabaseTasks.purge(purgeConfiguration());
+    });
+
+    expect(connection.recreateDatabase).toHaveBeenCalledWith("test-db", {});
+  });
+
+  it("recreates database with the given options", async () => {
+    await withStubbedConnectionEstablishConnection(connection, async () => {
+      await DatabaseTasks.purge(
+        purgeConfiguration({ encoding: "latin", collation: "latin1_swedish_ci" }),
+      );
+    });
+
+    expect(connection.recreateDatabase).toHaveBeenCalledWith("test-db", {
+      charset: "latin",
+      collation: "latin1_swedish_ci",
+    });
+  });
 });
 
 describeIfMysqlAdapter("MysqlDBCharsetTest", () => {

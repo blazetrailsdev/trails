@@ -258,7 +258,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const ss = adapter;
       try {
         await ss.createTable("delete_me", { force: true }, (t) => {
-          return t.timestamps({ null: true });
+          t.timestamps({ null: true });
         });
         await ss.removeTimestamps("delete_me");
         expect(await ss.columnExists("delete_me", "updated_at")).toBe(false);

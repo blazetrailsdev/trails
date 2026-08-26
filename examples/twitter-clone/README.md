@@ -68,7 +68,7 @@ the model code is adapter-agnostic, exactly like Rails.
 ## Database tasks
 
 A small `rails db:*`-style runner (`src/cli.ts`) wraps ActiveRecord's
-`Migration` / `MigrationRunner`:
+`Migration` / `MigrationContext`:
 
 | Command                  | Description                                   |
 | ------------------------ | --------------------------------------------- |

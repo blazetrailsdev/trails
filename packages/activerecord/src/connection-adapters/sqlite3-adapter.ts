@@ -2387,60 +2387,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     await this.dropTable(from);
   }
 
-  /** @internal */
-  private copyTableColumns(
-    definition: SQLite3TableDefinition,
-    fromPrimaryKey: string | string[] | null,
-    sourceColumns: Sqlite3Column[],
-    rename: Record<string, string> = {},
-  ): void {
-    const renamed = (name: string): string => rename[name] ?? name;
-    const compositePk = Array.isArray(fromPrimaryKey);
-
-    for (const column of sourceColumns) {
-      const columnOptions: Record<string, unknown> = {
-        limit: column.limit,
-        precision: column.precision,
-        scale: column.scale,
-        null: column.null,
-        collation: column.collation,
-        primaryKey: !compositePk && renamed(column.name) === fromPrimaryKey,
-      };
-
-      if (column.isVirtual()) {
-        columnOptions.as = column.defaultFunction;
-        columnOptions.stored = column.isVirtualStored();
-        columnOptions.type = column.type;
-      } else if (column.hasDefault && !column.isAutoIncrement()) {
-        const defaultFunction = column.defaultFunction;
-        const deserialized: unknown = (
-          this.lookupCastTypeFromColumn(column) as import("@blazetrails/activemodel").Type
-        ).deserialize(column.default);
-        columnOptions.default =
-          deserialized == null && defaultFunction != null ? () => defaultFunction : deserialized;
-      }
-
-      const columnType = column.isVirtual()
-        ? "virtual"
-        : column.isBigint()
-          ? "bigint"
-          : column.type;
-      definition.column(renamed(column.name), columnType as ColumnType, columnOptions);
-    }
-  }
-
-  /**
-   * @internal
-   *
-   * @missingRailsCall order:columns,createTable — PERMANENT: Per-entry verified
-   *   (RFC 0106 sqlite3 table-rebuild cluster), sqlite3_adapter.rb:602-639:
-   *   Rails calls `columns(from)` INSIDE the `create_table` block.
-   *   `createTable`'s TableDefinition block is synchronous in trails (the
-   *   definition is built, then rendered, with no await point), and `columns()`
-   *   is async, so the reflection is hoisted above the `createTable` call.
-   *   Everything Rails calls is called, once, with the same arguments — only the
-   *   sequence differs, and it is forced by the block being unable to await.
-   */
+  /** Mirrors: SQLite3Adapter#copy_table (sqlite3_adapter.rb:599-649) @internal */
   private async copyTable(
     from: string,
     to: string,
@@ -2452,19 +2399,55 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     const fromPrimaryKey = await this.primaryKey(from);
-    const rename = options.rename ?? {};
-    const sourceColumns = (await this.columns(from)) as Sqlite3Column[];
     const { rename: _rename, ...createOptions } = options;
+    const rename = options.rename ?? {};
 
     let definition!: SQLite3TableDefinition;
-    await this.createTable(to, { ...createOptions, id: false }, (td) => {
+    await this.createTable(to, { ...createOptions, id: false }, async (td) => {
       definition = td as SQLite3TableDefinition;
       if (Array.isArray(fromPrimaryKey)) definition.primaryKeys(fromPrimaryKey);
-      this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
+
+      for (const column of (await this.columns(from)) as Sqlite3Column[]) {
+        const columnName = rename[column.name] ?? column.name;
+
+        const columnOptions: Record<string, unknown> = {
+          limit: column.limit,
+          precision: column.precision,
+          scale: column.scale,
+          null: column.null,
+          collation: column.collation,
+          primaryKey: columnName === fromPrimaryKey,
+        };
+
+        if (column.isVirtual()) {
+          columnOptions.as = column.defaultFunction;
+          columnOptions.stored = column.isVirtualStored();
+          columnOptions.type = column.type;
+        } else if (column.hasDefault) {
+          const type = (await this.lookupCastTypeFromColumn(
+            column,
+          )) as import("@blazetrails/activemodel").Type;
+          let defaultValue: unknown = type.deserialize(column.default);
+          if (defaultValue == null) defaultValue = () => column.defaultFunction;
+
+          if (!column.isAutoIncrement()) {
+            columnOptions.default = defaultValue;
+          }
+        }
+
+        const columnType = column.isVirtual()
+          ? "virtual"
+          : column.isBigint()
+            ? "bigint"
+            : column.type;
+        definition.column(columnName, columnType as ColumnType, columnOptions);
+      }
+
       block?.(definition);
     });
 
     await this.copyTableIndexes(from, to, rename);
+
     const columnsToCopy = definition.columns
       .filter((col) => (col.options as Record<string, unknown>)["as"] === undefined)
       .map((col) => col.name);

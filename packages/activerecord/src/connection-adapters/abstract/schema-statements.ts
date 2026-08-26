@@ -355,8 +355,8 @@ export class SchemaStatements {
           limit?: number;
           precision?: number;
         }
-      | ((t: TableDefinitionOf<this>) => void),
-    fn?: (t: TableDefinitionOf<this>) => void,
+      | ((t: TableDefinitionOf<this>) => void | Promise<void>),
+    fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<void> {
     let kwargs: {
       id?: boolean | ColumnType | IdHashOptions;
@@ -374,7 +374,7 @@ export class SchemaStatements {
       limit?: number;
       precision?: number;
     } = {};
-    let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
+    let definer: ((t: TableDefinitionOf<this>) => void | Promise<void>) | undefined;
 
     if (typeof optionsOrFn === "function") {
       definer = optionsOrFn;
@@ -400,7 +400,7 @@ export class SchemaStatements {
       );
     }
 
-    const td = this.buildCreateTableDefinition(
+    const td = await this.buildCreateTableDefinition(
       tableName,
       { id, primaryKey, force, ...options },
       definer,
@@ -1327,7 +1327,7 @@ export class SchemaStatements {
     }
   }
 
-  buildCreateTableDefinition(
+  async buildCreateTableDefinition(
     tableName: string,
     options: {
       id?: boolean | ColumnType | IdHashOptions;
@@ -1335,8 +1335,8 @@ export class SchemaStatements {
       force?: boolean | "cascade";
       [key: string]: unknown;
     } = {},
-    fn?: (td: TableDefinitionOf<this>) => void,
-  ): TableDefinitionOf<this> {
+    fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
+  ): Promise<TableDefinitionOf<this>> {
     const { id = true, primaryKey, force: _force, ...rest } = options;
     // Rails uses `options.extract!`, which *deletes* what it returns — so
     // `_skipValidateOptions` only ever reaches the first extraction.
@@ -1361,12 +1361,12 @@ export class SchemaStatements {
     ) as TableDefinitionOf<this>;
     tableDefinition.setPrimaryKey(tableName, id, primaryKey, pkOptions);
 
-    if (fn) fn(tableDefinition);
+    if (fn) await fn(tableDefinition);
 
     return tableDefinition;
   }
 
-  buildCreateJoinTableDefinition(
+  async buildCreateJoinTableDefinition(
     table1: string,
     table2: string,
     options: {
@@ -1374,18 +1374,18 @@ export class SchemaStatements {
       tableName?: string;
       [key: string]: unknown;
     } = {},
-    fn?: (td: TableDefinitionOf<this>) => void,
-  ): TableDefinitionOf<this> {
+    fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
+  ): Promise<TableDefinitionOf<this>> {
     const joinTableName = this.findJoinTableName(table1, table2, options);
     const { columnOptions = {}, tableName: _, ...rest } = options;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
 
     const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
-    return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, (td) => {
+    return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, async (td) => {
       td.references(t1Ref, mergedColOpts);
       td.references(t2Ref, mergedColOpts);
-      if (fn) fn(td);
+      if (fn) await fn(td);
     });
   }
 

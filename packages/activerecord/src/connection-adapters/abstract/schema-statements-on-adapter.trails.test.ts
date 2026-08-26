@@ -176,7 +176,9 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("dropTable removes the table", async () => {
     // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
-    await adapter.createTable("temp_table", (t) => t.string("value"));
+    await adapter.createTable("temp_table", (t) => {
+      t.string("value");
+    });
     expect(await adapter.tableExists("temp_table")).toBe(true);
     await adapter.dropTable("temp_table");
     expect(await adapter.tableExists("temp_table")).toBe(false);

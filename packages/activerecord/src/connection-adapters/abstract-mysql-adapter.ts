@@ -2033,8 +2033,8 @@ export interface AbstractMysqlAdapter {
 
   createTable(
     name: string,
-    optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void),
-    fn?: (t: TableDefinitionOf<this>) => void,
+    optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
+    fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<void>;
 
   removeColumn(

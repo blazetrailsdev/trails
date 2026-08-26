@@ -104,27 +104,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      // Recreate the table with a non-binary table-level collation. Rails' MySQL
-      // test database defaults to utf8mb4_unicode_ci (config.example.yml), so the
-      // per-column collations differ from the table default and are emitted. This
-      // suite's DB default is utf8mb4_bin (template-global-setup), which would
-      // otherwise equal the id collation and suppress it (matching Rails'
-      // schema_collation logic). Set the table default explicitly to mirror Rails'
-      // environment so the dump exercises per-column collation preservation.
-      await adapter.dropTable("charset_collations", { ifExists: true });
-      await adapter.createTable(
-        "charset_collations",
-        {
-          id: { type: "string", collation: "utf8mb4_bin" },
-          charset: "utf8mb4",
-          collation: "utf8mb4_unicode_ci",
-          force: true,
-        },
-        (t: any) => {
-          t.string("string_ascii_bin", { charset: "ascii", collation: "ascii_bin" });
-          t.text("text_ucs2_unicode_ci", { charset: "ucs2", collation: "ucs2_unicode_ci" });
-        },
-      );
       const output = await dumpTableSchema(
         adapter as unknown as SchemaSource,
         "charset_collations",

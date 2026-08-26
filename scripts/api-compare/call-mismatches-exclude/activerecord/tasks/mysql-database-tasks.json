@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "purge",
-    "call": "recreate_database",
-    "reason": "Verified per-site (RFC 0106): tracked as RFC 0051's `mysql-purge-does-not-call-recreate-database`; the deviation and its measured reason (preserving the slot database's charset/collation, which `creation_options` cannot see) are justified at the call site in `purge`."
-  }
-]
