@@ -367,7 +367,7 @@ export class AbstractReflection {
         // matches the belongsTo's FK rather than the first class-name match.
         const hmDefaultFk = `${underscore((resolvedKlass as any).name)}_id`;
         const inverseHm = targetAssocs.find((a) => {
-          if ((a.options.className ?? camelize(singularize(a.name))) !== ownerName) return false;
+          if (a.className !== ownerName) return false;
           // Same `queryConstraints` fallback as `btFk` above: a composite
           // `foreignKey:` is normalized off `options` and onto
           // `options.queryConstraints` when the reflection is built.
