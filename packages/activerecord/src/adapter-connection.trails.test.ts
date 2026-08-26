@@ -47,6 +47,12 @@ class LifecycleTestAdapter extends AbstractAdapter {
     return this._connected;
   }
 
+  // `load_schema!` reaches this via `schema_cache.data_source_exists?`; without
+  // it the abstract `data_source_sql` raises (schema_statements.rb).
+  override async dataSources(): Promise<string[]> {
+    return [];
+  }
+
   override reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
     this._connected = true;
     this._connection = this;
