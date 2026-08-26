@@ -34,7 +34,7 @@ describe("descends_from_active_record? column test", () => {
   it("a virtual type attribute is not an inheritance column", () => {
     class VirtualTypeAuthor extends Author {
       static {
-        this.attribute("type", "string", { virtual: true } as never);
+        this.attribute("type", "string");
       }
     }
 
@@ -68,7 +68,7 @@ describe("descends_from_active_record? on a cold model", () => {
   it("a virtual type attribute on an unreflected model is not an inheritance column", () => {
     class ColdVirtualTypeAuthor extends Author {
       static {
-        this.attribute("type", "string", { virtual: true } as never);
+        this.attribute("type", "string");
       }
     }
 

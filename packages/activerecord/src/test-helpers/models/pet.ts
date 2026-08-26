@@ -29,7 +29,7 @@ export class Pet extends Base {
     this._primaryKey = "pet_id";
     // Rails: `attr_accessor :current_user` — a non-persisted accessor that
     // nested attributes can assign before the record is destroyed.
-    this.attribute("current_user", "string", { virtual: true });
+    this.attribute("current_user", "string");
     this.belongsTo("owner", { touch: true });
     this.hasMany("toys");
     this.hasMany("petTreasures");

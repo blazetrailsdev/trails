@@ -67,7 +67,6 @@ export function _writeAttribute(
  */
 export interface AttributeOptions {
   default?: unknown;
-  virtual?: boolean;
   limit?: number | null;
   /**
    * PG type modifiers, forwarded to the registry as Rails' `**options` are:

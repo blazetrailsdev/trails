@@ -33,7 +33,7 @@ export class Parrot extends Base {
 
     this.validates("name", { presence: true });
 
-    this.attribute("cancelSaveFromCallback", "boolean", { virtual: true });
+    this.attribute("cancelSaveFromCallback", "boolean");
     this.beforeSave(
       function (this: any) {
         this.cancelSaveCallbackMethod();
