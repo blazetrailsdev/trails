@@ -30,6 +30,12 @@ const CASES: [string, string][] = [
  * only. An empty `returning` means the INSERT wrote no row; a non-empty one with
  * the row absent from `topics` means something removed it in between; the row
  * present but unread means the read is at fault.
+ *
+ * The read runs on the test's own pinned connection, not a fresh checkout:
+ * `leaseConnection` routes through `checkout`, which resolves the pool's
+ * pool-scoped fixture pin ahead of everything else (`connection-pool.ts:883`,
+ * `:1542`). `openTransactions` is reported partly as a check on that — a `0`
+ * beside an empty table would mean this read went somewhere else.
  */
 async function missingRowDiagnostics(
   iteration: number,
