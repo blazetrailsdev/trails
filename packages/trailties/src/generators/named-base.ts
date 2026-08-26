@@ -11,6 +11,7 @@ export class NamedBase extends GeneratorBase {
   name: string;
   attributes: GeneratedAttribute[];
   classPathParts: string[];
+  /** @internal */
   fileName: string;
 
   constructor(options: NamedBaseOptions) {

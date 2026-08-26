@@ -87,6 +87,23 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     ).resolves.toEqual([]);
   });
 
+  // The inline-options shape — a `name` the owner never declared — used to skip
+  // `find_target?` entirely, because a reflection-less holder answered
+  // `klass === undefined` and the gate ends in `&& klass`
+  // (`association.rb:320-321`). Its ad hoc reflection now resolves `klass`, so
+  // the new-record-without-FK arm suppresses the query here too.
+  it("suppresses the query for an inline options set the owner never declared", async () => {
+    const developer = new Developer({ name: "New Dev" });
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(true);
+    await expect(
+      findHasManyTarget(developer, "inline_audit_logs", {
+        className: "AuditLog",
+        foreignKey: "developer_id",
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();

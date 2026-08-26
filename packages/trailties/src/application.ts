@@ -172,7 +172,11 @@ export class Application extends Engine {
     return (this._app = stack.build(this.endpoint()));
   }
 
-  /** Rails: `alias :build_middleware_stack :app` (`application.rb:558`). */
+  /**
+   * Rails: `alias :build_middleware_stack :app` (`application.rb:558`).
+   *
+   * @internal
+   */
   buildMiddlewareStack(): RackApp {
     return this.app();
   }
@@ -190,7 +194,10 @@ export class Application extends Engine {
 
   /** Mirrors `Application#default_middleware_stack` (`application.rb:626-629`).
    * Rails passes `paths`; `Engine#paths()` is async in trails (it resolves the
-   * root first), so the sync `config.paths()` it delegates to is passed here. */
+   * root first), so the sync `config.paths()` it delegates to is passed here.
+   *
+   * @internal
+   */
   defaultMiddlewareStack(): MiddlewareStack {
     const defaultStack = new DefaultMiddlewareStack(this, this.config, this.config.paths());
     return defaultStack.buildStack();
@@ -204,6 +211,8 @@ export class Application extends Engine {
    * `Path#existent` is async in trails (`paths.ts:147`) while initializers run
    * synchronously (`Initializable#runInitializers`), so the declared paths are
    * unshifted unfiltered — see the `generator-templates-existent-paths` story.
+   *
+   * @internal
    */
   ensureGeneratorTemplatesAdded(): void {
     const configuredPaths = this.config.generators().templates as string[];

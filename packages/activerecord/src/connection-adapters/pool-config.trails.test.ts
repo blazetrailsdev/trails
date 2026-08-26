@@ -58,7 +58,7 @@ describe("PoolConfig", () => {
     it("wraps primary class owners correctly", () => {
       config.connectionDescriptor = { name: "Base", primaryClassQ: () => true };
       expect(config.connectionDescriptor.primaryClassQ()).toBe(true);
-      expect(config.connectionDescriptor.name).toBe("Base");
+      expect(config.connectionDescriptor.name).toBe("ActiveRecord::Base");
     });
   });
 

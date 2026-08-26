@@ -46,6 +46,13 @@ export class Engine extends Trailtie {
     return undefined;
   }
 
+  /**
+   * `def self.find_root_with_flag` sits in Engine's `private` section and
+   * carries `# :nodoc:` (`engine.rb:701`) — Ruby's `private` does not reach a
+   * singleton method, but the `:nodoc:` keeps it out of the API reference all
+   * the same.
+   * @internal
+   */
   static async findRootWithFlag(
     flag: string,
     rootPath: string | undefined,
@@ -138,7 +145,11 @@ export class Engine extends Trailtie {
     return this._routes !== undefined;
   }
 
-  /** Mirrors: Rails `_all_load_paths(add_autoload_paths_to_load_path)` (engine.rb:730). */
+  /**
+   * Mirrors: Rails `_all_load_paths(add_autoload_paths_to_load_path)` (engine.rb:730).
+   *
+   * @internal
+   */
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
     const paths = await this.paths();

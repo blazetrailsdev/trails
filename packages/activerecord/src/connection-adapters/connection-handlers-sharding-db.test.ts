@@ -78,7 +78,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           expect(Array.isArray(rows)).toBe(true);
           await conn.executeMutation(`DROP TABLE IF EXISTS "people"`);
 
-          const pm = (Base.connectionHandler as any).getPoolManager("Base");
+          const pm = (Base.connectionHandler as any).getPoolManager("ActiveRecord::Base");
           expect([...pm.shardNames].sort()).toEqual(["default", "shard_one"]);
         });
       },
@@ -103,20 +103,19 @@ describe("ConnectionHandlersShardingDbTest", () => {
           },
         });
 
-        const basePool = Base.connectionHandler.retrieveConnectionPool("Base");
-        const defaultPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+        const basePool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
+        const defaultPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           shard: "default",
         });
 
-        expect((Base.connectionHandler as any).getPoolManager("Base")!.shardNames).toEqual([
-          "default",
-          "shard_one",
-        ]);
+        expect(
+          (Base.connectionHandler as any).getPoolManager("ActiveRecord::Base")!.shardNames,
+        ).toEqual(["default", "shard_one"]);
         expect(basePool).toBe(defaultPool);
         expect(defaultPool!.dbConfig.database).toBe(primary);
         expect(defaultPool!.dbConfig.name).toBe("primary");
 
-        const shardOnePool = Base.connectionHandler.retrieveConnectionPool("Base", {
+        const shardOnePool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           shard: "shard_one",
         });
         expect(shardOnePool).not.toBeUndefined();
@@ -150,36 +149,51 @@ describe("ConnectionHandlersShardingDbTest", () => {
           },
         });
 
-        const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          shard: "default",
-        });
-        const baseWritingPool = Base.connectionHandler.retrieveConnectionPool("Base");
+        const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            shard: "default",
+          },
+        );
+        const baseWritingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
         expect(baseWritingPool).toBe(defaultWritingPool);
         expect(defaultWritingPool!.dbConfig.database).toBe(primary);
         expect(defaultWritingPool!.dbConfig.name).toBe("primary");
 
-        const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          role: "reading",
-          shard: "default",
-        });
-        const baseReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          role: "reading",
-        });
+        const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            role: "reading",
+            shard: "default",
+          },
+        );
+        const baseReadingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            role: "reading",
+          },
+        );
         expect(baseReadingPool).toBe(defaultReadingPool);
         expect(defaultReadingPool!.dbConfig.database).toBe(primary);
         expect(defaultReadingPool!.dbConfig.name).toBe("primary_replica");
 
-        const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          shard: "shard_one",
-        });
+        const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            shard: "shard_one",
+          },
+        );
         expect(shardOneWritingPool).not.toBeUndefined();
         expect(shardOneWritingPool!.dbConfig.database).toBe(primaryShardOne);
         expect(shardOneWritingPool!.dbConfig.name).toBe("primary_shard_one");
 
-        const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
-          role: "reading",
-          shard: "shard_one",
-        });
+        const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool(
+          "ActiveRecord::Base",
+          {
+            role: "reading",
+            shard: "shard_one",
+          },
+        );
         expect(shardOneReadingPool).not.toBeUndefined();
         expect(shardOneReadingPool!.dbConfig.database).toBe(primaryShardOne);
         expect(shardOneReadingPool!.dbConfig.name).toBe("primary_shard_one_replica");
@@ -204,7 +218,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           database: databases[name],
           ...(replica ? { replica: true } : {}),
         }),
-        { ownerName: "Base", role, shard },
+        { ownerName: "ActiveRecord::Base", role, shard },
       );
 
     try {
@@ -311,10 +325,12 @@ describe("ConnectionHandlersShardingDbTest", () => {
   it("retrieve connection pool with invalid shard", async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "Base", { adapter: "sqlite3", database: dbPath("arunit.sqlite3") }),
-      { ownerName: "Base" },
+      { ownerName: "ActiveRecord::Base" },
     );
-    expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeUndefined();
-    expect(Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" })).toBeUndefined();
+    expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeUndefined();
+    expect(
+      Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", { shard: "foo" }),
+    ).toBeUndefined();
   });
 
   it("calling connected to on a non existent shard raises", async () => {
@@ -334,7 +350,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         expect(error.message).toBe(
           "No database connection defined for 'foo' shard and 'reading' role.",
         );
-        expect(error.connectionName).toBe("Base");
+        expect(error.connectionName).toBe("ActiveRecord::Base");
         expect(error.shard).toBe("foo");
         expect(error.role).toBe("reading");
       },
@@ -363,7 +379,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         expect(error.message).toBe(
           "No database connection defined for 'shard_one' shard and 'non_existent' role.",
         );
-        expect(error.connectionName).toBe("Base");
+        expect(error.connectionName).toBe("ActiveRecord::Base");
         expect(error.shard).toBe("shard_one");
         expect(error.role).toBe("non_existent");
       },
@@ -385,7 +401,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         }
         expect(error).toBeDefined();
         expect(error.message).toBe("No database connection defined for 'foo' shard.");
-        expect(error.connectionName).toBe("Base");
+        expect(error.connectionName).toBe("ActiveRecord::Base");
         expect(error.shard).toBe("foo");
         expect(error.role).toBe("writing");
       },
@@ -401,7 +417,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     const makePool = (shard: string) =>
       Base.connectionHandler.establishConnection(
         new HashConfig("test", shard, { adapter: "sqlite3", database: databases[shard] }),
-        { ownerName: "Base", role: "writing", shard },
+        { ownerName: "ActiveRecord::Base", role: "writing", shard },
       );
     try {
       makePool("default");
@@ -419,7 +435,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
   it("can swap roles while shard swapping is prohibited", async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "Base", { adapter: "sqlite3", database: dbPath("primary.sqlite3") }),
-      { ownerName: "Base", role: "reading", shard: "default" },
+      { ownerName: "ActiveRecord::Base", role: "reading", shard: "default" },
     );
     expect(() => {
       Base.prohibitShardSwapping(() => {

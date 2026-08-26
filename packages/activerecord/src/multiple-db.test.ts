@@ -59,7 +59,7 @@ describe("MultipleDbTest", () => {
 
   it("swapping the connection", async () => {
     const oldSpecName = Course.connectionSpecificationName;
-    Course.connectionSpecificationName = "Base";
+    Course.connectionSpecificationName = "ActiveRecord::Base";
     try {
       expect(await Entrant.leaseConnection()).toBe(await Course.leaseConnection());
     } finally {

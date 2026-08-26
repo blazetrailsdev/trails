@@ -12,7 +12,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
   let handler: ConnectionHandler;
   let rwPool: any;
   let roPool: any;
-  const connectionName = "Base";
+  const connectionName = "ActiveRecord::Base";
 
   const DB_NAMES = ["primary", "readonly", "animals"] as const;
   type DbName = (typeof DB_NAMES)[number];
@@ -153,11 +153,11 @@ describe("ConnectionHandlersMultiDbTest", () => {
       () => {
         Base.connectsTo({ database: { writing: "default", reading: "readonly" } });
 
-        const writingPool = Base.connectionHandler.retrieveConnectionPool("Base");
+        const writingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
         expect(writingPool).not.toBeNull();
         expect(writingPool!.dbConfig.name).toBe("default");
 
-        const readingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+        const readingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "reading",
         });
         expect(readingPool).not.toBeNull();
@@ -178,13 +178,13 @@ describe("ConnectionHandlersMultiDbTest", () => {
       () => {
         Base.connectsTo({ database: { default: "primary", readonly: "readonly" } });
 
-        const defaultPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+        const defaultPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "default",
         });
         expect(defaultPool).not.toBeNull();
         expect(defaultPool!.dbConfig.name).toBe("primary");
 
-        const readonlyPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+        const readonlyPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "readonly",
         });
         expect(readonlyPool).not.toBeNull();
@@ -199,7 +199,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       Base.connectsTo({ database: { writing: "postgresql://localhost/bar" } });
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      const pool = Base.connectionHandler.retrieveConnectionPool("Base");
+      const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
       expect(pool).not.toBeNull();
       expect(pool!.dbConfig.adapter).toMatch(/postgr/i);
     });
@@ -210,7 +210,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       Base.connectsTo({ database: { writing: sqliteDb("readonly") } });
       expect(currentRole.call(Base as any)).toBe("writing");
       expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeNull();
+      expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeNull();
     });
   });
 
@@ -230,7 +230,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         Base.connectsTo({ database: { writing: "animals" } });
         expect(currentRole.call(Base as any)).toBe("writing");
         expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-        expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeNull();
+        expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeNull();
       },
       { defaultEnv: "default_env" },
     );
@@ -253,7 +253,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         const handler = Base.connectionHandler;
         expect(Base.connectionHandler).toBe(handler);
 
-        const pool = handler.retrieveConnectionPool("Base");
+        const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
         expect(pool).not.toBeNull();
         expect(pool!.dbConfig.name).toBe("primary");
         expect(pool!.dbConfig.configurationHash).toEqual(config.default_env.primary);
@@ -281,7 +281,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
       () => {
         Base.connectsTo({ database: { writing: "development", reading: "development_readonly" } });
-        const pool = Base.connectionHandler.retrieveConnectionPool("Base", { role: "reading" });
+        const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
+          role: "reading",
+        });
         expect(pool).not.toBeNull();
       },
     );
@@ -298,8 +300,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
           database: { writing: "development", reading: "development_readonly" },
         });
         expect(result).toEqual([
-          Base.connectionHandler.retrieveConnectionPool("Base"),
-          Base.connectionHandler.retrieveConnectionPool("Base", { role: "reading" }),
+          Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base"),
+          Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "reading" }),
         ]);
       },
     );

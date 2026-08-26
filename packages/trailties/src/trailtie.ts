@@ -145,6 +145,7 @@ function blockKey(kind: BlockRunnerKind): string {
   return `_blocks_${kind}`;
 }
 
+/** @internal */
 function registerBlockFor(
   klass: typeof Trailtie,
   kind: BlockRunnerKind,
@@ -153,6 +154,7 @@ function registerBlockFor(
   ownState(klass, blockKey(kind), () => [] as TrailtieBlock[]).push(block);
 }
 
+/** @internal */
 function eachRegisteredBlock(
   instance: Trailtie,
   kind: BlockRunnerKind,

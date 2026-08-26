@@ -22,6 +22,7 @@ type ResolvedOptions = Required<Omit<DevcontainerGeneratorOptions, "cwd" | "outp
 
 export class DevcontainerGenerator extends GeneratorBase {
   readonly opts: ResolvedOptions;
+  /** @internal */
   readonly database: Database;
 
   constructor(options: DevcontainerGeneratorOptions) {

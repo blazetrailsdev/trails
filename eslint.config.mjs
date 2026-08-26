@@ -357,6 +357,7 @@ export default defineConfig(
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/trailties/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {

@@ -54,6 +54,7 @@ import {
 } from "@blazetrails/parity/write-json-manifest";
 import { PACKAGE_DIRS } from "./api-compare/config.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
+import { entitiesByTsFile } from "./api-compare/privates-entities.js";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -273,20 +274,18 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     return tsNames;
   };
 
+  const tsRelFor = (rubyFile: string) =>
+    path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
+
   for (const [rubyFile, names] of fileVis) {
-    const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
     const tsNames = project(names);
-    if (tsNames.size > 0) {
-      const existing = manifest.files[tsRel] ?? [];
-      manifest.files[tsRel] = [...new Set([...existing, ...tsNames])].sort();
-    }
-    const entities = fileEntities.get(rubyFile);
-    if (entities && entities.size > 0) {
-      manifest.entities[tsRel] = [
-        ...new Set([...(manifest.entities[tsRel] ?? []), ...entities]),
-      ].sort();
-    }
+    if (tsNames.size === 0) continue;
+    const tsRel = tsRelFor(rubyFile);
+    const existing = manifest.files[tsRel] ?? [];
+    manifest.files[tsRel] = [...new Set([...existing, ...tsNames])].sort();
   }
+
+  entitiesByTsFile(fileEntities, tsRelFor, manifest.entities);
 }
 
 const sortedFiles: Record<string, string[]> = {};

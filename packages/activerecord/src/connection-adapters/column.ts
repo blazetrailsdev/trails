@@ -233,7 +233,7 @@ export class Column implements Deduplicable {
    */
   deduplicated(): this {
     if (this.sqlTypeMetadata) {
-      this.sqlTypeMetadata.deduplicate();
+      this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
     }
     return Object.freeze(this);
   }

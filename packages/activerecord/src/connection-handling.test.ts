@@ -247,7 +247,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("connection_specification_name defaults to Base", async () => {
-    expect(Base.connectionSpecificationName).toBe("Base");
+    expect(Base.connectionSpecificationName).toBe("ActiveRecord::Base");
   });
 
   it("connection_specification_name returns 'Base' for a primary class even before connectsTo plants it", async () => {
@@ -262,7 +262,7 @@ describe("ConnectionHandlingTest", () => {
       expect(Object.prototype.hasOwnProperty.call(AppRecord, "_connectionSpecificationName")).toBe(
         false,
       );
-      expect(AppRecord.connectionSpecificationName).toBe("Base");
+      expect(AppRecord.connectionSpecificationName).toBe("ActiveRecord::Base");
     } finally {
       __resetPrimaryAbstractClass();
     }
@@ -825,7 +825,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       // resolveConfigForConnection side effect (planting
       // _connectionSpecificationName) is covered end-to-end.
       AppRecord.connectsTo({ database: { writing: "primary" } });
-      expect((AppRecord as any)._connectionSpecificationName).toBe("Base");
+      expect((AppRecord as any)._connectionSpecificationName).toBe("ActiveRecord::Base");
 
       SecondaryAbstract.connectsTo({ database: { writing: "primary" } });
       expect((SecondaryAbstract as any)._connectionSpecificationName).toBe("SecondaryAbstract");

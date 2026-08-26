@@ -82,7 +82,7 @@ async function establishMigrationConnection(
   // `connection.pool.db_config`, migration.rb:1512-1516).
   await pool.leaseConnection();
   onTestFinished(() => {
-    Base.connectionHandler.removeConnection("Base");
+    Base.connectionHandler.removeConnection("ActiveRecord::Base");
   });
 }
 
@@ -1461,7 +1461,7 @@ export class CreatePosts extends Migration {
     // removing the connection disconnects the pool, whose `disconnect` does
     // `conn.steal!; checkin conn` (connection_pool.rb:456-459), and `checkin`
     // expires the connection.
-    Base.connectionHandler.removeConnection("Base");
+    Base.connectionHandler.removeConnection("ActiveRecord::Base");
     await establishMigrationConnection(adapter, database, { useMetadataTable: false });
   }
 

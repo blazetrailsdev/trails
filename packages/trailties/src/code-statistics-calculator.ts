@@ -113,6 +113,7 @@ export class CodeStatisticsCalculator {
   }
 }
 
+/** @internal */
 export function fileType(filePath: string): FileType | undefined {
   if (filePath.endsWith("_test.rb")) return "minitest";
   const m = /\.([^.]+)$/.exec(filePath);
