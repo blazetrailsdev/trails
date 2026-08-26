@@ -2249,12 +2249,12 @@ export class AbstractAdapter implements Quoting {
    *
    * Rails additionally declares `TYPE_MAP` on `Mysql2Adapter`
    * (mysql2_adapter.rb:53) and `SQLite3Adapter` (sqlite3_adapter.rb:505), plus
-   * `EXTENDED_TYPE_MAPS` on `SQLite3Adapter` (506). trails has neither, so
-   * those two seed their extended maps from this base map and share this
-   * `EXTENDED_TYPE_MAPS` — inert only because both resolve casts through the
-   * invented `_buildTypeMap` path, which is exactly what
-   * `mysql-native-type-map-converges-onto-type-map` deletes. That story must
-   * add the missing declarations in the same change.
+   * `EXTENDED_TYPE_MAPS` on `SQLite3Adapter` (506). SQLite3 declares both now;
+   * `Mysql2Adapter` still declares neither, so it seeds its extended map from
+   * this base map and shares this `EXTENDED_TYPE_MAPS` — inert only because it
+   * resolves casts through the invented `_buildTypeMap` path, which is exactly
+   * what `mysql-native-type-map-converges-onto-type-map` deletes. That story
+   * must add the missing declaration in the same change.
    *
    * Built on first read rather than at class-definition time because the type
    * classes `initializeTypeMap` registers sit on a circular import edge and are

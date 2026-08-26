@@ -180,7 +180,7 @@ describe("StaticTest", () => {
       HTTP_ACCEPT_ENCODING: "identity",
     });
     expect(status).toBe(200);
-    expect(headers["vary"]).toBe("Accept-Encoding");
+    expect(headers["vary"]).toBe("accept-encoding");
   });
 
   it("serves brotli files when header set", async () => {
@@ -215,7 +215,7 @@ describe("StaticTest", () => {
   it("only set one content type", async () => {
     const mw = new Static(dynamicApp, tmpDir);
     const [_, headers] = await mw.call({ PATH_INFO: "/hello.txt", REQUEST_METHOD: "GET" });
-    expect(headers["content-type"]).toBe("text/plain; charset=utf-8");
+    expect(headers["content-type"]).toBe("text/plain");
   });
 
   it("serves files with headers", async () => {

@@ -3,12 +3,9 @@
  * directory. Mirrors Rails' `middleware/static.rb` (Static + FileHandler).
  */
 
-import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { Files, Mime, Request, Utils } from "@blazetrails/rack";
 import { getFs, getPath } from "@blazetrails/activesupport";
-
-async function* bodyFromBytes(bytes: Uint8Array): RackBody {
-  yield bytes;
-}
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -22,19 +19,10 @@ export interface FileHandlerOptions {
   headers?: Record<string, string>;
   precompressed?: string[];
   compressibleContentTypes?: RegExp;
-  gzip?: boolean;
-  brotli?: boolean;
 }
 
-type AcceptEncoding = ReadonlyArray<string>;
+type AcceptEncoding = ReadonlyArray<[string, number]>;
 type Found = readonly [filepath: string, contentHeaders: Record<string, string>];
-
-const DEFAULT_COMPRESSIBLE = /^(?:text\/|application\/javascript|image\/svg\+xml)/;
-const PRECOMPRESSED: Record<string, string | null> = {
-  br: ".br",
-  gzip: ".gz",
-  identity: null,
-};
 
 export class Static {
   private app: RackApp;
@@ -52,26 +40,44 @@ export class Static {
 }
 
 export class FileHandler {
+  /** `Accept-Encoding` value -> file extension (static.rb:47-51) */
+  static readonly PRECOMPRESSED: Record<string, string | null> = {
+    br: ".br",
+    gzip: ".gz",
+    identity: null,
+  };
+
   /** @internal */
   private root: string;
   /** @internal */
   private index: string;
   /** @internal */
-  private headers: Record<string, string>;
-  /** @internal */
   private precompressed: string[];
   /** @internal */
   private compressibleContentTypes: RegExp;
+  /** @internal */
+  private fileServer: Files;
 
-  constructor(root: string, options: FileHandlerOptions = {}) {
-    this.root = getPath().resolve(root.replace(/\/$/, ""));
-    this.index = options.index ?? "index";
-    this.headers = options.headers ?? {};
-    const enabled: string[] = [];
-    if (options.brotli !== false) enabled.push("br");
-    if (options.gzip !== false) enabled.push("gzip");
-    this.precompressed = [...(options.precompressed ?? enabled), "identity"];
-    this.compressibleContentTypes = options.compressibleContentTypes ?? DEFAULT_COMPRESSIBLE;
+  constructor(
+    root: string,
+    {
+      index = "index",
+      headers = {},
+      precompressed = ["br", "gzip"],
+      compressibleContentTypes = /^(?:text\/|application\/javascript|image\/svg\+xml)/,
+    }: FileHandlerOptions = {},
+  ) {
+    this.root = root.replace(/\/$/, "");
+    this.index = index;
+
+    this.precompressed = [...new Set([...precompressed, "identity"])];
+    this.compressibleContentTypes = compressibleContentTypes;
+
+    this.fileServer = new Files(this.root, headers);
+  }
+
+  async call(env: RackEnv): Promise<RackResponse> {
+    return (await this.attempt(env)) ?? this.fileServer.call(env);
   }
 
   /**
@@ -79,35 +85,50 @@ export class FileHandler {
    * response, or `null` to let the caller fall through to the next app.
    */
   async attempt(env: RackEnv): Promise<RackResponse | null> {
-    const method = (env["REQUEST_METHOD"] as string) || "GET";
-    if (method !== "GET" && method !== "HEAD") return null;
+    const request = new Request(env);
 
-    const pathInfo = (env["PATH_INFO"] as string) || "/";
-    const acceptEncoding = parseAcceptEncoding((env["HTTP_ACCEPT_ENCODING"] as string) ?? "");
-    const found = this.findFile(pathInfo, { acceptEncoding });
-    if (!found) return null;
-    const [filepath, contentHeaders] = found;
-    return this.serve(env, filepath, contentHeaders);
-  }
-
-  /** @internal */
-  serve(_env: RackEnv, filepath: string, contentHeaders: Record<string, string>): RackResponse {
-    const absolute = getPath().resolve(this.root, "." + filepath);
-    if (absolute !== this.root && !absolute.startsWith(this.root + getPath().sep)) {
-      throw new Error(`refusing to serve path outside root: ${filepath}`);
+    if (request.isGet() || request.isHead()) {
+      const found = this.findFile(request.pathInfo, { acceptEncoding: request.acceptEncoding });
+      if (found) {
+        return this.serve(request, ...found);
+      }
     }
-    const content = getFs().readFileSync(absolute);
-    const bytes = content instanceof Uint8Array ? content : new Uint8Array(content);
-    const headers: Record<string, string> = {
-      "content-length": String(bytes.byteLength),
-      ...this.headers,
-      ...contentHeaders,
-    };
-    return [200, headers, bodyFromBytes(bytes)];
+    return null;
   }
 
   /** @internal */
-  findFile(pathInfo: string, { acceptEncoding }: { acceptEncoding: AcceptEncoding }): Found | null {
+  private async serve(
+    request: Request,
+    filepath: string,
+    contentHeaders: Record<string, string>,
+  ): Promise<RackResponse> {
+    const original = request.pathInfo;
+    request.pathInfo = Utils.escapePath(filepath);
+
+    try {
+      const [status, headers, body] = await this.fileServer.call(request.env);
+      // Omit content-encoding/type/etc headers for 304 Not Modified
+      if (status !== 304) {
+        Object.assign(headers, contentHeaders);
+      }
+      return [status, headers, body];
+    } finally {
+      request.pathInfo = original;
+    }
+  }
+
+  /**
+   * Match a URI path to a static file to be served.
+   *
+   * Checks for `path`, `path`.html, and `path`/index.html files, in that
+   * order, including .br and .gzip compressed extensions.
+   *
+   * @internal
+   */
+  private findFile(
+    pathInfo: string,
+    { acceptEncoding }: { acceptEncoding: AcceptEncoding },
+  ): Found | null {
     let result: Found | null = null;
     this.eachCandidateFilepath(pathInfo, (filepath, contentType) => {
       const response = this.tryFiles(filepath, contentType, { acceptEncoding });
@@ -121,7 +142,7 @@ export class FileHandler {
   }
 
   /** @internal */
-  tryFiles(
+  private tryFiles(
     filepath: string,
     contentType: string,
     { acceptEncoding }: { acceptEncoding: AcceptEncoding },
@@ -129,151 +150,121 @@ export class FileHandler {
     const headers: Record<string, string> = { "content-type": contentType };
     if (this.isCompressible(contentType)) {
       return this.tryPrecompressedFiles(filepath, headers, { acceptEncoding });
+    } else if (this.isFileReadable(filepath)) {
+      return [filepath, headers];
     }
-    if (this.isFileReadable(filepath)) return [filepath, headers];
     return null;
   }
 
   /** @internal */
-  tryPrecompressedFiles(
+  private tryPrecompressedFiles(
     filepath: string,
     headers: Record<string, string>,
     { acceptEncoding }: { acceptEncoding: AcceptEncoding },
   ): Found | null {
-    // Mirrors Rails' shared `headers` mutation so Vary sticks through to
-    // the identity fallback.
     let result: Found | null = null;
-    this.eachPrecompressedFilepath(filepath, (encoding, candidate) => {
-      if (!this.isFileReadable(candidate)) return false;
-      if (encoding === "identity") {
-        result = [candidate, headers];
-        return true;
-      }
-      headers["vary"] = "Accept-Encoding";
-      const re = new RegExp(`\\b${encoding}\\b`, "i");
-      if (acceptEncoding.some((enc) => re.test(enc))) {
-        headers["content-encoding"] = encoding;
-        result = [candidate, headers];
-        return true;
+    this.eachPrecompressedFilepath(filepath, (contentEncoding, precompressedFilepath) => {
+      if (this.isFileReadable(precompressedFilepath)) {
+        // Identity encoding is default, so we skip Accept-Encoding negotiation
+        // and needn't set Content-Encoding.
+        //
+        // Vary header is expected when we've found other available encodings
+        // that Accept-Encoding ruled out.
+        if (contentEncoding === "identity") {
+          result = [precompressedFilepath, headers];
+          return true;
+        } else {
+          headers["vary"] = "accept-encoding";
+
+          const re = new RegExp(`\\b${contentEncoding}\\b`, "i");
+          if (acceptEncoding.some(([enc]) => re.test(enc))) {
+            headers["content-encoding"] = contentEncoding;
+            result = [precompressedFilepath, headers];
+            return true;
+          }
+        }
       }
       return false;
     });
     return result;
   }
 
-  /** @internal */
-  isFileReadable(path: string): boolean {
-    const filePath = getPath().resolve(this.root, "." + path);
-    if (filePath !== this.root && !filePath.startsWith(this.root + getPath().sep)) return false;
+  /**
+   * @internal
+   *
+   * static.rb:142 is `File.file?(file_path) && File.readable?(file_path)`.
+   * The `getFs()` adapter interface exposes no readability probe, so an
+   * unreadable file reads as readable here.
+   */
+  private isFileReadable(path: string): boolean {
+    const filePath = getPath().join(this.root, path);
     try {
-      const stat = getFs().statSync(filePath);
-      return stat.isFile();
+      return getFs().statSync(filePath).isFile();
     } catch {
       return false;
     }
   }
 
   /** @internal */
-  isCompressible(contentType: string): boolean {
+  private isCompressible(contentType: string): boolean {
     return this.compressibleContentTypes.test(contentType);
   }
 
   /** @internal */
-  eachPrecompressedFilepath(
+  private eachPrecompressedFilepath(
     filepath: string,
-    block: (encoding: string, candidate: string) => boolean | void,
+    block: (contentEncoding: string, precompressedFilepath: string) => boolean | void,
   ): void {
-    for (const encoding of this.precompressed) {
-      const ext = PRECOMPRESSED[encoding];
-      const candidate = ext == null ? filepath : `${filepath}${ext}`;
-      if (block(encoding, candidate)) return;
+    for (const contentEncoding of this.precompressed) {
+      const precompressedExt = FileHandler.PRECOMPRESSED[contentEncoding];
+      if (block(contentEncoding, `${filepath}${precompressedExt ?? ""}`)) return;
     }
   }
 
-  /** @internal */
-  eachCandidateFilepath(
+  /**
+   * @internal
+   *
+   * Rails reads `::ActionController::Base.default_static_extension`
+   * (static.rb:165). trails' `ActionController::Base` does not carry that
+   * config slot yet, so the value `abstract_controller/caching.rb:36` seeds it
+   * with stands in until it does.
+   */
+  private eachCandidateFilepath(
     pathInfo: string,
     block: (filepath: string, contentType: string) => boolean | void,
   ): void {
     const path = this.cleanPath(pathInfo);
     if (path == null) return;
 
-    const ext = getPath().extname(path).toLowerCase();
-    const contentType = MIME_TYPES[ext];
+    const ext = getPath().extname(path);
+    const contentType = Mime.mimeType(ext, null);
     if (block(path, contentType ?? "text/plain")) return;
 
+    // Tack on .html and /index.html only for paths that don't have an explicit,
+    // resolvable file extension. No need to check for foo.js.html and
+    // foo.js/index.html.
     if (!contentType) {
       const defaultExt = ".html";
       if (ext !== defaultExt) {
-        const defaultContentType = MIME_TYPES[defaultExt] ?? "text/plain";
+        const defaultContentType = Mime.mimeType(defaultExt, "text/plain")!;
+
         if (block(`${path}${defaultExt}`, defaultContentType)) return;
-        const sep = path.endsWith("/") ? "" : "/";
-        if (block(`${path}${sep}${this.index}${defaultExt}`, defaultContentType)) return;
+        if (block(`${path}/${this.index}${defaultExt}`, defaultContentType)) return;
       }
     }
   }
 
   /** @internal */
-  cleanPath(pathInfo: string): string | null {
-    let decoded: string;
+  private cleanPath(pathInfo: string): string | null {
+    let path: string;
     try {
-      decoded = decodeURIComponent(pathInfo.replace(/\/$/, ""));
+      path = Utils.unescapePath(pathInfo.replace(/\/$/, ""));
     } catch {
       return null;
     }
-    if (decoded.includes("\0")) return null;
-    const segments: string[] = [];
-    for (const seg of decoded.split("/")) {
-      if (seg === "" || seg === ".") continue;
-      if (seg === "..") {
-        if (segments.length === 0) return null;
-        segments.pop();
-        continue;
-      }
-      segments.push(seg);
+    if (Utils.validPath(path)) {
+      return Utils.cleanPathInfo(path);
     }
-    return "/" + segments.join("/");
+    return null;
   }
 }
-
-// Rails' try_precompressed_files only token-matches against the parsed
-// Accept-Encoding entries (the q value is ignored), so trails parses out
-// the bare tokens to mirror that. q=0 ("explicitly refused") is left in
-// the list intentionally — Rails has the same gap.
-function parseAcceptEncoding(header: string): AcceptEncoding {
-  if (!header) return [];
-  return header.split(",").map((part) => part.trim().split(";")[0].trim());
-}
-
-const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".htm": "text/html; charset=utf-8",
-  ".txt": "text/plain; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".xml": "application/xml; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-  ".ttf": "font/ttf",
-  ".otf": "font/otf",
-  ".eot": "application/vnd.ms-fontobject",
-  ".pdf": "application/pdf",
-  ".zip": "application/zip",
-  ".gz": "application/gzip",
-  ".br": "application/brotli",
-  ".mp3": "audio/mpeg",
-  ".mp4": "video/mp4",
-  ".webm": "video/webm",
-  ".ogg": "audio/ogg",
-  ".wav": "audio/wav",
-  ".map": "application/json",
-};
