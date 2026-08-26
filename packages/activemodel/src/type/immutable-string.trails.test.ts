@@ -14,12 +14,14 @@ describe("ImmutableStringType (trails)", () => {
     expect(type.serialize(array)).toBe(array);
   });
 
-  it("serialize strips a Symbol's leading colon but leaves a String alone", () => {
-    // immutable_string.rb:53 sends ::Symbol through `to_s`, and `:bob.to_s` is
-    // "bob". A trails Symbol carries its colon, so the colon is what separates
-    // that arm from the `else` (identity) one a String takes.
+  it("serialize leaves a String alone, leading colon and all", () => {
+    // immutable_string.rb:56 sends a String to `super` — identity. There is no
+    // trails arm for `when ::Symbol` (immutable_string.rb:53): that arm is a
+    // type test a String cannot satisfy, and trails spells a Symbol as a
+    // `":name"` string, so keying it off the colon corrupts String data.
     const type = new ImmutableStringType();
-    expect(type.serialize(":bob")).toBe("bob");
+    expect(type.serialize("::Alpha")).toBe("::Alpha");
+    expect(type.serialize(":bob")).toBe(":bob");
     expect(type.serialize("bob")).toBe("bob");
   });
 
