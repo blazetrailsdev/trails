@@ -238,11 +238,10 @@ export const ActiveRecord = {
         break;
       case "log":
         _dbWarningsAction = (warning) => {
-          let warningMessage = `[ActiveRecord::SQLWarning] ${warning.message}`;
+          let warningMessage = `[ActiveRecord::${warning.name}] ${warning.message}`;
           if (warning.code) warningMessage += ` (${warning.code})`;
-          const logger = getBase()?.logger as { warn?: (msg: string) => void } | null | undefined;
-          if (logger?.warn) logger.warn(warningMessage);
-          else console.warn(warningMessage);
+          const logger = getBase().logger as { warn: (msg: string) => void };
+          logger.warn(warningMessage);
         };
         break;
       case "raise":

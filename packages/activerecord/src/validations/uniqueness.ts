@@ -11,29 +11,6 @@ import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
- * Shared scope option validation — called eagerly from validatesUniquenessOf (declaration time)
- * and from UniquenessValidator#constructor (instantiation time). Mirrors Rails'
- * ArgumentError raised in UniquenessValidator#initialize for non-symbol :scope values.
- * @internal
- */
-function validateScopeOption(scope: unknown): void {
-  if (scope == null) return;
-  const scopes = Array.isArray(scope) ? scope : [scope];
-  if (!scopes.every((s) => typeof s === "string")) {
-    let scopeRepr: string;
-    try {
-      scopeRepr = JSON.stringify(scope) ?? String(scope);
-    } catch {
-      scopeRepr = String(scope);
-    }
-    throw new ArgumentError(
-      `${scopeRepr} is not a supported format for :scope option. ` +
-        "Pass a string or an array of strings instead.",
-    );
-  }
-}
-
-/**
  * Register a uniqueness validation for one or more attributes, delegating
  * through `_mergeAttributes` so multiple / nested-array attr lists (Rails'
  * `*attr_names` arity) and the trailing options hash are normalized the same
@@ -53,12 +30,7 @@ export function validatesUniquenessOf(
   },
   ...attrNames: unknown[]
 ): void {
-  const merged = this._mergeAttributes(attrNames);
-  // Validate options eagerly to match Rails' ArgumentError at declaration time
-  // (the constructor validates too, but validatesWith reaches it only after
-  // bucketing).
-  validateScopeOption(merged.scope);
-  this.validatesWith(UniquenessValidator, merged);
+  this.validatesWith(UniquenessValidator, this._mergeAttributes(attrNames));
 }
 
 export class UniquenessValidator extends EachValidator {
@@ -85,11 +57,6 @@ export class UniquenessValidator extends EachValidator {
    *
    * Validates options: :conditions must be callable, :scope must be
    * strings. Extracts :class option for finder resolution.
-   *
-   * @missingRailsCall all? — PERMANENT: Verified per-site (RFC 0106):
-   *   `Array(options[:scope]).all? { |s| s.respond_to?(:to_sym) }`
-   *   (`uniqueness.rb:11`) — `Array#all?` is `Array#every` in JS. The gate flags
-   *   it only because `all?` maps onto the unrelated `Relation#all`.
    */
   constructor(options: Record<string, unknown> = {}) {
     if (options.conditions != null && typeof options.conditions !== "function") {
@@ -98,7 +65,14 @@ export class UniquenessValidator extends EachValidator {
           "Pass a callable instead: `conditions: () => where({ approved: true })`",
       );
     }
-    validateScopeOption(options.scope);
+    const scopes =
+      options.scope == null ? [] : Array.isArray(options.scope) ? options.scope : [options.scope];
+    if (!scopes.every((scope) => typeof scope === "string")) {
+      throw new ArgumentError(
+        `${String(options.scope)} is not a supported format for :scope option. ` +
+          "Pass a string or an array of strings instead.",
+      );
+    }
     if (
       Object.prototype.hasOwnProperty.call(options, "caseSensitive") &&
       typeof options.caseSensitive !== "boolean"

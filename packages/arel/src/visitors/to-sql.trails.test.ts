@@ -3,10 +3,26 @@
  * arel/test/visitors/test_to_sql.rb.
  */
 import { describe, it, expect } from "vitest";
-import { testConnection, mysqlTestConnection } from "../test-helpers/connection.js";
+import { Temporal } from "@blazetrails/date";
+import {
+  testConnection,
+  mysqlTestConnection,
+  fakeRecordConnection,
+} from "../test-helpers/connection.js";
 import * as Nodes from "../nodes/index.js";
 import * as Visitors from "./index.js";
+import * as Collectors from "../collectors/index.js";
 import { Table } from "../table.js";
+import { star } from "../index.js";
+import { UpdateManager } from "../update-manager.js";
+import { DeleteManager } from "../delete-manager.js";
+
+const users = new Table("users");
+
+function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
+  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+  return visitor.compile(node as never, collector) as [string, unknown[]];
+}
 
 describe("ToSql Array-named identifiers", () => {
   type ToSqlInternals = { quoteColumnName(name: string | Nodes.SqlLiteral): string };
@@ -126,5 +142,238 @@ describe("ToSql build_quoted Table arm", () => {
   it("renders a Table reached through quotedNode as a table reference", () => {
     const node = users.get("id").eq(posts);
     expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."id" = "posts"');
+  });
+});
+
+describe("Quoted/Casted collapse", () => {
+  it("Quoted inlines via quote(valueForDatabase) when not extracting binds", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    expect(visitor.compile(new Nodes.Quoted("hi"))).toBe("'hi'");
+  });
+
+  it("Quoted Temporal.Instant binds through unified addBind path under extractBinds", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
+    const [sql, binds] = compileWithBinds(visitor, new Nodes.Quoted(instant));
+    expect(sql).toContain("2026-04-30");
+    expect(sql).not.toContain("?");
+    expect(binds).toHaveLength(0);
+  });
+
+  it("Quoted non-Date inlines under extractBinds=false", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    expect(visitor.compile(new Nodes.Quoted(42))).toBe("42");
+  });
+
+  it("Quoted string binds raw under extractBinds", () => {
+    const [sql, binds] = compileWithBinds(
+      new Visitors.ToSql(fakeRecordConnection),
+      new Nodes.Quoted("hi"),
+    );
+    expect(sql).toBe("'hi'");
+    expect(binds).toHaveLength(0);
+  });
+
+  it("Quoted number binds raw under extractBinds", () => {
+    const [sql, binds] = compileWithBinds(
+      new Visitors.ToSql(fakeRecordConnection),
+      new Nodes.Quoted(42),
+    );
+    expect(sql).toBe("42");
+    expect(binds).toHaveLength(0);
+  });
+
+  // Trails-only: asserts the adapter's `quoted_date` rendering (fake_record.rb:73-76).
+  it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
+    const value = Temporal.Instant.from("2026-04-30T00:00:00.000Z");
+    const [sql, binds] = compileWithBinds(
+      new Visitors.ToSql(testConnection),
+      new Nodes.Quoted(value),
+    );
+    expect(sql).toBe("'2026-04-30 00:00:00'");
+    expect(binds).toHaveLength(0);
+  });
+});
+
+describe("Nodes::Lock", () => {
+  it("visits the inner expr (no FOR UPDATE fallback)", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    const node = new Nodes.Lock(new Nodes.SqlLiteral("FOR SHARE"));
+    expect(visitor.compile(node)).toBe("FOR SHARE");
+  });
+
+  it("SelectManager#lock wraps default in SqlLiteral", () => {
+    expect(users.project(star()).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+  });
+
+  it("SelectManager#lock with custom string wraps in SqlLiteral", () => {
+    expect(users.project(star()).lock("FOR SHARE").toSql()).toBe('SELECT * FROM "users" FOR SHARE');
+  });
+});
+
+describe("OuterJoin guard", () => {
+  it("OuterJoin without an ON throws", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    const node = new Nodes.OuterJoin(users, null);
+    expect(() => visitor.compile(node)).toThrow();
+  });
+
+  it("RightOuterJoin without an ON throws", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    const node = new Nodes.RightOuterJoin(users, null);
+    expect(() => visitor.compile(node)).toThrow();
+  });
+
+  it("FullOuterJoin without an ON throws", () => {
+    const visitor = new Visitors.ToSql(fakeRecordConnection);
+    const node = new Nodes.FullOuterJoin(users, null);
+    expect(() => visitor.compile(node)).toThrow();
+  });
+});
+
+describe("Table with Node name", () => {
+  it("visits the Node when name is an Arel Node", () => {
+    const tbl = new Table("ignored");
+    (tbl as unknown as { name: Nodes.Node }).name = new Nodes.SqlLiteral("my_subq");
+    expect(new Visitors.ToSql(fakeRecordConnection).compile(tbl)).toBe("my_subq");
+  });
+});
+
+describe("UpdateManager subselect", () => {
+  it("renders WHERE pk IN (SELECT pk ...) when limit is present", () => {
+    const um = new UpdateManager();
+    um.table(users);
+    um.set([[users.get("name"), "x"]]);
+    um.take(1);
+    um.key = users.get("id");
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(um.ast);
+    expect(sql).toContain('IN (SELECT "users"."id"');
+  });
+});
+
+describe("DeleteManager subselect", () => {
+  it("renders WHERE pk IN (SELECT pk ...) when limit is present", () => {
+    const dm = new DeleteManager();
+    dm.from(users);
+    dm.take(1);
+    dm.key = users.get("id");
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(dm.ast);
+    expect(sql).toContain('IN (SELECT "users"."id"');
+  });
+});
+
+describe("ArelQuoter / defaultQuoter wiring", () => {
+  // Trails-only: this block exercises `defaultQuoter` — the adapter quoting —
+  // rather than the FakeRecord double of fake_record.rb:55-90, so every visitor
+  // here, the `RecordingToSql` subclasses at the end included, keeps
+  // `testConnection`.
+  const users = new Table("users");
+
+  it("default quoter emits double-quoted identifiers", () => {
+    const sql = new Visitors.ToSql(testConnection).compile(users.get("id").eq(1));
+    expect(sql).toContain('"users"."id"');
+  });
+
+  it("default quoter: schema-qualified name is split and each part double-quoted", () => {
+    const t = new Table("test_schema.things");
+    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.get(star())).ast);
+    expect(sql).toContain('"test_schema"."things".*');
+    expect(sql).toContain('FROM "test_schema"."things"');
+  });
+
+  it("default quoter: quoted table name with dot is preserved as single identifier", () => {
+    const t = new Table('test_schema."things.table"');
+    const sql = new Visitors.ToSql(testConnection).compile(t.project(t.get(star())).ast);
+    expect(sql).toContain('"test_schema"."things.table".*');
+    expect(sql).toContain('FROM "test_schema"."things.table"');
+  });
+
+  it("stub quoter: quoteTableName output appears in compiled SQL", () => {
+    const stubQuoter: Visitors.ArelConnection = {
+      quoteTableName: (name) => `<<${name}>>`,
+      quoteColumnName: (name) => `<<${name}>>`,
+      quoteString: (s) => s.replace(/'/g, "''"),
+      quote: (v) => (v === null ? "NULL" : `'${v}'`),
+      quotedBinary: (v) => `'${v}'`,
+      quotedTrue: () => "TRUE",
+      quotedFalse: () => "FALSE",
+      unquotedTrue: () => true,
+      unquotedFalse: () => false,
+      sanitizeAsSqlComment: (v) => v,
+      castBoundValue: (v) => v,
+    };
+    const sql = new Visitors.ToSql(stubQuoter).compile(users.get("id").eq(1));
+    expect(sql).toContain("<<users>>");
+  });
+
+  it("Uint8Array in value position is routed through quoter.quote(), not String()", () => {
+    // Guards against the String(Uint8Array) → comma-joined decimals ('31,139')
+    // corruption path. The visitor hands the raw value to `connection.quote`
+    // (to_sql.rb:867-870); the connection dispatches binary to quotedBinary and
+    // emits the correct dialect binary literal.
+    const received: unknown[] = [];
+    const stubQuoter: Visitors.ArelConnection = {
+      quoteTableName: (name) => `"${name}"`,
+      quoteColumnName: (name) => `"${name}"`,
+      quoteString: (s) => s.replace(/'/g, "''"),
+      quote: (v) => (v instanceof Uint8Array ? stubQuoter.quotedBinary(v) : `'${v}'`),
+      quotedBinary: (v) => {
+        received.push(v);
+        return v instanceof Uint8Array ? `'\\x${Buffer.from(v).toString("hex")}'` : `'${v}'`;
+      },
+      quotedTrue: () => "TRUE",
+      quotedFalse: () => "FALSE",
+      unquotedTrue: () => true,
+      unquotedFalse: () => false,
+      sanitizeAsSqlComment: (v) => v,
+      castBoundValue: (v) => v,
+    };
+    const bytes = new Uint8Array([0x1f, 0x8b]);
+    const node = users.get("payload").eq(bytes);
+    new Visitors.ToSql(stubQuoter).compile(node);
+    expect(received).toContain(bytes);
+  });
+
+  it("integers in raw value position bypass quote(), matching Rails visit_Integer", () => {
+    // Rails' raw-value dispatch sends an Integer to `visit_Integer`, which is
+    // `collector << o.to_s` (to_sql.rb:824-826) — the connection is never
+    // consulted. `quote` governs the Casted-node path (to_sql.rb:87-90), not
+    // this one. A quoter that mangles everything must therefore not be able to
+    // reach an integer here.
+    const quoted: unknown[] = [];
+    class RecordingToSql extends Visitors.ToSql {
+      protected override quote(value: unknown): string {
+        quoted.push(value);
+        return `<<${String(value)}>>`;
+      }
+    }
+    // A raw JS number reaches the visitor only when placed directly into a
+    // node; `.in([1, 2])` instead wraps each value in a Casted node via
+    // `quotedNode`, which is the to_sql.rb:87-90 path and does route through
+    // quote(). InfixOperation carries the raw value through unwrapped.
+    const sql = new RecordingToSql(testConnection).compile(
+      new Nodes.InfixOperation(
+        "+",
+        new Nodes.InfixOperation("+", users.get("id"), 1),
+        9007199254740993n,
+      ),
+    );
+    expect(quoted).toEqual([]);
+    expect(sql).toContain("+ 1");
+    expect(sql).toContain("+ 9007199254740993");
+  });
+
+  it("Casted values do route through quote(), unlike raw integers", () => {
+    // The companion to the guard above: to_sql.rb:87-90 sends a Casted /
+    // Quoted node's value through quote(), so the two paths must differ.
+    const quoted: unknown[] = [];
+    class RecordingToSql extends Visitors.ToSql {
+      protected override quote(value: unknown): string {
+        quoted.push(value);
+        return super.quote(value);
+      }
+    }
+    new RecordingToSql(testConnection).compile(users.get("id").in([1, 2]));
+    expect(quoted).toEqual([1, 2]);
   });
 });

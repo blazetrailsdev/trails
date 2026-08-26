@@ -11,7 +11,7 @@
  * mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938).
  *
  * NOTE: Both models must now be registered because constructor-level
- * `checkKlass()` (matching Rails' `Association#initialize → check_validity!`)
+ * `check_validity!` (Rails' `Association#initialize`)
  * requires the target class in the registry before `association()` is called.
  * This weakens the original guard: a future regression where `staleState()`
  * falls back to a registry lookup instead of reading from the held instance
@@ -79,7 +79,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     const child = new CpkSeedChild();
     const parent = new CompositePkParent({ id: [1, 2] });
 
-    // Build the holder first (constructor-level checkKlass resolves the class);
+    // Build the holder first (constructor-level check_validity! resolves the class);
     // the spy only guards the setTarget → staleState → foreignKeyNames path.
     const holder = child.association("compositePkParent");
 

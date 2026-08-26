@@ -24,7 +24,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { ActiveRecord } from "../../ar-config.js";
+import { Base } from "../../base.js";
+import { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -102,18 +103,12 @@ async function withExtensionEnabled(
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  let savedWarningsAction: typeof ActiveRecord.dbWarningsAction;
-  let savedWarningsIgnore: typeof ActiveRecord.dbWarningsIgnore;
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    savedWarningsAction = ActiveRecord.dbWarningsAction;
-    savedWarningsIgnore = ActiveRecord.dbWarningsIgnore;
   });
 
   afterEach(async () => {
-    ActiveRecord.dbWarningsAction = savedWarningsAction ?? "ignore";
-    ActiveRecord.dbWarningsIgnore = savedWarningsIgnore;
     vi.restoreAllMocks();
     if (adapter.isConnected()) {
       try {
@@ -822,28 +817,37 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("ignores warnings when behaviour ignore", async () => {
-      ActiveRecord.dbWarningsAction = "ignore";
-      const rows = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");
-      expect(rows).toEqual([]);
+      await withDbWarningsAction("ignore", async () => {
+        const rows = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");
+        expect(rows).toEqual([]);
+      });
     });
 
     it("logs warnings when behaviour log", async () => {
-      ActiveRecord.dbWarningsAction = "log";
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("PostgreSQL SQL warning"));
+      await withDbWarningsAction("log", async () => {
+        const sqlWarning = "[ActiveRecord::SQLWarning] PostgreSQL SQL warning (01000)";
+        const logger = { warn: vi.fn() };
+        const previousLogger = Base.logger;
+        Base.logger = logger as never;
+        try {
+          await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+          expect(logger.warn).toHaveBeenCalledWith(sqlWarning);
+        } finally {
+          Base.logger = previousLogger;
+        }
+      });
     });
 
     it("raises warnings when behaviour raise", async () => {
-      ActiveRecord.dbWarningsAction = "raise";
-      await expect(
-        adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
-      ).rejects.toBeInstanceOf(SQLWarning);
+      await withDbWarningsAction("raise", async () => {
+        await expect(
+          adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
+        ).rejects.toBeInstanceOf(SQLWarning);
+      });
     });
 
     it("reports when behaviour report", async () => {
       const { ActiveSupport, ErrorReporter } = await import("@blazetrails/activesupport");
-      ActiveRecord.dbWarningsAction = "report";
       const previousReporter = ActiveSupport.errorReporter;
       const reporter = new ErrorReporter();
       const events: Array<{ error: Error; handled: boolean }> = [];
@@ -854,11 +858,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       ActiveSupport.errorReporter = reporter;
       try {
-        await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-        expect(events).toHaveLength(1);
-        expect(events[0].error).toBeInstanceOf(SQLWarning);
-        expect(events[0].error.message).toBe("PostgreSQL SQL warning");
-        expect(events[0].handled).toBe(true);
+        await withDbWarningsAction("report", async () => {
+          await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+          expect(events).toHaveLength(1);
+          expect(events[0].error).toBeInstanceOf(SQLWarning);
+          expect(events[0].error.message).toBe("PostgreSQL SQL warning");
+          expect(events[0].handled).toBe(true);
+        });
       } finally {
         ActiveSupport.errorReporter = previousReporter;
       }
@@ -866,38 +872,41 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("warnings behaviour can be customized with a proc", async () => {
       let captured: SQLWarning | null = null;
-      ActiveRecord.dbWarningsAction = (w) => {
+      const warningAction = (w: SQLWarning) => {
         captured = w;
       };
-      await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-      expect(captured).toBeInstanceOf(SQLWarning);
-      expect((captured as unknown as SQLWarning).message).toBe("PostgreSQL SQL warning");
-      expect((captured as unknown as SQLWarning).level).toBe("WARNING");
+      await withDbWarningsAction(warningAction, async () => {
+        await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+        expect(captured).toBeInstanceOf(SQLWarning);
+        expect((captured as unknown as SQLWarning).message).toBe("PostgreSQL SQL warning");
+        expect((captured as unknown as SQLWarning).level).toBe("WARNING");
+      });
     });
 
     it("allowlist of warnings to ignore", async () => {
-      ActiveRecord.dbWarningsAction = "raise";
-      ActiveRecord.dbWarningsIgnore = [/PostgreSQL SQL warning/];
-      const rows = await adapter.execute(
-        "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
-      );
-      expect(rows).toEqual([]);
+      await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
+        const rows = await adapter.execute(
+          "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
+        );
+        expect(rows).toEqual([]);
+      });
     });
 
     it("allowlist of warning codes to ignore", async () => {
-      ActiveRecord.dbWarningsAction = "raise";
-      ActiveRecord.dbWarningsIgnore = ["01000"];
-      const rows = await adapter.execute(
-        "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
-      );
-      expect(rows).toEqual([]);
+      await withDbWarningsAction("raise", ["01000"], async () => {
+        const rows = await adapter.execute(
+          "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
+        );
+        expect(rows).toEqual([]);
+      });
     });
 
     it("does not raise notice level warnings", async () => {
-      ActiveRecord.dbWarningsAction = "raise";
-      await expect(
-        adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
-      ).resolves.toBeDefined();
+      await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
+        await expect(
+          adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
+        ).resolves.toBeDefined();
+      });
     });
 
     it("date decoding enabled", async () => {
