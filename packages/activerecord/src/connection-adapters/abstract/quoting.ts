@@ -480,7 +480,7 @@ export function quotedDate(
     | Temporal.PlainTime,
 ): string {
   // Rails: `value.acts_like?(:time)` (abstract/quoting.rb:185-191), which an
-  // `ActiveSupport::TimeWithZone` answers true (time_with_zone.rb:52-54). Both
+  // `ActiveSupport::TimeWithZone` answers true (time_with_zone.rb:504-506). Both
   // the `getutc` and the `getlocal` arm name the same instant, and rendering it
   // in `default_timezone` is what `formatInstantForSql` already does.
   if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();

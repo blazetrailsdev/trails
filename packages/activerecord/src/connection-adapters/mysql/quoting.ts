@@ -227,7 +227,7 @@ export function quotedDate(
 ): string {
   // Rails: the inherited `quoted_date` normalises an `acts_like?(:time)` value
   // through `getutc`/`getlocal` (abstract/quoting.rb:185-191); an
-  // `ActiveSupport::TimeWithZone` takes that arm (time_with_zone.rb:52-54).
+  // `ActiveSupport::TimeWithZone` takes that arm (time_with_zone.rb:504-506).
   if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
