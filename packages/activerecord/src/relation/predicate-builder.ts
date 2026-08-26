@@ -1,5 +1,5 @@
 import { Nodes, sql } from "@blazetrails/arel";
-import { wrap } from "@blazetrails/activesupport";
+import { wrap, toS } from "@blazetrails/activesupport";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -261,7 +261,7 @@ export class PredicateBuilder {
     // bind — `buildBindAttribute` resolves the wrapped type via `typeForAttribute`
     // (and `HomogeneousIn#castedValues` serializes through it for the IN path).
     if (this.isScalarQueryValue(value)) {
-      const normalized = this.normalizeQueryValue(String(attribute.name), value);
+      const normalized = this.normalizeQueryValue(toS(attribute.name), value);
       if (normalized === null || normalized === undefined) {
         return attribute.eq(null);
       }
@@ -278,8 +278,8 @@ export class PredicateBuilder {
     // `OID::Array#force_equality?` is `value.is_a?(::Array)` — a Ruby Set is not
     // an Array, so a Set on an array column force-equalizes in neither Rails nor
     // here. Normalizing Set→Array first would spuriously trip force-equality.
-    if (this.table.type(String(attribute.name)).isForceEquality?.(value) === true) {
-      return attribute.eq(this.buildBindAttribute(String(attribute.name), value));
+    if (this.table.type(toS(attribute.name)).isForceEquality?.(value) === true) {
+      return attribute.eq(this.buildBindAttribute(toS(attribute.name), value));
     }
     return this.handlerFor(value).call(attribute, value);
   }

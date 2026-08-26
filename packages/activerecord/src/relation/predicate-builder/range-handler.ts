@@ -1,6 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
 import type { PredicateBuilder } from "../predicate-builder.js";
+import { toS } from "@blazetrails/activesupport";
 
 /**
  * Handles Range values in where conditions by delegating to
@@ -25,8 +26,8 @@ export class RangeHandler {
    * literal is that shape, and `between` reads nothing else off it.
    */
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    const beginBind = this.predicateBuilder.buildBindAttribute(String(attribute.name), value.begin);
-    const endBind = this.predicateBuilder.buildBindAttribute(String(attribute.name), value.end);
+    const beginBind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value.begin);
+    const endBind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value.end);
     return attribute.between({ begin: beginBind, end: endBind, excludeEnd: value.excludeEnd });
   }
 

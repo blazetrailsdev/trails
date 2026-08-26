@@ -135,7 +135,12 @@ export class WhereClause {
     return (
       other instanceof WhereClause &&
       this.predicates.length === other.predicates.length &&
-      this.predicates.every((predicate, i) => predicateEql(predicate, other.predicates[i]))
+      // A bare-String predicate (query_methods.rb:1627) compares with
+      // `String#==` in Ruby; a JS primitive has no method to dispatch, so it is
+      // seated in the SqlLiteral whose `eql` is that same `String#==`.
+      this.predicates.every((predicate, i) =>
+        (typeof predicate === "string" ? sql(predicate) : predicate).eql(other.predicates[i]),
+      )
     );
   }
 
@@ -263,25 +268,6 @@ export class WhereClause {
   }
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT: `Arel::Nodes::SqlLiteral < String`
- *   (arel/nodes/sql_literal.rb:5), so a literal and a bare String carrying the
- *   same SQL are `==` in Ruby and Rails' plain `predicates ==`, `predicates -`
- *   and `predicates |` (where_clause.rb:18,22,75-79) dedup the pair. TypeScript
- *   cannot subclass the string primitive, so that inherited equality is spelled
- *   out here; `Node#eql` compares constructors and would never match across the
- *   two spellings.
- */
-function predicateEql(a: Nodes.Node | string, b: Nodes.Node | string): boolean {
-  const sqlText = (node: Nodes.Node | string): string | null =>
-    typeof node === "string" ? node : node instanceof Nodes.SqlLiteral ? node.value : null;
-  const aText = sqlText(a);
-  const bText = sqlText(b);
-  if (aText !== null || bText !== null) return aText === bText;
-  return (a as Nodes.Node).eql(b);
-}
-
 /** @internal */
 function invertPredicate(node: Nodes.Node | string | null | undefined): Nodes.Node {
   if (node == null) {
@@ -299,7 +285,7 @@ function subtractNodes(
 ): (Nodes.Node | string)[] {
   const result: (Nodes.Node | string)[] = [];
   for (const node of a) {
-    if (!b.some((other) => predicateEql(node, other))) {
+    if (!b.some((other) => (typeof node === "string" ? sql(node) : node).eql(other))) {
       result.push(node);
     }
   }
@@ -362,7 +348,11 @@ function unionNodes(
 ): (Nodes.Node | string)[] {
   const result: (Nodes.Node | string)[] = [...a];
   for (const node of b) {
-    if (!result.some((existing) => predicateEql(existing, node))) {
+    if (
+      !result.some((existing) =>
+        (typeof existing === "string" ? sql(existing) : existing).eql(node),
+      )
+    ) {
       result.push(node);
     }
   }

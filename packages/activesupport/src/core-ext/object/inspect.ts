@@ -31,6 +31,47 @@ function isPlainObject(value: object): boolean {
  */
 const SYMBOL_RE = /^:[A-Za-z_][A-Za-z0-9_]*[?!=]?$/;
 
+/** Ruby's named single-character escapes, in `String#inspect` order. */
+const RUBY_STRING_ESCAPES: ReadonlyMap<string, string> = new Map([
+  ["\\", "\\\\"],
+  ['"', '\\"'],
+  ["\n", "\\n"],
+  ["\t", "\\t"],
+  ["\r", "\\r"],
+  ["\f", "\\f"],
+  ["\v", "\\v"],
+  ["\x07", "\\a"],
+  ["\b", "\\b"],
+  ["\x1b", "\\e"],
+]);
+
+/**
+ * Ruby `String#inspect` (string.c). Beyond `\` and `"`, Ruby emits named
+ * escapes for the usual control characters, `\uXXXX` (uppercase, four digits)
+ * for any other non-printable, and escapes a `#` only where it would start an
+ * interpolation (`#{`, `#$`, `#@`). Printable non-ASCII passes through
+ * literally. `JSON.stringify` agrees on none of those four points.
+ */
+function stringInspect(value: string): string {
+  let out = '"';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    const escape = RUBY_STRING_ESCAPES.get(ch);
+    if (escape !== undefined) {
+      out += escape;
+    } else if (ch === "#" && "{$@".includes(value[i + 1] ?? "")) {
+      out += "\\#";
+    } else {
+      const code = ch.charCodeAt(0);
+      out +=
+        code < 0x20 || code === 0x7f
+          ? `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`
+          : ch;
+    }
+  }
+  return out + '"';
+}
+
 /**
  * Ruby `Object#inspect` — `[1, [2, "a"], {:b=>3}, nil]` for
  * `[1, [2, "a"], {b: 3}, nil]`, verified against MRI 3.3.
@@ -43,7 +84,7 @@ const SYMBOL_RE = /^:[A-Za-z_][A-Za-z0-9_]*[?!=]?$/;
 export function inspect(value: unknown): string {
   // Ruby `nil.inspect` is "nil"; `undefined` is trails' other spelling of nil.
   if (value == null) return "nil";
-  if (typeof value === "string") return SYMBOL_RE.test(value) ? value : JSON.stringify(value);
+  if (typeof value === "string") return SYMBOL_RE.test(value) ? value : stringInspect(value);
   if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
   if (typeof value === "object" && isPlainObject(value)) {
     const entries = Object.entries(value as Record<string, unknown>);

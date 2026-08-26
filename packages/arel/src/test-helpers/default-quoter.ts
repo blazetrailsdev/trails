@@ -1,6 +1,6 @@
 import type { ArelConnection } from "../visitors/connection.js";
-import { quoteSchemaQualifiedName } from "../visitors/split-schema-qualified-name.js";
 import { Temporal } from "@blazetrails/date";
+import { toS } from "@blazetrails/activesupport";
 
 // Standalone comment sanitize for these test hosts: strips block-comment
 // delimiters (leaving `--` alone, like Rails' abstract sanitize). Real
@@ -170,15 +170,15 @@ function quoteScalar(this: ArelConnection, value: unknown): string {
  * visitor falls back to it.
  */
 export const mysqlDefaultQuoter: ArelConnection = {
-  quoteTableName(name: string): string {
-    return String(name)
+  quoteTableName(name: unknown): string {
+    return toS(name)
       .split(".")
       .map((p) => "`" + p.replace(/`/g, "``") + "`")
       .join(".");
   },
 
-  quoteColumnName(name: string): string {
-    return "`" + String(name).replace(/`/g, "``") + "`";
+  quoteColumnName(name: unknown): string {
+    return "`" + toS(name).replace(/`/g, "``") + "`";
   },
 
   quoteString(s: string): string {
@@ -240,12 +240,13 @@ export const mysqlDefaultQuoter: ArelConnection = {
  * always passes a real connection (RFC 0007) — no visitor defaults to this.
  */
 export const defaultQuoter: ArelConnection = {
-  quoteTableName(name: string): string {
-    return quoteSchemaQualifiedName(String(name));
+  // Mirrors sqlite3/quoting.rb:48-50 — `"#{name.to_s.gsub('"', '""').gsub(".", "\".\"")}"`.
+  quoteTableName(name: unknown): string {
+    return `"${toS(name).replace(/"/g, '""').replace(/\./g, '"."')}"`;
   },
 
-  quoteColumnName(name: string): string {
-    return `"${String(name).replace(/"/g, '""')}"`;
+  quoteColumnName(name: unknown): string {
+    return `"${toS(name).replace(/"/g, '""')}"`;
   },
 
   quoteString(s: string): string {

@@ -234,20 +234,6 @@ describe("TableTest", () => {
     ).toBe('"test_schema"."things".*');
   });
 
-  it("star preserves quoted table name with dot", () => {
-    expect(
-      new Visitors.ToSql(testConnection).compile(
-        new Table('test_schema."things.table"').get(star()),
-      ),
-    ).toBe('"test_schema"."things.table".*');
-  });
-
-  it("star preserves quoted schema name with dot", () => {
-    expect(
-      new Visitors.ToSql(testConnection).compile(new Table('"my.schema".articles').get(star())),
-    ).toBe('"my.schema"."articles".*');
-  });
-
   it("star routes table-name quoting through the adapter visitor (MySQL=backticks)", () => {
     const sql = new Visitors.MySQL(mysqlTestConnection).compile(users.get(star()));
     expect(sql).toBe("`users`.*");
