@@ -689,30 +689,6 @@ export class PostgreSQLAdapter
     if (minMessages !== undefined && typeof minMessages !== "string") {
       throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);
     }
-    if (variables !== null && variables !== undefined) {
-      if (typeof variables !== "object" || Array.isArray(variables)) {
-        throw new TypeError("variables must be a plain object");
-      }
-      const variablesPrototype = Object.getPrototypeOf(variables);
-      if (variablesPrototype !== Object.prototype && variablesPrototype !== null) {
-        throw new TypeError("variables must be a plain object");
-      }
-      for (const [key, val] of Object.entries(variables)) {
-        if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(key)) {
-          throw new Error(`Invalid PostgreSQL session variable name: ${JSON.stringify(key)}`);
-        }
-        if (
-          val !== null &&
-          typeof val !== "string" &&
-          typeof val !== "boolean" &&
-          typeof val !== "number"
-        ) {
-          throw new TypeError(
-            `variables[${JSON.stringify(key)}] must be string | number | boolean | null, got ${typeof val}`,
-          );
-        }
-      }
-    }
     this._minMessages = minMessages ?? "warning";
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined

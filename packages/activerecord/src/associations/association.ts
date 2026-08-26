@@ -104,26 +104,6 @@ export class Association {
     return this._loadedStore;
   }
 
-  /**
-   * True when `target` was set by an *explicit* assignment / inverse-of seed
-   * (the writer paths routed through `_cacheSingularTarget`), as opposed to a
-   * query load. The inner functional loaders (`loadBelongsTo` / `loadHasOne`)
-   * short-circuit only on explicit sets — a prior query load must NOT memoize,
-   * so they can re-query after a mutation (e.g. a has_one :through deleted via
-   * its writer). This is the holder-resident successor to the old
-   * `_cachedAssociations` write-shadow, which only ever held explicit writes.
-   */
-  _explicitTarget = false;
-  /**
-   * True when `target` was set by a preload / eager-load path (the standard
-   * `Preloader`, `JoinDependency`, or the preloader batch's loaded-nil default),
-   * as opposed to a lazy query load. This is the holder-resident successor to
-   * the legacy `_preloadedAssociations` shadow `Map`: readers that previously
-   * gated on `record._preloadedAssociations.has(name)` now gate on
-   * `holder.isLoaded() && holder._loadedFromPreload`, distinguishing a preloaded
-   * target (including a preloaded-nil) from a lazy load that must re-query.
-   */
-  _loadedFromPreload = false;
   /** True after asyncLoadTarget() completes a full DB load — signals the dotted
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
@@ -232,8 +212,6 @@ export class Association {
     this.loaded = false;
     this._staleState = undefined;
     this._staleStateSnapshotted = false;
-    this._explicitTarget = false;
-    this._loadedFromPreload = false;
     this._loadedViaAsync = false;
   }
 
@@ -417,18 +395,12 @@ export class Association {
    * Set the inverse association on the given record, so that
    * `record.association(inverse_name).target` points back to owner.
    *
-   * `_explicitTarget` has no Rails analog — `inversed_from` alone is the whole
-   * of `set_inverse_instance` there. It is the trails flag (RFC 0022) that
-   * `_loadedSingularTarget` consults before the inner belongs_to/has_one
-   * loaders query, so it is raised here exactly as `_cacheSingularTarget` does
-   * on the other seeding path; without it an inverse wired through this method
-   * reads back as an unset target and re-queries.
+   * Mirrors: Association#set_inverse_instance (association.rb:132-137).
    */
   setInverseInstance(record: Base): Base {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
       inverse.inversedFrom(this.owner);
-      if (!inverse.isCollection()) inverse._explicitTarget = true;
     }
     return record;
   }
@@ -436,19 +408,11 @@ export class Association {
   /**
    * Mirrors: Association#set_inverse_instance_from_queries
    * (association.rb:139-144).
-   *
-   * `_explicitTarget` has no Rails analog — see {@link setInverseInstance}. It
-   * is raised here for the same reason, and only where `inversedFromQueries`
-   * actually took the write: an inverse it declined (`inversable?` false) must
-   * keep reading back as unset.
    */
   setInverseInstanceFromQueries(record: Base): Base {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
       inverse.inversedFromQueries(this.owner);
-      if (!inverse.isCollection() && inverse.target === this.owner) {
-        inverse._explicitTarget = true;
-      }
     }
     return record;
   }

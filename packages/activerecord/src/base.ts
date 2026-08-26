@@ -2929,7 +2929,7 @@ export class Base extends Model {
    *   - `_associationInstances` is the canonical `@association_cache` analog
    *     (name → built `Association` wrapper; what `association_instance_get/set`
    *     and `association()` read/write). The holder also carries any
-   *     preloaded/eager-loaded target (`isLoaded()` + `_loadedFromPreload`),
+   *     preloaded/eager-loaded target (`isLoaded()`),
    *     including an eagerly-preloaded *nil* association.
    *   - `_collectionProxies` is the Trails-specific user-facing `CollectionProxy`
    *     layer (incl. in-memory inverse-seeded records on a not-yet-loaded proxy),

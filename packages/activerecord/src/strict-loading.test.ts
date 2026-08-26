@@ -30,7 +30,6 @@ import { Interest } from "./test-helpers/models/interest.js";
 function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
   const holder = (record as any).association(name);
   holder.setTarget(value);
-  holder._loadedFromPreload = true;
 }
 
 async function withStrictLoadingByDefault<T>(model: typeof Base, fn: () => Promise<T>): Promise<T> {

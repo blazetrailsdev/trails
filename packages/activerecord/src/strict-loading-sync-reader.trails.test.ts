@@ -106,7 +106,6 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     ship.strictLoadingBang();
     const holder = (ship as any).association("developer");
     holder.setTarget(null);
-    holder._loadedFromPreload = true;
     expect(() => (ship as any).developer).not.toThrow();
     expect((ship as any).developer).toBeNull();
   });

@@ -1075,7 +1075,7 @@ export class JoinDependency {
       } else {
         proxy._setTargetFromLoader(child);
       }
-      proxy._loadedFromPreload = true;
+      proxy.loadedBang();
       if (typeof proxy.setInverseInstance === "function") {
         proxy.setInverseInstance(child);
       }
@@ -1096,7 +1096,6 @@ export class JoinDependency {
       const proxy = parent.association(node.immediateAssocName);
       if (!proxy || proxy.loaded) return;
       proxy.target = [];
-      proxy._loadedFromPreload = true;
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
@@ -1113,7 +1112,6 @@ export class JoinDependency {
       if (!proxy || proxy.loaded) return;
       const isCollection = node.assocType === "hasMany";
       proxy._setTargetFromLoader(isCollection ? [] : null);
-      proxy._loadedFromPreload = true;
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
