@@ -1,3 +1,5 @@
+import { kernelArray } from "@blazetrails/activesupport";
+
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttributeMutationTracker,
@@ -316,17 +318,29 @@ export function initAttributes(
 }
 
 /**
- * Per-instance reset hook for dirty-tracking state. Mirrors Rails
- * `ActiveModel::Dirty#init_internals` (dirty.rb:372-376). Ruby's `super` is
- * `super_()`, the receiver-bound link `prepend()` hands the module (model.ts
- * wires the chain in include order); the Model constructor enters it.
+ * Mirrors `ActiveModel::Dirty#as_json` (dirty.rb:264-268): hide the two
+ * mutation-tracker ivars from `Object#as_json`, which serializes every ivar
+ * (`instance_values`, core_ext/object/json.rb:58-66). Ruby names them
+ * `"mutations_from_database"` / `"mutations_before_last_save"` — the ivars
+ * stripped of their `@`; trails' are `_mutationsFromDatabase` /
+ * `_mutationsBeforeLastSave` (dirty.rb:373-374), so those are the names to
+ * except. Ruby's `super` is `super_()`, the receiver-bound link `prepend()`
+ * hands the module.
  *
  * @internal Rails-private helper.
  */
-export function initInternals(this: DirtyInternalsHost, super_: () => void): void {
-  super_();
-  this._mutationsBeforeLastSave = null;
-  this._mutationsFromDatabase = null;
+export function asJson(
+  this: unknown,
+  super_: (options: Record<string, unknown>) => unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  const except = [
+    ...kernelArray(options["except"]),
+    "_mutationsFromDatabase",
+    "_mutationsBeforeLastSave",
+  ];
+  options = { ...options, except };
+  return super_(options);
 }
 
 /**
@@ -340,6 +354,20 @@ export interface DirtyInternalsHost {
 /** Host shape consumed by `initializeDup` — the duplicate, mid-`dup()`. */
 export interface DirtyDupHost extends DirtyInternalsHost {
   _attributes: AttributeSet;
+}
+
+/**
+ * Per-instance reset hook for dirty-tracking state. Mirrors Rails
+ * `ActiveModel::Dirty#init_internals` (dirty.rb:372-376). Ruby's `super` is
+ * `super_()`, the receiver-bound link `prepend()` hands the module (model.ts
+ * wires the chain in include order); the Model constructor enters it.
+ *
+ * @internal Rails-private helper.
+ */
+export function initInternals(this: DirtyInternalsHost, super_: () => void): void {
+  super_();
+  this._mutationsBeforeLastSave = null;
+  this._mutationsFromDatabase = null;
 }
 
 /**
