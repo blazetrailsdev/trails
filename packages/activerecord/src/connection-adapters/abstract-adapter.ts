@@ -2750,14 +2750,12 @@ export class AbstractAdapter implements Quoting {
    *
    * The `Promise<Type>` arm is not Rails: `PostgreSQLAdapter#lookupCastType`
    * resolves a sql_type with a live regtype query, so its override is async
-   * (tracked by `pg-lookup-cast-type-async-divergence`). The `null` arm is
-   * `AbstractMysqlAdapter`'s early return for an empty sql_type, which
-   * `mysql-native-type-map-converges-onto-type-map` deletes. Both are spelled
-   * out rather than erased behind `unknown`, so a caller cannot silently
-   * duck-type past them.
+   * (tracked by `pg-lookup-cast-type-async-divergence`). It is spelled out
+   * rather than erased behind `unknown`, so a caller cannot silently
+   * duck-type past it.
    * @internal
    */
-  lookupCastType(sqlType: string | null): Type | Promise<Type> | null {
+  lookupCastType(sqlType: string | null): Type | Promise<Type> {
     // The quoting helper constrains its receiver to a `TypeMap`-bearing host;
     // the base `typeMap` getter is `unknown` because PostgreSQL's override
     // returns a `HashLookupTypeMap`, which is a separate class in Rails too
@@ -2766,7 +2764,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
-  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> | null {
+  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> {
     return this.lookupCastType(column.sqlType);
   }
 }
