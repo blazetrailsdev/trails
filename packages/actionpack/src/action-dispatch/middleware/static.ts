@@ -174,7 +174,7 @@ export class FileHandler {
           result = [precompressedFilepath, headers];
           return true;
         } else {
-          headers["vary"] = "Accept-Encoding";
+          headers["vary"] = "accept-encoding";
 
           const re = new RegExp(`\\b${contentEncoding}\\b`, "i");
           if (acceptEncoding.some(([enc]) => re.test(enc))) {

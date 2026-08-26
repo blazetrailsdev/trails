@@ -180,7 +180,7 @@ describe("StaticTest", () => {
       HTTP_ACCEPT_ENCODING: "identity",
     });
     expect(status).toBe(200);
-    expect(headers["vary"]).toBe("Accept-Encoding");
+    expect(headers["vary"]).toBe("accept-encoding");
   });
 
   it("serves brotli files when header set", async () => {

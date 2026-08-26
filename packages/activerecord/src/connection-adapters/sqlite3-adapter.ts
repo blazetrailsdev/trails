@@ -2904,12 +2904,17 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /**
-   * @internal Mirrors: AbstractAdapter.extended_type_map (abstract_adapter.rb:877-883)
+   * A divergent override, NOT a port: `sqlite3_adapter.rb` defines no
+   * `extended_type_map`, so Rails runs `AbstractAdapter`'s
+   * (abstract_adapter.rb:877-883) here unchanged.
    *
-   * Inherited in Rails. The base body re-registers `%r(\A[^\(]*datetime)i` on
-   * `Type::DateTime` to carry the timezone, which would undo the
-   * {@link SQLite3DateTime} registration `initialize_type_map` makes; restore
-   * it here, for the Temporal-language reason that class documents.
+   * @internal
+   * @noRailsEquivalent PERMANENT — a consequence of {@link SQLite3DateTime},
+   * which is itself `@noRailsEquivalent PERMANENT` for the Temporal-language
+   * reason that class documents. The inherited body re-registers
+   * `%r(\A[^\(]*datetime)i` on `Type::DateTime` to carry the timezone, which
+   * would clobber the `SQLite3DateTime` registration `initialize_type_map`
+   * makes; this restores it. It disappears when that class does.
    */
   static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
     const m = super.extendedTypeMap(options);
