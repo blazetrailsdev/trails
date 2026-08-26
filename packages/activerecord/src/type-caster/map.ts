@@ -1,4 +1,5 @@
 import { Type, ValueType } from "@blazetrails/activemodel";
+import { toS } from "@blazetrails/activesupport";
 import { enumTypeOf } from "../enum.js";
 
 /**
@@ -23,7 +24,7 @@ export class Map {
     // mapping shape, whereas the AttributeSet carries the EnumType built from
     // the reflected column type. `whereValuesHash` / `scopeForCreate`
     // round-trip the label through the same reflected type.
-    const enumType = enumTypeOf(this._klass, String(attrName));
+    const enumType = enumTypeOf(this._klass, toS(attrName));
     if (enumType) return enumType.serialize(value);
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
@@ -36,7 +37,7 @@ export class Map {
     // attribute set, so no query-side re-wrap is needed. Rails' `to_s` lives in
     // `klass.type_for_attribute` (model_schema.rb), so callers pass the column
     // as-is — a Symbol, a String, or an Arel node.
-    return this._baseTypeForAttribute(String(name));
+    return this._baseTypeForAttribute(toS(name));
   }
 
   private _baseTypeForAttribute(name: string): Type {

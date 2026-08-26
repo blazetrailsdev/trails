@@ -2394,11 +2394,10 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     const fromPrimaryKey = await this.primaryKey(from);
-    const { rename: _rename, ...createOptions } = options;
     const rename = options.rename ?? {};
 
     let definition!: SQLite3TableDefinition;
-    await this.createTable(to, { ...createOptions, id: false }, async (td) => {
+    await this.createTable(to, { ...options, id: false }, async (td) => {
       definition = td as SQLite3TableDefinition;
       if (Array.isArray(fromPrimaryKey)) definition.primaryKeys(fromPrimaryKey);
 
