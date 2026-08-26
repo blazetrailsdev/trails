@@ -34,27 +34,6 @@ export class JsonDataType extends Base {
   }
 }
 
-class MySettings {
-  constructor(private readonly hash: Record<string, unknown>) {}
-  toHash(): Record<string, unknown> {
-    return this.hash;
-  }
-  static load(hash: unknown): MySettings {
-    return new MySettings(hash as Record<string, unknown>);
-  }
-  static dump(object: unknown): unknown {
-    return (object as MySettings).toHash();
-  }
-}
-
-class JsonDataTypeWithFilter extends Base {
-  static {
-    this.tableName = "json_data_type";
-    this.attribute("payload", "json");
-    this.filterAttributes = [...(Base.filterAttributes ?? []), "password"];
-  }
-}
-
 /**
  * A `JsonDataType` seen through its generated attribute readers (`payload`,
  * `resolution`), which are declared by the schema at runtime rather than by
@@ -62,25 +41,10 @@ class JsonDataTypeWithFilter extends Base {
  */
 type JsonRecord = InstanceType<typeof JsonDataType> & Record<string, unknown>;
 
-function klass(): typeof JsonDataType {
-  return JsonDataType;
-}
-
 export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   const columnType = host.columnType;
 
-  const insertStatementPerDatabase =
-    host.insertStatementPerDatabase ??
-    ((values: string) => `insert into json_data_type (payload) VALUES ('${values}')`);
-
   let connection: AbstractAdapter;
-
-  async function assertTypeMatch(type: string, sqlType: string | undefined): Promise<void> {
-    const nativeType = (
-      (await Base.leaseConnection()).nativeDatabaseTypes()[type] as { name: string }
-    ).name;
-    expect(sqlType ?? "").toMatch(new RegExp(`^${nativeType}\\b`));
-  }
 
   beforeEach(async () => {
     connection = await Base.leaseConnection();
@@ -92,7 +56,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   afterEach(async () => {
     await connection.dropTable("json_data_type", { ifExists: true });
     void klass().resetColumnInformation();
-    void JsonDataTypeWithFilter.resetColumnInformation();
   });
 
   it("test_column", async () => {
@@ -121,14 +84,15 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_cast_value_on_write", async () => {
-    // Ruby's `:symbol => :bar` Symbol key/value survives `payload_before_type_cast`
-    // and is stringified by the cast; JS object keys and string values are already
-    // strings, so both halves read the same here.
-    const x = klass().new({ payload: { string: "foo", symbol: "bar" } }) as JsonRecord;
-    expect((x.attributeBeforeTypeCast as (attrName: string) => unknown)("payload")).toEqual({
-      string: "foo",
-      symbol: "bar",
-    });
+    // Ruby's `{ "string" => "foo", :symbol => :bar }` keeps its Symbol key and
+    // value in `payload_before_type_cast` and is stringified only by the cast.
+    // JS has no Symbol-vs-String distinction to normalize, so the live half of
+    // the same assertion is identity: before-type-cast is the assigned object
+    // itself, while the reader returns the serialize/deserialize round trip.
+    const payload = { string: "foo", symbol: "bar" };
+    const x = klass().new({ payload }) as JsonRecord;
+    expect((x.attributeBeforeTypeCast as (attrName: string) => unknown)("payload")).toBe(payload);
+    expect(x.payload).not.toBe(payload);
     expect(x.payload).toEqual({ string: "foo", symbol: "bar" });
     await x.saveBang();
     expect((await x.reload()).payload).toEqual({ string: "foo", symbol: "bar" });
@@ -328,6 +292,19 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(() => new NewKlass()).toThrow(ColumnNotSerializableError);
   });
 
+  class MySettings {
+    constructor(private readonly hash: Record<string, unknown>) {}
+    toHash(): Record<string, unknown> {
+      return this.hash;
+    }
+    static load(hash: unknown): MySettings {
+      return new MySettings(hash as Record<string, unknown>);
+    }
+    static dump(object: unknown): unknown {
+      return (object as MySettings).toHash();
+    }
+  }
+
   it("test_json_with_serialized_attributes", async () => {
     // Rails: Class.new(klass) { serialize :settings, coder: MySettings }
     class NewKlass extends klass() {}
@@ -346,6 +323,14 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(((await record.reload()).settings as MySettings).toHash()).toEqual({ three: "four" });
   });
 
+  class JsonDataTypeWithFilter extends Base {
+    static {
+      this.tableName = "json_data_type";
+      this.attribute("payload", "json");
+      this.filterAttributes = [...(Base.filterAttributes ?? []), "password"];
+    }
+  }
+
   it("test_pretty_print", async () => {
     await JsonDataTypeWithFilter.loadSchema();
     const x = (await JsonDataTypeWithFilter.createBang({ payload: {} })) as JsonRecord;
@@ -354,4 +339,19 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     await pp(x, { write: (s: string) => (string += s) });
     expect(string).toBeTruthy();
   });
+
+  function klass(): typeof JsonDataType {
+    return JsonDataType;
+  }
+
+  const insertStatementPerDatabase =
+    host.insertStatementPerDatabase ??
+    ((values: string) => `insert into json_data_type (payload) VALUES ('${values}')`);
+
+  async function assertTypeMatch(type: string, sqlType: string | undefined): Promise<void> {
+    const nativeType = (
+      (await Base.leaseConnection()).nativeDatabaseTypes()[type] as { name: string }
+    ).name;
+    expect(sqlType ?? "").toMatch(new RegExp(`^${nativeType}\\b`));
+  }
 }
