@@ -26,7 +26,7 @@ import { Rational, Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS } from "@blazetrails/activesupport";
+import { toS, TimeWithZone } from "@blazetrails/activesupport";
 
 // Rails MySQL overrides unquoted_true/false (1/0) but NOT quoted_true/false,
 // which inherit the abstract "TRUE"/"FALSE" (mysql/quoting.rb).
@@ -218,12 +218,17 @@ export function columnNameWithOrderMatcher(): RegExp {
  */
 export function quotedDate(
   value:
+    | TimeWithZone
     | Temporal.Instant
     | Temporal.ZonedDateTime
     | Temporal.PlainDateTime
     | Temporal.PlainDate
     | Temporal.PlainTime,
 ): string {
+  // Rails: the inherited `quoted_date` normalises an `acts_like?(:time)` value
+  // through `getutc`/`getlocal` (abstract/quoting.rb:185-191); an
+  // `ActiveSupport::TimeWithZone` takes that arm (time_with_zone.rb:52-54).
+  if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);

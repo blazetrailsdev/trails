@@ -29,7 +29,7 @@ import { Data as BitData } from "./oid/bit.js";
 import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { toS } from "@blazetrails/activesupport";
+import { toS, TimeWithZone } from "@blazetrails/activesupport";
 
 // Rails inherits from StandardError — use plain Error in TS for
 // parity. JS's `RangeError` is a built-in that extends Error; it
@@ -427,12 +427,17 @@ export function checkIntegerRange(value: bigint | number): void {
  */
 export function quotedDate(
   value:
+    | TimeWithZone
     | Temporal.Instant
     | Temporal.ZonedDateTime
     | Temporal.PlainDateTime
     | Temporal.PlainDate
     | Temporal.PlainTime,
 ): string {
+  // Rails: the inherited `quoted_date` normalises an `acts_like?(:time)` value
+  // through `getutc`/`getlocal` (abstract/quoting.rb:185-191); an
+  // `ActiveSupport::TimeWithZone` takes that arm (time_with_zone.rb:52-54).
+  if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
   if (value instanceof Temporal.Instant) return formatInstantForSqlPostgres(value);
   if (value instanceof Temporal.ZonedDateTime)
     return formatInstantForSqlPostgres(value.toInstant());
