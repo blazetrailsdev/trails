@@ -37,8 +37,14 @@ async function missingRowDiagnostics(
   returning: unknown,
 ): Promise<string> {
   const connection = await Topic.leaseConnection();
+  const id = connection.quoteColumnName("id");
+  const columns = [
+    id,
+    connection.quoteColumnName("title"),
+    connection.quoteColumnName("author_name"),
+  ];
   const all = await connection.execQuery(
-    'SELECT "id", "title", "author_name" FROM "topics" ORDER BY "id"',
+    `SELECT ${columns.join(", ")} FROM ${connection.quoteTableName("topics")} ORDER BY ${id}`,
   );
   return [
     `insert_all wrote a row that the next read did not find.`,
