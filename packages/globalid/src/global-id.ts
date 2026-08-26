@@ -37,40 +37,29 @@ export interface GlobalIDOptions {
 }
 
 export class GlobalID {
-  readonly uri: string;
-  private readonly _uri: GID;
+  readonly uri: GID;
 
   /** Mirrors: GlobalID#initialize(gid, options) */
   constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
-    const parsed = gid instanceof GID ? gid : GID.parse(gid);
-    this.uri = parsed.toString();
-    this._uri = parsed;
+    this.uri = gid instanceof GID ? gid : GID.parse(gid);
   }
 
   get app(): string {
-    return this._uri.app;
+    return this.uri.app;
   }
   get modelName(): string {
-    return this._uri.modelName;
+    return this.uri.modelName;
   }
   get modelId(): string | string[] {
-    return this._uri.modelId;
+    return this.uri.modelId;
   }
   get params(): Record<string, string> {
-    return this._uri.params;
+    return this.uri.params;
   }
 
-  /**
-   * Mirrors: GlobalID#deconstruct_keys — `delegate :deconstruct_keys, to: :uri`.
-   *
-   * Rails' `attr_reader :uri` holds the URI::GID itself and `app` /
-   * `model_name` / `model_id` / `params` / `deconstruct_keys` all delegate to
-   * it. Here the public `uri` is its string form (every trails caller reads it
-   * as one), so the parsed GID is held privately and is what those readers
-   * delegate through.
-   */
+  /** Mirrors: GlobalID#deconstruct_keys — `delegate :deconstruct_keys, to: :uri`. */
   deconstructKeys(keys: readonly string[] | null = null): GidComponents {
-    return this._uri.deconstructKeys(keys);
+    return this.uri.deconstructKeys(keys);
   }
 
   /**
@@ -141,11 +130,11 @@ export class GlobalID {
 
   /** Mirrors: GlobalID#to_param — base64url without padding. */
   toParam(): string {
-    return btoa(this.uri).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    return btoa(this.toString()).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
   toString(): string {
-    return this.uri;
+    return this.uri.toString();
   }
 
   /**
@@ -167,9 +156,16 @@ export class GlobalID {
     return this.toString();
   }
 
-  /** Mirrors: GlobalID#== */
+  /**
+   * Mirrors: GlobalID#== — `other.is_a?(GlobalID) && uri == other.uri`.
+   *
+   * Rails compares the two `URI::GID`s through `URI::Generic#==`, which is
+   * component-wise. `GID` has no structural equality yet, so the comparison
+   * goes through the string form — the same partition `URI::Generic#==`
+   * induces for a GID, since every component is recoverable from `to_s`.
+   */
   equals(other: GlobalID): boolean {
-    return other instanceof GlobalID && this.uri === other.uri;
+    return other instanceof GlobalID && this.uri.toString() === other.uri.toString();
   }
 
   /** Mirrors: GlobalID.app= validation */

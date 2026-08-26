@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { StringInquirer, inquiry } from "./string-inquirer.js";
+import { EnvironmentInquirer } from "./environment-inquirer.js";
 import {
   assertNotPredicate,
   assertNotRespondTo,
@@ -59,6 +60,21 @@ describe("StringInquirer", () => {
     const s = inquiry.call("development");
     expect(s.toString()).toBe("development");
     expect(String(s)).toBe("development");
+  });
+
+  it("is a String", () => {
+    const s = inquiry.call("production");
+    expect(s).toBeInstanceOf(String);
+    expect(s.length).toBe(10);
+    expect(s.toUpperCase()).toBe("PRODUCTION");
+  });
+
+  it("a subclass resolves its own state through the proxy", () => {
+    const env = new EnvironmentInquirer("development");
+    expect(env).toBeInstanceOf(String);
+    expect(env).toBeInstanceOf(StringInquirer);
+    expect(env.isLocal()).toBe(true);
+    expect((env as any)["development?"]()).toBe(true);
   });
 
   it("valueOf returns original string", () => {

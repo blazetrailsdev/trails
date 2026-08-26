@@ -24,7 +24,7 @@ describe("SignedGlobalID pick_purpose explicit-null semantics", () => {
     const sgid = SignedGlobalID.create(person, { verifier, for: null });
     expect(sgid.purpose).toBeNull();
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier, for: null })?.uri).toBe(sgid.uri);
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier, for: null })?.uri).toEqual(sgid.uri);
   });
 });
 

@@ -194,7 +194,7 @@ export class SignedGlobalID extends GlobalID {
   toString(): string {
     if (this._cached) return this._cached;
     const payload: SgidPayload = {
-      gid: this.uri,
+      gid: this.uri.toString(),
       purpose: this.purpose,
       expires_at: this.expiresAt ? this.expiresAt.toString({ smallestUnit: "millisecond" }) : null,
     };
@@ -217,9 +217,16 @@ export class SignedGlobalID extends GlobalID {
    * (same trap base.ts works around for findSignedGlobalId), so an
    * `instanceof` check would falsely report two value-equal SGIDs as
    * different across module boundaries.
+   *
+   * The URI half compares string forms rather than the two `URI::GID`s, for
+   * the reason `GlobalID#equals` records.
    */
   equals(other: SignedGlobalID): boolean {
-    return other != null && this.uri === other.uri && this.purpose === other.purpose;
+    return (
+      other != null &&
+      this.uri.toString() === other.uri.toString() &&
+      this.purpose === other.purpose
+    );
   }
 
   /** Mirrors: SignedGlobalID#inspect — `#<SignedGlobalID:0x...>` (stable per instance). */

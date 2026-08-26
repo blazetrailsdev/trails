@@ -120,7 +120,7 @@ describe("GlobalIdentificationTest", () => {
     expect(typeof token).toBe("string");
     const parsed = SignedGlobalID.parse(token, { verifier });
     expect(parsed).not.toBeNull();
-    expect(parsed!.uri).toBe("gid://bcx/Person/2");
+    expect(parsed!.uri.toString()).toBe("gid://bcx/Person/2");
   });
 });
 
