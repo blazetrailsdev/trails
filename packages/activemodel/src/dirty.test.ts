@@ -9,7 +9,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import * as AttributeMethods from "./attribute-methods.js";
-import { Dirty, asJson as dirtyAsJson, initInternals as dirtyInitInternals } from "./dirty.js";
+import { Dirty, asJson as dirtyAsJson } from "./dirty.js";
 
 /**
  * Rails' `DirtyTest::DirtyModel` (dirty_test.rb:6-43) includes
@@ -97,14 +97,9 @@ interface DirtyModel extends Dirty {
   nameWillChange(): void;
   colorWillChange(): void;
   statusWillChange(): void;
-  isNameChanged(...args: unknown[]): boolean;
-  isColorChanged(): boolean;
-  isSizeChanged(): boolean;
-  isStatusChanged(): boolean;
   nameChanged(options?: { from?: unknown; to?: unknown }): boolean;
   colorChanged(): boolean;
   sizeChanged(): boolean;
-  statusChanged(): boolean;
   namePreviouslyChanged(options?: { from?: unknown; to?: unknown }): boolean;
   nameChange: [unknown, unknown] | null;
   statusChange: [unknown, unknown] | null;
@@ -150,10 +145,9 @@ DirtyModelClass.attributeMethodAffix({ prefix: "clear", suffix: "Change", parame
 // (core_ext/object/json.rb:47-49), which TypeScript cannot reopen either.
 include(DirtyModel, ToJsonWithActiveSupportEncoder);
 
-prepend(DirtyModel.prototype, {
-  initInternals: dirtyInitInternals,
-  asJson: dirtyAsJson,
-});
+// `Dirty#as_json` (dirty.rb:264-268) sits above the `Object#as_json` in the
+// class body, as Ruby's `include ActiveModel::Dirty` puts it above `Object`.
+prepend(DirtyModel.prototype, { asJson: dirtyAsJson });
 
 // dirty_test.rb:9
 DirtyModelClass.defineAttributeMethods("name", "color", "size", "status");
