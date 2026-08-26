@@ -390,4 +390,27 @@ describe("TimeExtCalculationsTest", () => {
     expect(RubyTime.daysInYear(2000)).toBe(366);
     expect(RubyTime.daysInYear(1900)).toBe(365);
   });
+
+  it("rfc3339 parse", () => {
+    const time = RubyTime.rfc3339("1999-12-31T19:00:00.125-05:00");
+
+    expect(time.year).toBe(1999);
+    expect(time.month).toBe(12);
+    expect(time.day).toBe(31);
+    expect(time.hour).toBe(19);
+    expect(time.min).toBe(0);
+    expect(time.sec).toBe(0);
+    expect(time.usec).toBe(125000);
+    expect(time.utcOffset).toBe(-18000);
+
+    expect(() => RubyTime.rfc3339("1999-12-31")).toThrow(
+      expect.objectContaining({ message: "invalid date" }),
+    );
+    expect(() => RubyTime.rfc3339("1999-12-31T19:00:00")).toThrow(
+      expect.objectContaining({ message: "invalid date" }),
+    );
+    expect(() => RubyTime.rfc3339("foobar")).toThrow(
+      expect.objectContaining({ message: "invalid date" }),
+    );
+  });
 });

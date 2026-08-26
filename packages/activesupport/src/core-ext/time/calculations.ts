@@ -80,28 +80,27 @@ export function daysInYear(year: number = current().year): number {
  * Mirrors: `Time.rfc3339` (`time/calculations.rb:69-81`).
  *
  * `Date._rfc3339` answers an empty hash for anything that is not a full
- * date-time-with-offset, which is the `parts.empty?` raise below; ruby/date's
- * parser is not ported, so the grammar it accepts is spelled as the pattern.
+ * date-time-with-offset, which is the `parts.empty?` raise; `Hash#empty?` is
+ * spelled over the key list, and each `parts.fetch(:k)` is a non-null assertion
+ * because `rfc3339_cb` (`date_parse.c:2585-2609`) sets every one of those keys
+ * unconditionally once the pattern matches. `:sec_fraction` is the one Rails
+ * fetches with a default, and its stored value is a `Rational`, so the sum with
+ * `:sec` is one too.
  */
 export function rfc3339(str: string): RubyTime {
-  const parts =
-    /^(-?\d{4,})-(\d\d)-(\d\d)[Tt ](\d\d):(\d\d):(\d\d)(\.\d+)?([Zz]|[+-]\d\d:\d\d)$/.exec(str);
+  const parts = RubyDate._rfc3339(str);
 
-  if (!parts) throw new ArgumentError("invalid date");
+  if (Object.keys(parts).length === 0) throw new ArgumentError("invalid date");
 
-  const secFractionPart = parts[7];
+  const secFractionPart = parts.secFraction;
   return RubyTime.new(
-    Number(parts[1]),
-    Number(parts[2]),
-    Number(parts[3]),
-    Number(parts[4]),
-    Number(parts[5]),
-    secFractionPart === undefined
-      ? Number(parts[6])
-      : new Rational(Number(parts[6]), 1).add(
-          new Rational(BigInt(secFractionPart.slice(1).padEnd(9, "0").slice(0, 9)), 1_000_000_000n),
-        ),
-    /^[Zz]$/.test(parts[8]) ? "+00:00" : parts[8],
+    parts.year as number,
+    parts.mon,
+    parts.mday,
+    parts.hour,
+    parts.min,
+    secFractionPart === undefined ? parts.sec! : new Rational(parts.sec!, 1).add(secFractionPart),
+    Number(parts.offset),
   );
 }
 
@@ -207,6 +206,11 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
  * here so that the hash this hands on to the `Date` arm is the one Rails hands
  * it, without the caller's object moving under a `Date` receiver's contract.
  *
+ * `Numeric#divmod(1)` FLOORS — `(-1.5).divmod(1)` is `[-2, 0.5]` on ruby
+ * 3.3.11, where truncation would give `[-1, -0.5]` — so the quotient is
+ * `Math.floor` and the remainder is taken off it, which is what makes a
+ * negative fractional `:weeks`/`:days` land where Rails lands it.
+ *
  * `to_date.gregorian` (`:206`) puts the day on the
  * proleptic Gregorian calendar before advancing it. `Time#toDate`
  * (`packages/date/src/time.ts`) already builds under `GREGORIAN`, as MRI's
@@ -216,14 +220,14 @@ export function advance(this: RubyTime, options: AdvanceOptions): RubyTime {
   options = { ...options };
 
   if (options.weeks != null) {
-    const partialWeeks = options.weeks - Math.trunc(options.weeks);
-    options.weeks = Math.trunc(options.weeks);
+    const partialWeeks = options.weeks - Math.floor(options.weeks);
+    options.weeks = Math.floor(options.weeks);
     options.days = (options.days ?? 0) + 7 * partialWeeks;
   }
 
   if (options.days != null) {
-    const partialDays = options.days - Math.trunc(options.days);
-    options.days = Math.trunc(options.days);
+    const partialDays = options.days - Math.floor(options.days);
+    options.days = Math.floor(options.days);
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
