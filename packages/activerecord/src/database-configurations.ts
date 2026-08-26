@@ -116,9 +116,9 @@ export class DatabaseConfigurations {
     // (connection_handling.rb:6): a BLANK value is nil, so `DEFAULT_ENV`'s
     // `|| "default_env"` fires rather than the next lookup. An assignment here
     // stands in for that whole lambda's result, so an assigned "" means "both
-    // env vars are blank" and falls straight to the literal — never on to
+    // env vars are blank" and falls straight to `"default_env"` — never on to
     // `NODE_ENV`, which is the `RACK_ENV` bridge the lambda already consumed.
-    if (this._defaultEnv !== null) return this._defaultEnv || "default";
+    if (this._defaultEnv !== null) return this._defaultEnv || "default_env";
     return getEnv("NODE_ENV") || "development";
   }
 
