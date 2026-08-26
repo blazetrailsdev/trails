@@ -128,8 +128,8 @@ describe("Migration", () => {
       const five = mysql ? undefined : detect(columns, "five");
 
       expect(one.default).toBe("hello");
-      expect((await connection.lookupCastTypeFromColumn(two))!.deserialize(two.default)).toBe(true);
-      expect((await connection.lookupCastTypeFromColumn(three))!.deserialize(three.default)).toBe(
+      expect((await connection.lookupCastTypeFromColumn(two)).deserialize(two.default)).toBe(true);
+      expect((await connection.lookupCastTypeFromColumn(three)).deserialize(three.default)).toBe(
         false,
       );
       expect(four.default).toBe("1");
