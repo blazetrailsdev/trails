@@ -172,14 +172,16 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return ns - roundedOff;
   }
 
-  // Strips TimeWithZone from any value before DB serialization, since the
-  // subtype's serialize doesn't understand TimeWithZone. Containers go through
-  // the subtype's own `map` hook, the same one `cast` and
+  // Rails has no such hop: DelegateClass forwards serialize straight to the
+  // subtype, whose cast_value handles a TimeWithZone because it acts_like?(:time).
+  // Containers take the subtype's own `map` hook, the one `cast` and
   // `convert_time_to_time_zone` end in (value.rb:117-119, oid/range.rb:50-54,
-  // oid/array.rb:67-69), rather than a structural range/array test here.
+  // oid/array.rb:67-69).
   private _resolveForSerialize(value: unknown): unknown {
-    if (value instanceof TimeWithZone) return value.utc().toTime().toInstant();
-    return this.map(value, (v) => this._resolveForSerialize(v));
+    const extractUtc = (v: unknown): unknown =>
+      v instanceof TimeWithZone ? v.utc().toTime().toInstant() : v;
+    if (value instanceof TimeWithZone) return extractUtc(value);
+    return this.map(value, extractUtc);
   }
 
   override equals(other: Type): boolean {
