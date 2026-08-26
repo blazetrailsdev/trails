@@ -223,9 +223,9 @@ Two rules of thumb cover every field, including ones this table forgets:
 **Hand-editing a DB-owned field is the one failure worth spelling out**, because
 it is silent rather than loud: ingest skips DB-owned columns by design, so
 `status: done` typed into a story file reads correctly to a human, merges
-cleanly, and marks nothing done. `tsx scripts/check-owned-fields.ts` in the
-tasks repo turns that into a CI red naming the verb to use instead — but the
-rule is the point, not the guard.
+cleanly, and marks nothing done. The tasks repo's CI runs an owned-fields guard
+that turns that into a red naming the verb to use instead — but the rule is the
+point, not the guard, and the guard only judges stories your PR _modified_.
 
 Two traps follow from the DB being a real, _shared_ database:
 
