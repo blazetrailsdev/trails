@@ -10,13 +10,7 @@ import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { runCallbacks } from "@blazetrails/activesupport";
-import {
-  InsertManager,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  Table as ArelTable,
-} from "@blazetrails/arel";
+import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ActiveRecordError,
   ReadOnlyRecord,
@@ -259,12 +253,9 @@ export async function _insertRecord(
 
   const entries = Object.entries(values);
   if (entries.length > 0) {
-    // Rails: `im.insert(values.transform_keys { |name| arel_table[name] })` —
-    // the values are `ActiveModel::Attribute`s, which Rails' Arel visitor binds
-    // via `visit_ActiveModel_Attribute`. trails' visitor binds through
-    // `BindParam`, which unwraps `valueForDatabase` on the same seam, so the
-    // wrap is where the transform is and nothing else changes.
-    im.insert(entries.map(([col, val]) => [arelTable.get(col), new Nodes.BindParam(val)]));
+    // Rails: `im.insert(values.transform_keys { |name| arel_table[name] })`
+    // (persistence.rb:247).
+    im.insert(entries.map(([col, val]) => [arelTable.get(col), val]));
   }
 
   if (typeof connection.insert === "function") {
@@ -325,10 +316,8 @@ export async function _updateRecord(
   const arelTable: ArelTable = (this as any).arelTable;
   const um = new UpdateManager();
   um.table(arelTable);
-  // Rails: `um.set(values.transform_keys { |name| arel_table[name] })` — the
-  // values are `ActiveModel::Attribute`s bound through Arel, as in
-  // `_insertRecord` above.
-  um.set(setEntries.map(([col, val]) => [arelTable.get(col), new Nodes.BindParam(val)]));
+  // Rails: `um.set(values.transform_keys { |name| arel_table[name] })`.
+  um.set(setEntries.map(([col, val]) => [arelTable.get(col), val]));
 
   for (const [col, val] of Object.entries(constraints)) {
     um.where(arelTable.get(col).eq(val));

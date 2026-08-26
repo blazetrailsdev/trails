@@ -1890,12 +1890,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  private _baseColumnType(type: string, options?: Record<string, unknown>): string {
-    const opts = (options ?? {}) as ColumnOptions;
-    if (type !== "virtual") return this.typeToSql(type as ColumnType, opts);
-    return options?.type ? this.typeToSql(String(options.type) as ColumnType, opts) : "";
-  }
-
   /**
    * Parse FK constraint names from CREATE TABLE SQL. PRAGMA
    * foreign_key_list doesn't expose names, but the DDL does when
@@ -2425,9 +2419,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
           columnOptions.stored = column.isVirtualStored();
           columnOptions.type = column.type;
         } else if (column.hasDefault) {
-          const type = (await this.lookupCastTypeFromColumn(
-            column,
-          )) as import("@blazetrails/activemodel").Type;
+          const type = await this.lookupCastTypeFromColumn(column);
           let defaultValue: unknown = type.deserialize(column.default);
           if (defaultValue == null) defaultValue = () => column.defaultFunction;
 
