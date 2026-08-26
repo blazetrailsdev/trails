@@ -22,6 +22,47 @@ const CASES: [string, string][] = [
   ["Alpha::Beta", "Alpha::Beta"],
 ];
 
+/**
+ * Diagnostics for the intermittent failure tracked by
+ * `leading-colon-insert-all-first-returns-null-flake` (RFC 0061): the row
+ * `insert_all` just wrote is occasionally not found by the very next read, seen
+ * on SQLite and MariaDB and only ever inside a full-suite run. The cheap
+ * explanations are eliminated (a stale query cache — the cache is never enabled
+ * in the AR lanes; a silently skipped `ON CONFLICT DO NOTHING` — the only unique
+ * constraint is the PK and the id counters self-adjust), so the next sighting
+ * has to bring data out of the failing process itself.
+ *
+ * This runs ONLY once the read has already come back empty, and reports rather
+ * than repairs — it exists to turn a bare "Cannot read properties of null" into
+ * an error that says which of the remaining hypotheses is true:
+ *
+ *   - `returning` empty        → the INSERT itself wrote no row.
+ *   - `returning` non-empty but the row is absent from `topics` → something
+ *     removed it between the two statements.
+ *   - the row present in `topics` but not returned by the read → the read is at
+ *     fault (wrong connection, or an uncommitted transaction on another one).
+ */
+async function missingRowDiagnostics(
+  iteration: number,
+  sent: string,
+  returning: unknown,
+): Promise<string> {
+  const connection = (await Topic.leaseConnection()) as unknown as {
+    execQuery(sql: string): Promise<{ rows: unknown[][] }>;
+    openTransactions: number;
+  };
+  const all = await connection.execQuery(
+    'SELECT "id", "title", "author_name" FROM "topics" ORDER BY "id"',
+  );
+  return [
+    `insert_all wrote a row that the next read did not find.`,
+    `  iteration:        ${iteration} (sent ${JSON.stringify(sent)})`,
+    `  returning:        ${JSON.stringify(returning)}`,
+    `  openTransactions: ${connection.openTransactions}`,
+    `  topics rows:      ${JSON.stringify(all.rows)}`,
+  ].join("\n");
+}
+
 describe("leading-colon string writes", () => {
   fixtures({ topics: [Topic, {}] });
 
@@ -47,13 +88,16 @@ describe("leading-colon string writes", () => {
 
   it("create and insert_all store a leading colon verbatim", async () => {
     await Topic.create({ title: "seed" });
-    for (const [sent, stored] of CASES) {
+    for (const [iteration, [sent, stored]] of CASES.entries()) {
       const created = await Topic.create({ title: sent });
       expect((await Topic.find(created.id)).title).toBe(stored);
 
-      await Topic.insertAll([{ title: sent, author_name: "colon" }]);
+      const returning = await Topic.insertAll([{ title: sent, author_name: "colon" }]);
       const inserted = await Topic.where({ author_name: "colon" }).first();
-      expect(inserted!.title).toBe(stored);
+      if (inserted == null) {
+        throw new Error(await missingRowDiagnostics(iteration, sent, returning.rows));
+      }
+      expect(inserted.title).toBe(stored);
       await Topic.where({ author_name: "colon" }).deleteAll();
     }
   });
