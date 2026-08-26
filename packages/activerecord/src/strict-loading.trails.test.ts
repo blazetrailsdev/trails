@@ -87,6 +87,18 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     ).resolves.toEqual([]);
   });
 
+  it("suppresses the query for an inline options set the owner never declared", async () => {
+    const developer = new Developer({ name: "New Dev" });
+    developer.strictLoadingBang();
+    expect(developer.isNewRecord()).toBe(true);
+    await expect(
+      findHasManyTarget(developer, "inline_audit_logs", {
+        className: "AuditLog",
+        foreignKey: "developer_id",
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();

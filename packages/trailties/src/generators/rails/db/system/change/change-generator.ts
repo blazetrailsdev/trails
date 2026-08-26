@@ -21,6 +21,7 @@ export interface ChangeGeneratorOptions extends GeneratorOptions {
 
 export class ChangeGenerator extends GeneratorBase {
   readonly to: DatabaseName;
+  /** @internal */
   readonly appName: string;
   private _database?: Database;
 
@@ -36,6 +37,7 @@ export class ChangeGenerator extends GeneratorBase {
     this.appName = options.appName ?? this.path.basename(this.cwd);
   }
 
+  /** @internal */
   get database(): Database {
     if (!this._database) this._database = Database.build(this.to);
     return this._database;

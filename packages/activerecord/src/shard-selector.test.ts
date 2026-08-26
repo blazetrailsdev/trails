@@ -7,7 +7,7 @@ import { ambientPoolConfiguration } from "./test-adapter.js";
 describe("ShardSelectorTest", () => {
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
-    Base.connectionHandler.removeConnectionPool("Base", { shard: "shard_one" });
+    Base.connectionHandler.removeConnectionPool("ActiveRecord::Base", { shard: "shard_one" });
   });
 
   function setupShards() {
@@ -16,7 +16,7 @@ describe("ShardSelectorTest", () => {
     // database of its own.
     const dbConfig = new HashConfig("test", "Base", ambientPoolConfiguration());
     Base.connectionHandler.establishConnection(dbConfig, {
-      ownerName: "Base",
+      ownerName: "ActiveRecord::Base",
       role: "writing",
       shard: "shard_one",
     });

@@ -98,9 +98,13 @@ export class SqlTypeMetadata implements Deduplicable {
     return deduplicate(this);
   }
 
-  /** @internal */
+  /**
+   * `SqlTypeMetadata` adds nothing to `Deduplicable#deduplicated`, which is
+   * `freeze` (`deduplicable.rb:26`).
+   * @internal
+   */
   deduplicated(): this {
-    return this;
+    return Object.freeze(this);
   }
 }
 

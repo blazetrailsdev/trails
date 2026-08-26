@@ -144,6 +144,7 @@ export class GeneratedAttribute {
   }
 }
 
+/** @internal */
 function parseTypeAndOptions(type: string | undefined): [string | undefined, AttrOptions] {
   if (!type) return [undefined, {}];
   let parsedType: string | undefined;

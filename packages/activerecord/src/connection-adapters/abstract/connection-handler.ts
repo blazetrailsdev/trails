@@ -337,7 +337,7 @@ export class ConnectionHandler {
       if (shard !== "default") parts.push(`'${shard}' shard`);
       if (role !== "writing") parts.push(`'${role}' role`);
       const selector = parts.join(" and ");
-      const prefix = connectionName !== "Base" ? connectionName : "";
+      const prefix = connectionName !== "ActiveRecord::Base" ? connectionName : "";
       const full = [prefix, selector].filter(Boolean).join(" with ");
       const suffix = full ? ` for ${full}` : "";
       const message = `No database connection defined${suffix}.`;

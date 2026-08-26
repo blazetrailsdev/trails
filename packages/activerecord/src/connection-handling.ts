@@ -525,20 +525,22 @@ export function connectionSpecificationName(this: typeof Base): string {
 
   // Branch 2: explicitly cleared → parent walk (Base terminates).
   if (ownHas) {
-    if (this.name === "Base") return "Base";
+    if (this.name === "Base") return "ActiveRecord::Base";
     const parent = Object.getPrototypeOf(this);
     if (parent && typeof parent === "function" && parent !== this) {
       return connectionSpecificationName.call(parent as typeof Base);
     }
-    return "Base";
+    return "ActiveRecord::Base";
   }
 
   // Branch 3: no own property — derive from class shape.
-  // Base is always its own terminal; primary classes (ApplicationRecord) store
-  // their pool under "Base" per ConnectionDescriptor#name (connection_handler.rb:63).
-  if (this.name === "Base") return "Base";
+  // Base is always its own terminal (Rails' `Base.name`); primary classes
+  // (ApplicationRecord) store their pool under that same name, which is the
+  // string `ConnectionDescriptor#name` answers for them
+  // (connection_handler.rb:63).
+  if (this.name === "Base") return "ActiveRecord::Base";
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
-    return "Base";
+    return "ActiveRecord::Base";
   }
   // connectionClass = true means establish_connection or connectsTo was called
   // and planted a pool under this class's name without setting the ivar explicitly.
@@ -549,7 +551,7 @@ export function connectionSpecificationName(this: typeof Base): string {
   if (parent && typeof parent === "function" && parent !== this) {
     return connectionSpecificationName.call(parent as typeof Base);
   }
-  return "Base";
+  return "ActiveRecord::Base";
 }
 
 export function schemaCache(this: typeof Base) {
@@ -887,7 +889,7 @@ async function establishWithConfig(
   // class so it gets an independent pool entry under its own name instead of
   // inheriting the Base pool. Without this Tag.establishConnection and
   // Tag2.establishConnection both resolve connectionClassForSelf() → Base and
-  // register under the same "Base" pool key, defeating cross-connection
+  // register under the same primary-class pool key, defeating cross-connection
   // isolation tests.
   modelClass.connectionClass = true;
 
@@ -971,12 +973,14 @@ export function resolveConfigForConnection(
   if (!this.name) throw new Error("Anonymous class is not allowed.");
   // Mirrors Rails: connection_name = primary_class? ? Base.name : name, then
   // self.connection_specification_name = connection_name. The primary class
-  // (Base/ApplicationRecord) stores its pool under "Base" — matching
-  // ConnectionDescriptor#name's primary-class normalization — so
+  // (Base/ApplicationRecord) stores its pool under `Base.name` — the same
+  // string ConnectionDescriptor#name answers (connection_handler.rb:63) — so
   // subsequent connectionPool() lookups hit the right key. The reader uses
   // an own-property check so writing here doesn't bleed through JS static
   // inheritance into unrelated subclasses.
-  (this as any)._connectionSpecificationName = isPrimaryClass.call(this) ? "Base" : this.name;
+  (this as any)._connectionSpecificationName = isPrimaryClass.call(this)
+    ? "ActiveRecord::Base"
+    : this.name;
   // Rails: `Base.configurations.resolve(config_or_env)` — the `Base` constant
   // literally (connection_handling.rb:385-391), never `self`, so a model-local
   // `configurations` cannot redirect resolution.

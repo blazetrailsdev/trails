@@ -26,7 +26,7 @@ describe("writing pool census", () => {
     try {
       await Base.establishConnection({ adapter: "sqlite3", database: "db/primary.sqlite3" });
       expect(writingPoolsLeakedSinceBaseline()).toEqual(
-        expect.arrayContaining([expect.stringMatching(/^Base \(/)]),
+        expect.arrayContaining([expect.stringMatching(/^ActiveRecord::Base \(/)]),
       );
     } finally {
       await restoreWorkerConnection();

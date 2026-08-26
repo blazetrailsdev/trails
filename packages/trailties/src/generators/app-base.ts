@@ -67,6 +67,7 @@ export abstract class AppBase extends GeneratorBase {
     this.options = this.deduceImpliedOptions(options);
   }
 
+  /** @internal */
   get database(): Database {
     if (!this._database) this._database = Database.build(this.options.database ?? "sqlite3");
     return this._database;
@@ -84,12 +85,15 @@ export abstract class AppBase extends GeneratorBase {
   keeps(): boolean {
     return !this.skip("Keeps");
   }
+  /** @internal */
   devcontainer(): boolean {
     return !!this.options.devcontainer;
   }
+  /** @internal */
   skipDevcontainer(): boolean {
     return !this.options.devcontainer;
   }
+  /** @internal */
   dependsOnSystemTest(): boolean {
     return !(this.skip("SystemTest") || this.skip("Test") || this.options.api);
   }

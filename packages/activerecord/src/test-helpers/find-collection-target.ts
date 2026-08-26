@@ -1,6 +1,8 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { _buildAssociationInstance } from "../associations/instance-methods.js";
+import { resolveAssocClass } from "../associations.js";
+import { camelize, singularize } from "@blazetrails/activesupport";
 
 /**
  * Runs a has_many load the way `CollectionProxy` does — `find_target?`
@@ -9,13 +11,14 @@ import { _buildAssociationInstance } from "../associations/instance-methods.js";
  * necessarily the declared one.
  *
  * As in `CollectionProxy._findTargetViaAssociation`, the gate is read off the
- * owner's own holder (whose reflection answers `klass` and
- * `active_record_primary_key`) while the load runs on a holder built fresh, so
- * it leaves the record's real holder — its loadedness, its writeback
- * suppression, its inverse wiring — untouched, which is what these tests want
- * when they drive the loader directly. A `name` the owner never declared has no
- * real holder and so no `find_target?` to consult: Rails has no association
- * without a reflection, and that inline-fallback shape is trails-only.
+ * holder the record itself keeps (whose loadedness, writeback suppression and
+ * inverse wiring the load must not disturb) while the load runs on a holder
+ * built fresh, which is what these tests want when they drive the loader
+ * directly. A `name` the owner never declared has no such holder, so the gate
+ * is read off the fresh one instead: its reflection resolves `klass` from
+ * `className` the way the loaders do (`resolveAssocClass`, `associations.ts`),
+ * so `find_target?`'s trailing `&& klass` (`association.rb:320-321`) is
+ * answerable on every path rather than skipped for that shape.
  *
  * Test-only sugar: every call site would otherwise repeat the same cast.
  * `async` so `check_validity!` — run when
@@ -43,27 +46,23 @@ export async function findCollectionTarget(
   } else if (scope !== null) {
     options = scope;
   }
-  const declared = (
-    record.constructor as unknown as {
-      _reflectOnAssociation?: (n: string) => unknown;
-    }
-  )._reflectOnAssociation?.(name);
-  if (declared) {
-    const holder = (
-      record as unknown as {
-        association(n: string): { findTargetNeeded(): boolean; target: Base[] };
-      }
-    ).association(name);
-    // `load_target` answers `target` whether or not `find_target?` sent it to
-    // the database (association.rb:189-195), so an already-loaded holder
-    // reports what it holds rather than an empty list.
-    if (!holder.findTargetNeeded()) return holder.target ?? [];
-  }
   const assoc = _buildAssociationInstance.call(record, {
     name,
     type: "hasMany",
     scope: positionalScope,
     options,
-  });
+    klass: resolveAssocClass(record, name, options.className ?? camelize(singularize(name))),
+  } as never);
+  const holder =
+    (
+      record as unknown as {
+        _associationInstances: Map<string, { findTargetNeeded(): boolean; target: Base[] }>;
+      }
+    )._associationInstances.get(name) ??
+    (assoc as unknown as { findTargetNeeded(): boolean; target: Base[] });
+  // `load_target` answers `target` whether or not `find_target?` sent it to
+  // the database (association.rb:189-195), so an already-loaded holder
+  // reports what it holds rather than an empty list.
+  if (!holder.findTargetNeeded()) return holder.target ?? [];
   return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
 }

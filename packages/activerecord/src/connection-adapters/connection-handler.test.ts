@@ -100,12 +100,12 @@ describe("ConnectionHandlerTest", () => {
       database: "test/db/primary.sqlite3",
     });
     localHandler.establishConnection(config, {
-      ownerName: "Base",
+      ownerName: "ActiveRecord::Base",
       role: "also_writing",
       shard: "default",
     });
     localHandler.establishConnection(config, {
-      ownerName: "Base",
+      ownerName: "ActiveRecord::Base",
       role: "also_writing",
       shard: "one",
     });
@@ -118,12 +118,12 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test/db/primary.sqlite3",
     });
-    localHandler.establishConnection(config, { ownerName: "Base", role: "writing" });
-    localHandler.establishConnection(config, { ownerName: "Base", role: "reading" });
+    localHandler.establishConnection(config, { ownerName: "ActiveRecord::Base", role: "writing" });
+    localHandler.establishConnection(config, { ownerName: "ActiveRecord::Base", role: "reading" });
     expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
     // After shared-pool setup reading pool IS the writing pool — same connection leased.
-    const rwPool = localHandler.retrieveConnectionPool("Base", { role: "writing" })!;
-    const roPool = localHandler.retrieveConnectionPool("Base", { role: "reading" })!;
+    const rwPool = localHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "writing" })!;
+    const roPool = localHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "reading" })!;
     expect(roPool).toBe(rwPool);
   });
 
@@ -137,12 +137,12 @@ describe("ConnectionHandlerTest", () => {
         database: "test/db/primary.sqlite3",
       });
       localHandler.establishConnection(config, {
-        ownerName: "Base",
+        ownerName: "ActiveRecord::Base",
         role: "also_writing",
         shard: "default",
       });
       localHandler.establishConnection(config, {
-        ownerName: "Base",
+        ownerName: "ActiveRecord::Base",
         role: "also_writing",
         shard: "one",
       });
@@ -295,7 +295,7 @@ describe("ConnectionHandlerTest", () => {
       const ownConfig = new HashConfig("development", "Klass2", ambientPoolConfiguration());
 
       const basePool = freshHandler.establishConnection(baseConfig, {
-        ownerName: "Base",
+        ownerName: "ActiveRecord::Base",
         role: "writing",
       });
 

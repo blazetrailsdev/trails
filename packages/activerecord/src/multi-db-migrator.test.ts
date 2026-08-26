@@ -118,7 +118,7 @@ describe("MultiDbMigratorTest", () => {
   it("schema migration is different for different connections", () => {
     expect(schemaMigrationA).not.toBe(schemaMigrationB);
     expect(adapterA).not.toBe(adapterB);
-    expect(Base.connectionPool().poolConfig.connectionDescriptor.name).toBe("Base");
+    expect(Base.connectionPool().poolConfig.connectionDescriptor.name).toBe("ActiveRecord::Base");
     expect(ARUnit2Model.connectionPool().poolConfig.connectionDescriptor.name).toBe("ARUnit2Model");
   });
 

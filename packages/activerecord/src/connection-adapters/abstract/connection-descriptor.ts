@@ -21,10 +21,15 @@ export class ConnectionDescriptor {
   }
 
   /** Mirrors: ConnectionHandler::ConnectionDescriptor#name
-   *  (`abstract/connection_handler.rb:63`) — `primary_class? ? "ActiveRecord::Base" : @name`;
-   *  trails spells `ActiveRecord::Base` as `Base`. */
+   *  (`abstract/connection_handler.rb:63`) — `primary_class? ? "ActiveRecord::Base" : @name`,
+   *  the literal Rails hardcodes there. It is also what Rails'
+   *  `connection_specification_name` answers for a primary class (`Base.name`,
+   *  `connection_handling.rb:316-320`), which is why the pool key a descriptor
+   *  names and the one a model looks a pool up by are the same string — so
+   *  trails spells both with the Rails literal rather than with its own
+   *  `Base.name`. */
   get name(): string {
-    return this.primaryClassQ() ? "Base" : this._name;
+    return this.primaryClassQ() ? "ActiveRecord::Base" : this._name;
   }
 
   /** Mirrors: ConnectionHandler::ConnectionDescriptor#primary_class?
