@@ -18,10 +18,10 @@ export class Map {
     // Rails' `model.type_caster` (TypeCaster::Map → `klass.type_for_attribute`)
     // is EnumType-aware: an enum attribute serializes the label → its stored
     // database value. Resolve the enum through `enumTypeOf` (the replayed
-    // AttributeSet) rather than the local `_attributeDefinitions` O(1) cache:
-    // that cache keeps the pre-reflection EnumType, whose subtype was inferred
-    // from the mapping shape, whereas the AttributeSet carries the EnumType
-    // built from the reflected column type. `whereValuesHash` / `scopeForCreate`
+    // AttributeSet) rather than the `PendingType` the declaration pushed: that
+    // type is the pre-reflection EnumType, whose subtype was inferred from the
+    // mapping shape, whereas the AttributeSet carries the EnumType built from
+    // the reflected column type. `whereValuesHash` / `scopeForCreate`
     // round-trip the label through the same reflected type.
     const enumType = enumTypeOf(this._klass, String(attrName));
     if (enumType) return enumType.serialize(value);
@@ -47,8 +47,8 @@ export class Map {
     // alias resolution and the decorated
     // default attribute set (`attribute_types`) for free — so pending decorators
     // (serialize/normalizes/encrypts) are honored on the query side without a
-    // per-feature post-reflection replay onto `_attributeDefinitions`. `ValueType`
-    // is the fallback for non-model `klass` shapes lacking `typeForAttribute`.
+    // per-feature post-reflection replay. `ValueType` is the fallback for
+    // non-model `klass` shapes lacking `typeForAttribute`.
     if (typeof klass.typeForAttribute === "function") {
       return klass.typeForAttribute(name) as Type;
     }

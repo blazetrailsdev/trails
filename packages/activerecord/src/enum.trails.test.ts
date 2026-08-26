@@ -379,7 +379,7 @@ describe("Enum subtype resolved from the reflected column type", () => {
 // `decimal_number` is a real `decimal` column, so an integer-valued enum on it
 // must delegate to the reflected `DecimalType`, even though (a) mapping-shape
 // inference would guess `integer` and (b) reflection skips the user-provided
-// enum def, leaving `_attributeDefinitions` carrying the pre-reflection integer
+// enum def, leaving the pending `PendingType` carrying the pre-reflection integer
 // EnumType — so the reflected subtype only lives in the replayed AttributeSet.
 describe("Enum subtype resolved from a schema-reflected column type", () => {
   fixtures(["books"]);

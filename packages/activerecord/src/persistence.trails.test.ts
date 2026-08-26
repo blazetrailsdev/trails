@@ -196,13 +196,13 @@ describe("PersistenceTest (trails)", () => {
   // per-class off the class's own `table_name`, model_schema.rb): the residual
   // case PR #4680 left uncovered. A non-STI subclass that overrides
   // `_tableName` AND declares an `attribute()` before its first reflection
-  // forks its own `_attributeDefinitions`, copying the ancestor's foreign
+  // forks its own pending-modification queue, copying the ancestor's foreign
   // schema defs. `ensureSchemaLoaded` must still reflect the subclass's own
   // table rather than trusting those copied defs and silently dropping writes.
   // Mirrors `persist inherited class with different table name` (the Rails
   // test in persistence.test.ts) plus a predeclared virtual attribute.
   it("persist inherited class with different table name and predeclared attribute", async () => {
-    // Reflect the ancestor first so its `_attributeDefinitions` holds
+    // Reflect the ancestor first so its `columnsHash` holds
     // schema-sourced defs for the `minimalistics` table — the state the
     // subclass's map is forked from.
     await Minimalistic.create({});

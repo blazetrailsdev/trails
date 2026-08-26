@@ -19,9 +19,9 @@ describe("MultiParameterAttributeTest", () => {
   fixtures(["topics"]);
 
   beforeAll(async () => {
-    // Eagerly populate Topic._attributeDefinitions from the warm pool schema cache.
+    // Eagerly populate Topic's columnsHash from the warm pool schema cache.
     // Without this, the sync loadSchema path runs before the cache is applied to the
-    // model class and marks _schemaLoaded=true with empty _attributeDefinitions.
+    // model class and marks _schemaLoaded=true with no columns.
     await Topic.loadSchema();
   });
 

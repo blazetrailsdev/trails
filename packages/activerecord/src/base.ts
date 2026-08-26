@@ -1154,16 +1154,21 @@ export class Base extends Model {
     if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
       _initializeGeneratedModules.call(this as never);
     }
+    // Ruby reads `attribute(name, type = nil, **options)` off the call itself, so
+    // AR's override never has to work out which argument is the options bag.
+    // Collapse the two-arity call to the three-arity one once, with
+    // AttributeRegistration#attribute's own test, so `super` re-runs it as a
+    // no-op and the two spellings cannot drift.
+    if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
+      options = typeName;
+      typeName = undefined;
+    }
     super.attribute(name, typeName, options);
-    const attributeOptions =
-      typeName != null && typeof typeName === "object" && !(typeName instanceof Type)
-        ? typeName
-        : options;
-    if (attributeOptions?.virtual) {
-      if (!Object.prototype.hasOwnProperty.call(this, "_virtualAttributes")) {
-        this._virtualAttributes = new Set(this._virtualAttributes);
-      }
-      this._virtualAttributes!.add(name);
+    if (options?.virtual) {
+      const virtual = Object.prototype.hasOwnProperty.call(this, "_virtualAttributes")
+        ? this._virtualAttributes!
+        : (this._virtualAttributes = new Set(this._virtualAttributes));
+      virtual.add(name);
     }
     // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
     // `@attribute_names` recursively.

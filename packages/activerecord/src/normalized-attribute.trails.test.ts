@@ -3,7 +3,7 @@
  * subclass's attribute types. Rails keeps this per-class (`normalized_attributes`
  * is a `class_attribute` and `_default_attributes` replays only the class's own
  * pending decorators), but trails' STI reflection installed the base's shared
- * `_attributeDefinitions` map as an OWN property of the subclass, so a
+ * pending-modification queue as an OWN property of the subclass, so a
  * subclass decoration could land on the base and leak to sibling subclasses.
  * The decorated type is read where Rails reads it — `type_for_attribute` over
  * the replayed attribute set (attribute_registration.rb:43-51).

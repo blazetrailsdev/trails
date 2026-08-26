@@ -73,7 +73,7 @@ interface PendingEncryption {
  * The type wrapping itself is NOT done here: `encryptAttribute` pushes the
  * durable PendingDecorator once at declaration time, and every type inspection
  * resolves through `typeForAttribute` (Rails' single lookup surface) — there is
- * no eager `_attributeDefinitions` re-wrap to maintain. What remains is the
+ * no eager type re-wrap to maintain. What remains is the
  * bookkeeping Rails runs from `validate`: the frozen-encryption validator
  * install. The column-size validation is `load_schema!`'s
  * (encryptable_record.rb:126-130) and runs from that chain instead.

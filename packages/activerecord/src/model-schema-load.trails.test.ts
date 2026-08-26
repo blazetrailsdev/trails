@@ -4,8 +4,8 @@ type Type = ValueType;
 import { Base } from "./base.js";
 import { declaredAttributeNames, loadSchemaFromAdapter } from "./model-schema.js";
 
-/** The names a class declared with `attribute()` — the pending-queue read that
- * replaced the retired `_attributeDefinitions` registry. */
+/** The names a class declared with `attribute()`, read off the pending
+ * -modification queue the way `columnsHash`' synthesis does. */
 const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
 
 
