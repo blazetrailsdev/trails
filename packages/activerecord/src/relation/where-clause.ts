@@ -11,7 +11,7 @@
  */
 
 import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 export class WhereClause {
   private _predicates: (Nodes.Node | string)[];
@@ -340,6 +340,9 @@ function extractNodeValue(node: unknown): unknown {
   // is returned intact for scope_for_create, not flattened via
   // `value_for_database`. This matters now that multi-value arrays build
   // `HomogeneousIn`, whose `right` is an array of Casted nodes.
+  // `build_quoted` seats an ActiveModel::Attribute unwrapped (casted.rb:50-51),
+  // and it answers `value_before_type_cast` like the wrappers below do.
+  if (node instanceof ModelAttribute) return node.valueBeforeTypeCast;
   if (node instanceof Nodes.Quoted) return node.value;
   if (node instanceof Nodes.Casted) return node.valueBeforeTypeCast();
   if (node instanceof Nodes.BindParam) {

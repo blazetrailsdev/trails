@@ -323,7 +323,7 @@ describe("PredicateBuilderTest", () => {
       // Rails inverts a positively-built, bound predicate, so the value rides a
       // QueryAttribute bind rather than being inlined.
       expect(sql).toContain('"posts"."title" !=');
-      const bound = (node as unknown as { right: { value: { value: unknown } } }).right.value.value;
+      const bound = (node as unknown as { right: { value: unknown } }).right.value;
       expect(bound).toEqual({ id: 5 });
     });
 
@@ -432,8 +432,7 @@ describe("PredicateBuilderTest", () => {
       const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
       // Negation binds the RHS, so 'Rails' rides a QueryAttribute bind.
-      const bound = (nodes[0] as unknown as { right: { value: { value: unknown } } }).right.value
-        .value;
+      const bound = (nodes[0] as unknown as { right: { value: unknown } }).right.value;
       expect(bound).toBe("Rails");
       expect(sql).not.toContain('"posts"."authors"');
       expect(sql).toMatch(/NOT\b|!=|<>/);

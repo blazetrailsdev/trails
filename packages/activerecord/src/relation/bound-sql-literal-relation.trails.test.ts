@@ -83,7 +83,7 @@ describe("bound SQL literal with Relation bind value", () => {
     const builders = Topic.all() as unknown as BoundSqlLiteralBuilders;
     const node = builders.buildBoundSqlLiteral("id IN (?)", [approvedIds]);
 
-    const bind = node.positionalBinds[0];
+    const bind = node.positionalBinds![0];
     expect(bind).toBeInstanceOf(Nodes.SqlLiteral);
     expect((bind as Nodes.SqlLiteral).value).toContain("SELECT");
   });
@@ -93,7 +93,7 @@ describe("bound SQL literal with Relation bind value", () => {
     const builders = Topic.all() as unknown as BoundSqlLiteralBuilders;
     const node = builders.buildNamedBoundSqlLiteral("id IN (:ids)", { ids: approvedIds });
 
-    const bind = node.namedBinds.ids;
+    const bind = node.namedBinds!.ids;
     expect(bind).toBeInstanceOf(Nodes.SqlLiteral);
     expect((bind as Nodes.SqlLiteral).value).toContain("SELECT");
   });

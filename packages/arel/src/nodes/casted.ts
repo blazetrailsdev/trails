@@ -1,9 +1,8 @@
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
-import { _Attribute, _setBuildQuoted } from "../node-slots.js";
+import { _Attribute, _Table, _setBuildQuoted } from "../node-slots.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
-import { BindParam } from "./bind-param.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 /**
@@ -16,22 +15,20 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
  * TS deviations, all narrower/safer:
  * - Table / SelectManager aren't Arel nodes here, so the SelectManager arm is
  *   matched on its `ast` duck-type rather than by class (importing
- *   `SelectManager` from a node module closes a require cycle). The manager
- *   itself is returned, as Rails does (casted.rb:47-51), so
- *   `visit_Arel_SelectManager` supplies the subquery parens.
- * - ActiveModel::Attribute isn't an Arel node either. Rails has
- *   visit_ActiveModel_Attribute that routes it through add_bind; we
- *   wrap it in BindParam so the value participates in prepared-statement
- *   bind extraction (visitBindParam handles valueForDatabase — both the
- *   method form on QueryAttribute and the getter form on AM Attribute).
+ *   `SelectManager` from a node module closes a require cycle) and the Table
+ *   arm reads the `_Table` slot for the same reason. Both are returned
+ *   unchanged, as Rails does (casted.rb:47-51), so `visit_Arel_SelectManager`
+ *   supplies the subquery parens and `visit_Arel_Table` renders the table.
  */
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
   if (other && typeof other === "object") {
     if (_Attribute && other instanceof _Attribute) return other as Node;
+    if (_Table && other instanceof _Table) return other as Node;
     // Rails: casted.rb:50-51 — the `when ..., ActiveModel::Attribute` arm
-    // returning `other`. Class dispatch, like Rails.
-    if (other instanceof ModelAttribute) return new BindParam(other);
+    // returning `other` unwrapped. `visit_ActiveModel_Attribute`
+    // (to_sql.rb:756) is what lands its value as a bind.
+    if (other instanceof ModelAttribute) return other as unknown as Node;
     const maybeAst = (other as { ast?: unknown }).ast;
     if (maybeAst instanceof Node) return other as Node;
   }

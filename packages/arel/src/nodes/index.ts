@@ -26,7 +26,6 @@ export {
   Lateral,
   GroupingElement,
   Cube,
-  Rollup,
   GroupingSet,
   Group,
   OptimizerHints,

@@ -32,16 +32,12 @@ describe("Arel::Nodes::RollUpTest", () => {
     expect(Nodes.RollUp).toBeDefined();
     expect(new Nodes.RollUp([]) instanceof Nodes.RollUp).toBe(true);
   });
-
-  it("Rollup is a deprecated alias for RollUp", () => {
-    expect(Nodes.Rollup).toBe(Nodes.RollUp);
-  });
 });
 
 describe("Arel::Nodes::WithTest", () => {
   it("children getter returns expr slot", () => {
     const users = new Table("users");
-    const cte = new Nodes.Cte("t", users.project(new SqlLiteral("1")).ast);
+    const cte = new Nodes.Cte("t", users.project(new SqlLiteral("1")));
     const w = new Nodes.With([cte]);
     expect(w.children).toStrictEqual([cte]);
     expect((w as { expr: unknown }).expr).toBe(w.children);

@@ -97,3 +97,15 @@ export let _Dot: (new () => { accept(node: any, collector: any): any }) | undefi
 export function _setDot(ctor: new () => { accept(node: any, collector: any): any }): void {
   _Dot = ctor;
 }
+
+/**
+ * `Arel::Table` — the constant `Nodes.build_quoted` names in its pass-through
+ * `case` (casted.rb:47-51). A value import of `table.js` from `casted.ts`
+ * closes a cycle back through every node module `Table` reaches.
+ * @internal
+ */
+export let _Table: (new (name: any, ...rest: any[]) => any) | undefined;
+/** @internal */
+export function _setTable(ctor: new (name: any, ...rest: any[]) => any): void {
+  _Table = ctor;
+}

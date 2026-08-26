@@ -10,16 +10,35 @@ import type { SelectManager } from "../select-manager.js";
  * Mirrors: Arel::Nodes::Cte
  */
 export class Cte extends Binary {
+  // Mirrors `alias :name :left` / `alias :relation :right` (cte.rb:6-7): these
+  // are the Binary slots under another spelling, not fields beside them, so a
+  // write through either name is the same write — which is what `Binary#eql`
+  // reads (binary.rb:19-27).
+  //
   // Rails: `SelectManager#as` builds a `TableAlias` whose name is a
   // `Nodes::SqlLiteral` (rendered bare), so `TableAlias#to_cte` passes that
   // literal straight through to `Cte.new`. A plain-string name (e.g. a directly
   // constructed `Cte`) is quoted. Accept both.
-  name: string | SqlLiteral;
+  get name(): string | SqlLiteral {
+    return this.left as string | SqlLiteral;
+  }
+
+  set name(value: string | SqlLiteral) {
+    this.left = value;
+  }
+
   // Rails seats a manager here directly —
   // `Cte.new("foo", Table.new(:bar).project(Arel.star))`
   // (test/cases/arel/visitors/to_sql_test.rb:1008) — and
-  // `visit_Arel_SelectManager` (to_sql.rb:358-361) renders it.
-  relation: Node | SelectManager;
+  // `visit_Arel_SelectManager` (to_sql.rb:358-361) renders it, parens included.
+  get relation(): Node | SelectManager {
+    return this.right as Node | SelectManager;
+  }
+
+  set relation(value: Node | SelectManager) {
+    this.right = value;
+  }
+
   readonly materialized: boolean | null;
 
   constructor(
@@ -28,8 +47,6 @@ export class Cte extends Binary {
     materialized: boolean | null = null,
   ) {
     super(name, relation);
-    this.name = name;
-    this.relation = relation;
     this.materialized = materialized;
   }
 

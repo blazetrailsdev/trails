@@ -57,7 +57,7 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
   });
 
   it("Rollup emits `ROLLUP( … )` with spaces", () => {
-    const r = new Nodes.Rollup([users.get("a"), users.get("b")]);
+    const r = new Nodes.RollUp([users.get("a"), users.get("b")]);
     expect(compile(r)).toBe('ROLLUP( "users"."a", "users"."b" )');
   });
 
@@ -85,7 +85,7 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
     expect(compile(new Nodes.Cube([users.get("a"), users.get("b")]))).toBe(
       'CUBE( "users"."a", "users"."b" )',
     );
-    expect(compile(new Nodes.Rollup([users.get("a")]))).toBe('ROLLUP( "users"."a" )');
+    expect(compile(new Nodes.RollUp([users.get("a")]))).toBe('ROLLUP( "users"."a" )');
     expect(compile(new Nodes.GroupingSet([users.get("a"), users.get("b")]))).toBe(
       'GROUPING SETS( "users"."a", "users"."b" )',
     );

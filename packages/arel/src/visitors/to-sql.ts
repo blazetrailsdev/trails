@@ -2,7 +2,6 @@ import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
-import { SelectManager } from "../select-manager.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -1084,26 +1083,9 @@ export class ToSql extends Visitor {
     } else if (o.materialized === false) {
       collector.append("NOT MATERIALIZED ");
     }
-    // Rails' visit_Arel_Nodes_Cte emits only `AS ` and visits the relation,
-    // relying on the Grouping / SelectManager / set-operation visitors to supply
-    // their own parentheses (arel/visitors/to_sql.rb:732). Trails also stores
-    // bare SelectStatement / SqlLiteral relations, which don't self-wrap, so add
-    // the parens explicitly only for those — otherwise an array CTE
-    // (UnionAll) or a SqlLiteral CTE (Grouping) double-wraps to `AS ((…))`.
-    if (
-      (o.relation as unknown) instanceof SelectManager ||
-      o.relation instanceof Nodes.Grouping ||
-      o.relation instanceof Nodes.Union ||
-      o.relation instanceof Nodes.UnionAll ||
-      o.relation instanceof Nodes.Intersect ||
-      o.relation instanceof Nodes.Except
-    ) {
-      this.visit(o.relation, collector);
-    } else {
-      collector.append("(");
-      this.visit(o.relation, collector);
-      collector.append(")");
-    }
+    // No parens here: `Cte#relation` holds a SelectManager / Grouping /
+    // set-operation node, each of which supplies its own (to_sql.rb:732-744).
+    this.visit(o.relation, collector);
     return collector;
   }
 
@@ -1159,20 +1141,22 @@ export class ToSql extends Visitor {
     collector.retryable = false;
     const sql = o.sqlWithPlaceholders;
 
-    if (o.positionalBinds.length > 0) {
+    if (o.positionalBinds) {
+      const positionalBinds = o.positionalBinds;
       const segments = sql.split("?");
       const expected = segments.length - 1;
-      if (o.positionalBinds.length !== expected) {
+      if (positionalBinds.length !== expected) {
         throw new BindError(
-          `wrong number of bind variables (${o.positionalBinds.length} for ${expected})`,
+          `wrong number of bind variables (${positionalBinds.length} for ${expected})`,
           sql,
         );
       }
       for (let i = 0; i < segments.length; i++) {
         if (segments[i]) collector.append(segments[i]);
-        if (i < o.positionalBinds.length) this.visitBindValue(o.positionalBinds[i], collector);
+        if (i < positionalBinds.length) this.visitBindValue(positionalBinds[i], collector);
       }
-    } else if (Object.keys(o.namedBinds).length > 0) {
+    } else {
+      const namedBinds = o.namedBinds ?? {};
       const re = /:(?<!::)([a-zA-Z]\w*)|([^:]+|.)/gy;
       let m: RegExpExecArray | null;
       while ((m = re.exec(sql)) !== null) {
@@ -1180,14 +1164,12 @@ export class ToSql extends Visitor {
           collector.append(m[2]);
         } else {
           const name = m[1];
-          if (!(name in o.namedBinds)) {
+          if (!(name in namedBinds)) {
             throw new BindError(`missing value for :${name}`, sql);
           }
-          this.visitBindValue(o.namedBinds[name], collector);
+          this.visitBindValue(namedBinds[name], collector);
         }
       }
-    } else {
-      collector.append(sql);
     }
 
     return collector;
@@ -1719,11 +1701,7 @@ export class ToSql extends Visitor {
     reg(Nodes.Max, "visitArelNodesMax");
     reg(Nodes.Min, "visitArelNodesMin");
     reg(Nodes.Avg, "visitArelNodesAvg");
-    reg(Nodes.Cube, "visitArelNodesCube");
-    reg(Nodes.RollUp, "visitArelNodesRollUp");
-    reg(Nodes.GroupingSet, "visitArelNodesGroupingSet");
     reg(Nodes.Group, "visitArelNodesGroup");
-    reg(Nodes.GroupingElement, "visitArelNodesGroupingElement");
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
     reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
@@ -1804,37 +1782,6 @@ export class ToSql extends Visitor {
     this.visit(o.left, collector);
     collector.append(" || ");
     this.visit(o.right, collector);
-    return collector;
-  }
-
-  protected visitArelNodesCube(o: Nodes.Cube, collector: SQLString): SQLString {
-    collector.append("CUBE(");
-    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
-    collector.append(")");
-    return collector;
-  }
-
-  protected visitArelNodesRollUp(o: Nodes.RollUp, collector: SQLString): SQLString {
-    collector.append("ROLLUP(");
-    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
-    collector.append(")");
-    return collector;
-  }
-
-  protected visitArelNodesGroupingElement(
-    o: Nodes.GroupingElement,
-    collector: SQLString,
-  ): SQLString {
-    collector.append("(");
-    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
-    collector.append(")");
-    return collector;
-  }
-
-  protected visitArelNodesGroupingSet(o: Nodes.GroupingSet, collector: SQLString): SQLString {
-    collector.append("GROUPING SETS(");
-    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
-    collector.append(")");
     return collector;
   }
 

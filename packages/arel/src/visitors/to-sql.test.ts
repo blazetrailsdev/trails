@@ -401,16 +401,10 @@ describe("the to_sql visitor", () => {
     });
 
     it("handles CTEs with null materialized (tristate nil — no modifier)", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, null);
+      const cte = new Nodes.Cte("t", users.project(users.get("id")), null);
       const stmt = new SelectManager().with(cte).project("1");
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(stmt.ast);
       expect(sql).not.toContain("MATERIALIZED");
-    });
-
-    it("wraps a bare SelectStatement body in exactly one set of parens", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(cte);
-      expect(sql).toBe('"t" AS (SELECT "users"."id" FROM "users")');
     });
 
     it("does not double-wrap a Grouping body (SqlLiteral path)", () => {
@@ -443,7 +437,7 @@ describe("the to_sql visitor", () => {
     });
 
     it("handles Cte nodes", () => {
-      const cte = new Nodes.Cte("expr1", new Table("bar").project(star()).ast);
+      const cte = new Nodes.Cte("expr1", new Table("bar").project(star()));
       const manager = new Table("foo")
         .project(star())
         .with(cte)
@@ -964,7 +958,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should mark collector as non-retryable when visiting bound SQL literal", () => {
-    const lit = new Nodes.BoundSqlLiteral("id = ?", [1]);
+    const lit = new Nodes.BoundSqlLiteral("id = ?", [1], null);
     const collector = new Visitors.ToSql(fakeRecordConnection).accept(
       lit,
       new Collectors.SQLString(),
@@ -1602,7 +1596,7 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::BoundSqlLiteral", () => {
     it("works with positional binds", () => {
-      const node = new Nodes.BoundSqlLiteral("id = ?", [1]);
+      const node = new Nodes.BoundSqlLiteral("id = ?", [1], null);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       // Rails: `add_bind` emits the placeholder (BIND_BLOCK = proc { "?" }) into
       // a plain SQLString collector, so `compile` renders `id = ?`, not the
@@ -1884,7 +1878,7 @@ describe("the to_sql visitor", () => {
 
     it("CTE name escapes embedded double-quotes", () => {
       const inner = new Table("users");
-      const cte = new Nodes.Cte('w"in', new SelectManager(inner).project(inner.get("a")).ast);
+      const cte = new Nodes.Cte('w"in', new SelectManager(inner).project(inner.get("a")));
       const sql = new Visitors.ToSql(testConnection).compile(cte);
       expect(sql).toContain('"w""in" AS');
     });

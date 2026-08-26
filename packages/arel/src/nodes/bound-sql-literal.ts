@@ -12,8 +12,11 @@ import { Fragments } from "./fragments.js";
  */
 export class BoundSqlLiteral extends NodeExpression {
   readonly sqlWithPlaceholders: string;
-  readonly positionalBinds: unknown[];
-  readonly namedBinds: Record<string, unknown>;
+  // Mirrors bound_sql_literal.rb:31-38 — exactly one collection is kept; the
+  // unused side is nil, which is what `visit_Arel_Nodes_BoundSqlLiteral`
+  // branches on (to_sql.rb:799).
+  readonly positionalBinds: unknown[] | null;
+  readonly namedBinds: Record<string, unknown> | null;
 
   /**
    * Mirrors: bound_sql_literal.rb:8-40 — `initialize`, whose named-bind arm
@@ -25,44 +28,46 @@ export class BoundSqlLiteral extends NodeExpression {
    */
   constructor(
     sqlWithPlaceholders: string,
-    positionalBinds: unknown[] = [],
-    namedBinds: Record<string, unknown> = {},
+    positionalBinds: unknown[] | null,
+    namedBinds: Record<string, unknown> | null,
   ) {
     super();
-    this.sqlWithPlaceholders = sqlWithPlaceholders;
-    this.positionalBinds = positionalBinds;
-    this.namedBinds = namedBinds;
-    this.validate();
-  }
-
-  private validate(): void {
-    const sql = this.sqlWithPlaceholders;
-    const hasPositional = this.positionalBinds.length > 0;
-    const hasNamed = Object.keys(this.namedBinds).length > 0;
-
-    if (hasPositional && hasNamed) {
-      throw new BindError(`cannot mix positional and named binds`, sql);
-    }
+    const hasPositional = !(positionalBinds == null || positionalBinds.length === 0);
+    const hasNamed = !(namedBinds == null || Object.keys(namedBinds).length === 0);
 
     if (hasPositional) {
-      const expected = (sql.match(/\?/g) ?? []).length;
-      if (this.positionalBinds.length !== expected) {
+      if (hasNamed) {
+        throw new BindError(`cannot mix positional and named binds`, sqlWithPlaceholders);
+      }
+      const expected = (sqlWithPlaceholders.match(/\?/g) ?? []).length;
+      if (positionalBinds.length !== expected) {
         throw new BindError(
-          `wrong number of bind variables (${this.positionalBinds.length} for ${expected})`,
-          sql,
+          `wrong number of bind variables (${positionalBinds.length} for ${expected})`,
+          sqlWithPlaceholders,
         );
+      }
+    } else if (hasNamed) {
+      // Deduplicate tokens (matches Rails `.uniq`) before checking for missing binds.
+      const tokensInString = [
+        ...new Set([...sqlWithPlaceholders.matchAll(/:(?<!::)([a-zA-Z]\w*)/g)].map((m) => m[1])),
+      ];
+      const missing = tokensInString.filter((t) => !(t in namedBinds));
+      if (missing.length > 0) {
+        if (missing.length === 1) {
+          throw new BindError(`missing value for :${missing[0]}`, sqlWithPlaceholders);
+        } else {
+          throw new BindError(`missing values for ${JSON.stringify(missing)}`, sqlWithPlaceholders);
+        }
       }
     }
 
-    if (hasNamed) {
-      // Deduplicate tokens (matches Rails `.uniq`) before checking for missing binds.
-      const tokens = [...new Set([...sql.matchAll(/:(?<!::)([a-zA-Z]\w*)/g)].map((m) => m[1]))];
-      const missing = tokens.filter((t) => !(t in this.namedBinds));
-      if (missing.length === 1) {
-        throw new BindError(`missing value for :${missing[0]}`, sql);
-      } else if (missing.length > 1) {
-        throw new BindError(`missing values for ${JSON.stringify(missing)}`, sql);
-      }
+    this.sqlWithPlaceholders = sqlWithPlaceholders;
+    if (hasPositional) {
+      this.positionalBinds = positionalBinds;
+      this.namedBinds = null;
+    } else {
+      this.positionalBinds = null;
+      this.namedBinds = namedBinds;
     }
   }
 
