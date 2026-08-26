@@ -1,49 +1,20 @@
 import { describe, expect, it } from "vitest";
+import type { Type } from "@blazetrails/activemodel";
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
 import { RangeType } from "./range.js";
-import { TypeMapInitializer, type TypeMap } from "./type-map-initializer.js";
+import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
+import { TypeMapInitializer } from "./type-map-initializer.js";
 import { Vector } from "./vector.js";
-
-class TestStore implements TypeMap {
-  readonly mapping = new Map<number | string, unknown>();
-
-  registerType(
-    oid: number | string,
-    type?: unknown,
-    block?: (oid: number | string, ...args: unknown[]) => unknown,
-  ): void {
-    this.mapping.set(oid, block ?? type);
-  }
-
-  aliasType(oid: number | string, targetOid: number | string): void {
-    this.mapping.set(oid, this.mapping.get(targetOid));
-  }
-
-  lookup(oid: number | string, ...args: unknown[]): unknown {
-    const value = this.mapping.get(oid);
-    if (typeof value === "function")
-      return (value as (...args: unknown[]) => unknown)(oid, ...args);
-    return value;
-  }
-
-  has(oid: number | string): boolean {
-    return this.mapping.has(oid);
-  }
-
-  keys(): Array<number | string> {
-    return [...this.mapping.keys()];
-  }
-}
 
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),
   serialize: (value: unknown) => (value == null ? null : Number(value)),
-};
+} as unknown as Type;
 
 describe("PostgreSQL::OID::TypeMapInitializer", () => {
   it("registers arrays, ranges, enums, domains, mapped types, and composites", () => {
-    const store = new TestStore();
+    const store = new HashLookupTypeMap();
     store.registerType("int4", integerSubtype);
     store.registerType(23, integerSubtype);
 
@@ -69,11 +40,16 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
   });
 
   it("registers array and range types lazily with lookup arguments", () => {
-    const store = new TestStore();
-    store.registerType(23, (_oid: number | string, metadata?: { scale?: number }) => ({
-      ...integerSubtype,
-      metadata,
-    }));
+    const store = new HashLookupTypeMap();
+    store.registerType(
+      23,
+      undefined,
+      (_oid, ...args) =>
+        ({
+          ...(integerSubtype as object),
+          metadata: args[0],
+        }) as unknown as Type,
+    );
 
     new TypeMapInitializer(store).run([
       row({ oid: "1007", typname: "_int4", typinput: "array_in", typelem: "23" }),
@@ -90,7 +66,7 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
   });
 
   it("skips array registration when element OID is not in the store", () => {
-    const store = new TestStore();
+    const store = new HashLookupTypeMap();
     store.registerType("numeric", integerSubtype);
 
     // Process only the array row (element OID 1700 not yet keyed in the store).
@@ -108,7 +84,7 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
   });
 
   it("builds query condition fragments", () => {
-    const store = new TestStore();
+    const store = new HashLookupTypeMap();
     store.registerType("int4", integerSubtype);
     store.registerType(23, integerSubtype);
     const initializer = new TypeMapInitializer(store);

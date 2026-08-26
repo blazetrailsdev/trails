@@ -22,7 +22,8 @@ import {
   toBytes,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/date";
+import { Rational, Temporal } from "@blazetrails/date";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { toS } from "@blazetrails/activesupport";
@@ -126,9 +127,23 @@ export function unquoteIdentifier(identifier: string | null | undefined): string
   return identifier ?? null;
 }
 
-/** @internal */
+/**
+ * Mirrors: MySQL::Quoting#cast_bound_value (mysql/quoting.rb:54-69).
+ *
+ * Ruby's `Rational` and `BigDecimal` are both `Numeric`, so `when Rational`
+ * (rb:56-57) has to precede it while `when BigDecimal` (rb:60-61) is already
+ * shadowed by `when Numeric` and never runs — `BigDecimal(0).to_s` is "0.0",
+ * the same fixed form the dead arm asks for. The arms are ported in Rails'
+ * order, which leaves that one dead here for the same reason.
+ *
+ * @internal
+ */
 export function castBoundValue(value: unknown): unknown {
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (value instanceof Rational) return String(value.toF());
+  if (typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal) {
+    return String(value);
+  }
+  if (value instanceof BigDecimal) return value.toString("F");
   if (value === true) return "1";
   if (value === false) return "0";
   return value;

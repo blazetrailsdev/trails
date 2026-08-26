@@ -4,32 +4,13 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TypeMapInitializer
  */
 
+import type { Type } from "@blazetrails/activemodel";
+
+import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
 import { RangeType, type RangeSubtype } from "./range.js";
 import { Vector } from "./vector.js";
-
-/**
- * The oid-keyed store this initializer populates.
- *
- * @noRailsEquivalent CONVERGEABLE (story:
- * converge-pg-type-map-initializer-onto-ported-type-map). Rails passes a real
- * `ActiveRecord::Type::HashLookupTypeMap`; trails ports the `Type::TypeMap`
- * base (`type/type-map.ts`) but not that oid-keyed subclass, so the shape
- * stands in until it exists.
- */
-export interface TypeMap {
-  registerType(
-    oid: number | string,
-    type?: unknown,
-    block?: (oid: number | string, ...args: unknown[]) => unknown,
-  ): void;
-  /** @internal */
-  aliasType(oid: number | string, targetOid: number | string): void;
-  lookup?(oid: number | string, ...args: unknown[]): unknown;
-  has?(oid: number | string): boolean;
-  keys?(): Array<number | string>;
-}
 
 export interface PgTypeRow {
   oid: number | string;
@@ -50,15 +31,15 @@ export interface PgTypeRow {
 }
 
 export class TypeMapInitializer {
-  private store: TypeMap;
+  private store: HashLookupTypeMap;
 
-  constructor(store: TypeMap) {
+  constructor(store: HashLookupTypeMap) {
     this.store = store;
   }
 
   run(records: PgTypeRow[]): void {
-    const nodes = records.filter((row) => !this.storeHas(toInt(row.oid)));
-    const mapped = extract(nodes, (row) => this.storeHas(row.typname));
+    const nodes = records.filter((row) => !this.store.isKey(toInt(row.oid)));
+    const mapped = extract(nodes, (row) => this.store.isKey(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
     const enums = extract(nodes, (row) => row.typtype === "e");
     const domains = extract(nodes, (row) => row.typtype === "d");
@@ -81,7 +62,7 @@ export class TypeMapInitializer {
     // Divergence: Rails interpolates type names unescaped (they're internal
     // keys, not user input). We single-quote-escape defensively since the
     // output is still SQL and the cost is negligible.
-    const knownTypeNames = this.storeKeys().map((key) => `'${String(key).replace(/'/g, "''")}'`);
+    const knownTypeNames = this.store.keys().map((key) => `'${String(key).replace(/'/g, "''")}'`);
     return `WHERE\n  t.typname IN (${knownTypeNames.join(", ")})\n`;
   }
 
@@ -90,7 +71,7 @@ export class TypeMapInitializer {
   }
 
   queryConditionsForArrayTypes(): string {
-    const knownTypeOids = this.storeKeys().filter((key) => typeof key !== "string");
+    const knownTypeOids = this.store.keys().filter((key) => typeof key !== "string");
     // Divergence: Rails emits `t.typelem IN ()` for an empty OID set, which
     // is invalid SQL. We short-circuit to `WHERE 1=0` to return zero rows
     // instead of erroring.
@@ -119,7 +100,7 @@ export class TypeMapInitializer {
   }
 
   private registerDomainType(row: PgTypeRow): void {
-    const baseType = this.storeLookup(toInt(row.typbasetype));
+    const baseType = this.store.lookup(toInt(row.typbasetype));
     if (baseType) {
       this.register(row.oid, baseType);
     } else {
@@ -128,7 +109,7 @@ export class TypeMapInitializer {
   }
 
   private registerCompositeType(row: PgTypeRow): void {
-    const subtype = this.storeLookup(toInt(row.typelem));
+    const subtype = this.store.lookup(toInt(row.typelem));
     if (subtype) this.register(row.oid, new Vector(row.typdelim, subtype));
   }
 
@@ -146,15 +127,11 @@ export class TypeMapInitializer {
 
   private register(
     oid: number | string,
-    oidType: unknown | ((oid: number | string, ...args: unknown[]) => unknown),
+    oidType: Type | ((oid: number | string, ...args: unknown[]) => Type),
   ): void {
     oid = this.assertValidRegistration(oid, oidType);
     if (typeof oidType === "function") {
-      this.store.registerType(
-        oid,
-        undefined,
-        oidType as (oid: number | string, ...args: unknown[]) => unknown,
-      );
+      this.store.registerType(oid, undefined, oidType);
     } else {
       this.store.registerType(oid, oidType);
     }
@@ -168,32 +145,16 @@ export class TypeMapInitializer {
   private registerWithSubtype(
     oid: number | string,
     targetOid: number,
-    block: (subtype: OidSubtype) => unknown,
+    block: (subtype: OidSubtype) => Type,
   ): void {
-    if (this.storeHas(targetOid)) {
+    if (this.store.isKey(targetOid)) {
       this.register(oid, (_oid: number | string, ...args: unknown[]) =>
-        block(this.storeLookup(targetOid, ...args) as OidSubtype),
+        block(this.store.lookup(targetOid, ...args) as OidSubtype),
       );
     }
   }
 
-  private storeHas(key: number | string): boolean {
-    if (this.store.has) return this.store.has(key);
-    return this.storeKeys().includes(key);
-  }
-
-  private storeKeys(): Array<number | string> {
-    return this.store.keys?.() ?? [];
-  }
-
-  private storeLookup(key: number | string, ...args: unknown[]): unknown {
-    return this.store.lookup?.(key, ...args);
-  }
-
-  private assertValidRegistration(
-    oid: number | string,
-    oidType: unknown | ((oid: number | string, ...args: unknown[]) => unknown),
-  ): number {
+  private assertValidRegistration(oid: number | string, oidType: unknown): number {
     if (oidType == null) throw new Error(`can't register nil type for OID ${oid}`);
     return toInt(oid);
   }

@@ -8,7 +8,6 @@
  *          ActiveRecord::ConnectionAdapters::PostgreSQL (top-level module)
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { SchemaDumper, statelessTest } from "../../schema-dumper.js";
 import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
@@ -911,12 +910,4 @@ export class AlterTable extends AbstractAlterTable {
   addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
     this.uniqueConstraintAdds.push(this._pgTd.newUniqueConstraintDefinition(columnName, options));
   }
-}
-
-/** @internal */
-function aliasedTypes(name: any, fallback: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:289 cluster=pg-long-tail
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#aliased_types is not implemented",
-  );
 }
