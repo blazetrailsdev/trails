@@ -794,8 +794,8 @@ export abstract class SchemaDumper {
         let pkcolspec = this.columnSpecForPrimaryKey(pkcol as Column);
         if (Object.keys(pkcolspec).length > 0) {
           if (!Object.keys(pkcolspec).every((k) => k === "id" || k === "default")) {
-            const { id: id_, ...rest } = pkcolspec;
-            pkcolspec = { id: { ...(id_ != null ? { type: id_ } : {}), ...rest } };
+            const { id: type, ...rest } = pkcolspec;
+            pkcolspec = { id: { ...(type != null ? { type } : {}), ...rest } };
           }
           opts.push(this.formatColspec(pkcolspec));
         }
