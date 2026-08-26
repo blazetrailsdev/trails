@@ -19,14 +19,14 @@ export class NamedFunction extends Function {
   }
 
   /**
-   * Apply a window to this function call. Property-form override (vs.
-   * `over(...) {}`) — the inherited WindowPredications.over is mixed
-   * into Function as a property via Included<>, and NamedFunction's
-   * version widens the signature to accept Window/NamedWindow/string.
+   * Apply a window to this function call. Overrides the mixed-in
+   * WindowPredications.over, widening the signature to accept
+   * Window/NamedWindow/string. A prototype method, not an own property: an own
+   * property would be copied by `objectClone` still closed over the ORIGINAL.
    *
    * Mirrors: `OVER` support on Arel functions.
    */
-  over = (window?: Window | NamedWindow | string | null): Over => {
+  over(window?: Window | NamedWindow | string | null): Over {
     if (!window) return new Over(this, null);
     if (typeof window === "string") return new Over(this, new SqlLiteral(window));
     if (window instanceof NamedWindow) {
@@ -34,5 +34,5 @@ export class NamedFunction extends Function {
       return new Over(this, new SqlLiteral(`"${escaped}"`));
     }
     return new Over(this, window);
-  };
+  }
 }

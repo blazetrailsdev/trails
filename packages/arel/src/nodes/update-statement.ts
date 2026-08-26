@@ -1,3 +1,4 @@
+import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 
 /**
@@ -29,17 +30,12 @@ export class UpdateStatement extends Node {
     this.key = null;
   }
 
-  clone(): UpdateStatement {
-    const copy = new UpdateStatement();
-    copy.relation = this.relation;
-    copy.values = [...this.values];
+  // Mirrors Arel::Nodes::UpdateStatement#initialize_copy
+  // (update_statement.rb:21-25), which Ruby runs for `#clone`.
+  clone(): this {
+    const copy = objectClone(this);
     copy.wheres = [...this.wheres];
-    copy.orders = [...this.orders];
-    copy.groups = [...this.groups];
-    copy.havings = [...this.havings];
-    copy.limit = this.limit;
-    copy.offset = this.offset;
-    copy.key = this.key;
+    copy.values = [...this.values];
     return copy;
   }
 }

@@ -1,3 +1,4 @@
+import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 
 /**
@@ -27,16 +28,12 @@ export class DeleteStatement extends Node {
     this.key = null;
   }
 
-  clone(): DeleteStatement {
-    const copy = new DeleteStatement();
-    copy.relation = this.relation;
-    copy.wheres = [...this.wheres];
-    copy.orders = [...this.orders];
-    copy.groups = [...this.groups];
-    copy.havings = [...this.havings];
-    copy.limit = this.limit;
-    copy.offset = this.offset;
-    copy.key = this.key;
+  // Mirrors Arel::Nodes::DeleteStatement#initialize_copy
+  // (delete_statement.rb:20-24), which Ruby runs for `#clone`.
+  clone(): this {
+    const copy = objectClone(this);
+    if (this.relation) copy.relation = cloneSlot(this.relation);
+    if (this.wheres) copy.wheres = [...this.wheres];
     return copy;
   }
 }

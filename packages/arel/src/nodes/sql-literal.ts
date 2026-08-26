@@ -1,4 +1,5 @@
-import { isBlank, type Included } from "@blazetrails/activesupport";
+import { ArgumentError, isBlank, type Included } from "@blazetrails/activesupport";
+import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
 import { buildQuoted } from "./casted.js";
@@ -91,10 +92,10 @@ export class SqlLiteral extends Node {
   // callers, as on BoundSqlLiteral#plus.
   /** @internal */
   plus(other: unknown): Fragments {
-    if (!(other instanceof Node)) {
-      throw new TypeError("Expected Arel node");
+    if (!arelNode(other)) {
+      throw new ArgumentError("Expected Arel node");
     }
-    return this.join(other);
+    return new Fragments([this, other as Node]);
   }
 }
 

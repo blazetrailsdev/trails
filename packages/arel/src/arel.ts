@@ -10,7 +10,8 @@
  * side effects. `index.ts` re-exports this module, so `Arel.sql` keeps its
  * public name and path.
  */
-import type { Node } from "./nodes/node.js";
+import { _Attribute } from "./node-slots.js";
+import { Node } from "./nodes/node.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 
@@ -56,6 +57,24 @@ export function sql(
  */
 export function star(): SqlLiteral {
   return sql("*", { retryable: true });
+}
+
+/**
+ * Arel.arelNode() — is `value` something an Arel node slot accepts?
+ *
+ * Mirrors: Arel.arel_node? (arel.rb:64-66). The `Attribute` arm goes through
+ * the node-slots late binding: `attributes/attribute.ts` imports half the node
+ * tree, so a value import of it here would close a cycle over this module's
+ * `sql-literal.js` / `bound-sql-literal.js` edges.
+ *
+ * @internal
+ */
+export function arelNode(value: unknown): boolean {
+  return (
+    value instanceof Node ||
+    (_Attribute !== undefined && value instanceof _Attribute) ||
+    value instanceof SqlLiteral
+  );
 }
 
 /**

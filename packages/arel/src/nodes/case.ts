@@ -1,3 +1,4 @@
+import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -26,16 +27,16 @@ export class Case extends NodeExpression {
     this.default = defaultValue ?? null;
   }
 
-  // Property-form override (vs. `when(...) {}`): Predications.when is
-  // mixed into NodeExpression as a property via Included<>, and Case
-  // overrides with self-mutating semantics (Rails: builds When clauses
-  // on this.conditions, returns self).
-  when = (condition: Node | unknown, result?: Node | unknown): this => {
+  // Overrides the mixed-in Predications.when with Case's self-mutating
+  // semantics (case.rb:13-16). A prototype method, not an own property: an own
+  // property would be copied by `objectClone` still closed over the ORIGINAL,
+  // so a cloned Case's `#when` would mutate the original's conditions.
+  when(condition: Node | unknown, result?: Node | unknown): this {
     const whenNode = buildQuoted(condition);
     const thenNode = buildQuoted(result === undefined ? null : result);
     this.conditions.push(new When(whenNode, thenNode));
     return this;
-  };
+  }
 
   else(result: Node | unknown): this {
     this.default = new Else(buildQuoted(result === undefined ? null : result));
@@ -79,21 +80,13 @@ export class Case extends NodeExpression {
   // Mirrors Arel::Nodes::Case#initialize_copy (case.rb:29-33), which Ruby runs
   // for `#clone`: each of the three slots is itself cloned, so a cloned Case
   // shares no sub-node with the original.
-  clone(): Case {
-    const copy = new Case();
-    if (this.case) copy.case = cloneShallow(this.case);
+  clone(): this {
+    const copy = objectClone(this);
+    if (this.case) copy.case = cloneSlot(this.case);
     copy.conditions = this.conditions.map((x) => x.clone());
-    if (this.default) copy.default = cloneShallow(this.default);
+    if (this.default) copy.default = cloneSlot(this.default);
     return copy;
   }
-}
-
-// Ruby `Object#clone` on the `@case` and `@default` slots — the same narrowing
-// `cloneSlot` in binary.ts makes, for the same reason.
-function cloneShallow<T extends object>(node: T): T {
-  const cloneable = node as { clone?: () => T };
-  if (typeof cloneable.clone === "function") return cloneable.clone();
-  return Object.assign(Object.create(Object.getPrototypeOf(node) as object) as object, node);
 }
 
 export class When extends Binary {}

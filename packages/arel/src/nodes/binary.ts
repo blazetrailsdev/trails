@@ -1,6 +1,7 @@
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
+import { cloneSlot, objectClone } from "../clone-support.js";
 import { _Attribute, _Equality, _In } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -104,21 +105,6 @@ export const FetchAttribute = {
   },
 };
 
-// Ruby `Object#clone` on whatever occupies a Binary slot: a node that defines
-// its own `clone` runs it (Ruby would run its `initialize_copy` the same way),
-// an Array copies, and anything else gets the shallow same-class copy Ruby's
-// `Object#clone` is. Note the shallow arm carries over an own property holding
-// a bound function — the trails idiom for a Ruby `include` override, e.g.
-// `NamedFunction#over` — still bound to the ORIGINAL; give such a node its own
-// `clone` before putting it through here.
-function cloneSlot(value: NodeOrValue): NodeOrValue {
-  if (Array.isArray(value)) return [...value] as NodeOrValue;
-  const cloneable = value as { clone?: () => NodeOrValue };
-  if (typeof cloneable.clone === "function") return cloneable.clone();
-  if (typeof value !== "object" || value === null) return value;
-  return Object.assign(Object.create(Object.getPrototypeOf(value) as object) as object, value);
-}
-
 export class Binary extends NodeExpression {
   left: NodeOrValue;
   right: NodeOrValue;
@@ -133,7 +119,7 @@ export class Binary extends NodeExpression {
   // runs for `#clone` — the two slots are duplicated so a cloned node's array
   // or node halves are not shared with the original.
   clone(): this {
-    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
+    const copy = objectClone(this);
     if (this.left != null && this.left !== false) copy.left = cloneSlot(this.left);
     if (this.right != null && this.right !== false) copy.right = cloneSlot(this.right);
     return copy;
