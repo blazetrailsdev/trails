@@ -868,9 +868,10 @@ export class Base extends Model {
    * models, so it has to be told which declarations are not columns.
    * Copy-on-write per class, like every other inherited registry here.
    *
+   * Retired together with the virtual flag by RFC 0115
+   * `retire-virtual-attribute-reconciliation`.
+   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE — retired together with the virtual flag by
-   * RFC 0115 `retire-virtual-attribute-reconciliation`.
    */
   declare static _virtualAttributes?: Set<string>;
 

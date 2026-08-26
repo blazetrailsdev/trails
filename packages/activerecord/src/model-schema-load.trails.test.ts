@@ -4,10 +4,9 @@ type Type = ValueType;
 import { Base } from "./base.js";
 import { declaredAttributeNames, loadSchemaFromAdapter } from "./model-schema.js";
 
-/** The names a class declared with `attribute()`, read off the pending
- * -modification queue the way `columnsHash`' synthesis does. */
+/** The names a class declared with `attribute()`, read off the
+ * pending-modification queue the way `columnsHash`' synthesis does. */
 const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
-
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";

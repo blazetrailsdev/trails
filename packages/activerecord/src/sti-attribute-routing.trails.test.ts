@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { declaredAttributeNames } from "./model-schema.js";
-/** The names a class declared with `attribute()`, read off the pending
- * -modification queue the way `columnsHash`' synthesis does. */
+/** The names a class declared with `attribute()`, read off the
+ * pending-modification queue the way `columnsHash`' synthesis does. */
 const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
-
 
 describe("STI subclass attribute() registration", () => {
   it("keeps subclass attribute() calls on the subclass, not the STI base", () => {
