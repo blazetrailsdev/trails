@@ -561,8 +561,7 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
  * one inverse write, `set_inverse_instance` -> `inversed_from`
  * (`association.rb:132-137, 153-155`); a collection name reaches
  * `CollectionAssociation#target=` (`collection_association.rb:284-295`)
- * through it, and does not raise `_explicitTarget`, which `setInverseInstance`
- * likewise skips for a collection and only `_loadedSingularTarget` reads.
+ * through it.
  *
  * RFC 0022: writers and inverse-of seeders route through the holder, which is
  * the single source of truth — surfaced to readers via `Base#_associationCache`.
@@ -586,39 +585,9 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     // For has_one the FK lives on the target, so `inversedFrom` is equivalent
     // to `setTarget` (assign + loadedBang) with no owner FK write.
     assoc.inversedFrom(target);
-    (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
   record._associationInstances.get(assocName)?.inversedFrom(target);
-}
-
-/**
- * Read the explicitly-set singular target for `assocName` — the short-circuit
- * the inner `loadBelongsTo` / `loadHasOne` loaders consult before querying.
- *
- * RFC 0022: singular writers and inverse-of seeders store their target on the
- * `SingularAssociation` holder (`record.association(name).target`, Rails'
- * `@target`) as the source of truth. These inner loaders run *inside* the
- * holder's own `loadTarget` (`findTarget`) and from sibling
- * through-writers, where the holder is not yet loaded — so a loaded holder here
- * carries an explicit set/seed (or a prior explicit load), the short-circuit we
- * want, plus the `_preloadedAssociations` fallback. Returns a one-key box
- * (`{ value }`) on a hit so a loaded-nil target (null) is distinguished from a
- * miss.
- *
- * @internal
- */
-export function _loadedSingularTarget(
-  record: Base,
-  assocName: string,
-): { value: Base | null } | null {
-  const instance = record._associationInstances.get(assocName) as
-    | { isLoaded(): boolean; _explicitTarget?: boolean; target?: Base | null }
-    | undefined;
-  if (instance?.isLoaded() && instance._explicitTarget) {
-    return { value: instance.target ?? null };
-  }
-  return _preloadedHolderTarget(record, assocName) as { value: Base | null } | null;
 }
 
 /**
@@ -627,8 +596,11 @@ export function _loadedSingularTarget(
  * legacy `record._preloadedAssociations` shadow `Map`. Returns a one-key box
  * (`{ value }`) on a hit so a preloaded-nil target (the preloader stores
  * `setTarget(null)` for a belongs_to that resolved to no record) is
- * distinguished from a miss; gates on `_loadedFromPreload` (not bare
- * `isLoaded()`) so a lazy query load on the holder still re-queries.
+ * distinguished from a miss. Gates on Rails' own pair — `loaded?`
+ * (`association.rb:81-83`) and `@stale_state && stale_target?`
+ * (`association.rb:97-99`), the exact condition `load_target`
+ * (`association.rb:189-190`) re-queries on — so a target whose owner key moved
+ * under it re-queries rather than reading back stale.
  *
  * @internal
  */
@@ -637,12 +609,16 @@ export function _preloadedHolderTarget(
   assocName: string,
 ): { value: Base | Base[] | null } | null {
   const instance = record._associationInstances.get(assocName) as
-    | { isLoaded(): boolean; _loadedFromPreload?: boolean; target?: Base | Base[] | null }
+    | {
+        isLoaded(): boolean;
+        isStaleTarget(): boolean;
+        _staleStateIsSnapshotted: boolean;
+        target?: Base | Base[] | null;
+      }
     | undefined;
-  if (instance?.isLoaded() && instance._loadedFromPreload) {
-    return { value: instance.target ?? null };
-  }
-  return null;
+  if (instance == null || !instance.isLoaded()) return null;
+  if (instance._staleStateIsSnapshotted && instance.isStaleTarget()) return null;
+  return { value: instance.target ?? null };
 }
 
 /**

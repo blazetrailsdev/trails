@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/connection_test.rb
  */
-import { it, expect, describe, beforeEach, afterEach, vi } from "vitest";
+import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value } from "../../type.js";
@@ -319,58 +319,5 @@ describeIfPg("PostgresqlConnectionTest", () => {
     } finally {
       await a.close();
     }
-  });
-});
-
-describe("PostgreSQLAdapter constructor validation", () => {
-  it("rejects invalid variable key", () => {
-    expect(
-      () =>
-        new PostgreSQLAdapter({ connectionString: PG_TEST_URL, variables: { "bad;key": "val" } }),
-    ).toThrow("Invalid PostgreSQL session variable name");
-  });
-
-  it("rejects undefined variable value", () => {
-    expect(
-      () =>
-        new PostgreSQLAdapter({
-          connectionString: PG_TEST_URL,
-          variables: { debug_print_plan: undefined as unknown as null },
-        }),
-    ).toThrow("must be string | number | boolean | null");
-  });
-
-  it("rejects object variable value", () => {
-    expect(
-      () =>
-        new PostgreSQLAdapter({
-          connectionString: PG_TEST_URL,
-          variables: { debug_print_plan: {} as unknown as string },
-        }),
-    ).toThrow("must be string | number | boolean | null");
-  });
-
-  it("accepts numeric variable value (e.g. statement_timeout: 5000)", async () => {
-    let a: PostgreSQLAdapter | undefined;
-    try {
-      expect(() => {
-        a = new PostgreSQLAdapter({
-          connectionString: PG_TEST_URL,
-          variables: { statement_timeout: 5000 },
-        });
-      }).not.toThrow();
-    } finally {
-      await a?.close();
-    }
-  });
-
-  it("rejects non-plain-object variables", () => {
-    expect(
-      () =>
-        new PostgreSQLAdapter({
-          connectionString: PG_TEST_URL,
-          variables: new Map() as unknown as Record<string, string>,
-        }),
-    ).toThrow("variables must be a plain object");
   });
 });

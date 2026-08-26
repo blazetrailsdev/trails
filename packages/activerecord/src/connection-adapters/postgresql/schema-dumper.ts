@@ -258,7 +258,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const opts: string[] = [];
       if (ec.where) opts.push(`where: ${JSON.stringify(ec.where)}`);
       if (ec.using) opts.push(`using: ${JSON.stringify(ec.using)}`);
-      if (ec.deferrable !== undefined) opts.push(`deferrable: ${JSON.stringify(ec.deferrable)}`);
+      if (ec.deferrable) opts.push(`deferrable: ${JSON.stringify(ec.deferrable)}`);
       if (ec.exportNameOnSchemaDump()) opts.push(`name: ${JSON.stringify(ec.name)}`);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `  await ctx.addExclusionConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(ec.expression)}${optStr});`;
@@ -285,7 +285,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const opts: string[] = [];
       if (uc.nullsNotDistinct)
         opts.push(`nullsNotDistinct: ${JSON.stringify(uc.nullsNotDistinct)}`);
-      if (uc.deferrable !== undefined) opts.push(`deferrable: ${JSON.stringify(uc.deferrable)}`);
+      if (uc.deferrable) opts.push(`deferrable: ${JSON.stringify(uc.deferrable)}`);
       if (uc.exportNameOnSchemaDump()) opts.push(`name: ${JSON.stringify(uc.name)}`);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `  await ctx.addUniqueConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(uc.column)}${optStr});`;

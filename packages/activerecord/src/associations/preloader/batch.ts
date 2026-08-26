@@ -96,7 +96,6 @@ export class Batch {
         const association = (record as any).association(branch.association);
         if (!association.isLoaded()) {
           association._setTargetFromLoader(null);
-          association._loadedFromPreload = true;
         }
       } catch {}
     }

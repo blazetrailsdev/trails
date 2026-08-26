@@ -211,7 +211,6 @@ export class Association {
         try {
           const association = (owner as any).association(this.reflection.name);
           association._setTargetFromLoader(record);
-          association._loadedFromPreload = true;
           if (i === 0) {
             association.setInverseInstance(record);
           }
@@ -247,7 +246,6 @@ export class Association {
       value = records[0] ?? null;
       association._setTargetFromLoader(value);
     }
-    association._loadedFromPreload = true;
 
     // Route through `reflection.inverseName()` so automatic inverse detection
     // (via `automaticInverseOf()`, made functional by C1) fires for non-rich

@@ -691,10 +691,23 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
 }
 
 /**
+ * Mirrors: ActiveRecord::ConnectionHandling::DEFAULT_ENV
+ * (connection_handling.rb:7) — `-> { RAILS_ENV.call || "default_env" }`.
+ * `DatabaseConfigurations.currentEnv()` is trails' `RAILS_ENV` chain plus that
+ * literal fallback; the three other Rails `DEFAULT_ENV.call` sites
+ * (`database_configurations.rb:188`, `database_config.rb:91`,
+ * `migration.rb:1341`) still reach it through `currentEnv()` because a static
+ * import edge from those modules back into this one would close a module-eval
+ * cycle.
+ */
+export const DEFAULT_ENV = (): string => DatabaseConfigurations.currentEnv();
+
+/**
  * @missingRailsCall call — PERMANENT: Rails defaults the argument through
- *   `DEFAULT_ENV.call` (connection_handling.rb:51); the port's `configOrEnv ===
- *   undefined` arm routes to `autoConnect` (connection-handling.ts:770), which
- *   resolves the environment itself.
+ *   `DEFAULT_ENV.call` (connection_handling.rb:51). `DEFAULT_ENV` is now ported
+ *   at the Rails name, but Ruby needs `Proc#call` to invoke a Proc where JS
+ *   invokes the function value directly — `DEFAULT_ENV()` IS `DEFAULT_ENV.call`,
+ *   so there is no `call` identifier left for the comparator to match.
  * @missingRailsCall connection_handler — PERMANENT: Verified per-site (RFC
  *   0106): `connection_handler.establish_connection(...)`
  *   (`connection_handling.rb:53`) — the TS `establishConnection` resolves the
@@ -742,7 +755,7 @@ export async function establishConnection(
   // resolved object then goes to the handler verbatim, so the pool stores it
   // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
   // and buildAdapterArg live inside establishWithDbConfig.
-  configOrEnv ??= DatabaseConfigurations.currentEnv();
+  configOrEnv ??= DEFAULT_ENV();
   const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
   await establishWithDbConfig(modelClass, dbConfig);
 }

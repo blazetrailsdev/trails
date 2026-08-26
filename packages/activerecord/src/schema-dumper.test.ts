@@ -481,9 +481,9 @@ describe("SchemaDumperTest", () => {
       { using: "gist", name: "test_schema_exclusion_date_overlap" },
     );
     const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_exclusion");
-    expect(output).toContain("addExclusionConstraint");
-    expect(output).toContain("test_schema_exclusion_date_overlap");
-    expect(output).toContain("daterange(start_date, end_date) WITH &&");
+    expect(output).toContain(
+      'await ctx.addExclusionConstraint("test_schema_exclusion", "daterange(start_date, end_date) WITH &&", { using: "gist", name: "test_schema_exclusion_date_overlap" });',
+    );
   });
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
     const testAdapter = Base.connection;
@@ -499,10 +499,12 @@ describe("SchemaDumperTest", () => {
       name: "test_schema_unique_position_2_nnd",
     });
     const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_unique");
-    expect(output).toContain("addUniqueConstraint");
-    expect(output).toContain("test_schema_unique_position_1");
-    expect(output).toContain("test_schema_unique_position_2_nnd");
-    expect(output).toContain("nullsNotDistinct: true");
+    expect(output).toContain(
+      'await ctx.addUniqueConstraint("test_schema_unique", ["position_1"], { name: "test_schema_unique_position_1" });',
+    );
+    expect(output).toContain(
+      'await ctx.addUniqueConstraint("test_schema_unique", ["position_2"], { nullsNotDistinct: true, name: "test_schema_unique_position_2_nnd" });',
+    );
   });
   itIfSupports(
     "unique_constraints",

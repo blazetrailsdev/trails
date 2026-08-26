@@ -7,12 +7,15 @@ import {
 } from "./database-statements.js";
 
 function hostReporting(value: string | null): MaxAllowedPacketHost & { calls: number } {
-  const host = {
+  const host: MaxAllowedPacketHost & { calls: number } = {
     calls: 0,
     async showVariable(name: string) {
       expect(name).toBe("max_allowed_packet");
       host.calls += 1;
       return value;
+    },
+    maxAllowedPacket() {
+      return maxAllowedPacket.call(host);
     },
   };
   return host;
@@ -26,9 +29,11 @@ describe("MySQL::DatabaseStatements max_allowed_packet", () => {
     expect(host.calls).toBe(1);
   });
 
-  it("falls back to the MySQL default when the server does not answer", async () => {
+  it("raises rather than combining when the server does not answer", async () => {
     const host = hostReporting(null);
-    expect(await maxAllowedPacket.call(host)).toBe(16_777_216);
+    await expect(isMaxAllowedPacketReached.call(host, "SELECT 1", undefined)).rejects.toThrow(
+      /Fixtures set is too large 8\./,
+    );
   });
 
   it("splits statements against the server-reported ceiling", async () => {
