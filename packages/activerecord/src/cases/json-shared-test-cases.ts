@@ -327,7 +327,14 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     static {
       this.tableName = "json_data_type";
       this.attribute("payload", "json");
-      this.filterAttributes = [...(Base.filterAttributes ?? []), "password"];
+    }
+
+    static override get filterAttributes(): (
+      | string
+      | RegExp
+      | ((key: string, value: unknown) => unknown)
+    )[] {
+      return [...super.filterAttributes, "password"];
     }
   }
 
