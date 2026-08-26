@@ -23,34 +23,20 @@ const CASES: [string, string][] = [
 ];
 
 /**
- * Diagnostics for the intermittent failure tracked by
- * `leading-colon-insert-all-first-returns-null-flake` (RFC 0061): the row
- * `insert_all` just wrote is occasionally not found by the very next read, seen
- * on SQLite and MariaDB and only ever inside a full-suite run. The cheap
- * explanations are eliminated (a stale query cache — the cache is never enabled
- * in the AR lanes; a silently skipped `ON CONFLICT DO NOTHING` — the only unique
- * constraint is the PK and the id counters self-adjust), so the next sighting
- * has to bring data out of the failing process itself.
- *
- * This runs ONLY once the read has already come back empty, and reports rather
- * than repairs — it exists to turn a bare "Cannot read properties of null" into
- * an error that says which of the remaining hypotheses is true:
- *
- *   - `returning` empty        → the INSERT itself wrote no row.
- *   - `returning` non-empty but the row is absent from `topics` → something
- *     removed it between the two statements.
- *   - the row present in `topics` but not returned by the read → the read is at
- *     fault (wrong connection, or an uncommitted transaction on another one).
+ * Reports why the row `insert_all` just wrote was not found by the next read —
+ * the intermittent failure tracked by
+ * `leading-colon-insert-all-first-returns-null-flake` (RFC 0061), which has only
+ * ever reproduced inside a full-suite run. Runs on the already-failing path
+ * only. An empty `returning` means the INSERT wrote no row; a non-empty one with
+ * the row absent from `topics` means something removed it in between; the row
+ * present but unread means the read is at fault.
  */
 async function missingRowDiagnostics(
   iteration: number,
   sent: string,
   returning: unknown,
 ): Promise<string> {
-  const connection = (await Topic.leaseConnection()) as unknown as {
-    execQuery(sql: string): Promise<{ rows: unknown[][] }>;
-    openTransactions: number;
-  };
+  const connection = await Topic.leaseConnection();
   const all = await connection.execQuery(
     'SELECT "id", "title", "author_name" FROM "topics" ORDER BY "id"',
   );
