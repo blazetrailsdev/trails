@@ -35,8 +35,7 @@ describe("DatabaseConfigurationsTest", () => {
 
   it("configs for getter with name", () => {
     // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), so key the hash on it as
-    // database_configurations_test.rb:89 does.
+    // (database_configurations.rb:99), so key the hash on it.
     DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {
@@ -50,8 +49,7 @@ describe("DatabaseConfigurationsTest", () => {
 
   it("configs for with name symbol", () => {
     // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), so key the hash on it as
-    // database_configurations_test.rb:89 does.
+    // (database_configurations.rb:99), so key the hash on it.
     DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {
@@ -129,8 +127,7 @@ describe("DatabaseConfigurationsTest", () => {
 
   it("configs for with custom key", () => {
     // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), so key the hash on it as
-    // database_configurations_test.rb:89 does.
+    // (database_configurations.rb:99), so key the hash on it.
     DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {

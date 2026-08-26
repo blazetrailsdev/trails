@@ -199,7 +199,7 @@ export class DatabaseConfigurations {
         Object.prototype.hasOwnProperty.call(c.configuration, options.configKey!),
       );
     }
-    // `if name; configs.find { |db_config| db_config.name == name.to_s }; else; configs; end`
+    // `configs.find { |db_config| db_config.name == name.to_s }`
     // (database_configurations.rb:114-120) — a single config, not an array.
     if (options.name) {
       const nameStr = String(options.name);
