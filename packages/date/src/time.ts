@@ -697,7 +697,10 @@ export class Time {
    * sub-second as a `Rational` (`time.c`, `time_s_mkutc` -> `time_new_timew`),
    * so the fold goes through `Rational` rather than a double, and passing
    * `usec` truncates `sec` to a whole second exactly as MRI's does:
-   * `Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec` is `5000`.
+   * `Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec` is `5000`. The microsecond goes
+   * through `num_exact` too (`time_arg`), so a Rational one — Rails'
+   * `Time.local(..., 59, Rational(999999999, 1000))`
+   * (`core_ext/time/calculations.rb:256-263`) — keeps its full precision.
    */
   static utc(
     year: number | string,
@@ -717,9 +720,6 @@ export class Time {
       usec === undefined
         ? sec
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
-            // MRI takes the microsecond through `num_exact` (`time.c`
-            // `time_arg`), so a Rational one — `Time.local(..., 59,
-            // Rational(999999999, 1000))` — keeps its full precision.
             numExact(usec).quo(1_000_000),
           ),
       "UTC",
@@ -778,9 +778,6 @@ export class Time {
       usec === undefined
         ? (sec ?? 0)
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
-            // MRI takes the microsecond through `num_exact` (`time.c`
-            // `time_arg`), so a Rational one — `Time.local(..., 59,
-            // Rational(999999999, 1000))` — keeps its full precision.
             numExact(usec).quo(1_000_000),
           ),
     );

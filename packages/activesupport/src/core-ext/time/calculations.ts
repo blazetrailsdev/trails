@@ -49,10 +49,6 @@ export interface AdvanceOptions {
   seconds?: number;
 }
 
-// ---------------------------------------------------------------------------
-// class << self — time/calculations.rb:15-82
-// ---------------------------------------------------------------------------
-
 /**
  * Mirrors: `Time.current` (`time/calculations.rb:39-41`).
  *
@@ -109,10 +105,6 @@ export function rfc3339(str: string): RubyTime {
   );
 }
 
-// ---------------------------------------------------------------------------
-// instance methods — time/calculations.rb:84-385
-// ---------------------------------------------------------------------------
-
 /** Mirrors: `Time#seconds_since_midnight` (`time/calculations.rb:91-93`) */
 export function secondsSinceMidnight(this: RubyTime): number {
   return this.toI() - change.call(this, { hour: 0 }).toI() + this.usec / 1.0e6;
@@ -128,10 +120,26 @@ export function secFraction(this: RubyTime): number {
   return this.subsec;
 }
 
-/** Mirrors: `Time#change` (`time/calculations.rb:123-178`) */
+/**
+ * Mirrors: `Time#change` (`time/calculations.rb:123-178`).
+ *
+ * Each `options.fetch(:k, default)` is spelled `"k" in options` rather than
+ * `??`: `Hash#fetch` yields the STORED value whenever the key is present, `nil`
+ * included, where `??` would substitute the default for it. The `options[:hour]`
+ * truthiness tests are the opposite case — Ruby's `0` is truthy — so those are
+ * `!= null`, which admits the `hour: 0` Rails admits.
+ *
+ * `Rational(new_usec, 1000000)` (`:141`) is `quo`: `Rational()` of a Rational
+ * over an Integer is that Rational divided by it.
+ *
+ * The `zone.respond_to?(:utc_to_local)` arm
+ * (`:148-171`) selects a receiver whose `zone` is a `TZInfo` zone OBJECT. No
+ * trails `::Time` carries one — its `zone` is the tzdata abbreviation String —
+ * so the arm is unreachable, and its second-occurrence correction is not lost
+ * with it: the `isdst` handed to `::Time.local` on the next arm makes the same
+ * choice of the wall clock a DST fall-back repeats.
+ */
 export function change(this: RubyTime, options: ChangeOptions): RubyTime {
-  // `Hash#fetch` yields the stored value whenever the key is present, `nil`
-  // included, where `??` would substitute the default for it.
   const newYear = "year" in options ? options.year! : this.year;
   const newMonth = "month" in options ? options.month! : this.month;
   const newDay = "day" in options ? options.day! : this.day;
@@ -148,7 +156,11 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
   if (newNsec != null) {
     if (options.usec != null) {
       throw new ArgumentError(
-        `Can't change both :nsec and :usec at the same time: ${inspectOptions(options)}`,
+        `Can't change both :nsec and :usec at the same time: {${Object.entries(options)
+          .map(
+            ([key, value]) => `${key}: ${typeof value === "string" ? `"${value}"` : String(value)}`,
+          )
+          .join(", ")}}`,
       );
     }
     newUsec = new Rational(newNsec, 1000);
@@ -162,19 +174,12 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
 
   if (newUsec.cmp(1000000) >= 0) throw new ArgumentError("argument out of range");
 
-  // `Rational(new_usec, 1000000)` (`time/calculations.rb:141`) — `Rational()` of
-  // a Rational over an Integer is that Rational divided by it, which `quo` is.
   newSec = newSec.add(newUsec.quo(1_000_000));
 
   if (newOffset != null) {
     return RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, newOffset);
   } else if (this.isUtc()) {
     return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
-    // The `zone.respond_to?(:utc_to_local)` arm (`time/calculations.rb:148-171`)
-    // selects a receiver whose `zone` is a `TZInfo` zone OBJECT. No trails
-    // `::Time` carries one — its `zone` is the tzdata abbreviation String — and
-    // that arm's second-occurrence correction is not lost with it, because the
-    // `isdst` `::Time.local` takes below makes the same choice.
   } else if (this.zone != null) {
     return RubyTime.local(
       newSec,
@@ -193,19 +198,21 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
   }
 }
 
-/** `options.inspect` in `change`'s raise (`time/calculations.rb:135`). */
-function inspectOptions(options: ChangeOptions): string {
-  const pairs = Object.entries(options).map(
-    ([key, value]) => `${key}: ${typeof value === "string" ? `"${value}"` : String(value)}`,
-  );
-  return `{${pairs.join(", ")}}`;
-}
-
-/** Mirrors: `Time#advance` (`time/calculations.rb:194-217`) */
+/**
+ * Mirrors: `Time#advance` (`time/calculations.rb:194-217`).
+ *
+ * Rails writes the normalised `:weeks` / `:days` back into the CALLER's hash;
+ * `Date#advance` (`date/calculations.rb:127-136`) reads it only, and
+ * `date_ext_test.rb:367-371` asserts the difference. The write goes into a copy
+ * here so that the hash this hands on to the `Date` arm is the one Rails hands
+ * it, without the caller's object moving under a `Date` receiver's contract.
+ *
+ * `to_date.gregorian` (`:206`) puts the day on the
+ * proleptic Gregorian calendar before advancing it. `Time#toDate`
+ * (`packages/date/src/time.ts`) already builds under `GREGORIAN`, as MRI's
+ * `time_to_date` does, so there is no reform to lift.
+ */
 export function advance(this: RubyTime, options: AdvanceOptions): RubyTime {
-  // Rails writes the normalised `:weeks` / `:days` back into the caller's hash;
-  // `Date#advance` reads it only, and `date_ext_test.rb:367-371` asserts the
-  // difference, so the write goes into a copy rather than the caller's object.
   options = { ...options };
 
   if (options.weeks != null) {
@@ -237,7 +244,16 @@ export function ago(this: RubyTime, seconds: number): RubyTime {
   return since.call(this, -seconds);
 }
 
-/** Mirrors: `Time#since` (`time/calculations.rb:225-234`) */
+/**
+ * Mirrors: `Time#since` (`time/calculations.rb:225-234`).
+ *
+ * Rails' `rescue TypeError` arm exists for a
+ * `seconds` that `Time#+` will not take, and warns that Rails 8.1 will raise
+ * there instead. `seconds` is typed `number` here, so `Time#plus` cannot raise
+ * and the arm is unreachable; porting it would widen this method's return —
+ * and, through `ago`/`advance`/every `beginning_of_*`, the whole reopening's —
+ * to `Time | DateTime` for a branch nothing can enter.
+ */
 export function since(this: RubyTime, seconds: number): RubyTime {
   return this.plus(seconds);
 }
@@ -289,9 +305,9 @@ export function endOfMinute(this: RubyTime): RubyTime {
   });
 }
 
-// Rails' `alias`es over the methods above — `alias :in :since`
-// (`time/calculations.rb:235`), the day boundaries (:241-243, :250-254, :264),
-// the hour ones (:270, :281) and the minute ones (:286, :295).
+/** Rails' `alias`es: `alias :in :since` (`time/calculations.rb:235`), the day
+ * boundaries (:241-243, :250-254, :264), the hour ones (:270, :281) and the
+ * minute ones (:286, :295). */
 export { since as in };
 export { beginningOfDay as midnight };
 export { beginningOfDay as atMidnight };
@@ -383,8 +399,6 @@ declare module "@blazetrails/date" {
   }
 }
 
-// `class Time` is a reopening, so the members above land on the class itself —
-// the TS spelling of Ruby's open class, per CLAUDE.md "Module mixins".
 Object.assign(RubyTime.prototype, {
   secondsSinceMidnight,
   secondsUntilEndOfDay,
