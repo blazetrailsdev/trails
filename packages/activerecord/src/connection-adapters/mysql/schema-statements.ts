@@ -342,12 +342,10 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
  */
 export interface MysqlColumnReflectionHost {
   createTableInfo(tableName: string): Promise<string | null>;
-  lookupCastType?(sqlType: string): {
-    name: string;
-    limit?: number | null;
-    precision?: number | null;
-    scale?: number | null;
-  };
+  // `AbstractAdapter#lookup_cast_type` (abstract/quoting.rb:234) returns a
+  // `Type`; the widened return here carries `PostgreSQLAdapter`'s awaitable
+  // one, which never reaches this MySQL-only host.
+  lookupCastType?(sqlType: string | null): unknown;
 }
 
 /**
@@ -388,7 +386,15 @@ export async function newColumnFromField(
   const meta = fetchTypeMetadata(
     field["Type"] ?? "",
     field["Extra"] ?? "",
-    this.lookupCastType ? (sqlType) => this.lookupCastType!(sqlType) : undefined,
+    this.lookupCastType
+      ? (sqlType) =>
+          this.lookupCastType!(sqlType) as {
+            name: string;
+            limit?: number | null;
+            precision?: number | null;
+            scale?: number | null;
+          }
+      : undefined,
   );
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;

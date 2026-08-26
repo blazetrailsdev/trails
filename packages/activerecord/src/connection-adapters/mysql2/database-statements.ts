@@ -365,7 +365,7 @@ export async function performQuery(
  * @internal
  */
 export function castResult(
-  this: { lookupCastType(sqlType: string): Type },
+  this: { lookupCastType(sqlType: string): Type | Promise<Type> | null },
   rawResult: Mysql2RawResult,
 ): Result {
   if (rawResult.rows == null) return Result.empty();
@@ -381,7 +381,10 @@ export function castResult(
       : new Result(
           fields.map((f) => f.name),
           rawResult.rows,
-          buildColumnTypes(fields, (t) => this.lookupCastType(t)),
+          // MySQL's `lookup_cast_type` is the plain type-map lookup
+          // (abstract/quoting.rb:234-236); only PostgreSQL's override is
+          // awaitable, and it never reaches this MySQL-only helper.
+          buildColumnTypes(fields, (t) => this.lookupCastType(t) as Type),
         );
 
   freeRawResult(rawResult);

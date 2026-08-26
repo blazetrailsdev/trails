@@ -33,17 +33,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("statement pool max", async () => {
-      await adapter.beginDbTransaction();
+      // Rails' matching test sets statement_limit = 1 and asserts LRU
+      // eviction. The limit is constructor-only (statement_pool.rb:10-13), so
+      // the adapter is built at the limit under test.
+      const limited = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: 1 });
+      await limited.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::int", [1]);
-        const pool = adapter._statements;
-        // Rails' matching test sets statement_limit = 1 and asserts
-        // LRU eviction. setMaxSize immediately evicts excess entries.
-        await pool.setMaxSize(1);
-        await adapter.execute("SELECT $1::text", ["a"]);
-        expect(pool.length).toBe(1);
+        await limited.execute("SELECT $1::int", [1]);
+        await limited.execute("SELECT $1::text", ["a"]);
+        expect(limited._statements.length).toBe(1);
       } finally {
-        await adapter.rollback();
+        await limited.rollback();
+        await limited.close();
       }
     });
 
@@ -128,7 +129,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         statementLimit: 7,
       });
       await configured.execute("SELECT $1::int", [1]);
-      expect(configured._statements.maxSize).toBe(7);
+      const pool = configured._statements;
+      expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
       await configured.close();
     });
 

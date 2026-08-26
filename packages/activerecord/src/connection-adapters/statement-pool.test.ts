@@ -146,38 +146,26 @@ describe("SQLite3 StatementPool integration", () => {
     }
   });
 
-  it("setMaxSize shrinks and evicts LRU entries through dealloc", async () => {
+  it("evicts LRU entries through dealloc once the statement limit is reached", async () => {
     const dealloced: string[] = [];
     class TestPool extends StatementPool<string> {
       protected dealloc(stmt: string): void {
         dealloced.push(stmt);
       }
     }
-    const pool = new TestPool(5);
+    const pool = new TestPool(2);
     await pool.set("a", "stmt_a");
     await pool.set("b", "stmt_b");
-    await pool.set("c", "stmt_c");
-    // Touch "a" so it's moved to MRU — LRU order becomes b, c, a.
+    // Touch "a" so it's moved to MRU — LRU order becomes b, a.
     pool.get("a");
-    await pool.setMaxSize(1);
-    expect(pool.length).toBe(1);
+    await pool.set("c", "stmt_c");
+    expect(pool.length).toBe(2);
     expect(pool.has("a")).toBe(true);
-    expect(dealloced).toEqual(["stmt_b", "stmt_c"]);
+    expect(dealloced).toEqual(["stmt_b"]);
   });
 
-  it("setMaxSize(0) evicts everything and raises on a further insert", async () => {
-    const dealloced: string[] = [];
-    class TestPool extends StatementPool<string> {
-      protected dealloc(stmt: string): void {
-        dealloced.push(stmt);
-      }
-    }
-    const pool = new TestPool(5);
-    await pool.set("a", "stmt_a");
-    await pool.set("b", "stmt_b");
-    await pool.setMaxSize(0);
-    expect(pool.length).toBe(0);
-    expect(dealloced.sort()).toEqual(["stmt_a", "stmt_b"]);
+  it("a statement limit of 0 raises on the first insert", async () => {
+    const pool = new StatementPool<string>(0);
     // Rails' `[]=` has no zero-limit special case: `while 0 <= cache.size`
     // runs on the empty cache, `Hash#shift` returns nil and `nil.last` raises
     // (statement_pool.rb:31-33). A `statement_limit` of 0 is unsupported.
@@ -200,14 +188,5 @@ describe("SQLite3 StatementPool integration", () => {
     order.push("eviction-site-resumed");
     await pool.clear();
     expect(order).toEqual(["stmt_a", "eviction-site-resumed", "stmt_b"]);
-  });
-
-  it("setMaxSize rejects negative / non-integer values", () => {
-    const pool = new StatementPool<string>(5);
-    expect(() => pool.setMaxSize(-1)).toThrow(RangeError);
-    expect(() => pool.setMaxSize(1.5)).toThrow(RangeError);
-    expect(() => pool.setMaxSize(NaN)).toThrow(RangeError);
-    expect(() => pool.setMaxSize(Infinity)).toThrow(RangeError);
-    expect(pool.maxSize).toBe(5);
   });
 });

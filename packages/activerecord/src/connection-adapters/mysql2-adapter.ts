@@ -76,6 +76,8 @@ class Mysql2StatementPool extends MysqlStatementPool {
   }
 }
 
+let mysql2TypeMap: TypeMap | null = null;
+
 /**
  * MySQL adapter — connects ActiveRecord to a real MySQL/MariaDB database.
  *
@@ -125,6 +127,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
     m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql2" }));
     m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
+  }
+
+  /**
+   * @internal Mirrors: Mysql2Adapter::TYPE_MAP (mysql2_adapter.rb:53)
+   *
+   * Declared here, as in Rails, so `self::TYPE_MAP` inside `extended_type_map`
+   * resolves to the mysql2 map rather than the abstract one. Built on first
+   * read for the same temporal-dead-zone reason `AbstractAdapter::TYPE_MAP` is.
+   */
+  static override get TYPE_MAP(): TypeMap {
+    return (mysql2TypeMap ??= (() => {
+      const m = new TypeMap();
+      Mysql2Adapter.initializeTypeMap(m);
+      return m;
+    })());
   }
 
   // Mirrors Rails' Mysql2Adapter#active? (mysql2_adapter.rb:108), whose body is

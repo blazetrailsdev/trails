@@ -5,43 +5,19 @@
  */
 
 export class StatementPool<T = unknown> {
-  private _cache = new Map<string, T>();
-  private _maxSize: number;
+  /** Mirrors: StatementPool::DEFAULT_STATEMENT_LIMIT (statement_pool.rb:8) */
+  static readonly DEFAULT_STATEMENT_LIMIT = 1000;
 
-  constructor(maxSize = 1000) {
-    this._maxSize = maxSize;
+  private _cache: Map<string, T>;
+  private _statementLimit: number;
+
+  constructor(statementLimit?: number) {
+    this._cache = new Map<string, T>();
+    this._statementLimit = statementLimit ?? StatementPool.DEFAULT_STATEMENT_LIMIT;
   }
 
   get length(): number {
     return this.cache.size;
-  }
-
-  get maxSize(): number {
-    return this._maxSize;
-  }
-
-  /**
-   * Shrink (or grow) the LRU bound. Shrinking evicts the
-   * least-recently-used statements via `dealloc` — matches Rails'
-   * behavior when `statement_limit` is changed mid-session.
-   */
-  setMaxSize(maxSize: number): void | Promise<void> {
-    if (!Number.isInteger(maxSize) || maxSize < 0) {
-      throw new RangeError(
-        `StatementPool#setMaxSize expected a finite non-negative integer; got ${String(maxSize)}`,
-      );
-    }
-    this._maxSize = maxSize;
-    const deallocating: Array<Promise<void>> = [];
-    while (this.cache.size > this._maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey === undefined) break;
-      const evicted = this.cache.get(firstKey)!;
-      this.cache.delete(firstKey);
-      const pending = this.dealloc(evicted);
-      if (pending) deallocating.push(pending);
-    }
-    if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
   }
 
   get(key: string): T | undefined {
@@ -55,7 +31,7 @@ export class StatementPool<T = unknown> {
   set(key: string, stmt: T): void | Promise<void> {
     this.cache.delete(key);
     const deallocating: Array<Promise<void>> = [];
-    while (this._maxSize <= this.cache.size) {
+    while (this._statementLimit <= this.cache.size) {
       // `dealloc(cache.shift.last)` (statement_pool.rb:32). The non-null
       // assertion carries Rails' failure mode rather than papering over it: at
       // `statement_limit` 0 the loop runs on an empty cache, Ruby's

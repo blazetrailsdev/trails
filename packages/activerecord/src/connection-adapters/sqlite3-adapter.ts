@@ -418,9 +418,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       );
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
-      void this._statements.setMaxSize(
-        SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
-      );
+      // `@statements = build_statement_pool` runs after `@config` is assigned
+      // (abstract_adapter.rb:156); the TS field initializer above runs before
+      // this constructor body, so the pool is rebuilt once the limit is known.
+      this._statements = this.buildStatementPool();
     }
     this.connect();
     if (!this._asyncConnectPending) void this.configureConnection();

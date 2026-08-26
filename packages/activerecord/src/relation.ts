@@ -1657,15 +1657,12 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Extract scope attributes from the where clauses (for find_or_create_by).
-   */
-  /**
    * Return attributes that would be set on records created through this relation.
    *
-   * Mirrors: ActiveRecord::Relation#scope_for_create
+   * Mirrors: ActiveRecord::Relation#scope_for_create (relation.rb:1231-1235)
    */
   scopeForCreate(): Record<string, unknown> {
-    const hash = this._scopeAttributes();
+    const hash = this.whereClause.toH(this.model.tableName, { equalityOnly: true });
     if (!isEmpty(this.createWithValue)) {
       for (const [k, v] of Object.entries(this.createWithValue)) hash[k] = v;
     }
@@ -1684,11 +1681,6 @@ export class Relation<T extends Base> {
    */
   whereValuesHash(relationTableName: string = this.model.tableName): Record<string, unknown> {
     return this.whereClause.toH(relationTableName);
-  }
-
-  /** @internal */
-  protected _scopeAttributes(): Record<string, unknown> {
-    return this.whereClause.toH(this.model.tableName, { equalityOnly: true });
   }
 
   // -- SQL generation --
