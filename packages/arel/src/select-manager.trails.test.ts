@@ -69,10 +69,8 @@ describe("SelectManagerTest (trails)", () => {
     });
   });
 
-  // `join`/`outerJoin` + `on` builder chain. Rails' select_manager_test.rb
-  // "joins" describe exercises the join SQL by handing `from` a pre-built
-  // Nodes::InnerJoin/OuterJoin instead, so the fluent path has no Rails
-  // counterpart test and is pinned here rather than under a Rails test name.
+  // Rails' "joins" describe exercises join SQL by handing `from` a pre-built
+  // Nodes::InnerJoin/OuterJoin, so the fluent chain has no Rails counterpart.
   describe("join builder chain", () => {
     const posts = new Table("posts");
     const star = new Nodes.SqlLiteral("*");

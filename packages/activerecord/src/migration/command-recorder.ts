@@ -48,8 +48,8 @@ export class CommandRecorder {
     this._reverting = value;
   }
 
-  // Mirrors `attr_accessor :commands` (command_recorder.rb:65) — the live
-  // array, which `change_table`'s bulk path and `revert` both mutate in place.
+  /** Mirrors `attr_accessor :commands` (command_recorder.rb:65) — the live
+   *  array, which `change_table`'s bulk path and `revert` mutate in place. */
   get commands(): MigrationCommand[] {
     return this._commands;
   }

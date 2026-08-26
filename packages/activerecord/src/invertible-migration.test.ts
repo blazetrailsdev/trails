@@ -53,11 +53,8 @@ class InvertibleChangeTableMigration extends SilentMigration {
 
 class InvertibleTransactionMigration extends InvertibleMigration {
   async change(): Promise<void> {
-    // The Ruby writes a bare `transaction do super end`
-    // (invertible_migration_test.rb:36-42), which reaches the connection —
-    // the CommandRecorder while reverting — through `Migration#method_missing`
-    // (migration.rb:1044-1057). `Migration` has no `#transaction` of its own in
-    // Rails, so the forwarding itself is the mirror.
+    // Rails has no `Migration#transaction`: the Ruby's bare `transaction do`
+    // reaches the connection through `method_missing` (migration.rb:1044-1057).
     await this.methodMissing("transaction", async () => {
       await super.change();
     });
