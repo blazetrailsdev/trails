@@ -36,16 +36,20 @@ export class ImmutableStringType extends ValueType<string> {
    *   end
    *
    * `super` is Value#serialize — identity — so an Object, an Array or a Hash
-   * comes straight back out (string_test.rb:17-23 pins that). A Ruby Symbol is
-   * a `":name"` string in trails, and the leading colon is the discriminator
-   * the `when ::Symbol` arm gets from the type: `:bob.to_s` is `"bob"`, so the
-   * Symbol arm is `.slice(1)` while a String falls through to `super`
-   * unchanged.
+   * comes straight back out (string_test.rb:17-23 pins that), and so does a
+   * String.
+   *
+   * The `when ::Symbol` arm has no trails arm. Ruby reaches it on the *type*
+   * of the value, which a String can never satisfy; trails spells a Symbol as
+   * a `":name"` string, so keying that arm off a leading colon fires on
+   * ordinary String data as well and eats one colon per write (`"::Alpha"` was
+   * stored as `":Alpha"`). Attribute values here are data, not the API-argument
+   * positions where the colon is a real discriminator, so the String arm —
+   * verbatim identity — is the one that governs.
    */
   serialize(value: unknown): unknown {
     if (typeof value === "number" || typeof value === "bigint") return String(value);
     if (value instanceof BigDecimal || value instanceof Duration) return String(value);
-    if (typeof value === "string" && value.startsWith(":")) return value.slice(1);
     if (value === true) return this.true;
     if (value === false) return this.false;
     return super.serialize(value);
