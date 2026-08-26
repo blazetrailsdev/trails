@@ -226,8 +226,7 @@ export class SchemaCache {
 
     this._version = (coder["version"] as string | number) ?? null;
 
-    // `unless coder["deduplicated"]` (`schema_cache.rb:289-291`) — a dump that
-    // already interned its values is taken as-is, identity and all.
+    // `unless coder["deduplicated"]` (`schema_cache.rb:289-291`).
     if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
       this.deriveColumnsHashAndDeduplicateValues();
     }
@@ -1019,17 +1018,14 @@ export function deepDeduplicate<T>(value: T): T {
     ) as unknown as T;
   }
   if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;
-  if (isDeduplicable(value)) return deduplicate(value) as unknown as T;
-  return value;
-}
-
-/** @internal */
-function isDeduplicable(value: unknown): value is Deduplicable {
-  return (
+  if (
     value !== null &&
     typeof value === "object" &&
-    typeof (value as Deduplicable).deduplicateKey === "function"
-  );
+    typeof (value as unknown as Deduplicable).deduplicateKey === "function"
+  ) {
+    return deduplicate(value as unknown as Deduplicable) as unknown as T;
+  }
+  return value;
 }
 
 /**

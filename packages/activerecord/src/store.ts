@@ -450,8 +450,7 @@ export function store(
 
 /**
  * Returns the HashAccessor class for a given store attribute column.
- * Raises ConfigurationError if the column is not a declared store and the
- * attribute type has no accessor.
+ * Raises ConfigurationError unless the attribute's type responds to `accessor`.
  *
  * Mirrors: ActiveRecord::Store#store_accessor_for (private)
  *
