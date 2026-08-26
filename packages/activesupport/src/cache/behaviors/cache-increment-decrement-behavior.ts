@@ -20,7 +20,6 @@ export interface CacheIncrementDecrementBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
 export function cacheIncrementDecrementBehavior(host: CacheIncrementDecrementBehaviorHost): void {
   it("increment", () => {
     const cache = host.lookupStore();

@@ -791,7 +791,11 @@ export function toDate(date: Date): Temporal.PlainDate {
 /**
  * instantToS — Rails `Time#to_s` for a UTC `Temporal.Instant`.
  * Returns `"YYYY-MM-DD HH:MM:SS UTC"` — the default Ruby format for UTC times.
+ *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby gets this from `Time#to_s`, which every Time
+ * answers (`Time#to_fs`, core_ext/time/conversions.rb:55-61). A `Temporal.Instant` is not a Time
+ * and carries no such method, so the format has to be spelled as a free function.
  */
 export function instantToS(instant: Temporal.Instant): string {
   const zdt = instant.toZonedDateTimeISO("UTC");

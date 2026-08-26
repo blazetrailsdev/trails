@@ -26,7 +26,7 @@ function isPresent(value: unknown): boolean {
 }
 
 export abstract class Metadata {
-  /** @internal */
+  /** Mirrors: Metadata.use_message_serializer_for_metadata (messages/metadata.rb:10). */
   static useMessageSerializerForMetadata = false;
 
   static readonly ENVELOPE_SERIALIZERS: readonly unknown[] = [

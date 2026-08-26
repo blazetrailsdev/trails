@@ -205,6 +205,9 @@ export interface AttributeAssignment {
  * no such delegate, so it falls through to the key count.
  *
  * @internal Rails-private helper.
+ * @noRailsEquivalent CONVERGEABLE Rails spells this as a bare `attributes.empty?`
+ * guard inline in `assign_attributes` (attribute_assignment.rb:32); it converges by
+ * inlining once the ActionController::Parameters port carries a real `empty?`.
  */
 export function isMassAssignmentEmpty(attrs: object): boolean {
   if (isParamsLikeWrapper(attrs)) {

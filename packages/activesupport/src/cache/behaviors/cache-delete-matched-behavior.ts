@@ -13,7 +13,6 @@ export interface CacheDeleteMatchedBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
 export function cacheDeleteMatchedBehavior(host: CacheDeleteMatchedBehaviorHost): void {
   it("delete matched", () => {
     const cache = host.lookupStore();

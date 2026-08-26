@@ -218,12 +218,12 @@ export abstract class CurrentAttributes {
     return this.instance().set(attributes, block);
   }
 
-  /** Mirrors: CurrentAttributes.reset_all (current_attributes.rb:156-158) @internal */
+  /** Mirrors: CurrentAttributes.reset_all (current_attributes.rb:156-158) */
   static resetAll(): void {
     for (const instance of this.currentInstances().values()) instance.reset();
   }
 
-  /** Mirrors: CurrentAttributes.clear_all (current_attributes.rb:160-163) @internal */
+  /** Mirrors: CurrentAttributes.clear_all (current_attributes.rb:160-163) */
   static clearAll(): void {
     this.resetAll();
     this.currentInstances().clear();

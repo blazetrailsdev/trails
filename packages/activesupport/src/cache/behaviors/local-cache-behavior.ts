@@ -12,7 +12,6 @@ import { it } from "vitest";
 // to hold. They name the Rails cases in one place, against the Rails module,
 // rather than crediting whichever store test happened to list them.
 
-/** @internal */
 export function localCacheBehavior(): void {
   it.skip("instrumentation with local cache");
   it.skip("local writes are persistent on the remote cache");

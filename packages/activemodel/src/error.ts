@@ -145,9 +145,7 @@ export class Error {
     }) as string;
   }
 
-  /**
-   * @internal Rails-private helper (activemodel/lib/active_model/error.rb:64).
-   */
+  /** Mirrors: ActiveModel::Error.generate_message (error.rb:64). */
   static generateMessage(
     attribute: string,
     type: string,

@@ -194,8 +194,6 @@ export class Validations {
   /**
    * Mirrors Rails `def validation_context; context_for_validation.context; end`
    * (validations.rb:454-456) — a Symbol, an Array of Symbols, or `null`.
-   *
-   * @internal
    */
   get validationContext(): string | string[] | null {
     return this.contextForValidation().context;
@@ -546,8 +544,6 @@ interface ValidationsFreezeHost {
  * Throw `ValidationError` for the current model. Mirrors Rails
  * `def raise_validation_error; raise(ValidationError.new(self)); end`
  * (activemodel/lib/active_model/validations.rb:478-480).
- *
- * @internal Rails-private helper.
  */
 export function raiseValidationError<TBase extends object = object>(this: {
   errors: Errors<TBase>;
@@ -628,8 +624,6 @@ export interface ReadAttributeForValidationHost {
  * sets and restores the context per run, so the copy is never observed in
  * flight. Ruby's `super` is `super_()`, the receiver-bound link `prepend()`
  * hands the module — and as in Rails the replacement is assigned BEFORE it.
- *
- * @internal Rails-private helper.
  */
 export function initializeDup<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,

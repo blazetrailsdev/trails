@@ -121,7 +121,7 @@ export function nilUuid(): string {
 }
 
 /**
- * @internal Mirrors: Digest::UUID.pack_uuid_namespace
+ * Mirrors: Digest::UUID.pack_uuid_namespace
  * (`core_ext/digest/uuid.rb:61-71`, `private_class_method`).
  */
 export function packUuidNamespace(namespace: string | Uint8Array): Uint8Array {

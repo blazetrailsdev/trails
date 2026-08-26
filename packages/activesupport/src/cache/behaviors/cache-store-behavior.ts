@@ -15,7 +15,6 @@ export interface CacheStoreBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
 export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   let cache: Store;
 

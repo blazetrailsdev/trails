@@ -17,7 +17,6 @@ export interface CacheInstrumentationBehaviorHost {
   storeName: string;
 }
 
-/** @internal */
 export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorHost): void {
   let cache: Store;
 

@@ -25,7 +25,12 @@ interface ClassState {
 
 const _classState = new WeakMap<AnyClass, ClassState>();
 
-/** @internal Exposed for LogSubscriber to read per-class namespace. */
+/**
+ * @internal Exposed for LogSubscriber to read per-class namespace.
+ * @noRailsEquivalent PERMANENT Ruby reads the per-class ivars directly
+ * (`@namespace`, set at subscriber.rb:36); TS has no ivar, so the state lives in a
+ * module-level WeakMap that LogSubscriber reaches through this reader.
+ */
 export function getClassState(cls: AnyClass): ClassState {
   return getState(cls);
 }

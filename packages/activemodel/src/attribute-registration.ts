@@ -75,7 +75,6 @@ export class PendingType implements PendingModification {
     readonly type: Type | null,
   ) {}
 
-  /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
     attributeSet.set(this.name, existing.withType(this.type ?? existing.type));
@@ -89,7 +88,6 @@ export class PendingDefault implements PendingModification {
     readonly default_: unknown,
   ) {}
 
-  /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
     attributeSet.set(this.name, existing.withUserDefault(this.default_));
@@ -113,8 +111,6 @@ export interface AttributeRegistrationHost extends AttributeHostInternals {
  * type, appends the pending modifications, and resets the default attributes.
  * `ActiveModel::Attributes::ClassMethods#attribute` (attributes.rb:59-62) calls
  * this through `super` and then generates the attribute methods.
- *
- * @internal
  */
 export function attribute(
   this: AttributeRegistrationHost,
@@ -228,7 +224,6 @@ export class PendingDecorator implements PendingModification {
     readonly decorator: AttributeDecorator,
   ) {}
 
-  /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {

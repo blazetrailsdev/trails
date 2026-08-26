@@ -49,7 +49,6 @@ export interface CacheStoreCoderBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
 export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void {
   it("coder receive the entry on write", () => {
     const coder = new SpyCoder();

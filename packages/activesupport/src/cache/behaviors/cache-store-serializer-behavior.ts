@@ -17,7 +17,6 @@ export interface CacheStoreSerializerBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
 export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorHost): void {
   afterEach(() => {
     setFormatVersion(7.0);

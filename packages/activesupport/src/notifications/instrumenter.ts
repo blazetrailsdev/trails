@@ -53,7 +53,7 @@ export class Event {
     return this._end != null ? this._end / 1000.0 : null;
   }
 
-  /** @internal */
+  /** Mirrors: Notifications::Event#record (notifications/instrumenter.rb:132-143). */
   record<T = void>(fn?: (payload: EventPayload) => T): T {
     this.startBang();
     try {
@@ -67,9 +67,13 @@ export class Event {
   }
 
   /**
-   * @internal trails splits Ruby's one blocking `Event#record` into a sync and
-   * an awaiting form, as it does for `Notifications.instrument` /
-   * `instrumentAsync` (instrumenter.rb:59-67).
+   * trails splits Ruby's one blocking `Event#record` into a sync and an awaiting
+   * form, as it does for `Notifications.instrument` / `instrumentAsync`
+   * (instrumenter.rb:59-67).
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT Ruby's `Event#record` (instrumenter.rb:132-143) is
+   * blocking, so one method covers both cases; an awaited block needs its own arm.
    */
   async recordAsync<T = void>(fn?: (payload: EventPayload) => Promise<T>): Promise<T> {
     this.startBang();
@@ -264,7 +268,7 @@ export class Instrumenter {
     );
   }
 
-  /** @internal instrumenter.rb:82-84 */
+  /** Mirrors: Instrumenter#new_event (instrumenter.rb:82-84). */
   newEvent(name: string, payload: EventPayload = {}): Event {
     return new Event(name, null, null, this.id, payload);
   }

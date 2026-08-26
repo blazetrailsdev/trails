@@ -426,12 +426,12 @@ export class Deprecation {
     }
   }
 
-  /** @internal Rails: deprecation/reporting.rb:48-50. */
+  /** Mirrors: Deprecation::Reporting#begin_silence (deprecation/reporting.rb:48-50). */
   beginSilence(): void {
     this._silenceCounter += 1;
   }
 
-  /** @internal Rails: deprecation/reporting.rb:52-54. */
+  /** Mirrors: Deprecation::Reporting#end_silence (deprecation/reporting.rb:52-54). */
   endSilence(): void {
     this._silenceCounter -= 1;
   }

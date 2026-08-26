@@ -214,6 +214,10 @@ export const cattrAccessor = mattrAccessor;
  * Works like mattrAccessor but uses a separate config hash namespace.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE Backed by the private
+ * `Configurable::ClassMethods#config_accessor` (configurable.rb:111-128, made private at :129); the privates
+ * manifest cannot back it here because trails hosts it in module-ext.ts rather than a
+ * configurable.ts, and the manifest keys private names by the .rb they live in.
  */
 export function configAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
   mattrAccessor(target, ...namesAndOptions);

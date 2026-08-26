@@ -35,7 +35,6 @@ export interface CompressionBehaviorHost {
   compressionAlwaysDisabledByDefault?: boolean;
 }
 
-/** @internal */
 export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): void {
   let cache: Store;
 

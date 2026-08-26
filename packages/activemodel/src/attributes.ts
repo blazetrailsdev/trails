@@ -89,8 +89,6 @@ export interface AttributeOptions {
  * gets no accessor, because `define_attribute_method_pattern`'s
  * `instance_method_already_implemented?` arm rejects it; such an attribute still
  * round-trips through `readAttribute` / `writeAttribute`.
- *
- * @internal
  */
 export function attribute(
   this: AttributeRegistrationHost & { defineAttributeMethod(attrName: string): void },
@@ -154,8 +152,6 @@ export function setDefineMethodAttribute(
  * `ActiveModel::Model` includes `ActiveModel::API`, which includes
  * `Attributes`, so this link sits BELOW Validations and Dirty in the chain —
  * their `super` unwinds into it.
- *
- * @internal Rails-private helper.
  */
 export function initializeDup(
   this: AttributeInstanceHost,
@@ -180,8 +176,6 @@ export function initializeDup(
  * `initialize_clone`, which `AttributeSet` overrides to dup its inner hash
  * (attribute_set.rb:82-85) — spelled here as the same allocate-and-copy `dup()`
  * uses.
- *
- * @internal Rails-private helper.
  */
 export function freeze(this: AttributeInstanceHost): void {
   if (!Object.isFrozen(this)) {
@@ -256,8 +250,6 @@ export class Attributes {
    *
    * The reader `define_proxy_call` generates for the bare attribute pattern
    * dispatches here (attribute_methods.rb:333-346).
-   *
-   * @internal Rails-private helper.
    */
   attribute(attrName: string): unknown {
     return this._attributes.fetchValue(attrName) ?? null;

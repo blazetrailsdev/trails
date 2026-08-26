@@ -68,7 +68,6 @@ import {
 export class TestCase {
   // include ActiveSupport::Testing::TaggedLogging (test_case.rb:144)
   static setTaggedLogger = setTaggedLogger;
-  /** @internal */
   static taggedLogger = taggedLogger;
 
   // prepend ActiveSupport::Testing::SetupAndTeardown (test_case.rb:145)
