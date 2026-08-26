@@ -122,3 +122,33 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
   });
 });
+
+// `Class.new(ActiveSupport::Executor)` / `Class.new(ActiveSupport::Reloader)`
+// (`application.rb:122-123`). Rails gets the per-app isolation for free from
+// `Class.new` and has no test for it; trails' properties carry a written type,
+// which a plain `Executor` would also satisfy.
+describe("Rails::Application#executor and #reloader are per-application (trails)", () => {
+  class TestApplication extends Application {}
+
+  it("does not share callbacks between two applications", () => {
+    const one = new TestApplication();
+    const two = new TestApplication();
+
+    expect(one.executor).not.toBe(two.executor);
+    expect(one.reloader).not.toBe(two.reloader);
+
+    const ran: string[] = [];
+    one.executor.toRun(() => ran.push("one"));
+    two.executor.wrap(() => {});
+
+    expect(ran).toEqual([]);
+    one.executor.wrap(() => {});
+    expect(ran).toEqual(["one"]);
+  });
+
+  it("wires the reloader's executor to the application's own executor", () => {
+    const app = new TestApplication();
+
+    expect(app.reloader.executor).toBe(app.executor);
+  });
+});

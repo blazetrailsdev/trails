@@ -37,12 +37,15 @@ export class Application extends Engine {
   private _credentials?: EncryptedFile;
   private _app?: RackApp;
   /** Rails: `@executor = Class.new(ActiveSupport::Executor)` (`application.rb:122`);
-   * `@reloader.executor = @executor` (`application.rb:124`) is the constructor. */
-  readonly executor = class extends Executor {};
+   * `@reloader.executor = @executor` (`application.rb:124`) is the constructor.
+   * The `typeof Executor` annotation is declaration-emit only: TypeScript
+   * cannot write a `.d.ts` for an anonymous class type inheriting `#private`
+   * fields (TS4094). */
+  readonly executor: typeof Executor = class extends Executor {};
   /** Rails: `@reloader = Class.new(ActiveSupport::Reloader)` (`application.rb:123`) —
    * a per-application subclass so one app's prepare callbacks don't leak into
-   * another's. */
-  readonly reloader = class extends Reloader {};
+   * another's. Annotated for the same declaration-emit reason as `executor`. */
+  readonly reloader: typeof Reloader = class extends Reloader {};
   logger: Logger | null = null;
   cache: CacheStore | null = null;
 
