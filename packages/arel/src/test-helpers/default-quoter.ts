@@ -1,9 +1,5 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import { Temporal } from "@blazetrails/date";
-// Ruby `Object#to_s`, which every adapter's `quote_column_name` /
-// `quote_table_name` applies to the raw name (sqlite3/quoting.rb:48,
-// mysql/quoting.rb:51, postgresql/quoting.rb:47,59) — `nil.to_s` is "" and
-// `Array#to_s` is inspect-style, neither of which `String(x)` gives.
 import { toS } from "@blazetrails/activesupport";
 
 // Standalone comment sanitize for these test hosts: strips block-comment

@@ -24,9 +24,6 @@ import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
-// Ruby `Object#to_s`, the coercion sqlite3/quoting.rb:48 applies to the raw name:
-// `nil.to_s` is "" and `Array#to_s` is inspect-style, neither of which
-// `String(x)` gives.
 import { toS } from "@blazetrails/activesupport";
 
 export function quotedTrue(): string {
@@ -54,9 +51,10 @@ const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
 const QUOTED_TABLE_NAMES = new Map<unknown, string>();
 
 /**
- * Mirrors: SQLite3::Quoting#quote_table_name —
- * `%Q("#{name.gsub('"', '""').gsub(".", "\".\"")}")`. The whole name is wrapped
- * in double quotes with `.` rewritten as `"."` so `foo.bar` → `"foo"."bar"`.
+ * Mirrors: SQLite3::Quoting#quote_table_name (sqlite3/quoting.rb:48-50) —
+ * `%Q("#{name.to_s.gsub('"', '""').gsub(".", "\".\"")}")`. The whole name is
+ * wrapped in double quotes with `.` rewritten as `"."` so `foo.bar` →
+ * `"foo"."bar"`.
  */
 export function quoteTableName(name: unknown): string {
   let quoted = QUOTED_TABLE_NAMES.get(name);

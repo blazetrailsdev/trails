@@ -135,9 +135,9 @@ export class WhereClause {
     return (
       other instanceof WhereClause &&
       this.predicates.length === other.predicates.length &&
-      // A predicate may be a bare String (query_methods.rb:1627); Ruby compares
-      // it with `String#==`, which a JS primitive has no method to dispatch, so
-      // it is seated in the SqlLiteral whose equality is that same `String#==`.
+      // A bare-String predicate (query_methods.rb:1627) compares with
+      // `String#==` in Ruby; a JS primitive has no method to dispatch, so it is
+      // seated in the SqlLiteral whose `eql` is that same `String#==`.
       this.predicates.every((predicate, i) =>
         (typeof predicate === "string" ? sql(predicate) : predicate).eql(other.predicates[i]),
       )

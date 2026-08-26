@@ -16,4 +16,16 @@ describe("SqlLiteralTest (trails)", () => {
     expect(String(node)).toBe("id * 2");
     expect(`${node}`).toBe("id * 2");
   });
+
+  // `SqlLiteral < String` (sql_literal.rb:5), so `==` / `eql?` is `String#==`:
+  // the SQL text alone decides, `retryable` (sql_literal.rb:11) plays no part,
+  // and a bare String carrying the same text is equal. `Node#eql` — which
+  // compares constructors and serialized fields — matches neither arm.
+  it("eql? compares by sql text", () => {
+    const node = new Nodes.SqlLiteral("id * 2");
+    expect(node.eql("id * 2")).toBe(true);
+    expect(node.eql("id * 3")).toBe(false);
+    expect(node.eql(new Nodes.SqlLiteral("id * 2", { retryable: true }))).toBe(true);
+    expect(node.eql(new Nodes.SqlLiteral("id * 3"))).toBe(false);
+  });
 });

@@ -29,9 +29,6 @@ import { Data as BitData } from "./oid/bit.js";
 import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-// Ruby `Object#to_s`, the coercion postgresql/quoting.rb:47,59 applies to the raw name:
-// `nil.to_s` is "" and `Array#to_s` is inspect-style, neither of which
-// `String(x)` gives.
 import { toS } from "@blazetrails/activesupport";
 
 // Rails inherits from StandardError — use plain Error in TS for

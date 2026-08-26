@@ -42,11 +42,12 @@ export class SelectCore extends Node {
     this.source.left = value;
   }
 
-  // Mirrors `alias :froms :from` / `alias :froms= :from=` (select_core.rb:32-33).
+  /** Mirrors: `alias :froms :from` (select_core.rb:33). */
   get froms(): Node | null {
     return this.from;
   }
 
+  /** Mirrors: `alias :froms= :from=` (select_core.rb:32). */
   set froms(value: Node | null) {
     this.from = value;
   }

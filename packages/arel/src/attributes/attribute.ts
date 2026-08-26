@@ -37,7 +37,6 @@ export interface RelationLike {
   // `Table#tableAlias` is a plain string-or-nil. Both flow through here as
   // `o.relation.table_alias`.
   tableAlias?: string | SqlLiteral | null;
-  // Ruby passes `name` through untouched, nil included (attribute.rb:12,23).
   typeCastForDatabase: (attrName: string | Node | null, value: unknown) => unknown;
   typeForAttribute: (name: string | Node | null) => unknown;
   isAbleToTypeCast: () => boolean;

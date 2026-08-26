@@ -25,6 +25,7 @@ import {
   IsolatedExecutionState,
   LoadInterlockAwareMonitor,
   Notifications,
+  toS,
 } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
@@ -2691,9 +2692,7 @@ export class AbstractAdapter implements Quoting {
     // pool's BoundSchemaReflection, or one bound to this connection when the
     // adapter stands alone on a NullPool.
     const hash = await this.schemaCache.columnsHash(tableName);
-    // Rails: `attribute.name.to_s` (abstract_adapter.rb:1173) — a nil name
-    // (`table[nil]`, relation.rb:1027-1031) stringifies to "".
-    return hash?.[String(attribute.name ?? "")];
+    return hash?.[toS(attribute.name)];
   }
 
   /** @internal Mirrors: AbstractAdapter#collector */
