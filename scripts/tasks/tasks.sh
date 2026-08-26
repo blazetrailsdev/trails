@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tasks.sh — trails' `pnpm tasks` shim.
 #
-# The CLI itself lives in the tasks repo (scripts/cli.ts, entered through
+# The CLI itself lives in the tasks repo (src/cli.ts, entered through
 # bin/tasks); this script only finds a tasks checkout and hands off. It does
 # NOT set $TASKS_DIR — which working tree the CLI acts on is resolved by
 # resolveTasksDir() in the CLI from the caller's cwd, and setting the env var

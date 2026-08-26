@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-// SUPERSEDED — nothing invokes this file. The live CLI is `scripts/cli.ts` in
+// SUPERSEDED — nothing invokes this file. The live CLI is `src/cli.ts` in
 // the tasks repo; fix bugs there, or the two silently diverge. Deleted by story
 // `delete-trails-copy-of-tasks-cli`.
 //
