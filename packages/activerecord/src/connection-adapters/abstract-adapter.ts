@@ -125,6 +125,7 @@ import type {
   CheckConstraintDefinition,
 } from "./abstract/schema-definitions.js";
 import type { SchemaCreation } from "./abstract/schema-creation.js";
+import type { StatementPool } from "./statement-pool.js";
 import type { Column } from "./column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -926,7 +927,7 @@ export class AbstractAdapter implements Quoting {
    *
    * @internal
    */
-  _statements?: { reset(): void; clear(): void | Promise<void> } | null;
+  _statements?: StatementPool | null;
   /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
   private _inspectId?: number;
   private static _inspectSeq?: number;

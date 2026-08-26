@@ -16,7 +16,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 
@@ -113,19 +113,10 @@ describe("TransactionTest", () => {
     // mocks into later tests.
     //
     // `after_failure_actions` dispatches on the connection instance
-    // (`transaction.rb:1221`, `@connection.clear_cache!`), so the spy must sit
-    // on the prototype that OWNS clearCacheBang for the live adapter class:
-    // PostgreSQLAdapter overrides it, while sqlite3 and mysql2 inherit
-    // AbstractAdapter's (abstract_adapter.rb:739-748). Spying the owner rather
-    // than an instance still catches any pool slot.
-    function clearCacheBangOwner(conn: DatabaseAdapter): Required<DatabaseAdapter> {
-      let proto: object | null = Object.getPrototypeOf(conn) as object | null;
-      while (proto && !Object.prototype.hasOwnProperty.call(proto, "clearCacheBang")) {
-        proto = Object.getPrototypeOf(proto) as object | null;
-      }
-      if (!proto) throw new Error("no clearCacheBang on the connection's prototype chain");
-      return proto as Required<DatabaseAdapter>;
-    }
+    // (`transaction.rb:1221`, `@connection.clear_cache!`), so the spy sits on
+    // AbstractAdapter's prototype: Rails has no adapter override of
+    // `clear_cache!` (abstract_adapter.rb:739-748) and neither does trails, so
+    // every adapter dispatches to that one body.
 
     afterEach(() => {
       vi.restoreAllMocks();
@@ -133,7 +124,7 @@ describe("TransactionTest", () => {
 
     it("calls clearCacheBang and re-raises when the body throws the expired error", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
-      const spy = vi.spyOn(clearCacheBangOwner(CanonicalTopic.connection), "clearCacheBang");
+      const spy = vi.spyOn(AbstractAdapter.prototype, "clearCacheBang");
       await expect(
         transaction(CanonicalTopic, async () => {
           throw new PreparedStatementCacheExpired("cached plan expired");
@@ -143,7 +134,7 @@ describe("TransactionTest", () => {
     });
 
     it("does not call clearCacheBang for unrelated errors", async () => {
-      const spy = vi.spyOn(clearCacheBangOwner(CanonicalTopic.connection), "clearCacheBang");
+      const spy = vi.spyOn(AbstractAdapter.prototype, "clearCacheBang");
       await expect(
         transaction(CanonicalTopic, async () => {
           throw new Error("unrelated");

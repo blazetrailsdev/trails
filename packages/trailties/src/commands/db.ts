@@ -118,9 +118,18 @@ interface DatabaseEntry {
 
 /**
  * Every named config in the current env, optionally filtered to one name
- * via `--database`. Builds HashConfigs first so we can filter by
- * databaseTasks() — replicas and configs with `databaseTasks: false` are
- * skipped, matching Rails' `configsFor(includeHidden: false)`.
+ * via `--database`. The set of per-database names is chosen by
+ * `DatabaseTasks.forEach` (`tasks/database_tasks.rb:141-154`), which is what
+ * `databases.rake:35,54,105,120` uses to generate the namespaced
+ * `db:<task>:<name>` tasks — so replicas and `databaseTasks: false` configs
+ * are skipped here for exactly the reason they get no rake task there
+ * (`database_tasks.rb:150`).
+ *
+ * `for_each` yields nothing for a single-database application
+ * (`database_tasks.rb:147`): there are no namespaced tasks to generate, and the
+ * un-namespaced command is that application's only task. Rails reaches that
+ * lone config through `each_current_configuration`, which applies the same
+ * `database_tasks?` filter — hence the second arm.
  */
 async function taskableDatabaseEntries(
   opts: DatabaseOpts,
@@ -143,7 +152,23 @@ async function taskableDatabaseEntries(
       };
     }),
   );
-  const taskable = all.filter((c) => c.hashConfig.databaseTasks());
+  const namespacedNames = new Set<string>();
+  await withRegisteredConfigurations(
+    all.map((c) => c.hashConfig),
+    envName,
+    async () => {
+      DatabaseTasks.forEach(
+        { [envName]: Object.fromEntries(all.map((c) => [c.name, c.raw])) },
+        (name) => {
+          namespacedNames.add(name);
+        },
+      );
+    },
+  );
+  const taskable =
+    namespacedNames.size > 0
+      ? all.filter((c) => namespacedNames.has(c.name))
+      : all.filter((c) => c.hashConfig.databaseTasks());
   const filtered = dbName ? taskable.filter((c) => c.name === dbName) : taskable;
   if (filtered.length === 0 && dbName) {
     const available = taskable.map((c) => c.name).join(", ");
@@ -156,11 +181,10 @@ async function taskableDatabaseEntries(
 }
 
 /**
- * Iterate every named database config in the current env, optionally
- * filtered to a single name via `--database`. Mirrors Rails'
- * `DatabaseTasks.for_each(databases) { |name| ... }` which generates
- * per-name rake tasks. Commander can't generate dynamic subcommands,
- * so we use a `--database` flag instead.
+ * Adds the adapter checkout `DatabaseTasks.forEach` has no counterpart for:
+ * the name fan-out itself lives in `taskableDatabaseEntries`, which runs
+ * `forEach`. Commander can't generate dynamic subcommands, so the namespaced
+ * `db:<task>:<name>` task is spelled as a `--database` flag instead.
  *
  * For each config: connects an adapter, runs `fn`, closes the adapter.
  * `fn` receives the adapter, the raw config, the HashConfig, and the
@@ -192,6 +216,7 @@ async function forEachDatabase(
 /**
  * Like forEachDatabase but doesn't connect an adapter — for commands
  * like `create` and `drop` that need to operate BEFORE the DB exists.
+ * Same `taskableDatabaseEntries` / `DatabaseTasks.forEach` fan-out.
  */
 async function forEachDatabaseConfig(
   opts: DatabaseOpts,

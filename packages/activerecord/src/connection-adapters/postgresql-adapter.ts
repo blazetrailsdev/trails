@@ -534,7 +534,6 @@ export class PostgreSQLAdapter
   // names `@statements`.
   /** @internal */
   declare _statements: StatementPool;
-  private _needsDeallocateAll = false;
   private _closed = false;
   private _closingDriver: Promise<void> | null = null;
   // Per-acquire generation. Each _doAcquire captures the current value; a
@@ -1296,7 +1295,7 @@ export class PostgreSQLAdapter
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
-    if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
+    if (this._rawConnection && this._connectionConfigured) {
       return this._rawConnection;
     }
     if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
@@ -1360,10 +1359,6 @@ export class PostgreSQLAdapter
       if (this._closed || this._rawConnection !== client) {
         throw new Error("PostgreSQLAdapter: connection is closed");
       }
-      await this._maybeDrainOrphanedPreparedStatements(client);
-      if (this._closed || this._rawConnection !== client) {
-        throw new Error("PostgreSQLAdapter: connection is closed");
-      }
     } catch (error) {
       if (this._rawConnection === client) {
         this._rawConnection = null;
@@ -1395,18 +1390,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * If the connection was tagged for `DEALLOCATE ALL` (by the
-   * `clearCacheBang` reset branch on the prior session), drain its
-   * server-side prepared statements before handing it to user code.
-   */
-  private async _maybeDrainOrphanedPreparedStatements(client: pg.Client): Promise<void> {
-    if (!this._needsDeallocateAll) return;
-    this._needsDeallocateAll = false;
-    this._commandSettled = false;
-    await client.query("DEALLOCATE ALL");
-  }
-
-  /**
    * Re-open / drain the connection before the base `withRawConnection` loop
    * yields `this._connection`. Serialization against `resetBang` is NOT this
    * hook's job: the reset body runs under the same `@lock` the loop already
@@ -1422,8 +1405,6 @@ export class PostgreSQLAdapter
     if (!this._closed && this._rawConnection === null && this._pgClientOptions !== null) {
       await this.connect();
     }
-    const client = this._rawConnection;
-    if (client && !this._closed) await this._maybeDrainOrphanedPreparedStatements(client);
   }
 
   /**
@@ -2416,7 +2397,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._statements.reset();
-    this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = false;
     conn?.end().catch(() => {});
@@ -2631,7 +2611,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._statements.reset();
-    this._needsDeallocateAll = false;
     this._inTransaction = false;
     // Rails' disconnect! is NOT terminal: with_raw_connection's
     // `connect! if @raw_connection.nil?` (abstract_adapter.rb:985) lazily
@@ -2683,7 +2662,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._statements.reset();
-    this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
@@ -2699,46 +2677,6 @@ export class PostgreSQLAdapter
   /** @internal — the currently-held txn client (always _rawConnection while in TX). */
   _currentClientForTest(): pg.Client | null {
     return this._client;
-  }
-
-  /** @internal — whether the next acquire will run DEALLOCATE ALL. */
-  _needsDeallocateAllForTest(): boolean {
-    return this._needsDeallocateAll;
-  }
-
-  /**
-   * Clear cached prepared statements. Mirrors Rails'
-   * `PostgreSQLAdapter#clear_cache!` which sends DEALLOCATE for each
-   * cached entry on the adapter's sole PG::Connection. With the
-   * single-client design we always own the session, so a full
-   * `clear()` always applies (it fires DEALLOCATE per entry via the
-   * PG-specific dealloc override). If the connection has been torn
-   * down (post-disconnect/reconnect failure window) we mark
-   * `_needsDeallocateAll` so the next acquire drains the server side.
-   * Returns the pool's chained DEALLOCATEs so the caller can await them before
-   * putting its own query on the socket; Rails' `clear_cache!` blocks on them.
-   */
-  override clearCacheBang({
-    newConnection = false,
-  }: { newConnection?: boolean } = {}): void | Promise<void> {
-    // No `super` call: this body replaces `abstract_adapter.rb:739-748`'s
-    // single `@lock.synchronize` block rather than running after it. The
-    // precondition `dealloc` states outright is that "the statement pool is
-    // only accessed while holding the connection's lock"
-    // (postgresql_adapter.rb:308-310).
-    return this.lock.synchronize(() => {
-      if (newConnection) {
-        // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
-        // map without DEALLOCATE: the session that owned those statement names is
-        // gone, so naming them again is an error, not a cleanup.
-        this._statements.reset();
-      } else if (this._rawConnection) {
-        return this._statements.clear();
-      } else {
-        this._statements.reset();
-        this._needsDeallocateAll = true;
-      }
-    });
   }
 
   /**

@@ -12,6 +12,7 @@ import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js"
 import { Result } from "../../result.js";
 import { combineMultiStatements, type ExplainOption } from "../abstract/database-statements.js";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
+import type { StatementPool } from "../statement-pool.js";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
 // Mirrors Rails' build_read_query_regexp which combines the default read list
@@ -120,7 +121,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
   inTransaction: boolean;
   sqlKey(sql: string): string;
   /** Rails' `@statements` (abstract_adapter.rb:156). */
-  _statements: { delete(key: string): unknown };
+  _statements: StatementPool;
   verifiedBang(): void;
   /** @internal */
   handleWarnings(sql: unknown): void;

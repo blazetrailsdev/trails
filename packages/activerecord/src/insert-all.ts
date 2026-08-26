@@ -53,6 +53,8 @@ export interface InsertAllOptions {
  */
 interface ResolvedConnectionFacts {
   supportsInsertReturning: boolean;
+  supportsInsertOnDuplicateSkip: boolean;
+  supportsInsertOnDuplicateUpdate: boolean;
   supportsInsertConflictTarget: boolean;
   primaryKeys: string[];
   indexes: (tableName: string) => unknown[];
@@ -78,6 +80,14 @@ async function resolveConnectionFacts(
     typeof connection.supportsInsertReturning === "function"
       ? await connection.supportsInsertReturning()
       : false;
+  const supportsInsertOnDuplicateSkip =
+    typeof connection.supportsInsertOnDuplicateSkip === "function"
+      ? await connection.supportsInsertOnDuplicateSkip()
+      : false;
+  const supportsInsertOnDuplicateUpdate =
+    typeof connection.supportsInsertOnDuplicateUpdate === "function"
+      ? await connection.supportsInsertOnDuplicateUpdate()
+      : false;
   const supportsInsertConflictTarget =
     typeof connection.supportsInsertConflictTarget === "function"
       ? await connection.supportsInsertConflictTarget()
@@ -90,6 +100,8 @@ async function resolveConnectionFacts(
   const indexes: unknown[] = cache ? await cache.indexes(model.tableName) : [];
   return {
     supportsInsertReturning,
+    supportsInsertOnDuplicateSkip,
+    supportsInsertOnDuplicateUpdate,
     supportsInsertConflictTarget,
     primaryKeys,
     indexes: (name: string) => (name === model.tableName ? indexes : []),
@@ -379,11 +391,29 @@ export class InsertAll {
     return Array.isArray(this.uniqueBy.columns) ? this.uniqueBy.columns : [this.uniqueBy.columns];
   }
 
-  /** @internal */
+  /** @internal Mirrors: ActiveRecord::InsertAll#ensure_valid_options_for_connection! */
   private ensureValidOptionsForConnectionBang(): void {
     if (this.returning && !this._facts.supportsInsertReturning) {
-      throw new Error(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support INSERT...RETURNING`,
+      throw new ArgumentError(
+        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :returning`,
+      );
+    }
+
+    if (this.skipDuplicates() && !this._facts.supportsInsertOnDuplicateSkip) {
+      throw new ArgumentError(
+        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support skipping duplicates`,
+      );
+    }
+
+    if (this.updateDuplicates() && !this._facts.supportsInsertOnDuplicateUpdate) {
+      throw new ArgumentError(
+        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support upsert`,
+      );
+    }
+
+    if (this.uniqueBy && !this._facts.supportsInsertConflictTarget) {
+      throw new ArgumentError(
+        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
       );
     }
   }
@@ -454,7 +484,7 @@ export class InsertAll {
       // unsupported (plain insertAll on MySQL); a given unique_by raises.
       if (uniqueBy == null) return undefined;
       throw new ArgumentError(
-        `${(conn as any).constructor?.name ?? "Adapter"} does not support :uniqueBy`,
+        `${(conn as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
       );
     }
     // Rails: `name_or_columns = unique_by || model.primary_key`. The match runs

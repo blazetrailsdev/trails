@@ -557,7 +557,7 @@ export abstract class SchemaDumper {
     pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
     stream: string[] = [],
     config: SchemaDumperConfig = baseClass(),
-  ): string[] | Promise<string[]> {
+  ): Promise<string[]> {
     const options = this.generateOptions(config);
     // Adapter check runs FIRST because concrete DatabaseAdapters
     // (PostgreSQLAdapter, SQLite3Adapter) implement `tables()` /
