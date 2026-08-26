@@ -1186,9 +1186,14 @@ describe("InsertAllTest", () => {
   it.skipIf(supportsInsertConflictTarget)(
     "upsert all with unique by fails cleanly for adapters not supporting insert conflict target",
     async () => {
-      await expect(
-        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" }),
-      ).rejects.toThrow(/does not support :uniqueBy/);
+      const connection = await Base.leaseConnection();
+      const error = await Book.upsertAll([{ name: "Rework", author_id: 1 }], {
+        uniqueBy: "isbn",
+      }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ArgumentError);
+      expect((error as Error).message).toContain(
+        `${connection.constructor.name} does not support :unique_by`,
+      );
     },
   );
 

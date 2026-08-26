@@ -122,7 +122,14 @@ interface DatabaseEntry {
  * `DatabaseTasks.forEach` (`tasks/database_tasks.rb:141-154`), which is what
  * `databases.rake:35,54,105,120` uses to generate the namespaced
  * `db:<task>:<name>` tasks — so replicas and `databaseTasks: false` configs
- * are skipped here for exactly the reason they get no rake task there.
+ * are skipped here for exactly the reason they get no rake task there
+ * (`database_tasks.rb:150`).
+ *
+ * `for_each` yields nothing for a single-database application
+ * (`database_tasks.rb:147`): there are no namespaced tasks to generate, and the
+ * un-namespaced command is that application's only task. Rails reaches that
+ * lone config through `each_current_configuration`, which applies the same
+ * `database_tasks?` filter — hence the second arm.
  */
 async function taskableDatabaseEntries(
   opts: DatabaseOpts,
@@ -158,11 +165,6 @@ async function taskableDatabaseEntries(
       );
     },
   );
-  // `for_each` yields nothing for a single-database application
-  // (database_tasks.rb:147) — there are no namespaced tasks to generate, and
-  // the un-namespaced command is that application's only task. Rails reaches
-  // that lone config through `each_current_configuration`, which applies the
-  // same `database_tasks?` filter `for_each` does (database_tasks.rb:150).
   const taskable =
     namespacedNames.size > 0
       ? all.filter((c) => namespacedNames.has(c.name))
