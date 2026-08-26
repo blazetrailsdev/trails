@@ -57,8 +57,8 @@ describe("JoinDependency Arel node construction", () => {
   }
 
   beforeEach(() => {
-    (Owner as any)._associations = [];
-    (Asset as any)._associations = [];
+    (Owner as any)._reflections = {};
+    (Asset as any)._reflections = {};
     registerModel(Owner);
     registerModel(Asset);
   });
@@ -105,8 +105,8 @@ describe("JoinDependency Arel node construction", () => {
     class StiSubOwner extends StiOwner {}
     StiOwner.inheritanceColumn = "type";
     registerSubclass(StiSubOwner);
-    (StiOwner as any)._associations = [];
-    (StiSubOwner as any)._associations = [];
+    (StiOwner as any)._reflections = {};
+    (StiSubOwner as any)._reflections = {};
     registerModel(StiOwner);
     registerModel(StiSubOwner);
 
@@ -143,9 +143,9 @@ describe("JoinDependency Arel node construction", () => {
     Vehicle.inheritanceColumn = "type";
     registerSubclass(Car);
     registerSubclass(ElectricCar);
-    (Vehicle as any)._associations = [];
-    (Car as any)._associations = [];
-    (ElectricCar as any)._associations = [];
+    (Vehicle as any)._reflections = {};
+    (Car as any)._reflections = {};
+    (ElectricCar as any)._reflections = {};
     registerModel(Vehicle);
     registerModel(Car);
     registerModel(ElectricCar);
@@ -249,7 +249,7 @@ describe("JoinDependency Arel node construction", () => {
         this.attribute("body", "string");
       }
     }
-    (Comment as any)._associations = [];
+    (Comment as any)._reflections = {};
     registerModel(Comment);
 
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });

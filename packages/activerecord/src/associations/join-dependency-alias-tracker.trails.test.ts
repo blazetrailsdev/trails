@@ -35,7 +35,7 @@ describe("JoinDependency AliasTracker wiring", () => {
 
   beforeEach(() => {
     for (const m of [Post, Comment, Tag]) {
-      (m as any)._associations = [];
+      (m as any)._reflections = {};
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "postId" });

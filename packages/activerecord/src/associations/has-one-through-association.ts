@@ -542,18 +542,19 @@ async function loadHasOneThrough(
   options: AssociationOptions,
 ): Promise<Base | null> {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const throughAssoc = associations.find((a) => a.name === options.through);
+  const throughAssoc = ctor._reflectOnAssociation(
+    options.through!,
+  ) as unknown as AssociationDefinition | null;
   if (!throughAssoc) {
     throw _hmtNotFound(ctor, assocName, options.through!);
   }
 
   let throughRecord: Base | null;
-  if (throughAssoc.type === "hasOne") {
+  if (throughAssoc.macro === "hasOne") {
     throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
-  } else if (throughAssoc.type === "belongsTo") {
+  } else if (throughAssoc.macro === "belongsTo") {
     throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
-  } else if (throughAssoc.type === "hasMany") {
+  } else if (throughAssoc.macro === "hasMany") {
     const throughHolder = _buildAssociationInstance.call(record, {
       name: throughAssoc.name,
       type: "hasMany",
@@ -569,13 +570,12 @@ async function loadHasOneThrough(
 
   const sourceName = options.source ?? assocName;
   const throughCtor = throughRecord.constructor as typeof Base;
-  const throughAssociations: AssociationDefinition[] = throughCtor._associations ?? [];
-  const sourceAssoc = throughAssociations.find((a) => a.name === sourceName);
+  const sourceAssoc = throughCtor._reflectOnAssociation(sourceName);
 
   if (sourceAssoc) {
-    if (sourceAssoc.type === "belongsTo") {
+    if (sourceAssoc.macro === "belongsTo") {
       return (await association.call(throughRecord, sourceName).loadTarget()) as Base | null;
-    } else if (sourceAssoc.type === "hasOne") {
+    } else if (sourceAssoc.macro === "hasOne") {
       return (await association.call(throughRecord, sourceName).loadTarget()) as Base | null;
     }
   }

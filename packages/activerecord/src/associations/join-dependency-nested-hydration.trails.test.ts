@@ -30,7 +30,7 @@ describe("JoinDependency nested hydration", () => {
 
   beforeEach(() => {
     for (const m of [Author, Comment, Post]) {
-      m._associations = [];
+      m._reflections = {};
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });

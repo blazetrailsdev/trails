@@ -494,9 +494,9 @@ export function validateInverseOf(
   assocName: string,
   inverseOf: string,
 ): void {
-  const targetAssocs: AssociationDefinition[] = targetModel._associations ?? [];
-  if (targetAssocs.length === 0) return;
-  if (targetAssocs.some((a) => a.name === inverseOf)) return;
+  const targetReflections = Reflection.reflections(targetModel);
+  if (Object.keys(targetReflections).length === 0) return;
+  if (targetModel._reflectOnAssociation(inverseOf) != null) return;
 
   throw new InverseOfAssociationNotFoundError(owner._reflectOnAssociation(assocName), targetModel);
 }
@@ -656,8 +656,7 @@ export function _hmtNotFound(
   assocName: string,
   through: string,
 ): HasManyThroughAssociationNotFoundError {
-  const assocs: AssociationDefinition[] = ctor._associations ?? [];
-  const dictionary = assocs.map((a) => a.name).filter((n) => n !== assocName);
+  const dictionary = Object.keys(Reflection.reflections(ctor)).filter((n) => n !== assocName);
   const corrections = _correctNames(dictionary, through);
   return new HasManyThroughAssociationNotFoundError(ctor.name, through, assocName, corrections);
 }
@@ -670,8 +669,7 @@ export function _hmtNotFound(
  * the failing name against `record.class.reflections.keys`.
  */
 export function _associationNotFound(record: Base, name: string): AssociationNotFoundError {
-  const assocs: AssociationDefinition[] = (record.constructor as typeof Base)._associations ?? [];
-  const dictionary = assocs.map((a) => a.name);
+  const dictionary = Object.keys(Reflection.reflections(record.constructor as typeof Base));
   const corrections = _correctNames(dictionary, name);
   return new AssociationNotFoundError(record, name, corrections);
 }
@@ -1410,11 +1408,7 @@ export function association<T extends Base = Base>(
   }
 
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const assocDef = associations
-    .slice()
-    .reverse()
-    .find((a) => a.name === assocName);
+  const assocDef = ctor._reflectOnAssociation(assocName) as unknown as AssociationDefinition | null;
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }

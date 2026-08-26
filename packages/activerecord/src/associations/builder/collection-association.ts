@@ -100,10 +100,9 @@ export class CollectionAssociation extends Association {
     const prior = Array.isArray(existing) ? existing : [];
     model[fullCallbackName] = [...prior, ...normalized];
 
-    const assocs: any[] = model._associations ?? [];
-    const assocDef = assocs.find((a: any) => a.name === name);
-    if (assocDef) {
-      assocDef.options[callbackName] = model[fullCallbackName];
+    const reflection = model._reflectOnAssociation?.(name);
+    if (reflection) {
+      reflection.options[callbackName] = model[fullCallbackName];
     }
   }
 

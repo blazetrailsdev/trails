@@ -23,7 +23,7 @@ describe("JoinBase.table", () => {
   }
 
   beforeEach(() => {
-    (Post as any)._associations = [];
+    (Post as any)._reflections = {};
     registerModel(Post);
   });
 
@@ -58,7 +58,7 @@ describe("joinType propagation in joinConstraints", () => {
 
   beforeEach(() => {
     for (const m of [Post, Comment]) {
-      (m as any)._associations = [];
+      (m as any)._reflections = {};
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });

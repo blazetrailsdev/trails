@@ -76,9 +76,9 @@ describe("DJAS routing widening — nested-through", () => {
     registerModel("NtPost", NtPost);
     registerModel("NtComment", NtComment);
     registerModel("NtRating", NtRating);
-    (NtAuthor as any)._associations = [];
-    (NtPost as any)._associations = [];
-    (NtComment as any)._associations = [];
+    (NtAuthor as any)._reflections = {};
+    (NtPost as any)._reflections = {};
+    (NtComment as any)._reflections = {};
 
     Associations.hasMany.call(NtAuthor, "ntPosts", {
       className: "NtPost",

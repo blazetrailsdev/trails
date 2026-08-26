@@ -45,7 +45,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
 
   beforeEach(() => {
     for (const m of [Comment, Post, Reader]) {
-      m._associations = [];
+      m._reflections = {};
       registerModel(m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });

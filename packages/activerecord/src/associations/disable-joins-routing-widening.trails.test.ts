@@ -74,8 +74,8 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     registerModel("RwComment", RwComment);
     registerModel("RwMember", RwMember);
     registerModel("RwOtherOrigin", RwOtherOrigin);
-    (RwAuthor as any)._associations = [];
-    (RwComment as any)._associations = [];
+    (RwAuthor as any)._reflections = {};
+    (RwComment as any)._reflections = {};
 
     Associations.hasMany.call(RwAuthor, "rwComments", {
       className: "RwComment",

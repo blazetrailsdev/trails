@@ -360,17 +360,20 @@ export class AbstractReflection {
         if (this._counterCacheColumnKlass === resolvedKlass) {
           return this._counterCacheColumn as string | null;
         }
-        const targetAssocs: Array<{ type: string; name: string; options: any }> =
-          (resolvedKlass as any)._associations ?? [];
+        const targetAssocs = reflectOnAllAssociations(resolvedKlass, "hasMany");
         // Match on both class name AND FK so that when a target declares multiple
         // hasManyS to the same class with different FKs (e.g. DogLover has
         // hasMany("trainedDogs") and hasMany("dogs")), we pick the one whose FK
         // matches the belongsTo's FK rather than the first class-name match.
         const hmDefaultFk = `${underscore((resolvedKlass as any).name)}_id`;
         const inverseHm = targetAssocs.find((a) => {
-          if (a.type !== "hasMany") return false;
-          if ((a.options.className ?? camelize(singularize(a.name))) !== ownerName) return false;
-          const hmFkNorm = normFk(a.options.foreignKey ?? hmDefaultFk);
+          if (a.className !== ownerName) return false;
+          // Same `queryConstraints` fallback as `btFk` above: a composite
+          // `foreignKey:` is normalized off `options` and onto
+          // `options.queryConstraints` when the reflection is built.
+          const hmFkNorm = normFk(
+            a.options.foreignKey ?? a.options.queryConstraints ?? hmDefaultFk,
+          );
           return hmFkNorm.length === btFkNorm.length && hmFkNorm.every((k, i) => k === btFkNorm[i]);
         });
         // Only use the inverse hasMany's name when its singular camelCase form is
