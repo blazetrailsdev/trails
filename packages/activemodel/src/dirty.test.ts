@@ -27,10 +27,12 @@ const ivars = Symbol("ivars");
  * `ActiveModel::ForcedMutationTracker`, which is what this file exercises.
  *
  * The `include ActiveModel::API` half (dirty_test.rb:7) is not wired below:
- * the fixture's `initialize` (dirty_test.rb:11-17) overrides API's
- * (api.rb:78-81) and never calls `super`, so API contributes no behaviour to
- * this model, and trails' `api.ts` is not an includable module — `Model`
- * carries that surface. What IS wired is `AttributeMethods`, which Ruby gets
+ * trails' `api.ts` exports no instance-method bundle to `include()` — `Model`
+ * carries that surface. Nothing in the file reaches it. The one member of it a
+ * ported body could have needed is `initialize`, and the fixture overrides
+ * that one (dirty_test.rb:11-17) without calling `super`, so `assign_attributes`
+ * never runs; API's remaining surface (`persisted?`, `Conversion`, `Naming`)
+ * would be present on the Ruby instance and is simply unexercised here. What IS wired is `AttributeMethods`, which Ruby gets
  * from `Dirty`'s own `include ActiveModel::AttributeMethods` (dirty.rb:125);
  * trails' `include()` copies a module's own members, not its nested includes.
  *
