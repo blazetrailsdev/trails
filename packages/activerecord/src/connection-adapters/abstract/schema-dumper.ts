@@ -14,7 +14,7 @@
 
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type { ColumnInfo, IndexInfo, SchemaSource } from "../../schema-dumper.js";
+import type { ColumnInfo, SchemaSource } from "../../schema-dumper.js";
 
 /**
  * Column-shaped interface these helpers depend on.
@@ -173,7 +173,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   // Rails `schema_default` / `schema_expression` live in
   // `connection_adapters/abstract/schema_dumper.rb`, so the ports stay in this
   // file (the parity:api-mapped location) — the sole definitions, consumed by
-  // the single `emitTable`/`columnSpec` dispatch. `_adapter` is a trails-only
+  // the base `table`'s `columnSpec` dispatch. `_adapter` is a trails-only
   // helper on the base (it reaches base-private `_source`).
 
   /**
@@ -218,128 +218,5 @@ export class SchemaDumper extends BaseSchemaDumper {
       return adapter.isValidType(type);
     }
     return true;
-  }
-
-  /**
-   * The single `emitTable`, routed through `columnSpec` so per-dialect
-   * `prepareColumnOptions` overrides (schemaType, schemaLimit, schemaPrecision,
-   * schemaDefault, etc.) take effect. Mirrors the column-emission half of Rails'
-   * `SchemaDumper#table`, whose `@connection.column_spec` is the adapter's
-   * mixed-in method. Every dump reaches it — the single dumper class assigns this
-   * onto its prototype, including the mock-source paths.
-   *
-   * Builds into a local buffer so a raise mid-table discards the partial
-   * `create_table` body (Rails writes into its own `tbl` StringIO and only prints
-   * it on success — schema_dumper.rb:220-224). On any error we emit the "Could
-   * not dump table" comment instead of the table.
-   * @internal
-   */
-  protected emitTable(
-    stream: string[],
-    tableName: string,
-    columns: ColumnInfo[],
-    indexes: IndexInfo[],
-    adapterTableOpts: Record<string, unknown> = {},
-    inlineConstraints: string[] = [],
-  ): void {
-    const body: string[] = [];
-    try {
-      // Rails validates every column's type before emitting the body
-      // (schema_dumper.rb:196), raising on an unmapped/composite type whose
-      // DSL type is nil so `valid_type?` is false. This includes the PK column.
-      for (const col of columns) {
-        if (!this.validType(col.type)) {
-          const err = new Error(`Unknown type '${col.sqlType ?? ""}' for column '${col.name}'`);
-          // Rails raises a StandardError; surface that class in the comment.
-          err.name = "StandardError";
-          throw err;
-        }
-      }
-      this.emitTableBody(body, tableName, columns, indexes, adapterTableOpts, inlineConstraints);
-    } catch (e) {
-      const cls = e instanceof Error ? e.name : "StandardError";
-      const message = e instanceof Error ? e.message : String(e);
-      stream.push(
-        `# Could not dump table ${JSON.stringify(tableName)} because of following ${cls}`,
-      );
-      stream.push(`#   ${message}`);
-      return;
-    }
-    for (const line of body) stream.push(line);
-  }
-
-  /** @internal */
-  protected emitTableBody(
-    stream: string[],
-    tableName: string,
-    columns: ColumnInfo[],
-    indexes: IndexInfo[],
-    adapterTableOpts: Record<string, unknown> = {},
-    inlineConstraints: string[] = [],
-  ): void {
-    const pkColumns = this.resolvePrimaryKeyColumns(tableName, columns);
-    const hasCompositePk = pkColumns.length > 1;
-    const pkColumn = pkColumns[0];
-    // The single-PK column name Rails skips in the column loop (`next if column.name == pk`).
-    // Composite PKs (Rails Array case) and PK-less tables never skip a column.
-    const singlePkName = !hasCompositePk && pkColumn ? pkColumn.name : undefined;
-    const stripped = this.removePrefixAndSuffix(tableName);
-
-    const tableOpts: Record<string, unknown> = {};
-    if (hasCompositePk) {
-      // Rails (Array case) emits only `primary_key: [...]` — schema_dumper.rb:182.
-      tableOpts["primaryKey"] = JSON.stringify(pkColumns.map((c) => c.name));
-    } else if (!pkColumn) {
-      tableOpts["id"] = "false";
-    } else {
-      // Rails (String case): print `primary_key: <name>` for a non-"id" key, then the
-      // column spec unless empty. Mirrors schema_dumper.rb:170-179.
-      if (pkColumn.name !== "id") tableOpts["primaryKey"] = JSON.stringify(pkColumn.name);
-      const pkSpec = this.columnSpecForPrimaryKey(pkColumn);
-      if (Object.keys(pkSpec).length > 0) {
-        if (Object.keys(pkSpec).every((k) => k === "id" || k === "default")) {
-          Object.assign(tableOpts, pkSpec);
-        } else {
-          const { id: idType, ...rest } = pkSpec as { id?: unknown } & Record<string, unknown>;
-          tableOpts["id"] = { ...(idType != null ? { type: idType } : {}), ...rest };
-        }
-      }
-    }
-    if (typeof adapterTableOpts.charset === "string")
-      tableOpts["charset"] = JSON.stringify(adapterTableOpts.charset);
-    if (typeof adapterTableOpts.collation === "string")
-      tableOpts["collation"] = JSON.stringify(adapterTableOpts.collation);
-    if (typeof adapterTableOpts.options === "string")
-      tableOpts["options"] = JSON.stringify(adapterTableOpts.options);
-    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
-      tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment);
-    tableOpts["force"] = '"cascade"';
-
-    stream.push(
-      `  await ctx.createTable(${JSON.stringify(stripped)}, { ${this.formatColspec(tableOpts)} }, (t) => {`,
-    );
-
-    for (const col of columns) {
-      if (col.name === singlePkName) continue;
-
-      const [dslType, spec] = this.columnSpec(col);
-      const optStr = Object.keys(spec).length > 0 ? `, { ${this.formatColspec(spec)} }` : "";
-      const typeName = String(dslType);
-
-      if (this._isDslHelper(typeName)) {
-        stream.push(`    t.${typeName}(${JSON.stringify(col.name)}${optStr});`);
-      } else if ((col as any).isEnum && typeName === "enum") {
-        stream.push(`    t.enum(${JSON.stringify(col.name)}${optStr});`);
-      } else {
-        const colType = typeName === "enum" ? ((col as any).sqlType ?? typeName) : typeName;
-        stream.push(
-          `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(colType)}${optStr});`,
-        );
-      }
-    }
-
-    for (const line of inlineConstraints) stream.push(line);
-    stream.push("  });");
-    this.indexesInCreate(tableName, stream, indexes);
   }
 }

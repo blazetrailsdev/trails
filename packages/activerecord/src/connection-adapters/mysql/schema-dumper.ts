@@ -74,7 +74,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
+  protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
     if (!this.connection) return {};
     const opts = await this.connection.tableOptions(tableName);
     if (Object.hasOwn(opts, "collation")) {

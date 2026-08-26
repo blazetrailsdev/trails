@@ -348,7 +348,7 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).not.toContain("ar_internal_metadata");
   }, 60000);
 
-  it("emitTable forwards comment from fetchTableOptions into createTable options", async () => {
+  it("emitTable forwards comment from tableOptions into createTable options", async () => {
     // Subclasses the ConnectionAdapters dumper directly — that's where emitTable
     // (the single column_spec dispatch) lives; the bare base delegates to it.
     const { SchemaDumper: TopLevelDumper } =
@@ -360,9 +360,7 @@ describe("SchemaDumperAdapterTest", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     class CommentDumper extends TopLevelDumper {
-      protected override async fetchTableOptions(
-        _tableName: string,
-      ): Promise<Record<string, unknown>> {
+      protected override async tableOptions(_tableName: string): Promise<Record<string, unknown>> {
         return { comment: "user accounts" };
       }
     }
@@ -382,7 +380,7 @@ describe("SchemaDumperAdapterTest", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     class MysqlDumper extends TopLevelDumper {
-      protected override async fetchTableOptions(_t: string): Promise<Record<string, unknown>> {
+      protected override async tableOptions(_t: string): Promise<Record<string, unknown>> {
         return { charset: "utf8mb4", collation: "utf8mb4_bin" };
       }
     }

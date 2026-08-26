@@ -227,18 +227,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /**
-   * Emit PG exclusion/unique constraints as post-block ctx.add*Constraint()
-   * calls — these methods are PG-specific and not on the abstract TableDefinition
-   * passed to the createTable callback, so they cannot be inlined as t.* calls.
-   * @internal
-   */
-  override async table(tableName: string, stream: string[]): Promise<void> {
-    await super.table(tableName, stream);
-    await this.exclusionConstraintsInCreate(tableName, stream);
-    await this.uniqueConstraintsInCreate(tableName, stream);
-  }
-
-  /**
    * @internal
    *
    * @missingRailsCall any? — PERMANENT: Per-site verified (RFC 0106 wave 4b):
@@ -246,7 +234,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
    *   trails guards with `.length === 0` on the JS array — `Enumerable#any?`
    *   without a block is not a ported method name.
    */
-  protected async exclusionConstraintsInCreate(table: string, stream: string[]): Promise<void> {
+  protected override async exclusionConstraintsInCreate(
+    table: string,
+    stream: string[],
+  ): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: ExclusionConstraintDefinition[] =
       this._cachedExclConstraints ??
@@ -273,7 +264,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
    *   the same guard at postgresql/schema_dumper.rb:65 — `Enumerable#any?`
    *   without a block is a `.length` check on the JS array.
    */
-  protected async uniqueConstraintsInCreate(table: string, stream: string[]): Promise<void> {
+  protected override async uniqueConstraintsInCreate(
+    table: string,
+    stream: string[],
+  ): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: UniqueConstraintDefinition[] =
       this._cachedUniqConstraints ??
@@ -294,7 +288,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
+  protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
     const adapter = this.pgAdapter();
     if (!adapter?.tableOptions) return {};
     return adapter.tableOptions(tableName);

@@ -195,26 +195,26 @@ describe("MySQL::SchemaDumper", () => {
     );
   });
 
-  describe("fetchTableOptions", () => {
+  describe("tableOptions", () => {
     it("populates tableCollationCache when collation is present", async () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
       };
-      await (d as any).fetchTableOptions("users");
+      await (d as any).tableOptions("users");
       expect(d.tableCollationCache["users"]).toBe("utf8mb4_bin");
     });
 
     it("does not populate tableCollationCache when no collation in options", async () => {
       const d = make();
       d.connection = { tableOptions: async () => ({ charset: "utf8mb4" }) };
-      await (d as any).fetchTableOptions("users");
+      await (d as any).tableOptions("users");
       expect(Object.hasOwn(d.tableCollationCache, "users")).toBe(false);
     });
 
     it("returns empty object when connection is absent", async () => {
       const d = make();
-      expect(await (d as any).fetchTableOptions("users")).toEqual({});
+      expect(await (d as any).tableOptions("users")).toEqual({});
     });
 
     it("falls back to SHOW TABLE STATUS for collation when not in options", async () => {
@@ -224,7 +224,7 @@ describe("MySQL::SchemaDumper", () => {
         internalExecQuery: async () => Result.fromRowHashes([{ Collation: "utf8mb4_general_ci" }]),
         quote: (v) => `'${String(v)}'`,
       };
-      await (d as any).fetchTableOptions("users");
+      await (d as any).tableOptions("users");
       expect(d.tableCollationCache["users"]).toBe("utf8mb4_general_ci");
     });
   });
