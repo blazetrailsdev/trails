@@ -27,6 +27,7 @@ export class EncryptedAttributeType extends ValueType {
   private _default?: unknown;
   private _previousTypes?: Map<boolean, EncryptedAttributeType[]>;
   private _previousTypesWithoutCleanText?: EncryptedAttributeType[];
+  private _cleanTextScheme?: Scheme;
   private _serializeWithOldest = false;
 
   constructor(options: {
@@ -306,10 +307,10 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private cleanTextScheme(): Scheme {
-    return new Scheme({
+    return (this._cleanTextScheme ??= new Scheme({
       downcase: this.isDowncase,
       encryptor: new NullEncryptor(),
-    });
+    }));
   }
 
   /** @internal */
