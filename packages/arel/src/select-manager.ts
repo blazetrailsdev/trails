@@ -116,7 +116,7 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#as
    */
-  as(other: string): TableAlias {
+  as(other: string | SqlLiteral): TableAlias {
     return this.createTableAlias(
       this.grouping(this.ast),
       new SqlLiteral(other, { retryable: true }),

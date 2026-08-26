@@ -53,7 +53,9 @@ class InvertibleChangeTableMigration extends SilentMigration {
 
 class InvertibleTransactionMigration extends InvertibleMigration {
   async change(): Promise<void> {
-    await this.connection.transaction(async () => {
+    // Rails has no `Migration#transaction`: the Ruby's bare `transaction do`
+    // reaches the connection through `method_missing` (migration.rb:1044-1057).
+    await this.methodMissing("transaction", async () => {
       await super.change();
     });
   }
