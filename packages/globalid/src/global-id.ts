@@ -8,11 +8,11 @@ import type { LocateOptions, LocatorLike, LocatorModel } from "./locator.js";
 import { constantize } from "@blazetrails/activesupport";
 
 /**
- * @internal Mirrors Ruby's `model <= GlobalID` — matches the identity
- * itself OR any subclass. Safe for non-constructor `LocatorModel`
- * values (returns false instead of throwing on missing `.prototype`).
+ * Mirrors Ruby's `model <= GlobalID` — matches the identity itself OR any
+ * subclass. Safe for non-constructor `LocatorModel` values (returns false
+ * instead of throwing on missing `.prototype`).
  */
-export function isOrExtends(klass: LocatorModel, base: { prototype: object }): boolean {
+function isOrExtends(klass: LocatorModel, base: { prototype: object }): boolean {
   if ((klass as unknown) === base) return true;
   const proto = (klass as unknown as { prototype?: unknown }).prototype;
   return typeof proto === "object" && proto !== null && proto instanceof (base as never);
@@ -146,7 +146,14 @@ export class GlobalID {
     return this.toString();
   }
 
-  /** @internal The JS serialization hook; delegates to the ported `asJson`. */
+  /**
+   * The JS serialization hook; delegates to the ported `asJson`.
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT — `JSON.stringify` dispatches on `toJSON`,
+   * which is the JS spelling of what Ruby reaches through `as_json`; without
+   * it a GlobalID serializes as a bare object rather than its URI.
+   */
   toJSON(): string {
     return this.asJson();
   }

@@ -376,6 +376,8 @@ export default defineConfig(
       "packages/trailties/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
+      "packages/globalid/src/**/*.ts",
+      "packages/i18n/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction

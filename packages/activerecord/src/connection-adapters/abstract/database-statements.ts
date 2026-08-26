@@ -151,7 +151,7 @@ export interface DatabaseStatementsHost {
     userTransaction?: unknown;
   };
   withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
-  disableReferentialIntegrity?(fn: () => Promise<void>, tables?: string[]): Promise<void>;
+  disableReferentialIntegrity?(fn: () => Promise<void>): Promise<void>;
   /** @internal */
   executeBatch?(
     statements: string[],
@@ -540,10 +540,12 @@ export async function truncateTables(
 
   if (filtered.length === 0) return;
 
-  const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(this, filtered);
-
   const exec = this.execute ?? execute;
   const doTruncate = async () => {
+    const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(
+      this,
+      filtered,
+    );
     if (this.executeBatch) {
       await this.executeBatch(statements, "Truncate Tables");
     } else {
@@ -554,12 +556,7 @@ export async function truncateTables(
   };
 
   if (this.disableReferentialIntegrity) {
-    let executed = false;
-    await this.disableReferentialIntegrity(async () => {
-      executed = true;
-      await doTruncate();
-    }, filtered);
-    if (!executed) await doTruncate();
+    await this.disableReferentialIntegrity(doTruncate);
   } else {
     await doTruncate();
   }
@@ -990,17 +987,10 @@ export async function insertFixturesSet(
     }
   };
 
-  const affectedTables = [...new Set([...Object.keys(fixtureSet), ...tablesToDelete])];
-
   // Rails wraps fixture loading in a transaction with requires_new: true
   const doLoadInTransaction = async () => {
     if (this.disableReferentialIntegrity) {
-      let executed = false;
-      await this.disableReferentialIntegrity(async () => {
-        executed = true;
-        await doInserts();
-      }, affectedTables);
-      if (!executed) await doInserts();
+      await this.disableReferentialIntegrity(doInserts);
     } else {
       await doInserts();
     }

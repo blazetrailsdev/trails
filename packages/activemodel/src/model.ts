@@ -37,8 +37,6 @@ import {
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
-import { Serialization } from "./serialization.js";
-import { JSON as SerializersJSON } from "./serializers/json.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions } from "./validations.js";
@@ -109,14 +107,7 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model
-  extends
-    Dirty,
-    Access,
-    Conversion,
-    Serialization,
-    Naming,
-    SerializersJSON,
-    Included<typeof AttributeMethods.InstanceMethods> {
+  extends Dirty, Access, Conversion, Naming, Included<typeof AttributeMethods.InstanceMethods> {
   /**
    * Redeclared as a method, not the property `Included<>` derives, so a
    * subclass may override `attribute_missing` the way Rails' cascade expects.
@@ -238,7 +229,7 @@ export interface Model
 
 /**
  * Model — the base class that bundles Attributes, Validations, Callbacks,
- * Dirty tracking, Serialization, and Naming.
+ * Dirty tracking and Naming.
  *
  * Mirrors: ActiveModel::Model (with all the included modules)
  */
@@ -246,11 +237,6 @@ export interface Model
 export class Model {
   [key: string]: unknown;
 
-  /**
-   * `class_attribute :include_root_in_json, instance_writer: false,
-   * default: false` (json.rb:15), installed by `JSON.[included]`.
-   */
-  declare static includeRootInJson: boolean | string;
   /**
    * `class_attribute :param_delimiter, instance_reader: false, default: "-"`
    * (conversion.rb:32), installed by `Conversion.[included]`.
@@ -706,13 +692,6 @@ extend(Model, Naming);
 // the module's own `[included]` hook.
 include(Model, Conversion);
 extend(Model, ConversionClassMethods);
-
-// Ruby `include ActiveModel::Serialization` (serialization.rb:127), which
-// `ActiveModel::Serializers::JSON` pulls in (json.rb:11); its `included do`
-// block (json.rb:12-16) extends Naming and issues the
-// `class_attribute :include_root_in_json`.
-include(Model, Serialization);
-include(Model, SerializersJSON);
 
 // Ruby `include ActiveModel::AttributeAssignment` (api.rb:14).
 include(Model, {

@@ -119,7 +119,14 @@ export class KeyValue {
   store: Store | null;
   private _subtrees: boolean;
 
-  /** @internal Ruby's `@links` ivar, which `Flatten#links` memoizes into. */
+  /**
+   * Ruby's `@links` ivar, which `Flatten#links` memoizes into.
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT — a Ruby ivar is private to the object; the
+   * TS field cannot be `private` because `Flatten`'s `this`-typed mixin
+   * functions live in another file and read it.
+   */
   linksCache?: Map<string, Map<string, string>>;
 
   /** Mirrors: `include Flatten` (key_value.rb:70). */
@@ -136,7 +143,14 @@ export class KeyValue {
   /** @internal */
   escapeDefaultSeparator = escapeDefaultSeparator;
 
-  /** @internal Ruby's `@translations` ivar, which `translations` memoizes into. */
+  /**
+   * Ruby's `@translations` ivar, which `translations` memoizes into.
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT — a Ruby ivar is private to the object; the
+   * TS field cannot be `private` because the `this`-typed store functions live
+   * in another file and read it.
+   */
   translationsStore?: TranslationData;
 
   constructor(store: Store | null, subtrees = true) {

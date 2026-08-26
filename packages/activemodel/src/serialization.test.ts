@@ -1,4 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Serialization` in its class body, the way the
+   Rails test model it mirrors does; the empty class/interface merge beside it is how
+   `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
+import { Serialization } from "./serialization.js";
 import { Model } from "./index.js";
 import { NoMethodError } from "./attribute-assignment.js";
 
@@ -19,9 +25,12 @@ describe("SerializationTest", () => {
     // is consulted by `serializable_hash` (serialization_test.rb).
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "Alice" });
     (
       p as unknown as { readAttributeForSerialization(n: string): unknown }
@@ -34,9 +43,12 @@ describe("SerializationTest", () => {
     // yields `friends: []` — the accessor exists and returns an empty array.
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "Alice" });
     setAssociationAccessors(p, { posts: [] });
     const hash = p.serializableHash({ include: "posts" });
@@ -49,9 +61,12 @@ describe("SerializationTest", () => {
     // (a non-array Enumerable). serialization maps over it element-wise.
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const friend = { _attributes: new Map([["name", "Joe"]]) };
     const friendList: Iterable<unknown> = {
       [Symbol.iterator]: () => [friend][Symbol.iterator](),
@@ -66,10 +81,13 @@ describe("SerializationTest", () => {
   it("only include", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "Alice", age: 25 });
     const hash = p.serializableHash({ only: ["name"] });
     expect(hash["name"]).toBe("Alice");
@@ -79,10 +97,13 @@ describe("SerializationTest", () => {
   it("except include", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "Alice", age: 25 });
     const hash = p.serializableHash({ except: ["age"] });
     expect(hash["name"]).toBe("Alice");
@@ -92,9 +113,12 @@ describe("SerializationTest", () => {
   it("should raise NoMethodError for non existing method", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "test" });
     expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(NoMethodError);
     expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(
@@ -105,9 +129,12 @@ describe("SerializationTest", () => {
   it("multiple includes", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "test" });
     const hash = p.serializableHash();
     expect(hash).toHaveProperty("name", "test");
@@ -120,11 +147,14 @@ describe("SerializationTest", () => {
     // (Joe's is [David], Sue's is []).
     class User extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.attribute("email", "string");
         this.attribute("gender", "string");
       }
     }
+    interface User extends Serialization {}
+
     const david = new User({ name: "David", email: "david@example.com", gender: "male" });
     const joe = new User({ name: "Joe", email: "joe@example.com", gender: "male" });
     const sue = new User({ name: "Sue", email: "sue@example.com", gender: "female" });
@@ -157,10 +187,13 @@ describe("SerializationTest", () => {
   it("multiple includes with options", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "test", age: 25 });
     const hash = p.serializableHash({ only: ["name"] });
     expect(hash).toHaveProperty("name", "test");
@@ -170,10 +203,13 @@ describe("SerializationTest", () => {
   it("all includes with options", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "test", age: 25 });
     const hash = p.serializableHash();
     expect(hash).toHaveProperty("name", "test");
@@ -182,6 +218,7 @@ describe("SerializationTest", () => {
 
   class SerPerson extends Model {
     static {
+      include(this, Serialization);
       this.attribute("name", "string");
       this.attribute("age", "integer");
       this.attribute("email", "string");
@@ -190,6 +227,8 @@ describe("SerializationTest", () => {
       return `Hi ${this._readAttribute("name")}`;
     }
   }
+
+  interface SerPerson extends Serialization {}
 
   it("method serializable hash should work", () => {
     const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
@@ -235,11 +274,14 @@ describe("SerializationTest", () => {
 
   class Post extends Model {
     static {
+      include(this, Serialization);
       this.attribute("title", "string");
       this.attribute("body", "string");
       this.attribute("rating", "integer");
     }
   }
+
+  interface Post extends Serialization {}
 
   it("include option with singular association", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
@@ -267,11 +309,14 @@ describe("SerializationTest", () => {
   it("method serializable hash should work with only option with order of given keys", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.attribute("age", "integer");
         this.attribute("email", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "Alice", age: 25, email: "a@b.com" });
     const result = p.serializableHash({ only: ["email", "name"] });
     // Rails `Array(only) & attribute_names` orders by the `only:` list, not the
@@ -283,9 +328,12 @@ describe("SerializationTest", () => {
   it("include option with plural association", () => {
     class Person extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Serialization {}
+
     const p = new Person({ name: "Alice" });
     const result = p.serializableHash();
     expect(result.name).toBe("Alice");

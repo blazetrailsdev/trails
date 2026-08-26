@@ -102,7 +102,14 @@ export function setConfig(value: Config): void {
   currentConfig = value;
 }
 
-/** @internal Test seam — drops the process-wide config so a case starts clean. */
+/**
+ * Test seam — drops the process-wide config so a case starts clean.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE — Ruby's suite resets by assigning a fresh
+ * `I18n.config`; this also clears the trails-only normalized-key cache, so it
+ * folds into `setConfig` once that cache hangs off the Config instance.
+ */
 export function resetConfig(): void {
   currentConfig = undefined;
   normalizedKeyCache.clear();

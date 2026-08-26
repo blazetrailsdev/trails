@@ -32,6 +32,7 @@ import type {
 import {
   ArgumentError,
   AttributeMethodPattern,
+  JSONSerializer,
   Model,
   Type,
   type AttributeOptions,
@@ -808,6 +809,15 @@ interface _ConstructorAssociationWriter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
+  /**
+   * `class_attribute :include_root_in_json, instance_writer: false,
+   * default: false` (json.rb:15), installed by `JSON.[included]` from
+   * `include ActiveModel::Serializers::JSON` (serialization.rb:6). TS
+   * static-side inheritance flows only through `extends`, so the slot the
+   * mixin installs is declared here.
+   */
+  declare static includeRootInJson: boolean | string;
+
   // --- Translation mixin (wired via extend() after class) ---
   // Normalization
   declare static normalizes: (...args: NormalizesArgs) => void;
@@ -4201,8 +4211,12 @@ export class Base extends Model {
   }
 }
 
+// `toJSON` is omitted from the merge: `Base` already inherits
+// `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43)
+// through `Model`, and re-declaring it here would put a second copy of the
+// name on base.ts's surface.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof AutosaveAssociation> {
+export interface Base extends Included<typeof AutosaveAssociation>, Omit<JSONSerializer, "toJSON"> {
   /** Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26). */
   normalizeAttribute(name: string): void;
   /**
@@ -4610,6 +4624,13 @@ extend(Base, {
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
   localStoredAttributes: _localStoredAttributesMethod,
 });
+
+// `include ActiveRecord::Serialization` (base.rb:325), which is
+// `include ActiveModel::Serializers::JSON` (serialization.rb:6) — the JSON
+// surface ActiveModel::Model does NOT carry (model.rb:42-45). Its `included do`
+// block sets `self.include_root_in_json = false` (serialization.rb:9-11).
+include(Base, JSONSerializer);
+Base.includeRootInJson = false;
 
 include(Base, {
   // AttributeMethods::Write

@@ -1,9 +1,9 @@
 /**
  * Adapter-agnostic regression tests for disableReferentialIntegrity.
  *
- * These drive the module function against a fake host (no live PG), pinning
- * the RFC 0060 property that the catalog is enumerated exactly once and the
- * ENABLE pass re-enables the same set the DISABLE pass disabled. The live-PG
+ * These drive the module function against a fake host (no live PG), pinning the
+ * shape of referential_integrity.rb:7-38 — each ALTER pass collects `tables`
+ * itself, and the enable pass swallows an ActiveRecordError. The live-PG
  * behavior lives in adapters/postgresql/referential-integrity.test.ts.
  */
 import { describe, it, expect, vi } from "vitest";
@@ -37,13 +37,13 @@ function makeHost(tables: string[]): {
 }
 
 describe("disableReferentialIntegrity", () => {
-  it("enumerates the table list only once across both passes", async () => {
+  it("collects the table list in each pass", async () => {
     const { host, tablesCalls } = makeHost(["a", "b"]);
     await disableReferentialIntegrity.call(host, async () => {});
-    expect(tablesCalls()).toBe(1);
+    expect(tablesCalls()).toBe(2);
   });
 
-  it("re-enables exactly the set that was disabled even if the block changes the tables", async () => {
+  it("enables the tables the catalog holds once the block has run", async () => {
     let current = ["a", "b"];
     const executed: string[] = [];
     const host: FakeHost = {
@@ -65,35 +65,22 @@ describe("disableReferentialIntegrity", () => {
     expect(disableSql).toBe(
       `ALTER TABLE "a" DISABLE TRIGGER ALL;ALTER TABLE "b" DISABLE TRIGGER ALL`,
     );
-    expect(enableSql).toBe(`ALTER TABLE "a" ENABLE TRIGGER ALL;ALTER TABLE "b" ENABLE TRIGGER ALL`);
-    expect(enableSql).not.toContain(`"c"`);
-  });
-
-  it("toggles only the scoped tables and skips the catalog enumeration when a scope is given", async () => {
-    const { host, executed, tablesCalls } = makeHost(["a", "b", "c", "d"]);
-    await disableReferentialIntegrity.call(host, async () => {}, ["b", "c"]);
-    expect(tablesCalls()).toBe(0);
-    const disableSql = executed.find((s) => s.includes("DISABLE TRIGGER ALL"));
-    const enableSql = executed.find((s) => s.includes("ENABLE TRIGGER ALL"));
-    expect(disableSql).toBe(
-      `ALTER TABLE "b" DISABLE TRIGGER ALL;ALTER TABLE "c" DISABLE TRIGGER ALL`,
+    expect(enableSql).toBe(
+      `ALTER TABLE "a" ENABLE TRIGGER ALL;ALTER TABLE "b" ENABLE TRIGGER ALL;ALTER TABLE "c" ENABLE TRIGGER ALL`,
     );
-    expect(enableSql).toBe(`ALTER TABLE "b" ENABLE TRIGGER ALL;ALTER TABLE "c" ENABLE TRIGGER ALL`);
-    expect(disableSql).not.toContain(`"a"`);
   });
 
-  it("runs the block without any ALTER when the scope is empty", async () => {
-    const { host, executed, tablesCalls } = makeHost(["a", "b"]);
+  it("runs the block when the catalog is empty", async () => {
+    const { host, executed } = makeHost([]);
     let ran = false;
     await disableReferentialIntegrity.call(host, async () => {
       ran = true;
-    }, []);
+    });
     expect(ran).toBe(true);
-    expect(tablesCalls()).toBe(0);
-    expect(executed).toHaveLength(0);
+    expect(executed).toEqual(["", ""]);
   });
 
-  it("still warns and rethrows when an empty-scope block raises InvalidForeignKey", async () => {
+  it("still warns and rethrows when the block raises InvalidForeignKey", async () => {
     const { host } = makeHost(["a", "b"]);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const fkError = new InvalidForeignKey("boom", { sql: "", binds: [] });
@@ -101,7 +88,7 @@ describe("disableReferentialIntegrity", () => {
       await expect(
         disableReferentialIntegrity.call(host, async () => {
           throw fkError;
-        }, []),
+        }),
       ).rejects.toBe(fkError);
       expect(warn).toHaveBeenCalledOnce();
     } finally {
@@ -109,12 +96,9 @@ describe("disableReferentialIntegrity", () => {
     }
   });
 
-  it("swallows an enable-pass StatementInvalid when the block dropped a snapshotted table", async () => {
+  it("swallows an enable-pass StatementInvalid raised against a missing table", async () => {
     const host: FakeHost = {
       quoteTableName: (name) => `"${name}"`,
-      // Mirrors the adapter translating undefined_table (42P01) to
-      // StatementInvalid (an ActiveRecordError) — the enable-pass catch must
-      // swallow it rather than let it escape disableReferentialIntegrity.
       execute: async (sql) => {
         if (sql.includes("ENABLE TRIGGER ALL")) {
           throw new StatementInvalid('relation "gone" does not exist', { sql, binds: [] });

@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Serializers::JSON` in its class body, the way the
+   Rails test model it mirrors does; the empty class/interface merge beside it is how
+   `include()` surfaces those members on the type side. */
 /**
  * Serialization tests — TS-only coverage with no counterpart in
  * vendor/rails/activemodel/test/cases/serialization_test.rb. Relocated here
@@ -5,6 +9,8 @@
  * and a renamed or split Rails test stays visible in review.
  */
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
+import { JSON as SerializersJSON } from "./serializers/json.js";
 import { Model } from "./index.js";
 import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
 import { NoMethodError } from "./attribute-assignment.js";
@@ -25,11 +31,13 @@ describe("Serialization — trails-only coverage", () => {
   // there use it too.
   class Post extends Model {
     static {
+      include(this, SerializersJSON);
       this.attribute("title", "string");
       this.attribute("body", "string");
       this.attribute("rating", "integer");
     }
   }
+  interface Post extends SerializersJSON {}
 
   it("read_attribute_for_serialization dispatches the accessor, not a stale attributes hash", () => {
     // Rails default `alias :read_attribute_for_serialization :send`: a host
@@ -50,12 +58,15 @@ describe("Serialization — trails-only coverage", () => {
     // attribute's getter serializes the override, not the raw store value.
     class Person extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
       }
       get name(): string {
         return "OVERRIDE:" + (this.attribute("name") as string);
       }
     }
+    interface Person extends SerializersJSON {}
+
     const p = new Person({ name: "Bob" });
     expect(p.serializableHash()).toEqual({ name: "OVERRIDE:Bob" });
   });
@@ -114,12 +125,15 @@ describe("Serialization — trails-only coverage", () => {
     // from the store.
     class Person extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
       }
       greeting(): string {
         return "Hi " + (this._readAttribute("name") as string);
       }
     }
+    interface Person extends SerializersJSON {}
+
     const p = new Person({ name: "Bob" });
     expect(readAttributeForSerialization(p as unknown as SerializationRecord, "greeting")).toBe(
       "Hi Bob",
@@ -133,9 +147,12 @@ describe("Serialization — trails-only coverage", () => {
     // (Rails' lazy `to_ary` contract) rather than building eagerly.
     class Person extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
       }
     }
+    interface Person extends SerializersJSON {}
+
     const p = new Person({ name: "Alice" });
     setAssociationAccessors(p, { posts: [] });
     const hash = p.serializableHash({ include: "posts", __sync: true } as never);
@@ -148,10 +165,13 @@ describe("Serialization — trails-only coverage", () => {
     // (serialization.rb:130). trails must not substring-match a scalar string.
     class Person extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends SerializersJSON {}
+
     const p = new Person({ name: "Alice", age: 25 });
     const hash = p.serializableHash({ only: "name" });
     expect(hash["name"]).toBe("Alice");
@@ -161,10 +181,13 @@ describe("Serialization — trails-only coverage", () => {
   it("except include with scalar coerces via Array() like an array", () => {
     class Person extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends SerializersJSON {}
+
     const p = new Person({ name: "Alice", age: 25 });
     const hash = p.serializableHash({ except: "age" });
     expect(hash["name"]).toBe("Alice");
@@ -174,10 +197,13 @@ describe("Serialization — trails-only coverage", () => {
   it("asJson accepts a scalar only like the array form", () => {
     class Person extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends SerializersJSON {}
+
     const p = new Person({ name: "Alice", age: 25 });
     expect(p.asJson({ only: "name" })).toEqual(p.asJson({ only: ["name"] }));
   });
@@ -238,9 +264,12 @@ describe("Serialization — trails-only coverage", () => {
     it("asJson coerces Temporal attributes to ISO 8601 strings", () => {
       class Event extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("startsAt", "datetime");
         }
       }
+      interface Event extends SerializersJSON {}
+
       const e = new Event({ startsAt: "2026-04-24T10:00:00.123456Z" });
       const json = e.asJson();
       // `Time#as_json` renders at `ActiveSupport::JSON::Encoding.time_precision`
@@ -251,15 +280,21 @@ describe("Serialization — trails-only coverage", () => {
     it("asJson recurses into include: arrays and nested objects", () => {
       class Post extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("id", "big_integer");
           this.attribute("title", "string");
         }
       }
+      interface Post extends SerializersJSON {}
+
       class Blog extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("name", "string");
         }
       }
+      interface Blog extends SerializersJSON {}
+
       const b = new Blog({ name: "b" });
       setAssociationAccessors(b, {
         posts: [
@@ -276,10 +311,13 @@ describe("Serialization — trails-only coverage", () => {
     it("attribute named toJSON does not shadow Model#toJSON", () => {
       class Weird extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("toJSON", "string");
           this.attribute("name", "string");
         }
       }
+      interface Weird extends SerializersJSON {}
+
       const w = new Weird({ toJSON: "raw-value", name: "w" });
       expect(JSON.parse(JSON.stringify(w))).toEqual({ toJSON: "raw-value", name: "w" });
       expect(w.attribute("toJSON")).toBe("raw-value");
@@ -288,10 +326,13 @@ describe("Serialization — trails-only coverage", () => {
     it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
       class Row extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("id", "big_integer");
           this.attribute("name", "string");
         }
       }
+      interface Row extends SerializersJSON {}
+
       const r = new Row({ id: "42", name: "row-1" });
       expect(JSON.stringify(r)).toBe(r.toJSON());
       const parsed = JSON.parse(JSON.stringify(r));
@@ -301,10 +342,13 @@ describe("Serialization — trails-only coverage", () => {
     it("JSON.stringify(model) with large bigint id above Number.MAX_SAFE_INTEGER", () => {
       class Row extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("id", "big_integer");
           this.attribute("name", "string");
         }
       }
+      interface Row extends SerializersJSON {}
+
       const big = 2n ** 62n;
       const r = new Row({ id: big, name: "row-2" });
       expect(() => JSON.stringify(r)).not.toThrow();
@@ -317,10 +361,13 @@ describe("Serialization — trails-only coverage", () => {
     it("asJson is idempotent on JSON-safe values", () => {
       class Person extends Model {
         static {
+          include(this, SerializersJSON);
           this.attribute("name", "string");
           this.attribute("age", "integer");
         }
       }
+      interface Person extends SerializersJSON {}
+
       const p = new Person({ name: "Alice", age: 30 });
       expect(p.asJson()).toEqual({ name: "Alice", age: 30 });
     });
@@ -330,6 +377,7 @@ describe("Serialization — trails-only coverage", () => {
 describe("Serialization", () => {
   class Post extends Model {
     static {
+      include(this, SerializersJSON);
       this.attribute("title", "string");
       this.attribute("body", "string");
       this.attribute("rating", "integer");
@@ -339,6 +387,7 @@ describe("Serialization", () => {
       return String(this._readAttribute("title")).slice(0, 10);
     }
   }
+  interface Post extends SerializersJSON {}
 
   it("method serializable hash should work", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
@@ -404,10 +453,13 @@ describe("fromJson", () => {
   it("from_json should work without a root (class attribute)", () => {
     class User extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface User extends SerializersJSON {}
+
     const u = new User({});
     u.fromJson('{"name":"Alice","age":30}');
     expect(u._readAttribute("name")).toBe("Alice");
@@ -417,9 +469,12 @@ describe("fromJson", () => {
   it("returns this for chaining", () => {
     class User extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
       }
     }
+    interface User extends SerializersJSON {}
+
     const u = new User({});
     const result = u.fromJson('{"name":"Bob"}');
     expect(result).toBe(u);
@@ -428,9 +483,12 @@ describe("fromJson", () => {
   it("from_json should work with a root (method parameter)", () => {
     class User extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
       }
     }
+    interface User extends SerializersJSON {}
+
     const u = new User({});
     u.fromJson('{"user":{"name":"Charlie"}}', true);
     expect(u._readAttribute("name")).toBe("Charlie");
@@ -439,9 +497,12 @@ describe("fromJson", () => {
   it("marks attributes as changed via dirty tracking", () => {
     class User extends Model {
       static {
+        include(this, SerializersJSON);
         this.attribute("name", "string");
       }
     }
+    interface User extends SerializersJSON {}
+
     const u = new User({ name: "Original" });
     u.changesApplied();
     u.fromJson('{"name":"Updated"}');

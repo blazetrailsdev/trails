@@ -201,7 +201,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
     const a = new PostgreSQLAdapter({
       connectionString: PG_TEST_URL,
-      variables: { debug_print_plan: "default" },
+      variables: { debug_print_plan: ":default" },
     });
     try {
       const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
