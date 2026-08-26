@@ -3,6 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { Rational } from "@blazetrails/date";
 import { describeIfMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
@@ -88,13 +89,7 @@ describeIfMysqlAdapter("AbstractMysqlAdapter", () => {
     });
 
     it("where with rational for string column using bind parameters", async () => {
-      // Tracked deviation pending convergence, RFC 0082
-      // `rational-value-quoting-analogue`: Rails passes `Rational(0)` and
-      // expects `'0.0'`, but trails has no `Rational` analogue yet, so the
-      // nearest value is a plain `Number` — which makes this case duplicate the
-      // integer one above until that story ports the class (as `BigDecimal`
-      // already is).
-      await assertQuotedAs("'0'", 0);
+      await assertQuotedAs("'0.0'", new Rational(0, 1));
     });
   });
 });
