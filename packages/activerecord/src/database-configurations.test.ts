@@ -34,6 +34,10 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("configs for getter with name", () => {
+    // `configs_for(name:)` defaults env_name to `default_env`
+    // (database_configurations.rb:99), so key the hash on it as
+    // database_configurations_test.rb:89 does.
+    DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "primary.db" },
@@ -41,11 +45,14 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const animals = configs.configsFor({ name: "animals" });
-    expect(animals).toHaveLength(1);
-    expect(animals[0].database).toBe("animals.db");
+    expect(animals!.database).toBe("animals.db");
   });
 
   it("configs for with name symbol", () => {
+    // `configs_for(name:)` defaults env_name to `default_env`
+    // (database_configurations.rb:99), so key the hash on it as
+    // database_configurations_test.rb:89 does.
+    DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "primary.db" },
@@ -53,8 +60,7 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const animals = configs.configsFor({ name: "animals" });
-    expect(animals).toHaveLength(1);
-    expect(animals[0].name).toBe("animals");
+    expect(animals!.name).toBe("animals");
   });
 
   it("configs for getter with env and name", () => {
@@ -68,8 +74,7 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const result = configs.configsFor({ envName: "development", name: "animals" });
-    expect(result).toHaveLength(1);
-    expect(result[0].database).toBe("dev_animals.db");
+    expect(result!.database).toBe("dev_animals.db");
   });
 
   it("find db config returns first config for env", () => {
@@ -123,6 +128,10 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("configs for with custom key", () => {
+    // `configs_for(name:)` defaults env_name to `default_env`
+    // (database_configurations.rb:99), so key the hash on it as
+    // database_configurations_test.rb:89 does.
+    DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "primary.db" },
@@ -130,12 +139,11 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const cache = configs.configsFor({ name: "cache" });
-    expect(cache).toHaveLength(1);
-    expect(cache[0].database).toBe("cache.db");
+    expect(cache!.database).toBe("cache.db");
   });
 
   it("resolve returns current-env config when same name exists in multiple envs", () => {
-    // currentEnv()="test" (NODE_ENV=test in vitest), so the test config is returned.
+    // defaultEnv resolves to "test" (NODE_ENV=test in vitest), so the test config is returned.
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "dev.db" },
@@ -158,23 +166,23 @@ describe("DatabaseConfigurationsTest", () => {
       DatabaseConfigurations.defaultEnv = "development";
       vi.stubEnv("TRAILS_ENV", "production");
       vi.stubEnv("NODE_ENV", "test");
-      expect(DatabaseConfigurations.currentEnv()).toBe("production");
+      expect(DatabaseConfigurations.defaultEnv).toBe("production");
     });
 
     it("currentEnv falls back to NODE_ENV, then defaultEnv", () => {
       DatabaseConfigurations.defaultEnv = null;
       vi.stubEnv("NODE_ENV", "staging");
-      expect(DatabaseConfigurations.currentEnv()).toBe("staging");
+      expect(DatabaseConfigurations.defaultEnv).toBe("staging");
 
       vi.stubEnv("NODE_ENV", undefined as unknown as string);
-      expect(DatabaseConfigurations.currentEnv()).toBe("development");
+      expect(DatabaseConfigurations.defaultEnv).toBe("development");
     });
 
     it("forCurrentEnv follows an explicitly set defaultEnv over the process env", () => {
       vi.stubEnv("NODE_ENV", "test");
       DatabaseConfigurations.defaultEnv = "default_env";
 
-      const configs = DatabaseConfigurations.fromRaw({
+      const configs = new DatabaseConfigurations({
         default_env: {
           readonly: { adapter: "sqlite3", database: "readonly.sqlite3" },
           primary: { adapter: "sqlite3", database: "primary.sqlite3" },
@@ -186,7 +194,7 @@ describe("DatabaseConfigurationsTest", () => {
         common: { adapter: "sqlite3", database: "common.sqlite3" },
       });
 
-      expect(DatabaseConfigurations.currentEnv()).toBe("default_env");
+      expect(DatabaseConfigurations.defaultEnv).toBe("default_env");
       expect(configs.configsFor({ envName: "default_env" }).every((c) => c.forCurrentEnv)).toBe(
         true,
       );
@@ -206,9 +214,9 @@ describe("DatabaseConfigurationsTest", () => {
       vi.stubEnv("NODE_ENV", "test");
       DatabaseConfigurations.defaultEnv = "default_env";
 
-      expect(DatabaseConfigurations.currentEnv()).toBe("production");
+      expect(DatabaseConfigurations.defaultEnv).toBe("production");
 
-      const configs = DatabaseConfigurations.fromRaw({
+      const configs = new DatabaseConfigurations({
         production: { primary: { adapter: "sqlite3", database: "prod.db" } },
         default_env: { primary: { adapter: "sqlite3", database: "bad.db" } },
       });
@@ -220,11 +228,11 @@ describe("DatabaseConfigurationsTest", () => {
       // connection-handling find the synthesized config under the same env.
       vi.stubEnv("TRAILS_ENV", "production");
       vi.stubEnv("DATABASE_URL", "sqlite3:db/prod.sqlite3");
-      const configs = DatabaseConfigurations.fromEnv({});
-      const env = DatabaseConfigurations.currentEnv();
+      const configs = new DatabaseConfigurations({});
+      const env = DatabaseConfigurations.defaultEnv;
       const synthesized = configs.configsFor({ envName: env, name: "primary" });
       expect(env).toBe("production");
-      expect(synthesized).toHaveLength(1);
+      expect(synthesized).toBeDefined();
     });
 
     it("forCurrentEnv and fromEnv resolve the same env when TRAILS_ENV differs from defaultEnv", () => {
@@ -233,7 +241,7 @@ describe("DatabaseConfigurationsTest", () => {
       DatabaseConfigurations.defaultEnv = "development";
       vi.stubEnv("TRAILS_ENV", "production");
 
-      const configs = DatabaseConfigurations.fromEnv({
+      const configs = new DatabaseConfigurations({
         production: {
           primary: { adapter: "sqlite3", database: "prod.db" },
           animals: { adapter: "sqlite3", database: "prod_animals.db" },

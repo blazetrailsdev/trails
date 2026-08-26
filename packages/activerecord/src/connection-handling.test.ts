@@ -578,7 +578,7 @@ describe("ConnectionHandlingTest", () => {
   it("establishConnection backfills the adapter on an adapter-less HashConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
-    const env = DatabaseConfigurations.currentEnv();
+    const env = DatabaseConfigurations.defaultEnv;
 
     const dbConfig = new HashConfig(env, "primary", { url: "sqlite3:db/foo.sqlite3" });
     expect(dbConfig.adapter).toBeUndefined();
@@ -815,7 +815,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     try {
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
-      const env = DatabaseConfigurations.currentEnv();
+      const env = DatabaseConfigurations.defaultEnv;
       priorConfigs = Base.configurations();
       Base.configurations({
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },

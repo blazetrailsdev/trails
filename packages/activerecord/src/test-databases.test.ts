@@ -87,7 +87,7 @@ describe("TestDatabasesTest", () => {
     // "Updates the database configuration" — Rails re-reads the registry
     // (test_databases_test.rb:49); `configsFor` is stubbed to hand back the same
     // config object, which is the one create_and_load_schema suffixed.
-    expect(mockConfigurations.configsFor({ envName: "arunit", name: "primary" })[0].database).toBe(
+    expect(mockConfigurations.configsFor({ envName: "arunit" })[0].database).toBe(
       "test/db/primary.sqlite3-42",
     );
   });

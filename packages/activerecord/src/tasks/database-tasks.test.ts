@@ -49,7 +49,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       // stamp the config's metadata with the current env, assert the guard
       // passes, then protect that env and assert it raises.
       const protectedEnvironments = Base.protectedEnvironments;
-      const currentEnv = DatabaseConfigurations.currentEnv();
+      const currentEnv = DatabaseConfigurations.defaultEnv;
       const env = "arunit";
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
       const dbFile = path.join(tmp, "primary.sqlite3");
@@ -1232,9 +1232,9 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
     });
     DatabaseTasks.env = "test";
     await DatabaseTasks.purgeCurrent("production");
-    expect(purged).toEqual(
+    expect(purged).toEqual([
       DatabaseTasks.databaseConfiguration.configsFor({ envName: "production", name: "primary" }),
-    );
+    ]);
     expect(establishSpy).toHaveBeenCalledWith("production");
   });
 });

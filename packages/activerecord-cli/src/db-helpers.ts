@@ -24,14 +24,14 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   const { pathToFileURL } = await import("node:url");
   const mod = await import(pathToFileURL(configPath).href);
   const raw = mod.default ?? mod;
-  const configs = normalizeSqlitePaths(DatabaseConfigurations.fromEnv(raw), cwd);
+  const configs = normalizeSqlitePaths(new DatabaseConfigurations(raw), cwd);
   DatabaseTasks.databaseConfiguration = configs;
   DatabaseTasks.root = cwd;
   // `db:load_config` (`railties/databases.rake:27`): the discovery paths every
   // pool falls back to when its own `db_config.migrations_paths` is absent
   // (`connection_pool.rb:299`). Absolute, as `Rails.application.paths` are.
   Migrator.migrationsPaths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  await establishEnvironmentConnection(DatabaseConfigurations.currentEnv());
+  await establishEnvironmentConnection(DatabaseConfigurations.defaultEnv);
   return configs;
 }
 

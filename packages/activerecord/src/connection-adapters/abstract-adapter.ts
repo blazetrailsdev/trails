@@ -2843,38 +2843,30 @@ function ensureAbstractAdapterMixinsApplied(): void {
     });
   }
 
-  // `dirties_query_cache` wiring (Rails query_cache.rb:13). Rails wires the public
-  // `update`/`delete`/`insert`/`create`; trails wires one layer lower, on
-  // `execUpdate`/`execDelete`/`execInsert`/`execInsertAll`, because that is the
-  // single funnel every logical write shares. Two distinct update paths converge
-  // there: the model save path (`_updateRecord` in persistence.ts, `_destroyRow`
-  // in base.ts) calls
-  // `execUpdate`/`execDelete` DIRECTLY, bypassing the public `update`/`delete`
-  // entirely, while `update_all`/`updateColumns` (the ClassMethods
-  // `_updateRecord` in persistence.ts)
-  // go through the public `update`/`delete` — which themselves call
-  // `execUpdate`/`execDelete`. Wiring the public methods would miss the direct
-  // save path; wiring the low-level method catches both, exactly once each. The
-  // still-lower `executeMutation` these funnel through stays unwrapped, so a
-  // logical write clears exactly once. DDL dirties because schema-statements
-  // routes it through the wired public `execute`, as Rails does. Wire the methods NOT overridden
-  // by a concrete adapter here — they're only defined on AbstractAdapter, and a
-  // subclass prototype doesn't yet inherit them when the per-adapter module runs
-  // (circular-import load order), so they must be wired on AbstractAdapter. The
-  // OVERRIDDEN write methods (`execute`, `rollbackDbTransaction`,
-  // `rollbackToSavepoint`, and sqlite's `truncate`) are
+  // `dirties_query_cache base, :exec_query, :execute, :create, :insert, :update,
+  //  :delete, :truncate, :truncate_tables, :rollback_to_savepoint,
+  //  :rollback_db_transaction, :restart_db_transaction, :exec_insert_all`
+  // (query_cache.rb:13-15). The clear sits on the PUBLIC statement methods, above
+  // every adapter's arm-splitting override — which is what covers PostgreSQL's
+  // `use_insert_returning? == false` arm (postgresql/database_statements.rb:48-59),
+  // an arm that never reaches `AbstractAdapter#execInsert` at all.
+  //
+  // Wire here the methods NOT overridden by a concrete adapter — they're only
+  // defined on AbstractAdapter, and a subclass prototype doesn't yet inherit them
+  // when the per-adapter module runs (circular-import load order), so they must be
+  // wired on AbstractAdapter. The OVERRIDDEN write methods (`execute`,
+  // `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's `truncate`) are
   // wired on each concrete adapter instead — wiring them here too would leave the
-  // override unwrapped. Reads route through `internalExecQuery` and never trip
-  // the wrapper. `execInsert` is wired here rather than per-adapter: only
-  // PostgreSQL still overrides it (postgresql/database_statements.rb:45), and its
-  // override delegates to `super`, so one wrapper on the shared method clears
-  // exactly once for every adapter.
+  // override unwrapped. Reads route through `internalExecQuery` and never trip the
+  // wrapper, and the low-level `exec*` funnels stay unwrapped, so a logical write
+  // clears exactly once.
   dirtiesQueryCache(
     AbstractAdapter,
     "execQuery",
-    "execInsert",
-    "execUpdate",
-    "execDelete",
+    "create",
+    "insert",
+    "update",
+    "delete",
     "execInsertAll",
     "truncate",
     "truncateTables",

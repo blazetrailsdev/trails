@@ -52,7 +52,7 @@ let _configurations: DatabaseConfigurations | undefined;
 export function configurationsStore(): DatabaseConfigurations {
   // Memoized on first read so `Base.configurations` holds one object, as Rails'
   // @@configurations attribute does: save/restore round-trips must be no-ops.
-  _configurations ??= DatabaseConfigurations.fromEnv({});
+  _configurations ??= new DatabaseConfigurations({});
   return _configurations;
 }
 
@@ -83,29 +83,21 @@ export class DatabaseConfigurations {
     this.dbConfigHandlers.push(handler);
   }
 
-  /** @internal */
-  static get defaultEnv(): string {
-    if (this._defaultEnv === null) return "development";
-    return this._defaultEnv || "default";
-  }
-
-  /** @internal Assign null to clear the override and fall back to the process env. */
-  static set defaultEnv(value: string | null) {
-    this._defaultEnv = value;
-  }
-
   /**
-   * The active environment. Rails' counterpart is
-   * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV`, which resolves
-   * `Rails.env` → `RAILS_ENV` → `RACK_ENV` → the literal default.
-   * Ours resolves `TRAILS_ENV` → `defaultEnv` → `NODE_ENV` → the literal
-   * default.
+   * Mirrors: `DatabaseConfigurations#default_env`
+   * (`database_configurations.rb:188-190`) — `DEFAULT_ENV.call.to_s`, where
+   * `DEFAULT_ENV = -> { RAILS_ENV.call || "default_env" }`
+   * (`connection_handling.rb:7`).
    *
-   * DELIBERATE DEVIATION — `TRAILS_ENV` outranks `defaultEnv`, Rails is the
-   * other way round. Per BC-2 (`docs/infrastructure/browser-compat-plan.md:88`)
+   * Ours resolves `TRAILS_ENV` -> the assigned override -> `NODE_ENV` -> the
+   * literal default. This is the ONE env in the class: the env a config is
+   * built under and the env it is later looked up by are the same value.
+   *
+   * DELIBERATE DEVIATION — `TRAILS_ENV` outranks the assigned override, Rails
+   * is the other way round. Per BC-2 (`docs/infrastructure/browser-compat-plan.md:88`)
    * `TRAILS_ENV` is the rename of the old `process.env.NODE_ENV` reads, so it
-   * maps to Rails' `ENV["RAILS_ENV"]` / `ENV["RACK_ENV"]`, and `defaultEnv` is
-   * the `Rails.env` analogue — by `connection_handling.rb:6` `defaultEnv` would
+   * maps to Rails' `ENV["RAILS_ENV"]` / `ENV["RACK_ENV"]`, and the override is
+   * the `Rails.env` analogue — by `connection_handling.rb:6` the override would
    * therefore win. trails inverts that on purpose: `TRAILS_ENV` is how a deploy
    * declares which environment the process is, and no in-process bootstrap may
    * override it. Consequence to know: with `TRAILS_ENV` set, assigning
@@ -113,22 +105,17 @@ export class DatabaseConfigurations {
    *
    * `NODE_ENV` sits last, ahead of only the literal default: it is a
    * one-release bridge with no Rails counterpart, and test runners set it
-   * unconditionally, so it must not mask a deliberate `defaultEnv`.
-   *
-   * Single source of truth for "what env are we building/connecting for" —
-   * `fromEnv` (which builds the configs) and the runtime config selectors in
-   * `connection-handling` must resolve it identically, or the synthesized
-   * `DATABASE_URL` config can be built for one env and looked up under another.
+   * unconditionally, so it must not mask a deliberate assignment.
    *
    * @internal
    */
-  static currentEnv(): string {
-    return (
-      getEnv("TRAILS_ENV") ||
-      this._defaultEnv ||
-      getEnv("NODE_ENV") ||
-      DatabaseConfigurations.defaultEnv
-    );
+  static get defaultEnv(): string {
+    return getEnv("TRAILS_ENV") || this._defaultEnv || getEnv("NODE_ENV") || "development";
+  }
+
+  /** @internal Assign null to clear the override and fall back to the process env. */
+  static set defaultEnv(value: string | null) {
+    this._defaultEnv = value;
   }
 
   private _configurations: DatabaseConfig[];
@@ -137,25 +124,11 @@ export class DatabaseConfigurations {
     if (Array.isArray(configurations)) {
       this._configurations = configurations;
     } else {
-      // Mirrors Rails: DatabaseConfigurations#initialize calls build_configs which
-      // merges DATABASE_URL via environment_url_config + merge_db_environment_variables.
-      // Uses DatabaseConfigurations.defaultEnv (set by app bootstrap from RAILS_ENV/RACK_ENV),
-      // not NODE_ENV — matching Rails' env resolution semantics.
+      // `@configurations = build_configs(configurations)`
+      // (database_configurations.rb:73-75) — the ONE build path, which merges
+      // DATABASE_URL via environment_url_config + merge_db_environment_variables.
       this._configurations = this.buildConfigs(configurations);
     }
-  }
-
-  /**
-   * Build a DatabaseConfigurations from raw config, merging DATABASE_URL.
-   * Mirrors Rails' DatabaseConfigurations.new which auto-merges DATABASE_URL.
-   * Use this when you want Rails-compatible behavior (constructor + URL merge).
-   */
-  // fromRaw: build with explicit defaultEnv (not NODE_ENV) for test isolation.
-  // Used by merge-and-resolve tests that set DatabaseConfigurations.defaultEnv.
-  static fromRaw(configurations: RawConfigurations = {}): DatabaseConfigurations {
-    const instance = new DatabaseConfigurations([]);
-    instance._configurations = instance.buildConfigs(configurations);
-    return instance;
   }
 
   /**
@@ -189,6 +162,18 @@ export class DatabaseConfigurations {
    * Collects configs matching the given env/name/config_key filters.
    * Respects include_hidden to include replicas and database_tasks: false configs.
    */
+  configsFor(options: {
+    envName?: string;
+    name: string;
+    configKey?: string;
+    includeHidden?: boolean;
+  }): DatabaseConfig | undefined;
+  configsFor(options?: {
+    envName?: string;
+    name?: undefined;
+    configKey?: string;
+    includeHidden?: boolean;
+  }): DatabaseConfig[];
   configsFor(
     options: {
       envName?: string;
@@ -196,8 +181,11 @@ export class DatabaseConfigurations {
       configKey?: string;
       includeHidden?: boolean;
     } = {},
-  ): DatabaseConfig[] {
-    let configs = this.envWithConfigs(options.envName);
+  ): DatabaseConfig[] | DatabaseConfig | undefined {
+    // `env_name ||= default_env if name` (database_configurations.rb:99).
+    const envName =
+      options.envName ?? (options.name ? DatabaseConfigurations.defaultEnv : undefined);
+    let configs = this.envWithConfigs(envName);
 
     if (!options.includeHidden) {
       configs = configs.filter((c) => {
@@ -211,9 +199,11 @@ export class DatabaseConfigurations {
         Object.prototype.hasOwnProperty.call(c.configuration, options.configKey!),
       );
     }
+    // `if name; configs.find { |db_config| db_config.name == name.to_s }; else; configs; end`
+    // (database_configurations.rb:114-120) — a single config, not an array.
     if (options.name) {
       const nameStr = String(options.name);
-      configs = configs.filter((c) => c.name === nameStr);
+      return configs.find((c) => c.name === nameStr);
     }
     return configs;
   }
@@ -273,38 +263,16 @@ export class DatabaseConfigurations {
   }
 
   /**
-   * Build a DatabaseConfigurations from the current environment.
-   *
-   * If `DATABASE_URL` is set and no raw config is provided, it synthesizes
-   * a configuration for the current environment from the URL. This mirrors
-   * how Rails' DatabaseConfigurations handles DATABASE_URL.
-   */
-  static fromEnv(raw: RawConfigurations = {}): DatabaseConfigurations {
-    const instance = new DatabaseConfigurations([]);
-    // Build for the active env resolved by `currentEnv()` — the same method the
-    // runtime config selectors in `connection-handling` use, so the synthesized
-    // `DATABASE_URL` config is built under exactly the env it's later looked up
-    // by. DATABASE_URL merges into whichever environment is active.
-    instance._configurations = instance.buildConfigs(raw, DatabaseConfigurations.currentEnv());
-    return instance;
-  }
-
-  /**
    * Mirrors: ActiveRecord::DatabaseConfigurations#build_configs
    *
    * Builds DatabaseConfig objects from the raw config, adds a primary URL
    * config for the current env if none matches, then merges the per-name
    * `*_DATABASE_URL` / `DATABASE_URL` environment variables.
    *
-   * Rails reads `default_env` inline; `currentEnv` defaults to it and is only
-   * passed explicitly by `fromEnv`, which builds under the env the runtime
-   * config selectors look configs up by.
    */
-  private buildConfigs(
-    configs: RawConfigurations | DatabaseConfig[],
-    defaultEnv: string = DatabaseConfigurations.defaultEnv,
-  ): DatabaseConfig[] {
+  private buildConfigs(configs: RawConfigurations | DatabaseConfig[]): DatabaseConfig[] {
     if (Array.isArray(configs)) return configs;
+    const defaultEnv = DatabaseConfigurations.defaultEnv;
 
     const dbConfigs = Object.entries(configs).flatMap(([envName, config]) =>
       this._isThreeLevelConfig(config)
@@ -317,8 +285,6 @@ export class DatabaseConfigurations {
     );
 
     // `unless db_configs.find(&:for_current_env?)` (database_configurations.rb:212).
-    // Rails' `default_env` is supplied by the caller here so `fromEnv` can build
-    // under the env the runtime selectors actually look configs up by.
     if (!dbConfigs.some((c) => c.envName === defaultEnv)) {
       const urlConfig = this.environmentUrlConfig(defaultEnv, "primary", {});
       if (urlConfig) dbConfigs.push(urlConfig);
@@ -499,9 +465,9 @@ DatabaseConfigurations.registerDbConfigHandler((envName, name, url, config) => {
   return new HashConfig(envName, name, config);
 });
 
-// forCurrentEnv must use the same resolver as fromEnv() so that findDbConfig by
+// forCurrentEnv must use the same resolver as the constructor so findDbConfig by
 // DB name locates the config built for the active env. Mirrors Rails:
 // DatabaseConfig#for_current_env? and DatabaseConfigurations#build_configs both
 // call ConnectionHandling::DEFAULT_ENV.call
 // (Rails.env → RAILS_ENV → RACK_ENV → the literal default).
-_setDefaultEnvGetter(() => DatabaseConfigurations.currentEnv());
+_setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);

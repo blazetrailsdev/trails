@@ -2026,17 +2026,17 @@ export class MigrationContext<
   /**
    * @internal Mirrors: ActiveRecord::MigrationContext#current_environment
    * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
-   * trails counterpart is {@link DatabaseConfigurations.currentEnv}.
+   * trails counterpart is {@link DatabaseConfigurations.defaultEnv}.
    *
    * @missingRailsCall call — CONVERGEABLE: Rails invokes the
    *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
    *   (`DEFAULT_ENV.call`, migration.rb:1341); trails has no ported
    *   `DEFAULT_ENV` Proc yet, so this reads
-   *   `DatabaseConfigurations.currentEnv()` instead. Convergence is RFC 0023
+   *   `DatabaseConfigurations.defaultEnv` instead. Convergence is RFC 0023
    *   story `port-connection-handling-default-env-proc`.
    */
   get currentEnvironment(): string {
-    return DatabaseConfigurations.currentEnv();
+    return DatabaseConfigurations.defaultEnv;
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
