@@ -445,6 +445,11 @@ export {
 } from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
+// `core_ext/time/calculations.rb` is a reopening, so what it publishes is the
+// methods it lands on `Time`; its names are reached through the subpath
+// `@blazetrails/activesupport/core-ext/time/calculations`, as core-ext/date's
+// calculations are and for the same collision reason documented below.
+import "./core-ext/time/calculations.js";
 export * from "./core-ext/time/conversions.js";
 // Two Ruby methods, one TS spelling: the class-side parser `Time.rfc3339(str)`
 // (`core_ext/time/calculations.rb:69-83`) lives in `time-ext.js`, and the

@@ -697,7 +697,10 @@ export class Time {
    * sub-second as a `Rational` (`time.c`, `time_s_mkutc` -> `time_new_timew`),
    * so the fold goes through `Rational` rather than a double, and passing
    * `usec` truncates `sec` to a whole second exactly as MRI's does:
-   * `Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec` is `5000`.
+   * `Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec` is `5000`. The microsecond goes
+   * through `num_exact` too (`time_arg`), so a Rational one — Rails'
+   * `Time.local(..., 59, Rational(999999999, 1000))`
+   * (`core_ext/time/calculations.rb:256-263`) — keeps its full precision.
    */
   static utc(
     year: number | string,
@@ -706,7 +709,7 @@ export class Time {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    usec?: number,
+    usec?: number | Rational,
   ): Time {
     return new Time(
       year,
@@ -717,7 +720,7 @@ export class Time {
       usec === undefined
         ? sec
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
-            new Rational(Math.round(usec * 1_000), 1_000_000_000),
+            numExact(usec).quo(1_000_000),
           ),
       "UTC",
     );
@@ -746,7 +749,7 @@ export class Time {
           hour?: number | string | null,
           min?: number | string | null,
           sec?: number | string | Rational | null,
-          usec?: number,
+          usec?: number | Rational,
         ]
       | [
           sec: number | string | Rational | null,
@@ -775,7 +778,7 @@ export class Time {
       usec === undefined
         ? (sec ?? 0)
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
-            new Rational(Math.round(usec * 1_000), 1_000_000_000),
+            numExact(usec).quo(1_000_000),
           ),
     );
   }
@@ -1013,6 +1016,18 @@ export class Time {
   /** Ruby `Time#dst?`, the `isdst` alias (`ruby/time.c` `time_isdst`). */
   isDst(): boolean {
     return this.isdst;
+  }
+
+  /**
+   * Ruby `Time#to_i` (`ruby/time.c` `time_to_i`), the number of whole seconds
+   * since the epoch. MRI truncates towards negative infinity — the sub-second
+   * is held as a non-negative `Rational` off a floored second — so a pre-epoch
+   * time answers the floor rather than the truncation.
+   */
+  toI(): number {
+    const nanoseconds = this.#instant.epochNanoseconds;
+    const seconds = nanoseconds / 1_000_000_000n - (nanoseconds % 1_000_000_000n < 0n ? 1n : 0n);
+    return Number(seconds);
   }
 
   /**

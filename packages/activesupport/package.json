@@ -70,6 +70,10 @@
       "types": "./dist/core-ext/date/conversions.d.ts",
       "default": "./dist/core-ext/date/conversions.js"
     },
+    "./core-ext/time/calculations": {
+      "types": "./dist/core-ext/time/calculations.d.ts",
+      "default": "./dist/core-ext/time/calculations.js"
+    },
     "./core-ext/date-time/calculations": {
       "types": "./dist/core-ext/date-time/calculations.d.ts",
       "default": "./dist/core-ext/date-time/calculations.js"

@@ -473,10 +473,13 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     // calculations widen through `in_time_zone` (date/calculations.rb:55-87)
     // rather than operating on an instant. `DateTime` is its own receiver too:
     // its calculations answer a civil date at an offset rather than an instant.
-    // Both files sit at the Rails path the default rule already produces; the
-    // entries are what split the buckets off `date/acts_like.rb` and
-    // `date_time/acts_like.rb`, those two classes' first reopenings.
-    expect(rubyFileToTs("core_ext/time/calculations.rb", "activesupport")).toBe("time-ext.ts");
+    // `Time`'s reopening is ported onto trails' `Time` itself. All three files
+    // sit at the Rails path the default rule already produces; the entries are
+    // what split the buckets off `object/blank.rb`, `date/acts_like.rb` and
+    // `date_time/acts_like.rb`, those three classes' first reopenings.
+    expect(rubyFileToTs("core_ext/time/calculations.rb", "activesupport")).toBe(
+      "core-ext/time/calculations.ts",
+    );
     expect(rubyFileToTs("core_ext/date/calculations.rb", "activesupport")).toBe(
       "core-ext/date/calculations.ts",
     );
