@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { JSON as JSONHost } from "./json.js";
-import { Model } from "../index.js";
 
 // Mirrors ActiveModel::Serializers::JSON (json.rb). Pinning the host
 // surface here so the mixin shape (model_name + serializable_hash +
@@ -295,9 +294,5 @@ describe("Serializers::JSON host", () => {
     // Ruby: `if root` is true for "", and `root == true` is false, so
     // Rails wraps under the empty key.
     expect(p.asJson({ root: "" })).toMatchObject({ "": { name: "Hank", age: 70 } });
-  });
-
-  it("Model already implements the same surface ergonomically", () => {
-    expect(typeof Model.prototype.asJson).toBe("function");
   });
 });

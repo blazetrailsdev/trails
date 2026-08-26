@@ -196,7 +196,14 @@ export class Config {
   }
 }
 
-/** @internal Test seam — restores every class-level slot to its gem default. */
+/**
+ * Test seam — restores every class-level slot to its gem default.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE — Ruby's suite resets by assigning a fresh
+ * `I18n.config`; the class-level slots here are module bindings a fresh Config
+ * does not reach. Removable once the slots hang off the Config instance.
+ */
 export function resetClassConfig(): void {
   backend = undefined;
   defaultLocale = undefined;

@@ -324,7 +324,14 @@ function localizable(object: unknown): unknown {
 export abstract class Base {
   /** Mirrors: `include I18n::Backend::Transliterator` (base.rb:9). */
   transliterate = transliterate;
-  /** @internal Ruby's `@transliterators` ivar, which has no public reader. */
+  /**
+   * Ruby's `@transliterators` ivar, which has no public reader.
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT — a Ruby ivar is private to the object; the
+   * TS field cannot be `private` because `Transliterator`'s `this`-typed mixin
+   * functions live in another file and read it.
+   */
   transliterators?: Record<Locale, HashTransliterator | ProcTransliterator>;
 
   private eagerLoadedFlag = false;

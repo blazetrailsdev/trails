@@ -171,7 +171,7 @@ const OID_JSONB = 3802;
 /**
  * The `:variables` hash from `@config` (postgresql_adapter.rb:977, :1000).
  */
-type SessionVariables = Record<string, string | number | boolean | null | "default">;
+type SessionVariables = Record<string, string | number | boolean | null | ":default">;
 
 /**
  * Ruby's `Hash#fetch(key, default)` returns the STORED value whenever the key
@@ -805,10 +805,9 @@ export class PostgreSQLAdapter
     await client.query("SET intervalstyle = iso_8601");
     await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
     for (const [key, val] of Object.entries(variables)) {
-      if (val === null) continue;
-      if (val === "default") {
+      if (val === ":default") {
         await client.query(`SET SESSION ${key} TO DEFAULT`);
-      } else {
+      } else if (val != null) {
         const pgVal = val === true ? "on" : val === false ? "off" : String(val);
         await client.query(`SET SESSION ${key} TO ${this.quoteLiteral(pgVal)}`);
       }
@@ -3363,11 +3362,8 @@ export class PostgreSQLAdapter
   // Mirrors: ReferentialIntegrity#disable_referential_integrity. Extracted to
   // postgresql/referential-integrity.ts (Rails houses this in the
   // ReferentialIntegrity module, not schema_statements.rb).
-  override disableReferentialIntegrity(
-    fn: () => Promise<void>,
-    scopedTables?: string[],
-  ): Promise<void> {
-    return disableReferentialIntegrity.call(this, fn, scopedTables);
+  override disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    return disableReferentialIntegrity.call(this, fn);
   }
 
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!

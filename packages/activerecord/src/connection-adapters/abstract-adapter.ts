@@ -2117,7 +2117,7 @@ export class AbstractAdapter implements Quoting {
     return {};
   }
 
-  async disableReferentialIntegrity(fn: () => Promise<void>, _tables?: string[]): Promise<void> {
+  async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
     await fn();
   }
 

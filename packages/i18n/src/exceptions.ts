@@ -13,7 +13,14 @@
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 
-/** @internal Ruby `Object#inspect`, as far as the values reaching this file go. */
+/**
+ * Ruby `Object#inspect`, as far as the values reaching this file go.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT — Ruby gets `inspect` from `Object`, so no gem
+ * file declares it; JS has no equivalent universal method and the exception
+ * messages this file builds are defined in terms of it.
+ */
 export function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "string") return inspectString(value);

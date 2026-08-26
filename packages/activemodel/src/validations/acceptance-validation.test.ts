@@ -1,4 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Serialization` in its class body, the way the
+   Rails test model it mirrors does; the empty class/interface merge beside it is how
+   `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
+import { Serialization } from "../serialization.js";
 import { Model } from "../index.js";
 
 describe("AcceptanceValidationTest", () => {
@@ -165,10 +171,13 @@ describe("AcceptanceValidationTest", () => {
   it("setup! virtual attribute excluded from attributeNames and serialization", () => {
     class Agreement extends Model {
       static {
+        include(this, Serialization);
         this.attribute("name", "string");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Agreement extends Serialization {}
+
     expect(Agreement.attributeNames()).toContain("name");
     expect(Agreement.attributeNames()).not.toContain("terms");
     const a = new Agreement({ name: "test", terms: "1" });

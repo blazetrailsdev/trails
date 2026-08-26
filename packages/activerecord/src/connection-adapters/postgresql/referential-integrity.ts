@@ -7,7 +7,7 @@
 import { ActiveRecordError, InvalidForeignKey } from "../../errors.js";
 
 export interface ReferentialIntegrity {
-  disableReferentialIntegrity(fn: () => Promise<void>, tables?: string[]): Promise<void>;
+  disableReferentialIntegrity(fn: () => Promise<void>): Promise<void>;
   checkAllForeignKeysValidBang(): Promise<void>;
 }
 
@@ -42,26 +42,9 @@ interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
 // leaves any surrounding transaction usable. Only an InvalidForeignKey raised
 // by the block earns the missing-privileges warning; every other error bubbles
 // up unchanged.
-//
-// Rails toggles over the full `tables` set because its fixture load is a single
-// bulk `insert_fixtures_set` per run. trails fires this wrapper per fixture-load
-// and per truncate event (~84k times across a suite run), so an
-// ALTER over every canonical table dominates PG DDL cost. Callers that know the
-// exact tables they touch pass `scopedTables`; disabling triggers on just those
-// tables is sufficient because a table's FK-check triggers only fire when that
-// table is itself inserted/deleted/truncated — and those are the only tables the
-// wrapped block touches. Absent a scope, fall back to the whole catalog to
-// preserve the public `disable_referential_integrity` contract.
-//
-// The `scopedTables` parameter has no Rails counterpart (the method is zero-arg
-// in every adapter); it is a tracked deviation pending convergence — see RFC
-// 0023 story `converge-referential-integrity-scoped-tables-parameter` (hoist the
-// fixture-load flow to one block per set, matching Rails' insert_fixtures_set,
-// then drop the parameter).
 export async function disableReferentialIntegrity(
   this: ReferentialIntegrityHost,
   fn: () => Promise<void>,
-  scopedTables?: string[],
 ): Promise<void> {
   let originalException: Error | null = null;
 
@@ -75,9 +58,9 @@ export async function disableReferentialIntegrity(
   // translates to StatementInvalid (an ActiveRecordError), so the enable-pass
   // catch below swallows it — same as Rails silently rescues enable-pass
   // errors (referential_integrity.rb:28-34).
-  const tables = scopedTables ?? (await this.tables());
+  const tables = await this.tables();
 
-  // An empty scope has no triggers to toggle, so skip both ALTER passes — but
+  // An empty database has no triggers to toggle, so skip both ALTER passes — but
   // still route `fn()` through the shared catch below so an InvalidForeignKey it
   // raises earns the missing-privileges warning Rails always prints
   // (referential_integrity.rb:20-30), matching the non-empty path.
