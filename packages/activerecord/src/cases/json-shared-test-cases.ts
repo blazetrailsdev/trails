@@ -27,9 +27,6 @@ export interface JSONSharedTestCasesHost {
   insertStatementPerDatabase?: (values: string) => string;
 }
 
-// Rails: class JsonDataType < ActiveRecord::Base
-//   self.table_name = "json_data_type"
-//   store_accessor :settings, :resolution
 export class JsonDataType extends Base {
   static {
     this.tableName = "json_data_type";
@@ -37,7 +34,6 @@ export class JsonDataType extends Base {
   }
 }
 
-// Rails: class MySettings
 class MySettings {
   constructor(private readonly hash: Record<string, unknown>) {}
   toHash(): Record<string, unknown> {
@@ -51,10 +47,6 @@ class MySettings {
   }
 }
 
-// Rails: class JsonDataTypeWithFilter < ActiveRecord::Base
-//   self.table_name = "json_data_type"
-//   attribute :payload, :json
-//   def self.filter_attributes; super + [:password]; end
 class JsonDataTypeWithFilter extends Base {
   static {
     this.tableName = "json_data_type";
@@ -70,7 +62,6 @@ class JsonDataTypeWithFilter extends Base {
  */
 type JsonRecord = InstanceType<typeof JsonDataType> & Record<string, unknown>;
 
-// Rails: private def klass; JsonDataType; end
 function klass(): typeof JsonDataType {
   return JsonDataType;
 }
@@ -78,14 +69,12 @@ function klass(): typeof JsonDataType {
 export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   const columnType = host.columnType;
 
-  // Rails: private def insert_statement_per_database(values)
   const insertStatementPerDatabase =
     host.insertStatementPerDatabase ??
     ((values: string) => `insert into json_data_type (payload) VALUES ('${values}')`);
 
   let connection: AbstractAdapter;
 
-  // Rails: private def assert_type_match(type, sql_type)
   async function assertTypeMatch(type: string, sqlType: string | undefined): Promise<void> {
     const nativeType = (
       (await Base.leaseConnection()).nativeDatabaseTypes()[type] as { name: string }
@@ -93,7 +82,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(sqlType ?? "").toMatch(new RegExp(`^${nativeType}\\b`));
   }
 
-  // Rails: def setup; @connection = ActiveRecord::Base.lease_connection; end
   beforeEach(async () => {
     connection = await Base.leaseConnection();
     // trails: Rails reflects the ad-hoc table's columns lazily on first
@@ -101,10 +89,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     await klass().loadSchema();
   });
 
-  // Rails: def teardown
-  //   @connection.drop_table :json_data_type, if_exists: true
-  //   klass.reset_column_information
-  // end
   afterEach(async () => {
     await connection.dropTable("json_data_type", { ifExists: true });
     void klass().resetColumnInformation();
@@ -283,8 +267,8 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   // order-insensitive `Hash#==`; trails' port compares with `!==`
   // (activemodel/src/type/value.ts:77), so two structurally equal hashes are
   // "changed". Converging that base predicate is a change to every value type,
-  // tracked as its own story — not something to paper over with a `Json`-only
-  // `changed?` override Rails does not have.
+  // tracked as converge-value-type-changed-to-ruby-equality — not something to
+  // paper over with a `Json`-only `changed?` override Rails does not have.
   it.skip("test_changes_in_place_ignores_key_order", async () => {
     const json = klass().new() as JsonRecord;
     expect(json.isChanged).toBe(false);
