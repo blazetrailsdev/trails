@@ -1395,6 +1395,11 @@ const CALLBACKS = Symbol("callbacks");
  * map. Does NOT trigger copy-on-write.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby reads the chain straight off the `__callbacks`
+ * class attribute (callbacks.rb:69), which every ancestor answers by inheritance and
+ * `get_callbacks` reads by name (callbacks.rb:931-933). TS has no such per-class
+ * attribute, so the chains live behind a symbol key and the prototype walk has to be
+ * spelled out.
  */
 export function peekCallbackChain(target: object, name: string): CallbackChain | undefined {
   let t: object | null = target;
@@ -1407,7 +1412,14 @@ export function peekCallbackChain(target: object, name: string): CallbackChain |
   return undefined;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby reads the chain straight off the `__callbacks`
+ * class attribute (callbacks.rb:69), which every ancestor answers by inheritance and
+ * `get_callbacks` reads by name (callbacks.rb:931-933). TS has no such per-class
+ * attribute, so the chains live behind a symbol key and the prototype walk has to be
+ * spelled out.
+ */
 export function getCallbackChains(target: object): Map<string, CallbackChain> {
   const t = target as Record<symbol, unknown>;
   if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {

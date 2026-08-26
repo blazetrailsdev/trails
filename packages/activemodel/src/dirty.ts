@@ -299,8 +299,6 @@ type DirtyClass = { resolveAttributeName(name: string): string };
  * the receiver-bound link `prepend()` hands the module — here the real
  * `ActiveRecord::Core#init_attributes` (core.rb:563-573), which sits below this
  * module in the ancestors.
- *
- * @internal Rails-private helper.
  */
 export function initAttributes(
   this: { constructor: { _defaultAttributes?: () => AttributeSet } },
@@ -326,8 +324,6 @@ export function initAttributes(
  * `_mutationsBeforeLastSave` (dirty.rb:373-374), so those are the names to
  * except. Ruby's `super` is `super_()`, the receiver-bound link `prepend()`
  * hands the module.
- *
- * @internal Rails-private helper.
  */
 export function asJson(
   this: unknown,
@@ -375,8 +371,6 @@ export function initInternals(this: DirtyInternalsHost, super_: () => void): voi
  * tracker so `mutations_from_database` rebuilds it against the copy's own,
  * deep-duped `@attributes`. Ruby's `super` is `super_()`, the receiver-bound
  * link `prepend()` hands the module.
- *
- * @internal Rails-private helper.
  */
 export function initializeDup(
   this: DirtyDupHost,

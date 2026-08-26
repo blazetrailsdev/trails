@@ -20,6 +20,9 @@
  * keys.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT `empty?` is Ruby core, not Rails — see the note above,
+ * and `activerecord/src/ruby-truthy.ts` for the sibling. It exists so a ported body
+ * emits the call the RFC 0047 call-set gate credits (blank.rb:96, 111).
  */
 export function isEmpty(value: readonly unknown[] | string | object): boolean {
   if (typeof value === "string" || Array.isArray(value)) return value.length === 0;

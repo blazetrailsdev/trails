@@ -271,7 +271,14 @@ export class Model {
   /** Mirrors: ActiveModel::Conversion::ClassMethods#_to_partial_path (conversion.rb:108-117). */
   declare static _toPartialPath: Extended<typeof ConversionClassMethods>["_toPartialPath"];
 
-  /** @internal Rails-private helper (CLAUDE.md § "Generated attribute readers are properties"). */
+  /**
+   * @internal Rails-private helper (CLAUDE.md § "Generated attribute readers are properties").
+   * @noRailsEquivalent PERMANENT ActiveModel has no `define_method_attribute` hook at all —
+   * Rails only defines one on ActiveRecord (attribute_methods/read.rb:11). CLAUDE.md
+   * § "Generated attribute readers are properties" ratifies the ActiveModel-side hook
+   * repo-wide, because a zero-arg Ruby reader ports as a property and
+   * `define_proxy_call` cannot emit one.
+   */
   declare static defineMethodAttribute: typeof defineMethodAttribute;
 
   /** @internal Rails-private helper. */
@@ -281,10 +288,22 @@ export class Model {
   declare static attributeTypes: typeof attributeTypes;
   declare static typeForAttribute: typeof staticTypeForAttribute;
 
-  /** @internal Rails-private helper. */
+  /**
+   * @internal Rails-private helper.
+   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Model` picks the
+   * method up by `extend AttributeRegistration::ClassMethods`. The definition site in
+   * attribute-registration.ts IS manifest-backed; this TS-only `declare` is not,
+   * because the manifest keys private names by the .rb the member is DECLARED in.
+   */
   declare static pendingAttributeModifications: typeof _pendingAttributeModificationsHelper;
 
-  /** @internal Rails-private helper. */
+  /**
+   * @internal Rails-private helper.
+   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Model` picks the
+   * method up by `extend AttributeRegistration::ClassMethods`. The definition site in
+   * attribute-registration.ts IS manifest-backed; this TS-only `declare` is not,
+   * because the manifest keys private names by the .rb the member is DECLARED in.
+   */
   declare static resetDefaultAttributesBang: typeof _resetDefaultAttributesBangHelper;
 
   /**
@@ -293,13 +312,30 @@ export class Model {
    * ActiveModel::AttributeMethods is included after AttributeRegistration, so
    * its alias-resolving override (attribute_methods.rb:396-398) wins over
    * AttributeRegistration's `name.to_s` (attribute_registration.rb:101-103).
+   *
+   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Model` picks the
+   * method up by `extend AttributeRegistration::ClassMethods`. The definition site in
+   * attribute-registration.ts IS manifest-backed; this TS-only `declare` is not,
+   * because the manifest keys private names by the .rb the member is DECLARED in.
    */
   declare static resolveAttributeName: (name: string) => string;
 
-  /** @internal Rails-private helper. */
+  /**
+   * @internal Rails-private helper.
+   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Model` picks the
+   * method up by `extend AttributeRegistration::ClassMethods`. The definition site in
+   * attribute-registration.ts IS manifest-backed; this TS-only `declare` is not,
+   * because the manifest keys private names by the .rb the member is DECLARED in.
+   */
   declare static resolveTypeName: typeof _resolveTypeNameHelper;
 
-  /** @internal Rails-private helper. */
+  /**
+   * @internal Rails-private helper.
+   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Model` picks the
+   * method up by `extend AttributeRegistration::ClassMethods`. The definition site in
+   * attribute-registration.ts IS manifest-backed; this TS-only `declare` is not,
+   * because the manifest keys private names by the .rb the member is DECLARED in.
+   */
   declare static hookAttributeType: typeof _hookAttributeTypeHelper;
 
   /** Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names (attributes.rb:74-76). */

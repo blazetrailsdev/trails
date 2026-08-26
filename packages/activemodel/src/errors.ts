@@ -223,9 +223,7 @@ export class Errors<TBase extends object = object> {
     return map;
   }
 
-  /**
-   * @internal Rails-private helper.
-   */
+  /** Mirrors: ActiveModel::Errors#group_by_attribute (errors.rb:289-291). */
   groupByAttribute(): Record<string, ActiveModelError[]> {
     const result: Record<string, ActiveModelError[]> = {};
     for (const error of this._errors) {

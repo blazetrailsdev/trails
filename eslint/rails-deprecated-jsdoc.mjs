@@ -20,7 +20,14 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MANIFEST_PATH = path.resolve(__dirname, "rails-deprecated-methods.json");
+// Resolved lazily so the unit test can point at a tmp fixture via the env var
+// without ever writing over the committed manifest (the previous shape wrote
+// the fixture to the real path and restored it from a `process.on("exit")`
+// handler, which vitest workers do not reliably run — the fixture was left on
+// disk and swept into unrelated PRs by `git add -A`).
+const manifestPath = () =>
+  process.env.RAILS_DEPRECATED_METHODS_PATH ??
+  path.resolve(__dirname, "rails-deprecated-methods.json");
 
 // Methods the manifest flags as deprecated-in-Rails but which trails does
 // NOT deprecate (the trails port keeps them as live API). Keyed by TS rel
@@ -43,11 +50,12 @@ function isSkipped(rel, name) {
 let manifestCache = null;
 function loadManifest() {
   if (manifestCache) return manifestCache;
-  if (!fs.existsSync(MANIFEST_PATH)) {
+  const file = manifestPath();
+  if (!fs.existsSync(file)) {
     manifestCache = { files: {} };
     return manifestCache;
   }
-  manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+  manifestCache = JSON.parse(fs.readFileSync(file, "utf8"));
   return manifestCache;
 }
 

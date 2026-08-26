@@ -60,7 +60,11 @@ export default [
   // Keep this `files` list in sync with the `unbacked-internal-needs-receipt`
   // block in eslint.config.mjs.
   {
-    files: ["packages/trailties/src/**/*.ts"],
+    files: [
+      "packages/trailties/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+    ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
     // and `parity:api:extra` holds the tree out of scoring entirely.

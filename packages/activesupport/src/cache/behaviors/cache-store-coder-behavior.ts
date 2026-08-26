@@ -49,7 +49,13 @@ export interface CacheStoreCoderBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby spells this `include CacheStoreCoderBehavior`
+ * (activesupport/test/cache/behaviors/cache_store_coder_behavior.rb); TS has no `include` for a test
+ * mixin, so the module is a function the including describe calls. Rails TEST
+ * code is outside the Ruby extractor's population, so no manifest can back it.
+ */
 export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void {
   it("coder receive the entry on write", () => {
     const coder = new SpyCoder();

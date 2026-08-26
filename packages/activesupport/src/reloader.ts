@@ -81,7 +81,6 @@ export class Reloader extends ExecutionWrapper {
     this.prepareBang();
   }
 
-  /** @internal */
   static runBang({ reset = false }: { reset?: boolean } = {}): CompletableExecution {
     if (this.checkBang()) {
       return super.runBang({ reset });
@@ -105,8 +104,9 @@ export class Reloader extends ExecutionWrapper {
   }
 
   /**
-   * @internal `@should_reload` is a per-class ivar in Ruby, so a subclass never
-   * reads its parent's — hence the own-property guard (as in `activeKey`).
+   * Mirrors: Reloader.check! (reloader.rb:87-89). `@should_reload` is a per-class
+   * ivar in Ruby, so a subclass never reads its parent's — hence the own-property
+   * guard (as in `activeKey`).
    */
   static checkBang(): boolean {
     if (!Object.prototype.hasOwnProperty.call(this, "_shouldReload")) {
@@ -115,12 +115,10 @@ export class Reloader extends ExecutionWrapper {
     return (this._shouldReload ||= this.check());
   }
 
-  /** @internal */
   static reloadedBang(): void {
     this._shouldReload = false;
   }
 
-  /** @internal */
   static prepareBang(): void {
     runCallbacks(new this(), "prepare", () => undefined);
   }
@@ -153,19 +151,16 @@ export class Reloader extends ExecutionWrapper {
     }
   }
 
-  /** @internal */
   runBang(): void {
     super.runBang();
     this.releaseUnloadLockBang();
   }
 
-  /** @internal */
   classUnloadBang(block?: () => unknown): void {
     this.requireUnloadLockBang();
     runCallbacks(this, "class_unload", block);
   }
 
-  /** @internal */
   completeBang(): void {
     try {
       super.completeBang();

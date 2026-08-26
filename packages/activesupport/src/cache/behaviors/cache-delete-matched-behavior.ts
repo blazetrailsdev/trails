@@ -13,7 +13,13 @@ export interface CacheDeleteMatchedBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby spells this `include CacheDeleteMatchedBehavior`
+ * (activesupport/test/cache/behaviors/cache_delete_matched_behavior.rb); TS has no `include` for a test
+ * mixin, so the module is a function the including describe calls. Rails TEST
+ * code is outside the Ruby extractor's population, so no manifest can back it.
+ */
 export function cacheDeleteMatchedBehavior(host: CacheDeleteMatchedBehaviorHost): void {
   it("delete matched", () => {
     const cache = host.lookupStore();

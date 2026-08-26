@@ -69,7 +69,7 @@ let _raiseOnMissingTranslations = false;
  * Walk the class prototype chain collecting constructors that expose a
  * modelName static (i.e. those that include ActiveModel::Naming in Rails).
  *
- * @internal Mirrors ActiveModel::Translation#lookup_ancestors
+ * Mirrors: ActiveModel::Translation#lookup_ancestors (translation.rb:36-38).
  */
 export function lookupAncestors(
   this: object,

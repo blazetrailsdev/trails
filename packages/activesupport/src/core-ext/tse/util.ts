@@ -23,7 +23,7 @@ const HTML_ESCAPE_ONCE_REGEXP = /["><']|&(?!([a-zA-Z]+|(#\d+)|(#[xX][\dA-Fa-f]+)
  * HTML escapes strings but doesn't wrap them with an ActiveSupport::SafeBuffer.
  * This method is not for public consumption! Seriously!
  *
- * @internal Mirrors: ActiveSupport::CoreExt::ERBUtil#html_escape, aliased
+ * Mirrors: ActiveSupport::CoreExt::ERBUtil#html_escape, aliased
  * `unwrapped_html_escape` (`core_ext/erb/util.rb:11-18`). Rails' escape arm is
  * `super(ActiveSupport::Multibyte::Unicode.tidy_bytes(s))`; `tidy_bytes`
  * repairs invalid UTF-8 byte sequences, which a JS string cannot hold, so the
@@ -189,8 +189,6 @@ const CODE_RE = new RegExp(`.*?(?=(?:${FINISH_RE.source})|$)`, "s");
  *
  * Mirrors: ERB::Util.tokenize (`core_ext/erb/util.rb:159-207`). Ruby Symbol
  * token kinds keep their leading colon, per the trails Symbol convention.
- *
- * @internal
  */
 export function tokenize(source: string): [string, string][] {
   const scanner = new StringScanner(source.replace(/\r\n$|[\r\n]$/, ""));

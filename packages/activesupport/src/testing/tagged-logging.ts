@@ -55,7 +55,11 @@ export function beforeSetup(): void {
  * the equivalent storage here is module-global, so memoizing would pin the
  * first test's logger for the whole run — the writer's value takes precedence
  * and the slot is re-read otherwise.
+ *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE Backed by the private
+ * `Testing::TaggedLogging#tagged_logger` (testing/tagged_logging.rb:22-24); the privates
+ * manifest carries no row for this file at all, so the receipt stands in until it does.
  */
 export function taggedLogger(): TaggedLogger | null {
   return taggedLoggerValue ?? trailsLogger;

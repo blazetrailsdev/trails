@@ -80,6 +80,9 @@ export interface NumericMixinMethods {
  * still advertising the added instance methods to callers.
  *
  * @internal Rails-private helper.
+ * @noRailsEquivalent PERMANENT Ruby gets these methods by `include Helpers::Numeric`
+ * (type/helpers/numeric.rb:6), which needs no application function; TS has no
+ * `include`, so the module is spelled as the subclass factory that applies it.
  */
 export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
   Base: TBase,
