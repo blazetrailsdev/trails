@@ -485,16 +485,9 @@ export class SelectManager extends TreeManager {
     return this.createAnd(exprs as Node[]);
   }
 
-  // Mirrors Arel::TreeManager#initialize_copy (tree_manager.rb:60-63) and
-  // Arel::SelectManager#initialize_copy (select_manager.rb:14-17), which Ruby
-  // runs for `#clone`: the copy gets its own AST, and `core` re-reads the
-  // copied cores rather than pointing back at the original's.
-  clone(): SelectManager {
-    const copy = new SelectManager();
-    copy.ast = this.ast.clone();
-    return copy;
-  }
-
+  // Arel::SelectManager#initialize_copy (select_manager.rb:14-17) re-seats
+  // `@ctx` on the copied AST's last core; this getter derives that on every
+  // read, so the copy TreeManager#clone makes is already correct.
   private get core(): SelectCore {
     return this.ast.cores[this.ast.cores.length - 1];
   }

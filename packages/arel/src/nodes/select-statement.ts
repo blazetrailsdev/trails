@@ -1,3 +1,4 @@
+import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
@@ -29,14 +30,12 @@ export class SelectStatement extends NodeExpression {
     this.with = null;
   }
 
-  clone(): SelectStatement {
-    const copy = new SelectStatement();
-    copy.cores = this.cores.map((c) => c.clone());
-    copy.orders = [...this.orders];
-    copy.limit = this.limit;
-    copy.offset = this.offset;
-    copy.lock = this.lock;
-    copy.with = this.with;
+  // Mirrors Arel::Nodes::SelectStatement#initialize_copy
+  // (select_statement.rb:19-23), which Ruby runs for `#clone`.
+  clone(): this {
+    const copy = objectClone(this);
+    copy.cores = this.cores.map((x) => x.clone());
+    copy.orders = this.orders.map((x) => cloneSlot(x));
     return copy;
   }
 }

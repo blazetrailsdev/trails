@@ -1,3 +1,4 @@
+import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { JoinSource } from "./join-source.js";
 import type { OptimizerHints } from "./unary.js";
@@ -52,17 +53,16 @@ export class SelectCore extends Node {
     this.from = value;
   }
 
-  clone(): SelectCore {
-    const c = new SelectCore();
-    c.source = this.source.clone();
-    c.projections = [...this.projections];
-    c.wheres = [...this.wheres];
-    c.groups = [...this.groups];
-    c.havings = [...this.havings];
-    c.windows = [...this.windows];
-    c.setQuantifier = this.setQuantifier;
-    c.optimizerHints = this.optimizerHints;
-    c.comment = this.comment;
-    return c;
+  // Mirrors Arel::Nodes::SelectCore#initialize_copy (select_core.rb:35-43),
+  // which Ruby runs for `#clone`.
+  clone(): this {
+    const copy = objectClone(this);
+    if (this.source) copy.source = cloneSlot(this.source);
+    copy.projections = [...this.projections];
+    copy.wheres = [...this.wheres];
+    copy.groups = [...this.groups];
+    copy.havings = [...this.havings];
+    copy.windows = [...this.windows];
+    return copy;
   }
 }

@@ -1,3 +1,5 @@
+import { ArgumentError } from "@blazetrails/activesupport";
+import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
@@ -78,9 +80,9 @@ export class BoundSqlLiteral extends NodeExpression {
   // Param widened to `unknown` so the runtime guard is reachable from typed
   // callers too (matches Rails' runtime-validation intent).
   plus(other: unknown): Fragments {
-    if (!(other instanceof Node)) {
-      throw new TypeError("Expected Arel node");
+    if (!arelNode(other)) {
+      throw new ArgumentError("Expected Arel node");
     }
-    return new Fragments([this, other]);
+    return new Fragments([this, other as Node]);
   }
 }

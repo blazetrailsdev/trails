@@ -1,8 +1,10 @@
 /**
  * The bare `Arel.*` module functions (arel.rb:31-72).
  *
- * This file deliberately imports nothing at runtime beyond
- * `nodes/sql-literal.js` and `nodes/bound-sql-literal.js`, both leaves. Ruby
+ * This file deliberately imports nothing at runtime beyond `nodes/node.js`,
+ * `nodes/sql-literal.js`, `nodes/bound-sql-literal.js` and the zero-import
+ * `node-slots.js` — `node.ts` reaches only `node-slots.js` and
+ * `collectors/sql-string.js`, so all four are leaves. Ruby
  * resolves `Arel.sql` when the calling method runs, so a Rails body anywhere in the package may name it;
  * in ESM every import is eager, and re-importing them from `index.ts` — which
  * re-exports `select-manager.js`, `visitors/index.js` and friends — would
@@ -10,7 +12,8 @@
  * side effects. `index.ts` re-exports this module, so `Arel.sql` keeps its
  * public name and path.
  */
-import type { Node } from "./nodes/node.js";
+import { _Attribute } from "./node-slots.js";
+import { Node } from "./nodes/node.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 
@@ -56,6 +59,24 @@ export function sql(
  */
 export function star(): SqlLiteral {
   return sql("*", { retryable: true });
+}
+
+/**
+ * Arel.arelNode() — is `value` something an Arel node slot accepts?
+ *
+ * Mirrors: Arel.arel_node? (arel.rb:64-66). The `Attribute` arm goes through
+ * the node-slots late binding: `attributes/attribute.ts` imports half the node
+ * tree, so a value import of it here would close a cycle over this module's
+ * `sql-literal.js` / `bound-sql-literal.js` edges.
+ *
+ * @internal
+ */
+export function arelNode(value: unknown): boolean {
+  return (
+    value instanceof Node ||
+    (_Attribute !== undefined && value instanceof _Attribute) ||
+    value instanceof SqlLiteral
+  );
 }
 
 /**

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activesupport";
 import { sql, Nodes } from "../index.js";
 import type { Node } from "./node.js";
 import { uniq } from "../test-helpers/uniq.js";
@@ -32,7 +33,7 @@ describe("FragmentsTest", () => {
 
     it("fails if joined with something that is not an Arel node", () => {
       const fragments = new Nodes.Fragments();
-      expect(() => fragments.plus("Not a node")).toThrow(TypeError);
+      expect(() => fragments.plus("Not a node")).toThrow(ArgumentError);
     });
   });
 });

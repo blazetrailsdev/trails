@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activesupport";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { sql, Nodes, Visitors } from "../index.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
@@ -77,7 +78,7 @@ describe("SqlLiteralTest", () => {
 
     it("fails if joined with something that is not an Arel node", () => {
       const literal = sql("SELECT *");
-      expect(() => literal.plus("Not a node")).toThrow(TypeError);
+      expect(() => literal.plus("Not a node")).toThrow(ArgumentError);
     });
   });
 });

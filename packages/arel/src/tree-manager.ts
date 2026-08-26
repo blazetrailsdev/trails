@@ -1,5 +1,6 @@
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
 import { _Dot } from "./node-slots.js";
+import { cloneSlot, objectClone } from "./clone-support.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
@@ -79,6 +80,15 @@ export abstract class TreeManager {
   /** Mirrors: Arel::TreeManager#to_sql (arel/tree_manager.rb:53). */
   toSql(engine: ArelEngine | null = _engine.current): string {
     return this.ast.toSql(engine);
+  }
+
+  // Mirrors Arel::TreeManager#initialize_copy (tree_manager.rb:60-63), which
+  // Ruby runs for `#clone`: the AST is duplicated so a cloned manager does not
+  // share it with the original.
+  clone(): this {
+    const copy = objectClone(this);
+    copy.ast = cloneSlot(this.ast);
+    return copy;
   }
 }
 

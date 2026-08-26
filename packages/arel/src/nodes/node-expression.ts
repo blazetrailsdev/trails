@@ -55,10 +55,20 @@ export abstract class NodeExpression extends Node {
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
 type _Expressions = import("../expressions.js").ExpressionsModule;
+/**
+ * `when` is lifted out of the mapped `Included<>` shape and restated in method
+ * syntax for the same reason AliasPredication/OrderPredications use their
+ * module interfaces: `Case` overrides it with a method declaration (case.rb:13),
+ * and a property-typed base member makes that a TS2425 error.
+ */
+interface _PredicationsWhen {
+  when(right: unknown): import("./case.js").Case;
+}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface NodeExpression
   extends
-    Included<typeof import("../predications.js").Predications>,
+    Omit<Included<typeof import("../predications.js").Predications>, "when">,
+    _PredicationsWhen,
     Included<typeof import("../math.js").Math>,
     _Expressions,
     _AliasPredication,

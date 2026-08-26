@@ -1,3 +1,4 @@
+import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import * as Nodes from "../nodes/index.js";
@@ -1667,14 +1668,14 @@ export class ToSql extends Visitor {
     //
     // Each non-Arel scalar is wrapped in `@connection.cast_bound_value(value)`
     // before `add_bind`, mirroring Rails' `new_bind` lambda (to_sql.rb:775-778).
-    if (value instanceof Node) {
-      this.visit(value, collector);
+    if (arelNode(value)) {
+      this.visit(value as Node, collector);
     } else if (Array.isArray(value)) {
       if (value.length === 0) {
         // Rails (to_sql.rb:779): `collector << @connection.quote(nil)` — empty
         // list → NULL.
         collector.append(this.quote(null));
-      } else if (value.every((v) => !(v instanceof Node))) {
+      } else if (!value.some((v) => arelNode(v))) {
         collector.addBinds(
           value.map((v) => this.connection.castBoundValue(v)),
           null,
@@ -1687,8 +1688,8 @@ export class ToSql extends Visitor {
         // `addBind` directly instead of recursing through `visitBindValue`.
         value.forEach((v, i) => {
           if (i > 0) collector.append(", ");
-          if (v instanceof Node) {
-            this.visit(v, collector);
+          if (arelNode(v)) {
+            this.visit(v as Node, collector);
           } else {
             collector.addBind(this.connection.castBoundValue(v), this.bindBlock());
           }
