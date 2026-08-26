@@ -1238,40 +1238,40 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * concern overrides (counter_cache.rb:186-195, encryptable_record.rb:126-130)
  * run over a real anchor.
  *
+ * Rails' `schema_cache` is a POOL read (`load_schema!`, model_schema.rb:591) and
+ * never checks a connection out permanently, so the warm runs inside a
+ * `with_connection` scope: `reflectionAdapter`'s last resort is
+ * `leaseConnectionSync`, whose lease is permanent and trips
+ * `permanent_connection_checkout = :deprecated | :disallowed` on every save. The
+ * re-entry is the scope — inside it the connection is threaded, so the guard is
+ * false and the body runs once. A model with a directly-assigned adapter has no
+ * pool to scope against and skips it, as does a pool-less model, whose
+ * `connection_pool` throws where Ruby's always answers.
+ *
+ * `load_schema!` re-reflects even when `@schema_loaded` is already set, because
+ * the flag may have been stamped on `loadSchemaBangAnchor`'s synthesized
+ * `columns_hash` — the declared attributes alone, latched while this cache was
+ * still cold. The cache is warm by then, so the stale view is dropped first,
+ * recursively (model_schema.rb:553-568), which is what rebuilds an STI
+ * subclass's own memo.
+ *
  * @internal
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
-  // Rails reflects through `schema_cache`, which reads the POOL
-  // (model_schema.rb:591) and never checks a connection out permanently.
-  // `reflectionAdapter`'s last resort is `leaseConnectionSync`, which does —
-  // tripping `permanent_connection_checkout = :deprecated | :disallowed` on
-  // every save — so this async load takes its connection the way Rails' block
-  // form does — using an already-threaded or directly-assigned adapter first,
-  // exactly as `reflectionAdapter` does.
-  const threaded =
+  const startingAdapter: SchemaHost["connection"] | undefined =
     threadedConnectionFor(this as unknown as typeof Base) ??
     (this as unknown as { _adapter?: SchemaHost["connection"] })._adapter;
-  if (threaded) return loadSchemaFromConnection.call(this, threaded);
-  try {
-    return await withConnection.call<
-      typeof Base,
-      [(conn: SchemaHost["connection"]) => Promise<void>],
-      Promise<void>
-    >(this as unknown as typeof Base, async (conn) => {
-      if (!conn) return;
-      await loadSchemaFromConnection.call(this, conn);
-    });
-  } catch {
-    // `connection_pool` throws for a pool-less model; Ruby's is always there.
-    return;
+  if (!startingAdapter) {
+    try {
+      return await withConnection.call<typeof Base, [() => Promise<void>], Promise<void>>(
+        this as unknown as typeof Base,
+        () => loadSchemaFromAdapter.call(this),
+      );
+    } catch {
+      return;
+    }
   }
-}
-
-async function loadSchemaFromConnection(
-  this: SchemaHost,
-  startingAdapter: SchemaHost["connection"],
-): Promise<void> {
   const adapterOwner = this;
   const cache = startingAdapter.internalSchemaCache;
   if (!cache) return;
@@ -1315,14 +1315,6 @@ async function loadSchemaFromConnection(
   }
   if (currentAdapter !== startingAdapter) return;
 
-  // A model that reflected while the shared cache was still cold got
-  // `loadSchemaBangAnchor`'s synthesized `columns_hash` — built from its
-  // declared attributes alone — and was stamped `_schemaLoaded` on it. The
-  // cache is warm now, so drop that view (and every subclass's, which is what
-  // `reload_schema_from_cache` recurses for) before re-reflecting; otherwise
-  // the synthesized `column_names` outlives the real columns it was standing in
-  // for. Mirrors Rails nil'ing the schema ivars ahead of a fresh load
-  // (model_schema.rb:553-568).
   if (ownSchemaMemo(this, "_schemaLoaded")) {
     reloadSchemaFromCache.call(this);
   }
