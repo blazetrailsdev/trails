@@ -2426,10 +2426,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         } else if (column.hasDefault) {
           const type = this.lookupCastTypeFromColumn(column);
           let defaultValue: unknown = type.deserialize(column.default);
-          const defaultFunction = column.defaultFunction;
-          if (defaultValue == null && defaultFunction != null) {
-            defaultValue = () => defaultFunction;
-          }
+          if (defaultValue == null) defaultValue = () => column.defaultFunction;
 
           if (!column.isAutoIncrement()) {
             columnOptions.default = defaultValue;
