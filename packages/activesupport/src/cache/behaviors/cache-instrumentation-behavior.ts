@@ -17,13 +17,6 @@ export interface CacheInstrumentationBehaviorHost {
   storeName: string;
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT Ruby spells this `include CacheInstrumentationBehavior`
- * (activesupport/test/cache/behaviors/cache_instrumentation_behavior.rb); TS has no `include` for a test
- * mixin, so the module is a function the including describe calls. Rails TEST
- * code is outside the Ruby extractor's population, so no manifest can back it.
- */
 export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorHost): void {
   let cache: Store;
 

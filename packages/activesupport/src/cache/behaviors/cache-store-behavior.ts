@@ -15,13 +15,6 @@ export interface CacheStoreBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT Ruby spells this `include CacheStoreBehavior`
- * (activesupport/test/cache/behaviors/cache_store_behavior.rb); TS has no `include` for a test
- * mixin, so the module is a function the including describe calls. Rails TEST
- * code is outside the Ruby extractor's population, so no manifest can back it.
- */
 export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   let cache: Store;
 

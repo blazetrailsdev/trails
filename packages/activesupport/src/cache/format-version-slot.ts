@@ -12,24 +12,10 @@
 /** Mirrors Rails `@format_version = 7.0` (cache.rb:55). @internal */
 let _formatVersion = 7.0;
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT Ruby resolves `Cache.format_version` when the reader
- * RUNS (cache.rb:765, 921), so no slot is needed; ESM's eager import would close a
- * TDZ cycle through `class MemoryStore extends Store`. CLAUDE.md § "Call-time constant
- * resolution" ratifies the zero-import slot as the one sanctioned shape.
- */
 export function getFormatVersion(): number {
   return _formatVersion;
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT Ruby resolves `Cache.format_version` when the reader
- * RUNS (cache.rb:765, 921), so no slot is needed; ESM's eager import would close a
- * TDZ cycle through `class MemoryStore extends Store`. CLAUDE.md § "Call-time constant
- * resolution" ratifies the zero-import slot as the one sanctioned shape.
- */
 export function setFormatVersion(value: number): void {
   _formatVersion = value;
 }

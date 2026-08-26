@@ -12,13 +12,6 @@ import { it } from "vitest";
 // to hold. They name the Rails cases in one place, against the Rails module,
 // rather than crediting whichever store test happened to list them.
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT Ruby spells this `include LocalCacheBehavior`
- * (activesupport/test/cache/behaviors/local_cache_behavior.rb); TS has no `include` for a test
- * mixin, so the module is a function the including describe calls. Rails TEST
- * code is outside the Ruby extractor's population, so no manifest can back it.
- */
 export function localCacheBehavior(): void {
   it.skip("instrumentation with local cache");
   it.skip("local writes are persistent on the remote cache");

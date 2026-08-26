@@ -250,12 +250,6 @@ export class Attributes {
    *
    * The reader `define_proxy_call` generates for the bare attribute pattern
    * dispatches here (attribute_methods.rb:333-346).
-   *
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Backed by the private `ActiveModel::Attributes#attribute`
-   * (attributes.rb:161-163); the privates manifest drops it because the same NAME is
-   * public on `ClassMethods` in that .rb, so the receipt stands in until the manifest
-   * keys private names per entity rather than per file.
    */
   attribute(attrName: string): unknown {
     return this._attributes.fetchValue(attrName) ?? null;

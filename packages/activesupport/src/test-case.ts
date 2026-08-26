@@ -68,13 +68,6 @@ import {
 export class TestCase {
   // include ActiveSupport::Testing::TaggedLogging (test_case.rb:144)
   static setTaggedLogger = setTaggedLogger;
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `TestCase` picks the
-   * private `tagged_logger` up by `include Testing::TaggedLogging` (test_case.rb:144).
-   * This TS-only assignment is not manifest-backed because the manifest keys private
-   * names by the .rb the member is DECLARED in (testing/tagged_logging.rb:22-24).
-   */
   static taggedLogger = taggedLogger;
 
   // prepend ActiveSupport::Testing::SetupAndTeardown (test_case.rb:145)
