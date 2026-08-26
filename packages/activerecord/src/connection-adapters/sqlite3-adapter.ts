@@ -2870,16 +2870,17 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return checked;
   }
 
-  /** @internal Mirrors: SQLite3Adapter.initialize_type_map (sqlite3_adapter.rb:499-502) */
+  /**
+   * @internal Mirrors: SQLite3Adapter.initialize_type_map (sqlite3_adapter.rb:499-502)
+   *
+   * Rails registers exactly one SQLite-specific type on top of `super`. The
+   * {@link SQLite3DateTime} pair is the trails addition that class documents —
+   * registered after `super` and followed by the `/timestamp/i` alias so both
+   * spellings reach it, since a later registration wins the lookup.
+   */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
     this.registerClassWithLimit(m, /int/i, SQLite3Integer);
-
-    // Not Rails: the SQLite drivers trails supports hand back a DATETIME column
-    // as the TEXT it is stored as, where the Ruby sqlite3 gem has already
-    // parsed it, so the base `Type::DateTime` registration cannot cast it.
-    // `SQLite3DateTime` is that parse; it has to be re-registered after `super`
-    // and after the `/timestamp/i` alias so both spellings resolve to it.
     this.registerClassWithPrecision(m, /datetime/i, SQLite3DateTime);
     m.aliasType(/timestamp/i, "datetime");
   }
@@ -2903,11 +2904,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /**
-   * @internal Mirrors: AbstractAdapter.extended_type_map — inherited in Rails.
+   * @internal Mirrors: AbstractAdapter.extended_type_map (abstract_adapter.rb:877-883)
    *
-   * The base body re-registers `%r(\A[^\(]*datetime)i` on `Type::DateTime` to
-   * carry the timezone, which would undo the `SQLite3DateTime` registration
-   * above; restore it, for the same driver reason.
+   * Inherited in Rails. The base body re-registers `%r(\A[^\(]*datetime)i` on
+   * `Type::DateTime` to carry the timezone, which would undo the
+   * {@link SQLite3DateTime} registration `initialize_type_map` makes; restore
+   * it here, for the Temporal-language reason that class documents.
    */
   static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
     const m = super.extendedTypeMap(options);

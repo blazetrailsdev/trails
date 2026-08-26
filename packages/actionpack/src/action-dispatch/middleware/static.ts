@@ -189,7 +189,13 @@ export class FileHandler {
     return result;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * static.rb:142 is `File.file?(file_path) && File.readable?(file_path)`.
+   * The `getFs()` adapter interface exposes no readability probe, so an
+   * unreadable file reads as readable here.
+   */
   private isFileReadable(path: string): boolean {
     const filePath = getPath().join(this.root, path);
     try {
@@ -215,7 +221,14 @@ export class FileHandler {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * Rails reads `::ActionController::Base.default_static_extension`
+   * (static.rb:165). trails' `ActionController::Base` does not carry that
+   * config slot yet, so the value `abstract_controller/caching.rb:36` seeds it
+   * with stands in until it does.
+   */
   private eachCandidateFilepath(
     pathInfo: string,
     block: (filepath: string, contentType: string) => boolean | void,
@@ -231,16 +244,12 @@ export class FileHandler {
     // resolvable file extension. No need to check for foo.js.html and
     // foo.js/index.html.
     if (!contentType) {
-      // Rails reads `::ActionController::Base.default_static_extension`
-      // (static.rb:165); actionpack's `Base` does not carry the slot yet, so
-      // the framework default is spelled here until it does.
       const defaultExt = ".html";
       if (ext !== defaultExt) {
         const defaultContentType = Mime.mimeType(defaultExt, "text/plain")!;
 
         if (block(`${path}${defaultExt}`, defaultContentType)) return;
-        const sep = path.endsWith("/") ? "" : "/";
-        if (block(`${path}${sep}${this.index}${defaultExt}`, defaultContentType)) return;
+        if (block(`${path}/${this.index}${defaultExt}`, defaultContentType)) return;
       }
     }
   }
