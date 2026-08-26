@@ -769,6 +769,12 @@ prepend(Model.prototype, {
   initInternals: dirtyInitInternals,
   initializeDup: dirtyInitializeDup,
 });
+// `Dirty#as_json` (dirty.rb:264-268) is deliberately NOT in that chain:
+// `ActiveModel::Serializers::JSON#as_json` (json.rb:96-108) is included after
+// Dirty and does not call `super`, so Ruby's lookup never reaches the Dirty
+// body on a model that serializes through `serializable_hash`. It applies to a
+// Dirty-including model whose `as_json` is still `Object`'s — Rails'
+// `DirtyTest::DirtyModel` (dirty_test.rb:6-43).
 
 // model.rb:77 — `ActiveSupport.run_load_hooks(:active_model, Model)`.
 runLoadHooks("active_model", Model);
