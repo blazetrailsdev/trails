@@ -172,18 +172,16 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return ns - roundedOff;
   }
 
-  // Strips TimeWithZone from any value before DB serialization. Extracts UTC
-  // Temporal.Instant from TimeWithZone bounds in Range/Array values so the
-  // subtype's serialize (which doesn't understand TimeWithZone) receives plain
-  // Instants or timestamps.
+  // Rails has no such hop: DelegateClass forwards serialize straight to the
+  // subtype, whose cast_value handles a TimeWithZone because it acts_like?(:time).
+  // Containers take the subtype's own `map` hook, the one `cast` and
+  // `convert_time_to_time_zone` end in (value.rb:117-119, oid/range.rb:50-54,
+  // oid/array.rb:67-69).
   private _resolveForSerialize(value: unknown): unknown {
-    const extractUtc = (v: unknown): unknown =>
-      v instanceof TimeWithZone ? v.utc().toTime().toInstant() : v;
-    if (Array.isArray(value)) {
-      return value.map((v) => (isRangeLike(v) ? mapRange(v, extractUtc) : extractUtc(v)));
-    }
-    if (isRangeLike(value)) return mapRange(value, extractUtc);
-    return extractUtc(value);
+    if (value instanceof TimeWithZone) return value.utc().toTime().toInstant();
+    if (value instanceof Temporal.Instant) return value;
+    if (typeof value === "number" && !Number.isFinite(value)) return value;
+    return this.map(value, (v) => this._resolveForSerialize(v));
   }
 
   override equals(other: Type): boolean {
@@ -286,28 +284,6 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
   const proto = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;
-}
-
-interface RangeLike {
-  readonly begin: unknown;
-  readonly end: unknown;
-  readonly excludeEnd: boolean;
-  constructor: new (begin: unknown, end: unknown, excludeEnd: boolean) => RangeLike;
-}
-
-/** @internal */
-function isRangeLike(v: unknown): v is RangeLike {
-  if (v == null || typeof v !== "object" || Array.isArray(v) || isPlainObject(v)) return false;
-  return "begin" in v && "end" in v && "excludeEnd" in v;
-}
-
-/** @internal */
-function mapRange(range: RangeLike, fn: (v: unknown) => unknown): object {
-  return new (range.constructor as any)(
-    range.begin != null ? fn(range.begin) : null,
-    range.end != null ? fn(range.end) : null,
-    range.excludeEnd,
-  );
 }
 
 interface TimeZoneConversionHost {
