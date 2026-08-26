@@ -1,10 +1,10 @@
 import { DescendantsTracker, registerSubclass } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
-import { defaultValue, defaultValue as typeDefaultValue } from "./type.js";
+import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
-import type { AttributeDefinition, AttributeOptions } from "./attributes.js";
+import type { AttributeOptions } from "./attributes.js";
 
 /**
  * AttributeRegistration mixin — provides the static attribute() method
@@ -101,7 +101,6 @@ export class PendingDefault implements PendingModification {
  * `AttributeRegistration::ClassMethods`.
  */
 export interface AttributeRegistrationHost extends AttributeHostInternals {
-  _attributeDefinitions: Map<string, AttributeDefinition>;
   /** @internal */
   resolveTypeName(name: string, options?: Record<string, unknown>): Type;
   /** @internal */
@@ -134,59 +133,39 @@ export function attribute(
     typeName = undefined;
   }
   const typeProvided = typeName !== undefined;
-  if (!Object.hasOwn(this, "_attributeDefinitions")) {
-    this._attributeDefinitions = new Map(this._attributeDefinitions);
-  }
-  const existing = this._attributeDefinitions.get(name);
-  // When the type is omitted, preserve the existing attribute's type (Rails'
-  // PendingType `with_type` inheritance path); fall back to the value type only
-  // when nothing is known about the attribute yet.
-  // Rails' `attribute(name, ...)` forwards `**options` straight to the type
-  // registry (attributes.rb:59-62 → attribute_registration.rb:18); the two keys
-  // consumed here — `default` and `virtual` — are the ones Rails names
-  // explicitly, so only the rest reach the registry.
+  // Rails' `attribute(name, type = nil, default: (no_default = true), **options)`
+  // forwards `**options` straight to the type registry
+  // (attribute_registration.rb:13); the two keys trails names explicitly —
+  // `default` and `virtual` — are consumed here, so only the rest reach it.
   const { default: _default, virtual: _virtual, ...typeOptions } = options ?? {};
-  let type = typeProvided
-    ? typeName instanceof Type
-      ? typeName
-      : this.resolveTypeName(
-          typeName as string,
-          Object.keys(typeOptions).length > 0
-            ? (typeOptions as Record<string, unknown>)
-            : undefined,
-        )
-    : (existing?.type ?? typeDefaultValue());
-  // attribute_registration.rb:15 — `type = hook_attribute_type(name, type) if type`.
-  if (typeProvided) type = this.hookAttributeType(name, type);
-  // Preserve the existing defaultValue when no default is explicitly provided,
-  // matching Rails' PendingType behavior: with_type only changes the type and
-  // leaves the current default/value untouched.
-  const defaultValue =
-    options?.default !== undefined ? options.default : (existing?.defaultValue ?? null);
-  this._attributeDefinitions.set(name, {
-    ...existing,
-    name,
-    type,
-    defaultValue,
-    virtual: options?.virtual ?? existing?.virtual,
-    ...(options?.limit != null ? { limit: options.limit } : {}),
-  });
+  // attribute_registration.rb:14-15 — `type = resolve_type_name(type, **options)
+  // if type.is_a?(Symbol)` then `type = hook_attribute_type(name, type) if type`.
+  let type: Type | null = null;
+  if (typeProvided) {
+    type =
+      typeName instanceof Type
+        ? typeName
+        : this.resolveTypeName(
+            typeName as string,
+            Object.keys(typeOptions).length > 0
+              ? (typeOptions as Record<string, unknown>)
+              : undefined,
+          );
+    type = this.hookAttributeType(name, type);
+  }
 
-  // Push to pending-modification queue so _defaultAttributes() replays in
-  // the correct order relative to schema-reflected columns (AR) or other
-  // pending modifications (AM inheritance).
-  // Mirrors: ActiveModel::AttributeRegistration#attribute —
-  //   pending << PendingType.new(name, type) if type || no_default
-  //   pending << PendingDefault.new(name, default) unless no_default
+  // Mirrors: ActiveModel::AttributeRegistration#attribute (attribute_registration.rb:16-18)
+  //   pending_attribute_modifications << PendingType.new(name, type) if type || no_default
+  //   pending_attribute_modifications << PendingDefault.new(name, default) unless no_default
   // A bare re-declaration (no type, no default) still pushes a PendingType with
   // a nil type so it re-anchors to the attribute's current type at replay; a
   // default-only call pushes only PendingDefault, preserving the existing type.
   const noDefault = options?.default === undefined;
-  if (typeProvided || noDefault) {
-    this.pendingAttributeModifications().push(new PendingType(name, typeProvided ? type : null));
+  if (type != null || noDefault) {
+    this.pendingAttributeModifications().push(new PendingType(name, type));
   }
   if (!noDefault) {
-    this.pendingAttributeModifications().push(new PendingDefault(name, defaultValue));
+    this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));
   }
 
   // Mirrors: Rails reset_default_attributes — invalidate cache on this class
@@ -206,7 +185,7 @@ export function attribute(
  *
  * The decoration itself is applied when `_default_attributes` next
  * materializes (attribute_registration.rb:32-36) — nothing is written to
- * `_attributeDefinitions` here.
+ * the pending-modification queue here.
  */
 export function decorateAttributes(
   this: AttributeHostInternals,

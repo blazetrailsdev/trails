@@ -5,6 +5,9 @@ import {
   AttributeSet,
   AttributeSetBuilder,
   YAMLEncoder,
+  PendingDefault,
+  PendingType,
+  type Attribute,
   type Type,
 } from "@blazetrails/activemodel";
 import {
@@ -313,19 +316,92 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   // Synthesized fallback: filter ignoredColumns and virtual attrs to match
   // loadSchema's fallback and Rails behavior (virtual attrs are not DB columns).
   const ignored = new Set(this.ignoredColumns ?? []);
+  const virtual = this._virtualAttributes ?? new Set<string>();
+  const declared = declaredAttributes(this as unknown as SchemaHost);
   const result: Record<string, ColumnLike> = {};
-  for (const [name, def] of this._attributeDefinitions) {
+  for (const name of declared.keys()) {
     if (ignored.has(name)) continue;
-    if ((def as any).virtual) continue;
-    const fn = (def as any).defaultFunction ?? null;
-    result[name] = {
-      name,
-      type: def.type?.name ?? null,
-      default: def.defaultValue ?? null,
-      ...(fn != null ? { defaultFunction: fn } : {}),
-    };
+    if (virtual.has(name)) continue;
+    result[name] = synthesizedColumn(name, declared.getAttribute(name)) as ColumnLike;
   }
   return result;
+}
+
+/**
+ * The attribute set a model's own `attribute()` declarations replay to, with no
+ * schema columns underneath — Rails' `_default_attributes` seeded from an empty
+ * hash instead of `columns_hash` (attribute_registration.rb:53-58 vs
+ * attributes.rb:241-252).
+ *
+ * Rails never needs this: `columns_hash` is a DB read, so a model with no table
+ * simply has no columns. trails supports table-less attribute-only models, whose
+ * `columnsHash` is synthesized from what they declared, and that is the only
+ * thing this feeds. It cannot go through `_defaultAttributes()`, which re-enters
+ * `columnsHash()` on an unreflected class.
+ */
+function declaredAttributes(host: SchemaHost): AttributeSet {
+  const attributeSet = new AttributeSet(new Map<string, Attribute>());
+  applyDeclarations(host, attributeSet);
+  return attributeSet;
+}
+
+/**
+ * `apply_pending_attribute_modifications` (attribute_registration.rb:78-86)
+ * restricted to the two modifications that INTRODUCE an attribute. The
+ * decorators are skipped deliberately: they read the type the column seed put
+ * there, and `enum`'s raises outright when it finds the `Type.default_value`
+ * an unseeded set answers with (enum.ts:164-168).
+ */
+function applyDeclarations(cls: SchemaHost, attributeSet: AttributeSet): void {
+  const superclass = Object.getPrototypeOf(cls) as
+    | (SchemaHost & { _defaultAttributes?: unknown; _pendingAttributeModifications?: unknown[] })
+    | null;
+  if (superclass && typeof superclass._defaultAttributes === "function") {
+    applyDeclarations(superclass, attributeSet);
+  }
+  if (!Object.hasOwn(cls, "_pendingAttributeModifications")) return;
+  const pending = (cls as { _pendingAttributeModifications?: unknown[] })
+    ._pendingAttributeModifications;
+  for (const modification of pending ?? []) {
+    if (modification instanceof PendingType || modification instanceof PendingDefault) {
+      modification.applyTo(attributeSet);
+    }
+  }
+}
+
+/**
+ * The names this model declared with `attribute()`, its ancestors' included.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE — feeds `ensureSchemaLoaded`'s reflection
+ * gate, itself a trails-only bridge for Rails' synchronous `load_schema!`.
+ */
+export function declaredAttributeNames(this: SchemaHost): string[] {
+  return declaredAttributes(this).keys();
+}
+
+/**
+ * The own, copy-on-write virtual-attribute name set for `host` — the same
+ * per-class fork `attribute()` does, so a subclass never mutates its parent's.
+ */
+function ownVirtualAttributes(host: SchemaHost): Set<string> {
+  if (!Object.hasOwn(host, "_virtualAttributes")) {
+    host._virtualAttributes = new Set(host._virtualAttributes);
+  }
+  return host._virtualAttributes as Set<string>;
+}
+
+/**
+ * `columnsHash`-shaped metadata for one declared attribute.
+ */
+function synthesizedColumn(name: string, attribute: Attribute): Record<string, unknown> {
+  const type = attribute.type as Type & { limit?: number | null };
+  return {
+    name,
+    type: type?.name ?? null,
+    default: attribute.valueBeforeTypeCast ?? null,
+    limit: type?.limit ?? null,
+  };
 }
 
 type DatabaseAdapterLike = { internalSchemaCache?: unknown };
@@ -494,6 +570,7 @@ export async function createTable(this: typeof Base): Promise<void> {
   const isPg = adapterName === "postgres";
   const pkSet = new Set(pks);
   const a = this.connection;
+  const declared = declaredAttributes(this);
 
   // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
   await a.execute(`DROP TABLE IF EXISTS ${a.quoteTableName(table)}`);
@@ -509,15 +586,14 @@ export async function createTable(this: typeof Base): Promise<void> {
     colDefs.push(pkDef);
   } else {
     for (const pk of pks) {
-      const pkDef = this._attributeDefinitions.get(pk);
-      const pkType = sqlTypeFor(pkDef?.type?.name || "integer", adapterName);
+      const pkType = sqlTypeFor(declared.getAttribute(pk).type?.name || "integer", adapterName);
       colDefs.push(`${a.quoteColumnName(pk)} ${pkType} NOT NULL`);
     }
   }
 
-  for (const [name, def] of this._attributeDefinitions) {
+  for (const name of declared.keys()) {
     if (pkSet.has(name)) continue;
-    const sqlType = sqlTypeFor(def.type?.name || "string", adapterName);
+    const sqlType = sqlTypeFor(declared.getAttribute(name).type?.name || "string", adapterName);
     colDefs.push(`${a.quoteColumnName(name)} ${sqlType}`);
   }
 
@@ -560,7 +636,7 @@ export interface SchemaHost {
   _abstractClass?: boolean;
   _ignoredColumns?: string[];
   _protectedEnvironments?: string[];
-  _attributeDefinitions: Map<string, any>;
+  _virtualAttributes?: Set<string>;
   _defaultAttributes(): AttributeSet;
   _columnsHash?: Record<string, unknown>;
   _columns?: any[];
@@ -944,7 +1020,7 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  * Mirrors: ActiveRecord::ModelSchema#load_schema
  *
  * Sync: consults the adapter's schema cache if it's already populated
- * (no I/O), and reflects columns into `_attributeDefinitions`. For
+ * (no I/O), and reflects columns into `columnsHash`. For
  * models without a backing table (test fixtures with only user
  * `attribute()` declarations), falls back to synthesizing `_columnsHash`
  * from existing defs so downstream readers continue to work.
@@ -1023,32 +1099,28 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
   // columns once a cache entry exists. The find path passing the raw string id
   // to the bind for a tableless model in the meantime is harmless — there is
   // no DB column type to cast through.
+  const declared = declaredAttributes(this);
+  const declaredNames = declared.keys();
   let pkStillMissing = false;
-  if (this._attributeDefinitions.size > 0) {
+  if (declaredNames.length > 0) {
     const pks = Array.isArray(this.primaryKey)
       ? this.primaryKey
       : this.primaryKey != null
         ? [this.primaryKey]
         : [];
-    if (pks.some((pk) => !this._attributeDefinitions.has(pk))) {
+    if (pks.some((pk) => !declaredNames.includes(pk))) {
       pkStillMissing = true;
     }
   }
 
-  if (!ownSchemaMemo(this, "_columnsHash") && this._attributeDefinitions.size > 0) {
+  if (!ownSchemaMemo(this, "_columnsHash") && declaredNames.length > 0) {
     const hash: Record<string, unknown> = {};
     const ignored = new Set(this._ignoredColumns ?? []);
-    for (const [name, def] of this._attributeDefinitions) {
+    const virtual = this._virtualAttributes ?? new Set<string>();
+    for (const name of declaredNames) {
       if (ignored.has(name)) continue;
-      if (def.virtual) continue;
-      const fn = def.defaultFunction ?? null;
-      hash[name] = {
-        name,
-        type: def.type?.name ?? null,
-        default: def.defaultValue ?? null,
-        limit: def.limit ?? null,
-        ...(fn != null ? { defaultFunction: fn } : {}),
-      };
+      if (virtual.has(name)) continue;
+      hash[name] = synthesizedColumn(name, declared.getAttribute(name));
     }
     this._columnsHash = hash;
   }
@@ -1358,9 +1430,10 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
   if (ownSchemaMemo(host, "_virtualAttributesReconciled")) return;
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
-  for (const [name, def] of host._attributeDefinitions) {
-    const isVirtual = !real.has(name);
-    if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
+  const virtual = ownVirtualAttributes(host);
+  for (const name of declaredAttributes(host).keys()) {
+    if (real.has(name)) virtual.delete(name);
+    else virtual.add(name);
   }
   host._virtualAttributesReconciled = true;
 }

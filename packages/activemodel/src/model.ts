@@ -64,7 +64,6 @@ import {
   validatesWith as withValidatesWith,
 } from "./validations/with.js";
 import {
-  type AttributeDefinition,
   Attributes,
   attribute,
   attributeNames,
@@ -252,7 +251,6 @@ export class Model {
    * (conversion.rb:32), installed by `Conversion.[included]`.
    */
   declare static paramDelimiter: string;
-  static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   declare private static _modelName: ModelName | null;
   // Runtime accessors come from the `classAttribute()` calls at the bottom of
   // this file (attribute_methods.rb:70-73).

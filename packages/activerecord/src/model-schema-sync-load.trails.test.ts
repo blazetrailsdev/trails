@@ -3,6 +3,11 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
+import { declaredAttributeNames } from "./model-schema.js";
+/** The names a class declared with `attribute()` — the pending-queue read that
+ * replaced the retired `_attributeDefinitions` registry. */
+const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
+
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -33,7 +38,7 @@ describe("sync loadSchema / columnsHash", () => {
     const hash = Post.columnsHash();
 
     expect(hash.guid).toBe(cols.guid);
-    expect(Post._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Post)).not.toContain("guid");
   });
 
   it("columnsHash filters ignoredColumns out of the cached hash", () => {
@@ -81,7 +86,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Circle._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Circle)).not.toContain("guid");
     expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
     expect(Object.keys(Circle.columnsHash())).toContain("guid");
     // The subclass's own map is its own — but the base reflects too: generating
@@ -114,8 +119,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     // Reflection should have landed on the STI base via subclass adapter;
     // subclass shares the base's map reference.
-    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
-    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
+    expect(declared(Shape)).not.toContain("guid");
+    expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(false);
   });
 
   it("columnsHash on STI subclass returns cached Column objects from base adapter", () => {
@@ -165,7 +170,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    expect(Circle._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Circle)).not.toContain("guid");
   });
 
   it("preserves subclass-declared attributes across the subclass's reflection", () => {
@@ -187,10 +192,10 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Circle._attributeDefinitions.has("guid")).toBe(false);
-    expect(Circle._attributeDefinitions.has("radius")).toBe(true);
-    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
-    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
+    expect(declared(Circle)).not.toContain("guid");
+    expect(declared(Circle)).toContain("radius");
+    expect(declared(Shape)).not.toContain("radius");
+    expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
   it("reflection replaces a stale own columnsHash on the reflecting class", () => {
@@ -320,7 +325,7 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Shape.columnsHash();
-    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Shape)).not.toContain("guid");
 
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
 
@@ -339,13 +344,13 @@ describe("sync loadSchema / columnsHash", () => {
     (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Post.columnsHash(); // triggers reflection
 
-    expect(Post._attributeDefinitions.has("guid")).toBe(false);
-    expect(Post._attributeDefinitions.has("title")).toBe(true);
+    expect(declared(Post)).not.toContain("guid");
+    expect(declared(Post)).toContain("title");
 
     (resetColumnInformation as any).call(Post);
 
-    expect(Post._attributeDefinitions.has("guid")).toBe(false);
-    expect(Post._attributeDefinitions.has("title")).toBe(true);
+    expect(declared(Post)).not.toContain("guid");
+    expect(declared(Post)).toContain("title");
   });
 
   // An internalSchemaCache that starts warm and tracks whether resetColumnInformation

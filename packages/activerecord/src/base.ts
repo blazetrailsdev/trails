@@ -860,6 +860,20 @@ export class Base extends Model {
    */
   declare static _virtualAttributesReconciled?: boolean;
 
+  /**
+   * Names declared with trails' `attribute(..., { virtual: true })` — an
+   * attribute with no backing DB column. Rails has no such option: its
+   * `columns_hash` is a DB read, so a declared-but-column-less attribute is
+   * simply absent from it. trails synthesizes `columnsHash` for table-less
+   * models, so it has to be told which declarations are not columns.
+   * Copy-on-write per class, like every other inherited registry here.
+   *
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE — retired together with the virtual flag by
+   * RFC 0115 `retire-virtual-attribute-reconciliation`.
+   */
+  declare static _virtualAttributes?: Set<string>;
+
   /** Mirrors: ActiveRecord.writing_role */
   static writingRole = WRITING_ROLE;
   /** Mirrors: ActiveRecord.reading_role */
@@ -1141,6 +1155,16 @@ export class Base extends Model {
       _initializeGeneratedModules.call(this as never);
     }
     super.attribute(name, typeName, options);
+    const attributeOptions =
+      typeName != null && typeof typeName === "object" && !(typeName instanceof Type)
+        ? typeName
+        : options;
+    if (attributeOptions?.virtual) {
+      if (!Object.prototype.hasOwnProperty.call(this, "_virtualAttributes")) {
+        this._virtualAttributes = new Set(this._virtualAttributes);
+      }
+      this._virtualAttributes!.add(name);
+    }
     // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
     // `@attribute_names` recursively.
     ModelSchema.clearAttributeNamesMemo(this as never);
@@ -1160,7 +1184,7 @@ export class Base extends Model {
     // push their durable decorator eagerly at declaration, so — now that
     // `type_for_attribute` / `TypeCaster::Map` resolve through
     // `attribute_types` (the decorated default attribute set) — they need
-    // no per-feature `_attributeDefinitions` replay here.
+    // no per-feature declaration-registry replay here.
     encryptionHooks.applyPendingEncryptions(this);
   }
 
@@ -1190,7 +1214,7 @@ export class Base extends Model {
     // `Type.default_value` hash default (attribute_registration.rb:43-50). The set
     // replays every pending decorator (serialize/normalizes/encrypts) onto the
     // reflected column type, so query-side decorations are honored without a
-    // per-feature post-reflection replay onto `_attributeDefinitions`. Read the
+    // per-feature post-reflection replay onto a declaration registry. Read the
     // single attribute (O(1), and `getAttribute` returns a `value`-typed Null for
     // an unknown name) rather than `attributeTypes()[name]` — even though the
     // cast-types record + Proxy are now memoized, this avoids the record's
@@ -1210,7 +1234,7 @@ export class Base extends Model {
    * Get the Arel table for this model.
    *
    * Wires a TypeCasterMap so `arelTable.typeForAttribute(col)` resolves
-   * through the model's `_attributeDefinitions`. Predicate-builder bind
+   * through the model's `attributeTypes`. Predicate-builder bind
    * values rely on this to serialize through the right Type (e.g.
    * EncryptedAttributeType for deterministic encryption) — without a
    * typeCaster, `.where({col: "x"})` would emit the raw `"x"` in SQL
@@ -1296,7 +1320,7 @@ export class Base extends Model {
   }
 
   /**
-   * Await schema reflection — ensures `_attributeDefinitions` is populated
+   * Await schema reflection — ensures `columnsHash` is populated
    * from the adapter's schema cache before proceeding. Idempotent; cheap
    * to call repeatedly.
    *
@@ -1345,17 +1369,17 @@ export class Base extends Model {
     // would otherwise synthesize a columnsHash containing only the virtual
     // attrs and mark the model schema-loaded, hiding every real column.
     //
-    // `_attributeDefinitions` holds user `attribute()` declarations only —
-    // reflected columns live in `columns_hash` — so a concrete (non-virtual)
+    // The pending-modification queue holds user `attribute()` declarations only
+    // — reflected columns live in `columns_hash` — so a concrete (non-virtual)
     // declaration means the model spelled its own schema out and needs no DB
     // reflection. Enum-declared attrs (registered by `_enum` via
     // `this.attribute()`) must NOT block reflection: they are type overlays,
     // not full schema declarations, and the model still needs the DB to
     // discover its other columns.
     const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
-    for (const [name, def] of this._attributeDefinitions) {
-      const d = def as { virtual?: boolean };
-      if (!d.virtual && !enumNames?.has(name)) {
+    const virtual = this._virtualAttributes;
+    for (const name of ModelSchema.declaredAttributeNames.call(this as never)) {
+      if (!virtual?.has(name) && !enumNames?.has(name)) {
         // Some declared attributes may be virtual (no backing DB column).
         // Rails' `column_names` is always DB-sourced, so reconcile against the
         // real columns and flag those as virtual — keeping `columnNames()`
@@ -2752,7 +2776,7 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-    // Ensure schema reflection has populated _attributeDefinitions with
+    // Ensure schema reflection has populated columnsHash with
     // adapter-resolved cast types before hydrating from the row — otherwise
     // `attributes_builder`'s `attribute_types` falls back to ValueType and PG
     // OID casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only

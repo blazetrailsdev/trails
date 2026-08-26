@@ -19,11 +19,6 @@ describe("ReadTest", () => {
   // statics below are that include.
   function buildKlass() {
     class Klass {
-      static _attributeDefinitions = new Map<string, { name: string }>([
-        ["one", { name: "one" }],
-        ["two", { name: "two" }],
-        ["three", { name: "three" }],
-      ]);
       static _attributeMethodsGenerated = false;
       // read_test.rb:18's `def self.load_schema; end` — the fake klass has no
       // table, so the `load_schema` `define_attribute_methods` calls

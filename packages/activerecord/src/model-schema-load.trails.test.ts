@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ValueType, typeRegistry } from "@blazetrails/activemodel";
 type Type = ValueType;
 import { Base } from "./base.js";
-import { loadSchemaFromAdapter } from "./model-schema.js";
+import { declaredAttributeNames, loadSchemaFromAdapter } from "./model-schema.js";
+
+/** The names a class declared with `attribute()` — the pending-queue read that
+ * replaced the retired `_attributeDefinitions` registry. */
+const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
+
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -57,7 +62,7 @@ describe("loadSchemaFromAdapter", () => {
     // through a class-level registry, which holds user declarations only.
     expect(Model.typeForAttribute("guid").name).toBe("uuid");
     expect(Model.typeForAttribute("payload").name).toBe("jsonb");
-    expect(Model._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Model)).not.toContain("guid");
   });
 
   it("does not overwrite user-declared attributes", async () => {
@@ -67,9 +72,8 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    const def = Model._attributeDefinitions.get("guid");
-    expect(def?.type.name).toBe("string");
-    expect(Model._attributeDefinitions.has("guid")).toBe(true);
+    expect(Model.typeForAttribute("guid").name).toBe("string");
+    expect(declared(Model)).toContain("guid");
   });
 
   it("is a no-op for abstract classes", async () => {
@@ -79,7 +83,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Model)).not.toContain("guid");
   });
 
   it("reflects on a concrete subclass of an abstract parent", async () => {
@@ -110,7 +114,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Model)).not.toContain("guid");
   });
 
   it("falls through when dataSourceExists returns undefined (probe not implemented)", async () => {
@@ -125,7 +129,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Model)).not.toContain("guid");
   });
 
   it("falls back to ValueType when adapter has no cast type", async () => {
@@ -145,7 +149,7 @@ describe("loadSchemaFromAdapter", () => {
     expect(Model.typeForAttribute("mystery")).toBeInstanceOf(
       typeRegistry.lookup("value").constructor,
     );
-    expect(Model._attributeDefinitions.has("mystery")).toBe(false);
+    expect(declared(Model)).not.toContain("mystery");
   });
 
   it("invalidates the _attributesBuilder cache", async () => {
@@ -220,8 +224,8 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     // User-declared def survives ignoredColumns.
-    expect(Post._attributeDefinitions.has("age")).toBe(true);
-    expect(Post._attributeDefinitions.has("age")).toBe(true);
+    expect(declared(Post)).toContain("age");
+    expect(declared(Post)).toContain("age");
     // Accessor stripped.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
@@ -251,7 +255,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "id")).toBeUndefined();
-    expect(Post._attributeDefinitions.has("id")).toBe(false);
+    expect(declared(Post)).not.toContain("id");
 
     const rec = new Post();
     rec.writeAttribute("id", "abc-123");
@@ -275,7 +279,6 @@ describe("loadSchemaFromAdapter integration details", () => {
     const host = {
       adapter: firstAdapter,
       tableName: "posts",
-      _attributeDefinitions: new Map(),
       prototype: {},
     };
 
@@ -285,7 +288,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     resolveColumns({ guid: { sqlType: "uuid" } });
     await inflight;
 
-    expect(host._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(host)).not.toContain("guid");
   });
 });
 
@@ -300,6 +303,6 @@ describe("set adapter auto-loads schema", () => {
     await Post.loadSchema();
 
     expect(Post.typeForAttribute("guid").name).toBe("uuid");
-    expect(Post._attributeDefinitions.has("guid")).toBe(false);
+    expect(declared(Post)).not.toContain("guid");
   });
 });

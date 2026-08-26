@@ -336,9 +336,9 @@ describe("AttributeRegistrationTest", () => {
         this.attribute("age", "integer");
       }
     }
-    const defs = Person._attributeDefinitions;
-    expect(defs.get("name")!.type.name).toBe("string");
-    expect(defs.get("age")!.type.name).toBe("integer");
+    const types = Person.attributeTypes();
+    expect(types["name"].name).toBe("string");
+    expect(types["age"].name).toBe("integer");
   });
 
   it(".type_for_attribute returns the registered attribute type", () => {

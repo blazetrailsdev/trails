@@ -184,8 +184,7 @@ describe("AcceptanceValidationTest", () => {
         this.validates("terms", { acceptance: true });
       }
     }
-    expect(Agreement._attributeDefinitions.get("terms")!.type.name).toBe("boolean");
-    expect(Agreement._attributeDefinitions.get("terms")!.virtual).toBeUndefined();
+    expect(Agreement.attributeTypes()["terms"].name).toBe("boolean");
   });
 });
 describe("acceptance skips nil", () => {
