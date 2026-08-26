@@ -87,6 +87,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "missingRailsArgsReasons",
   "recv",
   "writer",
+  "reExportedFrom",
 ] as const;
 
 /**

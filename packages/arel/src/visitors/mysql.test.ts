@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
-import { buildQuoted } from "../nodes/casted.js";
 import { Table, star, sql, Nodes, Visitors, Collectors } from "../index.js";
 
 describe("MysqlTest", () => {
@@ -26,7 +25,7 @@ describe("MysqlTest", () => {
   it("should escape LIMIT", () => {
     const sc = new Nodes.UpdateStatement();
     sc.relation = new Table("users");
-    sc.limit = new Nodes.Limit(buildQuoted("omg"));
+    sc.limit = new Nodes.Limit(Nodes.buildQuoted("omg"));
     expect(compile(sc)).toBe(`UPDATE "users" LIMIT 'omg'`);
   });
 
@@ -57,7 +56,7 @@ describe("MysqlTest", () => {
 
     it("concats a string", () => {
       const table = new Table("users");
-      const query = table.get("name").concat(buildQuoted("abc"));
+      const query = table.get("name").concat(Nodes.buildQuoted("abc"));
       expect(mustBeLike(compile(query))).toBe(mustBeLike(`CONCAT("users"."name", 'abc')`));
     });
   });
@@ -79,7 +78,7 @@ describe("MysqlTest", () => {
 
     it("should handle nil", () => {
       const table = new Table("users");
-      const val = buildQuoted(null, table.get("active"));
+      const val = Nodes.buildQuoted(null, table.get("active"));
       const compiled = compile(new Nodes.IsNotDistinctFrom(table.get("name"), val));
       expect(mustBeLike(compiled)).toBe(mustBeLike(`"users"."name" <=> NULL`));
     });
@@ -97,7 +96,7 @@ describe("MysqlTest", () => {
 
     it("should handle nil", () => {
       const table = new Table("users");
-      const val = buildQuoted(null, table.get("active"));
+      const val = Nodes.buildQuoted(null, table.get("active"));
       const compiled = compile(new Nodes.IsDistinctFrom(table.get("name"), val));
       expect(mustBeLike(compiled)).toBe(mustBeLike(`NOT "users"."name" <=> NULL`));
     });

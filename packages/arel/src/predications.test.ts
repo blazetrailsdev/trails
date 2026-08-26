@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "./test-helpers/connection.js";
+import { Temporal } from "@blazetrails/date";
 import { Table, Nodes, Visitors } from "./index.js";
 
 describe("PredicationsMixin", () => {
@@ -94,6 +95,16 @@ describe("Predications range semantics", () => {
 
     it("range begin == end collapses to Equality", () => {
       const node = id.between({ begin: 5, end: 5 });
+      expect(node).toBeInstanceOf(Nodes.Equality);
+    });
+
+    it("range begin == end collapses to Equality for equal-valued Dates", () => {
+      // predications.rb:56 compares the bounds with Ruby `==`, so two distinct
+      // but equal Date objects collapse — the shape AR's RangeHandler builds.
+      const node = id.between({
+        begin: Temporal.PlainDate.from("2002-03-19"),
+        end: Temporal.PlainDate.from("2002-03-19"),
+      });
       expect(node).toBeInstanceOf(Nodes.Equality);
     });
 

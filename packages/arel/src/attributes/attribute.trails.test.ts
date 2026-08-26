@@ -95,16 +95,22 @@ describe("AttributeTest (trails)", () => {
   // convenience signature with no Rails-side test.
   describe("two-argument between overload", () => {
     it("between generates BETWEEN", () => {
-      expect(users.project(star()).where(users.get("age").between(18, 65)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" BETWEEN 18 AND 65',
-      );
+      expect(
+        users
+          .project(star())
+          .where(users.get("age").between({ begin: 18, end: 65 }))
+          .toSql(),
+      ).toBe('SELECT * FROM "users" WHERE "users"."age" BETWEEN 18 AND 65');
     });
 
     it("notBetween generates NOT BETWEEN", () => {
       // Mirrors Rails: not_between renders as `(col < begin OR col > end)`.
-      expect(users.project(star()).where(users.get("age").notBetween(18, 65)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE ("users"."age" < 18 OR "users"."age" > 65)',
-      );
+      expect(
+        users
+          .project(star())
+          .where(users.get("age").notBetween({ begin: 18, end: 65 }))
+          .toSql(),
+      ).toBe('SELECT * FROM "users" WHERE ("users"."age" < 18 OR "users"."age" > 65)');
     });
   });
 

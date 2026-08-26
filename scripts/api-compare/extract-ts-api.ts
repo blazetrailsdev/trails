@@ -927,6 +927,26 @@ export function extractFromProgram(
             d.getSourceFile() === sourceFile &&
             d.parent.parent.moduleSpecifier !== undefined,
         );
+        // Where that named re-export points, as a `<file>:<name>` key. The
+        // barrel is a re-export site, not a port location, so extra-surface
+        // scores the name against the DECLARING file's Rails counterpart.
+        const reExportSpecifier = sym.declarations?.find(
+          (d): d is ts.ExportSpecifier =>
+            ts.isExportSpecifier(d) &&
+            d.getSourceFile() === sourceFile &&
+            d.parent.parent.moduleSpecifier !== undefined,
+        );
+        let reExportedFrom: string | undefined;
+        if (reExportSpecifier !== undefined) {
+          const spec = reExportSpecifier.parent.parent.moduleSpecifier;
+          const targetRel =
+            spec !== undefined && ts.isStringLiteral(spec)
+              ? resolveRelModule(relPath, spec.text)
+              : null;
+          if (targetRel) {
+            reExportedFrom = `${targetRel}:${(reExportSpecifier.propertyName ?? reExportSpecifier.name).text}`;
+          }
+        }
         if (decl && (decl.getSourceFile() === sourceFile || namedReExport === true)) {
           let params: ParamInfo[] = [];
           let isFunctionLike = false;
@@ -998,6 +1018,7 @@ export function extractFromProgram(
               line,
               file: relPath,
               ...(internal ? { internal: true } : {}),
+              ...(reExportedFrom !== undefined ? { reExportedFrom } : {}),
               ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
               ...(calls !== undefined ? { calls } : {}),
               ...(callSeq !== undefined ? { callSeq } : {}),
@@ -1029,7 +1050,11 @@ export function extractFromProgram(
     // Only count public functions: a file with only non-exported helpers
     // (all `internal: true`) shouldn't fabricate a module — there's no
     // public surface for the module to represent.
-    const hasPublicFn = fileFunctions.some((fn) => !fn.internal);
+    // A function that only passes THROUGH this file (`export { buildQuoted }
+    // from "./casted.js"`) is not a declaration here, so it cannot conjure a
+    // module named after the barrel's filename — `nodes/index.ts` would
+    // fabricate `Index`, a name nobody wrote and Rails does not have.
+    const hasPublicFn = fileFunctions.some((fn) => !fn.internal && !fn.reExportedFrom);
     if (!fileHasClassOrModule && hasPublicFn) {
       const baseName = path.basename(relPath, ".ts");
       const moduleName = baseName

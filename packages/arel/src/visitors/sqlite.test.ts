@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
-import { buildQuoted } from "../nodes/casted.js";
 import { Table, sql, Nodes, Visitors, Collectors } from "../index.js";
 
 describe("SqliteTest", () => {
@@ -50,7 +49,7 @@ describe("SqliteTest", () => {
 
     it("should handle nil", () => {
       const table = new Table("users");
-      const val = buildQuoted(null, table.get("active"));
+      const val = Nodes.buildQuoted(null, table.get("active"));
       const compiled = compile(new Nodes.IsNotDistinctFrom(table.get("name"), val));
       expect(mustBeLike(compiled)).toBe(mustBeLike(`"users"."name" IS NULL`));
     });
@@ -68,7 +67,7 @@ describe("SqliteTest", () => {
 
     it("should handle nil", () => {
       const table = new Table("users");
-      const val = buildQuoted(null, table.get("active"));
+      const val = Nodes.buildQuoted(null, table.get("active"));
       const compiled = compile(new Nodes.IsDistinctFrom(table.get("name"), val));
       expect(mustBeLike(compiled)).toBe(mustBeLike(`"users"."name" IS NOT NULL`));
     });

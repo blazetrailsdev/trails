@@ -3,7 +3,7 @@ export { And, Or } from "./nary.js";
 export { Grouping } from "./grouping.js";
 export { SqlLiteral } from "./sql-literal.js";
 export { Fragments } from "./fragments.js";
-export { Quoted, Casted } from "./casted.js";
+export { Quoted, Casted, buildQuoted } from "./casted.js";
 export { Attribute } from "../attributes/attribute.js";
 export { Distinct } from "./terminal.js";
 export { Function, Exists, Sum, Max, Min, Avg } from "./function.js";

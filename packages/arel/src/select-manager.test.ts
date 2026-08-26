@@ -356,11 +356,11 @@ describe("SelectManagerTest", () => {
     it("should except two managers", () => {
       const m1 = new SelectManager(users);
       m1.project(star());
-      m1.where(users.get("age").between(18, 60));
+      m1.where(users.get("age").between({ begin: 18, end: 60 }));
 
       const m2 = new SelectManager(users);
       m2.project(star());
-      m2.where(users.get("age").between(40, 99));
+      m2.where(users.get("age").between({ begin: 40, end: 99 }));
 
       const node = m1.except(m2);
       expect(mustBeLike(visitor.compile(node))).toBe(
