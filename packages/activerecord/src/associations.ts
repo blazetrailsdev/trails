@@ -596,9 +596,11 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
  * legacy `record._preloadedAssociations` shadow `Map`. Returns a one-key box
  * (`{ value }`) on a hit so a preloaded-nil target (the preloader stores
  * `setTarget(null)` for a belongs_to that resolved to no record) is
- * distinguished from a miss. Gates on Rails' `loaded?` alone
- * (`association.rb:57-59`) — the holder's own `@loaded` is the whole of the
- * state Rails distinguishes here.
+ * distinguished from a miss. Gates on Rails' own pair — `loaded?`
+ * (`association.rb:81-83`) and `@stale_state && stale_target?`
+ * (`association.rb:97-99`), the exact condition `load_target`
+ * (`association.rb:189-190`) re-queries on — so a target whose owner key moved
+ * under it re-queries rather than reading back stale.
  *
  * @internal
  */
@@ -607,12 +609,16 @@ export function _preloadedHolderTarget(
   assocName: string,
 ): { value: Base | Base[] | null } | null {
   const instance = record._associationInstances.get(assocName) as
-    | { isLoaded(): boolean; target?: Base | Base[] | null }
+    | {
+        isLoaded(): boolean;
+        isStaleTarget(): boolean;
+        _staleStateIsSnapshotted: boolean;
+        target?: Base | Base[] | null;
+      }
     | undefined;
-  if (instance?.isLoaded()) {
-    return { value: instance.target ?? null };
-  }
-  return null;
+  if (instance == null || !instance.isLoaded()) return null;
+  if (instance._staleStateIsSnapshotted && instance.isStaleTarget()) return null;
+  return { value: instance.target ?? null };
 }
 
 /**

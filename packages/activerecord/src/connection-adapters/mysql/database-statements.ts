@@ -165,11 +165,16 @@ export async function isMaxAllowedPacketReached(
   return currentSize + Buffer.byteLength(previousPacket, "utf8") + 2 > maxPacket;
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#max_allowed_packet
+ * (`mysql/database_statements.rb:89-90`) — `@max_allowed_packet ||=
+ * show_variable("max_allowed_packet")`. Rails carries no fallback because
+ * `show_variable` always answers on a live MySQL connection; a host that cannot
+ * answer surfaces at the raise site in `is_max_allowed_packet_reached?` rather
+ * than silently combining forever.
+ * @internal
+ */
 export async function maxAllowedPacket(this: MaxAllowedPacketHost): Promise<number> {
-  // `show_variable` always answers on a live MySQL connection, so Rails needs
-  // no fallback; a host that cannot answer surfaces at the raise site in
-  // `is_max_allowed_packet_reached?` rather than silently combining forever.
   return (this._maxAllowedPacket ??= Number(await this.showVariable("max_allowed_packet")));
 }
 
