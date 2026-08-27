@@ -21,6 +21,7 @@ import { AdapterNotFound } from "../errors.js";
  * shorthand already names its adapter on the resolved configuration hash.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the scheme read Ruby does inline in ConnectionUrlResolver#config (database_configurations/connection_url_resolver.rb:63).
  */
 export function inferAdapterNameFromUrl(url: string): string | undefined {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {

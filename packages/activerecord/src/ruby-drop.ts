@@ -25,6 +25,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
  * returns a tail instead of raising.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby core Array#drop, modelled so a ported body still credits `reflection.chain.drop(1)` (association_scope.rb:115).
  */
 export function drop<T>(value: readonly T[], n: number): T[] {
   if (n < 0) throw new ArgumentError("attempt to drop negative size");

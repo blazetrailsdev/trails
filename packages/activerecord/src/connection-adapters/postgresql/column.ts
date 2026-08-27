@@ -92,6 +92,7 @@ export class Column extends BaseColumn {
    * Ruby's registry is a Hash keyed by the object itself, which works because
    * Rails pairs `==`/`eql?` with `hash`; a JS `Map` keys by identity, so the
    * port needs an explicit string key over exactly those attributes.
+   * @noRailsEquivalent PERMANENT Ruby pairs PostgreSQL::Column#hash with #== so a Hash dedupes it (postgresql/column.rb:72-77); a JS Map keys by identity.
    */
   override deduplicateKey(): string {
     return JSON.stringify([super.deduplicateKey(), this.isIdentity, this.isSerial]);

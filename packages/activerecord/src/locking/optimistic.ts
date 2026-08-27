@@ -328,8 +328,6 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
  * Mirrors `ActiveRecord::Locking::Optimistic#initialize_dup`
  * (optimistic.rb:72-75): `super` first, so the initialize callbacks in
  * `Core#initialize_dup` still observe the source's `lock_version`.
- *
- * @internal
  */
 export function initializeDup(
   this: InstanceLockingHost,

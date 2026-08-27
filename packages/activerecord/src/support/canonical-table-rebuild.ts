@@ -100,8 +100,6 @@ export interface FkSafeDropPlan {
  * misses. Any caller that has to be *right* about inbound FKs — as
  * {@link rebuildCanonicalTables} does — must pass `scanInbound` and pay for the
  * scan rather than rely on it.
- *
- * @internal
  */
 export async function fkSafeDropPlan(
   ss: FkSafeDropPlanHost,
@@ -182,8 +180,6 @@ export async function fkSafeDropPlan(
  *
  * SQLite is left on the loop: `PRAGMA foreign_key_list` has no reverse form and
  * the loop is already in the noise there (measured within run-to-run variance).
- *
- * @internal
  */
 export function bulkInboundFkHost(
   adapter: DatabaseAdapter,
@@ -300,7 +296,7 @@ export async function rebuildCanonicalTables(
  * and only genuinely-missing ones are created. Throws on an unknown name for the
  * same reason {@link rebuildCanonicalTables} does.
  *
- * @internal Low-level plumbing for shared internal setup helpers (e.g.
+ * Low-level plumbing for shared internal setup helpers (e.g.
  * `encryption/test-helpers.ts`). Do NOT call this from a `*.test.ts` file — wire
  * the canonical schema + fixtures through the `fixtures({ ... })` helper, which
  * is the sanctioned public test surface. The

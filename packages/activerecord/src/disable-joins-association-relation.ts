@@ -513,6 +513,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * spawn a plain Relation and silently drop the wrapping behavior.
    *
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby's Object#clone is inherited; JS needs a declared override to keep the subclass through spawn (relation/spawn_methods.rb:12).
    */
   override clone(): Relation<T> {
     // This runs on every `clone()` — including the

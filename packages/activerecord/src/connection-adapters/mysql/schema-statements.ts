@@ -481,8 +481,6 @@ export function extractForeignKeyAction(specifier: string): "cascade" | "nullify
  *
  * MySQL caps table aliases at 256 (https://dev.mysql.com/doc/refman/en/identifiers.html),
  * not max_identifier_length (64). Overrides the DatabaseLimits default.
- *
- * @internal
  */
 export function tableAliasLength(): number {
   return 256;
@@ -667,6 +665,7 @@ interface ForeignKeysHost {
  * their columns joined in ordinal order.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#foreign_keys
+ * @noRailsEquivalent CONVERGEABLE MySQL::SchemaStatements#foreign_keys (mysql/schema_statements.rb:74) as a free function rather than a mixin method.
  */
 export async function foreignKeys(
   this: ForeignKeysHost,

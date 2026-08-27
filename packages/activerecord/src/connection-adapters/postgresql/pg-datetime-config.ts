@@ -20,6 +20,7 @@ export const pgDatetimeConfig = {
  * what re-introspecting the column would yield.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE OID::DateTime#real_type_unless_aliased (postgresql/oid/date_time.rb:20) as a free function; the dumper has no type instance to call.
  */
 export function pgRealTypeUnlessAliased(physicalType: string): string {
   return pgDatetimeConfig.datetimeType === physicalType ? "datetime" : physicalType;

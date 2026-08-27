@@ -49,7 +49,6 @@ const READ_QUERY = new RegExp(
  * Returns true when sql is NOT a read query (i.e., is a write).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#write_query?
- * @internal
  */
 export function isWriteQuery(sql: string): boolean {
   // Rails rescues ArgumentError from invalid encoding and retries with .b (binary); JS has no equivalent

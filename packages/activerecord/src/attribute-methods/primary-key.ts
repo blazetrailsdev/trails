@@ -218,6 +218,7 @@ function cachedSchemaCacheFor(
  * `table_exists?` is async here: a read taken before the schema cache is warm
  * would otherwise cache the "id" convention forever.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (primary_key.rb:78-81) as a this-typed function; Ruby's memoizes, ours re-resolves because table_exists? is async.
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
@@ -232,6 +233,7 @@ export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | nul
  * (base.ts:1157) that delegates here, so this export is redundant public
  * surface; unexporting it is RFC 0081 shape-1 work, not a seam.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (primary_key.rb:106) as a this-typed function behind the Rails-named Base accessor.
  */
 export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]): void {
   this._primaryKey = key;
@@ -245,7 +247,6 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]):
  * than reading `_primaryKey` directly — otherwise, now that Base carries no
  * "id" field default, a chain with no configured pk would skip the schema cache
  * and the two methods could disagree.
- * @internal
  */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
   return Array.isArray(getPrimaryKeyAttr.call(this));

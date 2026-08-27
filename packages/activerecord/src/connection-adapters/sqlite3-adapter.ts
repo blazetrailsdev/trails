@@ -268,6 +268,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal Rails' `raw_connection`. Non-private so the extracted
    * `performQuery` can read `changes` / `last_insert_row_id` off it through
    * `PerformQueryHost`.
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#raw_connection (abstract_adapter.rb:700) under a non-Rails name; the extracted performQuery reads it off the host.
    */
   driver!: SqliteConnection;
   /**
@@ -783,6 +784,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * transaction-control SQL on its byte-identical no-materialize path.
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE DatabaseStatements#raw_execute (abstract/database_statements.rb:552) overridden so the batch arm and dirtying stay adapter-local.
    */
   override async rawExecute(
     sql: string,
@@ -2648,6 +2650,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * synchronously. Invoked by `openAsync()` and `verifyBang()`.
    *
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby's SQLite3::Database.new connects synchronously (sqlite3_adapter.rb:82); an async driver needs a second phase.
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
@@ -2701,7 +2704,10 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return adapter;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:800) re-implemented per adapter because our `active` getter is sync and cannot ping.
+   */
   override async verifyBang(): Promise<void> {
     await this.completeAsyncConnect();
     await super.verifyBang();
@@ -2857,7 +2863,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /**
-   * @internal Mirrors: SQLite3Adapter::TYPE_MAP (sqlite3_adapter.rb:505)
+   * Mirrors: SQLite3Adapter::TYPE_MAP (sqlite3_adapter.rb:505)
    *
    * Declared here, as in Rails, so `self::TYPE_MAP` inside `extended_type_map`
    * resolves to the SQLite map rather than the abstract one. Built on first
@@ -2871,7 +2877,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     })());
   }
 
-  /** @internal Mirrors: SQLite3Adapter::EXTENDED_TYPE_MAPS (sqlite3_adapter.rb:506) */
+  /** Mirrors: SQLite3Adapter::EXTENDED_TYPE_MAPS (sqlite3_adapter.rb:506) */
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /**

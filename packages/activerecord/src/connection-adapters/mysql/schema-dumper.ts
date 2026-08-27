@@ -218,7 +218,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return super.schemaScale(column);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE SchemaDumper#table (schema_dumper.rb:132) overridden for MySQL's per-column options; Ruby overrides prepare_column_options instead.
+   */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
     await super.table(tableName, stream);

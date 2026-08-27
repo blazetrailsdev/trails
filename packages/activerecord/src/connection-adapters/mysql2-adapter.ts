@@ -130,7 +130,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * @internal Mirrors: Mysql2Adapter::TYPE_MAP (mysql2_adapter.rb:53)
+   * Mirrors: Mysql2Adapter::TYPE_MAP (mysql2_adapter.rb:53)
    *
    * Declared here, as in Rails, so `self::TYPE_MAP` inside `extended_type_map`
    * resolves to the mysql2 map rather than the abstract one. Built on first

@@ -1402,6 +1402,7 @@ export class CollectionAssociation extends Association {
  * drift.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the accumulation body of CollectionAssociation#concat_records, extracted so the proxy path shares it (collection_association.rb:438-454).
  */
 export function concatRecordsLoop(
   records: Base[],
@@ -1434,6 +1435,7 @@ export function concatRecordsLoop(
  * the port's stand-in for Ruby, where every one of these bodies has already
  * finished by the time it returns.
  * @internal
+ * @noRailsEquivalent PERMANENT every Ruby body here has already finished when it returns; a `Promise<T> | T` port must test for the pending case (collection_association.rb:438).
  */
 export function isThenable<T>(value: Promise<T> | T): value is Promise<T> {
   return typeof (value as { then?: unknown } | null | undefined)?.then === "function";
@@ -1454,7 +1456,10 @@ function diffHooks(assoc: CollectionAssociation): {
   };
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby `target.include?(record)` compares with `==`; JS Array#includes is reference-only (collection_association.rb:333).
+ */
 export function includesRecord(records: Base[], record: Base): boolean {
   return records.some((r) => (r as unknown as { equals(o: unknown): boolean }).equals(record));
 }

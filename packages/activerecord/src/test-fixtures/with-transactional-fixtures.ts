@@ -143,6 +143,7 @@ async function replaySchemaCacheDump(
  * first attribute access.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the eager schema warm Ruby gets free from lazy synchronous load_schema (model_schema.rb:591).
  */
 export function warmSchemaCacheBeforeFirstTest(
   getAdapter: () => TransactionalFixturesAdapter,

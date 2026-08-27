@@ -18,6 +18,7 @@ export type SchemaQuoter = Pick<
  * concrete adapter is known to mix in `Quoting` at runtime. Throws a
  * descriptive error rather than failing inside a quoting call later.
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:100); TS must narrow the union at the boundary instead.
  */
 export function assertSchemaAdapter(
   adapter: DatabaseAdapter,

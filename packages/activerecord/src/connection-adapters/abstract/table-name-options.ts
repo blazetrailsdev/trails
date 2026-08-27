@@ -18,27 +18,42 @@ export interface TableNameOptionsSource {
 
 let _source: TableNameOptionsSource | null = null;
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby reads ActiveRecord::Base.table_name_prefix at call time (model_schema.rb:26); a TS import from here would close a module cycle.
+ */
 export function registerTableNameOptions(source: TableNameOptionsSource): void {
   _source = source;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.table_name_prefix, which Ruby names directly (model_schema.rb:26).
+ */
 export function globalTableNamePrefix(): string {
   return _source?.tableNamePrefix ?? "";
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.table_name_suffix, which Ruby names directly (model_schema.rb:34).
+ */
 export function globalTableNameSuffix(): string {
   return _source?.tableNameSuffix ?? "";
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.pluralize_table_names, which Ruby names directly (model_schema.rb:42).
+ */
 export function globalPluralizeTableNames(): boolean {
   return _source?.pluralizeTableNames ?? true;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT lazily-wired call of ActiveRecord::Base.get_primary_key, which Ruby names directly (attribute_methods/primary_key.rb:98).
+ */
 export function globalGetPrimaryKey(baseName: string): string {
   return _source?.getPrimaryKey(baseName) ?? "id";
 }

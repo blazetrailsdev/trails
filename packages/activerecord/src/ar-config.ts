@@ -23,6 +23,7 @@ type AnyClass = abstract new (...args: never[]) => object;
  * `ActiveRecord.schema_cache_ignored_table?` (active_record.rb:205).
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE port of ActiveRecord.schema_cache_ignored_table? spelled as a free function instead of on the AR module (active_record.rb:205).
  */
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
   for (const entry of ActiveRecord.schemaCacheIgnoredTables) {

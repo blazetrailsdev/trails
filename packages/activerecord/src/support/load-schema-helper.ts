@@ -502,7 +502,7 @@ const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Pro
  * in; that purge is a trails invention (Rails' single process never re-loads a
  * database), so it lives at the call site rather than as an arm here.
  *
- * @internal Boot/template setup paths only. Test files wire the canonical schema
+ * Boot/template setup paths only. Test files wire the canonical schema
  * + fixtures through `fixtures({ ... })`; the
  * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces that.
  *
@@ -620,8 +620,6 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
  * purge drops exactly the tables it lays and so must never run on this side of
  * the boot order. An adapter with no arm — Rails' missing
  * `adapter_specific_schema_file` — lays nothing and marks nothing.
- *
- * @internal
  */
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];

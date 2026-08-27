@@ -910,8 +910,6 @@ export function initInternals(
  * As with {@link initInternals}, Ruby reaches ActiveModel's links from above and
  * trails from below; `super_` is the receiver-bound link `prepend()` hands the
  * module.
- *
- * @internal
  */
 export function initializeDup(
   this: CoreRecord & {
@@ -977,7 +975,6 @@ export function inspectWithAttributes(
   return `#<${ctor.name} ${parts.join(", ")}>`;
 }
 
-/** @internal */
 export function attributesForInspect(this: CoreRecord): string[] {
   const klass = this.constructor as any;
   const forInspect = klass.attributesForInspect;

@@ -281,7 +281,6 @@ export class TableDefinition extends AbstractTableDefinition {
    * Creates a new ColumnDefinition with PostgreSQL-specific type normalization.
    * Handles the :virtual type alias.
    *
-   * @internal
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#new_column_definition
    */
   override newColumnDefinition(
@@ -340,7 +339,10 @@ export class TableDefinition extends AbstractTableDefinition {
     ];
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::Table/TableDefinition's define_column_methods macro (postgresql/schema_definitions.rb:238).
+   */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
       if (!(type in this.prototype)) {

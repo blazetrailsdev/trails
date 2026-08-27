@@ -97,8 +97,6 @@ async function adapterSpecificHalf(adapter: DatabaseAdapter): Promise<string[]> 
  * existed, or one whose chunks are not all there — a half-written snapshot is
  * re-laid rather than guessed at). A `null` puts the caller back on the
  * re-lay-the-arm path.
- *
- * @internal
  */
 export async function adapterSpecificTables(adapter: DatabaseAdapter): Promise<string[] | null> {
   const metadata = new InternalMetadata(adapter.pool);
@@ -140,8 +138,6 @@ export async function adapterSpecificTables(adapter: DatabaseAdapter): Promise<s
  * missing, so {@link adapterSpecificTables} answers `null` rather than splicing
  * two snapshots together. Chunks a wider snapshot left behind are likewise out
  * of the count's reach.
- *
- * @internal
  */
 export async function stampCanonicalSchema(
   adapter: DatabaseAdapter,
@@ -165,8 +161,6 @@ export async function stampCanonicalSchema(
 
 /**
  * Whether this database was laid by this run and no test has touched it since.
- *
- * @internal
  */
 export async function canonicalSchemaUpToDate(adapter: DatabaseAdapter): Promise<boolean> {
   const runToken = getEnv(RUN_TOKEN_ENV);
@@ -179,8 +173,6 @@ export async function canonicalSchemaUpToDate(adapter: DatabaseAdapter): Promise
 /**
  * The stamp value a database laid by `runToken` carries. Exported for the
  * template probe (`pg-template.test.ts`), which asserts globalSetup stamped it.
- *
- * @internal
  */
 export function canonicalSchemaStamp(runToken: string): string {
   return stampFor(runToken);

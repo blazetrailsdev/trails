@@ -145,6 +145,7 @@ function containedTableNamePrefix(this: typeof Base): string {
  * Build a WHERE clause string for the primary key of a given record.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the primary-key predicate Ruby builds through predicate_builder in _update_record (persistence.rb:1006).
  */
 export function buildPkWhere(this: typeof Base, idValue: unknown): string {
   const pk = this.primaryKey;
@@ -167,6 +168,7 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
  * Build an Arel node for a primary key WHERE condition.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the Arel form of that same predicate_builder call (persistence.rb:1006).
  */
 export function buildPkWhereNode(
   this: typeof Base,
@@ -210,6 +212,7 @@ export function buildPkWhereNode(
  * turn `_query_constraints_hash` into the predicate WHERE.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE turns _query_constraints_hash into the predicate WHERE Ruby builds inline (persistence.rb:1006).
  */
 export function buildWhereNodeFromConstraints(
   this: typeof Base,
@@ -410,6 +413,7 @@ type DatabaseAdapterLike = { internalSchemaCache?: unknown };
  * for columns that carry no client-side default anyway.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE connection-free read of ModelSchema#columns_hash (model_schema.rb:437-441); retires with RFC 0073.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
   const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
@@ -644,6 +648,7 @@ export interface SchemaHost {
  * `ignored_columns=`, `reload_schema_from_cache`, `load_schema!`).
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the recursive the recursive attribute-name and column-name memo nil-out of reload_schema_from_cache (model_schema.rb:553-568).
  */
 export function clearAttributeNamesMemo(host: SchemaHost): void {
   const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
@@ -810,8 +815,6 @@ export function columns(this: SchemaHost): any[] {
  * rather than YAML-only, but the accessor keeps the Rails name and passes the
  * model's own attribute types, so a declared `attribute :x, :my_type` override
  * round-trips through that type rather than through a global registry lookup.
- *
- * @internal
  */
 export function yamlEncoder(this: SchemaHost): YAMLEncoder {
   const own = ownSchemaMemo(this, "_yamlEncoder");
@@ -1249,6 +1252,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * `connection_pool` throws where Ruby's always answers.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:591), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
@@ -1501,6 +1505,7 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
  * (class-level `attribute_names`) use this since `tableExists` is async.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:200) for the sync callers; retires with RFC 0073.
  */
 export function cachedTableExists(this: SchemaHost): boolean | undefined {
   let conn: any;

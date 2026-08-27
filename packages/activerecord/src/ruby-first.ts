@@ -23,6 +23,7 @@
  * either yet, and porting an unused arm is surface the ports do not read.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby core Array#first, modelled so a ported body emits a call rather than an index read (association_scope.rb:115).
  */
 export function first<T>(value: readonly T[]): T | undefined {
   return value[0];

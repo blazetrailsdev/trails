@@ -161,7 +161,10 @@ export class AssociationCache {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE constructor for the association cache Ruby builds inline as `@association_cache = {}` (core.rb:474).
+ */
 export function createAssociationCache(): AssociationCache {
   return new AssociationCache();
 }

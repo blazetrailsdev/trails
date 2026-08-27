@@ -796,10 +796,8 @@ export class RestartParentTransaction extends Transaction {
     this.state.commitBang();
   }
 
-  /** @internal */
   override incompleteBang(): void {}
 
-  /** @internal */
   override async restoreBang(): Promise<void> {}
 
   override isFullRollback(): boolean {

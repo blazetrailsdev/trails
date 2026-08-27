@@ -341,6 +341,7 @@ export class ExecutorHooks {
    * at wire-up time to hand the pool a getter instead.
    *
    * @internal Wiring only; called exactly once, from `index.ts`.
+   * @noRailsEquivalent PERMANENT Ruby resolves the ActiveRecord::Base constant at call time (connection_pool.rb:1078); a TS import would close a module cycle.
    */
   static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
     ExecutorHooks._getConnectionHandler = resolver;
@@ -350,6 +351,7 @@ export class ExecutorHooks {
    * Resolves the current connection handler (lazily wired from `Base` in
    * index.ts to avoid a module-level cycle), or `null` before it is wired.
    * @internal
+   * @noRailsEquivalent PERMANENT the lazily-wired read of the same call-time constant Ruby names directly (connection_pool.rb:1078).
    */
   static connectionHandler(): ConnectionHandlerLike | null {
     return ExecutorHooks._getConnectionHandler?.() ?? null;
@@ -399,6 +401,7 @@ export class ConnectionPool implements ReapablePool {
    * already resolvable. Retiring this field is part of the pool async/sync
    * surface convergence (it disappears once adapter resolution no longer
    * straddles a sync entry point), not a permanent exception.
+   * @noRailsEquivalent CONVERGEABLE Ruby's `require` in ConnectionAdapters.resolve is synchronous (connection_adapters.rb:34-39); this disappears with the pool sync/async convergence.
    */
   adapterReady: Promise<unknown> = Promise.resolve();
 
@@ -696,6 +699,7 @@ export class ConnectionPool implements ReapablePool {
    * is tracked by `converge-sync-connection-lease-per-checkout-verify`.
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE the pre-async ConnectionPool#lease_connection (connection_pool.rb:315-319) for the sync accessors; retires with RFC 0073.
    */
   leaseConnectionSync(): DatabaseAdapter {
     const lease = this.connectionLease();
@@ -1110,6 +1114,7 @@ export class ConnectionPool implements ReapablePool {
    * discarded. Not a Rails counterpart — Rails' `discard!` is fully synchronous.
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE ConnectionPool#discard! (connection_pool.rb:530) with the async close drains Ruby's fully-synchronous discard has nothing to return.
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();
@@ -1299,6 +1304,7 @@ export class ConnectionPool implements ReapablePool {
    * nothing is in flight (the sync-driver case).
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE awaits the closes Ruby's synchronous `conn.disconnect!` completes in place (connection_pool.rb:530).
    */
   async drainPendingCloses(): Promise<void> {
     await Promise.all(this._pendingCloseDrains);
@@ -1312,7 +1318,6 @@ export class ConnectionPool implements ReapablePool {
    *     connection.pool = self
    *     connection
    *   end
-   *
    */
   newConnection(): DatabaseAdapter {
     const conn = this.dbConfig.newConnection() as DatabaseAdapter;

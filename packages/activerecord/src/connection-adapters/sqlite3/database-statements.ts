@@ -212,6 +212,7 @@ export async function internalBeginTransaction(
  * handle between the acquisition and the statement. Hence the union return
  * type; the queue drains back to `null` so the fast path stays reachable.
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby's Monitor#synchronize around perform_query (abstract_adapter.rb:1046) has no JS equivalent for an async body.
  */
 export function acquireStatementLock(host: {
   _statementLock: Promise<void> | null;

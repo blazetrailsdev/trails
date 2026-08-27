@@ -1339,6 +1339,7 @@ export class Base extends Model {
    * can't await without wrapping instances in a `Proxy`.
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE the schema load Ruby performs synchronously from method_missing (activemodel/attribute_methods.rb:474-486); async here, so callers must await it.
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
     return this.loadSchema();
@@ -1510,6 +1511,7 @@ export class Base extends Model {
   /**
    * @internal
    * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
+   * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:127) surfaced on Base as well as in inheritance.ts; one of the two should go.
    */
   static applicationRecordClassQ(): boolean {
     return _applicationRecordClassQ(this);
@@ -1869,10 +1871,8 @@ export class Base extends Model {
 
   // -- Explain --
 
-  /** @internal */
   declare static collectingQueriesForExplain: typeof _collectingQueriesForExplain;
 
-  /** @internal */
   declare static execExplain: typeof _execExplain;
 
   /** @internal */
@@ -3581,9 +3581,7 @@ export class Base extends Model {
   /** @internal */
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
-  /** @internal */
   declare readStoreAttribute: (storeAttribute: string, key: string) => unknown;
-  /** @internal */
   declare writeStoreAttribute: (storeAttribute: string, key: string, value: unknown) => void;
   /** @internal */
   declare storeAccessorFor: (storeAttribute: string) => typeof import("./store.js").HashAccessor;

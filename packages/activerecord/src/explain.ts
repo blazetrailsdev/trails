@@ -41,8 +41,6 @@ export async function collectingQueriesForExplain<T>(
  * Returns a formatted string ready to be logged.
  *
  * Mirrors: ActiveRecord::Explain#exec_explain
- *
- * @internal
  */
 export async function execExplain(
   this: ExplainHost,

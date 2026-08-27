@@ -318,17 +318,14 @@ const toRun = Symbol("toRun");
  * (`yield if reverting`).
  */
 export class ReversibleBlockHelper {
-  /** @internal */
   [toRun]: Array<() => Promise<void>> = [];
 
   constructor(public reverting: boolean) {}
 
-  /** @internal */
   up(fn: () => Promise<void>): void {
     if (!this.reverting) this[toRun].push(fn);
   }
 
-  /** @internal */
   down(fn: () => Promise<void>): void {
     if (this.reverting) this[toRun].push(fn);
   }
@@ -389,7 +386,6 @@ export class Migration {
    * Rails defines `delegate` and `nearest_delegate` only inside `class << self`
    * (`migration.rb:684-689`); the instance side reaches the adapter through
    * `connection` (`migration.rb:1006-1012`), never through a delegate reader.
-   * @internal
    */
   static delegate: Migration | null = null;
   private _version?: number;
@@ -452,8 +448,6 @@ export class Migration {
 
   /**
    * Override to define the forward migration.
-   *
-   * @internal
    */
   async up(): Promise<void> {
     const legacy = this._legacyClassDirection("up");
@@ -465,8 +459,6 @@ export class Migration {
   /**
    * Override to define the rollback migration.
    * Default: run change() in reverse direction.
-   *
-   * @internal
    */
   async down(): Promise<void> {
     const legacy = this._legacyClassDirection("down");
@@ -1499,7 +1491,7 @@ export class Migration {
 
   // --- Pending checks (Rails class methods) ---
 
-  /** @internal Mirrors: `ActiveRecord::Migration.check_pending_migrations` (`migration.rb:739-746`) */
+  /** Mirrors: `ActiveRecord::Migration.check_pending_migrations` (`migration.rb:739-746`) */
   static async checkPendingMigrations(): Promise<void> {
     const migrations = await this.pendingMigrations();
 
@@ -1553,14 +1545,12 @@ export class Migration {
     }
   }
 
-  /** @internal */
   static get nearestDelegate(): Migration | null {
     return (
       this.delegate ?? (Object.getPrototypeOf(this) as typeof Migration).nearestDelegate ?? null
     );
   }
 
-  /** @internal */
   static methodMissing(name: string, ...args: unknown[]): unknown {
     const delegate = this.nearestDelegate as unknown as Record<string, unknown> | null;
     if (delegate !== null && typeof delegate[name] === "function") {
@@ -1569,7 +1559,6 @@ export class Migration {
     throw new TypeError(`undefined method '${name}' for ${this.name}`);
   }
 
-  /** @internal */
   async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
     // Ruby carries the block on its own channel, so it is part of neither
     // `format_arguments` nor `arguments.first` (migration.rb:1045-1052); TS
@@ -1896,7 +1885,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#migrate
+   * Mirrors: ActiveRecord::MigrationContext#migrate
    * (`migration.rb:1228-1238`).
    */
   async migrate(
@@ -1912,7 +1901,7 @@ export class MigrationContext<
     return this.up(targetVersion, block);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#up (`migration.rb:1248-1256`) */
+  /** Mirrors: ActiveRecord::MigrationContext#up (`migration.rb:1248-1256`) */
   async up(
     this: MigrationContext,
     targetVersion?: number | string | null,
@@ -1928,7 +1917,7 @@ export class MigrationContext<
     ).migrate();
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
+  /** Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
   async down(
     this: MigrationContext,
     targetVersion?: number | string | null,
@@ -1945,7 +1934,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#rollback
+   * Mirrors: ActiveRecord::MigrationContext#rollback
    * (`migration.rb:1240-1242`) — `move(:down, steps)`, not `Migrator`'s own
    * `rollback`. The two are not equivalent: `move` indexes into the sorted
    * migration list from `currentMigration` and raises
@@ -1958,7 +1947,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#forward
+   * Mirrors: ActiveRecord::MigrationContext#forward
    * (`migration.rb:1244-1246`) — `move(:up, steps)`. See {@link rollback} for
    * why this does not delegate to `Migrator#forward`.
    */
@@ -1966,7 +1955,7 @@ export class MigrationContext<
     return this.move("up", steps);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
+  /** Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
   async run(
     this: MigrationContext,
     direction: "up" | "down",
@@ -1982,7 +1971,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#open
+   * Mirrors: ActiveRecord::MigrationContext#open
    * (`migration.rb:1272-1274`) — a fresh `Migrator` over this context's
    * migrations, so each read sees current schema_migrations.
    */
@@ -1990,7 +1979,7 @@ export class MigrationContext<
     return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#migrations_status (`migration.rb:1317-1330`) */
+  /** Mirrors: ActiveRecord::MigrationContext#migrations_status (`migration.rb:1317-1330`) */
   async migrationsStatus(
     this: MigrationContext,
   ): Promise<Array<{ status: "up" | "down"; version: string; name: string }>> {
@@ -2024,7 +2013,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#current_environment
+   * Mirrors: ActiveRecord::MigrationContext#current_environment
    * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
    * trails counterpart is {@link DatabaseConfigurations.defaultEnv}.
    *
@@ -2039,7 +2028,7 @@ export class MigrationContext<
     return DatabaseConfigurations.defaultEnv;
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
+  /** Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
   async protectedEnvironment(this: MigrationContext): Promise<boolean> {
     const stored = await this.lastStoredEnvironment();
     if (!stored) return false;
@@ -2047,7 +2036,7 @@ export class MigrationContext<
     return (Base.protectedEnvironments ?? ["production"]).includes(stored);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#last_stored_environment (`migration.rb:1348-1357`) */
+  /** Mirrors: ActiveRecord::MigrationContext#last_stored_environment (`migration.rb:1348-1357`) */
   async lastStoredEnvironment(this: MigrationContext): Promise<string | null> {
     const internalMetadata = this.internalMetadata;
     if (!internalMetadata.enabled) return null;
@@ -2064,7 +2053,7 @@ export class MigrationContext<
     return environment;
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#get_all_versions */
+  /** Mirrors: ActiveRecord::MigrationContext#get_all_versions */
   async getAllVersions(this: MigrationContext): Promise<number[]> {
     if (await this.schemaMigration.tableExists()) {
       return this.schemaMigration.integerVersions();
@@ -2073,7 +2062,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#current_version
+   * Mirrors: ActiveRecord::MigrationContext#current_version
    * (`migration.rb:1292-1295`), whose bare `rescue NoDatabaseError` returns nil.
    */
   async currentVersion(this: MigrationContext): Promise<number | undefined> {
@@ -2087,7 +2076,7 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#needs_migration?
+   * Mirrors: ActiveRecord::MigrationContext#needs_migration?
    * (`migration.rb:1295-1297`).
    *
    * @missingRailsCall size — PERMANENT: Ruby `Array#size` (migration.rb:1296)
@@ -2098,14 +2087,14 @@ export class MigrationContext<
     return (await this.pendingMigrationVersions()).length > 0;
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#pending_migration_versions */
+  /** Mirrors: ActiveRecord::MigrationContext#pending_migration_versions */
   async pendingMigrationVersions(this: MigrationContext): Promise<number[]> {
     const applied = new Set(await this.getAllVersions());
     return this.migrations.map((m) => m.version).filter((v) => !applied.has(v));
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#migrations
+   * Mirrors: ActiveRecord::MigrationContext#migrations
    * (`migration.rb:1303-1315`). Discovery reads *this context's*
    * `migrationsPaths`, which Rails keeps as per-instance constructor state
    * (`attr_reader :migrations_paths`), so two contexts built for two migration
@@ -2289,7 +2278,7 @@ export class Migrator {
     this._migrations = this._sortMigrations(migrations);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#migrations */
+  /** Mirrors: ActiveRecord::Migrator#migrations */
   get migrations(): MigrationProxy[] {
     return this.isDown() ? [...this._migrations].reverse() : this._sortMigrations(this._migrations);
   }
@@ -2350,7 +2339,7 @@ export class Migrator {
     return fnResult as T;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#run (`migration.rb:1444-1450`) */
+  /** Mirrors: ActiveRecord::Migrator#run (`migration.rb:1444-1450`) */
   async run(): Promise<number | undefined> {
     return this.isUseAdvisoryLock()
       ? this.withAdvisoryLock(() => this.runWithoutLock())
@@ -2358,7 +2347,7 @@ export class Migrator {
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::Migrator#migrate (`migration.rb:1452-1458`)
+   * Mirrors: ActiveRecord::Migrator#migrate (`migration.rb:1452-1458`)
    * — the advisory-lock gate over `migrate_without_lock`. The direction and
    * target version are the ones this Migrator was constructed with; the
    * `target_version.nil? / == 0 / >` dispatch belongs to
@@ -2539,7 +2528,7 @@ export class Migrator {
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#current_version (`migration.rb:1435-1437`) */
+  /** Mirrors: ActiveRecord::Migrator#current_version (`migration.rb:1435-1437`) */
   async currentVersion(): Promise<number> {
     const migrated = await this.migrated();
     return migrated.size > 0 ? Math.max(...migrated) : 0;
@@ -2630,18 +2619,18 @@ export class Migrator {
     return this.connection.supportsDdlTransactions?.() ?? false;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#current_migration (`migration.rb:1439-1441`) */
+  /** Mirrors: ActiveRecord::Migrator#current_migration (`migration.rb:1439-1441`) */
   async currentMigration(): Promise<MigrationProxy | null> {
     const currentVersion = await this.currentVersion();
     return this.migrations.find((m) => m.version === currentVersion) ?? null;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator `alias :current :current_migration` (`migration.rb:1442`) */
+  /** Mirrors: ActiveRecord::Migrator `alias :current :current_migration` (`migration.rb:1442`) */
   async current(): Promise<MigrationProxy | null> {
     return this.currentMigration();
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#runnable */
+  /** Mirrors: ActiveRecord::Migrator#runnable */
   async runnable(): Promise<MigrationProxy[]> {
     const runnable = this.migrations.slice(await this.start(), this.finish() + 1);
     const kept: MigrationProxy[] = [];
@@ -2658,13 +2647,13 @@ export class Migrator {
     return kept;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#pending_migrations (`migration.rb:1475-1478`) */
+  /** Mirrors: ActiveRecord::Migrator#pending_migrations (`migration.rb:1475-1478`) */
   async pendingMigrations(): Promise<MigrationProxy[]> {
     const alreadyMigrated = await this.migrated();
     return this.migrations.filter((m) => !alreadyMigrated.has(m.version));
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#migrated (`migration.rb:1480-1482`) */
+  /** Mirrors: ActiveRecord::Migrator#migrated (`migration.rb:1480-1482`) */
   async migrated(): Promise<Set<number>> {
     return this._migratedVersions ?? this.loadMigrated();
   }
@@ -2706,8 +2695,6 @@ export class Current extends Migration {
    * in the ported subset and the wrappers are not ported with it — porting
    * four identity wrappers whose only job is to reach an identity hook would
    * be indirection with no reader.
-   *
-   * @internal
    */
   compatibleTableDefinition(t: unknown): unknown {
     return t;

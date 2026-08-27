@@ -13,6 +13,7 @@ import type { Base } from "../base.js";
  * rung here means the receiver is `nil`, which is Ruby's NoMethodError.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE `options[:foreign_key] || reflection.foreign_key` spelled as a helper instead of inline (foreign_association.rb:11).
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,
@@ -44,6 +45,7 @@ export function ownerForeignKeyColumns(
  * `null_scope?` (collection_proxy.rb:1150-1152), so there is one copy.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE ForeignAssociation#foreign_key_present? as a free function so the proxy shares the one copy (foreign_association.rb:5).
  */
 export function foreignKeyPresentFor(reflection: AssociationReflection, owner: Base): boolean {
   const klass = (reflection as { klass?: { primaryKey?: unknown } }).klass;

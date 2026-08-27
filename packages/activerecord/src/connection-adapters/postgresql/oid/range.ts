@@ -48,6 +48,7 @@ export class Range {
  * the empty string, everything else as its bare string form (no per-bound quoting).
  * Shared by `Range#toString` and the adapter's `encodeRange`.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the nil/infinity bound rendering Ruby writes inline in Quoting#encode_range (postgresql/quoting.rb:113).
  */
 export function rangeBoundLiteral(value: unknown): string {
   return value == null || isInfinity(value) ? "" : String(value);

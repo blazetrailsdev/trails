@@ -11,6 +11,7 @@
  * empty strings and zeroes.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby truthiness is a language primitive JS disagrees with for "", 0 and NaN (finder_methods.rb:110).
  */
 export function isRubyTruthy(value: unknown): boolean {
   return value !== null && value !== undefined && value !== false;

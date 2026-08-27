@@ -262,7 +262,7 @@ let _registry: CanonicalTableDef[] | null = null;
 /**
  * Resolve the adapter's schema-statement helper and per-adapter column type map.
  *
- * @internal Shared with `canonical-table-rebuild.ts`.
+ * Shared with `canonical-table-rebuild.ts`.
  */
 export async function prepareSchema(
   adapter: DatabaseAdapter,
@@ -281,7 +281,7 @@ export async function prepareSchema(
  * Create one canonical table (and its indexes) from its definition, emitting the
  * same DDL `defineSchema` did.
  *
- * @internal Shared with `canonical-table-rebuild.ts`.
+ * Shared with `canonical-table-rebuild.ts`.
  */
 export async function runTable(
   adapter: DatabaseAdapter,
@@ -319,7 +319,7 @@ export async function runTable(
  * ({@link loadCanonicalSchema}) and a named-subset rebuild
  * (`rebuildCanonicalTables`, `canonical-table-rebuild.ts`).
  *
- * @internal The registry is the one declaration site for every canonical table;
+ * The registry is the one declaration site for every canonical table;
  * `canonical-table-rebuild.ts` reads it rather than restating any of them.
  */
 export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
@@ -2198,7 +2198,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
  * `arunit2`-only tables are skipped: `schema.rb:1444-1460` creates them through
  * the second connection, so Rails' primary `arunit` database never carries them.
  *
- * @internal Plumbing for the boot/template setup paths only. Do NOT call this
+ * Plumbing for the boot/template setup paths only. Do NOT call this
  * from a `*.test.ts` file — wire the canonical schema + fixtures through the
  * `fixtures({ ... })` helper, which is the sanctioned public test surface. The
  * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces this.
@@ -2223,7 +2223,7 @@ let _dependents: Map<string, string[]> | null = null;
  * records `foreignKey` calls and discards columns, so the edges come from the
  * one declaration site rather than a hand-maintained second list.
  *
- * @internal Read by `canonical-table-rebuild.ts` to widen a drop set. It lives
+ * Read by `canonical-table-rebuild.ts` to widen a drop set. It lives
  * here, next to the registry it replays, so `TableBuilder` stays file-local:
  * exporting the class would publish all fifteen of its `t.<type>()` members as
  * extra TS surface just to let a sibling module construct one throwaway probe.
@@ -2278,7 +2278,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * `column:` defaults the way `foreign_key_column_for` does
  * (schema_statements.rb:1241-1244): the singularized table name plus `_id`.
  *
- * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
+ * Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
  * {@link canonicalForeignKeyDependents}: `TableBuilder` stays file-local.
  */

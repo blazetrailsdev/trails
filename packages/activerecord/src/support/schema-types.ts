@@ -138,7 +138,6 @@ export type Schema = Record<string, TableSchema>;
 /** @internal */
 const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes", "foreignKeys"]);
 
-/** @internal */
 export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
   if (!table || typeof table !== "object") return false;
   const candidate = (table as { columns?: unknown }).columns;
@@ -169,8 +168,6 @@ export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema
  *   - MySQL: `integer` → INT, `big_integer` → BIGINT (both AUTO_INCREMENT).
  *   - SQLite: always `integer` — only `INTEGER PRIMARY KEY` aliases the rowid,
  *     so a `bigint` declaration would lose auto-increment.
- *
- * @internal
  */
 export function serialIdType(spec: ColumnSpec | undefined, adapterName: string): string {
   const type = typeof spec === "string" ? spec : spec?.type;
@@ -180,7 +177,6 @@ export function serialIdType(spec: ColumnSpec | undefined, adapterName: string):
   return isBig ? "bigint" : "integer";
 }
 
-/** @internal */
 export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
   return isWrappedSchema(table) ? table.columns : table;
 }
@@ -191,8 +187,6 @@ export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
  * which throws before the version cache is populated — so prime the pool memo
  * (`pool_config.rb:39-41`) first. A missing/throwing getter is treated as
  * unsupported, so we skip the expression index rather than emit invalid DDL.
- *
- * @internal
  */
 export async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
   const a = adapter as { supportsExpressionIndex?: () => Promise<boolean> };

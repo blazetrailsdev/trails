@@ -99,6 +99,7 @@ function arrayLen(value: string | string[]): number {
  * Returns null when no explicit column is configured.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the options[:counter_cache] normalization Ruby does inline in counter_cache_column (reflection.rb:590).
  */
 export function counterCacheColumnOption(counterCache: unknown): string | null {
   if (typeof counterCache === "string") return counterCache;
@@ -114,6 +115,7 @@ export function counterCacheColumnOption(counterCache: unknown): string | null {
  * the explicit column, else the pluralized owner model name + `_count`.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the belongs_to? arm of Reflection#counter_cache_column (reflection.rb:590) as a free function.
  */
 export function belongsToCounterCacheColumn(
   counterCache: unknown,
@@ -2103,37 +2105,30 @@ export class RuntimeReflection extends AbstractReflection {
   // the members AssociationScope reads off the chain head are forwarded here —
   // the same explicit forwarding ReflectionProxy uses.
 
-  /** @internal */
   get options(): Record<string, unknown> {
     return asConcrete(this._reflection).options;
   }
 
-  /** @internal */
   override isThroughReflection(): boolean {
     return this._reflection.isThroughReflection();
   }
 
-  /** @internal */
   override isCollection(): boolean {
     return this._reflection.isCollection();
   }
 
-  /** @internal */
   override isPolymorphic(): boolean {
     return this._reflection.isPolymorphic();
   }
 
-  /** @internal */
   scopeFor(relation: unknown, owner?: unknown): unknown {
     return asConcrete(this._reflection).scopeFor?.(relation, owner) ?? relation;
   }
 
-  /** @internal */
   override get chain(): AbstractReflection[] {
     return this._reflection.chain;
   }
 
-  /** @internal */
   get sourceReflection(): AbstractReflection | null {
     return (
       (this._reflection as unknown as { sourceReflection?: AbstractReflection | null })

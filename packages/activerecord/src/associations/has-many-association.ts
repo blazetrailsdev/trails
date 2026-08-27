@@ -531,12 +531,16 @@ function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): s
  * and the `:through` reflection, and so cannot pick a diff by inheritance —
  * can reach the same set semantics the OO association uses.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#difference, extracted so the reflection-agnostic proxy can reach it (has_many_association.rb:120).
  */
 export function setDifference(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => !includesRecord(b, record));
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#intersection, extracted for the same proxy path (has_many_association.rb:124).
+ */
 export function setIntersection(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => includesRecord(b, record));
 }
@@ -664,6 +668,7 @@ async function findTarget(
  * through-association loaders reach it without one.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE Association#scope (association.rb:107) taken as an owner/name/options triple because the proxy has no Association instance to call it on.
  */
 export function scope(
   record: Base,

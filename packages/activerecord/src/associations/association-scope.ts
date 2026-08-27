@@ -38,7 +38,10 @@ export type ValueTransformation<T = unknown> = (v: T) => unknown;
  */
 export type ScopeLambda<R> = (this: R, rel: R, owner: Base) => R | false | null | undefined;
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby applies a scope with instance_exec (association_scope.rb:169-172), which JS has no equivalent for.
+ */
 export function invokeScopeLambda<R>(
   fn: ScopeLambda<R>,
   rel: R,
@@ -861,6 +864,7 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
  * equality, so two tuples with equal contents created separately
  * wouldn't match. Rails' `|` operator on order_values is structural.
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby's `|` on order_values dedupes by eql?/hash; JS Array has only reference equality (association_scope.rb:114).
  */
 export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
   const result: unknown[] = [];

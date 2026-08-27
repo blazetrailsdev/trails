@@ -60,8 +60,6 @@ async function createOtherDogsTable(adapter: DatabaseAdapter): Promise<void> {
  * `College.count`. Suites that mutate these tables mid-run re-prepare them
  * through `withSecondPool` regardless, and a table missing outright puts this
  * boot back on the full rebuild.
- *
- * @internal
  */
 export async function provisionSecondDatabase(): Promise<void> {
   if (activeLane() !== "sqlite") {
@@ -105,9 +103,6 @@ async function setupSecondPool(): Promise<void> {
   await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);
 }
 
-/**
- * @internal
- */
 export function withSecondPool(): void {
   beforeAll(setupSecondPool);
 }

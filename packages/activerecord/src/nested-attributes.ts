@@ -547,7 +547,10 @@ export function generateAssociationWriter(
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE the `reflection.polymorphic?` guard Ruby writes inline in assign_nested_attributes (nested_attributes.rb:434).
+ */
 export function isPolymorphicBelongsTo(record: Base, associationName: string): boolean {
   const assocDef = (record.constructor as any)._reflectOnAssociation?.(associationName);
   return assocDef?.macro === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
@@ -653,6 +656,7 @@ async function detachDisplacedThenSetNewRecord(
  * constructor. The deferral is a *read*, so no DB state is in flight to race an
  * interim insert.
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby reads the existing record with a synchronous send (nested_attributes.rb:434); ours returns a promise a constructor cannot await.
  */
 export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
   const settled = load.then(

@@ -42,6 +42,7 @@ const QUERY_CONNECTION_KEY = Symbol.for("ar_query_connection");
  * through its query/transaction code rather than re-resolving `.connection`.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE reads the connection Ruby threads as with_connection's block parameter (connection_handling.rb:284).
  */
 export function currentQueryConnection(): DatabaseAdapter | null {
   return IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY) ?? null;
@@ -60,6 +61,7 @@ export function currentQueryConnection(): DatabaseAdapter | null {
  * resolution, so such a model still raises `ConnectionNotEstablished`.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the same threaded connection narrowed to the model's own pool, which Ruby gets from per-pool lease state (connection_handling.rb:284).
  */
 export function threadedConnectionFor(modelClass: typeof Base): DatabaseAdapter | null {
   const threaded = currentQueryConnection();

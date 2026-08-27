@@ -10,6 +10,7 @@
  * in SQLite, so it must classify as a reader too.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE approximates `stmt.column_count.zero?` (sqlite3/database_statements.rb:38) for drivers that expose no column metadata.
  */
 export function statementIsReader(sql: string): boolean {
   const upper = sql.trimStart().toUpperCase();

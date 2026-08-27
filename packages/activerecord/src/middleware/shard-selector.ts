@@ -15,9 +15,7 @@ export interface ShardRequest {
 type ShardResolverFn = (request: ShardRequest) => string;
 
 export class ShardSelector {
-  /** @internal */
   readonly resolver: ShardResolverFn;
-  /** @internal */
   readonly options: { lock?: boolean };
 
   private readonly app: (request: ShardRequest) => Promise<unknown>;
@@ -48,17 +46,26 @@ export class ShardSelector {
     return this.setShard(shard, () => this.app(request));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE reads ActiveSupport::Notifications, which Ruby names directly in the middleware body (middleware/shard_selector.rb:36).
+   */
   instrumenter(): typeof Notifications {
     return Notifications;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE reads the the resolver ivar ShardSelector keeps (middleware/shard_selector.rb:26); Ruby has no reader for it.
+   */
   shardResolver(): ShardResolverFn {
     return this.resolver;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE reads the the options-derived lock setting (middleware/shard_selector.rb:28); Ruby reads the ivar inline.
+   */
   shardSelectorStrategy(): { lock: boolean } {
     return { lock: this.options.lock ?? true };
   }

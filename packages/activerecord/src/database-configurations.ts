@@ -38,6 +38,7 @@ type DbConfigHandler = (
  * can only mean as a String — is a URL config.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby branches on `config.is_a?(Symbol)` (database_configurations.rb:44); TS collapses Symbol and String onto one type.
  */
 export function symbolConnectionName(config: unknown): string | undefined {
   if (typeof config !== "string" || config === "") return undefined;
@@ -48,7 +49,10 @@ export function symbolConnectionName(config: unknown): string | undefined {
 // not in core.ts, so leaf modules can read it without importing core.ts.
 let _configurations: DatabaseConfigurations | undefined;
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE reads the the configurations slot ActiveRecord::Base.configurations names directly (core.rb:34).
+ */
 export function configurationsStore(): DatabaseConfigurations {
   // Memoized on first read so `Base.configurations` holds one object, as Rails'
   // @@configurations attribute does: save/restore round-trips must be no-ops.
@@ -56,7 +60,10 @@ export function configurationsStore(): DatabaseConfigurations {
   return _configurations;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE writes that same the configurations slot (core.rb:38); Ruby assigns through the Base accessor.
+ */
 export function setConfigurationsStore(configs: DatabaseConfigurations): void {
   _configurations = configs;
 }
@@ -279,7 +286,6 @@ export class DatabaseConfigurations {
    * Builds DatabaseConfig objects from the raw config, adds a primary URL
    * config for the current env if none matches, then merges the per-name
    * `*_DATABASE_URL` / `DATABASE_URL` environment variables.
-   *
    */
   private buildConfigs(configs: RawConfigurations | DatabaseConfig[]): DatabaseConfig[] {
     if (Array.isArray(configs)) return configs;

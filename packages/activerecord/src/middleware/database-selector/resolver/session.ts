@@ -19,7 +19,6 @@ export interface SessionStore {
 }
 
 export class Session {
-  /** @internal */
   readonly session: SessionStore;
 
   constructor(session: SessionStore) {
