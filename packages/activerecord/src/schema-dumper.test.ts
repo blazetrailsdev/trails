@@ -525,9 +525,9 @@ describe("SchemaDumperTest", () => {
         name: "test_uc_no_idx_position",
       });
       const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_uc_no_idx");
-      expect(output).toContain("addUniqueConstraint");
-      // The backing index must not also appear as an addIndex call.
-      expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
+      expect(output).toContain("t.uniqueConstraint");
+      // The backing index must not also appear as an index call.
+      expect(output).not.toMatch(/t\.index\(.*test_uc_no_idx_position/);
     },
   );
   it.skipIf(adapterType !== "mysql")(
@@ -571,11 +571,9 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "key_tests");
     expect(output).toContain(
-      'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
+      't.index("awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
     );
-    expect(output).toContain(
-      'addIndex("key_tests", "pizza", { name: "index_key_tests_on_pizza" })',
-    );
+    expect(output).toContain('t.index("pizza", { name: "index_key_tests_on_pizza" })');
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes bigint default", async () => {

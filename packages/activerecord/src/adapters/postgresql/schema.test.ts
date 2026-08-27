@@ -978,9 +978,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.getDatabaseVersion();
       const lines: string[] = [];
       await adapter.createSchemaDumper().dumpTable(lines, "companies");
-      const indexLine = lines.find((l) => l.includes("company_include_index"))?.trim();
+      const indexLine = lines
+        .join("\n")
+        .split("\n")
+        .find((l) => l.includes("company_include_index"))
+        ?.trim();
       expect(indexLine).toBeDefined();
-      expect(indexLine).toContain(`"companies", ["firm_id", "type"]`);
+      expect(indexLine).toContain(`t.index(["firm_id", "type"]`);
       expect(indexLine).not.toContain(`["firm_id", "type", "name"`);
       expect(indexLine?.includes(`include: ["name","account_id"]`)).toBe(
         await adapter.supportsIndexInclude(),
