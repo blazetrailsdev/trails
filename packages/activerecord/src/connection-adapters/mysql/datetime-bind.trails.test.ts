@@ -4,8 +4,7 @@ import { describe, expect, it } from "vitest";
 import { quotedDate, typeCast as abstractTypeCast } from "../abstract/quoting.js";
 
 describe("MySQL datetime bind formatting", () => {
-  const bind = (v: unknown) =>
-    abstractTypeCast.call(quotingHost({ quotedDate }), v);
+  const bind = (v: unknown) => abstractTypeCast.call(quotingHost({ quotedDate }), v);
 
   it("emits YYYY-MM-DD HH:MM:SS.ffffff without T or Z", () => {
     const instant = Temporal.Instant.from("2026-05-08T14:32:00.123456Z");
