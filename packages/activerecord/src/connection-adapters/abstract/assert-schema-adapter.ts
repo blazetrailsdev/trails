@@ -1,3 +1,6 @@
+/**
+ * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:100); TS must narrow the union at the boundary instead.
+ */
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Quoting } from "./quoting.js";
 

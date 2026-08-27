@@ -1,3 +1,6 @@
+/**
+ * @noRailsEquivalent PERMANENT Ruby core Array#drop, modelled so a ported body still credits `reflection.chain.drop(1)` (association_scope.rb:115).
+ */
 import { ArgumentError } from "@blazetrails/activemodel";
 
 /**

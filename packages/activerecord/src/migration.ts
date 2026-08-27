@@ -318,6 +318,9 @@ const toRun = Symbol("toRun");
  * (`yield if reverting`).
  */
 export class ReversibleBlockHelper {
+  /**
+   * @noRailsEquivalent PERMANENT Ruby's `up`/`down` yield straight into the block (migration.rb:873-880); an async block has to be queued and awaited after it returns.
+   */
   [toRun]: Array<() => Promise<void>> = [];
 
   constructor(public reverting: boolean) {}

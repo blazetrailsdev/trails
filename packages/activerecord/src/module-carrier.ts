@@ -1,3 +1,6 @@
+/**
+ * @noRailsEquivalent PERMANENT Ruby includes an anonymous module into the class (enum.rb:251, store.rb:110); JS needs an explicitly interposed prototype.
+ */
 import type { Base } from "./base.js";
 
 /**
