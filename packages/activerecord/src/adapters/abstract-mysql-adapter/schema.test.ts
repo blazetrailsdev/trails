@@ -183,10 +183,12 @@ describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
   it("foreign keys method with ansi quotes", async () => {
     const a = ansi!;
     // Rails' schema.rb:715-726 lays `lessons_students` / `students` AND the
-    // `add_foreign_key :lessons_students, :students, on_delete: :cascade` this
-    // reads. trails' canonical schema lays the two tables but not the FK yet
-    // (`canonical-schema.ts:1074`), so add it here and take it back off again —
-    // the canonical shape is shared, and no rebuild is needed to restore it.
+    // `add_foreign_key :lessons_students, :students, on_delete: :cascade,
+    // deferrable: :immediate` this reads, so schema_test.rb:125-128 is a bare
+    // read. trails' canonical schema lays the two tables but not the FK
+    // (`canonical-schema.ts:1074`), so it is added and taken back off here
+    // until `lessons-students-canonical-foreign-key` closes that gap; then
+    // this reverts to the bare read.
     await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
     try {
       const fks = await a.foreignKeys("lessons_students");
