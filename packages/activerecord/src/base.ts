@@ -1461,32 +1461,11 @@ export class Base extends Model {
   // here; the members `Base` overrides itself are class-body statics above.
   declare static decorateAttributes: AttributeRegistrationClassHalf["decorateAttributes"];
   declare static attributeTypes: AttributeRegistrationClassHalf["attributeTypes"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static pendingAttributeModifications: AttributeRegistrationClassHalf["pendingAttributeModifications"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static resetDefaultAttributesBang: AttributeRegistrationClassHalf["resetDefaultAttributesBang"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static resolveAttributeName: AttributeRegistrationClassHalf["resolveAttributeName"];
 
   /**
@@ -1502,110 +1481,24 @@ export class Base extends Model {
   declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
   declare static attributeMethodAffix: AttributeMethodsClassHalf["attributeMethodAffix"];
   declare static generateAliasAttributeMethods: AttributeMethodsClassHalf["generateAliasAttributeMethods"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
-  declare static aliasAttributeMethodDefinition: AttributeMethodsClassHalf["aliasAttributeMethodDefinition"];
   declare static isAttributeAlias: AttributeMethodsClassHalf["isAttributeAlias"];
   declare static attributeAlias: AttributeMethodsClassHalf["attributeAlias"];
   declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
-  declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
-  /**
-   * @internal Rails-private helper (attribute_methods/read.rb:11-21).
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include AttributeMethods` (base.rb:316) → `include Read`
-   * (attribute_methods.rb:13). The definition site in attribute-methods/read.ts IS
-   * manifest-backed; this TS-only `declare` is not, because the manifest keys
-   * private names by the .rb the member is DECLARED in.
-   */
-  declare static defineMethodAttribute: typeof _defineMethodAttribute;
-  /**
-   * @internal Rails-private helper (attribute_methods/write.rb:15-25).
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include AttributeMethods` (base.rb:316) → `include Write`
-   * (attribute_methods.rb:14). The definition site in attribute-methods/write.ts IS
-   * manifest-backed; this TS-only `declare` is not, because the manifest keys
-   * private names by the .rb the member is DECLARED in.
-   */
-  declare static setDefineMethodAttribute: typeof _setDefineMethodAttribute;
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
   declare static defineAttributeMethodPattern: AttributeMethodsClassHalf["defineAttributeMethodPattern"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
-  declare static aliasesByAttributeName: AttributeMethodsClassHalf["aliasesByAttributeName"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
+  /** @internal Rails-private helper. */
   declare static _aliasesByAttributeName: Map<string, string[]>;
   /** @internal Rails-private helper (attribute_methods.rb:400-402). */
   declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static attributeMethodPatternsCache: AttributeMethodsClassHalf["attributeMethodPatternsCache"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static attributeMethodPatternsMatching: AttributeMethodsClassHalf["attributeMethodPatternsMatching"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static defineProxyCall: AttributeMethodsClassHalf["defineProxyCall"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static buildMangledName: AttributeMethodsClassHalf["buildMangledName"];
-  /**
-   * @internal Rails-private helper.
-   * @noRailsEquivalent CONVERGEABLE Ruby needs no re-declaration: `Base` picks the
-   * method up by `include ActiveModel::AttributeMethods` (attribute_methods.rb:9).
-   * The definition site in activemodel's attribute-methods.ts IS manifest-backed;
-   * this TS-only `declare` is not, because the manifest keys private names by the
-   * .rb the member is DECLARED in.
-   */
+  /** @internal Rails-private helper. */
   declare static defineCall: AttributeMethodsClassHalf["defineCall"];
 
   // --- ModelSchema mixin (wired via extend() after class) ---
