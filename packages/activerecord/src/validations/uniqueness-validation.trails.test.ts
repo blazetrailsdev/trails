@@ -100,9 +100,8 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   });
 
   afterAll(async () => {
-    // This describe writes through the raw pool, outside any fixtures
-    // transaction, so its row would otherwise outlive the file and be visible
-    // to every later test sharing the worker database.
+    // Written through the raw pool, outside any fixtures transaction, so it
+    // outlives the file unless deleted here.
     await DirectSubscriber.where({ nick: "direct-abc" }).deleteAll();
     pool.releaseConnection();
     await pool.disconnectBang();
