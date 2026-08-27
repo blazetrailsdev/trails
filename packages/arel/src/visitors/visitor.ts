@@ -116,6 +116,7 @@ export abstract class Visitor {
       // ancestors falls out of `rescue NoMethodError` as a TypeError
       // (visitor.rb:39), distinct from a class whose handler is aliased to
       // `unsupported` and raises UnsupportedVisitError (to_sql.rb:828).
+      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`Cannot visit ${describeClass(object)}`);
     }
     // `dispatchMethod` only ever returns a name the visitor responds to

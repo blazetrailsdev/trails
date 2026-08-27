@@ -381,6 +381,7 @@ export default defineConfig(
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -405,8 +406,11 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
     ],
-    ignores: ["**/*.test.ts"],
+    // test-helpers/ mirrors Rails' test/ code, which the error-class manifest
+    // never covers, so its throws have no ported class to reach for.
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
       "blazetrails/rails-error-parity": "error",
     },
@@ -759,7 +763,7 @@ export default defineConfig(
   //    inline `eslint-disable`. Disabling the rule must itself be an error —
   //    fix the `any`. No allowlist; applies to src and tests. ──
   {
-    files: ["packages/activerecord/src/**/*.ts"],
+    files: ["packages/activerecord/src/**/*.ts", "packages/arel/src/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
     },

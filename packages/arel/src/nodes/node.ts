@@ -1,5 +1,6 @@
 import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
 import { SQLString } from "../collectors/sql-string.js";
+import { ArelError } from "../errors.js";
 
 /**
  * The `engine` `Node#toSql()` / `TreeManager#toSql()` compile through — Rails'
@@ -56,6 +57,7 @@ export class Node {
    */
   toSql(engine: ArelEngine | null = _engine.current): string {
     if (!engine) {
+      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(
         "undefined method `connection' for nil — Arel::Table.engine is unset. " +
           "Set it to your ActiveRecord base class, or pass an engine to toSql().",
@@ -76,7 +78,7 @@ export class Node {
 
 function assertRegistered<T>(ctor: T | undefined, name: string): T {
   if (!ctor) {
-    throw new Error(
+    throw new ArelError(
       `Node.${name} requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.`,
     );
   }

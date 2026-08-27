@@ -5,6 +5,7 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import { ArelError } from "../errors.js";
 
 /**
  * Mirrors Arel::Visitors::UnsupportedVisitError (to_sql.rb:5-9) — a
@@ -1538,7 +1539,7 @@ export class ToSql extends Visitor {
     const d = ToSql.dispatchCache();
     const reg = (ctor: NodeCtor, m: string) => {
       if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
-        throw new Error(`ToSql dispatch: method '${m}' is not defined on the prototype`);
+        throw new ArelError(`ToSql dispatch: method '${m}' is not defined on the prototype`);
       }
       d.set(ctor, m);
     };

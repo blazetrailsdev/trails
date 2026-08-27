@@ -2,7 +2,7 @@
  * ESLint rule: rails-error-parity. Error classes are observable API, so our
  * hierarchy must mirror Rails and Rails-mirroring source must throw ported
  * error classes. Scoped (via eslint.config.mjs) to
- * `packages/{activerecord,activemodel,activesupport}/src/**\/*.ts` excluding
+ * `packages/{activerecord,activemodel,activesupport,arel}/src/**\/*.ts` excluding
  * `*.test.ts`:
  *
  *   1. On any in-scope file: every manifest error class whose Rails source
@@ -63,6 +63,7 @@ export const PKG_NS = {
   activerecord: "active_record/",
   activemodel: "active_model/",
   activesupport: "active_support/",
+  arel: "arel/",
 };
 
 function loadJson(p, fallback) {
@@ -88,7 +89,7 @@ function loadExclude() {
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
   const m = norm.match(
-    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport)\/src\/.+\.ts)$/,
+    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel)\/src\/.+\.ts)$/,
   );
   return m ? { rel: m[1], pkg: m[2] } : null;
 }

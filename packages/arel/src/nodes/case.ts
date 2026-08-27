@@ -5,6 +5,7 @@ import { NodeExpression } from "./node-expression.js";
 import { buildQuoted } from "./casted.js";
 import { Binary, type NodeOrValue } from "./binary.js";
 import { Unary } from "./unary.js";
+import { ArelError } from "../errors.js";
 
 /**
  * Represents a CASE WHEN ... THEN ... ELSE ... END expression.
@@ -84,7 +85,7 @@ export class Case extends NodeExpression {
       return;
     }
     const last = this.conditions[this.conditions.length - 1];
-    if (!last) throw new Error("Case#then called before Case#when");
+    if (!last) throw new ArelError("Case#then called before Case#when");
     last.right = buildQuoted(expression === undefined ? null : expression);
     return this;
   }

@@ -6,6 +6,7 @@ import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
 import { isHashAnalogue } from "./ruby-class.js";
+import { ArelError } from "../errors.js";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -413,6 +414,7 @@ export class Dot extends Visitor {
   protected visitEdge(o: object, method: string): void {
     if (!(method in o)) {
       const klass = (o as { constructor?: { name?: string } }).constructor?.name ?? "Object";
+      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`undefined method '${method}' for ${klass}`);
     }
     this.edge(method, () => this.visit((o as Record<string, unknown>)[method]));
@@ -532,7 +534,7 @@ export class Dot extends Visitor {
     });
     const edgeLines = this.edges.map((e) => {
       if (!e.to) {
-        throw new Error(`Dot: edge "${e.name}" has no destination node`);
+        throw new ArelError(`Dot: edge "${e.name}" has no destination node`);
       }
       return `${e.from.id} -> ${e.to.id} [label="${e.name}"];`;
     });
