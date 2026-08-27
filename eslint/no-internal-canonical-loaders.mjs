@@ -49,8 +49,31 @@ export function repoRel(filename) {
 // Symbols that must not be imported directly into a test file. `loadSchema`
 // (support/load-schema-helper.ts, the port of `LoadSchemaHelper#load_schema`)
 // wraps `loadCanonicalSchema`, so banning only the wrapped symbol would leave
-// the same schema-wiring backdoor open under a different name.
-export const BANNED = new Set(["ensureCanonicalTables", "loadCanonicalSchema", "loadSchema"]);
+// the same schema-wiring backdoor open under a different name;
+// `loadCanonicalArunit2Schema` (the arunit2 half of schema.rb:1444-1460, which
+// `loadCanonicalSchema` deliberately skips) is a second entry point into the
+// same canonical registry and would leave the backdoor open the same way.
+//
+// An ESLint rule has no filesystem access, so this set cannot be derived from
+// the loader modules' real exports at lint time — which is how
+// `loadCanonicalArunit2Schema` slipped in unbanned. It is pinned instead by the
+// guard test in this rule's `*.test.mjs`, which reads the real loader modules
+// and fails when one exports a `loadCanonical*` / `ensureCanonical*` entry
+// point that is not listed here.
+export const BANNED = new Set([
+  "ensureCanonicalTables",
+  "loadCanonicalArunit2Schema",
+  "loadCanonicalSchema",
+  "loadSchema",
+]);
+
+/**
+ * Canonical-registry entry points, by name shape. Every export of a pinned
+ * loader module matching this is expected to be BANNED; the guard test in
+ * `*.test.mjs` enforces it, so a new loader cannot be added without either
+ * banning it or renaming it out of the family deliberately.
+ */
+export const CANONICAL_ENTRY_POINT = /^(?:load|ensure)Canonical/;
 
 // Test files permitted to import the banned loaders (they test them directly).
 export const ALLOW = new Set(canonicalLoaderSelfTests);
