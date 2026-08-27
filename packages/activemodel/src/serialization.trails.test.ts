@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
+import { Dirty } from "./dirty.js";
 import { JSON as SerializersJSON } from "./serializers/json.js";
 import { Model } from "./index.js";
 import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
@@ -497,10 +498,12 @@ describe("fromJson", () => {
   it("marks attributes as changed via dirty tracking", () => {
     class User extends Model {
       static {
+        include(this, Dirty);
         include(this, SerializersJSON);
         this.attribute("name", "string");
       }
     }
+    interface User extends Dirty {}
     interface User extends SerializersJSON {}
 
     const u = new User({ name: "Original" });

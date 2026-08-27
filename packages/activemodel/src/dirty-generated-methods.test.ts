@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
+   model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
+   those members on the type side. */
+import { include } from "@blazetrails/activesupport";
+import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 
@@ -15,10 +21,12 @@ import { Model } from "./index.js";
 describe("DirtyGeneratedMethods", () => {
   class Person extends Model {
     static {
+      include(this, Dirty);
       this.attribute("name", "string");
       this.attribute("age", "integer");
     }
   }
+  interface Person extends Dirty {}
 
   it("<attr>Changed returns true after assignment", () => {
     const p = new Person({ name: "Alice" });
