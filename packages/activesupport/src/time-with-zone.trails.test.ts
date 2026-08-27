@@ -40,6 +40,22 @@ describe("TimeWithZone sub-millisecond precision", () => {
     expect(subMs().xmlschema(6)).toBe("1999-12-31T19:00:00.123456-05:00");
     expect(subMs().xmlschema(9)).toBe("1999-12-31T19:00:00.123456789-05:00");
   });
+
+  it("change(nsec:) keeps every nanosecond digit", () => {
+    expect(subMs().change({ nsec: 987654321 }).nsec).toBe(987654321);
+  });
+
+  it("change(usec:) keeps every microsecond digit", () => {
+    expect(subMs().change({ usec: 987654 }).nsec).toBe(987654000);
+  });
+
+  it("change of an unrelated component carries the fraction through", () => {
+    expect(subMs().change({ year: 2020 }).nsec).toBe(123456789);
+  });
+
+  it("change of a lower component still zeroes the fraction", () => {
+    expect(subMs().change({ hour: 3 }).nsec).toBe(0);
+  });
 });
 
 // `to_fs` resolves through `Time::DATE_FORMATS` (time_with_zone.rb:212-220), so

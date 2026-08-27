@@ -868,17 +868,26 @@ export class TimeWithZone {
     const min = options.min ?? (options.hour !== undefined ? 0 : l.minute);
     const sec =
       options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : l.second);
+    // Ruby carries the whole fraction into `new_sec` as a Rational
+    // (calculations.rb:132-141), so `change` is nanosecond-exact. `Date.UTC` and
+    // `TimeZone#local` are millisecond-granular, so the fraction is split: the
+    // millisecond half goes through them and `subMsNsec` is added back to the
+    // resulting instant, which is exact because a zone offset is whole seconds.
     let ms = l.millisecond;
+    let subMsNsec = l.nsec % 1_000_000;
     if (options.usec !== undefined) {
       ms = Math.floor(options.usec / 1000);
+      subMsNsec = (options.usec % 1000) * 1_000;
     } else if (options.nsec !== undefined) {
       ms = Math.floor(options.nsec / 1_000_000);
+      subMsNsec = options.nsec % 1_000_000;
     } else if (
       options.hour !== undefined ||
       options.min !== undefined ||
       options.sec !== undefined
     ) {
       ms = 0;
+      subMsNsec = 0;
     }
 
     // `periods.include?(period) ? period : nil` (time_with_zone.rb:406): the
@@ -895,12 +904,26 @@ export class TimeWithZone {
       (p) =>
         p.observedUtcOffset === this.period.observedUtcOffset && p.isDst() === this.period.isDst(),
     );
-    if (!period) return this._timeZone.local(year, month, day, hour, min, sec, ms);
+    if (!period) {
+      const base = this._timeZone.local(year, month, day, hour, min, sec, ms);
+      return subMsNsec === 0 ? base : this._withSubMsNsec(base, subMsNsec);
+    }
     return new TimeWithZone(
-      Temporal.Instant.fromEpochMilliseconds(
-        newTime.epochMilliseconds - period.observedUtcOffset * 1000,
+      Temporal.Instant.fromEpochNanoseconds(
+        BigInt(newTime.epochMilliseconds - period.observedUtcOffset * 1000) * 1_000_000n +
+          BigInt(subMsNsec),
       ),
       this._timeZone,
+    );
+  }
+
+  /** @internal Adds back the sub-millisecond half of a {@link change} fraction. */
+  private _withSubMsNsec(base: TimeWithZone, subMsNsec: number): TimeWithZone {
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochNanoseconds(
+        base.utc().toTime().toInstant().epochNanoseconds + BigInt(subMsNsec),
+      ),
+      base.timeZone,
     );
   }
 

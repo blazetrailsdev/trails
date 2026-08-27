@@ -328,20 +328,10 @@ function nsec(value: NsecBearing): bigint {
   );
 }
 
-/**
- * `Time#change(nsec:)` — replaces the sub-second fraction, leaving the second.
- * `TimeWithZone#change` (time_with_zone.rb:390-410) is the Ruby receiver here,
- * but trails' port of it is millisecond-granular, so the fraction is replaced on
- * the UTC instant and re-wrapped in the receiver's zone — the same value Ruby
- * answers, without the lossy hop.
- */
+/** `Time#change(nsec:)` — replaces the sub-second fraction, leaving the second. */
 function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
   if (value instanceof TimeWithZone) {
-    const utc = value.utc().toTime().toInstant();
-    return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(utc.epochNanoseconds - nsec(value) + newNsec),
-      value.timeZone,
-    ) as T;
+    return value.change({ nsec: Number(newNsec) }) as T;
   }
   if (value instanceof Temporal.Instant) {
     return Temporal.Instant.fromEpochNanoseconds(
