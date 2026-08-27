@@ -35,16 +35,15 @@
  * something — when it is the leading comment of a declaration, of a class /
  * interface / object member, of a parameter, or of a definition-shaped
  * statement (a `describe(...)` file header, an `it(...)` header, an assignment
- * that names what it assigns). That is where every port convention lives and where ordinary API documentation lives, and neither is
- * touched.
+ * that names what it assigns). That is where every port convention lives, and
+ * it is where ordinary API documentation lives too; neither is touched.
  *
- * A JSDoc block that is NOT in a documenting position — floating between
- * statements inside a function body, before an `if` or a `return`, at the end
- * of a block
- * — documents no declaration. It is narration, and `/** *\/` is exactly the
- * two-character reformatting that used to buy narration a pass. It is deleted
- * like any other free-form comment, unless it carries a JSDoc tag, a Rails
- * reference, or a tool directive on its own merits.
+ * A JSDoc block that is NOT in a documenting position documents no
+ * declaration — floating between statements inside a function body, before an
+ * `if` or a `return`, at the end of a block. It is narration, and `/** *\/` is
+ * exactly the two-character reformatting that used to buy narration a pass, so
+ * it is deleted like any other free-form comment, unless it carries a JSDoc
+ * tag, a Rails reference, or a tool directive on its own merits.
  *
  * The blanket alternative — "every JSDoc block must carry a tag or a Rails
  * reference" — was measured and rejected: it flags 94 pre-existing blocks in
