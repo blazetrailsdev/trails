@@ -9,11 +9,11 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StrictValidationFailed } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
+import { Subscriber } from "../test-helpers/models/subscriber.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 describe("UniquenessValidationContextTest", () => {
@@ -90,38 +90,39 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   let adapter: TestDatabaseAdapter;
   let pool: ConnectionPool;
 
-  class DirectTopic extends Topic {
-    static _tableName = "topics";
+  class DirectSubscriber extends Subscriber {
+    static _tableName = "subscribers";
   }
 
   beforeAll(async () => {
     ({ adapter, pool } = await checkoutRawTestAdapter());
-    await rebuildCanonicalTables(adapter, ["topics"]);
-    await adapter.addIndex("topics", "title", { unique: true, name: "topics_direct_index" });
-    (DirectTopic as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
+    (DirectSubscriber as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
   });
 
   afterAll(async () => {
+    // Written through the raw pool, outside any fixtures transaction, so it
+    // outlives the file unless deleted here.
+    await DirectSubscriber.where({ nick: "direct-abc" }).deleteAll();
     pool.releaseConnection();
     await pool.disconnectBang();
   });
 
   it("skips the existence check for a directly assigned adapter", async () => {
-    DirectTopic.clearValidatorsBang();
-    DirectTopic.validatesUniquenessOf("title");
+    DirectSubscriber.clearValidatorsBang();
+    DirectSubscriber.validatesUniquenessOf("nick");
 
-    const t = await DirectTopic.createBang({ title: "direct-abc" });
-    t.writeAttribute("author_name", "John");
+    const s = await DirectSubscriber.createBang({ nick: "direct-abc" });
+    s.writeAttribute("name", "John");
 
-    // title is unchanged and covered by a unique index, so no SELECT is issued.
+    // nick is unchanged and covered by a unique index, so no SELECT is issued.
     await assertNoQueries(false, async () => {
-      await t.isValid();
+      await s.isValid();
     });
 
-    // A changed title still consults the database.
-    t.writeAttribute("title", "direct-abc v2");
+    // A changed nick still consults the database.
+    s.writeAttribute("nick", "direct-abc v2");
     await assertQueriesCount(1, false, async () => {
-      await t.isValid();
+      await s.isValid();
     });
   });
 });
