@@ -52,12 +52,20 @@ async function missingRowDiagnostics(
   const all = await connection.execQuery(
     `SELECT ${columns.join(", ")} FROM ${connection.quoteTableName("topics")} ORDER BY ${id}`,
   );
+  let probe: string;
+  try {
+    const row = await Topic.create({ title: "__pk probe" });
+    probe = `inserted id ${String(row.id)}`;
+  } catch (error) {
+    probe = `raised ${error instanceof Error ? error.message : String(error)}`;
+  }
   return [
     `insert_all wrote a row that the next read did not find.`,
     `  iteration:        ${iteration} (sent ${JSON.stringify(sent)})`,
     `  returning:        ${JSON.stringify(returning)}`,
     `  openTransactions: ${connection.openTransactions}`,
     `  topics rows:      ${JSON.stringify(all.rows)}`,
+    `  next insert:      ${probe}`,
   ].join("\n");
 }
 
