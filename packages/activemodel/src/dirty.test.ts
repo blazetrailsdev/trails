@@ -27,8 +27,8 @@ const ivars = Symbol("ivars");
  * of `mutations_from_database` (dirty.rb:382-388) and tracks through
  * `ActiveModel::ForcedMutationTracker`, which is what this file exercises.
  *
- Also wired is `AttributeMethods`, which Ruby gets
- * from `Dirty`'s own `include ActiveModel::AttributeMethods` (dirty.rb:125);
+ * Also wired is `AttributeMethods`, which Ruby gets from `Dirty`'s own
+ * `include ActiveModel::AttributeMethods` (dirty.rb:125);
  * trails' `include()` copies a module's own members, not its nested includes.
  *
  * Ruby's `@name` + `attr_reader :name` + a hand-written `name=` port to one
