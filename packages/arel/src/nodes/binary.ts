@@ -11,6 +11,7 @@ import { Not } from "./unary.js";
 import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 import type { SelectManager } from "../select-manager.js";
+import type { Table } from "../table.js";
 
 // `ModelAttribute` is not an Arel node but occupies node slots in Rails:
 // `build_quoted` returns one unwrapped into the AST (casted.rb:50), and both
@@ -43,6 +44,12 @@ export type NodeOrValue =
   // `visit_Arel_SelectManager` (to_sql.rb:358-361) is a real rendering visitor
   // that wraps `o.ast` in parens, so nothing here can reach `unsupported`.
   | SelectManager
+  // `Arel::Table` is a standalone class upstream (table.rb:4), not a Node, yet
+  // it occupies node slots throughout: `JoinSource#initialize`'s
+  // `single_source` (join_source.rb:11), `TableAlias`'s relation
+  // (table_alias.rb:8-10), and a `Join`'s left. `visit_Arel_Table`
+  // (to_sql.rb:895-901) is a real rendering visitor for it.
+  | Table
   // Rails puts bare Strings in node slots structurally: `Cte#initialize` stores
   // the CTE name as `@left` (cte.rb:10-12), `TableAlias` the alias name as
   // `@right` (table_alias.rb), and Rails' own tests build
@@ -241,10 +248,10 @@ export class NotIn extends Binary {
 
 /** Join base class — Rails defines via const_set in binary.rb */
 export abstract class Join extends Binary {
-  declare left: Node;
-  declare right: Node | null;
+  declare left: Node | Table;
+  declare right: Node | Table | null;
 
-  constructor(left: Node, right: Node | null = null) {
+  constructor(left: Node | Table, right: Node | Table | null = null) {
     super(left, right);
   }
 }

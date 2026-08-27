@@ -44,7 +44,7 @@ export class Cte extends Binary {
 
   constructor(
     name: string | SqlLiteral,
-    relation: Node | SelectManager,
+    relation: Node | Table | SelectManager,
     materialized: boolean | null = null,
   ) {
     super(name, relation);

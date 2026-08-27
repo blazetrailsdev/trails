@@ -14,11 +14,18 @@ import {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const LISTED_ONE = "packages/activerecord/src/date.test.ts";
-const LISTED_TWO = "packages/activerecord/src/locking.test.ts";
+// Derived from the baseline rather than hardcoded: RFC 0079 burns these rows
+// down to zero, so a named path is a fixture that any burndown PR deletes out
+// from under this suite. `LISTED_TWO` is absent once no row allows more than
+// one call, and both are absent at the RFC's endpoint — the cases that need
+// them drop out rather than fail.
+const LISTED_ONE = Object.keys(REBUILD_CALLERS).find((rel) => REBUILD_CALLERS[rel] === 1);
+const LISTED_TWO = Object.keys(REBUILD_CALLERS).find((rel) => REBUILD_CALLERS[rel] >= 2);
+const LISTED_TWO_ALLOWED = LISTED_TWO === undefined ? 0 : REBUILD_CALLERS[LISTED_TWO];
 const UNLISTED = "packages/activerecord/src/relations.test.ts";
 
 const CALL = 'await rebuildCanonicalTables(Base.connection, ["topics"]);';
+const calls = (n) => Array.from({ length: n }, () => CALL).join(" ");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -30,16 +37,24 @@ const tester = new RuleTester({
 
 tester.run("no-new-rebuild-canonical-tables", rule, {
   valid: [
-    {
-      name: "a listed file calling exactly its allowance",
-      filename: LISTED_ONE,
-      code: `async function f() { ${CALL} }`,
-    },
-    {
-      name: "a listed file with an allowance of two, calling twice",
-      filename: LISTED_TWO,
-      code: `async function f() { ${CALL} ${CALL} }`,
-    },
+    ...(LISTED_ONE === undefined
+      ? []
+      : [
+          {
+            name: "a listed file calling exactly its allowance",
+            filename: LISTED_ONE,
+            code: `async function f() { ${CALL} }`,
+          },
+        ]),
+    ...(LISTED_TWO === undefined
+      ? []
+      : [
+          {
+            name: "a listed file with an allowance of two, calling twice",
+            filename: LISTED_TWO,
+            code: `async function f() { ${calls(LISTED_TWO_ALLOWED)} }`,
+          },
+        ]),
     {
       name: "an unlisted file that does not call the helper",
       filename: UNLISTED,
@@ -84,30 +99,46 @@ tester.run("no-new-rebuild-canonical-tables", rule, {
       code: `async function f() { ${CALL} ${CALL} }`,
       errors: [{ messageId: "unlistedCaller" }, { messageId: "unlistedCaller" }],
     },
-    {
-      name: "a listed file over its allowance reports only the excess call",
-      filename: LISTED_ONE,
-      code: `async function f() { ${CALL} ${CALL} }`,
-      errors: [{ messageId: "tooManyCalls", data: { allowed: "1", actual: "2" } }],
-    },
-    {
-      name: "two excess calls over an allowance of two report twice",
-      filename: LISTED_TWO,
-      code: `async function f() { ${CALL} ${CALL} ${CALL} ${CALL} }`,
-      errors: [{ messageId: "tooManyCalls" }, { messageId: "tooManyCalls" }],
-    },
-    {
-      name: "a listed file that dropped to zero calls must tighten the baseline",
-      filename: LISTED_ONE,
-      code: "async function f() { return 1; }",
-      errors: [{ messageId: "staleAllowance", data: { allowed: "1", actual: "0" } }],
-    },
-    {
-      name: "a listed file that dropped one of two calls must tighten the baseline",
-      filename: LISTED_TWO,
-      code: `async function f() { ${CALL} }`,
-      errors: [{ messageId: "staleAllowance", data: { allowed: "2", actual: "1" } }],
-    },
+    ...(LISTED_ONE === undefined
+      ? []
+      : [
+          {
+            name: "a listed file over its allowance reports only the excess call",
+            filename: LISTED_ONE,
+            code: `async function f() { ${CALL} ${CALL} }`,
+            errors: [{ messageId: "tooManyCalls", data: { allowed: "1", actual: "2" } }],
+          },
+          {
+            name: "a listed file that dropped to zero calls must tighten the baseline",
+            filename: LISTED_ONE,
+            code: "async function f() { return 1; }",
+            errors: [{ messageId: "staleAllowance", data: { allowed: "1", actual: "0" } }],
+          },
+        ]),
+    ...(LISTED_TWO === undefined
+      ? []
+      : [
+          {
+            name: "two excess calls over an allowance of two report twice",
+            filename: LISTED_TWO,
+            code: `async function f() { ${calls(LISTED_TWO_ALLOWED + 2)} }`,
+            errors: [{ messageId: "tooManyCalls" }, { messageId: "tooManyCalls" }],
+          },
+          {
+            name: "a listed file that dropped one of two calls must tighten the baseline",
+            filename: LISTED_TWO,
+            code: `async function f() { ${calls(LISTED_TWO_ALLOWED - 1)} }`,
+            errors: [
+              {
+                messageId: "staleAllowance",
+                data: {
+                  allowed: String(LISTED_TWO_ALLOWED),
+                  actual: String(LISTED_TWO_ALLOWED - 1),
+                },
+              },
+            ],
+          },
+        ]),
     {
       name: "a file outside packages/ and scripts/ can never be listed, so it reports",
       filename: "tools/scratch.ts",
@@ -167,10 +198,15 @@ describe("rebuild-canonical-tables-callers.json", () => {
 
 describe("scope helpers", () => {
   it("keys the baseline off the repo-relative path, absolute or not", () => {
-    expect(repoRel(`/home/someone/trails/${LISTED_ONE}`)).toBe(LISTED_ONE);
-    expect(repoRel(LISTED_ONE)).toBe(LISTED_ONE);
+    // `UNLISTED` here only because repoRel is about path shape, not membership;
+    // the membership half below reads a real row while the baseline still has
+    // one.
+    expect(repoRel(`/home/someone/trails/${UNLISTED}`)).toBe(UNLISTED);
+    expect(repoRel(UNLISTED)).toBe(UNLISTED);
     expect(repoRel("tools/scratch.ts")).toBeNull();
-    expect(rebuildCallerAllowance(`/abs/prefix/${LISTED_ONE}`)).toBe(REBUILD_CALLERS[LISTED_ONE]);
+    for (const rel of Object.keys(REBUILD_CALLERS)) {
+      expect(rebuildCallerAllowance(`/abs/prefix/${rel}`)).toBe(REBUILD_CALLERS[rel]);
+    }
   });
 
   it("reports an unlisted or out-of-scope file as having no allowance", () => {
@@ -182,7 +218,7 @@ describe("scope helpers", () => {
     for (const rel of HELPER_MODULES) {
       expect(isRebuildHelperModule(`/abs/prefix/${rel}`)).toBe(true);
     }
-    expect(isRebuildHelperModule(LISTED_ONE)).toBe(false);
+    expect(isRebuildHelperModule(UNLISTED)).toBe(false);
   });
 
   it("ignores the JSON contract note rather than treating it as a path", () => {

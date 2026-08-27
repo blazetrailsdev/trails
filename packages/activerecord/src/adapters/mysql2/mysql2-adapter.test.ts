@@ -37,7 +37,6 @@ import {
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
 import { Base } from "../../base.js";
 import { Logger } from "@blazetrails/activesupport";
@@ -177,45 +176,11 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     }
   });
 
-  beforeEach(async () => {
-    await adapter.executeMutation("SET FOREIGN_KEY_CHECKS=0");
-    for (const t of ["foos", "engines", "old_cars", "cars", "subscribers", "people"]) {
-      await adapter.executeMutation(`DROP TABLE IF EXISTS \`${t}\``);
-    }
-    await adapter.executeMutation("SET FOREIGN_KEY_CHECKS=1");
-    await rebuildCanonicalTables(adapter, ["people", "cars", "old_cars", "subscribers", "engines"]);
-  });
-
-  afterEach(async () => {
-    await adapter.executeMutation("DROP TABLE IF EXISTS `foos`");
-  });
-
   it("errors for bigint fks on integer pk table in alter table", async () => {
-    const error = await adapter
-      .addReference("engines", "old_car")
-      .then(() => adapter.addForeignKey("engines", "old_cars"))
-      .then(() => null)
-      .catch((e) => e);
-
-    expect(error).toBeInstanceOf(MismatchedForeignKey);
-    expect(error.message).toMatch(
-      /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
-    );
-    expect(error.message).toMatch(/which has type `int/i);
-    expect(error.message).toMatch(
-      /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
-    );
-    expect(error.cause).toBeInstanceOf(Error);
-    expect(error.connectionPool).toBe(adapter.pool);
-  });
-
-  // Rails: `skip "MariaDB does not return mismatched foreign key in error message" if @conn.mariadb?`
-  it.skipIf(isMariaDb)(
-    "errors for multiple fks on mismatched types for pk table in alter table",
-    async () => {
+    try {
       const error = await adapter
-        .addReference("engines", "person", { foreignKey: true })
-        .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
+        .addReference("engines", "old_car")
+        .then(() => adapter.addForeignKey("engines", "old_cars"))
         .then(() => null)
         .catch((e) => e);
 
@@ -224,90 +189,138 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
       );
       expect(error.message).toMatch(/which has type `int/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
+      );
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
+    } finally {
+      // Rails: `ensure @conn.execute("ALTER TABLE engines DROP COLUMN old_car_id") rescue nil`
+      await adapter.executeMutation("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
+    }
+  });
+
+  // Rails: `skip "MariaDB does not return mismatched foreign key in error message" if @conn.mariadb?`
+  it.skipIf(isMariaDb)(
+    "errors for multiple fks on mismatched types for pk table in alter table",
+    async () => {
+      try {
+        const error = await adapter
+          .addReference("engines", "person", { foreignKey: true })
+          .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
+          .then(() => null)
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(MismatchedForeignKey);
+        expect(error.message).toMatch(
+          /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+        );
+        expect(error.message).toMatch(/which has type `int/i);
+        expect(error.cause).toBeInstanceOf(Error);
+        expect(error.connectionPool).toBe(adapter.pool);
+      } finally {
+        // Rails' `ensure` block: `@conn.remove_reference(:engines, :person)` /
+        // `@conn.remove_reference(:engines, :old_car)`.
+        await adapter.removeReference("engines", "person");
+        await adapter.removeReference("engines", "old_car");
+      }
     },
   );
 
   it("errors for bigint fks on integer pk table in create table", async () => {
-    const error = await adapter
-      .executeMutation(
-        `
-          CREATE TABLE \`foos\` (
-            \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            \`old_car_id\` BIGINT,
-            INDEX \`idx_old_car_id\` (\`old_car_id\`),
-            CONSTRAINT \`fk_foos_old_car\` FOREIGN KEY (\`old_car_id\`) REFERENCES \`old_cars\` (\`id\`)
-          ) ENGINE=InnoDB
-        `,
-      )
-      .then(() => null)
-      .catch((e) => e);
+    try {
+      const error = await adapter
+        .executeMutation(
+          `
+            CREATE TABLE \`foos\` (
+              \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`old_car_id\` BIGINT,
+              INDEX \`idx_old_car_id\` (\`old_car_id\`),
+              CONSTRAINT \`fk_foos_old_car\` FOREIGN KEY (\`old_car_id\`) REFERENCES \`old_cars\` (\`id\`)
+            ) ENGINE=InnoDB
+          `,
+        )
+        .then(() => null)
+        .catch((e) => e);
 
-    expect(error).toBeInstanceOf(MismatchedForeignKey);
-    expect(error.message).toMatch(
-      /Column `old_car_id` on table `foos` does not match column `id` on `old_cars`/,
-    );
-    expect(error.message).toMatch(/which has type `int/i);
-    expect(error.message).toMatch(
-      /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer/,
-    );
-    expect(error.cause).toBeInstanceOf(Error);
-    expect(error.connectionPool).toBe(adapter.pool);
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `old_car_id` on table `foos` does not match column `id` on `old_cars`/,
+      );
+      expect(error.message).toMatch(/which has type `int/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(error.connectionPool).toBe(adapter.pool);
+    } finally {
+      // Rails: `ensure @conn.drop_table :foos, if_exists: true`
+      await adapter.dropTable("foos", { ifExists: true });
+    }
   });
 
   it("errors for integer fks on bigint pk table in create table", async () => {
-    const error = await adapter
-      .executeMutation(
-        `
-          CREATE TABLE \`foos\` (
-            \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            \`car_id\` INT,
-            INDEX \`idx_car_id\` (\`car_id\`),
-            CONSTRAINT \`fk_foos_car\` FOREIGN KEY (\`car_id\`) REFERENCES \`cars\` (\`id\`)
-          ) ENGINE=InnoDB
-        `,
-      )
-      .then(() => null)
-      .catch((e) => e);
+    try {
+      const error = await adapter
+        .executeMutation(
+          `
+            CREATE TABLE \`foos\` (
+              \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`car_id\` INT,
+              INDEX \`idx_car_id\` (\`car_id\`),
+              CONSTRAINT \`fk_foos_car\` FOREIGN KEY (\`car_id\`) REFERENCES \`cars\` (\`id\`)
+            ) ENGINE=InnoDB
+          `,
+        )
+        .then(() => null)
+        .catch((e) => e);
 
-    expect(error).toBeInstanceOf(MismatchedForeignKey);
-    expect(error.message).toMatch(
-      /Column `car_id` on table `foos` does not match column `id` on `cars`/,
-    );
-    expect(error.message).toMatch(/which has type `bigint/i);
-    expect(error.message).toMatch(
-      /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint/,
-    );
-    expect(error.cause).toBeInstanceOf(Error);
-    expect(error.connectionPool).toBe(adapter.pool);
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `car_id` on table `foos` does not match column `id` on `cars`/,
+      );
+      expect(error.message).toMatch(/which has type `bigint/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(error.connectionPool).toBe(adapter.pool);
+    } finally {
+      // Rails: `ensure @conn.drop_table :foos, if_exists: true`
+      await adapter.dropTable("foos", { ifExists: true });
+    }
   });
 
   it("errors for bigint fks on string pk table in create table", async () => {
-    const error = await adapter
-      .executeMutation(
-        `
-          CREATE TABLE \`foos\` (
-            \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            \`subscriber_id\` BIGINT,
-            INDEX \`idx_subscriber_id\` (\`subscriber_id\`),
-            CONSTRAINT \`fk_foos_subscriber\` FOREIGN KEY (\`subscriber_id\`) REFERENCES \`subscribers\` (\`nick\`)
-          ) ENGINE=InnoDB
-        `,
-      )
-      .then(() => null)
-      .catch((e) => e);
+    try {
+      const error = await adapter
+        .executeMutation(
+          `
+            CREATE TABLE \`foos\` (
+              \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`subscriber_id\` BIGINT,
+              INDEX \`idx_subscriber_id\` (\`subscriber_id\`),
+              CONSTRAINT \`fk_foos_subscriber\` FOREIGN KEY (\`subscriber_id\`) REFERENCES \`subscribers\` (\`nick\`)
+            ) ENGINE=InnoDB
+          `,
+        )
+        .then(() => null)
+        .catch((e) => e);
 
-    expect(error).toBeInstanceOf(MismatchedForeignKey);
-    expect(error.message).toMatch(
-      /Column `subscriber_id` on table `foos` does not match column `nick` on `subscribers`/,
-    );
-    expect(error.message).toMatch(/which has type `varchar/i);
-    expect(error.message).toMatch(
-      /To resolve this issue, change the type of the `subscriber_id` column on `foos` to be :string/,
-    );
-    expect(error.cause).toBeInstanceOf(Error);
-    expect(error.connectionPool).toBe(adapter.pool);
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `subscriber_id` on table `foos` does not match column `nick` on `subscribers`/,
+      );
+      expect(error.message).toMatch(/which has type `varchar/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `subscriber_id` column on `foos` to be :string/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(error.connectionPool).toBe(adapter.pool);
+    } finally {
+      // Rails: `ensure @conn.drop_table :foos, if_exists: true`
+      await adapter.dropTable("foos", { ifExists: true });
+    }
   });
 
   it("read timeout exception", () => {

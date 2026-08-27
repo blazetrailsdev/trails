@@ -1,3 +1,4 @@
+import type { Table } from "../table.js";
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -160,7 +161,7 @@ export class MySQL extends ToSql {
   protected override buildSubselect(
     key: Node | Node[],
     o: {
-      relation: Node | null;
+      relation: Node | Table | null;
       wheres: Node[];
       groups: Node[];
       havings: Node[];

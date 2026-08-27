@@ -3,8 +3,6 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { Base } from "./base.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
@@ -16,17 +14,7 @@ describe("DateTest", () => {
   // parallel forks.
   fixtures(["topics"]);
 
-  // Force-recreate the canonical `topics` table to its full shape. The table
-  // comes from the template clone and nothing else recreates it, so a reduced
-  // `topics` shape (e.g. `attribute-methods.test.ts` / `finder.test.ts` both
-  // declare a bespoke `topics` with NO `last_read` column) that a sibling handler-suite file
-  // co-scheduled earlier in the same fork wrote to the shared worker DB. The
-  // date cases below `Topic.create({ last_read })` then fail with a missing
-  // `last_read` column — the documented PG flake. `rebuildCanonicalTables`
-  // drops + recreates `topics` unconditionally so the column is always present.
-  // Registered after `fixtures` so this `beforeAll` runs last and wins.
   beforeAll(async () => {
-    await rebuildCanonicalTables(Base.connection, ["topics"]);
     // Eagerly resolve the `last_read` date type (Rails loads schema at boot). The
     // `assign valid dates` case below builds `Topic.new` synchronously, so without
     // a warmed type registry the multiparameter assembler can't see `last_read` is

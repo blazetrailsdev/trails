@@ -22,7 +22,7 @@ interface TypeCastable {
 }
 
 export class TableAlias extends Binary {
-  constructor(relation: Node, name: string | SqlLiteral) {
+  constructor(relation: Node | Table, name: string | SqlLiteral) {
     super(relation, name);
   }
 

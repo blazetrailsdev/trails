@@ -1,6 +1,7 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
+import type { Table } from "../table.js";
 
 /**
  * InsertStatement — INSERT INTO ... VALUES ...
@@ -15,12 +16,12 @@ import { Node } from "./node.js";
 export type InsertSelectSource = Node | { ast: Node; toSql: () => string } | null;
 
 export class InsertStatement extends Node {
-  relation: Node | null;
+  relation: Node | Table | null;
   columns: Node[];
   values: Node | null;
   select: InsertSelectSource;
 
-  constructor(relation: Node | null = null) {
+  constructor(relation: Node | Table | null = null) {
     super();
     this.relation = relation;
     this.columns = [];

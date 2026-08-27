@@ -30,7 +30,6 @@ import { itIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
@@ -105,31 +104,7 @@ describe("DirtyTest", () => {
   // Rails' in-test create_table); run it outside the wrapping transaction so
   // MySQL's DDL implicit-commit can't break the fixture rollback.
   fixtures([], { usesTransaction: ["field named field"] });
-
-  // Canonical-schema shield. This suite rides the preloaded canonical tables
-  // (people / topics / pirates / parrots / aircraft / numeric_data) rather than
-  // declaring its own, so the worker's signature cache keeps each plain schema
-  // load a no-op. But a sibling file that ran earlier in this worker can physically
-  // DROP+CREATE a shared table with a reduced shape (e.g. callbacks.test.ts'
-  // `topics: { title }` / `people: { name }`, clone.test.ts' trimmed `topics`,
-  // reflection.test.ts' `people: { name, age, active }`). That leaves the table
-  // missing the columns these tests read — `written_on` (datetime tests) and
-  // `created_at`/`updated_at` (whose auto-write is the only thing populating
-  // `saved_changes` after an INSERT) — so the suite reflects the wrong shape and
-  // fails. `rebuildCanonicalTables` bypasses the signature cache and rebuilds
-  // each table from the canonical schema verbatim (also clearing the adapter's
-  // per-table column cache via `createTable`), mirroring locking.test.ts' shield. The
-  // warm-up below then reflects the rebuilt canonical columns.
   beforeAll(async () => {
-    await rebuildCanonicalTables(Base.connection, [
-      "people",
-      "topics",
-      "pirates",
-      "parrots",
-      "aircraft",
-      "numeric_data",
-    ]);
-
     // Force schema reflection ONCE per worker: trails reflects columns lazily on
     // first query, and in-memory dirty tracking (`new Model()` then assign) needs
     // the attribute accessors to already exist.

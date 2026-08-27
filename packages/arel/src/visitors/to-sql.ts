@@ -90,10 +90,10 @@ export class ToSql extends Visitor {
     this.connection = connection;
   }
 
-  compile(node: Node | ReadonlyArray<Nodes.NodeOrValue>): string;
-  compile<T>(node: Node | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
+  compile(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>): string;
+  compile<T>(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
   compile(
-    node: Node | ReadonlyArray<Nodes.NodeOrValue>,
+    node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>,
     collector: { value: unknown } = new SQLString(),
   ): unknown {
     return this.accept(node, collector as unknown as SQLString).value;
@@ -1321,7 +1321,7 @@ export class ToSql extends Visitor {
     return this.unboundableSign(value) !== 0;
   }
 
-  protected hasJoinSources(o: { relation: Node | null }): boolean {
+  protected hasJoinSources(o: { relation: Node | Table | null }): boolean {
     return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
   }
 
@@ -1385,7 +1385,7 @@ export class ToSql extends Visitor {
   protected buildSubselect(
     key: Node | Node[],
     o: {
-      relation: Node | null;
+      relation: Node | Table | null;
       wheres: Node[];
       groups: Node[];
       havings: Node[];

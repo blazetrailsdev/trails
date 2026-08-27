@@ -1,6 +1,7 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
+import type { Table } from "../table.js";
 import { JoinSource } from "./join-source.js";
 import type { OptimizerHints } from "./unary.js";
 
@@ -23,7 +24,7 @@ export class SelectCore extends Node {
   optimizerHints: OptimizerHints | null;
   comment: Node | null;
 
-  constructor(relation: Node | null = null) {
+  constructor(relation: Node | Table | null = null) {
     super();
     this.source = new JoinSource(relation);
     this.projections = [];
@@ -36,16 +37,16 @@ export class SelectCore extends Node {
     this.comment = null;
   }
 
-  get from(): Node | null {
+  get from(): Node | Table | null {
     return this.source.left;
   }
 
-  set from(value: Node | null) {
+  set from(value: Node | Table | null) {
     this.source.left = value;
   }
 
   /** Mirrors: `alias :froms :from` (select_core.rb:33). */
-  get froms(): Node | null {
+  get froms(): Node | Table | null {
     return this.from;
   }
 

@@ -1188,13 +1188,12 @@ export class Relation<T extends Base> {
     // an Arel `SelectManager`, so the throwaway manager is the `[]`.
     const arel = new SelectManager(this.table);
     this.buildJoins(arel);
-    const joinedTables = arel
-      .joinSources()
-      .flatMap((join: Nodes.Join) =>
-        join instanceof Nodes.StringJoin
-          ? this.tablesInString(join.left)
-          : [(join.left as unknown as { name: string }).name],
-      );
+    const joinedTables = arel.joinSources().flatMap((join: Nodes.Join) =>
+      join instanceof Nodes.StringJoin
+        ? // A StringJoin's left is the raw SQL fragment, never a Table.
+          this.tablesInString(join.left as Nodes.Node)
+        : [(join.left as unknown as { name: string }).name],
+    );
 
     joinedTables.push(String(this.table.name));
 

@@ -40,7 +40,7 @@ const UNION_NODE_CLASSES: Record<
 export class SelectManager extends TreeManager {
   ast: SelectStatement;
 
-  constructor(table?: Table | null) {
+  constructor(table?: Table | Node | null) {
     super();
     this.ast = new SelectStatement(table ?? null);
   }
@@ -208,8 +208,8 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#join (select_manager.rb:102-113).
    */
   join(
-    relation: Node | string | null | undefined,
-    klass: new (left: Node, right: Node | null) => Join = InnerJoin,
+    relation: Node | Table | string | null | undefined,
+    klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
   ): this {
     if (relation == null) return this;
 
@@ -219,7 +219,7 @@ export class SelectManager extends TreeManager {
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       const text = typeof relation === "string" ? relation : relation.value;
       if (text.length === 0) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
+      klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
     }
 
     this.core.source.right.push(this.createJoin(relation, null, klass));
@@ -231,7 +231,7 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#outer_join (select_manager.rb:115-117).
    */
-  outerJoin(relation: Node | string | null | undefined): this {
+  outerJoin(relation: Node | Table | string | null | undefined): this {
     return this.join(relation, OuterJoin);
   }
 
