@@ -12,7 +12,7 @@ let serialize: ((klass: typeof Base, attr: string, opts: { coder: unknown }) => 
 
 /**
  * @internal Called once by base.ts during module init.
- * @noRailsEquivalent PERMANENT Ruby names ActiveRecord::Base.serialize at call time (store.rb:112); a TS import would close a module cycle.
+ * @noRailsEquivalent PERMANENT Ruby names `serialize` at call time from the `store` macro body (store.rb:108); a TS import would close a module cycle.
  */
 export function registerSerializeFn(
   fn: (klass: typeof Base, attr: string, opts: { coder: unknown }) => void,

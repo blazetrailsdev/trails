@@ -462,7 +462,7 @@ export function autoloadModel(name: string): void {
  * because polymorphic reflections intentionally throw on `.klass` access.
  * Non-polymorphic errors (e.g. not-an-AR-subclass) propagate unchanged.
  * @internal
- * @noRailsEquivalent CONVERGEABLE AssociationReflection#klass (reflection.rb:507) with the polymorphic guard Ruby expresses by raising, hoisted to a helper.
+ * @noRailsEquivalent CONVERGEABLE MacroReflection#klass (reflection.rb:422) and the `name.constantize` its `_klass` falls through to (reflection.rb:434); the polymorphic arm is pre-checked here rather than rescued from AssociationReflection#compute_class's raise (reflection.rb:490).
  */
 export function resolveAssocClass(
   recordOrClass: Base | typeof Base,

@@ -726,7 +726,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *   end
    *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractMysqlAdapter#change_column_default_for_alter (abstract_mysql_adapter.rb:370) without the Ruby _for_alter arity split.
+   * @noRailsEquivalent CONVERGEABLE Rails leaves `change_column_default_for_alter` on SchemaStatements (abstract/schema_statements.rb:1843) and gives MySQL only `build_change_column_default_definition` (abstract_mysql_adapter.rb:373); the port overrides the whole method on the adapter instead.
    */
   async changeColumnDefaultForAlter(
     tableName: string,

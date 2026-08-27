@@ -220,7 +220,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE SchemaDumper#prepare_column_options (abstract/schema_dumper.rb:14), which MySQL overrides for its per-column options where the port overrides `table` instead.
+   * @noRailsEquivalent CONVERGEABLE SchemaDumper#prepare_column_options (abstract/schema_dumper.rb:25), which MySQL overrides for its per-column options where the port overrides `table` instead.
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);

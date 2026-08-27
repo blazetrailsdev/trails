@@ -220,7 +220,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `.target` is read through the same store. Returns the
    * in-memory target without triggering a DB load — JS has no blocking IO, so
    * a fresh load means awaiting the proxy / `loadTarget()` first.
-   * @noRailsEquivalent CONVERGEABLE a non-loading read of Rails' CollectionProxy#target (collection_proxy.rb:34); Ruby needs no non-loading variant because its load is synchronous.
+   * @noRailsEquivalent CONVERGEABLE a non-loading read of Rails' CollectionProxy#target (collection_proxy.rb:40); Ruby needs no non-loading variant because its load is synchronous.
    */
   readTargets(): T[] {
     return this._target;
