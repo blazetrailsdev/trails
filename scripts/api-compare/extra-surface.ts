@@ -85,6 +85,7 @@
  */
 
 import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
@@ -102,6 +103,7 @@ import { resolveModuleName } from "./compare.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
+import { libPathsManifest } from "../../vendor/sources.js";
 
 /**
  * Track the FQN alongside the entity so namespace-scoped include resolution
@@ -1193,6 +1195,101 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * only to `ConnectionAdapters::Quoting`, never to PG/MySQL siblings of the
  * same short name. Cross-package / stdlib mixins are silently skipped.
  */
+/**
+ * The two symbol-keyed members trails uses to port a Ruby Concern's hooks —
+ * `included do ... end` and `def self.extended(base)` — as
+ * `static [included](base)` / `static [extended](base)`, keyed by the symbols
+ * `packages/activesupport/src/include.ts` exports
+ * (`Symbol.for("@blazetrails/activesupport:included")` and its `extended`
+ * twin). CLAUDE.md § "Module mixins" ratifies the shape repo-wide.
+ *
+ * The extractor records a computed member by its source text
+ * (`getMemberName`), so the manifest name IS the bracketed spelling below —
+ * which is also how the symbol import resolves at every site in the repo,
+ * since the binding is imported under the activesupport name.
+ *
+ * The string-named `included` / `extended` / `inherited` methods are a
+ * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`
+ * marks them `tsMirrorIsDrift`, and a bracketed name never collides with a
+ * bare one.
+ */
+export const CONCERN_HOOK_MEMBERS = {
+  included: "[included]",
+  extended: "[extended]",
+} as const;
+
+/** `included do ... end` — activemodel/lib/active_model/api.rb:65. */
+const INCLUDED_BLOCK_RE = /^[ \t]*included do\b/m;
+/** `def self.included(base)` — the pre-Concern spelling of the same hook. */
+const SELF_INCLUDED_RE = /^[ \t]*def self\.included\b/m;
+/** `def self.extended(base)` — activemodel/lib/active_model/callbacks.rb:66. */
+const SELF_EXTENDED_RE = /^[ \t]*def self\.extended\b/m;
+
+/**
+ * Which hook members the given Ruby source earns, read off the `.rb` text
+ * rather than the manifest: the extractor flattens an `included do extend X end`
+ * into the module's `extends` and drops a block that only calls
+ * `class_attribute` (conversion.rb:27-33), so the manifest cannot tell a
+ * Concern with a hook from one without.
+ *
+ * The credit is conditional on the Ruby side actually declaring the block, so
+ * a hook written into a TS file whose counterpart has none stays novel and the
+ * rule cannot launder an invented hook.
+ */
+export function concernHookNames(rubySource: string): Set<string> {
+  const names = new Set<string>();
+  if (INCLUDED_BLOCK_RE.test(rubySource) || SELF_INCLUDED_RE.test(rubySource)) {
+    names.add(CONCERN_HOOK_MEMBERS.included);
+  }
+  if (SELF_EXTENDED_RE.test(rubySource)) names.add(CONCERN_HOOK_MEMBERS.extended);
+  return names;
+}
+
+/** Key into the `concernHooks` map: one entry per (package, Ruby file). */
+export function concernHookKey(pkg: string, rubyFile: string): string {
+  return `${pkg}\u0000${rubyFile}`;
+}
+
+/** Every `.rb` the manifest attributes surface to, in the package's entry. */
+function rubyFilesOf(pkg: ApiManifest["packages"][string]): Set<string> {
+  const files = new Set<string>();
+  for (const info of [...Object.values(pkg.classes), ...Object.values(pkg.modules)]) {
+    if (info.file) files.add(info.file);
+  }
+  for (const file of Object.keys(pkg.fileConstants ?? {})) files.add(file);
+  return files;
+}
+
+/**
+ * Read every mapped `.rb` and record the Concern hooks it declares, so
+ * `buildReport` can credit the TS port of each. Done once per run, off the
+ * vendored lib dirs `vendor/sources.ts` already resolves for the extractor; a
+ * file the manifest names but vendor no longer has is simply skipped.
+ */
+export async function loadConcernHooks(
+  ruby: ApiManifest,
+  filterPkg: string | null,
+): Promise<Map<string, Set<string>>> {
+  const libPaths = libPathsManifest();
+  const hooks = new Map<string, Set<string>>();
+  for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
+    if (filterPkg !== null && pkg !== filterPkg) continue;
+    const libDir = libPaths[pkg];
+    if (libDir === undefined) continue;
+    for (const rubyFile of rubyFilesOf(rubyPkg)) {
+      let source: string;
+      try {
+        source = await fsp.readFile(path.join(libDir, rubyFile), "utf-8");
+      } catch {
+        continue;
+      }
+      const names = concernHookNames(source);
+      if (names.size > 0) hooks.set(concernHookKey(pkg, rubyFile), names);
+    }
+  }
+  return hooks;
+}
+
 function collectAllowedNames(
   entities: RubyEntity[],
   pkg: string,
@@ -1525,6 +1622,7 @@ function buildPackageReport(
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
   fileTagRejections: FileTagRejection[],
+  concernHooks: Map<string, Set<string>>,
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
   const tsPkg = ts.packages[pkg];
@@ -1711,6 +1809,13 @@ function buildPackageReport(
         );
         if (sourceAllowed.has(fn.name)) allowed.add(fn.name);
       }
+    }
+
+    // The symbol-keyed Concern hook: Rails' `included do` / `self.extended`
+    // block is real Rails surface with no method name of its own, so the TS
+    // port of it is not extra — see `concernHookNames`.
+    if (rubyFile !== null) {
+      for (const hook of concernHooks.get(concernHookKey(pkg, rubyFile)) ?? []) allowed.add(hook);
     }
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized
@@ -2012,8 +2117,15 @@ export function buildReport(
     excludeGlobs: string[];
     novelOnly: boolean;
     topN: number;
+    /**
+     * Per-(package, Ruby file) Concern hooks from `loadConcernHooks`. Optional
+     * so a caller measuring a synthetic manifest need not stage `.rb` files on
+     * disk; absent, no hook is credited.
+     */
+    concernHooks?: Map<string, Set<string>>;
   },
 ): Report {
+  const concernHooks = opts.concernHooks ?? new Map<string, Set<string>>();
   const tagged = collectTaggedEntries(ts);
   const tagKeys = new Set(tagged.map(allowKeyOf));
   const matchedTagKeys = new Set<string>();
@@ -2041,6 +2153,7 @@ export function buildReport(
         tagKeys,
         matchedTagKeys,
         fileTagRejections,
+        concernHooks,
       ),
     );
   }
@@ -2222,6 +2335,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     excludeGlobs: args.excludeGlobs,
     novelOnly: args.novelOnly,
     topN: args.topN,
+    concernHooks: await loadConcernHooks(ruby, args.filterPkg),
   });
 
   if (args.json) {

@@ -34,7 +34,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
-import { buildReport } from "./extra-surface.js";
+import { buildReport, loadConcernHooks } from "./extra-surface.js";
 import {
   MARK_PATH,
   exceedances,
@@ -59,6 +59,7 @@ async function main(tighten: boolean): Promise<number> {
     excludeGlobs: [],
     novelOnly: false,
     topN: 0,
+    concernHooks: await loadConcernHooks(ruby, null),
   });
   const current = measure(report.packages);
 
