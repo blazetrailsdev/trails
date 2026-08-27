@@ -326,9 +326,8 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
  * attributes.rb:241-252).
  *
  * Rails never needs this: `columns_hash` is a DB read, so a model with no table
- * simply has no columns. trails supports table-less attribute-only models, whose
- * `columnsHash` is synthesized from what they declared. It cannot go through
- * `_defaultAttributes()`, which re-enters `columnsHash()` on an unreflected class.
+ * simply has no columns. It cannot go through `_defaultAttributes()`, which
+ * re-enters `columnsHash()` on an unreflected class.
  */
 function declaredAttributes(host: SchemaHost): AttributeSet {
   const attributeSet = new AttributeSet(new Map<string, Attribute>());
@@ -1037,17 +1036,13 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
     return;
   }
 
-  // Cache-miss path. Rails' `schema_cache.columns_hash` blocks, so
-  // `load_schema!` always lands on DB-sourced columns (model_schema.rb:592-594);
-  // trails' cache read is async, so a cold model can reach here with nothing to
-  // reflect. Set `@columns_hash` to the empty hash a table with no reflected
-  // columns has — Rails' `load_schema!` always assigns it, and `load_schema`'s
-  // `return if @columns_hash` (model_schema.rb:534-546) is what stops a
-  // `columns_hash` read from inside the load re-entering it. Do NOT stamp
-  // `_schemaLoaded`: the DB read has not happened, so a later `loadSchema` must
-  // still be able to run it. Synthesizing columns from declared attributes here
-  // — which trails used to do — is what made a declared attribute
-  // indistinguishable from a real column.
+  // trails' `schema_cache.columns_hash` is async where Rails' blocks, so this
+  // path exists at all: a cold cache leaves nothing to reflect.
+  // `@columns_hash` is still assigned, as `load_schema!` always assigns it
+  // (model_schema.rb:592-594) and `load_schema`'s `return if @columns_hash`
+  // (:534-546) is the re-entrancy guard a `columns_hash` read from inside the
+  // load depends on. `_schemaLoaded` is deliberately not stamped: the DB read
+  // has not happened, so a later `loadSchema` must still run it.
   this._columnsHash = {};
 }
 
@@ -1260,11 +1255,10 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
 /**
  * Sync counterpart: consult the already-populated schema cache only.
  * Returns true if reflection happened; false when the cache is empty
- * (caller may fall back to attribute-defs-derived metadata).
  */
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   // No `abstract_class?` term: `load_schema!` guards on the table name alone
-  // (model_schema.rb:587-590), so an abstract class that inherits a concrete
+  // (model_schema.rb:587-590), so an abstract class inheriting a concrete
   // superclass's table reflects that table's columns.
   // Access can throw when no pool is configured; treat as "no adapter".
   let adapter: SchemaHost["connection"] | undefined;
