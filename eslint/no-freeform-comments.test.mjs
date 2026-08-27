@@ -222,3 +222,18 @@ tester.run("no-freeform-comments (a directive does not rescue its neighbours)", 
     },
   ],
 });
+
+// `@deprecated` is required by `blazetrails/rails-deprecated-jsdoc` wherever
+// Rails deprecates the member. Stripping it set the two rules fighting — one
+// deleting the tag, the other re-adding it — which ESLint reports as a
+// circular fix and which leaves the file in whichever state the last pass won.
+tester.run("no-freeform-comments (@deprecated survives)", rule, {
+  valid: [{ code: `/** @deprecated */\nexport function unsignedFloat() {}\n` }],
+  invalid: [
+    {
+      code: `/** Deprecated in Rails 5.1. @deprecated use float instead. */\nexport function unsignedFloat() {}\n`,
+      errors: prose,
+      output: `/** @deprecated */\nexport function unsignedFloat() {}\n`,
+    },
+  ],
+});

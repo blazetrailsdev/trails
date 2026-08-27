@@ -61,6 +61,11 @@ const DIRECTIVE_RE =
  * `@missingRailsArgs`, and `@internal` decides whether a member is measured at
  * all — so the tag AND the reason argument it requires are machine input.
  *
+ * `@deprecated` is required by `blazetrails/rails-deprecated-jsdoc` wherever
+ * Rails deprecates the member, and TypeDoc reflects it in the published API.
+ * Stripping it made the two rules fight — one deleting the tag, the other
+ * re-adding it — which is what ESLint reports as a circular fix.
+ *
  * `@empty` marks an intentionally-empty block. ESLint's `no-empty` ignores a
  * block that contains a comment, which is how an empty branch used to be
  * legal — the English sentence in it was load-bearing. `@empty` is that
@@ -70,7 +75,8 @@ const DIRECTIVE_RE =
  * `@param` / `@returns` / `@example` are deliberately absent: nothing reads
  * them and they are English by construction.
  */
-const KEPT_TAG_RE = /@(internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty)\b/u;
+const KEPT_TAG_RE =
+  /@(internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty|deprecated)\b/u;
 
 /**
  * The permanence token `parity:api:extra` and `lint-missing-rails-call-reasons`
