@@ -7,7 +7,7 @@ import { Table, DeleteManager } from "./index.js";
 describe("DeleteManagerTest (trails)", () => {
   const users = new Table("users");
 
-  it("handles limit properly", () => {
+  it("renders WHERE, ORDER BY and LIMIT together", () => {
     const mgr = new DeleteManager();
     mgr.from(users);
     mgr.where(users.get("active").eq(false));

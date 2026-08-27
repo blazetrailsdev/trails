@@ -5,7 +5,7 @@ import { Table, star, Nodes, Visitors } from "../index.js";
 describe("SQLite visitor boolean casting", () => {
   const users = new Table("users");
 
-  it("does not support boolean", () => {
+  it("casts a Casted boolean to 1", () => {
     const visitor = new Visitors.SQLite(testConnection);
     // `eq` wraps the raw `true` via quotedNode into a Casted node, which is
     // how a boolean reaches the visitor; a raw `true` placed straight into

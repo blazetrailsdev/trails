@@ -577,13 +577,17 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Two instances exist and are the only ones:
+where Ruby resolves the constant. Three instances exist and are the only ones:
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
   `key-generator.ts`.
 - `activerecord/src/associations/collection-proxy-slot.ts` — the
   `CollectionProxy` ctor, read by `associations.ts`.
+- `arel/src/node-slots.ts` — the `Not` / `Grouping` / `Or` / `And` / `Equality`
+  / `In` / `Attribute` / `Dot` / `Table` ctors and `buildQuoted`, read by
+  `nodes/node.ts`, `nodes/node-expression.ts`, `nodes/binary.ts`,
+  `nodes/casted.ts`, `arel.ts`, `tree-manager.ts`.
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do
