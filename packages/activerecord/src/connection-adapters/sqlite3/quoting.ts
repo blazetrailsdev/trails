@@ -24,7 +24,7 @@ import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS, TimeWithZone } from "@blazetrails/activesupport";
+import { toS } from "@blazetrails/activesupport";
 
 export function quotedTrue(): string {
   return "1";
@@ -77,22 +77,6 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
   return quoteColumnName(attr);
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE
- */
-export function quotedDate(
-  value:
-    | TimeWithZone
-    | Temporal.Instant
-    | Temporal.ZonedDateTime
-    | Temporal.PlainDateTime
-    | Temporal.PlainDate
-    | Temporal.PlainTime,
-): string {
-  return abstractQuotedDate(value);
-}
-
 export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
     value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
@@ -111,7 +95,7 @@ export function quotedTime(value: QuotedTimeValue): string {
           value.nanosecond,
         )
       : value.with({ year: 2000, month: 1, day: 1 });
-  return quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
+  return abstractQuotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
 export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {

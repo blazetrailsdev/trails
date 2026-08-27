@@ -41,7 +41,6 @@ import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
   quoteString as mysqlQuoteString,
-  quotedDate as mysqlQuotedDate,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
   quotedBinary as mysqlQuotedBinary,
@@ -197,10 +196,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   tableAliasLength(): number {
     return mysqlTableAliasLength();
-  }
-
-  quotedDate(value: Parameters<typeof mysqlQuotedDate>[0]): string {
-    return mysqlQuotedDate(value);
   }
 
   override typeCast(value: unknown): unknown {

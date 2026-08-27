@@ -194,7 +194,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
    * untouched (value.rb:117-119), while OID::Range and OID::Array rebuild
    * their value from the mapped elements (oid/range.rb:50-54, oid/array.rb:67-69).
    */
-  override map(value: unknown, block?: (value: unknown) => unknown): unknown {
+  override map(value: unknown, block: (value: unknown) => unknown): unknown {
     return (this._subtype as ValueTypeInstance).map(value as never, block);
   }
 

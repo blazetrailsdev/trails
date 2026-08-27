@@ -6,6 +6,7 @@ import {
   DateNegativeInfinity,
 } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
+import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, PgTextEncoderArray } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
@@ -324,6 +325,15 @@ describe("PostgreSQL quoting", () => {
     const instant = Temporal.Instant.from("-000043-03-15T12:34:56Z");
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
     expect(quotedDate(instant)).toBe("0044-03-15 12:34:56 BC");
+  });
+
+  it("quoted_date reads the BC year off a TimeWithZone's own zone", () => {
+    const twz = new TimeWithZone(
+      Temporal.Instant.from("0000-12-31T23:30:00Z"),
+      TimeZone.find("Tokyo")!,
+    );
+    expect(twz.year).toBe(1);
+    expect(quotedDate(twz)).toBe("0000-12-31 23:30:00");
   });
 
   it("quoted_date suffixes BC for a PlainDateTime with proleptic year <= 0", () => {

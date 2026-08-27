@@ -85,7 +85,6 @@ import {
   quotedFalse as sqliteQuotedFalse,
   unquotedFalse as sqliteUnquotedFalse,
   quotedBinary as sqliteQuotedBinary,
-  quotedDate as sqliteQuotedDate,
   quotedTime as sqliteQuotedTime,
 } from "./sqlite3/quoting.js";
 import { isSqlLiteral, type QuotingDispatchHost } from "./abstract/quoting.js";
@@ -625,10 +624,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override quote(value: unknown): string {
     return sqliteQuote.call(this, value);
-  }
-
-  quotedDate(value: Parameters<typeof sqliteQuotedDate>[0]): string {
-    return sqliteQuotedDate(value);
   }
 
   quotedTime(value: Parameters<typeof sqliteQuotedTime>[0]): string {

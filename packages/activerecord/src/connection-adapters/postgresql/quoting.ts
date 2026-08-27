@@ -3,23 +3,20 @@ import { ActiveRecord } from "../../ar-config.js";
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  type TemporalDateLike,
   toBytes,
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/date";
-import {
-  formatInstantForSqlPostgres,
-  formatPlainDateTimeForSqlPostgres,
-  formatPlainDateForSqlPostgres,
-} from "../abstract/sql-datetime.js";
+import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
 import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { toS, TimeWithZone } from "@blazetrails/activesupport";
+import { toS } from "@blazetrails/activesupport";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(value: bigint | number) {
@@ -274,22 +271,18 @@ export function checkIntegerRange(value: bigint | number): void {
   }
 }
 
-export function quotedDate(
-  value:
-    | TimeWithZone
-    | Temporal.Instant
-    | Temporal.ZonedDateTime
-    | Temporal.PlainDateTime
-    | Temporal.PlainDate
-    | Temporal.PlainTime,
-): string {
-  if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
-  if (value instanceof Temporal.Instant) return formatInstantForSqlPostgres(value);
-  if (value instanceof Temporal.ZonedDateTime)
-    return formatInstantForSqlPostgres(value.toInstant());
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSqlPostgres(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSqlPostgres(value);
+export function quotedDate(value: TemporalDateLike): string {
+  if (yearOf(value) <= 0) {
+    const bceYear = String(-yearOf(value) + 1).padStart(4, "0");
+    return `${abstractQuotedDate(value).replace(/^-?\d+/, bceYear)} BC`;
+  }
   return abstractQuotedDate(value);
+}
+
+function yearOf(value: TemporalDateLike): number {
+  if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(defaultSqlTimezone()).year;
+  if (value instanceof Temporal.PlainTime) return 2000;
+  return value.year;
 }
 
 /** @internal */

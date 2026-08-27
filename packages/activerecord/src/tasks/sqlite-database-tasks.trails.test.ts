@@ -206,14 +206,13 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
 
 // trails-only: an in-memory database has no file for a child `sqlite3` to
 // attach, so structureDump materialises it with `VACUUM INTO` before shelling
-// out and structureLoad takes the named non-CLI fallback
-// (`inMemoryStructureLoad`). Rails has no in-memory lane and so no counterpart
-// test.
+// out. Rails has no in-memory lane and so no counterpart test.
 //
-// Both tests seed through `structureLoad` rather than a second connection:
-// better-sqlite3 takes a plain filename, not a SQLite URI, so a `:memory:`
-// database cannot be shared with a second adapter.
-describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
+// The schema is laid through the live connection rather than through
+// `structureLoad`: since the RFC 0051 in-memory lane decision, `structureLoad`
+// is Rails' three-liner (`sqlite_database_tasks.rb:60-63`), whose child process
+// applies the script to its OWN throwaway in-memory database.
+describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   const created: string[] = [];
   const configuration = new HashConfig("development", "primary", {
     adapter: "sqlite3",
@@ -226,9 +225,8 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
   // It drains the pool on the way out (`disconnectPoolFromPoolManager`).
   let previous: ReturnType<typeof Base.removeConnection>;
 
-  async function freshDatabase(): Promise<void> {
-    Base.removeConnection();
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
+  async function lay(...statements: string[]): Promise<void> {
+    for (const statement of statements) await Base.adapter.executeMutation(statement);
   }
 
   beforeEach(async () => {
@@ -258,18 +256,15 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
   };
 
   it("honors ignoreTables", async () => {
-    const tasks = new SQLiteDatabaseTasks(configuration);
-    await tasks.structureLoad(
-      sqlFile(
-        "CREATE TABLE bar(id INTEGER);\n" +
-          "CREATE TABLE prefix_foo(id INTEGER);\n" +
-          "CREATE TABLE prefix_bar(id INTEGER);\n",
-      ),
+    await lay(
+      "CREATE TABLE bar(id INTEGER)",
+      "CREATE TABLE prefix_foo(id INTEGER)",
+      "CREATE TABLE prefix_bar(id INTEGER)",
     );
     SchemaDumper.ignoreTables = [/^prefix_/g];
 
     const filename = sqlFile();
-    await tasks.structureDump(filename);
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
 
     const contents = fs.readFileSync(filename, "utf8");
     expect(contents).toMatch(/CREATE TABLE bar/);
@@ -277,35 +272,38 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
     expect(contents).not.toMatch(/prefix_bar/);
   });
 
-  it("round-trips a trigger body through structureLoad", async () => {
-    const tasks = new SQLiteDatabaseTasks(configuration);
-    await tasks.structureLoad(
-      sqlFile(
-        "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\n" +
-          "CREATE INDEX index_widgets_on_name ON widgets(name);\n" +
-          "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
-          "BEGIN " +
-          "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
-          "END;\n",
-      ),
+  it("dumps a trigger body whole", async () => {
+    await lay(
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT)",
+      "CREATE INDEX index_widgets_on_name ON widgets(name)",
+      "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
+        "BEGIN " +
+        "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
+        "END",
     );
 
     const dumped = sqlFile();
-    await tasks.structureDump(dumped);
-    expect(fs.readFileSync(dumped, "utf8")).toMatch(/CREATE TRIGGER touch_widgets/);
+    await new SQLiteDatabaseTasks(configuration).structureDump(dumped);
 
-    // A second in-memory database is a different, empty database. Loading the
-    // dump into it and dumping again proves the trigger body survived whole —
-    // splitting the script on semicolons would have cut it at the first one.
-    await freshDatabase();
-    await tasks.structureLoad(dumped);
-
-    const reloaded = sqlFile();
-    await tasks.structureDump(reloaded);
-    const contents = fs.readFileSync(reloaded, "utf8");
+    const contents = fs.readFileSync(dumped, "utf8");
     expect(contents).toMatch(/CREATE TRIGGER touch_widgets/);
     expect(contents).toMatch(/UPDATE widgets SET updated_at/);
     expect(contents).toMatch(/index_widgets_on_name/);
+  });
+
+  // RFC 0051 `sqlite-structure-load-in-memory-lane-decision`: the `:memory:`
+  // lane gets Rails' behaviour rather than a trails-only adapter path. The
+  // child `sqlite3 :memory: < dump.sql` applies the script to a database of
+  // its own and exits, so the connection that owns this one never sees it.
+  it("leaves the live in-memory connection untouched, as Rails' child process does", async () => {
+    await new SQLiteDatabaseTasks(configuration).structureLoad(
+      sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
+    );
+
+    const tables = (await Base.adapter.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'",
+    )) as Array<{ name: string }>;
+    expect(tables).toHaveLength(0);
   });
 
   it("dumps an in-memory database byte-for-byte as it dumps a file-backed one", async () => {
@@ -313,10 +311,12 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT);\n" +
       "CREATE INDEX index_widgets_on_name ON widgets(name);\n";
 
-    const tasks = new SQLiteDatabaseTasks(configuration);
-    await tasks.structureLoad(sqlFile(schema));
+    await lay(
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)",
+      "CREATE INDEX index_widgets_on_name ON widgets(name)",
+    );
     const fromMemory = sqlFile();
-    await tasks.structureDump(fromMemory);
+    await new SQLiteDatabaseTasks(configuration).structureDump(fromMemory);
 
     const dbFile = tmpDbPath();
     created.push(dbFile);

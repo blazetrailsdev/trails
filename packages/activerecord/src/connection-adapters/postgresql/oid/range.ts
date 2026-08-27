@@ -89,8 +89,7 @@ export class RangeType extends ValueType<Range> {
     return new Range(from, to, value.excludeEnd);
   }
 
-  override map(value: Range | null, block?: (value: unknown) => unknown): Range | null {
-    if (value == null || !block) return value;
+  override map(value: Range, block: (value: unknown) => unknown): Range {
     const newBegin = block(value.begin);
     const newEnd = block(value.end);
     return new Range(newBegin, newEnd, value.excludeEnd);

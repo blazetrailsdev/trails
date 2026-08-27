@@ -185,10 +185,21 @@ export class SQLiteDatabaseTasks {
     }
   }
 
+  /**
+   * RFC 0051 decision (`sqlite-structure-load-in-memory-lane-decision`): the
+   * `:memory:` lane gets Rails' behaviour, not an adapter path of its own.
+   *
+   * `structureDump` can materialise an in-memory database with `VACUUM INTO`,
+   * but SQLite has no inverse — nothing pulls a file's schema back into a live
+   * in-memory connection — so the only mechanism that could load a script into
+   * the connection that owns the database is an adapter `exec`, which Rails has
+   * no counterpart for. Rather than keep a trails-only adapter path here, the
+   * child process runs exactly as it does in Rails: it opens its own throwaway
+   * in-memory database, applies the script to that, and exits. `db schema:load
+   * --format=sql` is therefore not a meaningful operation against a `:memory:`
+   * config, in trails as in Rails.
+   */
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    if (isInMemoryDatabase(this.dbConfig.database as string))
-      return this.inMemoryStructureLoad(filename);
-
     const flags = extraFlags != null ? (Array.isArray(extraFlags) ? extraFlags : [extraFlags]) : [];
     // Rails' backtick form redirects the dump file into sqlite3's stdin
     // (`sqlite3 #{flags} #{database} < "#{filename}"`) and does NOT check the
@@ -198,21 +209,6 @@ export class SQLiteDatabaseTasks {
     const childProcess = await getChildProcessAsync();
     const args = [...flags, this.dbConfig.database as string];
     childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
-  }
-
-  /**
-   * The in-memory counterpart to `structureLoad`'s CLI path.
-   *
-   * `exec` runs the whole script in one shot, so a dump carrying a trigger body
-   * (`CREATE TRIGGER ... BEGIN ...; ...; END`) survives, where splitting on
-   * semicolons would cut it in half. `register` matches `/sqlite/`, and every
-   * SQLite-family adapter extends `SQLite3Adapter`, which defines `exec`
-   * (`sqlite3-adapter.ts:1166`) — hence the cast rather than a feature-detect.
-   */
-  private async inMemoryStructureLoad(filename: string): Promise<void> {
-    const sql = getFs().readFileSync(filename, "utf8");
-    const adapter = await this.connection();
-    await (adapter as unknown as { exec(sql: string): Promise<void> }).exec(sql);
   }
 
   /**
