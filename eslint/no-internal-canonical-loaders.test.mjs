@@ -81,8 +81,6 @@ tester.run("no-internal-canonical-loaders", rule, {
       code: 'import { loadSchema } from "./support/load-schema-helper.js";',
       errors: [{ messageId: "banned", data: { name: "loadSchema" } }],
     },
-    // The arunit2 half of the canonical schema is a second entry point into the
-    // same registry, banned for the same reason.
     {
       filename: FILENAME,
       code: 'import { loadCanonicalArunit2Schema } from "./support/canonical-schema.js";',
@@ -270,10 +268,6 @@ describe("no-internal-canonical-loaders module matcher", () => {
     }
   });
 
-  // BANNED is hand-listed because the rule cannot read the filesystem, which is
-  // how `loadCanonicalArunit2Schema` shipped unbanned. Derive the expectation
-  // here instead: a loader module gaining another canonical entry point fails
-  // until it is banned.
   it("bans every canonical entry point the loader modules export", async () => {
     const { loaderExports } = await scan;
     const unbanned = [];
