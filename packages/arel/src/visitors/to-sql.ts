@@ -180,7 +180,7 @@ export class ToSql extends Visitor {
       collector.append("(");
       for (let j = 0; j < o.rows[i].length; j++) {
         if (j > 0) collector.append(", ");
-        // to_sql.rb:106-114
+        // to_sql.rb:106-114, to_sql.rb:631, to_sql.rb:867-870, quoting.rb:86, insert_manager_test.rb:10
         const value = o.rows[i][j];
         if (
           value instanceof Nodes.SqlLiteral ||
@@ -250,7 +250,7 @@ export class ToSql extends Visitor {
 
   // Mirrors: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170).
   protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints, collector: SQLString): SQLString {
-    // to_sql.rb:170-172, select_manager.rb:147-149
+    // to_sql.rb:170-172, to_sql.rb:171, select_manager.rb:147-149
     const hints = o.expr.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
     collector.append(`/*+ ${hints} */`);
     return collector;
@@ -1487,7 +1487,8 @@ export class ToSql extends Visitor {
 
   /**
    * Mirrors: `to_sql.rb#unboundable?` (to_sql.rb:905-907), bind_param.rb:39-40,
-   * query_attribute.rb:46-51.
+   * query_attribute.rb:46-51, predications.rb:256-258, casted.rb:43-45,
+   * casted.rb:5-35.
    */
   protected unboundableSign(value: unknown): 1 | -1 | 0 {
     const v = value as { isUnboundable?: () => unknown } | null | undefined;
