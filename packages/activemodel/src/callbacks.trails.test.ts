@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import {
   Callbacks as ASCallbacks,
@@ -5,10 +9,12 @@ import {
   runCallbacks,
   throwAbort,
   withOptions,
+  include,
 } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Callbacks, type CallbackConditions, defineModelCallbacks } from "./callbacks.js";
 import { NoMethodError } from "./attribute-assignment.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("defineModelCallbacks", () => {
   it("raises NoMethodError for an only: entry with no generator", () => {
@@ -77,6 +83,8 @@ function generated(klass: typeof Model): GeneratedModelCallbacks {
 describe("define_model_callbacks only: and callback objects", () => {
   it("define_model_callbacks with only option limits timing types", () => {
     class Job extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.defineModelCallbacks("process", { only: ["before", "after"] });
       }
@@ -105,11 +113,16 @@ describe("define_model_callbacks only: and callback objects", () => {
       },
     };
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(auditor);
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(log).toContain("auditing Alice");
@@ -123,11 +136,16 @@ describe("define_model_callbacks only: and callback objects", () => {
       },
     };
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(auditor);
       }
     }
+    interface Person extends Attributes {}
+
     await new Person({ name: "test" }).isValid();
     expect(log).toContain("camelCase called");
   });
@@ -142,12 +160,17 @@ describe("define_model_callbacks only: and callback objects", () => {
       },
     };
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
         generated(this).aroundSave(wrapper);
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     await p.runCallbacks("save", () => {
       log.push("save");
@@ -163,12 +186,17 @@ describe("define_model_callbacks only: and callback objects", () => {
       },
     };
     class Job extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.defineModelCallbacks("process");
         (this as any).beforeProcess(observer);
       }
     }
+    interface Job extends Attributes {}
+
     const j = new Job({ name: "import" });
     await j.runCallbacks("process", () => {
       log.push("executed");
@@ -288,6 +316,8 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   it("setCallback on subclass does not leak up to parent (copy-on-first-write)", async () => {
     const log: string[] = [];
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.defineModelCallbacks("save");
       }
@@ -377,11 +407,16 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   it("skipCallback with if: skips the callback conditionally at run time", async () => {
     const log: string[] = [];
     class Writer extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("age", "integer");
         this.defineModelCallbacks("save");
       }
     }
+    interface Writer extends Attributes {}
+
     const savingMessage = (): void => {
       log.push("saving...");
     };
@@ -492,7 +527,10 @@ describe("unified sync/async runner", () => {
   it("async validator function registered via Model.validate runs and awaits", async () => {
     const seen: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validate(async (r: any) => {
           await Promise.resolve();
@@ -501,6 +539,8 @@ describe("unified sync/async runner", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     const result = p.isValid();
     expect(result).toBeInstanceOf(Promise);
@@ -511,7 +551,10 @@ describe("unified sync/async runner", () => {
 
   it("async validator method registered via Model.validate runs and awaits", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validate("checkRemote");
       }
@@ -520,6 +563,8 @@ describe("unified sync/async runner", () => {
         this.errors.add("name", "failed remote check");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     expect(await p.isValid()).toBe(false);
     expect(p.errors.messagesFor("name")).toEqual(["failed remote check"]);
@@ -533,11 +578,16 @@ describe("unified sync/async runner", () => {
       }
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(AsyncValidator);
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     expect(await p.isValid()).toBe(false);
     expect(p.errors.messagesFor("name")).toEqual(["async validatesWith"]);
@@ -546,7 +596,10 @@ describe("unified sync/async runner", () => {
   it("an async before_validation callback that halts is awaited", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(async () => {
           await Promise.resolve();
@@ -558,6 +611,8 @@ describe("unified sync/async runner", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     const result = p.isValid();
     expect(result).toBeInstanceOf(Promise);
@@ -587,7 +642,10 @@ describe("Callbacks", () => {
   it("before/after callbacks run in order", async () => {
     const order: string[] = [];
     class Ordered extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
         generated(this).beforeSave(() => {
@@ -598,6 +656,8 @@ describe("Callbacks", () => {
         });
       }
     }
+    interface Ordered extends Attributes {}
+
     const o = new Ordered();
     await o.runCallbacks("save", () => {
       order.push("action");
@@ -608,7 +668,10 @@ describe("Callbacks", () => {
   it("around callbacks wrap the action", async () => {
     const order: string[] = [];
     class Around extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
         generated(this).aroundSave(async (_record, proceed) => {
@@ -618,6 +681,8 @@ describe("Callbacks", () => {
         });
       }
     }
+    interface Around extends Attributes {}
+
     const a = new Around();
     await a.runCallbacks("save", () => {
       order.push("action");
@@ -628,7 +693,10 @@ describe("Callbacks", () => {
   it("further callbacks should not be called if before validation throws abort", () => {
     const order: string[] = [];
     class Halting extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
         generated(this).beforeSave(() => {
@@ -640,6 +708,8 @@ describe("Callbacks", () => {
         });
       }
     }
+    interface Halting extends Attributes {}
+
     const h = new Halting();
     const result = h.runCallbacks("save", () => {
       order.push("action");
@@ -652,12 +722,17 @@ describe("Callbacks", () => {
 
   it("before_validation halting prevents validations from running", async () => {
     class NoValidate extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
         this.beforeValidation(() => throwAbort());
       }
     }
+    interface NoValidate extends Attributes {}
+
     const n = new NoValidate();
     expect(await n.isValid()).toBe(false);
     expect(n.errors.count).toBe(0);
@@ -692,7 +767,10 @@ describe("Callbacks (extended)", () => {
   it("afterValidation runs after validation", async () => {
     const order: string[] = [];
     class Validated extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
         this.afterValidation(() => {
@@ -700,6 +778,8 @@ describe("Callbacks (extended)", () => {
         });
       }
     }
+    interface Validated extends Attributes {}
+
     const v = new Validated({ name: "dean" });
     await v.isValid();
     expect(order).toContain("after_validation");
@@ -708,7 +788,10 @@ describe("Callbacks (extended)", () => {
   it("afterValidation runs even when invalid", async () => {
     const order: string[] = [];
     class Validated extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
         this.afterValidation(() => {
@@ -716,6 +799,8 @@ describe("Callbacks (extended)", () => {
         });
       }
     }
+    interface Validated extends Attributes {}
+
     const v = new Validated();
     await v.isValid();
     expect(order).toContain("after_validation");
@@ -724,7 +809,10 @@ describe("Callbacks (extended)", () => {
   it("callback inheritance — child inherits parent callbacks", async () => {
     const order: string[] = [];
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
         generated(this).beforeSave(() => {
@@ -732,6 +820,8 @@ describe("Callbacks (extended)", () => {
         });
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
       static {
         generated(this).beforeSave(() => {
@@ -752,7 +842,10 @@ describe("Callbacks (extended)", () => {
     const parentOrder: string[] = [];
     const childOrder: string[] = [];
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
         generated(this).beforeSave(() => {
@@ -761,6 +854,8 @@ describe("Callbacks (extended)", () => {
         });
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
       static {
         generated(this).beforeSave(() => {
@@ -776,7 +871,10 @@ describe("Callbacks (extended)", () => {
 
   it("custom validate with method name string", async () => {
     class WithMethod extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("value", "integer");
         this.validate("validateCustom");
       }
@@ -786,6 +884,8 @@ describe("Callbacks (extended)", () => {
         }
       }
     }
+    interface WithMethod extends Attributes {}
+
     expect(await new WithMethod({ value: 1 }).isValid()).toBe(true);
     const w = new WithMethod({ value: 0 });
     expect(await w.isValid()).toBe(false);
@@ -796,11 +896,15 @@ describe("Callbacks (extended)", () => {
 describe("defineModelCallbacks()", () => {
   it("creates before/after/around methods for custom events", async () => {
     class Payment extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("amount", "integer");
         this.defineModelCallbacks("process", "refund");
       }
     }
+    interface Payment extends Attributes {}
 
     const log: string[] = [];
     (Payment as any).beforeProcess((_record: any) => {
@@ -817,11 +921,15 @@ describe("defineModelCallbacks()", () => {
 
   it("creates around callback", () => {
     class Payment extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("amount", "integer");
         this.defineModelCallbacks("charge");
       }
     }
+    interface Payment extends Attributes {}
 
     expect(typeof (Payment as any).aroundCharge).toBe("function");
   });
@@ -830,11 +938,16 @@ describe("defineModelCallbacks()", () => {
 describe("callbacks with prepend option", () => {
   it("prepend: true puts callback first in the chain", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.defineModelCallbacks("save");
         this.attribute("name", "string");
       }
     }
+    interface User extends Attributes {}
+
     const order: string[] = [];
     generated(User).beforeSave(() => {
       order.push("first");
@@ -855,12 +968,16 @@ describe("callbacks with prepend option", () => {
 describe("withOptions()", () => {
   it("applies common validation options to all validates calls", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("email", "string");
         this.attribute("active", "boolean", { default: true });
       }
     }
+    interface User extends Attributes {}
 
     withOptions(User, { on: "create" }, (m) => {
       m.validates("name", { presence: true });

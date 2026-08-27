@@ -24,7 +24,8 @@ import {
   Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
-import { Model as ActiveModel } from "@blazetrails/activemodel";
+import { AttributeRegistration, Model as ActiveModel } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import { itIfSupports } from "../support/supports.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
@@ -989,7 +990,14 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   });
 
   function makeMockModel(columns: string[]) {
-    class MockModel extends ActiveModel {}
+    class MockModel extends ActiveModel {
+      static {
+        // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
+        // (activerecord/attributes.rb:8), which is where `decorate_attributes`
+        // comes from; `ActiveModel::Model` does not carry it (model.rb:42-45).
+        include(this, AttributeRegistration);
+      }
+    }
     return Object.assign(MockModel, {
       columnNames: () => columns,
     }) as any;

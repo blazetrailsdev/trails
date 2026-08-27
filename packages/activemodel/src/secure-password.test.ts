@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import bcrypt from "bcryptjs";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 let savedMinCost: boolean;
 
@@ -22,13 +23,16 @@ afterEach(() => {
 
 function createUserClass(opts: { validations?: boolean } = {}) {
   class User extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       include(this, Dirty);
       this.attribute("name", "string");
       this.attribute("password_digest", "string");
     }
   }
-  interface User extends Dirty {}
+  interface User extends Attributes, Dirty {}
   hasSecurePassword(User, "password", opts);
   return User;
 }
@@ -278,13 +282,16 @@ describe("SecurePasswordTest", () => {
 
   it("override secure password attribute", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
         this.attribute("token_digest", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     hasSecurePassword(User, "token");
     const u = new User({ name: "test" });
     (u as any).token = "mytoken";

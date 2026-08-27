@@ -1,5 +1,4 @@
 import type { Base } from "./base.js";
-import { Model } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 import { include } from "@blazetrails/activesupport";
@@ -123,7 +122,7 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
   // and raises `MissingAttributeError` for an unknown name — including
   // `id = …` on a key-less table (`PrimaryKey#id=` →
   // `_writeAttribute(@primary_key=null, value)`).
-  Model.prototype._writeAttribute.call(this, name, value);
+  this._attributes.writeFromUser(name, value);
 }
 
 /**

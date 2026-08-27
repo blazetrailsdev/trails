@@ -1,7 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model, Types, ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
 import type { Type } from "./type.js";
+import { AttributeRegistration } from "./attribute-registration.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 class MyType extends ValueType<unknown> {
   readonly name: string = "MyType";
@@ -26,8 +33,9 @@ class MyDecorator extends ValueType<unknown> {
 }
 
 describe("AttributeRegistrationTest", () => {
-  function classWith(baseClass: typeof Model | null, block: (klass: any) => void): any {
-    const klass = class extends (baseClass ?? Model) {};
+  function classWith(baseClass: any, block: (klass: any) => void): any {
+    const klass = baseClass ? class extends baseClass {} : class {};
+    include(klass, AttributeRegistration);
     block(klass);
     return klass;
   }
@@ -38,49 +46,78 @@ describe("AttributeRegistrationTest", () => {
 
   it("attributes can be registered", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
       }
     }
+    interface MyModel extends Attributes {}
+
     expect(MyModel.attributeNames()).toContain("title");
   });
 
   it("type options are forwarded when type is specified by name", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("count", "integer");
       }
     }
+    interface MyModel extends Attributes {}
+
     const m = new MyModel({ count: "5" });
     expect(m._readAttribute("count")).toBe(5);
   });
 
   it("default value can be specified", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("status", "string", { default: "pending" });
       }
     }
+    interface MyModel extends Attributes {}
+
     const m = new MyModel({});
     expect(m._readAttribute("status")).toBe("pending");
   });
 
   it("default value can be nil", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string", { default: null });
       }
     }
+    interface MyModel extends Attributes {}
+
     const m = new MyModel({});
     expect(m._readAttribute("name")).toBeNull();
   });
 
   it(".type_for_attribute returns the default type when an unregistered attribute is specified", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Attributes {}
+
     const fallback = MyModel.typeForAttribute("unknown");
     expect(fallback).toBeInstanceOf(ValueType);
     expect(fallback.cast("anything")).toBe("anything");
@@ -88,10 +125,16 @@ describe("AttributeRegistrationTest", () => {
 
   it("attributeTypes returns a fallback ValueType for unknown keys", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Attributes {}
+
     const types = MyModel.attributeTypes();
     expect(types["unknown"]).toBeInstanceOf(ValueType);
     expect(types["unknown"].cast("hello")).toBe("hello");
@@ -99,10 +142,16 @@ describe("AttributeRegistrationTest", () => {
 
   it("attributeTypes returns the registered type, not the fallback, for known keys", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+
       static {
+        include(this, Attributes);
         this.attribute("count", "integer");
       }
     }
+    interface MyModel extends Attributes {}
+
     const types = MyModel.attributeTypes();
     expect(types["count"].name).toBe("integer");
     expect(types["count"].cast("5")).toBe(5);
@@ -110,21 +159,36 @@ describe("AttributeRegistrationTest", () => {
 
   it("new attributes can be registered at any time", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Attributes {}
+
     MyModel.attribute("age", "integer");
     expect(MyModel.attributeNames()).toContain("age");
   });
 
   it("attributes are inherited", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
         this.attribute("age", "integer");
       }
@@ -135,11 +199,19 @@ describe("AttributeRegistrationTest", () => {
 
   it("subclass attributes do not affect superclass", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.attribute("age", "integer");
       }
@@ -149,11 +221,19 @@ describe("AttributeRegistrationTest", () => {
 
   it("new superclass attributes are inherited even after subclass attributes are registered", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
         this.attribute("age", "integer");
       }
@@ -163,11 +243,18 @@ describe("AttributeRegistrationTest", () => {
 
   it("new superclass attributes do not override subclass attributes", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.attribute("name", "integer");
       }
@@ -178,11 +265,18 @@ describe("AttributeRegistrationTest", () => {
 
   it("superclass attributes can be overridden", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string", { default: "parent" });
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.attribute("name", "string", { default: "child" });
       }
@@ -193,11 +287,18 @@ describe("AttributeRegistrationTest", () => {
 
   it("superclass default values can be overridden", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("status", "string", { default: "active" });
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.attribute("status", "string", { default: "inactive" });
       }
@@ -312,21 +413,34 @@ describe("AttributeRegistrationTest", () => {
 
   it("type is resolved when specified by name", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ age: "25" });
     expect(p._readAttribute("age")).toBe(25);
   });
 
   it(".attribute_types reflects registered attribute types", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const types = Person.attributeTypes();
     expect(types["name"].name).toBe("string");
     expect(types["age"].name).toBe("integer");
@@ -334,32 +448,49 @@ describe("AttributeRegistrationTest", () => {
 
   it(".type_for_attribute returns the registered attribute type", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface User extends Attributes {}
+
     expect(User.typeForAttribute("name")?.name).toBe("string");
     expect(User.typeForAttribute("age")?.name).toBe("integer");
   });
 
   it(".attribute_types returns the default type when key is missing", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     expect(Person.typeForAttribute("name").name).toBe("string");
     expect(Person.typeForAttribute("missing_key")).toBeInstanceOf(ValueType);
   });
 
   it("_pendingAttributeModifications queue is populated by attribute()", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer", { default: 0 });
       }
     }
+    interface MyModel extends Attributes {}
+
     const queue = (MyModel as any)._pendingAttributeModifications;
     expect(queue).toBeDefined();
     expect(queue.length).toBe(3);
@@ -367,21 +498,33 @@ describe("AttributeRegistrationTest", () => {
 
   it("_default_attributes seeds empty set and replays pending queue", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("score", "integer", { default: 10 });
       }
     }
+    interface MyModel extends Attributes {}
+
     const defaults = (MyModel as any)._defaultAttributes();
     expect(defaults.getAttribute("score").value).toBe(10);
   });
 
   it("pending queue from superclass is replayed before subclass queue", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("role", "string", { default: "user" });
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
         this.attribute("role", "string", { default: "admin" });
       }
@@ -392,10 +535,15 @@ describe("AttributeRegistrationTest", () => {
 
   it("adding an attribute to a superclass after a subclass has cached _defaultAttributes invalidates the subclass cache", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {}
 
     const before = (Child as any)._defaultAttributes();
@@ -410,10 +558,15 @@ describe("AttributeRegistrationTest", () => {
 
   it("reset_default_attributes cascade propagates through multiple inheritance levels", () => {
     class Base extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("base_attr", "string");
       }
     }
+    interface Base extends Attributes {}
+
     class Mid extends Base {}
     class Leaf extends Mid {}
 

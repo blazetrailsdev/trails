@@ -4,6 +4,7 @@ import {
   CodeGenerator,
   include,
   included,
+  prepend,
   type Extended,
   type Included,
   Module,
@@ -443,6 +444,7 @@ export const InstanceMethods = {
       instanceWriter: false,
       default: [new AttributeMethodPattern()],
     });
+    prepend((base as { prototype: object }).prototype, { initInternals });
   },
 
   attributeMissing(
@@ -600,6 +602,15 @@ export function defineMethodAttribute(
       });
     });
   });
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function initInternals(this: { constructor: ClassMethodsHost }, super_: () => void): void {
+  _resurrectAttributeMethods(this.constructor);
+  super_();
 }
 
 export function _resurrectAttributeMethods(klass: ClassMethodsHost): void {

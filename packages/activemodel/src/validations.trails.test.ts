@@ -1,21 +1,29 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { Range } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/activesupport";
+import { Range, include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Errors } from "./errors.js";
 import { ModelName } from "./naming.js";
 import { humanAttributeName } from "./translation.js";
 import { Validations } from "./validations.js";
 import { resetI18n } from "./test-helpers/i18n.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("ValidationsTest (trails)", () => {
   describe("presence", () => {
     class Article extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { presence: true });
       }
     }
+    interface Article extends Attributes {}
 
     it("rejects null", async () => {
       const a = new Article();
@@ -41,11 +49,15 @@ describe("ValidationsTest (trails)", () => {
 
   describe("absence", () => {
     class Blank extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { absence: true });
       }
     }
+    interface Blank extends Attributes {}
 
     it("accepts null", async () => {
       expect(await new Blank().isValid()).toBe(true);
@@ -64,13 +76,17 @@ describe("ValidationsTest (trails)", () => {
 
   describe("length", () => {
     class WithLength extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", {
           length: { minimum: 3, maximum: 10 },
         });
       }
     }
+    interface WithLength extends Attributes {}
 
     it("validates length of using minimum", async () => {
       const w = new WithLength({ name: "ab" });
@@ -90,11 +106,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("validates length of using is", async () => {
       class Exact extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("code", "string");
           this.validates("code", { length: { is: 4 } });
         }
       }
+      interface Exact extends Attributes {}
+
       expect(await new Exact({ code: "1234" }).isValid()).toBe(true);
       expect(await new Exact({ code: "123" }).isValid()).toBe(false);
       expect(await new Exact({ code: "12345" }).isValid()).toBe(false);
@@ -102,11 +123,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("validates with in (range)", async () => {
       class WithRange extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { length: { in: new Range(2, 5) } });
         }
       }
+      interface WithRange extends Attributes {}
+
       expect(await new WithRange({ name: "a" }).isValid()).toBe(false);
       expect(await new WithRange({ name: "ab" }).isValid()).toBe(true);
       expect(await new WithRange({ name: "abcde" }).isValid()).toBe(true);
@@ -120,11 +146,15 @@ describe("ValidationsTest (trails)", () => {
 
   describe("numericality", () => {
     class Numeric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("value", "string");
         this.validates("value", { numericality: true });
       }
     }
+    interface Numeric extends Attributes {}
 
     it("default validates numericality of", async () => {
       expect(await new Numeric({ value: "42" }).isValid()).toBe(true);
@@ -139,98 +169,143 @@ describe("ValidationsTest (trails)", () => {
 
     it("validates numericality of with nil allowed", async () => {
       class NilOk extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "string");
           this.validates("value", { numericality: { allowNil: true } });
         }
       }
+      interface NilOk extends Attributes {}
+
       expect(await new NilOk({}).isValid()).toBe(true);
     });
 
     it("validates numericality of only integers", async () => {
       class IntOnly extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "string");
           this.validates("value", { numericality: { onlyInteger: true } });
         }
       }
+      interface IntOnly extends Attributes {}
+
       expect(await new IntOnly({ value: "42" }).isValid()).toBe(true);
       expect(await new IntOnly({ value: "3.14" }).isValid()).toBe(false);
     });
 
     it("validates numericality with greater_than", async () => {
       class GreaterThan extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { greaterThan: 5 } });
         }
       }
+      interface GreaterThan extends Attributes {}
+
       expect(await new GreaterThan({ value: 6 }).isValid()).toBe(true);
       expect(await new GreaterThan({ value: 5 }).isValid()).toBe(false);
     });
 
     it("validates numericality with greater_than_or_equal_to", async () => {
       class GreaterThanOrEqual extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { greaterThanOrEqualTo: 5 } });
         }
       }
+      interface GreaterThanOrEqual extends Attributes {}
+
       expect(await new GreaterThanOrEqual({ value: 5 }).isValid()).toBe(true);
       expect(await new GreaterThanOrEqual({ value: 4 }).isValid()).toBe(false);
     });
 
     it("validates numericality with equal_to", async () => {
       class EqualTo extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { equalTo: 5 } });
         }
       }
+      interface EqualTo extends Attributes {}
+
       expect(await new EqualTo({ value: 5 }).isValid()).toBe(true);
       expect(await new EqualTo({ value: 4 }).isValid()).toBe(false);
     });
 
     it("validates numericality with less_than", async () => {
       class LessThan extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { lessThan: 5 } });
         }
       }
+      interface LessThan extends Attributes {}
+
       expect(await new LessThan({ value: 4 }).isValid()).toBe(true);
       expect(await new LessThan({ value: 5 }).isValid()).toBe(false);
     });
 
     it("validates numericality with less_than_or_equal_to", async () => {
       class LessThanOrEqual extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { lessThanOrEqualTo: 5 } });
         }
       }
+      interface LessThanOrEqual extends Attributes {}
+
       expect(await new LessThanOrEqual({ value: 5 }).isValid()).toBe(true);
       expect(await new LessThanOrEqual({ value: 6 }).isValid()).toBe(false);
     });
 
     it("validates numericality with odd", async () => {
       class Odd extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { odd: true } });
         }
       }
+      interface Odd extends Attributes {}
+
       expect(await new Odd({ value: 3 }).isValid()).toBe(true);
       expect(await new Odd({ value: 4 }).isValid()).toBe(false);
     });
 
     it("validates numericality with even", async () => {
       class Even extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "integer");
           this.validates("value", { numericality: { even: true } });
         }
       }
+      interface Even extends Attributes {}
+
       expect(await new Even({ value: 4 }).isValid()).toBe(true);
       expect(await new Even({ value: 3 }).isValid()).toBe(false);
     });
@@ -238,7 +313,10 @@ describe("ValidationsTest (trails)", () => {
 
   describe("inclusion and exclusion", () => {
     class Colorful extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("color", "string");
         this.validates("color", {
           inclusion: { in: ["red", "green", "blue"] },
@@ -246,6 +324,7 @@ describe("ValidationsTest (trails)", () => {
         });
       }
     }
+    interface Colorful extends Attributes {}
 
     it("accepts included and non-excluded values", async () => {
       expect(await new Colorful({ color: "red" }).isValid()).toBe(true);
@@ -266,13 +345,17 @@ describe("ValidationsTest (trails)", () => {
 
   describe("format", () => {
     class EmailUser extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("email", "string");
         this.validates("email", {
           format: { with: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, multiline: true },
         });
       }
     }
+    interface EmailUser extends Attributes {}
 
     it("accepts valid email", async () => {
       expect(await new EmailUser({ email: "user@example.com" }).isValid()).toBe(true);
@@ -287,12 +370,16 @@ describe("ValidationsTest (trails)", () => {
 
   describe("confirmation", () => {
     class Signup extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("password", "string");
         this.attribute("passwordConfirmation", "string");
         this.validates("password", { confirmation: true });
       }
     }
+    interface Signup extends Attributes {}
 
     it("accepts matching password and confirmation", async () => {
       expect(
@@ -309,9 +396,12 @@ describe("ValidationsTest (trails)", () => {
 
   describe("uniqueness", () => {
     class UniqueUser extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static existingNames = new Set<string>();
 
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
@@ -328,6 +418,7 @@ describe("ValidationsTest (trails)", () => {
         return true;
       }
     }
+    interface UniqueUser extends Attributes {}
 
     it("accepts unique names", async () => {
       UniqueUser.existingNames.clear();
@@ -347,13 +438,17 @@ describe("ValidationsTest (trails)", () => {
 
   describe("type-based validations", () => {
     class TypedModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("age", "integer");
         this.attribute("email", "string");
         this.validates("age", { presence: true, numericality: { onlyInteger: true } });
         this.validates("email", { presence: true });
       }
     }
+    interface TypedModel extends Attributes {}
 
     it("accepts valid types", async () => {
       expect(await new TypedModel({ age: 30, email: "test@example.com" }).isValid()).toBe(true);
@@ -369,13 +464,18 @@ describe("ValidationsTest (trails)", () => {
 
   it("validates an undeclared getter via the send default", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("first", "string");
       }
       get fullName(): string {
         return (this._readAttribute("first") as string) ?? "";
       }
     }
+    interface Person extends Attributes {}
+
     Person.validatesEach(["fullName"], (record, attr, value) => {
       if (!value) record.errors.add(attr, "gotcha");
     });
@@ -389,13 +489,18 @@ describe("ValidationsTest (trails)", () => {
 
   it("read_attribute_for_validation returns undefined for a present reader that returns undefined", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
       get optional(): string | undefined {
         return undefined;
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Al" });
     expect(
       (
@@ -406,10 +511,15 @@ describe("ValidationsTest (trails)", () => {
 
   it("read_attribute_for_validation raises NoMethodError-style for a missing reader", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Al" });
     expect(() =>
       (
@@ -421,32 +531,44 @@ describe("ValidationsTest (trails)", () => {
   it("validates format of with multiline regexp should raise error", () => {
     expect(() => {
       class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { format: { with: /^test$/m } });
         }
       }
+      interface Person extends Attributes {}
     }).toThrow(/multiline/i);
   });
 
   it("validates format of without any regexp should raise error", () => {
     expect(() => {
       class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { format: {} });
         }
       }
+      interface Person extends Attributes {}
     }).toThrow(/with.*without/i);
   });
 
   describe("return-shape parity", () => {
     class Topic extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { presence: true });
       }
     }
+    interface Topic extends Attributes {}
 
     it("validate returns boolean (Rails alias_method :validate, :valid?)", async () => {
       expect(await new Topic({ title: "ok" }).validate()).toBe(true);
@@ -455,11 +577,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("invalid? accepts a context argument", async () => {
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true, on: "create" });
         }
       }
+      interface Scoped extends Attributes {}
+
       const s = new Scoped({});
       expect(await s.isInvalid()).toBe(false);
       expect(await s.isInvalid("create")).toBe(true);
@@ -472,24 +599,34 @@ describe("ValidationsTest (trails)", () => {
 
     it("validate! forwards context to valid?", async () => {
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true, on: "create" });
         }
       }
+      interface Scoped extends Attributes {}
+
       expect(await new Scoped({}).validateBang()).toBe(true);
       await expect(new Scoped({}).validateBang("create")).rejects.toThrow(/Validation failed/);
     });
 
     it("valid? accepts an array context that matches :on-registered validators", async () => {
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("title", "string");
           this.validates("name", { presence: true, on: "create" });
           this.validates("title", { presence: true, on: ["publish"] });
         }
       }
+      interface Scoped extends Attributes {}
+
       const a = new Scoped({});
       expect(await a.isValid("create")).toBe(false);
       expect(a.errors.attributeNames).toEqual(["name"]);
@@ -505,11 +642,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("on: [array] validator fires when current context is a single symbol in the set", async () => {
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true, on: ["create", "publish"] });
         }
       }
+      interface Scoped extends Attributes {}
+
       expect(await new Scoped({}).isValid("create")).toBe(false);
       expect(await new Scoped({}).isValid("publish")).toBe(false);
       expect(await new Scoped({}).isValid("unrelated")).toBe(true);
@@ -518,13 +660,18 @@ describe("ValidationsTest (trails)", () => {
     it("validationContext round-trips array contexts while a validation is in flight", async () => {
       const captured: Array<string | string[] | null> = [];
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validate((record: InstanceType<typeof Scoped>) => {
             captured.push(record.validationContext);
           });
         }
       }
+      interface Scoped extends Attributes {}
+
       await new Scoped({}).isValid(["create", "publish"]);
       expect(captured).toEqual([["create", "publish"]]);
     });
@@ -532,13 +679,18 @@ describe("ValidationsTest (trails)", () => {
     it("valid?(null) clears the context (Rails sets it to nil on entry)", async () => {
       const captured: Array<string | string[] | null> = [];
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validate((r: InstanceType<typeof Scoped>) => {
             captured.push(r.validationContext);
           });
         }
       }
+      interface Scoped extends Attributes {}
+
       const m = new Scoped({});
       await m.isValid("previous");
       await m.isValid(null);
@@ -547,11 +699,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("valid? restores previous context in ensure/finally even on failure", async () => {
       class Scoped extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Scoped extends Attributes {}
+
       const m = new Scoped({});
       const before = m.validationContext;
       await m.isValid("custom");
@@ -561,11 +718,15 @@ describe("ValidationsTest (trails)", () => {
 
   describe("ValidationError + freeze (Rails fidelity)", () => {
     class Topic extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { presence: true });
       }
     }
+    interface Topic extends Attributes {}
 
     it("ValidationError message comes from I18n :model_invalid", async () => {
       await expect(new Topic({}).validateBang()).rejects.toThrow(
@@ -620,13 +781,18 @@ describe("ValidationsTest (trails)", () => {
   describe("_validators hash-of-arrays (Rails fidelity)", () => {
     it("validatorsOn is O(1) per-attribute lookup", () => {
       class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("age", "integer");
           this.validates("name", { presence: true });
           this.validates("age", { numericality: true });
         }
       }
+      interface Person extends Attributes {}
+
       expect(Person.validatorsOn("name")).toHaveLength(1);
       expect(Person.validatorsOn("age")).toHaveLength(1);
       expect(Person.validatorsOn("nonexistent")).toEqual([]);
@@ -634,12 +800,17 @@ describe("ValidationsTest (trails)", () => {
 
     it("validators() returns a uniq flat list across all attribute buckets", () => {
       class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
           this.validatesEach(["name", "email"], () => {});
         }
       }
+      interface Person extends Attributes {}
+
       expect(Person.validators()).toHaveLength(1);
       expect(Person.validatorsOn("name")).toHaveLength(1);
       expect(Person.validatorsOn("email")).toHaveLength(1);
@@ -648,11 +819,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("inheritance is copy-on-first-write (subclass sees parent writes made before its own first write)", () => {
       class Base extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Base extends Attributes {}
+
       class Child extends Base {}
       expect(Child.validatorsOn("name")).toHaveLength(1);
       Base.validates("name", { length: { minimum: 2 } });
@@ -666,11 +842,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("subclass inherits validators but its changes don't leak up", () => {
       class Base extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Base extends Attributes {}
+
       class Child extends Base {}
       expect(Child.validatorsOn("name")).toHaveLength(1);
       Child.validates("name", { length: { minimum: 2 } });
@@ -680,11 +861,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("clearValidators! empties the map", () => {
       class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Person extends Attributes {}
+
       expect(Person.validators()).toHaveLength(1);
       Person.clearValidatorsBang();
       expect(Person.validators()).toEqual([]);
@@ -693,11 +879,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("validatorsOn returns a fresh array (no state-mutating reads)", () => {
       class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Person extends Attributes {}
+
       Person.validatorsOn("never_registered");
       expect(Array.from(Person._validators.keys())).not.toContain("never_registered");
 
@@ -712,7 +903,10 @@ describe("ValidationsTest (trails)", () => {
   describe("validatesEach", () => {
     it("validates each", async () => {
       class Payment extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("price", "integer");
           this.attribute("discount", "integer");
           this.validatesEach(["price", "discount"], (record, attr, value) => {
@@ -722,6 +916,7 @@ describe("ValidationsTest (trails)", () => {
           });
         }
       }
+      interface Payment extends Attributes {}
 
       const p = new Payment({ price: -5, discount: 10 });
       expect(await p.isValid()).toBe(false);
@@ -737,7 +932,10 @@ describe("ValidationsTest (trails)", () => {
 
     it("supports conditional options", async () => {
       class Payment extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("price", "integer");
           this.attribute("discount", "integer");
           this.validatesEach(
@@ -756,6 +954,7 @@ describe("ValidationsTest (trails)", () => {
           );
         }
       }
+      interface Payment extends Attributes {}
 
       const p = new Payment({ price: null, discount: -3 });
       expect(await p.isValid()).toBe(true);
@@ -774,11 +973,16 @@ describe("ValidationsTest (trails)", () => {
       }
 
       class Item extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("count", "integer");
           this.validatesWith(EvenValidator);
         }
       }
+
+      interface Item extends Attributes {}
 
       const item = new Item({ count: 3 });
       expect(await item.isValid()).toBe(false);
@@ -805,11 +1009,16 @@ describe("ValidationsTest (trails)", () => {
       }
 
       class Game extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("score", "integer");
           this.validatesWith(ThresholdValidator, { threshold: 50 });
         }
       }
+
+      interface Game extends Attributes {}
 
       const g = new Game({ score: 30 });
       expect(await g.isValid()).toBe(false);
@@ -827,13 +1036,18 @@ describe("ValidationsTest (trails)", () => {
       }
 
       class Widget extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("active", "boolean");
           this.validatesWith(AlwaysInvalidValidator, {
             if: (r: any) => r._readAttribute("active") === true,
           });
         }
       }
+
+      interface Widget extends Attributes {}
 
       const w = new Widget({ active: false });
       expect(await w.isValid()).toBe(true);
@@ -845,11 +1059,15 @@ describe("ValidationsTest (trails)", () => {
   describe("Validations", () => {
     describe("presence", () => {
       class Article extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("title", "string");
           this.validates("title", { presence: true });
         }
       }
+      interface Article extends Attributes {}
 
       it("rejects null", async () => {
         const a = new Article();
@@ -875,11 +1093,15 @@ describe("ValidationsTest (trails)", () => {
 
     describe("absence", () => {
       class Blank extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { absence: true });
         }
       }
+      interface Blank extends Attributes {}
 
       it("accepts null", async () => {
         expect(await new Blank().isValid()).toBe(true);
@@ -898,13 +1120,17 @@ describe("ValidationsTest (trails)", () => {
 
     describe("length", () => {
       class WithLength extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", {
             length: { minimum: 3, maximum: 10 },
           });
         }
       }
+      interface WithLength extends Attributes {}
 
       it("validates length of using minimum", async () => {
         const w = new WithLength({ name: "ab" });
@@ -924,11 +1150,16 @@ describe("ValidationsTest (trails)", () => {
 
       it("validates length of using is", async () => {
         class Exact extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("code", "string");
             this.validates("code", { length: { is: 4 } });
           }
         }
+        interface Exact extends Attributes {}
+
         expect(await new Exact({ code: "1234" }).isValid()).toBe(true);
         expect(await new Exact({ code: "123" }).isValid()).toBe(false);
         expect(await new Exact({ code: "12345" }).isValid()).toBe(false);
@@ -936,11 +1167,16 @@ describe("ValidationsTest (trails)", () => {
 
       it("validates with in (range)", async () => {
         class WithRange extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("name", "string");
             this.validates("name", { length: { in: new Range(2, 5) } });
           }
         }
+        interface WithRange extends Attributes {}
+
         expect(await new WithRange({ name: "a" }).isValid()).toBe(false);
         expect(await new WithRange({ name: "ab" }).isValid()).toBe(true);
         expect(await new WithRange({ name: "abcde" }).isValid()).toBe(true);
@@ -954,11 +1190,15 @@ describe("ValidationsTest (trails)", () => {
 
     describe("numericality", () => {
       class Numeric extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("value", "string");
           this.validates("value", { numericality: true });
         }
       }
+      interface Numeric extends Attributes {}
 
       it("default validates numericality of", async () => {
         expect(await new Numeric({ value: "42" }).isValid()).toBe(true);
@@ -973,21 +1213,31 @@ describe("ValidationsTest (trails)", () => {
 
       it("validates numericality of with nil allowed", async () => {
         class NilOk extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("count", "string");
             this.validates("count", { numericality: { allowNil: true } });
           }
         }
+        interface NilOk extends Attributes {}
+
         expect(await new NilOk({}).isValid()).toBe(true);
       });
 
       it("validates numericality of with integer only", async () => {
         class IntOnly extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("count", "string");
             this.validates("count", { numericality: { onlyInteger: true } });
           }
         }
+        interface IntOnly extends Attributes {}
+
         expect(await new IntOnly({ count: "5" }).isValid()).toBe(true);
         const f = new IntOnly({ count: "5.5" });
         expect(await f.isValid()).toBe(false);
@@ -996,44 +1246,64 @@ describe("ValidationsTest (trails)", () => {
 
       it("validates numericality with greater than", async () => {
         class GT extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("age", "integer");
             this.validates("age", { numericality: { greaterThan: 0 } });
           }
         }
+        interface GT extends Attributes {}
+
         expect(await new GT({ age: 1 }).isValid()).toBe(true);
         expect(await new GT({ age: 0 }).isValid()).toBe(false);
       });
 
       it("validates numericality with less than", async () => {
         class LT extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("rating", "integer");
             this.validates("rating", { numericality: { lessThan: 10 } });
           }
         }
+        interface LT extends Attributes {}
+
         expect(await new LT({ rating: 9 }).isValid()).toBe(true);
         expect(await new LT({ rating: 10 }).isValid()).toBe(false);
       });
 
       it("validates numericality with odd", async () => {
         class Odd extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("n", "integer");
             this.validates("n", { numericality: { odd: true } });
           }
         }
+        interface Odd extends Attributes {}
+
         expect(await new Odd({ n: 3 }).isValid()).toBe(true);
         expect(await new Odd({ n: 4 }).isValid()).toBe(false);
       });
 
       it("validates numericality with even", async () => {
         class Even extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("n", "integer");
             this.validates("n", { numericality: { even: true } });
           }
         }
+        interface Even extends Attributes {}
+
         expect(await new Even({ n: 4 }).isValid()).toBe(true);
         expect(await new Even({ n: 3 }).isValid()).toBe(false);
       });
@@ -1041,11 +1311,15 @@ describe("ValidationsTest (trails)", () => {
 
     describe("inclusion", () => {
       class Status extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("status", "string");
           this.validates("status", { inclusion: { in: ["draft", "published"] } });
         }
       }
+      interface Status extends Attributes {}
 
       it("validates inclusion of", async () => {
         expect(await new Status({ status: "draft" }).isValid()).toBe(true);
@@ -1060,11 +1334,15 @@ describe("ValidationsTest (trails)", () => {
 
     describe("exclusion", () => {
       class NoAdmin extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("role", "string");
           this.validates("role", { exclusion: { in: ["admin", "root"] } });
         }
       }
+      interface NoAdmin extends Attributes {}
 
       it("accepts non-excluded values", async () => {
         expect(await new NoAdmin({ role: "user" }).isValid()).toBe(true);
@@ -1079,11 +1357,15 @@ describe("ValidationsTest (trails)", () => {
 
     describe("format", () => {
       class Email extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("email", "string");
           this.validates("email", { format: { with: /^[^@]+@[^@]+$/, multiline: true } });
         }
       }
+      interface Email extends Attributes {}
 
       it("validate format", async () => {
         expect(await new Email({ email: "dean@example.com" }).isValid()).toBe(true);
@@ -1097,24 +1379,33 @@ describe("ValidationsTest (trails)", () => {
 
       it("skips null", async () => {
         class NilSkippingEmail extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("email", "string");
             this.validates("email", {
               format: { with: /^[^@]+@[^@]+$/, multiline: true, allowNil: true },
             });
           }
         }
+        interface NilSkippingEmail extends Attributes {}
+
         expect(await new NilSkippingEmail({}).isValid()).toBe(true);
       });
     });
 
     describe("acceptance", () => {
       class Terms extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("accepted", "boolean");
           this.validates("accepted", { acceptance: true });
         }
       }
+      interface Terms extends Attributes {}
 
       it("terms of service agreement", async () => {
         expect(await new Terms({ accepted: "1" }).isValid()).toBe(true);
@@ -1128,13 +1419,18 @@ describe("ValidationsTest (trails)", () => {
 
       it("terms of service agreement with accept value", async () => {
         class Custom extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("agreed", "string");
             this.validates("agreed", {
               acceptance: { accept: ["I agree", "yes"] },
             });
           }
         }
+        interface Custom extends Attributes {}
+
         expect(await new Custom({ agreed: "I agree" }).isValid()).toBe(true);
         expect(await new Custom({ agreed: "no" }).isValid()).toBe(false);
       });
@@ -1142,11 +1438,15 @@ describe("ValidationsTest (trails)", () => {
 
     describe("confirmation", () => {
       class WithConfirm extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("password", "string");
           this.validates("password", { confirmation: true });
         }
       }
+      interface WithConfirm extends Attributes {}
 
       it("passes when no confirmation field set", async () => {
         expect(await new WithConfirm({ password: "secret" }).isValid()).toBe(true);
@@ -1174,7 +1474,10 @@ describe("ValidationsTest (trails)", () => {
     describe("conditional", () => {
       it("if validation using block false", async () => {
         class Cond extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("name", "string");
             this.attribute("requireName", "boolean", { default: false });
             this.validates("name", {
@@ -1184,13 +1487,18 @@ describe("ValidationsTest (trails)", () => {
             });
           }
         }
+        interface Cond extends Attributes {}
+
         expect(await new Cond({ requireName: false }).isValid()).toBe(true);
         expect(await new Cond({ requireName: true }).isValid()).toBe(false);
       });
 
       it("unless validation using block true", async () => {
         class Unless extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("name", "string");
             this.attribute("optional", "boolean", { default: false });
             this.validates("name", {
@@ -1200,6 +1508,8 @@ describe("ValidationsTest (trails)", () => {
             });
           }
         }
+        interface Unless extends Attributes {}
+
         expect(await new Unless({ optional: true }).isValid()).toBe(true);
         expect(await new Unless({ optional: false }).isValid()).toBe(false);
       });
@@ -1208,7 +1518,10 @@ describe("ValidationsTest (trails)", () => {
     describe("custom validate", () => {
       it("function validator", async () => {
         class Custom extends Model {
+          declare static attribute: AttributesClassHalf["attribute"];
+
           static {
+            include(this, Attributes);
             this.attribute("value", "integer");
             this.validate(function (record: any) {
               const val = record._readAttribute("value");
@@ -1218,6 +1531,8 @@ describe("ValidationsTest (trails)", () => {
             });
           }
         }
+        interface Custom extends Attributes {}
+
         expect(await new Custom({ value: 4 }).isValid()).toBe(true);
         const c = new Custom({ value: 3 });
         expect(await c.isValid()).toBe(false);
@@ -1227,22 +1542,32 @@ describe("ValidationsTest (trails)", () => {
 
     it("invalid should be the opposite of valid", async () => {
       class Required extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Required extends Attributes {}
+
       expect(await new Required().isInvalid()).toBe(true);
       expect(await new Required({ name: "dean" }).isInvalid()).toBe(false);
     });
 
     it("fullMessages prefixes attribute name", async () => {
       class FM extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("title", "string");
           this.validates("title", { presence: true });
         }
       }
+      interface FM extends Attributes {}
+
       const f = new FM();
       await f.isValid();
       expect(f.errors.fullMessages).toContain("Title can't be blank");
@@ -1263,11 +1588,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("errors are cleared between isValid calls", async () => {
       class Clearable extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface Clearable extends Attributes {}
+
       const c = new Clearable();
       await c.isValid();
       expect(c.errors.count).toBeGreaterThan(0);
@@ -1279,11 +1609,16 @@ describe("ValidationsTest (trails)", () => {
   describe("custom messages", () => {
     it("presence with custom message", async () => {
       class Custom extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: { message: "is required" } });
         }
       }
+      interface Custom extends Attributes {}
+
       const c = new Custom();
       await c.isValid();
       expect(c.errors.messagesFor("name")).toContain("is required");
@@ -1291,13 +1626,18 @@ describe("ValidationsTest (trails)", () => {
 
     it("length with custom tooShort and tooLong", async () => {
       class Custom extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", {
             length: { minimum: 3, maximum: 5, tooShort: "too few!", tooLong: "too many!" },
           });
         }
       }
+      interface Custom extends Attributes {}
+
       const short = new Custom({ name: "ab" });
       await short.isValid();
       expect(short.errors.messagesFor("name")).toContain("too few!");
@@ -1310,13 +1650,18 @@ describe("ValidationsTest (trails)", () => {
   describe("errors.fullMessagesFor()", () => {
     it("full_messages_for contains all the error messages for the given attribute indifferent", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
           this.validates("name", { presence: true });
           this.validates("email", { presence: true });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       await u.isValid();
       expect(u.errors.fullMessagesFor("name")).toEqual(["Name can't be blank"]);
@@ -1328,11 +1673,16 @@ describe("ValidationsTest (trails)", () => {
   describe("errors.ofKind()", () => {
     it("of_kind? defaults message to :invalid", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       await u.isValid();
       expect(u.errors.ofKind("name", ":blank")).toBe(true);
@@ -1344,26 +1694,36 @@ describe("ValidationsTest (trails)", () => {
   describe("validators / validatorsOn", () => {
     it("returns all registered validators", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
           this.validates("name", { presence: true });
           this.validates("email", { presence: true, length: { minimum: 5 } });
         }
       }
+      interface User extends Attributes {}
+
       const validators = User.validators();
       expect(validators.length).toBe(3);
     });
 
     it("returns validators for a specific attribute", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
           this.validates("name", { presence: true, length: { minimum: 2, maximum: 50 } });
           this.validates("email", { presence: true });
         }
       }
+      interface User extends Attributes {}
+
       const nameValidators = User.validatorsOn("name");
       expect(nameValidators.length).toBe(2);
       const emailValidators = User.validatorsOn("email");
@@ -1372,12 +1732,17 @@ describe("ValidationsTest (trails)", () => {
 
     it("returns empty array for attribute with no validators", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("bio", "string");
           this.validates("name", { presence: true });
         }
       }
+      interface User extends Attributes {}
+
       expect(User.validatorsOn("bio")).toEqual([]);
     });
   });
@@ -1385,13 +1750,18 @@ describe("ValidationsTest (trails)", () => {
   describe("custom validation contexts", () => {
     it("with a class that adds errors on create and validating a new model", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("terms_accepted", "string");
           this.validates("name", { presence: true });
           this.validates("terms_accepted", { presence: true, on: "registration" });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ name: "Alice" });
       expect(await u.isValid()).toBe(true);
       expect(await u.isValid("registration")).toBe(false);
@@ -1399,13 +1769,18 @@ describe("ValidationsTest (trails)", () => {
 
     it("with a class that adds errors on update and validating a new model", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
           this.validates("name", { presence: true });
           this.validates("email", { presence: true, on: "create" });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ name: "Alice" });
       expect(await u.isValid("create")).toBe(false);
       expect(await u.isValid("update")).toBe(true);
@@ -1415,10 +1790,15 @@ describe("ValidationsTest (trails)", () => {
   describe("Errors enhancements", () => {
     it("delete removes details on given attribute", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       u.errors.add("name", ":blank");
       u.errors.add("name", ":too_short");
@@ -1430,10 +1810,15 @@ describe("ValidationsTest (trails)", () => {
 
     it("delete with type only removes matching errors", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       u.errors.add("name", ":blank");
       u.errors.add("name", ":too_short");
@@ -1444,10 +1829,15 @@ describe("ValidationsTest (trails)", () => {
 
     it("each iterates over all errors", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       u.errors.add("name", ":blank");
       u.errors.add("email", ":invalid");
@@ -1458,10 +1848,15 @@ describe("ValidationsTest (trails)", () => {
 
     it("merge errors", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u1 = new User({});
       const u2 = new User({});
       u1.errors.add("name", ":blank");
@@ -1472,11 +1867,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("to_hash returns the error messages hash", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       u.errors.add("name", ":blank");
       u.errors.add("name", ":too_short");
@@ -1488,10 +1888,15 @@ describe("ValidationsTest (trails)", () => {
 
     it("include?", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       u.errors.add("name", ":blank");
       expect(u.errors.include("name")).toBe(true);
@@ -1500,10 +1905,15 @@ describe("ValidationsTest (trails)", () => {
 
     it("messages returns grouped messages", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       u.errors.add("name", ":blank");
       expect(u.errors.messages.get("name")).toEqual(["can't be blank"]);
@@ -1511,10 +1921,15 @@ describe("ValidationsTest (trails)", () => {
 
     it("full_messages creates a list of error messages with the attribute name included", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       expect(u.errors.fullMessage("name", "is required")).toBe("Name is required");
       expect(u.errors.fullMessage("base", "Something went wrong")).toBe("Something went wrong");
@@ -1524,7 +1939,10 @@ describe("ValidationsTest (trails)", () => {
   describe("conditional validates (if/unless)", () => {
     it("skips validation when if condition returns false", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("requires_name", "boolean");
           this.validates("name", {
@@ -1533,13 +1951,18 @@ describe("ValidationsTest (trails)", () => {
           });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ requires_name: false });
       expect(await u.isValid()).toBe(true);
     });
 
     it("runs validation when if condition returns true", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("requires_name", "boolean");
           this.validates("name", {
@@ -1548,13 +1971,18 @@ describe("ValidationsTest (trails)", () => {
           });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ requires_name: true });
       expect(await u.isValid()).toBe(false);
     });
 
     it("skips validation when unless condition returns true", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("skip_validation", "boolean");
           this.validates("name", {
@@ -1563,13 +1991,18 @@ describe("ValidationsTest (trails)", () => {
           });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ skip_validation: true });
       expect(await u.isValid()).toBe(true);
     });
 
     it("runs validation when unless condition returns false", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("skip_validation", "boolean");
           this.validates("name", {
@@ -1578,6 +2011,8 @@ describe("ValidationsTest (trails)", () => {
           });
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ skip_validation: false });
       expect(await u.isValid()).toBe(false);
     });
@@ -1586,12 +2021,17 @@ describe("ValidationsTest (trails)", () => {
   describe("validates_*_of shorthand methods", () => {
     it("validate presences", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("email", "string");
           this.validatesPresenceOf("name", "email");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       expect(await u.isValid()).toBe(false);
       expect(u.errors.messagesFor("name").length).toBeGreaterThan(0);
@@ -1600,89 +2040,129 @@ describe("ValidationsTest (trails)", () => {
 
     it("validates absence of", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("spam", "string");
           this.validatesAbsenceOf("spam");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ spam: "not empty" });
       expect(await u.isValid()).toBe(false);
     });
 
     it("validatesLengthOf validates length", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validatesLengthOf("name", { minimum: 3 });
         }
       }
+      interface User extends Attributes {}
+
       expect(await new User({ name: "AB" }).isValid()).toBe(false);
       expect(await new User({ name: "ABC" }).isValid()).toBe(true);
     });
 
     it("validatesSizeOf is an alias for validatesLengthOf", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validatesSizeOf("name", { minimum: 3 });
         }
       }
+      interface User extends Attributes {}
+
       expect(await new User({ name: "AB" }).isValid()).toBe(false);
       expect(await new User({ name: "ABC" }).isValid()).toBe(true);
     });
 
     it("validatesNumericalityOf validates numericality", async () => {
       class Item extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("price", "float");
           this.validatesNumericalityOf("price", { greaterThan: 0 });
         }
       }
+      interface Item extends Attributes {}
+
       expect(await new Item({ price: -1 }).isValid()).toBe(false);
       expect(await new Item({ price: 10 }).isValid()).toBe(true);
     });
 
     it("validatesInclusionOf validates inclusion", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("role", "string");
           this.validatesInclusionOf("role", { in: ["admin", "user"] });
         }
       }
+      interface User extends Attributes {}
+
       expect(await new User({ role: "hacker" }).isValid()).toBe(false);
       expect(await new User({ role: "admin" }).isValid()).toBe(true);
     });
 
     it("validatesFormatOf validates format", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("email", "string");
           this.validatesFormatOf("email", { with: /@/ });
         }
       }
+      interface User extends Attributes {}
+
       expect(await new User({ email: "nope" }).isValid()).toBe(false);
       expect(await new User({ email: "a@b.com" }).isValid()).toBe(true);
     });
 
     it("validatesConfirmationOf validates confirmation", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("password", "string");
           this.validatesConfirmationOf("password");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({ password: "secret", passwordConfirmation: "mismatch" });
       expect(await u.isValid()).toBe(false);
     });
 
     it("validatesLengthOf accepts multiple attributes", async () => {
       class Topic extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("title", "string");
           this.attribute("content", "string");
           this.validatesLengthOf("title", "content", { minimum: 2 });
         }
       }
+      interface Topic extends Attributes {}
+
       const t = new Topic({ title: "", content: "" });
       expect(await t.isValid()).toBe(false);
       expect(t.errors.messagesFor("title").length).toBeGreaterThan(0);
@@ -1692,44 +2172,63 @@ describe("ValidationsTest (trails)", () => {
 
     it("validatesPresenceOf passes through strict option", async () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.validatesPresenceOf("name", { strict: true });
         }
       }
+      interface User extends Attributes {}
+
       await expect(new User({}).isValid()).rejects.toThrow();
       expect(await new User({ name: "Alice" }).isValid()).toBe(true);
     });
 
     it("validatesPresenceOf passes through if and on options", async () => {
       class Topic extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("title", "string");
           this.validatesPresenceOf("title", { if: () => true, on: "update" });
         }
       }
+      interface Topic extends Attributes {}
+
       expect(await new Topic({ title: "" }).isValid()).toBe(true);
       expect(await new Topic({ title: "" }).isInvalid("update")).toBe(true);
     });
 
     it("validatesPresenceOf passes through unless option", async () => {
       class Topic extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("title", "string");
           this.validatesPresenceOf("title", { unless: () => true });
         }
       }
+      interface Topic extends Attributes {}
+
       expect(await new Topic({ title: "" }).isValid()).toBe(true);
     });
   });
 
   describe("initialize_dup", () => {
     class DupTopic extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { presence: true });
       }
     }
+    interface DupTopic extends Attributes {}
 
     it("gives the copy its own empty Errors", async () => {
       const topic = new DupTopic();
@@ -1745,10 +2244,15 @@ describe("ValidationsTest (trails)", () => {
   describe("Errors#generateMessage", () => {
     it("generate_message works without i18n_scope", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       expect(u.errors.generateMessage("name", ":blank")).toBe("can't be blank");
       expect(u.errors.generateMessage("name", ":invalid")).toBe("is invalid");
@@ -1756,11 +2260,16 @@ describe("ValidationsTest (trails)", () => {
 
     it("substitutes options into message", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
           this.attribute("age", "integer");
         }
       }
+      interface User extends Attributes {}
+
       const u = new User({});
       expect(u.errors.generateMessage("age", ":greater_than", { count: 0 })).toBe(
         "must be greater than 0",
@@ -1769,12 +2278,10 @@ describe("ValidationsTest (trails)", () => {
   });
 
   describe("include Validations", () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (validations.rb:37); the class/interface merge is how `include()` surfaces on the type side.
     interface Host extends Validations {
       title: string | null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class Host {
       declare static modelName: ModelName;
       declare static i18nScope: string;

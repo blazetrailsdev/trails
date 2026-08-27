@@ -1,7 +1,16 @@
-import { extend, include, type CodeGenerator, included } from "@blazetrails/activesupport";
+import {
+  extend,
+  type Extended,
+  include,
+  type CodeGenerator,
+  type Included,
+  included,
+  prepend,
+} from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
+  AttributeMethodPattern,
   AttrNames,
   ClassMethods as AttributeMethodsClassMethods,
   InstanceMethods as AttributeMethodsInstanceMethods,
@@ -10,6 +19,7 @@ import {
   type AttributeMethod,
 } from "./attribute-methods.js";
 import {
+  AttributeRegistration,
   ClassMethods as AttributeRegistrationClassMethods,
   attribute as registrationAttribute,
   type AttributeRegistrationHost,
@@ -75,6 +85,18 @@ export function setDefineMethodAttribute(
   });
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function initialize(
+  this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
+  super_: () => void,
+): void {
+  this._attributes = this.constructor._defaultAttributes().deepDup();
+  super_();
+}
+
 export function initializeDup(
   this: AttributeInstanceHost,
   super_: (other: unknown) => void,
@@ -84,7 +106,7 @@ export function initializeDup(
   super_(other);
 }
 
-export function freeze(this: AttributeInstanceHost): void {
+export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
   if (!Object.isFrozen(this)) {
     const attributes = this._attributes;
     const cloned = Object.create(Object.getPrototypeOf(attributes) as object) as AttributeSet;
@@ -92,11 +114,17 @@ export function freeze(this: AttributeInstanceHost): void {
     cloned.initializeClone(attributes);
     this._attributes = cloned.freeze();
   }
+  return super_();
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export interface Attributes {
+export interface Attributes extends Included<typeof AttributeMethodsInstanceMethods> {
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
+
+  /** @internal */
+  _writeAttribute(name: string, value: unknown): void;
+  /** @internal */
+  "attribute="(name: string, value: unknown): void;
 }
 
 type AttributeMethodSuffixHost = AttributeMethodHost &
@@ -110,7 +138,7 @@ type AttributeMethodSuffixHost = AttributeMethodHost &
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attributes {
   static [included](base: AttributeMethodSuffixHost): void {
-    extend(base, AttributeRegistrationClassMethods);
+    include(base, AttributeRegistration);
     extend(base, AttributeMethodsClassMethods);
     include(base, AttributeMethodsInstanceMethods);
 
@@ -118,6 +146,10 @@ export class Attributes {
 
     extend(base, ClassMethods);
     extend(base, { defineMethodAttribute });
+
+    prepend(base.prototype, { initInternals: initialize });
+    prepend(base.prototype, { initializeDup });
+    prepend(base.prototype, { freeze });
 
     base.attributeMethodSuffix("=", { parameters: "value" });
   }
@@ -142,12 +174,6 @@ export class Attributes {
   attributeNames(): string[] {
     return this._attributes.keys();
   }
-
-  freeze(): this {
-    freeze.call(this);
-    Object.freeze(this);
-    return this;
-  }
 }
 
 include(Attributes, { attributeMissing: AttributeMethodsInstanceMethods.attributeMissing });
@@ -157,3 +183,21 @@ export const ClassMethods = {
   attributeNames,
   setDefineMethodAttribute,
 };
+
+/** @noRailsEquivalent PERMANENT */
+export type AttributesClassHalf = AttributeRegistrationClassHalf &
+  AttributeMethodsClassHalf &
+  Extended<typeof ClassMethods> & {
+    attributeAliases: Record<string, string>;
+    isAttributeAliases: boolean;
+    attributeMethodPatterns: AttributeMethodPattern[];
+    isAttributeMethodPatterns: boolean;
+    /** @internal */
+    _aliasesByAttributeName: Map<string, string[]>;
+  };
+
+/** @noRailsEquivalent PERMANENT */
+export type AttributeRegistrationClassHalf = Extended<typeof AttributeRegistrationClassMethods>;
+
+/** @noRailsEquivalent PERMANENT */
+export type AttributeMethodsClassHalf = Extended<typeof AttributeMethodsClassMethods>;

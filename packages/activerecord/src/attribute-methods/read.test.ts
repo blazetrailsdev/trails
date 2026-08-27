@@ -6,6 +6,9 @@ import {
   isAttributeMethodsGenerated,
   ClassMethods,
 } from "../attribute-methods.js";
+import { defineMethodAttribute } from "./read.js";
+import { setDefineMethodAttribute } from "./write.js";
+import { AttributeMethods as AMAttributeMethods } from "@blazetrails/activemodel";
 
 fixtures({});
 
@@ -29,19 +32,20 @@ describe("ReadTest", () => {
       static attributeAliases = {};
       static _aliasesByAttributeName = new Map<string, string[]>();
       static defineAttributeMethods = defineAttributeMethods;
-      static defineMethodAttribute = Base.defineMethodAttribute;
-      static setDefineMethodAttribute = Base.setDefineMethodAttribute;
+      static defineMethodAttribute = defineMethodAttribute;
+      static setDefineMethodAttribute = setDefineMethodAttribute;
       static attributeMethodsGenerated = isAttributeMethodsGenerated;
       static attributeNames = () => ["one", "two", "three"];
       static _hasAttribute = ClassMethods._hasAttribute;
       static attributeTypes = () => ({});
       static aliasAttribute = Base.aliasAttribute;
       static defineAttributeMethod = Base.defineAttributeMethod;
-      static defineAttributeMethodPattern = Base.defineAttributeMethodPattern;
+      static defineAttributeMethodPattern =
+        AMAttributeMethods.ClassMethods.defineAttributeMethodPattern;
       static generatedAttributeMethods = Base.generatedAttributeMethods;
       static isInstanceMethodAlreadyImplemented = Base.isInstanceMethodAlreadyImplemented;
       static attributeMethodPatternsCache = Base.attributeMethodPatternsCache;
-      static aliasesByAttributeName = Base.aliasesByAttributeName;
+      static aliasesByAttributeName = AMAttributeMethods.ClassMethods.aliasesByAttributeName;
       static generateAliasAttributeMethods = Base.generateAliasAttributeMethods;
       static defineProxyCall = Base.defineProxyCall;
       static buildMangledName = Base.buildMangledName;

@@ -1,7 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { runCallbacks, throwAbort } from "@blazetrails/activesupport";
+import { runCallbacks, throwAbort, include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { type CallbackConditions } from "./callbacks.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 type GeneratedMacro<F> = (...args: Array<F | object | string | CallbackConditions>) => void;
 
@@ -88,7 +93,10 @@ describe("CallbacksTest", () => {
   it("only selects which types of callbacks should be created from an array list", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
           log.push("before");
@@ -98,6 +106,8 @@ describe("CallbacksTest", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     await p.isValid();
     expect(log).toContain("before");
@@ -106,10 +116,15 @@ describe("CallbacksTest", () => {
 
   it("no callbacks should be created", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     expect(await p.isValid()).toBe(true);
   });
@@ -209,7 +224,10 @@ describe("CallbacksTest", () => {
   it("the callback chain is not halted when around or after callbacks return false", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation((_r: any) => {
           log.push("after1");
@@ -220,6 +238,8 @@ describe("CallbacksTest", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(log).toEqual(["after1", "after2"]);
@@ -228,11 +248,16 @@ describe("CallbacksTest", () => {
   it("the :if option array should not be mutated by an after callback", async () => {
     const conditions = { if: (_r: any) => true };
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation((_r: any) => {}, conditions);
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(typeof conditions.if).toBe("function");
@@ -241,7 +266,10 @@ describe("CallbacksTest", () => {
   it("the callback chain is not halted when a before callback returns false)", async () => {
     const log: string[] = [];
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
           log.push("before");
@@ -251,6 +279,8 @@ describe("CallbacksTest", () => {
         });
       }
     }
+    interface MyModel extends Attributes {}
+
     const m = new MyModel({ name: "test" });
     await m.isValid();
     expect(log).toContain("before");

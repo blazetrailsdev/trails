@@ -1,10 +1,18 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
-import { assertPredicate, assertNothingRaised, Range } from "@blazetrails/activesupport";
+import { assertPredicate, assertNothingRaised, Range, include } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Model } from "../index.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Topic extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   static {
+    include(this, Attributes);
     this.attribute("title", "string");
     this.attribute("authorName", "string");
     this.attribute("content", "string");
@@ -15,12 +23,17 @@ class Topic extends Model {
     return 5;
   }
 }
+interface Topic extends Attributes {}
 
 class Person extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   static {
+    include(this, Attributes);
     this.attribute("karma", "string");
   }
 }
+interface Person extends Attributes {}
 
 describe("LengthValidationTest", () => {
   afterEach(() => {

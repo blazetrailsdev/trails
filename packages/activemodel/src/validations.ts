@@ -12,7 +12,6 @@ import { Errors } from "./errors.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
-import { freeze as attributesFreeze, type AttributeInstanceHost } from "./attributes.js";
 
 import { Naming } from "./naming.js";
 import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
@@ -338,7 +337,6 @@ export const InstanceMethods = {
   freeze<T extends ValidationsFreezeHost>(this: T): T {
     void this.errors;
     void this.contextForValidation();
-    attributesFreeze.call(this as unknown as AttributeInstanceHost);
     Object.freeze(this);
     return this;
   },

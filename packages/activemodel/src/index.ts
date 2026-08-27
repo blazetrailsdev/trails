@@ -28,13 +28,19 @@ export {
   NullMutationTracker,
 } from "./attribute-mutation-tracker.js";
 export {
+  AttributeRegistration,
   applyPendingAttributeModifications,
   PendingDefault,
   PendingType,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
-export type { AttributeOptions } from "./attributes.js";
+export type {
+  AttributeOptions,
+  AttributesClassHalf,
+  AttributeMethodsClassHalf,
+  AttributeRegistrationClassHalf,
+} from "./attributes.js";
 export {
   Attribute,
   FromDatabase,

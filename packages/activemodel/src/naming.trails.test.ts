@@ -1,8 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { TypeError } from "./attribute-assignment.js";
-import { Inflections } from "@blazetrails/activesupport";
+import { Inflections, include } from "@blazetrails/activesupport";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("naming (trails-only)", () => {
   class Post extends Model {}
@@ -186,10 +191,15 @@ describe("naming (trails-only)", () => {
   describe("humanAttributeName()", () => {
     it("humanizes attribute names at the Model level", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("first_name", "string");
         }
       }
+      interface User extends Attributes {}
+
       expect(User.humanAttributeName("first_name")).toBe("First name");
       expect(User.humanAttributeName("email")).toBe("Email");
     });
@@ -198,10 +208,15 @@ describe("naming (trails-only)", () => {
   describe("i18nScope", () => {
     it("returns 'activemodel' by default", () => {
       class User extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
         static {
+          include(this, Attributes);
           this.attribute("name", "string");
         }
       }
+      interface User extends Attributes {}
+
       expect(User.i18nScope).toBe("activemodel");
     });
   });

@@ -1,4 +1,4 @@
-import { DescendantsTracker, registerSubclass } from "@blazetrails/activesupport";
+import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
@@ -260,4 +260,12 @@ export const ClassMethods = {
   resolveAttributeName,
   resolveTypeName,
   hookAttributeType,
+};
+
+export const AttributeRegistration = {
+  ClassMethods,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `extend()`'s own AnyClass shape.
+  [included](base: new (...args: any[]) => any): void {
+    extend(base, ClassMethods);
+  },
 };

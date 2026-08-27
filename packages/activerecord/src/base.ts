@@ -31,6 +31,11 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
+  AttributeMethods as AMAttributeMethods,
+  AttributeMethodPattern,
+  type AttributeMethodsClassHalf,
+  AttributeRegistration,
+  type AttributeRegistrationClassHalf,
   Dirty as AMDirty,
   JSONSerializer,
   Model,
@@ -187,6 +192,7 @@ import {
   _hasAttribute as _privateHasAttribute,
   attributePresent as _attributePresent,
   attributeNames as _attributeNames,
+  attributes as _attributes,
   accessedFields as _accessedFields,
   attributesForCreate as _attributesForCreate,
   attributesForUpdate as _attributesForUpdate,
@@ -244,6 +250,7 @@ import {
   setDefineMethodAttribute as _setDefineMethodAttribute,
   writeAttribute as _writeAttributeMethod,
   _writeAttribute as _writeAttributeLowLevel,
+  Write as _Write,
 } from "./attribute-methods/write.js";
 import {
   BeforeTypeCast as _BeforeTypeCast,
@@ -1153,7 +1160,20 @@ export class Base extends Model {
       options = typeName;
       typeName = undefined;
     }
-    super.attribute(name, typeName, options);
+    // `ActiveRecord::Attributes::ClassMethods#attribute` IS
+    // `ActiveModel::AttributeRegistration::ClassMethods#attribute`
+    // (activerecord/attributes.rb:213 → attribute_registration.rb:12-20). TS has no
+    // `super` for a module outside the prototype chain, so the registration half is
+    // called through its import alias.
+    AttributeRegistration.ClassMethods.attribute.call(this as never, name, typeName, options);
+    // CLAUDE.md § "Generated attribute readers are properties" — Rails' AR
+    // `attribute` stops at the registration and lets `method_missing` generate the
+    // reader on first send, after `reload_schema_from_cache` (attributes.rb:267-271)
+    // has dropped the stale set. A generated reader here is an accessor PROPERTY,
+    // which no `method_missing` can create, so the declaration generates it eagerly
+    // — the same statement `ActiveModel::Attributes::ClassMethods#attribute` makes
+    // (attributes.rb:61) on a host that includes that module.
+    this.defineAttributeMethod(name);
     // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
     // `@attribute_names` recursively.
     ModelSchema.clearAttributeNamesMemo(this as never);
@@ -1179,7 +1199,7 @@ export class Base extends Model {
    * @internal Rails-private helper.
    * Mirrors: ActiveRecord::Base#hook_attribute_type (composed via module includes)
    */
-  static override hookAttributeType(name: string, type: Type): Type {
+  static hookAttributeType(name: string, type: Type): Type {
     const tzType = tzHookAttributeType.call(this as any, name, type);
     return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
   }
@@ -1189,7 +1209,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::ModelSchema::ClassMethods#type_for_attribute
    */
-  static override typeForAttribute(name: string, block?: () => Type): Type {
+  static typeForAttribute(name: string, block?: () => Type): Type {
     (ModelSchema.loadSchema as any).call(this);
     // Rails resolves attribute aliases first
     // (`attr_name = attribute_aliases[attr_name] || attr_name`).
@@ -1432,6 +1452,54 @@ export class Base extends Model {
   declare static appendToConnectedToStack: typeof ConnectionHandling.appendToConnectedToStack;
   /** @internal */
   declare static resolveConfigForConnection: typeof ConnectionHandling.resolveConfigForConnection;
+
+  // `include Attributes` (base.rb:311) → `include ActiveModel::AttributeRegistration`
+  // (activerecord/attributes.rb:8), and `include AttributeMethods` (base.rb:316)
+  // → `include ActiveModel::AttributeMethods` (activerecord/attribute_methods.rb:9).
+  // These declarations are the type side of the two `include()`/`extend()` calls
+  // at the bottom of this file, read off the module halves rather than restated
+  // here; the members `Base` overrides itself are class-body statics above.
+  declare static decorateAttributes: AttributeRegistrationClassHalf["decorateAttributes"];
+  declare static attributeTypes: AttributeRegistrationClassHalf["attributeTypes"];
+  /** @internal Rails-private helper. */
+  declare static pendingAttributeModifications: AttributeRegistrationClassHalf["pendingAttributeModifications"];
+  /** @internal Rails-private helper. */
+  declare static resetDefaultAttributesBang: AttributeRegistrationClassHalf["resetDefaultAttributesBang"];
+  /** @internal Rails-private helper. */
+  declare static resolveAttributeName: AttributeRegistrationClassHalf["resolveAttributeName"];
+
+  /**
+   * `class_attribute :attribute_aliases` / `:attribute_method_patterns`
+   * (activemodel/attribute_methods.rb:70-73), installed by the module's
+   * `included` hook.
+   */
+  declare static attributeAliases: Record<string, string>;
+  declare static isAttributeAliases: boolean;
+  declare static attributeMethodPatterns: AttributeMethodPattern[];
+  declare static isAttributeMethodPatterns: boolean;
+  declare static attributeMethodPrefix: AttributeMethodsClassHalf["attributeMethodPrefix"];
+  declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
+  declare static attributeMethodAffix: AttributeMethodsClassHalf["attributeMethodAffix"];
+  declare static generateAliasAttributeMethods: AttributeMethodsClassHalf["generateAliasAttributeMethods"];
+  declare static isAttributeAlias: AttributeMethodsClassHalf["isAttributeAlias"];
+  declare static attributeAlias: AttributeMethodsClassHalf["attributeAlias"];
+  declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
+  declare static defineAttributeMethodPattern: AttributeMethodsClassHalf["defineAttributeMethodPattern"];
+  declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
+  /** @internal Rails-private helper. */
+  declare static _aliasesByAttributeName: Map<string, string[]>;
+  /** @internal Rails-private helper (attribute_methods.rb:400-402). */
+  declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
+  /** @internal Rails-private helper. */
+  declare static attributeMethodPatternsCache: AttributeMethodsClassHalf["attributeMethodPatternsCache"];
+  /** @internal Rails-private helper. */
+  declare static attributeMethodPatternsMatching: AttributeMethodsClassHalf["attributeMethodPatternsMatching"];
+  /** @internal Rails-private helper. */
+  declare static defineProxyCall: AttributeMethodsClassHalf["defineProxyCall"];
+  /** @internal Rails-private helper. */
+  declare static buildMangledName: AttributeMethodsClassHalf["buildMangledName"];
+  /** @internal Rails-private helper. */
+  declare static defineCall: AttributeMethodsClassHalf["defineCall"];
 
   // --- ModelSchema mixin (wired via extend() after class) ---
   // Mirrors: ActiveRecord::Attributes
@@ -2973,7 +3041,13 @@ export class Base extends Model {
   declare isStrictLoadingAll: typeof _Core.isStrictLoadingAll;
   declare isStrictLoadingNPlusOneOnly: typeof _Core.isStrictLoadingNPlusOneOnly;
   declare isFrozen: typeof _Core.isFrozen;
-  declare freeze: typeof _Core.freeze;
+  /**
+   * `ActiveRecord::Core#freeze` (core.rb:596-599) — `@attributes =
+   * @attributes.clone.freeze; self`. Spelled `() => this` rather than
+   * `typeof _Core.freeze` so it stays assignable to the `this`-returning link
+   * `ActiveModel::Validations#freeze` puts on `Model` (validations.rb:372-377).
+   */
+  declare freeze: () => this;
 
   /**
    * Get the association that triggered the destruction of this record (if any).
@@ -4500,6 +4574,31 @@ extend(Base, {
   unscoped: _unscoped,
 });
 extend(Base, ModelSchema.ClassMethods);
+// `extend()` copies unconditionally, where Ruby's singleton ancestry puts a
+// `ClassMethods` module BELOW the class body — so the class-body halves of the
+// three members `AttributeRegistration::ClassMethods` also defines are captured
+// here and re-applied after the two includes, leaving Rails' precedence.
+const BaseAttributeRegistrationOverrides = {
+  attribute: Base.attribute,
+  typeForAttribute: Base.typeForAttribute,
+  hookAttributeType: Base.hookAttributeType,
+};
+// base.rb:311 — `include Attributes`, which is
+// `include ActiveModel::AttributeRegistration` (activerecord/attributes.rb:8)
+// and nothing else on the instance side. `ActiveModel::Model` does NOT carry it
+// (model.rb:42-45), so this include is where `Base` gets it.
+include(Base, AttributeRegistration);
+// base.rb:316 — `include AttributeMethods`, which is
+// `include ActiveModel::AttributeMethods` (activerecord/attribute_methods.rb:9).
+// ActiveRecord does NOT include `ActiveModel::Attributes` anywhere, so the
+// registration and method-generation halves arrive separately, in Rails' order:
+// AttributeMethods lands second, which is what makes its alias-resolving
+// `resolve_attribute_name` (activemodel/attribute_methods.rb:396-398) win over
+// the registration one (attribute_registration.rb:101-103).
+extend(Base, AMAttributeMethods.ClassMethods);
+include(Base, AMAttributeMethods.InstanceMethods);
+extend(Base, BaseAttributeRegistrationOverrides);
+
 extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
@@ -4611,6 +4710,11 @@ include(Base, {
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
   _writeAttribute: _writeAttributeLowLevel,
+  // write.rb:45 — `alias :attribute= :_write_attribute`. Ruby's `alias` captures
+  // the method as it stands in `Write`, so the `=` pattern's proxy target keeps
+  // reaching that body even though `HasReadonlyAttributes#_write_attribute`
+  // (readonly_attributes.rb:57-62) is included above it.
+  "attribute=": _writeAttributeLowLevel,
   // PrimaryKey
   toKey: _toKey,
   // Store (private instance helpers)
@@ -4619,7 +4723,12 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
-// attribute_methods.rb:14 includes BeforeTypeCast ahead of Dirty, so its
+// attribute_methods.rb:14 — `include Write`, whose `included do` block declares
+// the `=` writer pattern (write.rb:9-11). `ActiveModel::Model` does NOT carry it
+// (model.rb:42-45), so this include is where `Base` gets it, ahead of the
+// patterns the modules below add.
+include(Base, _Write);
+// attribute_methods.rb:15 includes BeforeTypeCast ahead of Dirty, so its
 // `included do` patterns (before_type_cast.rb:32-33) precede both halves of
 // Dirty's in `attributeMethodPatterns`.
 include(Base, _BeforeTypeCast);
@@ -4872,25 +4981,27 @@ for (const [name, fn] of [
 // Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid).
 _setSuperIsValid(Model.prototype.isValid);
 
-// Add attributes= setter (Rails: alias for assign_attributes) while preserving
-// the existing Model getter. Can't go through include() since object-literal
-// setters lose their descriptor; defineProperty merges both halves cleanly.
+// `ActiveRecord::AttributeMethods#attributes` (attribute_methods.rb:339-341) and
+// the `alias attributes= assign_attributes` `include AttributeAssignment`
+// (base.rb:302) brings with it (attribute_assignment.rb:36). Ruby resolves the
+// two independently; a JS property takes both halves from one descriptor, and
+// an object-literal setter loses its descriptor through `include()`, so
+// `defineProperty` merges them here.
 {
-  const modelGetter = Object.getOwnPropertyDescriptor(Model.prototype, "attributes")?.get;
-  if (modelGetter) {
-    Object.defineProperty(Base.prototype, "attributes", {
-      get: modelGetter,
-      set(this: Base, attrs: Record<string, unknown>) {
-        // A TS `set` accessor cannot await, so a key whose writer reaches the
-        // database is parked for `save` to drain; `setAttributes` is the
-        // awaitable spelling of the same alias (attribute_assignment.rb:36).
-        const pending = this.setAttributes(attrs);
-        if (pending) _NestedAttributes.parkNestedReaderLoad(this, pending);
-      },
-      configurable: true,
-      enumerable: false,
-    });
-  }
+  Object.defineProperty(Base.prototype, "attributes", {
+    get(this: Base): Record<string, unknown> {
+      return _attributes.call(this as unknown as ThisParameterType<typeof _attributes>);
+    },
+    set(this: Base, attrs: Record<string, unknown>) {
+      // A TS `set` accessor cannot await, so a key whose writer reaches the
+      // database is parked for `save` to drain; `setAttributes` is the
+      // awaitable spelling of the same alias (attribute_assignment.rb:36).
+      const pending = this.setAttributes(attrs);
+      if (pending) _NestedAttributes.parkNestedReaderLoad(this, pending);
+    },
+    configurable: true,
+    enumerable: false,
+  });
 }
 
 registerTableNameOptions({
