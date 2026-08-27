@@ -20,6 +20,7 @@ import { fileURLToPath } from "url";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { isTestFileUnported } from "@blazetrails/parity/unported-files";
 import { rubyToConventionTs } from "./test-compare/compare.js";
+import { normalizeTestName } from "../eslint/rails-test-name-parity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -39,11 +40,6 @@ interface RubyTestCase {
 interface RubyTestFile {
   file: string;
   testCases: RubyTestCase[];
-}
-
-/** Mirrors compare.ts `normalize` + `normalizeErb`. */
-export function normalizeTestName(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim().replace(/erb/g, "tse");
 }
 
 async function main() {
