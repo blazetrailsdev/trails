@@ -458,10 +458,7 @@ describe("the to_sql visitor", () => {
     mgr3.insert([[users.get("name"), Number.NaN]]);
     expect(mgr3.toSql()).toContain("VALUES (NaN)");
   });
-});
 
-describe("the to_sql visitor", () => {
-  const users = new Table("users");
   describe("Nodes::Cte", () => {
     it("handles CTEs with null materialized (tristate nil — no modifier)", () => {
       const cte = new Nodes.Cte("t", users.project(users.get("id")), null);
@@ -486,10 +483,7 @@ describe("the to_sql visitor", () => {
       expect(sql).toBe('"t" AS ( (SELECT 1) UNION ALL (SELECT 2) )');
     });
   });
-});
 
-describe("the to_sql visitor", () => {
-  const users = new Table("users");
   describe("Nodes::NotIn", () => {
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
@@ -498,18 +492,14 @@ describe("the to_sql visitor", () => {
       expect(collector.preparable).toBe(false);
     });
   });
-});
 
-describe("the to_sql visitor", () => {
   describe("Nodes::Fragments", () => {
     it("interleaves a space between values", () => {
       const node = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("foo bar");
     });
   });
-});
 
-describe("the to_sql visitor", () => {
   describe("Nodes::HomogeneousIn", () => {
     it("is not preparable", () => {
       // HomogeneousIn#casted_values reaches Table#type_for_attribute, which
@@ -524,9 +514,7 @@ describe("the to_sql visitor", () => {
       expect(collector.preparable).toBe(false);
     });
   });
-});
 
-describe("the to_sql visitor", () => {
   describe("value-class visitors aliased to unsupported", () => {
     // Rails aliases visit_Class/Date/DateTime/Float/Hash/NilClass/String/
     // Time/TrueClass/FalseClass and the ActiveSupport string types to
@@ -718,11 +706,7 @@ describe("the to_sql visitor", () => {
         ).toBe('"users"."id" = \'x\'');
       });
     });
-  });
-});
 
-describe("the to_sql visitor", () => {
-  describe("value-class visitors aliased to unsupported", () => {
     it("visit_Set is aliased to visit_Array (joins with ', ')", () => {
       // Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861).
       const v = new Visitors.ToSql(fakeRecordConnection);
@@ -739,10 +723,7 @@ describe("the to_sql visitor", () => {
       expect(out.value).toBe("1, 2");
     });
   });
-});
 
-describe("the to_sql visitor", () => {
-  const users = new Table("users");
   describe("Nodes::Equality", () => {
     it("emits IS NULL for a BindParam wrapping a bare null", () => {
       const node = new Nodes.Equality(users.get("id"), new Nodes.BindParam(null));
@@ -754,10 +735,7 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toContain("IS NOT NULL");
     });
   });
-});
 
-describe("the to_sql visitor", () => {
-  const users = new Table("users");
   const posts = new Table("posts");
   it("should mark collector as non-retryable if SQL literal is marked as retryable", () => {
     const lit = new Nodes.SqlLiteral("1", { retryable: true });
@@ -824,10 +802,7 @@ describe("the to_sql visitor", () => {
     const sql = new Visitors.ToSql(fakeRecordConnection).compile(values);
     expect(sql).toContain("(?)");
   });
-});
 
-describe("the to_sql visitor", () => {
-  const users = new Table("users");
   describe("TableAlias", () => {
     it("emits a subquery alias bare (Rails AliasPredication via SqlLiteral name)", () => {
       // SelectManager#as wraps the relation in a Grouping, which Rails'
@@ -845,10 +820,7 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain('"users" "u"');
     });
   });
-});
 
-describe("the to_sql visitor", () => {
-  const users = new Table("users");
   // Rails: to_sql.rb:632's `when ..., ActiveModel::Attribute` arm visits the
   // right, reaching visit_ActiveModel_Attribute (rb:756) and its add_bind.
   it("visits an ActiveModel::Attribute assignment right instead of quoting it", () => {
@@ -1135,23 +1107,6 @@ describe("the to_sql visitor", () => {
       const node = new Nodes.NotEqual(users.get("id"), unboundable(1));
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
     });
-  });
-
-  // `BindParam#unboundable?` (bind_param.rb:39-40) delegates to its value's
-  // `unboundable?`; the visitor never consults `infinite?` (bind_param.rb:35-37),
-  // which exists for `Predications#open_ended?` (predications.rb:248).
-  describe("BindParam unboundable short-circuit", () => {
-    const unboundable = (sign: 1 | -1) => new Nodes.BindParam({ isUnboundable: () => sign });
-
-    it("GreaterThan short-circuits to 1=0 for positive unboundable", () => {
-      const node = new Nodes.GreaterThan(users.get("id"), unboundable(1));
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=0");
-    });
-
-    it("GreaterThan short-circuits to 1=1 for negative unboundable", () => {
-      const node = new Nodes.GreaterThan(users.get("id"), unboundable(-1));
-      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("1=1");
-    });
 
     it("LessThan short-circuits to 1=1 for positive unboundable", () => {
       const node = new Nodes.LessThan(users.get("id"), unboundable(1));
@@ -1168,6 +1123,10 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe('"users"."id" > ?');
     });
   });
+
+  // `BindParam#unboundable?` (bind_param.rb:39-40) delegates to its value's
+  // `unboundable?`; the visitor never consults `infinite?` (bind_param.rb:35-37),
+  // which exists for `Predications#open_ended?` (predications.rb:248).
 
   // Mirrors Rails' to_sql.rb private helpers (sanitize_as_sql_comment,
   // quote_table_name, quote_column_name).

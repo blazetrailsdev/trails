@@ -122,10 +122,7 @@ describe("SelectManagerTest", () => {
       });
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("skip", () => {
     // Mirrors Rails: `skip(amount)` flows the raw value into
     // `Nodes::Offset.new(amount)` (select_manager.rb), no `Quoted` wrap.
@@ -152,10 +149,7 @@ describe("SelectManagerTest", () => {
       expect(mgr.offset).toBeNull();
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("take", () => {
     it("stores the raw amount on the Limit (no Quoted wrap)", () => {
       const mgr = new SelectManager(users).take(5);
@@ -212,10 +206,7 @@ describe("SelectManagerTest", () => {
       expect(new Visitors.ToSql(fakeRecordConnection).compile(q1.minus(q2))).toContain("EXCEPT");
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("taken", () => {
     it("taken aliases limit", () => {
       const mgr = users.project(star()).take(5);
@@ -223,27 +214,19 @@ describe("SelectManagerTest", () => {
       expect(mgr.taken).toBe(5);
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("order", () => {
     it("accepts string and wraps in SqlLiteral", () => {
       const mgr = users.project(star()).order("name ASC");
       expect(mgr.toSql()).toContain("ORDER BY name ASC");
     });
   });
-});
 
-describe("SelectManagerTest", () => {
   it("froms filters null — fromless manager returns empty array", () => {
     const mgr = new SelectManager();
     expect(mgr.froms).toHaveLength(0);
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("delete", () => {
     it("limited composite-key delete renders a row-value subselect", () => {
       const mgr = new SelectManager();
@@ -255,10 +238,7 @@ describe("SelectManagerTest", () => {
       );
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("update", () => {
     it("takes a bound sql literal", () => {
       const mgr = new SelectManager();
@@ -273,10 +253,7 @@ describe("SelectManagerTest", () => {
       expect(stmt.toSql()).toBe('UPDATE "users" SET foo = ?');
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("where", () => {
     it("accepts a TreeManager and unwraps to ast", () => {
       const sub = users.project(users.get("id")).where(users.get("active").eq(true));
@@ -284,10 +261,7 @@ describe("SelectManagerTest", () => {
       expect(mgr.toSql()).toContain("WHERE");
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
   describe("comment", () => {
     it("stores the Comment node on the SelectCore (Rails fidelity)", () => {
       const mgr = users.project(star()).comment("trace");
@@ -306,11 +280,7 @@ describe("SelectManagerTest", () => {
       expect(matches.length).toBe(1);
     });
   });
-});
 
-describe("SelectManagerTest", () => {
-  const users = new Table("users");
-  const posts = new Table("posts");
   it("chains where + order + limit + offset", () => {
     expect(
       users
