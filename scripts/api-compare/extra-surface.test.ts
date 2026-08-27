@@ -13,6 +13,8 @@ import {
   gateUnclassified,
   gateStale,
   gateFileTagRejections,
+  concernHookNames,
+  concernHookKey,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -294,6 +296,137 @@ describe("buildReport — ActiveSupport::Concern allow-set", () => {
 
   it("does not allow them on a class that does not include the Concern", () => {
     expect(run([]).sort()).toEqual(["modelName", "validates"]);
+  });
+});
+
+describe("concernHookNames", () => {
+  it("credits [included] for an `included do` block", () => {
+    // activemodel/lib/active_model/conversion.rb:27-33 — the block only calls
+    // `class_attribute`, so nothing about it reaches the manifest.
+    const source = [
+      "module ActiveModel",
+      "  module Conversion",
+      "    extend ActiveSupport::Concern",
+      "",
+      "    included do",
+      '      class_attribute :param_delimiter, default: "-"',
+      "    end",
+      "  end",
+      "end",
+    ].join("\n");
+    expect([...concernHookNames(source)]).toEqual(["[included]"]);
+  });
+
+  it("credits [included] for a `def self.included` hook", () => {
+    expect([...concernHookNames("  def self.included(base)\n  end\n")]).toEqual(["[included]"]);
+  });
+
+  it("credits [extended] for a `def self.extended` hook", () => {
+    // activemodel/lib/active_model/callbacks.rb:66.
+    expect([...concernHookNames("    def self.extended(base) # :nodoc:\n    end\n")]).toEqual([
+      "[extended]",
+    ]);
+  });
+
+  it("credits nothing for a module with no hook", () => {
+    const source = ["module ActiveModel", "  module Naming", "  end", "end"].join("\n");
+    expect([...concernHookNames(source)]).toEqual([]);
+  });
+
+  it("does not credit an `included` call that is not the block form", () => {
+    expect([...concernHookNames("  self.included_modules\n  included?(x)\n")]).toEqual([]);
+  });
+});
+
+describe("buildReport — symbol-keyed Concern hook", () => {
+  function makeManifests(): { ruby: ApiManifest; ts: ApiManifest } {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {},
+          modules: {
+            "ActiveModel::Conversion": {
+              name: "Conversion",
+              file: "conversion.rb",
+              includes: [],
+              extends: ["ActiveSupport::Concern"],
+              instanceMethods: [],
+              classMethods: [],
+            },
+            "ActiveModel::Naming": {
+              name: "Naming",
+              file: "naming.rb",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Conversion: {
+              name: "Conversion",
+              file: "conversion.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("[included]")],
+            },
+            Naming: {
+              name: "Naming",
+              file: "naming.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("[included]")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return { ruby, ts };
+  }
+
+  const run = (concernHooks: Map<string, Set<string>>): Record<string, string[]> => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+      concernHooks,
+    });
+    return Object.fromEntries(
+      (report.packages[0]?.extraFiles ?? []).map((f) => [f.tsFile, f.extras.map((e) => e.name)]),
+    );
+  };
+
+  it("credits the hook where the Ruby file declares an included block", () => {
+    const hooks = new Map([
+      [concernHookKey("activemodel", "conversion.rb"), new Set(["[included]"])],
+    ]);
+    expect(run(hooks)["conversion.ts"]).toBeUndefined();
+  });
+
+  it("keeps the hook novel where the Ruby file declares none", () => {
+    const hooks = new Map([
+      [concernHookKey("activemodel", "conversion.rb"), new Set(["[included]"])],
+    ]);
+    expect(run(hooks)["naming.ts"]).toEqual(["[included]"]);
+  });
+
+  it("credits nothing when no hooks are supplied", () => {
+    expect(run(new Map())["conversion.ts"]).toEqual(["[included]"]);
   });
 });
 
