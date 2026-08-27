@@ -15,7 +15,7 @@ export interface DirtyOptions {
 
 /**
  * The host `include ActiveModel::Dirty` needs — a class that already carries
- * `ActiveModel::AttributeMethods`, which `dirty.rb:130` includes.
+ * `ActiveModel::AttributeMethods`, which `dirty.rb:125` includes.
  */
 interface DirtyIncludeHost {
   prototype: object;
@@ -358,6 +358,13 @@ export function initAttributes(
  * `_mutationsBeforeLastSave` (dirty.rb:373-374), so those are the names to
  * except. Ruby's `super` is `super_()`, the receiver-bound link `prepend()`
  * hands the module.
+ *
+ * Deliberately NOT a link in a host that also serializes through
+ * `serializable_hash`: `ActiveModel::Serializers::JSON#as_json`
+ * (json.rb:96-108) is included after Dirty and does not call `super`, so Ruby's
+ * lookup never reaches this body there. It applies to a Dirty-including model
+ * whose `as_json` is still `Object`'s — Rails' `DirtyTest::DirtyModel`
+ * (dirty_test.rb:6-43).
  */
 export function asJson(
   this: unknown,
