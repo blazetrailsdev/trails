@@ -1231,11 +1231,6 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
     }
   }
   const adapterOwner = this;
-  // Rails reaches the schema cache as the one-arg, pool-bound handle
-  // (`AbstractAdapter#schema_cache`, abstract_adapter.rb:298); on a
-  // lone-connection pool `for_lone_connection` (schema_cache.rb:155) is what
-  // keeps the read off `pool.with_connection`, and the getter picks that
-  // shape itself.
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
   const table = this.tableName;

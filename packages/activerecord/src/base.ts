@@ -2874,10 +2874,6 @@ export class Base extends Model {
     // of the scalar pass and calls `assign_multiparameter_attributes` itself
     // (attribute_assignment.rb:11-22).
     const ctor = new.target;
-    // Store-accessor keys need no split here: `store_accessor` generates an
-    // ordinary `#{key}=` writer (store.rb:96-120), so super() reaches it
-    // through `_assign_attribute`'s `public_send("#{k}=", v)`
-    // (activemodel/attribute_assignment.rb:67-75) like any other key.
     const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
     const wasSuppressed = suppressor._suppressInitializeCallback;
