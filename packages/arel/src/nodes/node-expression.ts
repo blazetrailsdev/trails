@@ -27,9 +27,7 @@ export abstract class NodeExpression extends Node {
  */
 type _Predications = import("../predications.js").PredicationsModule;
 type _Math = import("../math.js").MathModule;
-type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
 type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface NodeExpression
-  extends _Predications, _Math, _Expressions, _AliasPredication, _OrderPredications {}
+export interface NodeExpression extends _Predications, _Math, _Expressions, _OrderPredications {}

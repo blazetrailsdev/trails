@@ -98,9 +98,7 @@ export class Aliases {
   }
 
   selectArel(): Nodes.As[] {
-    return this._tables.flatMap((t) =>
-      t.columns.map((c) => t.table.get(c.column).as(c.alias) as Nodes.As),
-    );
+    return this._tables.flatMap((t) => t.columns.map((c) => t.table.get(c.column).as(c.alias)));
   }
 }
 

@@ -21,6 +21,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
 
 _setBuildQuoted(buildQuoted);
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Casted extends NodeExpression {
   readonly value: unknown;
   readonly attribute: Attribute;
@@ -88,3 +89,7 @@ export class Quoted extends Unary {
     return this.expr;
   }
 }
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Casted extends _AliasPredication {}

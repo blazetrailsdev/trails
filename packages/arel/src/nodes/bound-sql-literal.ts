@@ -5,6 +5,7 @@ import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
 import { Fragments } from "./fragments.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BoundSqlLiteral extends NodeExpression {
   readonly sqlWithPlaceholders: string;
   readonly positionalBinds: unknown[] | null;
@@ -81,3 +82,7 @@ export class BoundSqlLiteral extends NodeExpression {
     return new Fragments([this, other as Node]);
   }
 }
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface BoundSqlLiteral extends _AliasPredication {}

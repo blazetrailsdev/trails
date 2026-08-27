@@ -7,7 +7,7 @@ function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unkn
   return visitor.compile(node as never, collector) as [string, unknown[]];
 }
 
-describe("MatchesTest", () => {
+describe("Matches escape handling", () => {
   const users = new Table("users");
 
   describe("escape", () => {

@@ -39,6 +39,7 @@ export const FetchAttribute = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Binary extends NodeExpression {
   left: NodeOrValue;
   right: NodeOrValue;
@@ -220,3 +221,7 @@ include(LessThanOrEqual as unknown as Includable, fetchAttributeModule);
 include(IsDistinctFrom as unknown as Includable, fetchAttributeModule);
 include(IsNotDistinctFrom as unknown as Includable, fetchAttributeModule);
 include(NotIn as unknown as Includable, fetchAttributeModule);
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Binary extends _AliasPredication {}

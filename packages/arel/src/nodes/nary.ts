@@ -3,6 +3,7 @@ import { _setAnd, _setOr } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Nary extends NodeExpression {
   readonly children: Node[];
 
@@ -50,3 +51,7 @@ export class Or extends Nary {}
 
 _setAnd(And);
 _setOr(Or);
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Nary extends _AliasPredication {}
