@@ -27,8 +27,6 @@ export interface AttributeRegistrationClassMethods {
   typeForAttribute(name: string, block?: () => Type): Type;
 }
 
-export type AttributeRegistration = AttributeRegistrationClassMethods;
-
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
   _cachedAttributeTypes?: Record<string, Type> | null;
@@ -416,3 +414,23 @@ export function hookAttributeType(
 ): Type {
   return type;
 }
+
+/**
+ * Mirrors: ActiveModel::AttributeRegistration::ClassMethods
+ * (attribute_registration.rb:11-115) — everything `include
+ * ActiveModel::AttributeRegistration` puts on the includer's singleton,
+ * including the `private` half at :53-115 (Ruby's `private` does not take a
+ * method off the module).
+ */
+export const ClassMethods = {
+  attribute,
+  decorateAttributes,
+  _defaultAttributes,
+  attributeTypes,
+  typeForAttribute,
+  pendingAttributeModifications,
+  resetDefaultAttributesBang,
+  resolveAttributeName,
+  resolveTypeName,
+  hookAttributeType,
+};

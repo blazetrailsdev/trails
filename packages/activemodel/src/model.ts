@@ -44,7 +44,6 @@ import {
   attribute,
   attributeNames,
   setDefineMethodAttribute,
-  _writeAttribute,
   initializeDup as attributesInitializeDup,
 } from "./attributes.js";
 import {
@@ -542,35 +541,11 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
-// Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
-extend(Model, {
-  decorateAttributes,
-  attributeTypes,
-  typeForAttribute: staticTypeForAttribute,
-  _defaultAttributes,
-  pendingAttributeModifications: _pendingAttributeModificationsHelper,
-  resetDefaultAttributesBang: _resetDefaultAttributesBangHelper,
-  resolveTypeName: _resolveTypeNameHelper,
-  hookAttributeType: _hookAttributeTypeHelper,
-});
-// `include ActiveModel::AttributeMethods` lands after AttributeRegistration
-// (model.rb:12-14), so its alias-resolving `resolve_attribute_name` override
-// (attribute_methods.rb:396-398) wins over the registration one. The module's
-// ClassMethods land on the class and its instance methods on instances, which
-// is what lets every ported body self-send them.
-extend(Model, AttributeMethods.ClassMethods);
-// Its `included do` block (attribute_methods.rb:70-73) rides along, issued from
-// the module's own `[included]` hook.
-include(Model, AttributeMethods.InstanceMethods);
-
-// `include ActiveModel::Attributes` (attributes.rb:29) — its `included` hook
-// issues `attribute_method_suffix "=", parameters: "value"` (attributes.rb:35),
-// so it has to run after the `attributeMethodPatterns` class attribute exists.
-extend(Model, AttributesClassMethods);
-extend(Model, { defineMethodAttribute });
+// `include ActiveModel::Attributes` (attributes.rb:30), which is itself
+// `AttributeRegistration` + `AttributeMethods` (attributes.rb:32-33) — the
+// module's `[included]` hook issues all three class halves and its own
+// `included do` block, so this is the one statement Ruby writes.
 include(Model, Attributes);
-// attributes.rb:156-159 — `_write_attribute` and `alias :attribute= :_write_attribute`.
-include(Model, { _writeAttribute, "attribute=": _writeAttribute });
 
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Range } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
+import { Errors } from "./errors.js";
+import { Validations } from "./validations.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
 // Trails-only extras that have no `validations_test.rb` counterpart. They live
@@ -1807,6 +1810,43 @@ describe("ValidationsTest (trails)", () => {
       expect(u.errors.generateMessage("age", ":greater_than", { count: 0 })).toBe(
         "must be greater than 0",
       );
+    });
+  });
+
+  // `include ActiveModel::Validations` is a Concern (validations.rb:37), so a
+  // Ruby includer gets `ClassMethods` (validations.rb:57-307) and the
+  // reopenings at `validations/with.rb:87` and `validations/validates.rb:110`
+  // from the one `include` — no `extend` at the call site.
+  describe("include Validations", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (validations.rb:37); the class/interface merge is how `include()` surfaces on the type side.
+    interface Host extends Validations {
+      title: string | null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    class Host {
+      title: string | null = null;
+
+      constructor() {
+        this.errors = new Errors(this);
+      }
+
+      readAttributeForValidation(attribute: string): unknown {
+        return (this as unknown as Record<string, unknown>)[attribute];
+      }
+    }
+    include(Host, Validations);
+    (Host as unknown as { validates(...args: unknown[]): void }).validates("title", {
+      presence: true,
+    });
+
+    it("gives the includer the class macros and the runner", async () => {
+      const host = new Host();
+      expect(await host.isValid()).toBe(false);
+      expect(host.errors.messages.get("title")).toEqual(["can't be blank"]);
+
+      host.title = "hello";
+      expect(await host.isValid()).toBe(true);
     });
   });
 });

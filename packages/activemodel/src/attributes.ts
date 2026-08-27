@@ -1,14 +1,16 @@
-import { include, type CodeGenerator, included } from "@blazetrails/activesupport";
+import { extend, include, type CodeGenerator, included } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
   ClassMethods as AttributeMethodsClassMethods,
   InstanceMethods as AttributeMethodsInstanceMethods,
+  defineMethodAttribute,
   type AttributeMethodHost,
   type AttributeMethod,
 } from "./attribute-methods.js";
 import {
+  ClassMethods as AttributeRegistrationClassMethods,
   attribute as registrationAttribute,
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
@@ -203,6 +205,10 @@ export interface Attributes {
  *
  * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
  */
+/** The class Ruby's `included(base)` hook receives (attributes.rb:35). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
+
 /** A class with `ActiveModel::AttributeMethods` already extended onto it. */
 type AttributeMethodSuffixHost = AttributeMethodHost & {
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
@@ -217,7 +223,32 @@ export class Attributes {
    *   end
    */
   static [included](base: AttributeMethodSuffixHost): void {
+    // attributes.rb:32-33 — `include ActiveModel::AttributeRegistration` and
+    // `include ActiveModel::AttributeMethods`. Both are Concerns whose whole
+    // contribution is a `ClassMethods` extend (attribute_registration.rb has no
+    // `included do` block); AttributeMethods lands second, which is what makes
+    // its alias-resolving `resolve_attribute_name` (attribute_methods.rb:396-398)
+    // win over the registration one (attribute_registration.rb:101-103).
+    extend(base, AttributeRegistrationClassMethods);
+    extend(base, AttributeMethodsClassMethods);
+    include(base as unknown as IncludingClass, AttributeMethodsInstanceMethods);
+
+    // attributes.rb:39 — the module's own `ClassMethods`, whose `attribute`
+    // (:59-61) and `define_method_attribute=` (:92-104) override the
+    // registration halves.
+    extend(base, ClassMethods);
+    extend(base, { defineMethodAttribute });
+
+    // attributes.rb:35 — the `included do` block.
     base.attributeMethodSuffix("=", { parameters: "value" });
+
+    // attributes.rb:156-159 — `_write_attribute` and
+    // `alias :attribute= :_write_attribute`, private instance methods this
+    // file declares as free functions rather than on the prototype.
+    include(base as unknown as IncludingClass, {
+      _writeAttribute,
+      "attribute=": _writeAttribute,
+    });
   }
 
   _attributes: AttributeSet;
@@ -277,3 +308,14 @@ export class Attributes {
 // brings `attribute_missing` with it; the interface merge above is its type
 // side.
 include(Attributes, { attributeMissing: AttributeMethodsInstanceMethods.attributeMissing });
+
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-104) — the
+ * class half `include ActiveModel::Attributes` contributes, issued from the
+ * module's own `[included]` hook.
+ */
+export const ClassMethods = {
+  attribute,
+  attributeNames,
+  setDefineMethodAttribute,
+};

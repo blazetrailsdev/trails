@@ -16,6 +16,11 @@ import { freeze as attributesFreeze, type AttributeInstanceHost } from "./attrib
 
 import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
 import { HelperMethods } from "./validations/helper-methods.js";
+import {
+  ClassMethods as WithClassMethods,
+  validatesWith as withValidatesWith,
+} from "./validations/with.js";
+import * as Validates from "./validations/validates.js";
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import type { CallbackFn, CallbackConditions } from "./callbacks.js";
 import {
@@ -123,12 +128,40 @@ export class Validations {
    * `lookup_ancestors` and `i18n_scope` (translation.rb:20, :27, :44).
    */
   static [included](base: IncludingClass): void {
+    // `ActiveSupport::Concern#append_features` extends `ClassMethods` before it
+    // class_evals the `included do` block, so the macros land first. Ruby's
+    // reopenings of the same module (`validations/with.rb:87`,
+    // `validations/validates.rb:110`) ride along on the one `extend`; each
+    // reopening lives in the `.ts` matching its `.rb`, so they are separate
+    // `extend()` calls here.
+    extend(base, ClassMethods);
+    extend(base, WithClassMethods);
+    extend(base, {
+      validates: Validates.validates,
+      validatesBang: Validates.validatesBang,
+      _validatesDefaultKeys: Validates._validatesDefaultKeys,
+      _parseValidatesOptions: Validates._parseValidatesOptions,
+    });
+
     extend(base, Callbacks);
     extend(base, Translation);
     extend(base, HelperMethods);
     include(base, HelperMethods);
     defineCallbacks(base.prototype, "validate", { scope: ["name"] });
     classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
+
+    // The module's own instance methods that this file (and
+    // `validations/with.rb:144-151`) declares as free functions rather than on
+    // the `Validations` prototype — `include()` copies a class module's
+    // prototype, so these need the second call.
+    include(base, {
+      contextForValidation,
+      runValidationsBang,
+      raiseValidationError,
+      readAttributeForValidation,
+      freeze,
+      validatesWith: withValidatesWith,
+    });
   }
 
   declare errors: Errors;
