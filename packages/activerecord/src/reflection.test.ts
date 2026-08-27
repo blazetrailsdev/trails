@@ -970,6 +970,7 @@ describe("ReflectionTest", () => {
   it("non existent columns return null object", async () => {
     await CanonicalTopic.loadSchema();
     const column = (CanonicalTopic as any).columnForAttribute("attribute_that_doesnt_exist");
+    expect(column).toBeInstanceOf(NullColumn);
     expect(column.name).toBe("attribute_that_doesnt_exist");
     expect(column.sqlType).toBeNull();
     expect(column.type).toBeNull();

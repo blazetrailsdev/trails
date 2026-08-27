@@ -10,6 +10,11 @@
  * connected model with a real table is DB-faithful without a prior reflection —
  * matching Rails' `columns.map(&:name)`.
  *
+ * The cold-cache half of that boundary is gone: `columns_hash` is a pure DB read
+ * (model_schema.rb:592-594), so an unreflected model has no columns rather than
+ * a set synthesized from its declarations. Only the warm path this file pins
+ * remains.
+ *
  * `fixtures([], { useTransactionalTests: false })` here on purpose: the
  * transactional variant's per-test `clearSchemaCache` teardown would wipe the
  * boot-warmed cache, which is exactly the cold-cache state this test must avoid.

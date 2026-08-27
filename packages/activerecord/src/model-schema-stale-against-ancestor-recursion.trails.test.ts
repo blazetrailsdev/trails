@@ -14,7 +14,7 @@ function makeAdapter(): unknown {
   return {
     internalSchemaCache: {
       isCached: () => true,
-      getCachedColumnsHash: () => columns,
+      getCachedColumnsHash: () => undefined,
       dataSourceExists: async () => true,
       columnsHash: async () => columns,
     },
@@ -36,6 +36,11 @@ describe("loadSchema — subclass left stale by an ancestor invalidation", () =>
     reloadSchemaFromCache.call(Base as never);
 
     expect(() => loadSchema.call(Topic as never)).not.toThrow();
-    expect(Object.keys(Topic.columnsHash())).toEqual(["id", "title"]);
+    // `isCached` is true but the cache has no `_columnsHash` entry, so nothing
+    // is reflected. `columns_hash` is a pure DB read (model_schema.rb:592-594):
+    // the declared `id`/`title` attributes are not columns, and `_schemaLoaded`
+    // stays unset so a later load can still run the real read.
+    expect(Topic.columnsHash()).toEqual({});
+    expect((Topic as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(false);
   });
 });
