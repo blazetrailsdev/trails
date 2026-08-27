@@ -224,6 +224,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
+    // `schema_collation` fetches this lazily inside its own body
+    // (mysql/schema_dumper.rb:66-71); that query is async here and
+    // `schemaCollation` is sync, so it is issued from this async point.
+    await this.populateTableCollationFromStatus(tableName);
     await super.table(tableName, stream);
   }
 

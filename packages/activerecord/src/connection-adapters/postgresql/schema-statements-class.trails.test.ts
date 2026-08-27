@@ -442,12 +442,15 @@ describe("SchemaStatements#dropTable", () => {
     expect(clearedTables).toEqual(["posts", "comments"]);
   });
 
-  it("throws ArgumentError when called with no table names", async () => {
-    const { adapter } = makeFakeAdapter();
+  // Ruby's `*table_names` splat makes the zero-name call a no-op
+  // (postgresql/schema_statements.rb:57-60 builds an empty `join(", ")`; no
+  // adapter raises), so there is nothing to assert here beyond the no-op the
+  // abstract body's own test pins.
+  it("issues no statement when called with no table names", async () => {
+    const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await expect(
-      (ss as unknown as { dropTable: () => Promise<void> }).dropTable(),
-    ).rejects.toBeInstanceOf(ArgumentError);
+    await (ss as unknown as { dropTable: () => Promise<void> }).dropTable();
+    expect(executed).toEqual([`DROP TABLE `]);
   });
 });
 

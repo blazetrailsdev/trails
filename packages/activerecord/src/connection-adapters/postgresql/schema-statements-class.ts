@@ -134,9 +134,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const hasOptions = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
     const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
-    if (tableNames.length === 0) {
-      throw new ArgumentError("dropTable requires at least one table name");
-    }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     for (const name of tableNames) {

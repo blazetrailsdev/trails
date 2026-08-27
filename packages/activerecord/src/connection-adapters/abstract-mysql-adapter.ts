@@ -1562,9 +1562,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       force?: boolean | "cascade";
       temporary?: boolean;
     };
-    if (tableNames.length === 0) {
-      throw new ArgumentError("dropTable requires at least one table name");
-    }
     for (const tableName of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
     }

@@ -6,10 +6,7 @@ import {
   _assignAttributes,
   _assignAttribute,
 } from "./attribute-assignment.js";
-import {
-  sanitizeForMassAssignment,
-  sanitizeForbiddenAttributes,
-} from "./forbidden-attributes-protection.js";
+import { ForbiddenAttributesProtection } from "./forbidden-attributes-protection.js";
 import { Validations, type ValidationContext } from "./validations.js";
 import type { AttrNameArg } from "./validations/helper-methods.js";
 import type { validatesWith as withValidatesWith } from "./validations/with.js";
@@ -72,9 +69,13 @@ export class API {
       attributeWriterMissing,
       _assignAttributes,
       _assignAttribute,
-      sanitizeForMassAssignment,
-      sanitizeForbiddenAttributes,
     });
+
+    // attribute_assignment.rb:7 — `include ActiveModel::ForbiddenAttributesProtection`,
+    // which the include above brings along in Ruby; `include()` copies a
+    // module's own members, not its nested includes, so the module goes on
+    // itself here.
+    include(base, ForbiddenAttributesProtection);
 
     // api.rb:62 — `include ActiveModel::Validations`. The module's own
     // `[included]` hook issues its `ClassMethods` half and its `included do`

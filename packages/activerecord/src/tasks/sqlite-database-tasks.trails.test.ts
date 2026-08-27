@@ -205,9 +205,10 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
 });
 
 // trails-only: an in-memory database has no file for a child `sqlite3` to
-// attach, so structureDump/structureLoad take the named non-CLI fallback
-// (`inMemoryStructureDump` / `inMemoryStructureLoad`). Rails has no in-memory
-// lane and so no counterpart test.
+// attach, so structureDump materialises it with `VACUUM INTO` before shelling
+// out and structureLoad takes the named non-CLI fallback
+// (`inMemoryStructureLoad`). Rails has no in-memory lane and so no counterpart
+// test.
 //
 // Both tests seed through `structureLoad` rather than a second connection:
 // better-sqlite3 takes a plain filename, not a SQLite URI, so a `:memory:`
@@ -305,5 +306,28 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
     expect(contents).toMatch(/CREATE TRIGGER touch_widgets/);
     expect(contents).toMatch(/UPDATE widgets SET updated_at/);
     expect(contents).toMatch(/index_widgets_on_name/);
+  });
+
+  it("dumps an in-memory database byte-for-byte as it dumps a file-backed one", async () => {
+    const schema =
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT);\n" +
+      "CREATE INDEX index_widgets_on_name ON widgets(name);\n";
+
+    const tasks = new SQLiteDatabaseTasks(configuration);
+    await tasks.structureLoad(sqlFile(schema));
+    const fromMemory = sqlFile();
+    await tasks.structureDump(fromMemory);
+
+    const dbFile = tmpDbPath();
+    created.push(dbFile);
+    const fileTasks = new SQLiteDatabaseTasks(
+      new HashConfig("development", "primary", { adapter: "sqlite3", database: dbFile }),
+    );
+    await fileTasks.structureLoad(sqlFile(schema));
+    const fromFile = sqlFile();
+    await fileTasks.structureDump(fromFile);
+
+    expect(fs.readFileSync(fromMemory, "utf8")).toEqual(fs.readFileSync(fromFile, "utf8"));
+    expect(fs.existsSync(`${fromMemory}.dump.sqlite3`)).toBe(false);
   });
 });

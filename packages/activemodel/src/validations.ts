@@ -53,37 +53,6 @@ export const _defineAroundModelCallback = _defineAroundModelCallbackImpl;
 export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
 
 /**
- * Mirrors: ActiveModel::Validations
- * (validations.rb:437 `alias :read_attribute_for_validation :send`).
- *
- * The literal translation of `send(attr)`: dispatch the public reader named
- * after the attribute. trails exposes declared attributes as value-returning
- * getters (which read the attribute store, exactly like the generated reader
- * Rails' `send` would call) and custom readers as methods, so a function member
- * is invoked (Ruby `send(:full_name)`) and a value member returned directly. A
- * plain getter with no declared attribute is therefore honored, not read as nil.
- * A name that resolves to no reader raises, mirroring Ruby `send`'s
- * `NoMethodError` (a typo'd / undeclared validation attribute fails loud rather
- * than validating a nil-ish value). `EachValidator` dispatches through any
- * instance override (validator.ts).
- */
-export function readAttributeForValidation(
-  this: ReadAttributeForValidationHost,
-  attribute: string,
-): unknown {
-  // Ruby `send` keys off method *existence* (`respond_to?`), not the return
-  // value: a reader that exists and returns nil yields nil, only a name with
-  // no reader raises NoMethodError. `key in this` is the JS analog — it sees
-  // own data properties, getters, and inherited methods up the prototype chain.
-  if (!(attribute in this)) {
-    const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
-    throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
-  }
-  const reader = this[attribute];
-  return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
-}
-
-/**
  * Host shape consumed by `initInternals`. Kept loose so any class with
  * the validation-related fields satisfies it without circular imports
  * back to `Model`.
@@ -92,23 +61,6 @@ export interface ValidationsInternalsHost<TBase extends object = object> {
   errors: Errors<TBase>;
   _validationContext: string | string[] | null;
   _contextForValidation?: ValidationContext;
-}
-
-/**
- * Lazy per-instance accessor for the active `ValidationContext`.
- * Mirrors Rails
- * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
- * (activemodel/lib/active_model/validations.rb:463-465). The returned object owns
- * the active context — Rails keeps it here, not in a model ivar (:503-505, :361-368),
- * which is what lets a frozen model be validated.
- *
- * @internal Rails-private helper.
- */
-export function contextForValidation(this: ContextForValidationHost): ValidationContext {
-  if (this._contextForValidation) return this._contextForValidation;
-  const vc = new ValidationContext();
-  this._contextForValidation = vc;
-  return vc;
 }
 
 /** The class Ruby's `included(base)` hook receives (validations.rb:40). */
@@ -138,14 +90,12 @@ export class Validations {
     // the rest of `super` — the members validations.rb declares on the module
     // itself (:296-306, :376, :437, :467-471, :589) and `with.rb:144-151`,
     // which this port spells as free functions rather than prototype methods.
-    include(base, {
-      contextForValidation,
-      runValidationsBang,
-      raiseValidationError,
-      readAttributeForValidation,
-      freeze,
-      validatesWith: withValidatesWith,
-    });
+    include(base, InstanceMethods);
+
+    // `validations/with.rb:144-151` reopens the same module to add
+    // `validates_with`; each reopening lives in the `.ts` matching its `.rb`,
+    // so it is its own `include()` here.
+    include(base, { validatesWith: withValidatesWith });
 
     // concern.rb:137 — `base.extend const_get(:ClassMethods)`. Ruby's
     // reopenings of the same module (`validations/with.rb:87`,
@@ -559,35 +509,11 @@ export function initInternals<TBase extends object>(
   this._contextForValidation = undefined;
 }
 
-/**
- * Run the `:validate` callbacks and report whether the model has no
- * errors. Mirrors Rails
- * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
- * (activemodel/lib/active_model/validations.rb:473-476).
- *
- * @internal Rails-private helper.
- */
-export async function runValidationsBang(this: RunValidationsHost): Promise<boolean> {
-  await this._runValidateCallbacks();
-  return this.errors.empty;
-}
-
 /** Host shape the {@link freeze} link reads through. */
 interface ValidationsFreezeHost {
   readonly errors: unknown;
   /** @internal */
   contextForValidation(): unknown;
-}
-
-/**
- * Throw `ValidationError` for the current model. Mirrors Rails
- * `def raise_validation_error; raise(ValidationError.new(self)); end`
- * (activemodel/lib/active_model/validations.rb:478-480).
- */
-export function raiseValidationError<TBase extends object = object>(this: {
-  errors: Errors<TBase>;
-}): never {
-  throw new ValidationError(this);
 }
 
 /**
@@ -605,34 +531,112 @@ export interface ValidationsContextHost {
 }
 
 /**
- * Mirrors Rails `ActiveModel::Validations#freeze` (validations.rb:372-377):
- *
- *   def freeze
- *     errors
- *     context_for_validation
- *     super
- *   end
- *
- * Rails pre-touches `@errors` and `@context_for_validation` so frozen models
- * can still answer `#errors` and `#validation_context` without tripping their
- * `||=` lazy-init. Trails mirrors that by reading `errors` and calling
- * `contextForValidation()` to populate its cached `ValidationContext`. The
- * `validationContext` getter alone is not enough — it doesn't write to
- * `_contextForValidation`, so a subsequent `contextForValidation()` call on the
- * frozen instance would throw on the cache assignment.
- *
- * `super` reaches `Attributes#freeze` (attributes.rb:150-153) and then Ruby's
- * `Object#freeze`; TS has no `super` across mixins, so this link runs both, the
- * way `attributes.freeze` already documents.
+ * Mirrors: ActiveModel::Validations (validations.rb:37) — the members the
+ * module declares on itself, which `ActiveSupport::Concern#append_features`
+ * mixes into the includer before it extends `ClassMethods`
+ * (concern.rb:135-138). They live in a module object rather than on the
+ * {@link Validations} class module because each is `this`-typed against its own
+ * host shape; the class module carries the members whose Ruby readers port as
+ * accessor properties, which only a prototype takes across `include()`.
  */
-export function freeze<T extends ValidationsFreezeHost>(this: T): T {
-  void this.errors;
-  void this.contextForValidation();
-  // validations.rb:376 — `super` reaches `Attributes#freeze` (attributes.rb:150-153).
-  attributesFreeze.call(this as unknown as AttributeInstanceHost);
-  Object.freeze(this);
-  return this;
-}
+export const InstanceMethods = {
+  /**
+   * Mirrors Rails `ActiveModel::Validations#freeze` (validations.rb:372-377):
+   *
+   *   def freeze
+   *     errors
+   *     context_for_validation
+   *     super
+   *   end
+   *
+   * Rails pre-touches `@errors` and `@context_for_validation` so frozen models
+   * can still answer `#errors` and `#validation_context` without tripping their
+   * `||=` lazy-init. Trails mirrors that by reading `errors` and calling
+   * `contextForValidation()` to populate its cached `ValidationContext`. The
+   * `validationContext` getter alone is not enough — it doesn't write to
+   * `_contextForValidation`, so a subsequent `contextForValidation()` call on the
+   * frozen instance would throw on the cache assignment.
+   *
+   * `super` reaches `Attributes#freeze` (attributes.rb:150-153) and then Ruby's
+   * `Object#freeze`; TS has no `super` across mixins, so this link runs both, the
+   * way `attributes.freeze` already documents.
+   */
+  freeze<T extends ValidationsFreezeHost>(this: T): T {
+    void this.errors;
+    void this.contextForValidation();
+    // validations.rb:376 — `super` reaches `Attributes#freeze` (attributes.rb:150-153).
+    attributesFreeze.call(this as unknown as AttributeInstanceHost);
+    Object.freeze(this);
+    return this;
+  },
+
+  /**
+   * Mirrors: ActiveModel::Validations
+   * (validations.rb:437 `alias :read_attribute_for_validation :send`).
+   *
+   * The literal translation of `send(attr)`: dispatch the public reader named
+   * after the attribute. trails exposes declared attributes as value-returning
+   * getters (which read the attribute store, exactly like the generated reader
+   * Rails' `send` would call) and custom readers as methods, so a function member
+   * is invoked (Ruby `send(:full_name)`) and a value member returned directly. A
+   * plain getter with no declared attribute is therefore honored, not read as nil.
+   * A name that resolves to no reader raises, mirroring Ruby `send`'s
+   * `NoMethodError` (a typo'd / undeclared validation attribute fails loud rather
+   * than validating a nil-ish value). `EachValidator` dispatches through any
+   * instance override (validator.ts).
+   */
+  readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
+    // Ruby `send` keys off method *existence* (`respond_to?`), not the return
+    // value: a reader that exists and returns nil yields nil, only a name with
+    // no reader raises NoMethodError. `key in this` is the JS analog — it sees
+    // own data properties, getters, and inherited methods up the prototype chain.
+    if (!(attribute in this)) {
+      const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
+      throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
+    }
+    const reader = this[attribute];
+    return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
+  },
+
+  /**
+   * Lazy per-instance accessor for the active `ValidationContext`.
+   * Mirrors Rails
+   * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
+   * (activemodel/lib/active_model/validations.rb:463-465). The returned object owns
+   * the active context — Rails keeps it here, not in a model ivar (:503-505, :361-368),
+   * which is what lets a frozen model be validated.
+   *
+   * @internal Rails-private helper.
+   */
+  contextForValidation(this: ContextForValidationHost): ValidationContext {
+    if (this._contextForValidation) return this._contextForValidation;
+    const vc = new ValidationContext();
+    this._contextForValidation = vc;
+    return vc;
+  },
+
+  /**
+   * Run the `:validate` callbacks and report whether the model has no
+   * errors. Mirrors Rails
+   * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
+   * (activemodel/lib/active_model/validations.rb:473-476).
+   *
+   * @internal Rails-private helper.
+   */
+  async runValidationsBang(this: RunValidationsHost): Promise<boolean> {
+    await this._runValidateCallbacks();
+    return this.errors.empty;
+  },
+
+  /**
+   * Throw `ValidationError` for the current model. Mirrors Rails
+   * `def raise_validation_error; raise(ValidationError.new(self)); end`
+   * (activemodel/lib/active_model/validations.rb:478-480).
+   */
+  raiseValidationError<TBase extends object = object>(this: { errors: Errors<TBase> }): never {
+    throw new ValidationError(this);
+  },
+};
 
 /**
  * Host shape consumed by `contextForValidation`.

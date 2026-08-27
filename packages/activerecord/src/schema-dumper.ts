@@ -780,17 +780,6 @@ export abstract class SchemaDumper {
     try {
       this.tableName = table;
 
-      // Rails calls `@connection.table_options(table)` at schema_dumper.rb:187,
-      // AFTER `column_spec_for_primary_key`. trails has to read it before the
-      // column-spec chain: MySQL's `schemaCollation` compares against the table
-      // collation, which Rails fetches lazily inside `schema_collation`
-      // (mysql/schema_dumper.rb:66-71) — an async query here, so `tableOptions`
-      // is what prefills that cache, and the primary key's own collation would
-      // otherwise be compared against a cold one. It stays inside the `begin`,
-      // where Rails makes the call, so a failing options query still degrades to
-      // the one-table "Could not dump" comment (`:220-224`).
-      const tableOptions = await this.tableOptions(table);
-
       const tbl: string[] = [];
 
       // first dump primary key column
@@ -817,6 +806,7 @@ export abstract class SchemaDumper {
         opts.push("id: false");
       }
 
+      const tableOptions = await this.tableOptions(table);
       if (isPresent(tableOptions)) {
         opts.push(this.formatOptions(tableOptions));
       }
