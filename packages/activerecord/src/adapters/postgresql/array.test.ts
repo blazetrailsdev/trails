@@ -11,6 +11,13 @@ import { Temporal } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 
+// PG's `type_cast` has one array arm, `when OID::Array::Data then
+// encode_array(value)` (postgresql/quoting.rb:177-185), because a pg-ruby bind
+// is an already-encoded String by then. Raw `execute(sql, binds)` callers below
+// hand the same `Data` the write path produces (`OID::Array#serialize`,
+// oid/array.rb:38-44) rather than a bare JS array.
+const textArray = new OidArray(new ValueType());
+
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 });
@@ -360,28 +367,36 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("strings with quotes", async () => {
       const tags = ["this has", 'some "s that need to be escaped"'];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });
 
     it("strings with commas", async () => {
       const tags = ["this,has", "many,values"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });
 
     it("strings with array delimiters", async () => {
       const tags = ["{", "}"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });
 
     it("strings with null strings", async () => {
       const tags = ["NULL", "NULL"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });
@@ -432,7 +447,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("escaping", async () => {
       const unknown = 'foo\\",bar,baz,\\';
       const tags = [`hello_${unknown}`];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });
@@ -452,7 +469,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         "ten\r",
         "NULL",
       ];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });
@@ -473,10 +492,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("mutate array", async () => {
-      // PG's type_cast has one array arm, `when OID::Array::Data`
-      // (postgresql/quoting.rb:177-185), so a raw bind hands the same `Data`
-      // the write path produces (`OID::Array#serialize`, oid/array.rb:38-44).
-      const textArray = new OidArray(new ValueType());
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
         textArray.serialize(["one", "two"]),
       ]);
@@ -639,7 +654,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("encoding arrays of utf8 strings", async () => {
       const tags = ["nový", "ファイル"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(tags),
+      ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
       expect(rows[0].tags).toEqual(tags);
     });

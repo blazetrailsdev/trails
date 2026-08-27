@@ -4,6 +4,13 @@
  * Rails name. Subject under test is `Mysql2StatementPool`, our subclass of the
  * port of `AbstractMysqlAdapter::StatementPool`
  * (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb).
+ *
+ * The pool is driven through `internal_exec_query` with an explicit `prepare:`
+ * because that is the only path Rails prepares on: `prepare:` is decided once in
+ * `to_sql_and_binds` (`prepared_statements && preparable`,
+ * abstract/database_statements.rb:74) and threaded down, while `execute` takes
+ * no binds at all in Ruby (abstract/database_statements.rb:196) and defaults
+ * `prepare: false` through `raw_execute` (`:552`).
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
@@ -31,13 +38,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("statement pool tracks distinct prepared queries", async () => {
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT ? AS n", [1]);
-        await adapter.execute("SELECT ? AS n", [2]);
+        await adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
+        await adapter.internalExecQuery("SELECT ? AS n", "SQL", [2], { prepare: true });
         const pool = adapter._statements!;
         expect(pool).toBeDefined();
         expect(pool.length).toBe(1);
 
-        await adapter.execute("SELECT ? AS s", ["a"]);
+        await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
         expect(pool.length).toBe(2);
       } finally {
         await adapter.rollback();
@@ -53,8 +60,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT ? AS n", [1]);
-        await adapter.execute("SELECT ? AS s", ["a"]);
+        await adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
+        await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
         expect(adapter._statements!.length).toBe(1);
       } finally {
         await adapter.rollback();
@@ -71,7 +78,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         // no zero-limit case either: `while 0 <= cache.size` runs on the empty
         // cache and `nil.last` raises (statement_pool.rb:31-33). So a
         // `statement_limit` of 0 is unsupported rather than a caching switch.
-        await expect(adapter.execute("SELECT ? AS n", [1])).rejects.toThrow();
+        await expect(
+          adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true }),
+        ).rejects.toThrow();
       } finally {
         await adapter.rollback();
         await adapter.close();
@@ -85,8 +94,22 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       );
       await adapter.beginDbTransaction();
       try {
-        await adapter.executeMutation(`INSERT INTO \`sp_mut\` (\`name\`) VALUES (?)`, ["a"]);
-        await adapter.executeMutation(`INSERT INTO \`sp_mut\` (\`name\`) VALUES (?)`, ["b"]);
+        await adapter.internalExecQuery(
+          `INSERT INTO \`sp_mut\` (\`name\`) VALUES (?)`,
+          "SQL",
+          ["a"],
+          {
+            prepare: true,
+          },
+        );
+        await adapter.internalExecQuery(
+          `INSERT INTO \`sp_mut\` (\`name\`) VALUES (?)`,
+          "SQL",
+          ["b"],
+          {
+            prepare: true,
+          },
+        );
         const pool = adapter._statements!;
         expect(pool.length).toBe(1);
       } finally {
@@ -99,7 +122,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const closable = new Mysql2Adapter(MYSQL_TEST_URL);
       closable.preparedStatements = true;
       await closable.beginDbTransaction();
-      await closable.execute("SELECT ? AS n", [1]);
+      await closable.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
       const pool = closable._statements!;
       await closable.rollback();
       await closable.close();
@@ -159,8 +182,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("clearCacheBang drops cached plans on the active connection", async () => {
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT ? AS n", [1]);
-        await adapter.execute("SELECT ? AS s", ["a"]);
+        await adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
+        await adapter.internalExecQuery("SELECT ? AS s", "SQL", ["a"], { prepare: true });
         const pool = adapter._statements!;
         expect(pool.length).toBe(2);
         await adapter.clearCacheBang();
