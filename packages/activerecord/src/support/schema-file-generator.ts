@@ -154,6 +154,8 @@ function generateCode(
           column: fk.column,
           ...(fk.primaryKey === undefined ? {} : { primaryKey: fk.primaryKey }),
           ...(fk.name === undefined ? {} : { name: fk.name }),
+          ...(fk.onDelete === undefined ? {} : { onDelete: fk.onDelete }),
+          ...(fk.deferrable === undefined ? {} : { deferrable: fk.deferrable }),
         })});`,
     );
 

@@ -1,4 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 
 export type PrimitiveColumnSpec =
   | "string"
@@ -102,6 +103,10 @@ export interface ForeignKeySpec {
   column: string;
   primaryKey?: string;
   name?: string;
+  /** Rails `on_delete:` (schema.rb:726 `on_delete: :cascade`). */
+  onDelete?: ReferentialAction;
+  /** Rails `deferrable:` (schema.rb:100, :726 `deferrable: :immediate`). */
+  deferrable?: "immediate" | "deferred" | false;
 }
 
 export interface WrappedTableSchema {

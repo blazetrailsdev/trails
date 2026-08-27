@@ -1071,17 +1071,27 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
+  // schema.rb declares `students` *after* `lessons_students` (schema.rb:715-724)
+  // and joins them with a standalone `add_foreign_key` (schema.rb:726). The
+  // registry has no post-table statement, so the FK rides inside the
+  // `lessons_students` block and `students` is laid first — the referenced
+  // table has to exist by then on PG/MySQL.
+  await define("students", {}, (t) => {
+    t.string("name");
+    t.boolean("active");
+    t.integer("college_id");
+  });
+
   await define("lessons_students", { id: false }, (t) => {
     t.bigInteger("lesson_id");
     t.index("lesson_id");
     t.bigInteger("student_id");
     t.index("student_id");
-  });
-
-  await define("students", {}, (t) => {
-    t.string("name");
-    t.boolean("active");
-    t.integer("college_id");
+    t.foreignKey("students", {
+      column: "student_id",
+      onDelete: "cascade",
+      deferrable: "immediate",
+    });
   });
 
   await define("lint_models", {}, (t) => {});
@@ -2300,6 +2310,8 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
         const primaryKey = join(opts.primaryKey);
         if (primaryKey !== undefined) fk.primaryKey = primaryKey;
         if (opts.name !== undefined) fk.name = opts.name;
+        if (opts.onDelete !== undefined) fk.onDelete = opts.onDelete;
+        if (opts.deferrable !== undefined) fk.deferrable = opts.deferrable;
         foreignKeys.push(fk);
       },
     } as unknown as TableDefinition;

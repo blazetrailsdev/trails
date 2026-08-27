@@ -499,6 +499,8 @@ export function describeForeignKey(spec: ForeignKeySpec): string {
   const parts = [`${spec.column}→${spec.toTable}`];
   if (spec.primaryKey !== undefined) parts.push(`primaryKey=${spec.primaryKey}`);
   if (spec.name !== undefined) parts.push(`name=${spec.name}`);
+  if (spec.onDelete !== undefined) parts.push(`onDelete=${spec.onDelete}`);
+  if (spec.deferrable !== undefined) parts.push(`deferrable=${spec.deferrable}`);
   return parts.join(" ");
 }
 
