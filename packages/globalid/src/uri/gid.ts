@@ -178,8 +178,8 @@ function cgiEscape(s: string): string {
 }
 
 /**
- * The `model_id` half of the component compare — a composite id is an Array in
- * Ruby, where `==` is element-wise. @internal
+ * The `model_id` half of `GID#equals`. Ruby gets this from `Array#==` on a
+ * composite id; JS `===` on two arrays compares identity. @internal
  */
 function modelIdEquals(a: string | string[], b: string | string[]): boolean {
   if (Array.isArray(a) || Array.isArray(b)) {
@@ -189,8 +189,8 @@ function modelIdEquals(a: string | string[], b: string | string[]): boolean {
   return a === b;
 }
 
-/** The `params` half of the component compare — Ruby `Hash#==`. @internal */
-function paramsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+/** The `params` half of `GID#equals`, spelling Ruby's `Hash#==`. @internal */
+function paramsEquals(a: Record<string, string>, b: Record<string, string>): boolean {
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && a[key] === b[key]);
@@ -264,20 +264,21 @@ export class GID {
    * `gid.rb:28-29` carries — `app` (aliased to `host`), `model_name`,
    * `model_id` and `params` — so the compare is over those.
    *
+   * `self.class == oth.class` is spelled as a null guard plus a read through
+   * the public component readers rather than an `instanceof`: TS treats the
+   * src/ and dist/ resolutions of this module as distinct classes because of
+   * the private fields, the same trap `SignedGlobalID#equals` works around.
+   *
    * @noRailsEquivalent PERMANENT (`vendor/globalid/lib/global_id/uri/gid.rb:7` — `class GID <
    *   Generic` inherits `==` from Ruby's stdlib `URI::Generic`, which is out of scope to port).
    */
   equals(oth: GID): boolean {
-    // `self.class == oth.class` is spelled as a null guard plus a read through
-    // the public component readers rather than an `instanceof`: TS treats the
-    // src/ and dist/ resolutions of this module as distinct classes because of
-    // the private fields, the same trap `SignedGlobalID#equals` works around.
     if (oth == null) return false;
     return (
       this.app === oth.app &&
       this.modelName === oth.modelName &&
       modelIdEquals(this.modelId, oth.modelId) &&
-      paramsEqual(this.params, oth.params)
+      paramsEquals(this.params, oth.params)
     );
   }
 

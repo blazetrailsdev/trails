@@ -7,7 +7,7 @@ import { fixtures } from "../../test-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
 import { TypeMap } from "../../type/type-map.js";
-import { lookupCastType } from "../abstract/quoting.js";
+import { lookupCastType, quotedDate } from "../abstract/quoting.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
 import {
@@ -16,7 +16,6 @@ import {
   quote as quoteFn,
   quotedBinary,
   quoteDefaultExpression,
-  quotedDate,
   quotedTime,
   quotedTrue,
   quotedFalse,
