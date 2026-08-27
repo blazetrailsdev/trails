@@ -790,7 +790,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     tableName: string,
     nameOrOptions: string | { name: string },
   ): Promise<void> {
-    const connection = this.connection as unknown as DatabaseAdapter & ValidateConstraintStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
+      ValidateConstraintStatements;
     await connection.validateCheckConstraint(this._pt(tableName), nameOrOptions);
   }
 
@@ -801,7 +802,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   ): Promise<void> {
     const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
-    const connection = this.connection as unknown as DatabaseAdapter & ValidateConstraintStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
+      ValidateConstraintStatements;
     await connection.validateForeignKey(this._pt(fromTable), toTable, opts);
   }
 
@@ -811,23 +813,23 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     tableName = this._pt(tableName);
-    const connection = this.connection as unknown as DatabaseAdapter & CommentStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & CommentStatements;
     await connection.changeColumnComment(tableName, columnName, commentOrChanges);
   }
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     tableName = this._pt(tableName);
-    const connection = this.connection as unknown as DatabaseAdapter & CommentStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & CommentStatements;
     await connection.changeTableComment(tableName, commentOrChanges);
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
-    const connection = this.connection as unknown as DatabaseAdapter & ExtensionStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & ExtensionStatements;
     await connection.enableExtension(name, options);
   }
 
   async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
-    const connection = this.connection as unknown as DatabaseAdapter & ExtensionStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & ExtensionStatements;
     await connection.disableExtension(name, options);
   }
 
@@ -836,7 +838,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     values: string[],
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const connection = this.connection as unknown as DatabaseAdapter & EnumStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & EnumStatements;
     await connection.createEnum(name, values, options);
   }
 
@@ -853,12 +855,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       !Array.isArray(valuesOrOptions);
     const values = isOptsObj ? undefined : valuesOrOptions;
     const opts = isOptsObj ? valuesOrOptions : (options ?? undefined);
-    const connection = this.connection as unknown as DatabaseAdapter & EnumStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & EnumStatements;
     await connection.dropEnum(name, values, opts);
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    const connection = this.connection as unknown as DatabaseAdapter & EnumStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter & EnumStatements;
     await connection.renameEnumValue(name, options);
   }
 
@@ -868,7 +870,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     options?: UniqueConstraintOptions,
   ): Promise<void> {
     tableName = this._pt(tableName);
-    const connection = this.connection as unknown as DatabaseAdapter & UniqueConstraintStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
+      UniqueConstraintStatements;
     await connection.addUniqueConstraint(tableName, columnName, options);
   }
 
@@ -886,7 +889,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const columnName = isOptsObj ? undefined : columnNameOrOptions;
     const opts = isOptsObj ? columnNameOrOptions : (options ?? undefined);
     tableName = this._pt(tableName);
-    const connection = this.connection as unknown as DatabaseAdapter & UniqueConstraintStatements;
+    const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
+      UniqueConstraintStatements;
     await connection.removeUniqueConstraint(tableName, columnName, opts);
   }
 
