@@ -8,9 +8,7 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { ArelError } from "../errors.js";
 
 /**
- * Mirrors Arel::Visitors::UnsupportedVisitError (to_sql.rb:5-9) — a
- * `StandardError`, not an `ArelError`, declared in this file exactly as Rails
- * declares it, and built from the offending object.
+ * Mirrors: Arel::Visitors::UnsupportedVisitError (to_sql.rb:5-9).
  */
 export class UnsupportedVisitError extends Error {
   constructor(object: unknown) {
@@ -20,10 +18,7 @@ export class UnsupportedVisitError extends Error {
 }
 
 /**
- * Mirrors Ruby's core `NotImplementedError`, which `to_sql.rb` raises from the
- * three strategy hooks below (:195, :521, :525). Ruby gets the class from the
- * language, so `arel/errors.rb` declares nothing for it and neither does
- * `errors.ts`; it stays file-local here, exactly where Rails raises it.
+ * to_sql.rb:195, to_sql.rb:521, to_sql.rb:525
  */
 class NotImplementedError extends Error {
   constructor(message: string) {
@@ -35,52 +30,23 @@ class NotImplementedError extends Error {
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
-// -- Raw-value dispatch helpers --
-//
-// Rails dispatches a raw value on its Ruby class (visitor.rb:29-30). These map
-// each JS analogue onto the class Rails would pick; the mapping itself lives
-// in `rubyClassName` (ruby-class.ts), which `Visitor#visit` consults.
+// visitor.rb:29-30
 
-// The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
-// Assignment visitors (to_sql.rb:110, 632). Rails dispatches on the class, and
-// so does trails — the same predicate `Nodes.build_quoted` uses (casted.ts).
-// Arel's own Casted/Quoted expose `valueForDatabase` but are Nodes, not
-// ActiveModel::Attributes, so they keep falling to `quote()` in ValuesList as
-// rb:110's narrow `when` requires.
+// to_sql.rb:110, to_sql.rb:632
 function isActiveModelAttribute(v: unknown): boolean {
   return v instanceof ModelAttribute;
 }
 
-// Rails' UnsupportedVisitError message interpolates `object.class.name`
-// (to_sql.rb:5-8). `null`/`undefined` have no constructor; Ruby's analogue for
-// both is NilClass.
-//
-// Folding `undefined` in here is deliberate, and survives `undefined` being
-// dropped from `NodeOrValue` (binary.ts). The two are complementary rather than
-// contradictory: the union declines to *declare* `undefined` a legal slot
-// occupant, while this normalizes one that arrives anyway. It can still arrive,
-// because `update-manager.ts` launders values into a slot via one boundary
-// `as NodeOrValue` cast from `unknown` — the `math.ts` / `attribute.ts` casts
-// were removed once their operands were narrowed to `NodeOrValue`, but
-// `UpdateManager#set` sits on the ActiveRecord edge and cannot be (see the note
-// at its call site). The primary normalization is
-// `rubyClassName` (ruby-class.ts:32), which maps `undefined` to `"NilClass"` at
-// the dispatch boundary so it routes to `visitNilClass`; this helper just keeps
-// the downstream message consistent with that.
-// Removing it would be strictly less faithful — an `undefined` would read its
-// `.constructor` off nothing and surface as a "Cannot visit" TypeError instead
-// of Rails' NilClass UnsupportedVisitError.
+// to_sql.rb:5-8
 function constructorName(v: unknown): string {
   if (v === null || v === undefined) return "NilClass";
   return (v as { constructor?: { name?: string } }).constructor?.name ?? typeof v;
 }
 
-/** Default placeholder block; mirrors Rails' module-level `BIND_BLOCK`. */
+/** Mirrors: Arel::Visitors::ToSql::BIND_BLOCK */
 const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
 
 /**
- * ToSql visitor — walks the AST and produces SQL strings.
- *
  * Mirrors: Arel::Visitors::ToSql
  */
 export class ToSql extends Visitor {
@@ -156,10 +122,6 @@ export class ToSql extends Visitor {
       collector.append(")");
     }
 
-    // Mirrors Rails: prefer `o.values` when both are present
-    // (insert_statement.rb / to_sql.rb pattern). Routes through
-    // `visit` so a SelectManager-shaped duck-type (the form
-    // `InsertManager#select` stores) lands in `visitArelSelectManager`.
     if (o.values) {
       return this.maybeVisit(o.values, collector);
     } else if (o.select) {
@@ -181,14 +143,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesCasted(o: Nodes.Casted, collector: SQLString): SQLString {
-    // Mirrors Rails to_sql.rb:87-88 `visit_Arel_Nodes_Casted`:
-    // collector << quote(o.value_for_database).to_s — the quoted literal is
-    // appended directly (visit_Arel_Nodes_Quoted is an alias). Only BindParam
-    // uses add_bind. Inlines exactly like visitQuoted.
-    //
-    // Ruby's `value_for_database` is one zero-arg method however the receiver
-    // spells it; in TS a QueryAttribute answers with a method and an
-    // ActiveModel::Attribute with a getter, so the call half is applied here.
+    // to_sql.rb:87-88
     let valueForDatabase = o.valueForDatabase();
     if (
       valueForDatabase &&
@@ -203,12 +158,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Rails: `alias :visit_Arel_Nodes_Quoted :visit_Arel_Nodes_Casted`
-   * (to_sql.rb:90). Quoted and Casted both inline their quoted literal
-   * (`collector << quote(o.value_for_database)`); only BindParam uses
-   * add_bind. Delegates to the shared Casted visitor.
-   */
+  /** Rails: `alias :visit_Arel_Nodes_Quoted :visit_Arel_Nodes_Casted` (to_sql.rb:90). */
   private visitArelNodesQuoted(o: Nodes.Quoted, collector: SQLString): SQLString {
     return this.visitArelNodesCasted(o as unknown as Nodes.Casted, collector);
   }
@@ -230,17 +180,7 @@ export class ToSql extends Visitor {
       collector.append("(");
       for (let j = 0; j < o.rows[i].length; j++) {
         if (j > 0) collector.append(", ");
-        // Mirrors Rails' `case` exactly (to_sql.rb:106-114): only SqlLiteral,
-        // BindParam and ActiveModel::Attribute are visited; every other row
-        // entry is a raw value and is quoted directly, never dispatched
-        // through `visit`.
-        //
-        // The list is deliberately narrower than Assignment's (which visits any
-        // Node, to_sql.rb:631). Rails' rows carry raw values — see
-        // `create_values_list([%w{ a b }, ...])`, insert_manager_test.rb:10 —
-        // so a Casted/Quoted row falls to `quote()`, which has no node branch
-        // (to_sql.rb:867-870 → quoting.rb:86 `else raise TypeError`) and
-        // raises. Keeping the list narrow preserves that.
+        // to_sql.rb:106-114
         const value = o.rows[i][j];
         if (
           value instanceof Nodes.SqlLiteral ||
@@ -276,11 +216,7 @@ export class ToSql extends Visitor {
     return this.visitArelNodesSelectOptions(o, collector);
   }
 
-  /**
-   * Mirrors Rails: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). Emits
-   * limit/offset/lock via `maybeVisit`. As in Rails it is called with the
-   * `SelectStatement` itself, which carries those three fields.
-   */
+  /** Mirrors: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). */
   protected visitArelNodesSelectOptions(o: Nodes.SelectStatement, collector: SQLString): SQLString {
     this.maybeVisit(o.limit, collector);
     this.maybeVisit(o.offset, collector);
@@ -288,10 +224,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors Rails: visit_Arel_Nodes_SelectCore (to_sql.rb:149). Where Rails
-  // uses collect_nodes_for to emit `spacer` + injectJoin in one call, we do
-  // the same; wheres/havings collapse multiple predicates with " AND " via
-  // collect_nodes_for's connector arg.
+  // Mirrors: visit_Arel_Nodes_SelectCore (to_sql.rb:149).
   protected visitArelNodesSelectCore(o: Nodes.SelectCore, collector: SQLString): SQLString {
     collector.append("SELECT");
 
@@ -315,41 +248,22 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
-  // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
-  // an array); each hint is sanitized and the joined result wrapped in
-  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
-  // node, which `collect_optimizer_hints` threads here through `maybeVisit`.
+  // Mirrors: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170).
   protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints, collector: SQLString): SQLString {
-    // Each hint routes through `sanitizeAsSqlComment` — the same
-    // connection-delegating helper `visitArelNodesComment` uses (to_sql.rb:171).
-    // Rails maps every hint through the sanitizer and ALWAYS wraps the joined
-    // result in `/*+ ... */` (to_sql.rb:170-172) — there is no post-sanitization
-    // empty filter, so hints that sanitize to empty still emit the comment. The
-    // node only exists when `optimizer_hints(*hints)` got a non-empty splat
-    // (select_manager.rb:147-149), which is the only emptiness Rails guards.
+    // to_sql.rb:170-172, select_manager.rb:147-149
     const hints = o.expr.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
     collector.append(`/*+ ${hints} */`);
     return collector;
   }
 
-  // Mirrors Rails: visit_Arel_Nodes_Comment (to_sql.rb:175) — emits the
-  // joined `/* ... */` blocks without a leading space. Callers add the
-  // leading separator (typically via `maybeVisit`).
+  // Mirrors: visit_Arel_Nodes_Comment (to_sql.rb:175).
   protected visitArelNodesComment(o: Nodes.Comment, collector: SQLString): SQLString {
     const blocks = o.values.map((v) => `/* ${this.sanitizeAsSqlComment(v)} */`);
     collector.append(blocks.join(" "));
     return collector;
   }
 
-  // ---------------------------------------------------------------------
-  // Rails-mirrored private helpers (to_sql.rb).
-  // ---------------------------------------------------------------------
-
-  /**
-   * Mirrors `to_sql.rb#collect_nodes_for`. Emits `spacer` then visits each
-   * node separated by `connector` (default `", "`). No-op when empty.
-   */
+  /** Mirrors: `to_sql.rb#collect_nodes_for`. */
   protected collectNodesFor(
     nodes: Node[],
     collector: SQLString,
@@ -491,10 +405,7 @@ export class ToSql extends Visitor {
     } else if (o.right instanceof Nodes.SqlLiteral) {
       return this.infixValue(o as { left: Node; right: Node }, collector, " OVER ");
     } else if (typeof o.right === "string") {
-      // Rails' `when String, Symbol` arm quotes a bare window name as an
-      // identifier (to_sql.rb:306-307). A SqlLiteral right, by contrast,
-      // renders bare — `over("foo")` is `OVER "foo"` but
-      // `over(Arel.sql("foo"))` is `OVER foo`.
+      // to_sql.rb:306-307
       this.visit(o.left, collector);
       collector.append(` OVER ${this.quoteColumnName(o.right)}`);
       return collector;
@@ -535,12 +446,7 @@ export class ToSql extends Visitor {
     collector.preparable = false;
     this.visit(o.left, collector);
     collector.append(o.type === "in" ? " IN (" : " NOT IN (");
-    // Mirrors Rails to_sql.rb:346-351 exactly: branch on the *casted* list, not
-    // the raw values, and emit `quote(nil)` (→ `NULL`) when it is empty. This
-    // matters once every value is filtered out — e.g. an all-out-of-range
-    // multi-value array (`id IN [2^63, 2^63+1]`) whose `castedValues` collapse
-    // to `[]` — so we render `IN (NULL)` rather than the invalid `IN ()` that
-    // `addBinds([])` would produce.
+    // to_sql.rb:346-351
     const values = o.castedValues;
     if (values.length === 0) {
       collector.append(this.quote(null));
@@ -551,10 +457,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#visit_Arel_SelectManager` — visits the manager's AST
-   * wrapped in parens so it can be embedded as a subquery.
-   */
+  /** Mirrors: `to_sql.rb#visit_Arel_SelectManager`. */
   protected visitArelSelectManager(o: { ast: Node }, collector: SQLString): SQLString {
     collector.append("(");
     this.visit(o.ast, collector);
@@ -633,12 +536,7 @@ export class ToSql extends Visitor {
 
   private visitArelNodesTableAlias(o: Nodes.TableAlias, collector: SQLString): SQLString {
     this.visit(o.relation, collector);
-    // Mirrors Rails `visit_Arel_Nodes_TableAlias`: `quote_table_name(o.name)`
-    // renders a `SqlLiteral` name bare and quotes a plain string. The bare-alias
-    // cases come from the *value*, not the relation shape: `SelectManager#as`
-    // and the set-op `from()` path both name the alias with a `SqlLiteral`
-    // (`quoteTableName` returns its `value` unchanged), while `Table#alias("foo")`
-    // keeps `"foo"`.
+    // Mirrors: `visit_Arel_Nodes_TableAlias`.
     collector.append(` ${this.quoteTableName(o.name)}`);
     return collector;
   }
@@ -667,8 +565,6 @@ export class ToSql extends Visitor {
     return this.visitBinaryOp(o, ">=", collector);
   }
 
-  // Per-class dispatch wrappers for shared helpers — mirrors Rails' per-method
-  // form (each operator/aggregate has its own visit method).
   protected visitArelNodesGreaterThan(o: Nodes.GreaterThan, collector: SQLString): SQLString {
     const sign = this.unboundableSign(o.right);
     if (sign === 1) return collector.append("1=0");
@@ -789,8 +685,7 @@ export class ToSql extends Visitor {
   }
 
   private visitArelTable(o: Table, collector: SQLString): SQLString {
-    // Mirrors Rails visit_Arel_Table (to_sql.rb): if name is a Node, visit
-    // it (subquery-as-table); else quote as identifier.
+    // Mirrors: visit_Arel_Table (to_sql.rb).
     const name = o.name;
     if (name instanceof Node) {
       this.visit(name, collector);
@@ -812,7 +707,6 @@ export class ToSql extends Visitor {
         values = values.filter((v) => this.unboundableSign(v) === 0);
       }
       if (values.length === 0) {
-        // Empty IN is always false — Rails uses 1=0
         collector.append("1=0");
         return collector;
       }
@@ -851,7 +745,6 @@ export class ToSql extends Visitor {
         values = values.filter((v) => this.unboundableSign(v) === 0);
       }
       if (values.length === 0) {
-        // Empty NOT IN is always true — Rails uses 1=1
         collector.append("1=1");
         return collector;
       }
@@ -883,10 +776,7 @@ export class ToSql extends Visitor {
   private visitArelNodesAssignment(o: Nodes.Assignment, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(" = ");
-    // Mirrors Rails (to_sql.rb:630-641): a Node/Attribute right is visited; a
-    // raw value is quoted directly rather than dispatched through `visit`.
-    // `instanceof Node` covers rb:631's `Arel::Attributes::Attribute` arm too —
-    // Arel's Attribute extends Node here (attributes/attribute.ts).
+    // to_sql.rb:630-641
     if (o.right instanceof Node || isActiveModelAttribute(o.right)) {
       this.visit(o.right, collector);
     } else {
@@ -981,7 +871,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors Rails: visit_Arel_Nodes_When (to_sql.rb).
+  // Mirrors: visit_Arel_Nodes_When (to_sql.rb).
   protected visitArelNodesWhen(o: Nodes.When, collector: SQLString): SQLString {
     collector.append("WHEN ");
     this.visit(o.left, collector);
@@ -990,7 +880,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors Rails: visit_Arel_Nodes_Else (to_sql.rb).
+  // Mirrors: visit_Arel_Nodes_Else (to_sql.rb).
   protected visitArelNodesElse(o: Nodes.Else, collector: SQLString): SQLString {
     collector.append("ELSE ");
     this.visit(o.expr as Nodes.NodeOrValue, collector);
@@ -1001,9 +891,7 @@ export class ToSql extends Visitor {
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    // Rails strips the table qualifier so `SET col = col + 1` works in UPDATE
-    // statements: `collector << quote_column_name(o.name)` (to_sql.rb:728-730),
-    // where `UnqualifiedColumn#name` delegates to `@expr.name`.
+    // to_sql.rb:728-730
     collector.append(this.quoteColumnName(o.name as string | Node | null));
     return collector;
   }
@@ -1015,8 +903,7 @@ export class ToSql extends Visitor {
     } else if (o.materialized === false) {
       collector.append("NOT MATERIALIZED ");
     }
-    // No parens here: `Cte#relation` holds a SelectManager / Grouping /
-    // set-operation node, each of which supplies its own (to_sql.rb:732-744).
+    // to_sql.rb:732-744
     this.visit(o.relation, collector);
     return collector;
   }
@@ -1029,30 +916,18 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#bind_block` (which returns Rails' `BIND_BLOCK = proc { "?" }`).
-   * Returns the placeholder-rendering callback the SQLString collector calls
-   * for each unbound bind. Dialects override to emit numbered placeholders
-   * (e.g. `$1`, `$2` for Postgres-with-binds).
-   *
-   * The default callback is cached at module load (Rails caches it under
-   * `BIND_BLOCK`) so the hot bind path doesn't allocate a closure per call.
-   */
+  /** Mirrors: `to_sql.rb#bind_block`. */
   protected bindBlock(): (index: number) => string {
     return DEFAULT_BIND_BLOCK;
   }
 
-  /**
-   * Mirrors Rails: `visit_ActiveModel_Attribute` (to_sql.rb:756).
-   * Rails calls `collector.add_bind(o, &bind_block)` — always emits an
-   * unbound placeholder; the dispatch never delegates to the BindParam visitor.
-   */
+  /** Mirrors: `visit_ActiveModel_Attribute` (to_sql.rb:756). */
   protected visitActiveModelAttribute(o: ModelAttribute, collector: SQLString): SQLString {
     collector.addBind(o, this.bindBlock());
     return collector;
   }
 
-  /** Mirrors Rails: `visit_Arel_Nodes_BindParam` (to_sql.rb:760-762). */
+  /** Mirrors: `visit_Arel_Nodes_BindParam` (to_sql.rb:760-762). */
   protected visitArelNodesBindParam(o: Nodes.BindParam, collector: SQLString): SQLString {
     collector.addBind(o.value, this.bindBlock());
     return collector;
@@ -1062,8 +937,7 @@ export class ToSql extends Visitor {
     if (!(o as { retryable?: boolean }).retryable) {
       collector.retryable = false;
     }
-    // Mirrors to_sql.rb:764-767: plain SqlLiteral is non-preparable.
-    // where("col = ?", val) now creates BoundSqlLiteral (which stays preparable).
+    // to_sql.rb:764-767
     collector.preparable = false;
     collector.append(o.value);
     return collector;
@@ -1096,46 +970,18 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // ---------------------------------------------------------------------
-  // Non-Arel visit dispatchers (Rails dispatches on Ruby native classes
-  // for stray values that drift into the visitor).
-  // ---------------------------------------------------------------------
-
-  /**
-   * Mirrors Rails: `visit_Integer` (to_sql.rb:824-826) — a bare
-   * `collector << o.to_s`, with no `@connection` involvement. Accepts `bigint`
-   * as well as `number`: Ruby's `Integer` is arbitrary-precision and Arel has
-   * no separate bignum visitor, so both JS numeric types land here.
-   *
-   * Callers: `Visitor#visit` routes every `bigint` here, and every
-   * *integral* `number` — the `Number.isInteger` split mirrors Ruby's
-   * Integer-vs-Float, so a `1.5` reaches `visitFloat` and raises (rb:839) as
-   * it does in Rails.
-   */
+  /** Mirrors: `visit_Integer` (to_sql.rb:824-826). */
   protected visitInteger(o: number | bigint, collector: SQLString): SQLString {
     collector.append(String(o));
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#unsupported` (to_sql.rb:828-830) — `collector` is
-   * required to match the Rails signature even though it's unused after the
-   * raise.
-   */
+  /** Mirrors: `to_sql.rb#unsupported` (to_sql.rb:828-830). */
   protected unsupported(o: unknown, _collector: SQLString): never {
     throw new UnsupportedVisitError(o);
   }
 
-  // Rails aliases every Ruby value class with no SQL rendering to
-  // `unsupported` (to_sql.rb:832-845): visiting one raises
-  // `UnsupportedVisitError`. TS has no method-alias, so each delegates to
-  // the shared helper. Each keeps the Rails `(o, collector)` shape.
-  //
-  // `Visitor#visit` class-dispatches raw values onto these, so the unsupported
-  // contract is enforced on the one path that can reach it — they are not
-  // documentation-only. The exception is the Ruby-specific string classes
-  // (Multibyte::Chars, StringInquirer), which have no JS analogue to dispatch
-  // from and stand as the documented contract, directly testable.
+  // to_sql.rb:832-845
 
   /** Rails: `alias :visit_ActiveSupport_Multibyte_Chars :unsupported`. */
   protected visitActiveSupportMultibyteChars(o: unknown, collector: SQLString): never {
@@ -1215,21 +1061,13 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesUnaryOperation(o: Nodes.UnaryOperation, collector: SQLString): SQLString {
-    // Mirrors Rails: `collector << " #{o.operator} "` (visitors/to_sql.rb).
-    // The operator is emitted verbatim with a space on each side; callers
-    // are responsible for the operator's own whitespace.
+    // visitors/to_sql.rb
     collector.append(` ${o.operator} `);
     this.visit(o.expr, collector);
     return collector;
   }
 
-  /**
-   * Mirrors Rails: `visit_Array` (to_sql.rb:858). Rails delegates to
-   * `inject_join` which calls `visit` on each element; in Ruby `visit` of
-   * a primitive routes through `visit_Integer`/`visit_String`/etc. Trails
-   * doesn't dispatch on JS primitives — `rubyClassName` (ruby-class.ts) is the
-   * equivalent path that handles both Node and non-Node entries.
-   */
+  /** Mirrors: `visit_Array` (to_sql.rb:858). */
   protected visitArray(o: ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): SQLString {
     return this.injectJoin(o, collector, ", ");
   }
@@ -1243,12 +1081,7 @@ export class ToSql extends Visitor {
     return this.injectJoin(o.values, collector, " ");
   }
 
-  /**
-   * Mirrors `to_sql.rb#quote` (to_sql.rb:867-870): SqlLiteral passes through,
-   * everything else is handed to the connection. Rails' Arel does no value
-   * formatting of its own — every date/array/binary decision lives in the
-   * adapter's `quote`.
-   */
+  /** Mirrors: `to_sql.rb#quote` (to_sql.rb:867-870). */
   protected quote(value: unknown): string {
     if (value instanceof Nodes.SqlLiteral) return value.value;
     return this.connection.quote(value);
@@ -1272,13 +1105,7 @@ export class ToSql extends Visitor {
     return this.connection.quoteColumnName(name);
   }
 
-  /**
-   * Mirrors `to_sql.rb#sanitize_as_sql_comment` (to_sql.rb:882): SqlLiteral
-   * passes through; everything else delegates to the connection so the
-   * adapter's comment-escaping rules apply. Both `visitArelNodesComment` and
-   * `visitArelNodesOptimizerHints` route through here (real adapters
-   * neutralize-and-space delimiters; the default quoters strip them).
-   */
+  /** Mirrors: `to_sql.rb#sanitize_as_sql_comment` (to_sql.rb:882). */
   protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
     if (value instanceof Nodes.SqlLiteral) return value.value;
     return this.connection.sanitizeAsSqlComment(String(value));
@@ -1289,11 +1116,7 @@ export class ToSql extends Visitor {
     return this.maybeVisit(o.optimizerHints, collector);
   }
 
-  /**
-   * Mirrors `to_sql.rb#maybe_visit`: if `thing` is non-null, emits a leading
-   * space and visits it; otherwise no-op. Used to thread optional clauses
-   * (limit/offset/lock/comment) through select-statement visitors.
-   */
+  /** Mirrors: `to_sql.rb#maybe_visit`. */
   protected maybeVisit(thing: Node | null | undefined, collector: SQLString): SQLString {
     if (!thing) return collector;
     collector.append(" ");
@@ -1301,10 +1124,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#inject_join`: visits `list[0]`, then for each
-   * subsequent node emits `joinStr` and visits.
-   */
+  /** Mirrors: `to_sql.rb#inject_join`. */
   protected injectJoin(
     list: ReadonlyArray<Nodes.NodeOrValue>,
     collector: SQLString,
@@ -1317,7 +1137,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors `to_sql.rb#unboundable?` as a truthy check. */
+  /** Mirrors: `to_sql.rb#unboundable?`. */
   protected isUnboundable(value: unknown): boolean {
     return this.unboundableSign(value) !== 0;
   }
@@ -1334,7 +1154,7 @@ export class ToSql extends Visitor {
     return !!(o.limit || o.offset || o.orders.length > 0);
   }
 
-  /** Mirrors `to_sql.rb#has_group_by_and_having?`. */
+  /** Mirrors: `to_sql.rb#has_group_by_and_having?`. */
   protected hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean {
     return o.groups.length > 0 && o.havings.length > 0;
   }
@@ -1345,9 +1165,6 @@ export class ToSql extends Visitor {
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
-      // A composite primary key arrives as an array of column nodes, rendered as
-      // a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2 ...)`. Mirrors Rails
-      // `prepare_update_statement`'s `Grouping.new(o.key)`.
       const key = Array.isArray(o.key)
         ? o.key.map((k) => this.subselectKey(k))
         : this.subselectKey(o.key);
@@ -1367,9 +1184,6 @@ export class ToSql extends Visitor {
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
-      // A composite primary key arrives as an array of column nodes; the
-      // visitor renders it as a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2
-      // ...)`. Mirrors Rails `prepare_delete_statement`'s `Grouping.new(o.key)`.
       const key = Array.isArray(o.key)
         ? o.key.map((k) => this.subselectKey(k))
         : this.subselectKey(o.key);
@@ -1399,8 +1213,6 @@ export class ToSql extends Visitor {
     const core = stmt.cores[0];
     if (o.relation) core.source = new Nodes.JoinSource(o.relation);
     core.wheres = [...o.wheres];
-    // A composite key projects each column (`SELECT pk1, pk2`); Rails relies on
-    // `visit_Array` to comma-join, here we spread for the same SQL.
     core.projections = Array.isArray(key) ? [...key] : [key];
     core.groups = [...o.groups];
     core.havings = [...o.havings];
@@ -1410,7 +1222,7 @@ export class ToSql extends Visitor {
     return stmt;
   }
 
-  /** Mirrors `to_sql.rb#infix_value`. Visits left, emits literal, visits right. */
+  /** Mirrors: `to_sql.rb#infix_value`. */
   protected infixValue(
     o: { left: Nodes.NodeOrValue; right: Nodes.NodeOrValue },
     collector: SQLString,
@@ -1422,11 +1234,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#infix_value_with_paren`. Recursively wraps adjacent
-   * same-class infix nodes in `( ... )` per Rails' shape — Rails compares
-   * `o.left.class == o.class` to keep nested same-operator chains flat.
-   */
+  /** Mirrors: `to_sql.rb#infix_value_with_paren`. */
   protected infixValueWithParen(
     o: Node & { left: Node; right: Node },
     collector: SQLString,
@@ -1452,10 +1260,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#grouping_parentheses`. Wraps a SelectStatement in
-   * parens when it would otherwise emit ambiguously; otherwise plain visit.
-   */
+  /** Mirrors: `to_sql.rb#grouping_parentheses`. */
   protected groupingParentheses(
     o: Node,
     collector: SQLString,
@@ -1471,19 +1276,13 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors `to_sql.rb#require_parentheses?`. */
+  /** Mirrors: `to_sql.rb#require_parentheses?`. */
   protected isRequireParentheses(o: Nodes.SelectStatement): boolean {
     return o.orders.length > 0 || Boolean(o.limit) || Boolean(o.offset);
   }
 
-  /**
-   * Mirrors `to_sql.rb#aggregate`. Renders `NAME(DISTINCT? expr, ...) AS alias?`.
-   */
+  /** Mirrors: `to_sql.rb#aggregate`. */
   protected aggregate(name: string, o: Nodes.Function, collector: SQLString): SQLString {
-    // Trails-specific: aggregate calls aren't safe to retry against a
-    // detached connection. Rails has no equivalent (the retryable flag is
-    // a Trails collector concern), so this is the one piece of behavior we
-    // carry alongside the Rails-shaped body.
     collector.retryable = false;
     collector.append(`${name}(`);
     if (o.distinct) collector.append("DISTINCT ");
@@ -1496,10 +1295,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors `to_sql.rb#is_distinct_from`. CASE-form fallback for adapters
-   * that lack native `IS [NOT] DISTINCT FROM`.
-   */
+  /** Mirrors: `to_sql.rb#is_distinct_from`. */
   protected isDistinctFrom(
     o: { left: Nodes.NodeOrValue; right: Nodes.NodeOrValue },
     collector: SQLString,
@@ -1517,7 +1313,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors `to_sql.rb#collect_ctes`. Visits each CTE child joined by ", ". */
+  /** Mirrors: `to_sql.rb#collect_ctes`. */
   protected collectCtes(
     children: ReadonlyArray<{ toCte(): Node }>,
     collector: SQLString,
@@ -1530,9 +1326,6 @@ export class ToSql extends Visitor {
   }
 
   /**
-   * Seeds this visitor's dispatch cache. Called once, lazily, the first time
-   * the cache is built — see the note in `Visitor.dispatchCache`.
-   *
    * @internal
    */
   static registerDispatch(): void {
@@ -1611,10 +1404,7 @@ export class ToSql extends Visitor {
     reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
     reg(Nodes.BoundSqlLiteral, "visitArelNodesBoundSqlLiteral");
     reg(Nodes.BindParam, "visitArelNodesBindParam");
-    // Not an Arel node, but Rails' dispatch is by class for every object it
-    // visits (visitor.rb:29-30) and to_sql.rb:756 defines a handler for it,
-    // so ValuesList/Assignment's visit branch resolves here rather than
-    // raising UnsupportedVisitError.
+    // visitor.rb:29-30, to_sql.rb:756
     reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
@@ -1659,22 +1449,12 @@ export class ToSql extends Visitor {
   }
 
   private visitBindValue(value: unknown, collector: SQLString): void {
-    // Mirrors Rails' `new_bind` lambda inside `visit_Arel_Nodes_BoundSqlLiteral`
-    // (to_sql.rb:774-795, Rails 8.0.2): non-Arel values are routed through
-    // `collector.add_bind` / `add_binds`, NOT inline-quoted. On the Composite
-    // path this yields parameterized SQL (`topics.id = ?`) plus a bind list — so
-    // the prepared-statement template is reused across values — while the
-    // inlining `SubstituteBinds` collector still renders the quoted literal for
-    // `to_sql`.
-    //
-    // Each non-Arel scalar is wrapped in `@connection.cast_bound_value(value)`
-    // before `add_bind`, mirroring Rails' `new_bind` lambda (to_sql.rb:775-778).
+    // to_sql.rb:774-795, to_sql.rb:775-778
     if (arelNode(value)) {
       this.visit(value as Node, collector);
     } else if (Array.isArray(value)) {
       if (value.length === 0) {
-        // Rails (to_sql.rb:779): `collector << @connection.quote(nil)` — empty
-        // list → NULL.
+        // to_sql.rb:779
         collector.append(this.quote(null));
       } else if (!value.some((v) => arelNode(v))) {
         collector.addBinds(
@@ -1683,10 +1463,7 @@ export class ToSql extends Visitor {
           this.bindBlock(),
         );
       } else {
-        // Mixed Arel-node / scalar list (to_sql.rb:784-791): visit nodes,
-        // single-`add_bind` every other element. A *nested* array here is bound
-        // as one value (one `?`), NOT re-expanded — that's why this branch calls
-        // `addBind` directly instead of recursing through `visitBindValue`.
+        // to_sql.rb:784-791
         value.forEach((v, i) => {
           if (i > 0) collector.append(", ");
           if (arelNode(v)) {
@@ -1709,23 +1486,8 @@ export class ToSql extends Visitor {
   }
 
   /**
-   * Mirrors `to_sql.rb#unboundable?` (to_sql.rb:905-907), returning the sign
-   * the Ruby predicate yields so the comparison visitors can `case` on it:
-   *
-   *     value.respond_to?(:unboundable?) && value.unboundable?
-   *
-   * It is purely duck-typed. Only two types answer it: `BindParam`
-   * (bind_param.rb:39-40, itself delegating to its value) and
-   * `QueryAttribute` (query_attribute.rb:46-51), where it means "serializes
-   * out of the column's range" (`value <=> 0`) — NOT "is infinite".
-   *
-   * `infinite?` is a different predicate and is never consulted by the visitor;
-   * it serves `Predications#open_ended?` (predications.rb:256-258). Note it is
-   * defined on `Quoted` (casted.rb:43-45 — the `Quoted` class lives in
-   * casted.rb), NOT on `Casted`, which defines no `infinite?` at all
-   * (casted.rb:5-35). So a raw `Float::INFINITY`, or a `Quoted`/`Casted`
-   * wrapping one, is bounded here and renders as a value rather than
-   * collapsing.
+   * Mirrors: `to_sql.rb#unboundable?` (to_sql.rb:905-907), bind_param.rb:39-40,
+   * query_attribute.rb:46-51.
    */
   protected unboundableSign(value: unknown): 1 | -1 | 0 {
     const v = value as { isUnboundable?: () => unknown } | null | undefined;
@@ -1737,20 +1499,11 @@ export class ToSql extends Visitor {
   }
 
   /**
-   * Mirrors Rails' `right.nil?` guard in the equality visitors: a nil right
-   * emits `IS NULL` rather than `= ?`. Ruby needs no type switch here because
-   * every wrapper defines `nil?` as `value.nil?` — Casted (casted.rb:15),
-   * Quoted (casted.rb:41), BindParam (bind_param.rb:23-25) — so the single
-   * polymorphic call covers explicit nils and binds that *serialize* to nil (a
-   * null-mapped or unknown enum label, or a normalizer that blanks the value).
+   * Mirrors: casted.rb:15, casted.rb:41, bind_param.rb:23-25.
    */
   protected rightIsNull(right: unknown): boolean {
-    // A raw nil that never got wrapped has no `isNil()` to dispatch to; Ruby's
-    // `nil.nil?` is just true. A bare null therefore renders IS NULL and never
-    // reaches the raw-value dispatch, even though visit_NilClass is aliased to
-    // `unsupported` for the paths that do reach it.
     if (right === null || right === undefined) return true;
-    // Everything else answers Rails' `right.nil?` (to_sql.rb:649) duck-typed.
+    // to_sql.rb:649
     const maybe = right as { isNil?: () => boolean };
     return typeof maybe?.isNil === "function" && maybe.isNil();
   }

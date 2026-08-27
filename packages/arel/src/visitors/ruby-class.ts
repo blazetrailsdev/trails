@@ -1,6 +1,4 @@
 /**
- * The JS half of Ruby's `object.class`, for `Visitor#visit` dispatch.
- *
  * @noRailsEquivalent PERMANENT — `Visitor#visit` dispatches on
  * `dispatch[object.class]` (visitor.rb:29), and every Ruby value has a class.
  * A JS primitive has none, so the class name Ruby would have dispatched on has
@@ -10,33 +8,18 @@
 import { temporalClassName, temporalTag } from "../temporal-tag.js";
 
 /**
- * The Ruby class name `Visitor#visit` would dispatch a raw value on.
- *
- * Rails gets this for free: `dispatch[object.class]` (visitor.rb:29) reads the
- * runtime class off any object, and `dispatch_cache` (visitor.rb:17-21) turns
- * it into `:"visit_#{klass.name}"`. JS primitives have no such class, so this
- * function is the missing half of `object.class` — it names the Ruby class a
- * value would have had, and `Visitor#visit` turns that name into `visit<Name>`.
- *
- * Returns `null` for values that dispatch on their JS constructor instead
- * (every Arel node, ActiveModel::Attribute, and any other real class), which
- * is the dispatch path `Visitor#visit` tries first.
+ * visitor.rb:29, visitor.rb:17-21
  */
 export function rubyClassName(v: unknown): string | null {
-  // Not a Node and not importable here (SelectManager → ToSql → SelectManager
-  // is circular), so it is recognised by shape. Rails dispatches it on its
-  // real class to `visit_Arel_SelectManager` (to_sql.rb:106).
+  // to_sql.rb:106
   if (v !== null && typeof v === "object" && "ast" in v && "toSql" in v) {
     return "ArelSelectManager";
   }
   if (Array.isArray(v)) return "Array";
   if (typeof v === "number") {
-    // Ruby splits Integer (renders, to_sql.rb:824) from Float (raises,
-    // rb:839); `Number.isInteger` is that split. A non-finite number is never
-    // integral, so it lands on Float and raises, as Rails' Float does.
+    // to_sql.rb:824, to_sql.rb:839
     return Number.isInteger(v) ? "Integer" : "Float";
   }
-  // Ruby has no fixnum/bignum distinction at this layer — both are Integer.
   if (typeof v === "bigint") return "Integer";
   if (v === null || v === undefined) return "NilClass";
   if (typeof v === "string") return "String";
@@ -48,29 +31,7 @@ export function rubyClassName(v: unknown): string | null {
 }
 
 /**
- * The analogue of Ruby's Hash — the class `Visitor#visit` would dispatch a
- * record on.
- *
- * Rails' `Visitor#visit` walks `object.class.ancestors` (visitor.rb:36-41), so
- * every `Hash` descendant reaches `visit_Hash` for *any* visitor, not just one.
- * JS has no Hash class — the record literal *is* the Hash — so the equivalent
- * of that ancestor split is whether the prototype chain is made only of plain
- * records:
- *
- *   - `{ a: 1 }` and `Object.create(null)` are Hashes;
- *   - `Object.create({ a: 1 })` is the JS way to derive a record from another
- *     record — Ruby's `class MyHash < Hash` — so it's a Hash too;
- *   - a class instance (including `class Config extends Object`) has a prototype
- *     whose own `constructor` points back at the class, which is Ruby's
- *     `Config < Object`: no ancestor handler, so it is not a Hash.
- *
- * What marks a *class* prototype is that back-reference: `class C {}` installs
- * `C.prototype.constructor === C`, so the own `constructor` is a function
- * pointing back at this very object. Anything else — absent, a non-function, or
- * a function whose `.prototype` is some other object — leaves the value a
- * record, so keep walking. A literal `constructor` key (`{ constructor: "x" }`)
- * fails the identity, and its name is irrelevant to dispatch anyway: Ruby
- * dispatches by ancestry, so a Hash with a `:constructor` key is still a Hash.
+ * visitor.rb:36-41
  */
 export function isHashAnalogue(v: unknown): boolean {
   if (typeof v !== "object" || v === null) return false;
@@ -86,16 +47,7 @@ export function isHashAnalogue(v: unknown): boolean {
   return true;
 }
 
-// The Ruby class Rails would dispatch a date/time value on, all three of which
-// Rails aliases to `unsupported` (to_sql.rb:836-844). Temporal is the Time/Date
-// analogue in this codebase and Temporal types expose no `toISOString`, so they
-// match on their tag via the shared whitelist; a JS Date (or any toISOString
-// duck-type) is an instant-in-time and maps to Time.
-//
-// Only the whitelisted tags answer: `Duration`, `PlainYearMonth` and
-// `PlainMonthDay` have no Ruby analogue and so fall through to the same
-// no-visitable-ancestor path an arbitrary object takes, rather than being
-// mislabelled as a Time.
+// to_sql.rb:836-844
 function dateTimeClassName(v: unknown): string | null {
   const temporalClass = temporalClassName(v);
   if (temporalClass !== null) return temporalClass;
