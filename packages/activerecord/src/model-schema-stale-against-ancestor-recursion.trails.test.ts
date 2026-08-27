@@ -14,7 +14,7 @@ function makeAdapter(): unknown {
   return {
     internalSchemaCache: {
       isCached: () => true,
-      getCachedColumnsHash: () => undefined,
+      getCachedColumnsHash: () => columns,
       dataSourceExists: async () => true,
       columnsHash: async () => columns,
     },

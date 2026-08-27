@@ -299,10 +299,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
     | undefined;
   const table = klass.tableName;
   // Gate on the same map we read (`_columnsHash` via getCachedColumnsHash),
-  // not `isCached` (which checks `_columns`): a populated `_columns` without a
-  // matching `_columnsHash` entry would otherwise pass the guard, return
-  // undefined here, and fall through to the synthesized branch — re-leaking
-  // declared-but-columnless attributes the warm was meant to exclude.
+  // not `isCached` (which checks `_columns`).
   if (cache && typeof cache.getCachedColumnsHash === "function") {
     const cached = cache.getCachedColumnsHash(table);
     if (cached) {
@@ -316,15 +313,10 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
     }
   }
 
-  // Synthesized fallback: filter ignoredColumns to match loadSchema's fallback.
-  const ignored = new Set(this.ignoredColumns ?? []);
-  const declared = declaredAttributes(this as unknown as SchemaHost);
-  const result: Record<string, ColumnLike> = {};
-  for (const name of declared.keys()) {
-    if (ignored.has(name)) continue;
-    result[name] = synthesizedColumn(name, declared.getAttribute(name)) as ColumnLike;
-  }
-  return result;
+  // `columns_hash` is a pure DB read (model_schema.rb:592-594): a table whose
+  // columns have not been reflected yet has none, exactly as a Rails model with
+  // no table does. A declared-but-columnless `attribute()` never appears here.
+  return {};
 }
 
 /**
@@ -365,19 +357,6 @@ function applyDeclarations(cls: SchemaHost, attributeSet: AttributeSet): void {
       modification.applyTo(attributeSet);
     }
   }
-}
-
-/**
- * One declared attribute in the shape `columnsHash`' readers expect of a column.
- */
-function synthesizedColumn(name: string, attribute: Attribute): Record<string, unknown> {
-  const type = attribute.type as Type & { limit?: number | null };
-  return {
-    name,
-    type: type?.name ?? null,
-    default: attribute.valueBeforeTypeCast ?? null,
-    limit: type?.limit ?? null,
-  };
 }
 
 type DatabaseAdapterLike = { internalSchemaCache?: unknown };
@@ -993,10 +972,9 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  * Mirrors: ActiveRecord::ModelSchema#load_schema
  *
  * Sync: consults the adapter's schema cache if it's already populated
- * (no I/O), and reflects columns into `columnsHash`. For
- * models without a backing table (test fixtures with only user
- * `attribute()` declarations), falls back to synthesizing `_columnsHash`
- * from the declarations so downstream readers continue to work.
+ * (no I/O), and reflects columns into `columnsHash`. A model whose cache entry
+ * is cold reflects nothing and stays unloaded — `columns_hash` is a pure DB
+ * read (model_schema.rb:592-594).
  *
  * For a full async reflection (fetching from the adapter if the cache
  * isn't populated), call `Base.loadSchema()` (base.ts).
@@ -1059,47 +1037,18 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
     return;
   }
 
-  // Cache-miss path: with the schema cache always warm (RFC 0031), a
-  // table-backed model reflects from the persistent cache entry above and
-  // returns — so the int8→BigInt PK divergence that the removed eager id
-  // pre-cast (`_castAttributeValue`) worried about cannot arise on this path.
-  // Reaching here
-  // means a genuinely tableless attribute-only model (the synthesize fallback
-  // below builds its `columnsHash` from declared attributes), which has no
-  // adapter-resolved PK type at all. If such a model still lacks a typed
-  // primary-key def, do NOT mark the load terminal: leaving `_schemaLoaded`
-  // unset lets a later load replace the synthesized view with real reflected
-  // columns once a cache entry exists. The find path passing the raw string id
-  // to the bind for a tableless model in the meantime is harmless — there is
-  // no DB column type to cast through.
-  const declared = declaredAttributes(this);
-  const declaredNames = declared.keys();
-  let pkStillMissing = false;
-  if (declaredNames.length > 0) {
-    const pks = Array.isArray(this.primaryKey)
-      ? this.primaryKey
-      : this.primaryKey != null
-        ? [this.primaryKey]
-        : [];
-    if (pks.some((pk) => !declaredNames.includes(pk))) {
-      pkStillMissing = true;
-    }
-  }
-
-  if (!ownSchemaMemo(this, "_columnsHash") && declaredNames.length > 0) {
-    const hash: Record<string, unknown> = {};
-    const ignored = new Set(this._ignoredColumns ?? []);
-    for (const name of declaredNames) {
-      if (ignored.has(name)) continue;
-      hash[name] = synthesizedColumn(name, declared.getAttribute(name));
-    }
-    this._columnsHash = hash;
-  }
-  if (!pkStillMissing) {
-    this._schemaLoaded = true;
-    this._defaultAttributes();
-    defineAttributeMethodsAfterLoad(this);
-  }
+  // Cache-miss path. Rails' `schema_cache.columns_hash` blocks, so
+  // `load_schema!` always lands on DB-sourced columns (model_schema.rb:592-594);
+  // trails' cache read is async, so a cold model can reach here with nothing to
+  // reflect. Set `@columns_hash` to the empty hash a table with no reflected
+  // columns has — Rails' `load_schema!` always assigns it, and `load_schema`'s
+  // `return if @columns_hash` (model_schema.rb:534-546) is what stops a
+  // `columns_hash` read from inside the load re-entering it. Do NOT stamp
+  // `_schemaLoaded`: the DB read has not happened, so a later `loadSchema` must
+  // still be able to run it. Synthesizing columns from declared attributes here
+  // — which trails used to do — is what made a declared attribute
+  // indistinguishable from a real column.
+  this._columnsHash = {};
 }
 
 /**
@@ -1314,7 +1263,9 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
  * (caller may fall back to attribute-defs-derived metadata).
  */
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
-  if ((host as any).abstractClass) return false;
+  // No `abstract_class?` term: `load_schema!` guards on the table name alone
+  // (model_schema.rb:587-590), so an abstract class that inherits a concrete
+  // superclass's table reflects that table's columns.
   // Access can throw when no pool is configured; treat as "no adapter".
   let adapter: SchemaHost["connection"] | undefined;
   try {
