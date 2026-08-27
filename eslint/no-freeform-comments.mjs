@@ -52,7 +52,7 @@
  * one reds that rule.
  */
 const DIRECTIVE_RE =
-  /^\s*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=/iu;
+  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=/iu;
 
 /**
  * The repo's own JSDoc flags, the only tags that survive. Each is read by a
@@ -126,6 +126,10 @@ function isJsDoc(comment) {
  * key=value input kept verbatim. The English reason that used to follow a tag
  * is prose in a tag's clothing and goes with the rest.
  */
+function hasDirective(comment) {
+  return comment.value.split("\n").some((line) => DIRECTIVE_RE.test(line));
+}
+
 function keptLines(comment) {
   const kept = [];
   for (const line of comment.value.split("\n")) {
@@ -172,9 +176,10 @@ function renderComment(comment, kept) {
   if (kept.length === 0) return null;
   if (comment.type === "Line") return `//${kept[0].replace(/^[\s*]*/u, " ")}`;
   const indent = " ".repeat(comment.loc.start.column);
+  const open = isJsDoc(comment) ? "/**" : "/*";
   const bodies = kept.map((line) => line.replace(/^[\s*]*/u, ""));
-  if (bodies.length === 1) return `/** ${bodies[0]} */`;
-  return [`/**`, ...bodies.map((b) => `${indent} * ${b}`), `${indent} */`].join("\n");
+  if (bodies.length === 1) return `${open} ${bodies[0]} */`;
+  return [open, ...bodies.map((b) => `${indent} * ${b}`), `${indent} */`].join("\n");
 }
 
 const rule = {
@@ -209,6 +214,10 @@ const rule = {
       "Program:exit"(program) {
         if (program.body.length === 0) return;
         for (const group of groupLineComments(sourceCode.getAllComments(), sourceCode)) {
+          // A directive comment is machine input: rewriting it is how the
+          // first fix pass turned `/* eslint-disable */` into `/** ... */`,
+          // which the second pass no longer recognised and deleted.
+          if (group.some(hasDirective)) continue;
           const rewrites = group.map((comment) => [comment, keptLines(comment)]);
           const anyKept = rewrites.some(([, kept]) => kept.length > 0);
           const changed = rewrites.some(

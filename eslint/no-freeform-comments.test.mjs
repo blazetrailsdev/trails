@@ -156,3 +156,24 @@ tester.run("no-freeform-comments (tag documents keep data, not prose)", rule, {
     },
   ],
 });
+
+// A directive comment is machine input and is left byte-identical, prose and
+// all. Rewriting it is what turned `/* eslint-disable X -- why */` into
+// `/** eslint-disable X */` on the first fix pass; the second pass no longer
+// recognised that as a directive and deleted it, silently un-suppressing the
+// rule it was holding off.
+tester.run("no-freeform-comments (directive comments are untouched)", rule, {
+  valid: [
+    {
+      code: `/* eslint-disable no-console --\n   Each model spells the include in its class body.\n   The empty merge beside it is how include() surfaces the members. */\nconst x = 1;\n`,
+    },
+    { code: `/* eslint-disable no-console */\nconst x = 1;\n` },
+    { code: `/* eslint-enable no-console */\nconst x = 1;\n` },
+    // Recognised even wearing a JSDoc `*` continuation, so a directive that
+    // ever lands inside a block comment is never mistaken for prose.
+    { code: `/**\n * eslint-disable no-console\n */\nconst x = 1;\n` },
+    // A trailing directive keeps the prose that documents which rule it lifts.
+    { code: `const x = 1; // eslint-disable-line no-console -- the CLI prints here\n` },
+  ],
+  invalid: [],
+});
