@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 /** The names a class declared with `attribute()` — the `name`s on its own
- * pending-modification queue (activemodel attribute_registration.rb:33-40),
+ * pending-modification queue (activemodel attribute_registration.rb:17-18,77-78),
  * which holds user declarations only and never schema-sourced columns. */
 const declared = (klass: unknown): string[] => {
   if (!Object.hasOwn(klass as object, "_pendingAttributeModifications")) return [];
