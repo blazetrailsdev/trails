@@ -397,7 +397,6 @@ export default defineConfig(
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/arel/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -422,10 +421,19 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
-      "packages/arel/src/**/*.ts",
     ],
-    // test-helpers/ mirrors Rails' test/ code, which the error-class manifest
-    // never covers, so its throws have no ported class to reach for.
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/rails-error-parity": "error",
+    },
+  },
+
+  // arel's enrollment carries one extra ignore: `test-helpers/` mirrors Rails'
+  // `test/` tree, which the error-class manifest never reads, so its throws
+  // (assertion failures, test-double guards) have no ported class to reach for.
+  // Kept as its own block so the three packages above stay strictly gated.
+  {
+    files: ["packages/arel/src/**/*.ts"],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
       "blazetrails/rails-error-parity": "error",
