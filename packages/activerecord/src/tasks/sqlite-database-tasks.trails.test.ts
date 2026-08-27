@@ -229,11 +229,6 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     for (const statement of statements) await Base.adapter.executeMutation(statement);
   }
 
-  async function freshDatabase(): Promise<void> {
-    Base.removeConnection();
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
-  }
-
   beforeEach(async () => {
     previous = Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
@@ -301,9 +296,9 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   // child `sqlite3 :memory: < dump.sql` applies the script to a database of
   // its own and exits, so the connection that owns this one never sees it.
   it("leaves the live in-memory connection untouched, as Rails' child process does", async () => {
-    await freshDatabase();
-    const tasks = new SQLiteDatabaseTasks(configuration);
-    await tasks.structureLoad(sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"));
+    await new SQLiteDatabaseTasks(configuration).structureLoad(
+      sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
+    );
 
     const tables = (await Base.adapter.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'",
