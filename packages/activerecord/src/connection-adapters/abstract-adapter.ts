@@ -2257,7 +2257,7 @@ export class AbstractAdapter implements Quoting {
    *   unported the suffix has nothing to apply to.
    */
   static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
-    const cmds = Array.isArray(commands) ? commands : [commands];
+    const cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
     if (cmds.length === 0) {
       throw new Error(
         `Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`,
@@ -2268,7 +2268,7 @@ export class AbstractAdapter implements Quoting {
 
   /** Opens a database console session. Mirrors: AbstractAdapter.dbconsole (abstract_adapter.rb:119-121). */
   static dbconsole(_config?: unknown, _options?: unknown): unknown {
-    // @nie disposition=TODO
+    // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
     throw new NotImplementedError("dbconsole");
   }
 
