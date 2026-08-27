@@ -288,3 +288,20 @@ tester.run("no-freeform-comments (an unclassifiable tag is left alone)", rule, {
   ],
   invalid: [],
 });
+
+// A kept tag must LEAD its line, the rule the extractors apply. Matching one
+// mid-sentence read a quoted mention inside a reason as a second tag —
+// `which is itself \`@noRailsEquivalent PERMANENT\` for ...` minted a duplicate,
+// and TypeScript then truncates the real reason at it, dropping the
+// declaration out of the compared surface
+// (sqlite3-adapter.ts:2889, caught by `pnpm parity:api`).
+tester.run("no-freeform-comments (a quoted tag in prose is not a tag)", rule, {
+  valid: [],
+  invalid: [
+    {
+      code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT — a consequence of SQLite3DateTime,\n * which is itself \`@noRailsEquivalent PERMANENT\` for the Temporal reason\n * that class documents.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/**\n * @internal\n * @noRailsEquivalent PERMANENT\n */\nconst x = 1;\n`,
+    },
+  ],
+});

@@ -75,8 +75,21 @@ const DIRECTIVE_RE =
  * `@param` / `@returns` / `@example` are deliberately absent: nothing reads
  * them and they are English by construction.
  */
-const KEPT_TAG_RE =
-  /@(internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty|deprecated)\b/u;
+const KEPT_TAG_NAMES =
+  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty|deprecated";
+
+/**
+ * A kept tag, which must LEAD its line — the same rule the extractors apply
+ * (`isLineLeadingJsDocTag`, scripts/api-compare/extract-ts-api.ts). A tag
+ * matched mid-sentence reads a quoted mention inside a reason as a second tag:
+ * `which is itself \`@noRailsEquivalent PERMANENT\` for ...` then mints a
+ * duplicate, and TypeScript truncates the real reason at it.
+ */
+const KEPT_TAG_RE = new RegExp(`^[\\s*]*@(${KEPT_TAG_NAMES})\\b`, "u");
+
+/** The same tags anywhere in the line, for a one-line block that has no
+ *  leading position to occupy: `/** Mirrors: X. @internal *\/`. */
+const INLINE_KEPT_TAG_RE = new RegExp(`@(${KEPT_TAG_NAMES})\\b`, "u");
 
 /**
  * The permanence token `parity:api:extra` and `lint-missing-rails-call-reasons`
@@ -164,13 +177,14 @@ function keptLines(comment) {
     }
     block = null;
   };
+  const tagRe = lines.length === 1 ? INLINE_KEPT_TAG_RE : KEPT_TAG_RE;
   for (const line of lines) {
     if (DIRECTIVE_RE.test(line)) {
       flush();
       kept.push(line);
       continue;
     }
-    const tag = KEPT_TAG_RE.exec(line);
+    const tag = tagRe.exec(line);
     if (tag) {
       flush();
       block = { name: tag[1], text: line.slice(tag.index + tag[0].length) };
