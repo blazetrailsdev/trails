@@ -87,7 +87,7 @@
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
-import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
 import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
 import {
   SKIP,
@@ -1251,7 +1251,7 @@ export function concernHookKey(pkg: string, rubyFile: string): string {
 }
 
 /** Every `.rb` the manifest attributes surface to, in the package's entry. */
-function rubyFilesOf(pkg: ApiManifest["packages"][string]): Set<string> {
+function rubyFilesOf(pkg: PackageInfo): Set<string> {
   const files = new Set<string>();
   for (const info of [...Object.values(pkg.classes), ...Object.values(pkg.modules)]) {
     if (info.file) files.add(info.file);
@@ -1811,9 +1811,6 @@ function buildPackageReport(
       }
     }
 
-    // The symbol-keyed Concern hook: Rails' `included do` / `self.extended`
-    // block is real Rails surface with no method name of its own, so the TS
-    // port of it is not extra — see `concernHookNames`.
     if (rubyFile !== null) {
       for (const hook of concernHooks.get(concernHookKey(pkg, rubyFile)) ?? []) allowed.add(hook);
     }
