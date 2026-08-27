@@ -7,6 +7,7 @@ import { itIfSupports } from "../../support/supports.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";
+import { BinaryData } from "@blazetrails/activemodel";
 import type {
   SqliteDriver,
   SqliteOpenConfig,
@@ -278,7 +279,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("quote binary column escapes it", async () => {
     await adapter.exec(`CREATE TABLE "bin_esc" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
     const buf = Buffer.from([0x00, 0x01, 0x02, 0xff]);
-    await adapter.executeMutation(`INSERT INTO "bin_esc" ("data") VALUES (?)`, [buf]);
+    await adapter.executeMutation(`INSERT INTO "bin_esc" ("data") VALUES (?)`, [
+      new BinaryData(buf),
+    ]);
     const rows = await adapter.execute(`SELECT "data" FROM "bin_esc"`);
     expect(Buffer.from(rows[0].data as Buffer)).toEqual(buf);
   });
@@ -287,7 +290,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.exec(`CREATE TABLE "enc_test" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
     const original = Buffer.from("hello world");
     const copy = Buffer.from(original);
-    await adapter.executeMutation(`INSERT INTO "enc_test" ("data") VALUES (?)`, [copy]);
+    await adapter.executeMutation(`INSERT INTO "enc_test" ("data") VALUES (?)`, [
+      new BinaryData(copy),
+    ]);
     expect(original).toEqual(Buffer.from("hello world"));
   });
 

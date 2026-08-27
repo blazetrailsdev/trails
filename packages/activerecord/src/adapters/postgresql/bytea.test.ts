@@ -7,6 +7,7 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
+import { BinaryData } from "@blazetrails/activemodel";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 // Rails: class ByteaDataType < ActiveRecord::Base
@@ -93,7 +94,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: data = "\u001F"
       // Rails: @connection.execute "insert into bytea_data_type (payload) VALUES ('#{data}')"
       const data = Buffer.from([0x1f]);
-      await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, [data]);
+      await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, [
+        new BinaryData(data),
+      ]);
       // Rails: record = ByteaDataType.first
       const record = await (ByteaDataType as any).first();
       // Rails: assert_equal(data, record.payload)

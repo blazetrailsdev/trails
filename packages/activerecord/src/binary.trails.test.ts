@@ -55,18 +55,17 @@ describe("binary type_casted_binds payload", () => {
   });
 
   it("casts both byte forms Rails reaches type_cast with", async () => {
-    // Rails sees bytes here two ways, and both arms are inherited from the
-    // abstract chain now that sqlite3/mysql end at `else super`:
-    //   - `Type::Binary::Data`, which `BinaryType#serialize` wraps at the source
-    //     (binary.rb:30-33) → unwrapped by rb:96's `value.to_s`.
-    //   - a BINARY/ASCII-8BIT `String` on the `execute(sql, binds)` boundary →
-    //     passed through by rb:102's `when nil, Numeric, String then value`.
-    //     A JS string can't hold arbitrary bytes, so a byte view is that form.
+    // Rails sees bytes here two ways — `Type::Binary::Data`, which
+    // `BinaryType#serialize` wraps at the source (binary.rb:30-33), and a
+    // BINARY/ASCII-8BIT `String` bound straight to `execute(sql, binds)`. A JS
+    // string can't hold arbitrary bytes, so trails' raw-`execute` callers wrap
+    // that second form in a `Data` too: rb:96's `value.to_s` is the single byte
+    // arm, and rb:102's `when nil, Numeric, String` stays string-only as in
+    // Ruby. An unwrapped byte view therefore falls to the `raise TypeError`.
     const bytes = new Uint8Array([0xde, 0xad]);
     expect(new BinaryType().serialize(bytes)).toBeInstanceOf(BinaryData);
     const conn = await Base.connection;
-    for (const cast of [conn.typeCast(new BinaryData(bytes)), conn.typeCast(bytes)]) {
-      expect(new Uint8Array(cast as Uint8Array)).toEqual(bytes);
-    }
+    expect(new Uint8Array(conn.typeCast(new BinaryData(bytes)) as Uint8Array)).toEqual(bytes);
+    expect(() => conn.typeCast(bytes)).toThrow(TypeError);
   });
 });

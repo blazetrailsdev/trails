@@ -1,11 +1,10 @@
 import { Temporal } from "@blazetrails/date";
 import { Nodes, Visitors } from "@blazetrails/arel";
-import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
+import { ArgumentError, SerializeCastValue, type Type } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 
-import { isSchemaLoaded } from "./model-schema.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
@@ -16,11 +15,6 @@ import { withConnection } from "./connection-handling.js";
 import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } from "./timestamp.js";
 
 type ModelClass = typeof Base;
-
-// Mirrors timestamp.ts CREATED_ATTRS/UPDATED_ATTRS: both _at and _on are magic
-// timestamp columns, so verifyAttributes must allow either pair even when only
-// the other is in the model's declared attribute set.
-const TIMESTAMP_ATTR_ALLOWLIST = ["created_at", "created_on", "updated_at", "updated_on"] as const;
 
 // Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#column_name_with_order_matcher
 // Intentionally more restrictive than Rails: quoted identifiers ("col", `col`) and COLLATE
@@ -206,8 +200,6 @@ export class InsertAll {
       this.keys.add(key);
     }
 
-    this.verifyAttributeNamesAreKnown();
-
     if (this.returning === undefined) {
       this.returning = facts.supportsInsertReturning ? this.primaryKeys() : false;
     }
@@ -315,31 +307,6 @@ export class InsertAll {
     const rowKeys = new Set(Object.keys(attributes));
     if (rowKeys.size !== expected.size || ![...expected].every((k) => rowKeys.has(k))) {
       throw new ArgumentError("All objects being inserted must have the same keys");
-    }
-  }
-
-  /** @internal */
-  private verifyAttributeNamesAreKnown(): void {
-    // Rails raises UnknownAttributeError in extract_types_from_columns_on against
-    // schema_cache.columns_hash (insert_all.rb:306-313); we mirror the same
-    // intent against the model's declared attribute set so the error surfaces
-    // before any SQL is built. Rails reads that hash through a blocking
-    // reflect, so it never judges a model whose schema is not loaded — this
-    // check must not either, or a table_name= that reset the schema
-    // (`Book.table_name = "db.books"`, insert_all_test.rb) would raise on a
-    // column the reflect is about to produce.
-    if (!isSchemaLoaded.call(this.model as never)) return;
-    const known = new Set(this.model.attributeNames());
-    if (known.size === 0) return;
-    for (const pk of this.primaryKeys()) known.add(pk);
-    for (const col of TIMESTAMP_ATTR_ALLOWLIST) known.add(col);
-    for (const key of this.keys) {
-      if (!known.has(key)) {
-        // UnknownAttributeError only reads record?.constructor?.name; skip the
-        // full constructor (attribute init, defaults, callbacks) on the error
-        // path by handing it a bare object with the right constructor link.
-        throw new UnknownAttributeError({ constructor: this.model }, key);
-      }
     }
   }
 
@@ -618,6 +585,47 @@ export class Builder implements InsertBuilder {
     this._connection = insertAll.connection;
   }
 
+  /**
+   * Mirrors: ActiveRecord::InsertAll::Builder#extract_types_from_columns_on
+   * (insert_all.rb:306-313).
+   *
+   * Rails reads `@model.schema_cache.columns_hash(table_name)`, which blocks on
+   * a connection checkout when the entry is cold. `SchemaCache#columnsHash` is
+   * async in trails and this builder path cannot await, so the read is the
+   * query-free `getCachedColumnsHash` off `internalSchemaCache` — the sync-peek
+   * slot behind `AbstractAdapter#schema_cache` (the RFC 0073 constraint both
+   * document).
+   * @internal
+   */
+  private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
+    const columns = (
+      this._connection as unknown as {
+        internalSchemaCache: {
+          getCachedColumnsHash(t: string): Record<string, unknown> | undefined;
+        };
+      }
+    ).internalSchemaCache.getCachedColumnsHash(tableName);
+
+    // Ruby's blocking read always has the columns to judge against. A cold
+    // entry here means trails cannot yet know them, and judging the keys
+    // against nothing would raise on a column the reflect is about to produce
+    // — `Book.table_name = "\${db}.books"` (insert_all_test.rb:836-845) resets
+    // the schema and inserts before anything has warmed the qualified name.
+    if (columns != null) {
+      const unknownColumn = keys.find((key) => !(key in columns));
+      if (unknownColumn !== undefined) {
+        // UnknownAttributeError only reads record?.constructor?.name; skip the
+        // full constructor (attribute init, defaults, callbacks) on the error
+        // path by handing it a bare object with the right constructor link.
+        throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
+      }
+    }
+
+    const types: Record<string, Type> = {};
+    for (const key of keys) types[key] = this.model.typeForAttribute(key);
+    return types;
+  }
+
   /** Mirrors Rails `quote_column` → `connection.quote_column_name`. @internal */
   private quoteColumn(name: string): string {
     return this._connection.quoteColumnName(name);
@@ -676,10 +684,13 @@ export class Builder implements InsertBuilder {
   }
 
   valuesList(): Nodes.ValuesList {
-    const model = this._insertAll.model;
+    const types = this.extractTypesFromColumnsOn(this.model.tableName, [
+      ...this._insertAll.keysIncludingTimestamps(),
+    ]);
+
     const rows = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      const type = model.typeForAttribute(key);
+      const type = types[key];
       value = SerializeCastValue.serialize(type, type.cast(value));
       // Rails hands the serialized value to the ValuesList *as a value*
       // (insert_all.rb:246): `connection.visitor.compile` renders it, quoting

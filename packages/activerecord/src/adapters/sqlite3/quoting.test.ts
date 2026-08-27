@@ -6,6 +6,7 @@ import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
+import { BinaryData } from "@blazetrails/activemodel";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -58,7 +59,9 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   it("type cast binary encoding without logger", async () => {
     await adapter.exec(`CREATE TABLE "bin_enc" ("id" INTEGER PRIMARY KEY, "data" BLOB)`);
     const buf = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
-    await adapter.executeMutation(`INSERT INTO "bin_enc" ("data") VALUES (?)`, [buf]);
+    await adapter.executeMutation(`INSERT INTO "bin_enc" ("data") VALUES (?)`, [
+      new BinaryData(buf),
+    ]);
     const rows = await adapter.execute(`SELECT "data" FROM "bin_enc"`);
     expect(Buffer.from(rows[0].data as Buffer)).toEqual(buf);
   });
