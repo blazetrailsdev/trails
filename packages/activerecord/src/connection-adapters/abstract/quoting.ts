@@ -47,7 +47,7 @@ export interface QuotingDispatchHost {
 
 export type QuotedTimeValue = TimeValue | Temporal.PlainTime | Temporal.PlainDateTime;
 
-type TemporalDateLike =
+export type TemporalDateLike =
   | TimeWithZone
   | Temporal.Instant
   | Temporal.ZonedDateTime
@@ -246,15 +246,7 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
   );
 }
 
-export function quotedDate(
-  value:
-    | TimeWithZone
-    | Temporal.Instant
-    | Temporal.ZonedDateTime
-    | Temporal.PlainDateTime
-    | Temporal.PlainDate
-    | Temporal.PlainTime,
-): string {
+export function quotedDate(value: TemporalDateLike): string {
   if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());

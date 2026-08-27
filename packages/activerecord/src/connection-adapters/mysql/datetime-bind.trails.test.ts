@@ -1,12 +1,11 @@
 import { quotingHost } from "../../support/quoting-host.js";
 import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
-import { typeCast as abstractTypeCast } from "../abstract/quoting.js";
-import { quotedDate as mysqlQuotedDate } from "./quoting.js";
+import { quotedDate, typeCast as abstractTypeCast } from "../abstract/quoting.js";
 
 describe("MySQL datetime bind formatting", () => {
   const bind = (v: unknown) =>
-    abstractTypeCast.call(quotingHost({ quotedDate: mysqlQuotedDate }), v);
+    abstractTypeCast.call(quotingHost({ quotedDate }), v);
 
   it("emits YYYY-MM-DD HH:MM:SS.ffffff without T or Z", () => {
     const instant = Temporal.Instant.from("2026-05-08T14:32:00.123456Z");

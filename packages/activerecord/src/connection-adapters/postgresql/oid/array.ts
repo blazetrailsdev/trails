@@ -121,7 +121,7 @@ export interface ArraySubtype {
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
   typeCastForSchema?(value: unknown): string;
-  map?(value: unknown, block?: (value: unknown) => unknown): unknown;
+  map?(value: unknown, block: (value: unknown) => unknown): unknown;
   userInputInTimeZone?(value: unknown): unknown;
 }
 
@@ -213,9 +213,13 @@ export class Array extends ValueType<unknown> {
     return `[${value.map((item) => this.formatValueForSchema(item)).join(", ")}]`;
   }
 
-  map(value: unknown, block?: (value: unknown) => unknown): unknown {
-    if (globalThis.Array.isArray(value)) return block ? value.map(block) : value;
-    return this.subtype.map ? this.subtype.map(value, block) : block ? block(value) : value;
+  map(value: unknown, block: (value: unknown) => unknown): unknown {
+    // `subtype.map` is declared optional only because trails' tests hand
+    // `Array` a duck-typed subtype double; every real `Type::Value` answers it
+    // (value.rb:117-119), which is why array.rb:68 calls it unguarded.
+    return globalThis.Array.isArray(value)
+      ? value.map((element) => block(element))
+      : this.subtype.map!(value as never, block);
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {

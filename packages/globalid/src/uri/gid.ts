@@ -177,6 +177,25 @@ function cgiEscape(s: string): string {
     .replace(/[~!*'()]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 }
 
+/**
+ * The `model_id` half of the component compare — a composite id is an Array in
+ * Ruby, where `==` is element-wise. @internal
+ */
+function modelIdEquals(a: string | string[], b: string | string[]): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((segment, i) => segment === b[i]);
+  }
+  return a === b;
+}
+
+/** The `params` half of the component compare — Ruby `Hash#==`. @internal */
+function paramsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && a[key] === b[key]);
+}
+
 /** CGI.unescape equivalent: `+`→space, `%XX`→char. @internal */
 function cgiUnescape(s: string): string {
   return decodeURIComponent(s.replace(/\+/g, "%20"));
@@ -236,6 +255,30 @@ export class GID {
   /** Mirrors: URI::GID#to_s */
   toString(): string {
     return this._uri;
+  }
+
+  /**
+   * `URI::GID` inherits `==` from Ruby's stdlib `URI::Generic`
+   * (`uri/generic.rb:1396-1402`): same class, then a component-wise compare of
+   * the two normalized component arrays. `GID`'s components are the four
+   * `gid.rb:28-29` carries — `app` (aliased to `host`), `model_name`,
+   * `model_id` and `params` — so the compare is over those.
+   *
+   * @noRailsEquivalent PERMANENT (`vendor/globalid/lib/global_id/uri/gid.rb:7` — `class GID <
+   *   Generic` inherits `==` from Ruby's stdlib `URI::Generic`, which is out of scope to port).
+   */
+  equals(oth: GID): boolean {
+    // `self.class == oth.class` is spelled as a null guard plus a read through
+    // the public component readers rather than an `instanceof`: TS treats the
+    // src/ and dist/ resolutions of this module as distinct classes because of
+    // the private fields, the same trap `SignedGlobalID#equals` works around.
+    if (oth == null) return false;
+    return (
+      this.app === oth.app &&
+      this.modelName === oth.modelName &&
+      modelIdEquals(this.modelId, oth.modelId) &&
+      paramsEqual(this.params, oth.params)
+    );
   }
 
   /**

@@ -13,11 +13,6 @@
  */
 
 import {
-  formatInstantForSqlMysql as formatInstantForSql,
-  formatPlainDateTimeForSqlMysql as formatPlainDateTimeForSql,
-  formatPlainDateForSql,
-} from "../abstract/sql-datetime.js";
-import {
   typeCast as abstractTypeCast,
   toBytes,
   type QuotingDispatchHost,
@@ -26,7 +21,7 @@ import { Rational, Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS, TimeWithZone } from "@blazetrails/activesupport";
+import { toS } from "@blazetrails/activesupport";
 
 export function unquotedTrue(): number {
   return 1;
@@ -142,43 +137,6 @@ export function columnNameWithOrderMatcher(): RegExp {
   const nulls = String.raw`(?:\s+NULLS\s+(?:FIRST|LAST))?`;
   const ordered = String.raw`${expr}${collate}${dir}${nulls}`;
   return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE
- */
-export function quotedDate(
-  value:
-    | TimeWithZone
-    | Temporal.Instant
-    | Temporal.ZonedDateTime
-    | Temporal.PlainDateTime
-    | Temporal.PlainDate
-    | Temporal.PlainTime,
-): string {
-  if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
-  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
-  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  if (value instanceof Temporal.PlainTime) {
-    const dt = new Temporal.PlainDateTime(
-      2000,
-      1,
-      1,
-      value.hour,
-      value.minute,
-      value.second,
-      value.millisecond,
-      value.microsecond,
-      value.nanosecond,
-    );
-    return formatPlainDateTimeForSql(dt);
-  }
-  throw new TypeError(
-    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
-  );
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

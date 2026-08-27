@@ -70,7 +70,7 @@ export abstract class Type<T = unknown> {
     return false;
   }
 
-  map(value: T | null, _block?: (value: unknown) => unknown): T | null {
+  map(value: T | null, _block: (value: unknown) => unknown): T | null {
     return value;
   }
 

@@ -62,27 +62,6 @@ export function formatPlainDateForSql(value: Temporal.PlainDate): string {
   return strftime(strftimeSubject(value.toPlainDateTime()), DATE_DB_FORMAT);
 }
 
-function bceSuffixed(year: number, superResult: string): string {
-  if (year <= 0) {
-    const bceYear = String(-year + 1).padStart(4, "0");
-    return `${superResult.replace(/^-?\d+/, bceYear)} BC`;
-  }
-  return superResult;
-}
-
-export function formatInstantForSqlPostgres(value: Temporal.Instant): string {
-  const z = value.toZonedDateTimeISO(defaultSqlTimezone());
-  return bceSuffixed(z.year, formatInstantForSql(value));
-}
-
-export function formatPlainDateTimeForSqlPostgres(value: Temporal.PlainDateTime): string {
-  return bceSuffixed(value.year, formatPlainDateTimeForSql(value));
-}
-
-export function formatPlainDateForSqlPostgres(value: Temporal.PlainDate): string {
-  return bceSuffixed(value.year, formatPlainDateForSql(value));
-}
-
 export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
   const dt = new Temporal.PlainDateTime(
     2000,

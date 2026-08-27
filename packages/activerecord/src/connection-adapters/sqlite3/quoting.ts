@@ -14,6 +14,7 @@ import {
   isSqlLiteral,
   type QuotingHost,
   quotedDate as abstractQuotedDate,
+  type TemporalDateLike,
   typeCast as abstractTypeCast,
   toBytes,
   type QuotedTimeValue,
@@ -24,7 +25,7 @@ import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS, TimeWithZone } from "@blazetrails/activesupport";
+import { toS } from "@blazetrails/activesupport";
 
 export function quotedTrue(): string {
   return "1";
@@ -81,15 +82,7 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
  * @internal
  * @noRailsEquivalent CONVERGEABLE
  */
-export function quotedDate(
-  value:
-    | TimeWithZone
-    | Temporal.Instant
-    | Temporal.ZonedDateTime
-    | Temporal.PlainDateTime
-    | Temporal.PlainDate
-    | Temporal.PlainTime,
-): string {
+export function quotedDate(value: TemporalDateLike): string {
   return abstractQuotedDate(value);
 }
 
