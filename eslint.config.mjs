@@ -27,6 +27,7 @@ import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import requireCanonicalRebuild from "./eslint/require-canonical-rebuild.mjs";
+import noNewRebuildCanonicalTables from "./eslint/no-new-rebuild-canonical-tables.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import { noRawSqlFiles, noRawSqlIgnores } from "./eslint/no-raw-sql-scope.mjs";
 import {
@@ -252,6 +253,7 @@ export default defineConfig(
           "test-fixture-parity": testFixtureParity,
           "require-table-teardown": requireTableTeardown,
           "require-canonical-rebuild": requireCanonicalRebuild,
+          "no-new-rebuild-canonical-tables": noNewRebuildCanonicalTables,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
@@ -575,6 +577,24 @@ export default defineConfig(
     },
   },
 
+  // ── no-new-rebuild-canonical-tables: the RFC 0079 only-shrink ratchet over
+  //    rebuildCanonicalTables. The helper drops + recreates canonical tables on
+  //    the SHARED per-worker database, so every call site is a paid-per-run
+  //    patch over a contamination source; RFC 0079 drives the count to zero and
+  //    then deletes the helper. The sibling rule require-canonical-rebuild
+  //    MANDATES a rebuild after a canonical drop, so without this ratchet the
+  //    caller count can only grow — and did, by three sites. The baseline is
+  //    eslint/rebuild-canonical-tables-callers.json (path -> allowed count) and
+  //    only shrinks. Scoped to packages/ + scripts/ rather than to activerecord
+  //    test files, because a new caller anywhere is exactly what this stops.
+  //    See eslint/no-new-rebuild-canonical-tables.mjs. ──
+  {
+    files: ["packages/**/*.ts", "scripts/**/*.ts"],
+    rules: {
+      "blazetrails/no-new-rebuild-canonical-tables": "error",
+    },
+  },
+
   // ── no-raw-sql: ban raw SQL strings passed to execution sinks (and the
   //    RFC-0022 `sql.replace`/`sql.concat` string-surgery pattern) outside the
   //    adapter/DDL layer. Build queries with @blazetrails/arel. The adapter
@@ -611,7 +631,8 @@ export default defineConfig(
   //    canonical loaders (loadCanonicalSchema in support/canonical-schema.ts,
   //    ensureCanonicalTables in support/canonical-table-rebuild.ts)
   //    directly — wire the canonical schema + fixtures through `fixtures({ ... })`.
-  //    rebuildCanonicalTables is intentionally allowed (documented shared shield).
+  //    rebuildCanonicalTables is allowed by THIS rule (documented shared shield),
+  //    but its caller list is frozen separately by no-new-rebuild-canonical-tables.
   //    Only canonical-schema.trails.test.ts / canonical-table-rebuild.trails.test.ts may
   //    import them, to test them directly (allowlisted in the rule).
   //    Enforced across every workspace package, not just activerecord: the
