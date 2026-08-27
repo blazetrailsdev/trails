@@ -226,8 +226,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   let previous: ReturnType<typeof Base.removeConnection>;
 
   async function lay(...statements: string[]): Promise<void> {
-    const connection = await Base.connectionPool().leaseConnection();
-    for (const statement of statements) await connection.executeMutation(statement);
+    for (const statement of statements) await Base.adapter.executeMutation(statement);
   }
 
   async function freshDatabase(): Promise<void> {
@@ -306,8 +305,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     const tasks = new SQLiteDatabaseTasks(configuration);
     await tasks.structureLoad(sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"));
 
-    const connection = await Base.connectionPool().leaseConnection();
-    const tables = (await connection.execute(
+    const tables = (await Base.adapter.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'",
     )) as Array<{ name: string }>;
     expect(tables).toHaveLength(0);
