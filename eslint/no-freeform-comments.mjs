@@ -80,10 +80,12 @@ const KEPT_TAG_RE = /@(internal|noRailsEquivalent|missingRailsCall|missingRailsA
 const PERMANENCE_RE = /^\s*(PERMANENT|CONVERGEABLE)\b/u;
 
 /**
- * A contiguous run of `//` comments is one human comment that happens to wrap.
- * Judging each physical line separately splits a Rails citation from the
- * sentence it anchors and deletes half of it, so line comments are grouped
- * into blocks first and kept or deleted whole.
+ * A contiguous run of `//` comments is one human comment that happens to wrap,
+ * so line comments are grouped and judged whole rather than per physical line.
+ *
+ * A directive line breaks the run. It is its own comment, and grouping it with
+ * its neighbours would let one `eslint-disable` keep every sentence written
+ * above it — the run is skipped wholesale on the directive's account.
  */
 function groupLineComments(comments, sourceCode) {
   const groups = [];
@@ -99,6 +101,8 @@ function groupLineComments(comments, sourceCode) {
     }
     const contiguous =
       current &&
+      !DIRECTIVE_RE.test(comment.value) &&
+      !DIRECTIVE_RE.test(current[current.length - 1].value) &&
       comment.loc.start.line === current[current.length - 1].loc.end.line + 1 &&
       onlyCommentOnItsLine(comment, sourceCode) &&
       onlyCommentOnItsLine(current[current.length - 1], sourceCode);

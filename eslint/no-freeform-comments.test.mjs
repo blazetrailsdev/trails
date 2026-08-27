@@ -202,3 +202,23 @@ tester.run("no-freeform-comments (@empty marks an intentionally-empty block)", r
     },
   ],
 });
+
+// A directive does not rescue the prose that happens to sit next to it. A
+// contiguous run of `//` lines is grouped so a wrapped sentence is judged
+// whole, but a directive line is its own comment: skipping the whole group on
+// its account would keep every sentence written above an `eslint-disable`.
+tester.run("no-freeform-comments (a directive does not rescue its neighbours)", rule, {
+  valid: [],
+  invalid: [
+    {
+      code: `// Rails' second failure terminal: no handler on the class.\n// eslint-disable-next-line no-console\nconsole.log(1);\n`,
+      errors: freeform,
+      output: `// eslint-disable-next-line no-console\nconsole.log(1);\n`,
+    },
+    {
+      code: `// eslint-disable-next-line no-console\nconsole.log(1);\n// Trailing narration.\nconst x = 1;\n`,
+      errors: freeform,
+      output: `// eslint-disable-next-line no-console\nconsole.log(1);\nconst x = 1;\n`,
+    },
+  ],
+});
