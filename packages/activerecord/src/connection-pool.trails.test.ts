@@ -456,18 +456,53 @@ it("concurrent unpinConnectionBang calls do not interleave inside the pin tear-d
       }
     };
 
-    const [first, second] = await Promise.all([
+    const [first, second] = await Promise.allSettled([
       pool.unpinConnectionBang(),
       pool.unpinConnectionBang(),
     ]);
 
     // Baseline (no lock) records ["rollback:begin", "rollback:begin", …] and a
-    // maxInFlight of 2, and both callers report a clean unpin because both see
-    // the transaction still open.
+    // maxInFlight of 2, because the second unpin enters the tear-down while
+    // the first is still mid-rollback.
     expect(maxInFlight).toBe(1);
     expect(events).toEqual(["rollback:begin", "rollback:end"]);
-    expect([first, second]).toEqual([true, false]);
+    // Rails clears the pin BEFORE inspecting the transaction
+    // (connection_pool.rb:345-347), so the loser of a concurrent double-unpin
+    // of a depth-1 pin finds no pin at all and raises the guard at :341.
+    expect(first).toMatchObject({ status: "fulfilled", value: true });
+    expect(second).toMatchObject({ status: "rejected" });
+    expect((second as PromiseRejectedResult).reason).toMatchObject({
+      message: expect.stringContaining("isn't a pinned connection"),
+    });
     expect(pinned.transactionManager.openTransactions).toBe(0);
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("unpinConnectionBang leaves the connection checked out when the rollback raises", async () => {
+  // Rails' `checkin` is a plain trailing statement inside the synchronize
+  // block, not an ensure (connection_pool.rb:357-361), so a raising
+  // `rollback_transaction` propagates with the connection NOT checked in — the
+  // depth having already been decremented (:345). The baseline ran the checkin
+  // from a `finally` and checked the connection in anyway.
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang();
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
+
+    const tm = pinned.transactionManager as unknown as {
+      rollbackTransaction: (...args: unknown[]) => Promise<unknown>;
+    };
+    tm.rollbackTransaction = async () => {
+      throw new Error("rollback exploded");
+    };
+
+    await expect(pool.unpinConnectionBang()).rejects.toThrow("rollback exploded");
+    // The pin is gone (the decrement and clear precede the transaction arm)
+    // but the connection was never checked in.
+    expect(pinned.inUse).toBe(true);
+    await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
   } finally {
     await closePoolConnections(pool);
   }

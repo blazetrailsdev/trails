@@ -97,13 +97,14 @@ describe("ConnectionPool::Queue", () => {
     expect(q.poll()).toBe(c2);
   });
 
-  it("clear empties queue and returns elements", () => {
+  it("clear empties queue", () => {
     const q = new Queue();
     q.add(fakeConn(1));
     q.add(fakeConn(2));
 
-    const cleared = q.clear();
-    expect(cleared).toHaveLength(2);
+    // queue.rb:50-54 — `@queue.clear`; Rails manufactures no list of removed
+    // elements for callers, so neither does trails.
+    q.clear();
     expect(q.length).toBe(0);
   });
 
