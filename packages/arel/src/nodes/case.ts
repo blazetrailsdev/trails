@@ -2,9 +2,8 @@ import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
-import { SqlLiteral } from "./sql-literal.js";
 import { buildQuoted } from "./casted.js";
-import { As, Binary } from "./binary.js";
+import { Binary, type NodeOrValue } from "./binary.js";
 import { Unary } from "./unary.js";
 
 /**
@@ -19,9 +18,11 @@ export class Case extends NodeExpression {
   conditions: When[];
   default: Node | null;
 
-  constructor(operand?: Node, defaultValue?: Node) {
+  // Rails names the second parameter `default` (case.rb:8); `default` is a
+  // reserved word in TypeScript, so the parameter keeps the `Value` suffix.
+  constructor(expression?: Node, defaultValue?: Node) {
     super();
-    this.case = operand ?? null;
+    this.case = expression ?? null;
     this.conditions = [];
     // case.rb:11 stores the second argument raw — only `#else` wraps in an
     // Else node (case.rb:25-28).
@@ -32,15 +33,14 @@ export class Case extends NodeExpression {
   // semantics (case.rb:13-16). A prototype method, not an own property: an own
   // property would be copied by `objectClone` still closed over the ORIGINAL,
   // so a cloned Case's `#when` would mutate the original's conditions.
-  when(condition: Node | unknown, result?: Node | unknown): this {
-    const whenNode = buildQuoted(condition);
-    const thenNode = buildQuoted(result === undefined ? null : result);
-    this.conditions.push(new When(whenNode, thenNode));
+  when(condition: Node | unknown, expression: NodeOrValue = null): this {
+    // case.rb:14-15 stores `expression` raw — only `#then` and `#else` quote.
+    this.conditions.push(new When(buildQuoted(condition), expression));
     return this;
   }
 
-  else(result: Node | unknown): this {
-    this.default = new Else(buildQuoted(result === undefined ? null : result));
+  else(expression: Node | unknown): this {
+    this.default = new Else(buildQuoted(expression === undefined ? null : expression));
     return this;
   }
   // Mirrors Arel::Nodes::Case#hash / #eql? / #== (case.rb:35-46).
@@ -74,10 +74,10 @@ export class Case extends NodeExpression {
   // callers chaining `.when().then(value).when()` see `this` (and TS can
   // resolve `this.when` without an undefined-check).
   then(onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown): void;
-  then(result: Node | unknown): this;
+  then(expression: Node | unknown): this;
 
-  then(result: Node | unknown, onRejected?: unknown): this | void {
-    if (typeof result === "function" && typeof onRejected === "function") {
+  then(expression: Node | unknown, onRejected?: unknown): this | void {
+    if (typeof expression === "function" && typeof onRejected === "function") {
       (onRejected as (e: Error) => unknown)(
         new TypeError("Arel::Nodes::Case is not awaitable; use #toSql() to render"),
       );
@@ -85,12 +85,8 @@ export class Case extends NodeExpression {
     }
     const last = this.conditions[this.conditions.length - 1];
     if (!last) throw new Error("Case#then called before Case#when");
-    last.right = buildQuoted(result === undefined ? null : result);
+    last.right = buildQuoted(expression === undefined ? null : expression);
     return this;
-  }
-
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   // Mirrors Arel::Nodes::Case#initialize_copy (case.rb:29-33), which Ruby runs

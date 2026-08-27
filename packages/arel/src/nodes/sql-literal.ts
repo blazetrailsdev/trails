@@ -92,7 +92,7 @@ export class SqlLiteral extends Node {
   // Predications#quoted_node, which calls `Nodes.build_quoted(other, self)`).
   /** @internal */
   quotedNode(other: unknown): Node {
-    return other instanceof Node ? other : buildQuoted(other, this);
+    return buildQuoted(other, this);
   }
 
   // Mirrors Arel::Nodes::SqlLiteral#+ (sql_literal.rb:25-29), including the

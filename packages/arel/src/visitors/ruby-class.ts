@@ -41,7 +41,6 @@ export function rubyClassName(v: unknown): string | null {
   if (v === null || v === undefined) return "NilClass";
   if (typeof v === "string") return "String";
   if (typeof v === "boolean") return v ? "TrueClass" : "FalseClass";
-  if (typeof v === "symbol") return "Symbol";
   const dateTime = dateTimeClassName(v);
   if (dateTime !== null) return dateTime;
   if (isHashAnalogue(v)) return "Hash";

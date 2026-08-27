@@ -6,14 +6,14 @@ describe("As", () => {
   describe("#as", () => {
     it("makes an AS node", () => {
       const attr = new Table("users").get("id");
-      const as = attr.as(sql("foo"));
+      const as = attr.as(sql("foo")) as Nodes.As;
       expect(as.left).toBe(attr);
       expect((as.right as Nodes.SqlLiteral).value).toBe("foo");
     });
 
     it("converts right to SqlLiteral if a string", () => {
       const attr = new Table("users").get("id");
-      const as = attr.as("foo");
+      const as = attr.as("foo") as Nodes.As;
       expect(as.right).toBeInstanceOf(Nodes.SqlLiteral);
     });
   });

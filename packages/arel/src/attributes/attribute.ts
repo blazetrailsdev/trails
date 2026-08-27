@@ -1,27 +1,14 @@
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { _setAttribute } from "../node-slots.js";
 import { Node } from "../nodes/node.js";
-import { As } from "../nodes/binary.js";
-import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
-import { Count } from "../nodes/count.js";
-import { Sum, Max, Min, Avg } from "../nodes/function.js";
-import { Ascending } from "../nodes/ascending.js";
-import { Descending } from "../nodes/descending.js";
 import { buildQuoted } from "../nodes/casted.js";
-import { Grouping } from "../nodes/grouping.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
-import { Extract } from "../nodes/extract.js";
-import {
-  BitwiseAnd,
-  BitwiseOr,
-  BitwiseXor,
-  BitwiseShiftLeft,
-  BitwiseShiftRight,
-} from "../nodes/infix-operation.js";
-import { BitwiseNot } from "../nodes/unary-operation.js";
-import type { NodeOrValue } from "../nodes/binary.js";
+import { Expressions, type ExpressionsModule } from "../expressions.js";
 import { Predications, type PredicationsModule, type RangeLike } from "../predications.js";
+import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
+import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
+import { Math as MathMixin, type MathModule } from "../math.js";
 
 /**
  * Attribute — represents a column on a table.
@@ -112,110 +99,24 @@ export class Attribute extends Node {
   quotedNode(other: unknown): Node {
     return buildQuoted(other, this);
   }
-
-  asc(): Ascending {
-    return new Ascending(this);
-  }
-
-  desc(): Descending {
-    return new Descending(this);
-  }
-
-  // -- Math --
-  //
-  // Mirrors Arel::Math: operands pass through unwrapped. The visitor
-  // renders primitive values via `visit` class dispatch. The operand is
-  // typed `NodeOrValue` (not `unknown` + cast) so the union that encodes
-  // what a Rails node slot admits is enforced at the call site.
-
-  add(other: NodeOrValue): Grouping {
-    return new Grouping(new Addition(this, other));
-  }
-
-  subtract(other: NodeOrValue): Grouping {
-    return new Grouping(new Subtraction(this, other));
-  }
-
-  multiply(other: NodeOrValue): Multiplication {
-    return new Multiplication(this, other);
-  }
-
-  divide(other: NodeOrValue): Division {
-    return new Division(this, other);
-  }
-
-  bitwiseAnd(other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseAnd(this, other));
-  }
-
-  bitwiseOr(other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseOr(this, other));
-  }
-
-  bitwiseXor(other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseXor(this, other));
-  }
-
-  bitwiseShiftLeft(other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseShiftLeft(this, other));
-  }
-
-  bitwiseShiftRight(other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseShiftRight(this, other));
-  }
-
-  bitwiseNot(): BitwiseNot {
-    return new BitwiseNot(this);
-  }
-
-  as(other: string | SqlLiteral): As {
-    return new As(this, new SqlLiteral(other, { retryable: true }));
-  }
-
-  // -- Aggregate functions --
-  //
-  // Mirrors: Arel::Expressions (mixed into Attribute in Rails). Returns
-  // the typed Function subclasses Rails uses (Count/Sum/Max/Min/Avg) so
-  // `instanceof` checks line up across the codebase. The visitor
-  // (visitAggregate in to-sql.ts) renders them identically to a
-  // NamedFunction with the same name.
-
-  count(distinct: boolean | null = false): Count {
-    return new Count([this], distinct);
-  }
-
-  sum(): Sum {
-    return new Sum([this]);
-  }
-
-  maximum(): Max {
-    return new Max([this]);
-  }
-
-  minimum(): Min {
-    return new Min([this]);
-  }
-
-  average(): Avg {
-    return new Avg([this]);
-  }
-
-  extract(field: string): Extract {
-    // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).
-    return new Extract([this], field);
-  }
 }
 
-// Mirrors `include Arel::Predications` (attribute.rb:7). Every predication —
+// Mirrors the five `include`s at attribute.rb:6-10. Every predication —
 // eq/notEq/in/notIn/matches/between/*_any/*_all and the private
 // quoted_array / grouping_any / infinity? helpers — comes from the mixin and
 // dispatches back through this class's `quotedNode`, which is the only piece
 // Attribute supplies (the type-casting variant).
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Attribute extends Omit<
-  PredicationsModule,
-  "between" | "notBetween" | "isInfinity" | "isUnboundable" | "isOpenEnded"
-> {
+export interface Attribute
+  extends
+    Omit<
+      PredicationsModule,
+      "between" | "notBetween" | "isInfinity" | "isUnboundable" | "isOpenEnded"
+    >,
+    ExpressionsModule,
+    AliasPredicationModule,
+    OrderPredicationsModule,
+    MathModule {
   // Restated (rather than inherited) so a subclass can `override` them with a
   // narrowed signature — the self-dispatch predications.rb:38-51 relies on.
 
@@ -229,6 +130,11 @@ export interface Attribute extends Omit<
   notBetween(other: RangeLike): Node;
 }
 
+// Mirrors attribute.rb:6-10, in Rails' include order.
+include(Attribute, Expressions);
 include(Attribute, Predications);
+include(Attribute, AliasPredication);
+include(Attribute, OrderPredications);
+include(Attribute, MathMixin);
 
 _setAttribute(Attribute);
