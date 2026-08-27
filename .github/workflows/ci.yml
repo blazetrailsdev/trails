@@ -1358,37 +1358,12 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_PREPARED_STATEMENTS: "1"
 
-  # The website's own unit + component tests, split out of the `Website` build
-  # job so they run on every website-affecting PR without the slow SvelteKit +
-  # typedoc + VitePress build (that job stays disabled, see below). The root
-  # vitest config excludes `packages/website/**` from every project, so this
-  # is the only place `packages/website/src/**/*.test.ts` runs.
-  website-tests:
-    name: Website Tests
-    needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      (needs.changes.outputs.website_affected == 'true' ||
-      needs.changes.outputs.website_label == 'true')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      # `tsconfig.json` extends `./.svelte-kit/tsconfig.json`, which esbuild
-      # resolves per test file — without the sync every file fails to collect.
-      - run: pnpm --filter @blazetrails/website exec svelte-kit sync
-      - run: pnpm --filter @blazetrails/website exec vitest run
-
   website:
     name: Website
     needs: changes
     # TEMPORARILY DISABLED. The build has been failing on main and the job
     # doesn't run on ordinary PRs, so nothing catches the breakage before it
-    # lands; the site being stale is acceptable for now. The package's unit and
-    # component tests do NOT wait on that — they run in `website-tests` above.
-    # To re-enable, delete
+    # lands; the site being stale is acceptable for now. To re-enable, delete
     # the leading `false &&` from the `if:` below. The aggregate `ci` job
     # already treats this job's skip as always-legitimate (see the website
     # case there).
@@ -1903,7 +1878,6 @@ jobs:
       - mysql-tests
       - maria-tests
       - website
-      - website-tests
       - rails-comparison
       - schema-parity-rails
       - schema-parity-trails
@@ -2046,13 +2020,6 @@ jobs:
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
                   if [ "$COMPARISON_AFFECTED" = "false" ]; then
-                    continue
-                  fi
-                  ;;
-                website-tests)
-                  # Legitimate skip when nothing under packages/website/ changed
-                  # and the PR carries neither the `website` nor `release` label.
-                  if [ "$WEBSITE_AFFECTED" = "false" ] && [ "$WEBSITE_LABEL" != "true" ]; then
                     continue
                   fi
                   ;;

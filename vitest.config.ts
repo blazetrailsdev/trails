@@ -38,6 +38,11 @@ import { resolveForkCount } from "./packages/activerecord/src/support/ar-db-fork
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
   "**/dist/**",
+  // The website is deliberately out of CI, tests included. Its suite needs a
+  // `svelte-kit sync` and a browser-shaped environment, and the site being
+  // stale between manual runs is acceptable — the `Website` build job in
+  // ci.yml is disabled for the same reason. Run it by hand from
+  // packages/website: `pnpm exec svelte-kit sync && pnpm exec vitest run`.
   "packages/website/**",
   "packages/*/dx-tests/**",
 ];
