@@ -14,7 +14,6 @@ import { Topic } from "../test-helpers/models/topic.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 describe("UniquenessValidationContextTest", () => {
@@ -91,26 +90,34 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   let adapter: TestDatabaseAdapter;
   let pool: ConnectionPool;
 
+  // A table of this suite's own rather than canonical `subscribers`: the raw
+  // pool reaches a private, empty `:memory:` database on the `sqlite3_mem`
+  // lane and the shared per-worker one everywhere else, so a canonical name
+  // could neither be created on one lane nor torn down on the other. Same
+  // shape as schema.rb:1169-1176 — the unique index on `nick` is what
+  // `covered_by_unique_index?` reads.
   class DirectSubscriber extends Subscriber {
-    static _tableName = "subscribers";
+    static _tableName = "direct_subscribers";
   }
 
   beforeAll(async () => {
     ({ adapter, pool } = await checkoutRawTestAdapter());
-    // The raw pool builds its own connection, and on the `:memory:` lane that
-    // is a private, empty database — nothing has laid the canonical schema in
-    // it. Guarded on absence so the file-backed lanes, where the table is
-    // already there and shared with every other file, are left untouched.
-    if (!(await adapter.tableExists("subscribers"))) {
-      await rebuildCanonicalTables(adapter, ["subscribers"]);
-    }
+    await adapter.dropTable("direct_subscribers", { ifExists: true });
+    await adapter.createTable("direct_subscribers", { id: false }, (t) => {
+      t.string("nick", { null: false });
+      t.string("name");
+      t.integer("id");
+      t.integer("books_count", { null: false, default: 0 });
+      t.integer("update_count", { null: false, default: 0 });
+      t.index("nick", { unique: true });
+    });
     (DirectSubscriber as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
   });
 
   afterAll(async () => {
-    // Written through the raw pool, outside any fixtures transaction, so it
-    // outlives the file unless deleted here.
-    await DirectSubscriber.where({ nick: "direct-abc" }).deleteAll();
+    // Written through the raw pool, outside any fixtures transaction, so the
+    // table outlives the file on the shared per-worker lanes unless dropped.
+    await adapter.dropTable("direct_subscribers", { ifExists: true });
     pool.releaseConnection();
     await pool.disconnectBang();
   });
