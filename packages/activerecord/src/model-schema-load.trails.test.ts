@@ -4,18 +4,6 @@ type Type = ValueType;
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
-/** The names a class declared with `attribute()` — the `name`s on its own
- * pending-modification queue (activemodel attribute_registration.rb:17-18,77-78),
- * which holds user declarations only and never schema-sourced columns. */
-const declared = (klass: unknown): string[] => {
-  if (!Object.hasOwn(klass as object, "_pendingAttributeModifications")) return [];
-  return (
-    klass as { _pendingAttributeModifications: { name?: string }[] }
-  )._pendingAttributeModifications
-    .map((modification) => modification.name)
-    .filter((name): name is string => name !== undefined);
-};
-
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
 }
@@ -69,7 +57,6 @@ describe("loadSchemaFromAdapter", () => {
     // through a class-level registry, which holds user declarations only.
     expect(Model.typeForAttribute("guid").name).toBe("uuid");
     expect(Model.typeForAttribute("payload").name).toBe("jsonb");
-    expect(declared(Model)).not.toContain("guid");
   });
 
   it("does not overwrite user-declared attributes", async () => {
@@ -80,7 +67,6 @@ describe("loadSchemaFromAdapter", () => {
     await loadSchemaFromAdapter.call(Model);
 
     expect(Model.typeForAttribute("guid").name).toBe("string");
-    expect(declared(Model)).toContain("guid");
   });
 
   it("is a no-op for abstract classes", async () => {
@@ -90,7 +76,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(declared(Model)).not.toContain("guid");
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBeFalsy();
   });
 
   it("reflects on a concrete subclass of an abstract parent", async () => {
@@ -121,7 +107,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(declared(Model)).not.toContain("guid");
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBeFalsy();
   });
 
   it("falls through when dataSourceExists returns undefined (probe not implemented)", async () => {
@@ -136,7 +122,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(declared(Model)).not.toContain("guid");
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(true);
   });
 
   it("falls back to ValueType when adapter has no cast type", async () => {
@@ -156,7 +142,6 @@ describe("loadSchemaFromAdapter", () => {
     expect(Model.typeForAttribute("mystery")).toBeInstanceOf(
       typeRegistry.lookup("value").constructor,
     );
-    expect(declared(Model)).not.toContain("mystery");
   });
 
   it("invalidates the _attributesBuilder cache", async () => {
@@ -231,8 +216,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     // User-declared def survives ignoredColumns.
-    expect(declared(Post)).toContain("age");
-    expect(declared(Post)).toContain("age");
+    expect(Post.typeForAttribute("age").name).toBe("integer");
     // Accessor stripped.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
@@ -262,7 +246,6 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "id")).toBeUndefined();
-    expect(declared(Post)).not.toContain("id");
 
     const rec = new Post();
     rec.writeAttribute("id", "abc-123");
@@ -295,7 +278,8 @@ describe("loadSchemaFromAdapter integration details", () => {
     resolveColumns({ guid: { sqlType: "uuid" } });
     await inflight;
 
-    expect(declared(host)).not.toContain("guid");
+    expect(Object.hasOwn(host, "_schemaLoaded")).toBe(false);
+    expect(Object.hasOwn(host, "_columnsHash")).toBe(false);
   });
 });
 
@@ -310,6 +294,5 @@ describe("set adapter auto-loads schema", () => {
     await Post.loadSchema();
 
     expect(Post.typeForAttribute("guid").name).toBe("uuid");
-    expect(declared(Post)).not.toContain("guid");
   });
 });

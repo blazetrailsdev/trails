@@ -1,16 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-/** The names a class declared with `attribute()` — the `name`s on its own
- * pending-modification queue (activemodel attribute_registration.rb:17-18,77-78),
- * which holds user declarations only and never schema-sourced columns. */
-const declared = (klass: unknown): string[] => {
-  if (!Object.hasOwn(klass as object, "_pendingAttributeModifications")) return [];
-  return (
-    klass as { _pendingAttributeModifications: { name?: string }[] }
-  )._pendingAttributeModifications
-    .map((modification) => modification.name)
-    .filter((name): name is string => name !== undefined);
-};
+
+/** ActiveModel's `attribute_names` — `attribute_types.keys`
+ * (activemodel attributes.rb:74-76). ActiveRecord's override gates on
+ * `table_exists?` (attribute_methods.rb:236-241) and would answer `[]` for
+ * these adapter-less classes, so the AM spelling is the one that reads them. */
+const attributeNamesOf = (klass: unknown): string[] =>
+  Object.keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
 
 describe("STI subclass attribute() registration", () => {
   it("keeps subclass attribute() calls on the subclass, not the STI base", () => {
@@ -26,8 +22,8 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    expect(declared(Circle)).toContain("radius");
-    expect(declared(Shape)).not.toContain("radius");
+    expect(attributeNamesOf(Circle)).toContain("radius");
+    expect(attributeNamesOf(Shape)).not.toContain("radius");
 
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
@@ -43,7 +39,7 @@ describe("STI subclass attribute() registration", () => {
 
     // Shape IS the STI base (not a subclass), so its map is its own.
     expect(Object.hasOwn(Shape, "_pendingAttributeModifications")).toBe(true);
-    expect(declared(Shape)).toContain("name");
+    expect(attributeNamesOf(Shape)).toContain("name");
   });
 
   it("non-STI classes are unaffected", () => {
@@ -54,7 +50,7 @@ describe("STI subclass attribute() registration", () => {
     }
 
     expect(Object.hasOwn(Widget, "_pendingAttributeModifications")).toBe(true);
-    expect(declared(Widget)).toContain("price");
+    expect(attributeNamesOf(Widget)).toContain("price");
   });
 
   it("STI subclass attribute declared AFTER base inherits the base's attrs too", () => {
@@ -73,7 +69,7 @@ describe("STI subclass attribute() registration", () => {
 
     expect(Triangle.typeForAttribute("name").name).toBe("string");
     expect(Triangle.typeForAttribute("sides").name).toBe("integer");
-    expect(declared(Shape)).not.toContain("sides");
+    expect(attributeNamesOf(Shape)).not.toContain("sides");
   });
 
   it("STI subclass encrypts() stays on the subclass, unlike attribute()", async () => {
@@ -144,7 +140,7 @@ describe("STI subclass attribute() registration", () => {
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
 
     expect(Shape.typeForAttribute("guid").name).toBe("uuid");
-    expect(declared(Shape)).not.toContain("radius");
+    expect(attributeNamesOf(Shape)).not.toContain("radius");
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
     expect(Circle.typeForAttribute("radius").name).toBe("integer");
     expect(Circle.typeForAttribute("guid").name).toBe("uuid");
@@ -173,11 +169,11 @@ describe("STI subclass attribute() registration", () => {
 
     expect(Object.hasOwn(Ticket, "_pendingAttributeModifications")).toBe(true);
     expect(Ticket.typeForAttribute("priority").name).toBe("integer");
-    expect(declared(Shape)).not.toContain("priority");
-    expect(declared(Circle)).not.toContain("priority");
+    expect(attributeNamesOf(Shape)).not.toContain("priority");
+    expect(attributeNamesOf(Circle)).not.toContain("priority");
 
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
-    expect(declared(Shape)).not.toContain("radius");
+    expect(attributeNamesOf(Shape)).not.toContain("radius");
     expect(Circle.typeForAttribute("radius").name).toBe("integer");
 
     // Inherited (shared-ancestor) declarations remain visible on the descendant.

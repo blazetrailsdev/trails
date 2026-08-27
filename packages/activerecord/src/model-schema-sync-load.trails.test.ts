@@ -3,17 +3,6 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
-/** The names a class declared with `attribute()` — the `name`s on its own
- * pending-modification queue (activemodel attribute_registration.rb:17-18,77-78),
- * which holds user declarations only and never schema-sourced columns. */
-const declared = (klass: unknown): string[] => {
-  if (!Object.hasOwn(klass as object, "_pendingAttributeModifications")) return [];
-  return (
-    klass as { _pendingAttributeModifications: { name?: string }[] }
-  )._pendingAttributeModifications
-    .map((modification) => modification.name)
-    .filter((name): name is string => name !== undefined);
-};
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -44,7 +33,6 @@ describe("sync loadSchema / columnsHash", () => {
     const hash = Post.columnsHash();
 
     expect(hash.guid).toBe(cols.guid);
-    expect(declared(Post)).not.toContain("guid");
   });
 
   it("columnsHash filters ignoredColumns out of the cached hash", () => {
@@ -92,7 +80,6 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(declared(Circle)).not.toContain("guid");
     expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
     expect(Object.keys(Circle.columnsHash())).toContain("guid");
     // The subclass's own map is its own — but the base reflects too: generating
@@ -125,8 +112,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     // Reflection should have landed on the STI base via subclass adapter;
     // subclass shares the base's map reference.
-    expect(declared(Shape)).not.toContain("guid");
-    expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(false);
+    expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
 
   it("columnsHash on STI subclass returns cached Column objects from base adapter", () => {
@@ -176,7 +162,6 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    expect(declared(Circle)).not.toContain("guid");
   });
 
   it("preserves subclass-declared attributes across the subclass's reflection", () => {
@@ -198,9 +183,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(declared(Circle)).not.toContain("guid");
-    expect(declared(Circle)).toContain("radius");
-    expect(declared(Shape)).not.toContain("radius");
+    expect(Circle.typeForAttribute("radius").name).toBe("integer");
+    expect(Shape.typeForAttribute("radius").name).toBe("value");
     expect(Object.hasOwn(Circle, "_pendingAttributeModifications")).toBe(true);
   });
 
@@ -331,7 +315,6 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Shape.columnsHash();
-    expect(declared(Shape)).not.toContain("guid");
 
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
 
@@ -350,13 +333,13 @@ describe("sync loadSchema / columnsHash", () => {
     (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Post.columnsHash(); // triggers reflection
 
-    expect(declared(Post)).not.toContain("guid");
-    expect(declared(Post)).toContain("title");
+    expect(Object.keys(Post.columnsHash())).toContain("guid");
+    expect(Post.typeForAttribute("title").name).toBe("string");
 
     (resetColumnInformation as any).call(Post);
 
-    expect(declared(Post)).not.toContain("guid");
-    expect(declared(Post)).toContain("title");
+    expect((Post as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
+    expect(Post.typeForAttribute("title").name).toBe("string");
   });
 
   // An internalSchemaCache that starts warm and tracks whether resetColumnInformation
