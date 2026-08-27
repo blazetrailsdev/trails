@@ -1784,6 +1784,7 @@ function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown
  * (if any) to an Arel UpdateManager or DeleteManager. Mirrors the constraint
  * stacking in Rails `persistence.rb` `_update_record` / `_delete_record`.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the constraint stacking Ruby writes inline in _update_record / _delete_record (persistence.rb:263).
  */
 export function applyDefaultAndGlobalConstraints(
   manager: { where(node: unknown): unknown },

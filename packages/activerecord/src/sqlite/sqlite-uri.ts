@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Rails leaves file:/:memory: handling to SQLITE_OPEN_URI inside the sqlite3 gem (sqlite3_adapter.rb:34); the JS drivers disagree about it, so trails resolves the URI itself.
+ */
+
+/**
  * True for SQLite in-memory database names per the SQLite URI spec
  * (https://www.sqlite.org/inmemorydb.html): `:memory:`, `file::memory:...`,
  * and named in-memory URIs whose query string carries a real `mode=memory`
@@ -9,14 +13,14 @@
  * misclassified. This is the single predicate both `SQLite3Adapter` and
  * `SQLiteDatabaseTasks` classify with.
  *
- * No Rails counterpart, and `@internal` rather than tagged because the tag
- * would be stale on a declaration `@internal` already drops from the compared
- * surface: Rails never asks the question — `sqlite3_adapter.rb` compares
+ * No Rails counterpart: Rails never asks the question — `sqlite3_adapter.rb` compares
  * `@config[:database]` against the literal `":memory:"`, and
  * `tasks/sqlite_database_tasks.rb` operates on `db_config.database` directly
  * and shells out. trails needs it for the `sqlite3_mem` lane, whose database is
  * a shared-cache in-memory URI rather than the bare `:memory:` alias.
+ *
  * @internal
+ * @noRailsEquivalent PERMANENT Rails compares the config database against the literal ":memory:" inline (sqlite3_adapter.rb:34); the sqlite3_mem lane needs a URI-aware predicate.
  */
 export function isInMemoryDatabase(database: string): boolean {
   if (database === ":memory:") return true;
@@ -40,6 +44,7 @@ export function isInMemoryDatabase(database: string): boolean {
  * `databaseExists()` checks the path `open()` actually uses; only `file:/...`
  * / `file://host/...` is absolute.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the file:/:memory: handling Ruby leaves to SQLITE_OPEN_URI in SQLite3Adapter.new_client (sqlite3_adapter.rb:34).
  */
 export function resolveUriDatabasePath(database: string): string | null {
   if (database === ":memory:") return null;

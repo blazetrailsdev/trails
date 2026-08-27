@@ -23,6 +23,9 @@
  * Schemas are declared explicitly by tests via `defineSchema()` / `fixtures()`.
  */
 
+/**
+ * @noRailsEquivalent CONVERGEABLE the pool-mechanics setup of the Rails pool test (test/cases/connection_pool_test.rb:16-30), which Ruby writes inline per test.
+ */
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
@@ -88,6 +91,7 @@ const _primaryConfiguration: Record<string, unknown> = {
  * a pool-under-test duplicates (see `connection_pool_test.rb:16-30`).
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE reads `connection_pool.db_config.configuration_hash` the way the Rails pool test does (test/cases/connection_pool_test.rb:16-30).
  */
 export function ambientPoolConfiguration(): Record<string, unknown> {
   return { ..._primaryConfiguration };
@@ -105,6 +109,7 @@ let rawTestAdapterCaps: Record<string, unknown> = {};
  * to exactly one server connection the way {@link newRawTestAdapter} does.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the same configuration hash with the one-connection caps that test applies (test/cases/connection_pool_test.rb:16-30).
  */
 export function rawTestAdapterConfiguration(): Record<string, unknown> {
   return { ...ambientPoolConfiguration(), ...rawTestAdapterCaps };
@@ -171,6 +176,7 @@ const { ConnectionDescriptor } =
  * disconnected connection.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the lease_connection setup of the Rails pool test (test/cases/connection_pool_test.rb:16-30), which Ruby writes inline per test.
  */
 export async function checkoutRawTestAdapter(): Promise<{
   adapter: DatabaseAdapter;
@@ -270,6 +276,7 @@ async function buildInTestPool(): Promise<ConnectionPool> {
  * lifecycle. Repeated calls in the same file share one memoized pool.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the duplicate-pool setup of the Rails pool test (test/cases/connection_pool_test.rb:16-30), memoized per file.
  */
 export async function createPooledTestAdapter(): Promise<{
   adapter: LeasedTestAdapter;

@@ -689,6 +689,7 @@ export class HasOneAssociation extends SingularAssociation {
  * triggering a spurious nullify/destroy of the row being re-assigned.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby's `target != record` dispatches Core#== (core.rb:631); JS `!==` is identity only, so the comparison needs a named port.
  */
 export function sameRecord(a: Base | null, b: Base | null): boolean {
   if (a === b) return true;

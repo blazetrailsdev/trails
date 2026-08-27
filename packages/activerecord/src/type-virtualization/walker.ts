@@ -509,6 +509,7 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
  *   in the synthesized `typeof <expr>`).
  *
  * @internal
+ * @noRailsEquivalent PERMANENT scans TS source for include() calls so a Ruby `include` reaches the type checker (activesupport concern.rb:132); Ruby needs no such pass.
  */
 export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
   // Only fire when `include` is imported from activesupport — the symbol

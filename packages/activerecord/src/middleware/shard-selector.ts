@@ -15,9 +15,7 @@ export interface ShardRequest {
 type ShardResolverFn = (request: ShardRequest) => string;
 
 export class ShardSelector {
-  /** @internal */
   readonly resolver: ShardResolverFn;
-  /** @internal */
   readonly options: { lock?: boolean };
 
   private readonly app: (request: ShardRequest) => Promise<unknown>;
@@ -48,17 +46,26 @@ export class ShardSelector {
     return this.setShard(shard, () => this.app(request));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE mirrors Resolver#instrumenter (middleware/database_selector/resolver.rb:33), which ShardSelector has no counterpart for.
+   */
   instrumenter(): typeof Notifications {
     return Notifications;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE ShardSelector#resolver (middleware/shard_selector.rb:38) under a longer name; the Rails spelling is the convergence.
+   */
   shardResolver(): ShardResolverFn {
     return this.resolver;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE the `lock` read off ShardSelector#options (middleware/shard_selector.rb:38), which Ruby indexes inline at its use site.
+   */
   shardSelectorStrategy(): { lock: boolean } {
     return { lock: this.options.lock ?? true };
   }

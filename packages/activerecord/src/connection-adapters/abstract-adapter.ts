@@ -157,6 +157,7 @@ export type AdapterName = "sqlite" | "postgres" | "mysql2";
  * Map a database.yml `adapter:` config string to the normalized `AdapterName` family.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the adapter-name normalization Ruby does inline in ConnectionAdapters.resolve (connection_adapters.rb:34-39).
  */
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
   switch (configAdapter?.toLowerCase()) {
@@ -1209,8 +1210,6 @@ export class AbstractAdapter implements Quoting {
   /**
    * Register a `:checkout`/`:checkin` callback. Mirrors Rails'
    * `set_callback(phase, kind, method)`.
-   *
-   * @internal
    */
   static setCallback(
     phase: ConnectionCallbackPhase,
@@ -1447,6 +1446,7 @@ export class AbstractAdapter implements Quoting {
    * resolve uniformly across adapters.
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE identity default for PostgreSQLAdapter#sql_key (postgresql_adapter.rb:914); Ruby reaches it by respond_to?, TS needs a declared base.
    */
   sqlKey(sql: string): string {
     return sql;
@@ -1544,6 +1544,7 @@ export class AbstractAdapter implements Quoting {
    * the bound reflection (see {@link schemaCache}) — so this is the
    * trails-internal name for the sync peeks and pool-arg-taking reads that our
    * async `BoundSchemaReflection` can't serve.
+   * @noRailsEquivalent CONVERGEABLE the raw schema-cache slot behind AbstractAdapter#schema_cache (abstract_adapter.rb:298); needed while our reflection reads are async.
    */
   get internalSchemaCache(): SchemaCache {
     const reflection = this._poolSchemaReflection();
@@ -1623,7 +1624,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  /** @internal */
   async returnValueAfterInsert(column: Column): Promise<boolean> {
     return column.isAutoPopulated();
   }
@@ -1933,7 +1933,6 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
-  /** @internal */
   asyncEnabled(): boolean {
     return (
       this.supportsConcurrentConnections() &&
@@ -2166,7 +2165,6 @@ export class AbstractAdapter implements Quoting {
     return attribute.eq(value);
   }
 
-  /** @internal */
   async caseInsensitiveComparison(attribute: Nodes.Attribute, value: unknown): Promise<Nodes.Node> {
     const column = await this.columnForAttribute(attribute);
 
@@ -2275,7 +2273,7 @@ export class AbstractAdapter implements Quoting {
   // --- Type registration (Rails: class << self private) ---
 
   /**
-   * @internal Mirrors: AbstractAdapter::TYPE_MAP (abstract_adapter.rb:942)
+   * Mirrors: AbstractAdapter::TYPE_MAP (abstract_adapter.rb:942)
    *
    * Declared only here, as in Rails: `PostgreSQLAdapter` and
    * `AbstractMysqlAdapter` define no `TYPE_MAP` constant, so `self::TYPE_MAP`
@@ -2299,10 +2297,10 @@ export class AbstractAdapter implements Quoting {
     })());
   }
 
-  /** @internal Mirrors: AbstractAdapter::EXTENDED_TYPE_MAPS (abstract_adapter.rb:943) */
+  /** Mirrors: AbstractAdapter::EXTENDED_TYPE_MAPS (abstract_adapter.rb:943) */
   static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
-  /** @internal Mirrors: AbstractAdapter.extended_type_map */
+  /** Mirrors: AbstractAdapter.extended_type_map */
   static extendedTypeMap(
     this: typeof AbstractAdapter,
     options: { defaultTimezone?: string },
@@ -2357,7 +2355,6 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /** @internal */
   static registerClassWithPrecision(
     this: typeof AbstractAdapter,
     mapping: TypeMap,
@@ -2797,7 +2794,7 @@ export class AbstractAdapter implements Quoting {
     return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
   }
 
-  /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
+  /** Mirrors: AbstractAdapter#lookup_cast_type_from_column */
   lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> {
     return this.lookupCastType(column.sqlType);
   }

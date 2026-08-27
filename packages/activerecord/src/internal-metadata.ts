@@ -201,7 +201,6 @@ export class InternalMetadata {
    * `ar_internal_metadata` can hold 2^53 rows. Ruby's Integer is arbitrary
    * precision and needs no such reading; this carries the bignum under a
    * `number` the way `IntegerType#narrowBigInt` (`integer.ts:218-221`) does.
-   *
    */
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
@@ -221,7 +220,6 @@ export class InternalMetadata {
    * `NullPool#schema_cache` answers nil (`abstract/connection_pool.rb:38`), so
    * the send raises NoMethodError on a pool-less collaborator. JS would answer
    * a TypeError for the same read, so Ruby's error class is raised explicitly.
-   * @internal
    */
   async tableExists(): Promise<boolean> {
     const schemaCache: BoundSchemaReflection | null = this._pool.schemaCache;

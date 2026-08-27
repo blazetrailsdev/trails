@@ -746,7 +746,10 @@ export class Builder implements InsertBuilder {
     return !this._insertAll.updatableColumns().includes(columnName);
   }
 
-  /** @internal Mirrors Rails `insert.model.quoted_table_name`. */
+  /**
+   * @internal Mirrors Rails `insert.model.quoted_table_name`.
+   * @noRailsEquivalent CONVERGEABLE `insert.model.quoted_table_name` (insert_all.rb:235) as a Builder method rather than a chained send.
+   */
   quotedTableName(): string {
     return this.quoteTable(String(this.model.arelTable.name));
   }

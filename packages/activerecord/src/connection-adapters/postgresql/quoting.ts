@@ -423,7 +423,6 @@ export function checkIntegerRange(value: bigint | number): void {
  * Mirrors: PostgreSQL::Quoting#quoted_date. Emits a microsecond-precision SQL
  * literal (fixed 6 fractional digits when usec > 0, per Rails' `sprintf("%06d",
  * usec)`), appending " BC" for proleptic years ≤ 0 (Temporal year 0 → 1 BC).
- * @internal
  */
 export function quotedDate(
   value:

@@ -139,6 +139,7 @@ function resolveDeclaredPk(
  * on its real column, not a hardcoded `id`. Composite-PK models fold their key
  * columns (present values, else `compositeIdentify`) into the string.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the primary-key derivation Ruby performs inline in FixtureSet#table_rows (fixtures.rb:742).
  */
 export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
   const pk = model.primaryKey;
@@ -181,7 +182,10 @@ export function ref(tableName: string, fixtureName: string): FixtureRef {
   return { [REF_TAG]: true, tableName, fixtureName };
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby detects a label reference by String type at interpolation time (fixtures.rb:742); TS models it as a tagged value.
+ */
 export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
 }
@@ -252,7 +256,10 @@ async function ensureStaticDeclaredIds(): Promise<void> {
   staticDeclaredIds = map;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE FixtureSet.identify (fixtures.rb:619) applied to a resolved reference, extracted from the row-building loop.
+ */
 export function resolveFixtureId(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -276,6 +283,7 @@ export function resolveFixtureId(
  * `targetColumn` within `targetPkCols` matters, since `compositeIdentify` shifts
  * each successive key column (Rails' `composite_identify`).
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the composite arm of FixtureSet.composite_identify (fixtures.rb:633) for a belongs_to reference column.
  */
 export function resolveCompositeRefColumn(
   adapter: DatabaseAdapter,
@@ -325,7 +333,10 @@ export function clearTableRegistry(adapter: DatabaseAdapter): void {
   declaredIds.delete(adapter);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE FixtureSet#model_class (fixtures.rb:754) reached by table name because our registry is keyed that way.
+ */
 export function resolveModelForTable(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -674,6 +685,7 @@ async function resetPkSequence(
  * cross-table FK order among them does not matter. Returns each set's reloaded
  * result in the same order the sets were passed.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the single insert_fixtures_set call of FixtureSet.insert (fixtures.rb:665), extracted so the merge happens once per load.
  */
 export async function insertPreparedFixtureSets(
   adapter: DatabaseAdapter,

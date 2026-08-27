@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Rails branches on stmt.column_count (sqlite3/database_statements.rb:86), which the drivers without column metadata do not expose, so the classification is approximated here.
+ */
+
+/**
  * Row-returning classification for drivers that cannot report a prepared
  * statement's real column count.
  *
@@ -10,6 +14,7 @@
  * in SQLite, so it must classify as a reader too.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE approximates `stmt.column_count.zero?` (sqlite3/database_statements.rb:86) for drivers that expose no column metadata.
  */
 export function statementIsReader(sql: string): boolean {
   const upper = sql.trimStart().toUpperCase();

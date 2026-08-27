@@ -2238,6 +2238,39 @@ function classOf(info: PackageInfo, name: string): ClassInfo {
   return Object.values(info.classes).find((c) => c.name === name)!;
 }
 
+describe("extractFromProgram — interface extends from another file", () => {
+  it("marks an inherited member `declaredIn` the file that declares it", () => {
+    const info = extractFromFiles("/p", {
+      "abstract-adapter.ts": `
+        export class AbstractAdapter {
+          asyncEnabled(): boolean {
+            return true;
+          }
+        }
+      `,
+      "schema-statements.ts": `
+        import { AbstractAdapter } from "./abstract-adapter.js";
+
+        export interface SchemaStatements extends AbstractAdapter {}
+
+        export class SchemaStatements {
+          tableExists(name: string): boolean {
+            return name !== "";
+          }
+        }
+      `,
+    });
+    const merged = info.modules["schema-statements.ts:SchemaStatements"];
+    const inherited = merged.instanceMethods.find((m) => m.name === "asyncEnabled")!;
+    expect(inherited.declaredIn).toBe("abstract-adapter.ts");
+    // The interface's own file still owns what it declares itself.
+    const own = classOf(info, "SchemaStatements").instanceMethods.find(
+      (m) => m.name === "tableExists",
+    )!;
+    expect(own.declaredIn).toBeUndefined();
+  });
+});
+
 describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
   it("records a reason written above the imports against the file", () => {
     const info = extractFromFiles("/p", {
@@ -2287,6 +2320,44 @@ describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
           export class LibSQLAdapter extends SQLite3Adapter {}
         `,
         "sqlite3-adapter.ts": `export class SQLite3Adapter {}`,
+      }),
+    ).toThrow(/truncated by a bare `@deprecated`/);
+  });
+
+  it("records a reason in a DETACHED block in an import-less file", () => {
+    const info = extractFromFiles("/p", {
+      "ruby-truthy.ts": `
+        /**
+         * Ruby truthiness, for ports of Ruby conditionals.
+         *
+         * @noRailsEquivalent PERMANENT — a language primitive JS disagrees with
+         * for "", 0 and NaN.
+         */
+
+        /** Only \`nil\` and \`false\` are falsey in Ruby. */
+        export function isRubyTruthy(value: unknown): boolean {
+          return value !== null && value !== undefined && value !== false;
+        }
+      `,
+    });
+    expect(info.fileNoRailsEquivalent).toEqual({
+      "ruby-truthy.ts": 'PERMANENT — a language primitive JS disagrees with for "", 0 and NaN.',
+    });
+  });
+
+  it("rejects a detached file-level reason truncated by a bare @word in its prose", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "ruby-truthy.ts": `
+          /**
+           * @noRailsEquivalent PERMANENT — a language primitive, kept apart
+           * the way @deprecated APIs are.
+           */
+
+          export function isRubyTruthy(value: unknown): boolean {
+            return value !== false;
+          }
+        `,
       }),
     ).toThrow(/truncated by a bare `@deprecated`/);
   });
@@ -2843,7 +2914,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(iface.interfaceMembers).toContain("name");
   });
 
-  it("carries a tag through an interface's resolved extends members", () => {
+  it("leaves an extends-resolved member's tag on its declaring file only", () => {
     const info = extractFromFiles("/p", {
       "relation-base.ts": `
         export interface RelationBase {
@@ -2858,11 +2929,19 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         export interface Relation extends RelationBase {}
       `,
     });
-    const rel = info.classes["relation.ts:Relation"] ?? info.modules["relation.ts:Relation"];
-    expect(rel.instanceMethods.find((m) => m.name === "then")!.noRailsEquivalent).toBe(
+    const base =
+      info.classes["relation-base.ts:RelationBase"] ??
+      info.modules["relation-base.ts:RelationBase"];
+    expect(base.instanceMethods.find((m) => m.name === "then")!.noRailsEquivalent).toBe(
       "JS thenable protocol on Relation",
     );
-    expect(rel.instanceMethods.find((m) => m.name === "where")!.noRailsEquivalent).toBeUndefined();
+    const rel = info.classes["relation.ts:Relation"] ?? info.modules["relation.ts:Relation"];
+    const then = rel.instanceMethods.find((m) => m.name === "then")!;
+    expect(then.declaredIn).toBe("relation-base.ts");
+    expect(then.noRailsEquivalent).toBeUndefined();
+    expect(rel.instanceMethods.find((m) => m.name === "where")!.declaredIn).toBe(
+      "relation-base.ts",
+    );
   });
 
   it("records the reason on a tagged class declaration", () => {
@@ -3239,11 +3318,8 @@ interface EmitEntry {
  */
 function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
   const out: EmitEntry[] = [];
-  const push = (container: string, m: MethodInfo, skipForeign: boolean): void => {
-    const counted =
-      m.internal !== true &&
-      !m.name.startsWith("_") &&
-      !(skipForeign && m.declaredIn !== undefined);
+  const push = (container: string, m: MethodInfo, _skipForeign: boolean): void => {
+    const counted = m.internal !== true && !m.name.startsWith("_") && m.declaredIn === undefined;
     out.push({ container, name: m.name, counted, hasReason: m.noRailsEquivalent !== undefined });
   };
   for (const [key, c] of Object.entries({ ...info.classes, ...info.modules })) {
@@ -3302,7 +3378,7 @@ const EMIT_SITE_INVENTORY: EmitEntry[] = [
   },
   { container: "emit-sites.ts:Locator", name: "findConst", counted: true, hasReason: true },
   { container: "emit-sites.ts:Locator", name: "findIt", counted: true, hasReason: true },
-  { container: "emit-sites.ts:Quoting", name: "inherited", counted: true, hasReason: true },
+  { container: "emit-sites.ts:Quoting", name: "inherited", counted: false, hasReason: false },
   { container: "emit-sites.ts:Quoting", name: "quoteAsync", counted: true, hasReason: true },
   { container: "emit-sites.ts:Registry", name: "aliasRef", counted: true, hasReason: true },
   { container: "emit-sites.ts:Registry", name: "inline", counted: true, hasReason: true },

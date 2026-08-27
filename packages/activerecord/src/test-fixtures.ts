@@ -136,6 +136,7 @@ export interface FixturesConnectionOpts {
  * id are both caught. Join-table sets (no model) concatenate and are not guarded.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE FixtureSet.create_fixtures' name-to-model resolution (fixtures.rb:595), async because model classes load by dynamic import.
  */
 export async function resolveFixtureNames(
   names: readonly FixtureName[],

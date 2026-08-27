@@ -2997,8 +2997,6 @@ export class Relation<T extends Base> {
    * then runs `initialize_copy`; TypeScript has no `allocate`, so the class is
    * re-instantiated here (subclasses override to reach their own constructor)
    * and `initializeCopy` does the ivar copy.
-   *
-   * @internal
    */
   clone(): Relation<T> {
     // Allocate from the per-model `Relation` subclass carrier

@@ -10,7 +10,10 @@ import {
   globalGetPrimaryKey,
 } from "./table-name-options.js";
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE Ruby splats column names with Array() at each use site (abstract/schema_statements.rb:1173); named here so the arms share one spelling.
+ */
 export function splitColumnNames(
   args: unknown[],
   columnType: string,
@@ -204,6 +207,7 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
  * many `column`s as `primaryKey`s. `Array(nil)` is empty in Ruby, so a lone
  * array with no counterpart also mismatches.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the composite-arity guard Ruby writes inline in add_foreign_key (abstract/schema_statements.rb:1173-1266).
  */
 export function assertCompositeForeignKeyArity(
   toTable: string,
@@ -256,6 +260,7 @@ export type ForeignKeyStoredOptionKey =
  * `addForeignKey`) so `isDefinedFor` slices a defaulted key (e.g. primaryKey
  * "id") out rather than mismatching it.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE reproduces the key set Ruby's foreign_key_options hash carries (abstract/schema_statements.rb:1246); TS has no options hash to read keys off.
  */
 export function foreignKeyOptionsStoredKeys(
   options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,
@@ -284,6 +289,7 @@ export class ForeignKeyDefinition {
    * `options.fetch(:validate, validate)` fallback in `defined_for?`: when the
    * definition did not store `validate`, a `validate` lookup is ignored.
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby reads `options.fetch(:validate, validate)` off the raw hash in defined_for? (abstract/schema_definitions.rb:161); TS has no such hash.
    */
   readonly storesValidate: boolean;
 
@@ -294,6 +300,7 @@ export class ForeignKeyDefinition {
    * `options.slice(*self.options.keys)`. Rails reads this off the raw options
    * hash; trails has no such hash, so we record the key set explicitly.
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby's `options.slice(*self.options.keys)` in defined_for? reads a raw hash TS does not keep (abstract/schema_definitions.rb:161).
    */
   readonly storedOptionKeys: ReadonlySet<ForeignKeyStoredOptionKey>;
 
@@ -1148,7 +1155,6 @@ export class TableDefinition {
     }
   }
 
-  /** @internal */
   primaryKeys(name?: string[]): PrimaryKeyDefinition | undefined {
     if (name) this._primaryKeys = new PrimaryKeyDefinition(name);
     return this._primaryKeys;
@@ -1158,7 +1164,6 @@ export class TableDefinition {
    * Creates a new ColumnDefinition for a column with the given name, type, and options.
    * Subclasses override to add adapter-specific type normalization.
    *
-   * @internal
    * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#new_column_definition
    */
   newColumnDefinition(
@@ -1183,7 +1188,6 @@ export class TableDefinition {
     return this.createColumnDefinition(name, type, options);
   }
 
-  /** @internal */
   aliasedTypes(name: string, fallback: string): string {
     return name === "timestamp" ? "datetime" : fallback;
   }
@@ -1524,7 +1528,6 @@ export class Table {
     private _schema: SchemaStatementsLike,
   ) {}
 
-  /** @internal */
   aliasedTypes(name: string, fallback: string): string {
     return name === "timestamp" ? "datetime" : fallback;
   }

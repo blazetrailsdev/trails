@@ -1225,7 +1225,7 @@ export class DatabaseTasks {
   }
 
   /**
-   * @internal Mirrors: `DatabaseTasks.with_temporary_pool_for_each`
+   * Mirrors: `DatabaseTasks.with_temporary_pool_for_each`
    * (`tasks/database_tasks.rb:512-521`).
    */
   static async withTemporaryPoolForEach(

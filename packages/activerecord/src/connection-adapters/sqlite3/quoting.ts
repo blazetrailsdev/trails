@@ -113,9 +113,11 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
 }
 
 /**
- * Mirrors: SQLite3::Quoting#quoted_date — identical to the abstract quoter; the
- * override exists so the inherited dispatch has a `self.quoted_date` to land on.
+ * Identical to the abstract quoter — SQLite3 overrides only `quoted_time`
+ * (sqlite3/quoting.rb:74) and inherits `quoted_date` — so the redeclaration
+ * exists only to give the inherited dispatch a `self.quoted_date` to land on.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE SQLite3 inherits Quoting#quoted_date (abstract/quoting.rb:184) and overrides only `quoted_time` (sqlite3/quoting.rb:74); this redeclares it so the inherited dispatch has a receiver-local method to land on.
  */
 export function quotedDate(
   value:
@@ -138,7 +140,6 @@ export function quotedDate(
  * strings. Returns the bare literal (no surrounding quotes); the inherited
  * `quote` wraps it. A `Type::Time::Value` is unwrapped in `default_timezone`
  * first, as the abstract `quotedTime` does.
- * @internal
  */
 export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {

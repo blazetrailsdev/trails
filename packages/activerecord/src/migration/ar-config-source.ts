@@ -17,12 +17,18 @@ export interface MigrationArConfig {
 
 let _arConfig: MigrationArConfig | null = null;
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby names ActiveRecord::Base from Migration at call time (migration.rb:677); a TS import would close a module cycle.
+ */
 export function registerMigrationArConfig(config: MigrationArConfig): void {
   _arConfig = config;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT the lazily-wired read of that same call-time constant (migration.rb:677).
+ */
 export function migrationArConfig(): MigrationArConfig | null {
   return _arConfig;
 }

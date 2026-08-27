@@ -1,3 +1,7 @@
+/**
+ * @noRailsEquivalent PERMANENT Ruby's Integer == is width-agnostic (association_scope.rb:83); node-postgres splits an owner PK and a child FK across BigInt and number, so the port needs an explicit fold.
+ */
+
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
@@ -14,6 +18,7 @@ const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
  * through untouched.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby's Integer == is width-agnostic; node-postgres splits a PK/FK pair across BigInt and number (association_scope.rb:83).
  */
 export function normalizeAssociationKey(key: unknown): unknown {
   if (typeof key === "bigint") {
@@ -28,6 +33,7 @@ export function normalizeAssociationKey(key: unknown): unknown {
  * matching paths (through-join filtering, inverse wiring).
  *
  * @internal
+ * @noRailsEquivalent PERMANENT the value-equality Ruby gets free from Integer == across the same BigInt/number split (association_scope.rb:83).
  */
 export function associationKeysEqual(a: unknown, b: unknown): boolean {
   return normalizeAssociationKey(a) === normalizeAssociationKey(b);

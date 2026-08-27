@@ -31,7 +31,7 @@ let _adapterSpecificSchemaLoaded = false;
  * nothing re-lays them, which surfaces far away as `table "defaults" does not
  * exist`.
  *
- * @internal Called by `loadAdapterSpecificSchema`; not for test files.
+ * Called by `loadAdapterSpecificSchema`; not for test files.
  */
 export function noteAdapterSpecificSchemaLoaded(): void {
   _adapterSpecificSchemaLoaded = true;
@@ -52,7 +52,7 @@ export function noteAdapterSpecificSchemaLoaded(): void {
  * bespoke table from a previous run would otherwise be snapshotted as boot-laid
  * and never dropped again.
  *
- * @internal Boot/template setup paths only.
+ * Boot/template setup paths only.
  */
 export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<void> {
   const laid = (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
@@ -75,7 +75,7 @@ export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<vo
  * pre-snapshot reset that did *not* mean to lose the adapter-specific tables now
  * throws instead of silently losing them.
  *
- * @internal Boot/template setup paths only.
+ * Boot/template setup paths only.
  */
 export async function purgeToCanonicalTables(
   adapter: DatabaseAdapter,

@@ -119,7 +119,6 @@ export function quotedBinary(
   );
 }
 
-/** @internal */
 export function unquoteIdentifier(identifier: string | null | undefined): string | null {
   if (identifier && identifier.startsWith("`") && identifier.endsWith("`")) {
     return identifier.slice(1, -1).replace(/``/g, "`");
@@ -137,8 +136,6 @@ export function unquoteIdentifier(identifier: string | null | undefined): string
  * Ruby's engineering-notation default, NOT the `"F"` form the dead arm asks
  * for: `BigDecimal("123456.789").to_s` is `0.123456789e6` (verified on MRI).
  * `toString` defaults to `"F"` here, so the format is passed explicitly.
- *
- * @internal
  */
 export function castBoundValue(value: unknown): unknown {
   if (value instanceof Rational) {
@@ -215,6 +212,7 @@ export function columnNameWithOrderMatcher(): RegExp {
  * dispatch lands here instead of the nanosecond-precision abstract helper.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE MySQL inherits Quoting#quoted_date (abstract/quoting.rb:184); ours must cap Temporal's nanoseconds at microseconds for strict-mode MySQL.
  */
 export function quotedDate(
   value:

@@ -144,7 +144,7 @@ export class SchemaCache {
   }
 
   /**
-   * @internal Mirrors SchemaCache.read in Rails: transparently gunzips .gz files.
+   * Mirrors SchemaCache.read in Rails: transparently gunzips .gz files.
    *
    * @missingRailsCall open — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_cache.rb:246 is `Zlib::GzipReader.open(filename) { |gz| ... }`;
@@ -354,6 +354,7 @@ export class SchemaCache {
    * Rails surface. It disappears once those accessors can block on a checkout
    * the way `columns_hash(pool, table)` does — blocked on RFC 0073 (the
    * permanent connection-checkout flip), not on anything TypeScript forbids.
+   * @noRailsEquivalent CONVERGEABLE query-free read of SchemaCache#columns_hash (schema_cache.rb:352), which may block on a checkout; retires with RFC 0073.
    */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
@@ -369,6 +370,7 @@ export class SchemaCache {
    * Rails surface. It disappears once that caller can block the way
    * `data_source_exists?(pool, name)` does — blocked on RFC 0073 (the permanent
    * connection-checkout flip).
+   * @noRailsEquivalent CONVERGEABLE query-free read of SchemaCache#data_source_exists? (schema_cache.rb:309), which may block on a checkout; retires with RFC 0073.
    */
   getCachedDataSourceExists(name: string): boolean | undefined {
     return this._dataSourceExists.get(name);
@@ -415,6 +417,7 @@ export class SchemaCache {
    * Rails surface. It disappears once that accessor can block the way
    * `primary_keys(pool, table)` does — blocked on RFC 0073 (the permanent
    * connection-checkout flip).
+   * @noRailsEquivalent CONVERGEABLE query-free read of SchemaCache#primary_keys (schema_cache.rb:298), which may block on a checkout; retires with RFC 0073.
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
     return this._primaryKeys.get(tableName);
@@ -492,6 +495,7 @@ export class SchemaCache {
    * have: once they can block on a checkout, every population path is
    * `add(pool, tableName)` again. Blocked on RFC 0073 (the permanent
    * connection-checkout flip).
+   * @noRailsEquivalent CONVERGEABLE the write half of the sync readers above; Ruby populates only through SchemaCache#add (schema_cache.rb:326). Retires with RFC 0073.
    */
   setColumns(tableName: string, cols: Column[]): void {
     this._columns.set(tableName, cols);
@@ -712,6 +716,7 @@ export class SchemaReflection {
    * this pairs the two so the eager-warm pool path has a single entry point
    * that also routes through the lone-connection `FakePool`. Don't grep Rails
    * for it.
+   * @noRailsEquivalent CONVERGEABLE pairs SchemaReflection#load! (schema_cache.rb:27) with SchemaCache#add_all (schema_cache.rb:220) behind one entry point.
    */
   async loadAllBang(pool: unknown): Promise<this> {
     const cache = await this.cache(pool);
@@ -726,6 +731,7 @@ export class SchemaReflection {
    * so adapter-side consumers (AbstractAdapter.schemaCache) see the
    * preloaded data from a schema_cache.json without hitting the DB.
    * External callers should not mutate the returned cache.
+   * @noRailsEquivalent CONVERGEABLE reads the ivar slot SchemaReflection keeps (schema_cache.rb:16) so the pool can share the one raw cache.
    */
   get loadedCache(): SchemaCache | null {
     return this._cache;
@@ -737,6 +743,7 @@ export class SchemaReflection {
    * reader — the BoundSchemaReflection and the adapters' `internalSchemaCache`
    * alike. Assigning drops any in-flight disk load so it can't overwrite the
    * cache the caller just installed.
+   * @noRailsEquivalent CONVERGEABLE the companion writer for that same ivar slot (schema_cache.rb:16); Ruby assigns it directly.
    */
   set loadedCache(cache: SchemaCache | null) {
     this._cache = cache;
@@ -925,6 +932,7 @@ export class BoundSchemaReflection {
    * @internal trails-only composite — NOT a Rails method. Bound counterpart of
    * {@link SchemaReflection#loadAllBang}; see that note. Rails has `load!` and
    * `add(name)` on BoundSchemaReflection but no `load_all!`.
+   * @noRailsEquivalent CONVERGEABLE bound counterpart pairing BoundSchemaReflection#load! (schema_cache.rb:169) with add_all; Ruby has no load_all!.
    */
   async loadAllBang(): Promise<this> {
     await this._schemaReflection.loadAllBang(this._pool);

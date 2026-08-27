@@ -992,6 +992,7 @@ export class PostgreSQLAdapter
    * Mirrors: PostgreSQLAdapter#case_insensitive_comparison (via AbstractAdapter).
    * Async override: looks up the column type and checks pg_proc before emitting LOWER.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:814) overridden async because the pg_proc check queries.
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1792,6 +1793,7 @@ export class PostgreSQLAdapter
    * the PQTRANS_ACTIVE that has no byte of its own.
    *
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby reads PG::Connection#transaction_status off libpq (postgresql_adapter.rb:850); node-pg exposes no equivalent single accessor.
    */
   get transactionStatus(): number {
     const client = this._rawConnection as (pg.Client & { readyForQuery?: boolean }) | null;
@@ -2216,7 +2218,6 @@ export class PostgreSQLAdapter
 
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#exec_insert
-   * @internal
    */
   override async execInsert(
     sql: string,
@@ -2417,6 +2418,7 @@ export class PostgreSQLAdapter
    * async ping the way Rails' `active?` does.
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:759) re-implemented per adapter because our `active` getter is sync and cannot ping.
    */
   override async verifyBang(): Promise<void> {
     // Mirrors Rails' verify! → reconnect! when active? returns false
@@ -2458,8 +2460,6 @@ export class PostgreSQLAdapter
    * fire ROLLBACK (best-effort, only if in TX) followed by DISCARD ALL
    * on the SAME persistent connection — preserves the socket and only
    * scrubs session state, exactly as Rails does.
-   *
-   * @internal
    */
   override resetBang(): void {
     if (!this._rawConnection) {

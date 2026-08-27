@@ -442,8 +442,6 @@ export function initInternals(this: TimestampInstanceHost, super_: () => void): 
  * Mirrors `ActiveRecord::Timestamp#initialize_dup` (timestamp.rb:50-53): the
  * clear happens as the `super` stack unwinds, so the initialize callbacks in
  * `Core#initialize_dup` still see the source's timestamps.
- *
- * @internal
  */
 export function initializeDup(
   this: TimestampInstanceHost,

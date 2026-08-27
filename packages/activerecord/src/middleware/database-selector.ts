@@ -28,11 +28,8 @@ type ContextClass = {
 };
 
 export class DatabaseSelector {
-  /** @internal */
   readonly resolverKlass: ResolverClass;
-  /** @internal */
   readonly contextKlass: ContextClass;
-  /** @internal */
   readonly options: Record<string, unknown>;
 
   private readonly app: (request: MiddlewareRequest) => Promise<unknown>;
@@ -53,7 +50,10 @@ export class DatabaseSelector {
     return this.selectDatabase(request, () => this.app(request));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE mirrors Resolver#instrumenter (middleware/database_selector/resolver.rb:33), read from the middleware rather than the resolver.
+   */
   instrumenter(): typeof Notifications {
     return Notifications;
   }

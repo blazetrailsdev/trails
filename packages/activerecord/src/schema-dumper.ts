@@ -279,7 +279,6 @@ class AdapterSchemaSource implements SchemaSource {
     return this._adapter.tables();
   }
 
-  /** @internal */
   lookupCastTypeFromColumn(column: ColumnInfo): Type {
     // AbstractMysqlAdapter's override returns null for a blank sqlType — a
     // trails invention it flags itself (abstract-mysql-adapter.ts:1268-1276,
@@ -430,13 +429,13 @@ export abstract class SchemaDumper {
    * only ever emits Ruby, so Rails has no slot to converge this onto.
    */
   static language: SchemaDumpLanguage = "ts";
-  /** @internal Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
+  /** Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
   static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
-  /** @internal Mirrors Rails' `SchemaDumper.chk_ignore_pattern`. */
+  /** Mirrors Rails' `SchemaDumper.chk_ignore_pattern`. */
   static chkIgnorePattern: RegExp = /^chk_rails_[0-9a-f]{10}$/;
-  /** @internal Mirrors Rails' `SchemaDumper.excl_ignore_pattern`. */
+  /** Mirrors Rails' `SchemaDumper.excl_ignore_pattern`. */
   static exclIgnorePattern: RegExp = /^excl_rails_[0-9a-f]{10}$/;
-  /** @internal Mirrors Rails' `SchemaDumper.unique_ignore_pattern`. */
+  /** Mirrors Rails' `SchemaDumper.unique_ignore_pattern`. */
   static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
 
   /**
@@ -733,7 +732,10 @@ export abstract class SchemaDumper {
     return m ? m[1] : table;
   }
 
-  /** @internal Used by `dumpTableSchema` and external callers. */
+  /**
+   * @internal Used by `dumpTableSchema` and external callers.
+   * @noRailsEquivalent CONVERGEABLE the per-table body of SchemaDumper#tables (schema_dumper.rb:134), extracted so dumpTableSchema shares it.
+   */
   async dumpTable(stream: string[], tableName: string): Promise<void> {
     await this.table(tableName, stream);
   }

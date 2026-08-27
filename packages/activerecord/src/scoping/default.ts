@@ -91,7 +91,6 @@ export class Default {
    * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#unscoped
    * (default.rb:17-26) — `block_given? ? relation.scoping(&block) : relation`.
    * `relation` is Rails' `Core::ClassMethods#relation` (core.rb:431-435).
-   * @internal
    */
   static unscoped(this: any, block?: () => any): any {
     return block ? this.relation().scoping(block) : this.relation();
@@ -125,6 +124,7 @@ function defaultScopeMethod(modelClass: any): ((this: any) => any) | undefined {
  * Mirrors the `respond_to?(:default_scope)` clause of
  * `Scoping::Default::ClassMethods#scope_attributes?`.
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby tests `respond_to?(:default_scope)` in scope_attributes? (scoping/default.rb:55); JS has no equivalent method lookup.
  */
 export function hasDefaultScopeOverride(modelClass: any): boolean {
   return defaultScopeMethod(modelClass) !== undefined;

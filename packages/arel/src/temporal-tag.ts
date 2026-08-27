@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Ruby dispatches a Date/Time by its class (visitor.rb:39); JS has no such class to switch on, so Temporal values are recognized by their `Symbol.toStringTag` and mapped to the Ruby class Rails would visit.
+ */
+
+/**
  * Temporal types carry a `Temporal.X` `Symbol.toStringTag`. Reading it keeps
  * Temporal checks structural rather than pulling the namespace into arel's
  * runtime imports — arel has no activesupport dependency at runtime.
@@ -8,8 +12,6 @@
  * separate because recognizing a Temporal and having a Ruby analogue are
  * different questions: `Duration` answers here but not there, which is how
  * to-sql keeps an unmapped Temporal out of its `toISOString` duck-type.
- *
- * @internal
  */
 export function temporalTag(v: unknown): string | null {
   if (typeof v !== "object" || v === null) return null;
@@ -44,8 +46,6 @@ const TEMPORAL_CLASS_NAMES: Readonly<Record<string, TemporalClassName>> = {
 /**
  * The Ruby class Rails would dispatch `v` on, or `null` when `v` is not a
  * Temporal value or is one with no Ruby analogue.
- *
- * @internal
  */
 export function temporalClassName(v: unknown): TemporalClassName | null {
   const tag = temporalTag(v);

@@ -338,6 +338,7 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
  * the wider, fallback-only namespace — `registerSubclass` and `Base.adapter=`
  * must not promote a throwaway subclass into association resolution).
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby resolves a model name through `type_name.constantize` and lets Zeitwerk define the constant (inheritance.rb:196); JS has no constant table to register into.
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
   guardCanonicalNameShadow(name, model);
@@ -442,6 +443,7 @@ export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeo
  * No-op when the name already resolves or the index has no entry, so a genuine
  * miss still leaves `constantize` to raise.
  * @internal
+ * @noRailsEquivalent PERMANENT `constantize` runs Zeitwerk's autoloader on a miss (inheritance.rb:196); JS module resolution has no such hook.
  */
 export function autoloadModel(name: string): void {
   // `constantize` strips a leading `::` itself; the registry and the index are
@@ -460,6 +462,7 @@ export function autoloadModel(name: string): void {
  * because polymorphic reflections intentionally throw on `.klass` access.
  * Non-polymorphic errors (e.g. not-an-AR-subclass) propagate unchanged.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE MacroReflection#klass (reflection.rb:422) and the `name.constantize` its `_klass` falls through to (reflection.rb:434); the polymorphic arm is pre-checked here rather than rescued from AssociationReflection#compute_class's raise (reflection.rb:490).
  */
 export function resolveAssocClass(
   recordOrClass: Base | typeof Base,
@@ -487,6 +490,7 @@ export function resolveAssocClass(
  * Throws InverseOfAssociationNotFoundError if not found.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the InverseOfAssociationNotFoundError raise of Association#initialize (association.rb:41), extracted from the macro path.
  */
 export function validateInverseOf(
   owner: typeof Base,
@@ -1012,6 +1016,7 @@ export function _scopeForAssociation(model: typeof Base): Relation<Base> {
  * different reference and still run.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby applies the scope with instance_exec (association_scope.rb:169-172); JS cannot rebind a lambda's self.
  */
 export function applyAssociationScope<R>(
   rel: R,
@@ -1211,6 +1216,7 @@ export async function _loadSingularViaStatementCache(
  * Sync loaded result to the association instance if one exists.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE writes the loaded target Ruby sets inline via `association.target =` (association.rb:102).
  */
 export function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
   const holder = record._associationInstances.get(assocName) as
@@ -1566,8 +1572,6 @@ export function initInternals(this: Base, super_: () => void): void {
  * Mirrors: ActiveRecord::Associations#initialize_dup (associations.rb:69-72) —
  * `@association_cache = {}` then `super`. `include Associations` is base.rb:317,
  * so this is the outermost link of the `initialize_dup` chain.
- *
- * @internal
  */
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
   this._resetAssociationCaches();

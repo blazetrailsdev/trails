@@ -1838,22 +1838,67 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
  * one gem — and writing the same reason on every declaration in them is pure
  * repetition (RFC 0072). The file-level form states it once.
  *
- * It is read only from a block above the IMPORTS — the one placement where it
- * documents the file rather than a declaration. A block at the top of a file
- * whose first statement is a declaration is that declaration's own doc block
- * (TypeScript binds it there, and `noRailsEquivalentReason` already reads it);
- * treating it as file-level too would silently widen every such tag into a
- * blanket. So a file with no imports has no file-level form.
+ * Two placements carry it, and both are ones TypeScript does NOT bind to a
+ * declaration:
  *
- * TypeScript binds a file's leading block to that first import, so the reason
- * goes through the SAME parse as the declaration-level one and inherits both of
- * its hard errors: an empty reason, and a reason truncated by a bare `@word` in
- * its prose. A claim that could be silently cut short would not be a checked one.
+ *   - a block above the IMPORTS, which TypeScript binds to that first import; and
+ *   - a DETACHED block — one separated from whatever follows it by a blank line
+ *     — which TypeScript binds to nothing at all.
+ *
+ * The invariant both preserve is the same: a block written directly ABOVE a
+ * declaration is that declaration's own doc block (`noRailsEquivalentReason`
+ * already reads it there), and reading it as file-level too would silently
+ * widen every such tag into a blanket. The blank line is what separates the two
+ * cases, which is why an import-less file could not carry the tag at all before
+ * RFC 0121 — `temporal-tag.ts` and `ruby-truthy.ts` have no runtime imports by
+ * design and nothing to hang it on.
+ *
+ * Both placements reach the SAME parse as the declaration-level tag, and so
+ * inherit both of its hard errors: an empty reason, and a reason truncated by a
+ * bare `@word` in its prose. A claim that could be silently cut short would not
+ * be a checked one. The detached path gets there by re-parsing the file text up
+ * to the end of the block with a synthetic declaration appended, so the tag is
+ * read off a real node — the file name and line numbers in either error still
+ * point at the real source.
  */
 export function fileLevelNoRailsEquivalentReason(sourceFile: ts.SourceFile): string | undefined {
   const first = sourceFile.statements[0];
-  if (first === undefined || !ts.isImportDeclaration(first)) return undefined;
-  return noRailsEquivalentReason(first);
+  if (first === undefined) return undefined;
+  if (ts.isImportDeclaration(first)) return noRailsEquivalentReason(first);
+  const detached = detachedLeadingJsDoc(sourceFile, first);
+  if (detached === undefined) return undefined;
+  const text = `${sourceFile.text.slice(0, detached.end)}\nexport const __fileLevelTag = 0;\n`;
+  const reparsed = ts.createSourceFile(sourceFile.fileName, text, ts.ScriptTarget.Latest, true);
+  const anchor = reparsed.statements[reparsed.statements.length - 1];
+  return anchor === undefined ? undefined : noRailsEquivalentReason(anchor);
+}
+
+/**
+ * The last JSDoc block in `first`'s leading trivia that a blank line separates
+ * from what follows it — the detached form of the file-level tag.
+ *
+ * Walking from the end is what lets a file carry both: a detached overview
+ * block AND a doc block bound to the first declaration. The first range that is
+ * followed by a blank line is the detached one; anything after it abuts the
+ * declaration and belongs to it.
+ */
+function detachedLeadingJsDoc(
+  sourceFile: ts.SourceFile,
+  first: ts.Statement,
+): ts.CommentRange | undefined {
+  const text = sourceFile.text;
+  const ranges = ts.getLeadingCommentRanges(text, first.getFullStart()) ?? [];
+  if (ranges.length === 0) return undefined;
+  const followedBy = [...ranges.slice(1).map((r) => r.pos), first.getStart(sourceFile)];
+  for (let i = ranges.length - 1; i >= 0; i--) {
+    const range = ranges[i];
+    if (!text.startsWith("/**", range.pos)) continue;
+    const gap = text.slice(range.end, followedBy[i]);
+    // Two newlines is one blank line: the one ending the comment's own line and
+    // the one ending the blank line itself.
+    if ((gap.match(/\n/g) ?? []).length >= 2) return range;
+  }
+  return undefined;
 }
 
 /**
@@ -2533,20 +2578,41 @@ function extractInterface(
               const propType = checker.getTypeOfSymbolAtLocation(prop, type);
               const signatures = propType.getCallSignatures();
               if (signatures.length > 0) {
-                // Unlike the `__mixin` and inherited-interface-property cases
-                // elsewhere, these entries carry no `declaredIn`, so
-                // `collectTsFileNames` counts them as THIS file's surface —
-                // they need the resolved declaration's tag, visibility and
-                // `@internal` flag to be scored the way that declaration is.
+                // These entries carry the resolved declaration's tag, visibility
+                // and `@internal` flag so a member declared in THIS file (a
+                // mapped type over a local class, `Included<typeof X>`) is
+                // scored the way that declaration is.
                 // `getProperties()` returns protected and private members, and
                 // the copy pushed below carries no modifier of its own.
-                const noRailsEquivalent = noRailsEquivalentOfSymbol(prop, checker);
+                //
+                // A member resolved from a base declared in ANOTHER file is that
+                // file's surface, not this one's: `interface SchemaStatements
+                // extends DatabaseAdapter {}` would otherwise re-score every
+                // AbstractAdapter method here, where no tag can reach it — the
+                // member's own file is where it matches, so a receipt written
+                // there is stale, and the file-level form is refused for a file
+                // that has a Rails counterpart. `declaredIn` is how
+                // `collectTsFileNames` already skips exactly this, and this is
+                // the promise its docblock makes ("no inherited surface").
+                const propDeclFile =
+                  srcDir !== undefined && propDecl !== undefined
+                    ? path.relative(srcDir, propDecl.getSourceFile().fileName).replace(/\\/g, "/")
+                    : undefined;
+                const foreign = propDeclFile !== undefined && propDeclFile !== file;
+                // Only an own member carries its tag here, the same split the
+                // `__mixin` walker makes: a tag copied off a foreign base would
+                // never match at this file and would read as stale on top of its
+                // correct match on the declaring one.
+                const noRailsEquivalent = foreign
+                  ? undefined
+                  : noRailsEquivalentOfSymbol(prop, checker);
                 instanceMethods.push({
                   name: propName,
                   visibility: propVisibility,
                   params: [],
                   line: 0,
                   file,
+                  ...(foreign ? { declaredIn: propDeclFile } : {}),
                   ...(propVisibility !== "public" ||
                   (propDecl !== undefined && internalJsDocTagApplies(propDecl))
                     ? { internal: true }

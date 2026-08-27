@@ -61,6 +61,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * the association.
    *
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby's Object#clone is inherited; JS needs a declared override to keep the AssociationRelation subclass through spawn (relation.rb:97).
    */
   override clone(): Relation<T> {
     const Ctor = associationRelationClassFor(this.model);

@@ -244,6 +244,7 @@ function toArray(value: unknown): unknown[] {
  * `super` half itself, so this helper only performs the seeding.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the pre-super seeding half of ThroughAssociation#build_record (through_association.rb:116-129); the caller runs the super half.
  */
 export function throughBuildRecord(
   assoc: { owner: Base; reflection: any },

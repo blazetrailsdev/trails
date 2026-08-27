@@ -72,6 +72,7 @@ export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./transaction.js";
 export {
   LogSubscriber,
+  /** @noRailsEquivalent PERMANENT Ruby names the ActiveRecord::Base constant at call time (log_subscriber.rb:110); a TS import would close a module cycle. */
   setBaseResolver as setLogSubscriberBaseResolver,
 } from "./log-subscriber.js";
 export { ExplainSubscriber } from "./explain-subscriber.js";

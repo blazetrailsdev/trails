@@ -21,7 +21,6 @@ export interface BootOutcome {
 
 let outcome: BootOutcome | null = null;
 
-/** @internal */
 export function recordBootOutcome(arm: BootArm, stamped: boolean): void {
   outcome = { arm, stamped };
 }
@@ -29,8 +28,6 @@ export function recordBootOutcome(arm: BootArm, stamped: boolean): void {
 /**
  * The recorded outcome, or null in a context that did not run the boot setup
  * file.
- *
- * @internal
  */
 export function bootOutcome(): BootOutcome | null {
   return outcome;

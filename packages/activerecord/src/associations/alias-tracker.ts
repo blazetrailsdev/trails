@@ -23,6 +23,7 @@ const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
  * caster rides across the alias for free, no hand-carried copy.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE inline `arel_table.alias(...)` of TableMetadata.associated_table (table_metadata.rb:43), extracted so both alias-tracker callers share it.
  */
 export function aliasedArelTableFor(
   klass: { arelTable?: Table; tableName?: string } | null | undefined,
@@ -45,6 +46,7 @@ export function aliasedArelTableFor(
  * caster-less table; the concrete class is only known per row at runtime.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE reflection-keyed form of the same table_metadata.rb:43 inline; Ruby reaches it off the reflection without a named helper.
  */
 export function aliasedArelTableForReflection(
   reflection: { klass?: unknown; isPolymorphic?: () => boolean } | null | undefined,

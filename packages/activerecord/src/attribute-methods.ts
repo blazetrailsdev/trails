@@ -167,6 +167,7 @@ export class GeneratedAttributeMethods extends Module {
    * set on; JS modules carry no such binding, so the owner stamps it at the
    * same point in `initialize_generated_modules`.
    * @internal
+   * @noRailsEquivalent PERMANENT Ruby names the generated module by const_set on the owning class (attribute_methods.rb:43); a JS object carries no such binding.
    */
   ownerName?: string;
 
@@ -992,35 +993,27 @@ import {
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
 } from "./attribute-methods/dirty.js";
 
-/** @internal */
 export function readAttributeBeforeTypeCast(this: InstanceMethodHost, name: string): unknown {
   return _readAttributeBeforeTypeCast(this as any, name);
 }
-/** @internal */
 export function readAttributeForDatabase(this: InstanceMethodHost, attrName: string): unknown {
   return _readAttributeForDatabase(this as any, attrName);
 }
-/** @internal */
 export function attributesBeforeTypeCast(this: InstanceMethodHost): Record<string, unknown> {
   return _attributesBeforeTypeCast.call(this as any);
 }
-/** @internal */
 export function attributesForDatabase(this: InstanceMethodHost): Record<string, unknown> {
   return _attributesForDatabase(this as any);
 }
-/** @internal */
 export function attributeBeforeTypeCast(this: InstanceMethodHost, attrName: string): unknown {
   return _attributeBeforeTypeCast.call(this as any, attrName);
 }
-/** @internal */
 export function attributeForDatabase(this: InstanceMethodHost, attrName: string): unknown {
   return _attributeForDatabase.call(this as any, attrName);
 }
-/** @internal */
 export function attributeCameFromUser(this: InstanceMethodHost, attrName: string): boolean {
   return _attributeCameFromUser.call(this as any, attrName);
 }
-/** @internal */
 export function queryCastAttribute(
   this: InstanceMethodHost,
   attrName: string,
@@ -1028,7 +1021,6 @@ export function queryCastAttribute(
 ): unknown {
   return _queryCastAttribute.call(this as any, attrName, value);
 }
-/** @internal */
 export function isSavedChangeToAttribute(
   this: InstanceMethodHost,
   attr: string,
@@ -1036,22 +1028,18 @@ export function isSavedChangeToAttribute(
 ): boolean {
   return _isSavedChangeToAttribute(this as any, attr, options);
 }
-/** @internal */
 export function savedChangeToAttribute(
   this: InstanceMethodHost,
   attr: string,
 ): [unknown, unknown] | null {
   return _savedChangeToAttribute(this as any, attr);
 }
-/** @internal */
 export function attributeBeforeLastSave(this: InstanceMethodHost, attr: string): unknown {
   return _attributeBeforeLastSave(this as any, attr);
 }
-/** @internal */
 export function isSavedChanges(this: InstanceMethodHost): boolean {
   return _isSavedChanges(this as any);
 }
-/** @internal */
 export function isWillSaveChangeToAttribute(
   this: InstanceMethodHost,
   attr: string,
@@ -1059,22 +1047,18 @@ export function isWillSaveChangeToAttribute(
 ): boolean {
   return _isWillSaveChangeToAttribute(this as any, attr, options);
 }
-/** @internal */
 export function attributeChangeToBeSaved(
   this: InstanceMethodHost,
   attr: string,
 ): [unknown, unknown] | null {
   return _attributeChangeToBeSaved(this as any, attr);
 }
-/** @internal */
 export function attributeInDatabase(this: InstanceMethodHost, attr: string): unknown {
   return _attributeInDatabase(this as any, attr);
 }
-/** @internal */
 export function attributeNamesForPartialUpdates(this: InstanceMethodHost): string[] {
   return _attributeNamesForPartialUpdates.call(this as any);
 }
-/** @internal */
 export function attributeNamesForPartialInserts(this: InstanceMethodHost): string[] {
   return _attributeNamesForPartialInserts.call(this as any);
 }

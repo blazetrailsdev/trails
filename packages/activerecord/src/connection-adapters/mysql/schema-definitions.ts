@@ -280,7 +280,10 @@ export class TableDefinition extends AbstractTableDefinition {
     return type;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE MySQL::Table/TableDefinition's define_column_methods macro (mysql/schema_definitions.rb:46); Ruby generates the methods, TS declares them.
+   */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
       if (!(type in this.prototype)) {

@@ -79,6 +79,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * back to the adapter's `typeToSql` — otherwise `pgDatetimeConfig.datetimeType`
    * and `nativeDatabaseTypesOverrides` are bypassed.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE Ruby's SchemaCreation delegates type_to_sql to the adapter (abstract/schema_creation.rb:16-20); ours must override to route back.
    */
   override typeToSql(
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
@@ -200,6 +201,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * the MySQL SchemaCreation). Without this, bulk `changeColumnForAlter` throws
    * "Unknown definition type: ChangeColumnDefinition".
    * @internal
+   * @noRailsEquivalent CONVERGEABLE Ruby dispatches visit_#{o.class} dynamically (abstract/schema_creation.rb:11); our manual chain must be extended per adapter.
    */
   override accept(
     o:

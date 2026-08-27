@@ -16,7 +16,7 @@ import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
-  performLast as basePerformLast,
+  FinderMethods,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
@@ -220,6 +220,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `.target` is read through the same store. Returns the
    * in-memory target without triggering a DB load — JS has no blocking IO, so
    * a fresh load means awaiting the proxy / `loadTarget()` first.
+   * @noRailsEquivalent CONVERGEABLE a non-loading read of Rails' CollectionProxy#target (collection_proxy.rb:40); Ruby needs no non-loading variant because its load is synchronous.
    */
   readTargets(): T[] {
     return this._target;
@@ -231,6 +232,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * for both `string` and `string[]` primary-key values; records whose key is
    * not yet assigned (new records) are skipped. Used by the migration stories
    * to dedup proxy writes against the canonical store.
+   * @noRailsEquivalent CONVERGEABLE index over the same target array Ruby scans inline in CollectionAssociation#find_by_scan (collection_association.rb:521).
    */
   targetsByPrimaryKey(): Map<string, T> {
     const byKey = new Map<string, T>();
@@ -241,7 +243,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return byKey;
   }
 
-  /** @internal Owner record — used by AssociationRelation. */
+  /**
+   * @internal Owner record — used by AssociationRelation.
+   * @noRailsEquivalent CONVERGEABLE mirrors Association#owner (association.rb:36); it belongs on the Association object, which our proxy stands in for.
+   */
   get owner(): Base {
     return this._record;
   }
@@ -252,6 +257,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `@association_cache` entry back to the reloaded record
    * (`persistence.rb:752`). Rails' proxy owner lives inside the `Association`
    * object; ours is the `CollectionProxy`'s backing `_record`.
+   * @noRailsEquivalent CONVERGEABLE the settable half of Association#owner that `reload` re-points (persistence.rb:752); Ruby's lives on Association, not the proxy.
    */
   set owner(record: Base) {
     this._record = record;
@@ -265,6 +271,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * in `Reflection.addReflection`), so there is no reflection-less association
    * to fall back for.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE mirrors Association#reflection (association.rb:37); it belongs on the Association object, which our proxy stands in for.
    */
   get reflection(): AssociationDefinition {
     const ctor = this._record.constructor as typeof Base;
@@ -285,7 +292,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     };
   }
 
-  /** @internal Association name — used by AssociationRelation. */
+  /**
+   * @internal Association name — used by AssociationRelation.
+   * @noRailsEquivalent CONVERGEABLE mirrors `reflection.name` as Ruby reads it off the association (association.rb:37).
+   */
   get associationName(): string {
     return this._assocName;
   }
@@ -581,6 +591,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `skip_callbacks: true` (inverse wiring still runs, but before/after_add do
    * not — this is not a user `<<`) and the default `replace: false`.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE the `add_to_target(record, skip_callbacks: true)` call nested attributes makes (nested_attributes.rb:534), named here for the proxy.
    */
   addExistingRecord(record: T): void {
     this._association.addToTarget(record, { skipCallbacks: true });
@@ -805,7 +816,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // unloaded arm's `reverse_order.limit(...)` reaches the association scope
     // through `delegate(*QueryMethods, to: :scope)` (:1128-1137).
     if (this.isFindFromTarget()) await this.loadTarget();
-    return basePerformLast.call(this as any, n);
+    return FinderMethods.last.call(this as any, n);
   }
 
   /**

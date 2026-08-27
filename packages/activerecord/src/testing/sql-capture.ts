@@ -87,6 +87,7 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
  * tests (and the mysql:8 DDL cost they carry).
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE ActiveRecord::TestCase#capture_sql (test/cases/test_case.rb:90), async because the block it wraps is.
  */
 export async function captureSql(
   fn: () => void | Promise<void>,
@@ -126,6 +127,7 @@ export async function captureSql(
  * the same `"<name> <sql>"` text from each `sql.active_record` event and
  * return the joined buffer.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the capture_log_output helper of the Rails insert-all test (test/cases/insert_all_test.rb:849).
  */
 export async function captureLogOutput(fn: () => void | Promise<void>): Promise<string> {
   let output = "";

@@ -127,6 +127,7 @@ function removeIndexSpec(
  * PostgreSQL adapters, whose `removeIndex` overrides are self-contained.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE SchemaStatements#index_name_for_remove (abstract/schema_statements.rb:1647) taking the already-fetched indexes, since ours cannot re-query synchronously.
  */
 export function indexNameForRemoveFrom(
   generateIndexName: GenerateIndexName,
@@ -174,6 +175,7 @@ export function indexNameForRemoveFrom(
  * overrides for their `ifExists` short-circuit.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE SchemaStatements#index_exists? (abstract/schema_statements.rb:102) over already-fetched indexes for the same async reason.
  */
 export function indexExistsForRemoveFrom(
   generateIndexName: GenerateIndexName,

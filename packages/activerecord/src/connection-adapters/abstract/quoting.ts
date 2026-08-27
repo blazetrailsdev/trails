@@ -363,6 +363,7 @@ export function unquotedFalse(): boolean {
  * this, so every adapter accepts the same union.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE Ruby's quoted_binary receives a Type::Binary::Data and calls to_s (abstract/quoting.rb:206); TS must normalize the byte-source union first.
  */
 export function toBytes(value: unknown): Uint8Array | null {
   if (value instanceof BinaryData) return value.bytes;
@@ -454,6 +455,7 @@ export function columnNameWithOrderMatcher(): RegExp {
  * API — sqlite3-adapter.ts imports it for the same branch — hence `@internal`.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby writes `Arel::Nodes::SqlLiteral === value` inline at each branch (abstract/quoting.rb:206); TS cannot spell case-equality matching.
  */
 export function isSqlLiteral(value: unknown): value is { value: string } {
   return (
@@ -467,8 +469,6 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
 /**
  * Format a date/time value for SQL without surrounding quotes.
  * Temporal.Instant and ZonedDateTime respect default_timezone.
- *
- * @internal
  */
 export function quotedDate(
   value:
@@ -518,8 +518,6 @@ export function quotedDate(
  * A `Type::Time::Value` is unwrapped first: Rails' `value.change(year: 2000,
  * month: 1, day: 1)` reads the `::Time`'s components in `default_timezone`,
  * which is what `quoted_date` would have read them in too.
- *
- * @internal
  */
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {

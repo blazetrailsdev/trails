@@ -49,7 +49,10 @@ export const encryptionHooks: EncryptionHooks = {
   decrypt: async () => {},
 };
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby names ActiveRecord::Encryption at call time (encryption/encryptable_record.rb:87); a TS import from the core path would close a module cycle.
+ */
 export function registerEncryptionHooks(hooks: EncryptionHooks): void {
   Object.assign(encryptionHooks, hooks);
 }

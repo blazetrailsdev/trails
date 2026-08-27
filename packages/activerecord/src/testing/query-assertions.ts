@@ -22,10 +22,8 @@ export interface SqlPayload {
  * `logFull` contains non-schema [sql, binds] pairs; `logAll` contains all sql strings.
  */
 export class SQLCounter {
-  /** @internal */
   readonly logFull: [string, unknown[]][];
 
-  /** @internal */
   readonly logAll: string[];
 
   constructor() {
@@ -33,7 +31,6 @@ export class SQLCounter {
     this.logAll = [];
   }
 
-  /** @internal */
   get log(): string[] {
     return this.logFull.map(([sql]) => sql);
   }
@@ -41,8 +38,6 @@ export class SQLCounter {
   /**
    * Mirrors Ruby's `def call(*, payload)` — the payload is the last positional,
    * whatever arity the notifier's subscriber hands it.
-   *
-   * @internal
    */
   call(...args: unknown[]): void {
     const payload = args[args.length - 1] as SqlPayload;

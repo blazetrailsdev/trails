@@ -5,12 +5,18 @@ let _contextIdCounter = 0;
 const CONTEXT_ID_KEY = Symbol.for("ar_execution_context_id");
 const _exitHooks: ((contextId: string) => void)[] = [];
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby hangs per-thread pool state off Thread.current and reaps it on thread death (connection_pool.rb:711); JS has no thread lifetime.
+ */
 export function registerContextExitHook(hook: (contextId: string) => void): void {
   _exitHooks.push(hook);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT the JS stand-in for Ruby's ActiveSupport::IsolatedExecutionState.context (connection_pool.rb:711).
+ */
 export function executionContextId(): number {
   return IsolatedExecutionState.get<number>(CONTEXT_ID_KEY) ?? 0;
 }

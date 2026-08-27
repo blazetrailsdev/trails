@@ -479,6 +479,7 @@ function unionReferences(
  * Mirrors: ActiveRecord::QueryMethods#build_where_clause (query_methods.rb:1640)
  * — `references = PredicateBuilder.references(opts)`.
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the PredicateBuilder.references call of build_where_clause (query_methods.rb:1640) as a free function.
  */
 export function referencesFromConditions(conditions: unknown): Nodes.SqlLiteral[] {
   if (!isPlainObject(conditions)) return [];
@@ -942,6 +943,7 @@ export type ExceptSkip = ExceptKey | (string & {});
  * reads back as its default.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the `r.values = values` assignment of SpawnMethods#relation_with (spawn_methods.rb:72-74); TS cannot await a set accessor.
  */
 export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
   host._values = values;
@@ -1321,6 +1323,7 @@ function uniqArray(arr: unknown[]): unknown[] {
  * falls back to per-key structural equality for plain-object specs — so
  * `leftJoins({ ":posts": "x" })` called twice folds to one entry as in Rails.
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby's Array#| dedupes by eql?/hash (query_methods.rb:256); JS Array has only reference equality.
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
   if (a instanceof JoinDependency || b instanceof JoinDependency) return a === b;
@@ -2079,7 +2082,6 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  * `buildFrom`, the predicate builder), so it cannot become async either. The
  * lease raises the same `ConnectionNotEstablished` Rails' `with_connection`
  * raises when no pool is established.
- * @internal
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
   return ((this as any)._arel ??= this.buildArel((this as any)._conn(), aliases));
@@ -2088,7 +2090,6 @@ export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
 /**
  * Mirrors: ActiveRecord::QueryMethods#construct_join_dependency
  * (query_methods.rb:1598).
- * @internal
  */
 export function constructJoinDependency(
   this: QueryMethodsHost,
@@ -2244,7 +2245,10 @@ export function processWithArgs(
 }
 
 /** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby's Object#to_i coercion (query_methods.rb:1758) has no JS equivalent that matches its string and nil arms.
+ */
 export function toI(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === "number") return Math.trunc(value);
@@ -2266,6 +2270,7 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  * subquery rather than reaching `visitBindValue`'s `quote()`. Arel nodes are
  * rendered to SQL the same way (trails passes nodes here where Rails would not).
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the `ActiveRecord::Relation === value` branch of build_bound_sql_literal (query_methods.rb:1704).
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
@@ -3317,6 +3322,7 @@ export function selectAssociationList(
  * through — `select_association_list` stashes it rather than raising.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby rejects a String because it is not a Symbol (query_methods.rb:1830-1836); TS collapses Symbol and String onto one type.
  */
 export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
   for (const v of values) {
@@ -3339,6 +3345,7 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
  * way.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the inner select_named_joins block of build_joins (query_methods.rb:1865-1873), shared by both partition paths.
  */
 export function selectInnerNamedJoins(
   this: QueryMethodsHost,
@@ -3521,6 +3528,7 @@ export interface JoinEmissionPlan {
  * dedup fold (PR #3501 / #3890) lives in exactly one place and cannot re-drift.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the emission half of QueryMethods#build_joins (query_methods.rb:1881), extracted so the dedup fold lives in one place.
  */
 export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmissionPlan): void {
   if (plan.leadingJoins.length > 0) manager.joinSources().push(...plan.leadingJoins);

@@ -631,8 +631,13 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     for (const container of [tsPkg.classes, tsPkg.modules]) {
       for (const c of Object.values(container)) {
         if (!c.file || c.reExportedFrom) continue;
-        for (const m of c.instanceMethods) pushMethod(pkg, c.file, m);
-        for (const m of c.classMethods) pushMethod(pkg, c.file, m);
+        // `declaredIn` members are skipped for the same reason
+        // `walkTsFileSurface` skips them: they are not this file's surface, so a
+        // key pushed here could never match and would read as STALE on top of
+        // its correct match on the declaring file.
+        for (const m of c.instanceMethods)
+          if (m.declaredIn === undefined) pushMethod(pkg, c.file, m);
+        for (const m of c.classMethods) if (m.declaredIn === undefined) pushMethod(pkg, c.file, m);
         // The container's OWN name, tagged on the class/interface/namespace
         // declaration itself — the only inline form available to an extra that
         // is a declaration rather than a member (e.g. a class TS must export as
@@ -656,6 +661,7 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
         if (c.isInterface === true && c.noRailsEquivalent !== undefined) {
           const covered = c.interfaceMembers;
           for (const m of c.instanceMethods) {
+            if (m.declaredIn !== undefined) continue;
             if (covered && !covered.includes(m.name)) continue;
             push(pkg, c.file, m.name, c.noRailsEquivalent, true);
           }
@@ -988,7 +994,14 @@ function walkTsFileSurface(
     }
     const interfaceMembers = c.interfaceMembers;
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
-      if (skipForeign && m.declaredIn !== undefined) continue;
+      // `declaredIn` marks a member the extractor pulled in from another file —
+      // a synthesized mixin's base surface, or an `interface X extends Y`'s
+      // inherited properties. Either way it is that file's surface, scored
+      // there, and the only place a `@noRailsEquivalent` on it can match; the
+      // `skipForeign` guard used to limit this to the mixin case, which left an
+      // extending interface re-scoring its base's whole surface with no tag
+      // able to reach it.
+      if (m.declaredIn !== undefined) continue;
       const fromInterface =
         c.isInterface === true && (interfaceMembers ? interfaceMembers.includes(m.name) : true);
       pushMember(m, fromInterface ? c.name : null);

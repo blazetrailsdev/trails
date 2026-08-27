@@ -164,7 +164,6 @@ export function onEncryptedAttributeDeclared(
   return Configurable.onEncryptedAttributeDeclared(callback);
 }
 
-/** @internal */
 export function encryptedAttributeWasDeclared(klass: any, name: string): void {
   Configurable.encryptedAttributeWasDeclared(klass, name);
 }
@@ -208,7 +207,6 @@ export function defaultContext(value?: Context): Context {
   return Contexts.defaultContext;
 }
 
-/** @internal */
 export function resetDefaultContext(): void {
   Contexts.resetDefaultContext();
 }

@@ -16,11 +16,8 @@ export interface ResolverContext {
 const SEND_TO_REPLICA_DELAY = 2000;
 
 export class Resolver {
-  /** @internal */
   readonly context: ResolverContext;
-  /** @internal */
   readonly delay: number;
-  /** @internal */
   readonly instrumenter: typeof Notifications;
 
   constructor(context: ResolverContext, options: { delay?: number } = {}) {

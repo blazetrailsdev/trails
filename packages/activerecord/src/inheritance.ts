@@ -229,6 +229,7 @@ export function qualifiedName(modelClass: typeof Base): string {
  * The namespace segments for `modelClass` — `moduleName.split("::")` or `[]`.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby gets the segments from Module#module_parents (activesupport core_ext/module/introspection.rb:53); JS classes carry no namespace.
  */
 export function namespaceSegments(modelClass: typeof Base): string[] {
   const moduleName = (modelClass as typeof Base & { moduleName?: string }).moduleName;
@@ -242,6 +243,7 @@ export function namespaceSegments(modelClass: typeof Base): string[] {
  * Mirrors Ruby's `Module#module_parents` (sans `Object`).
  *
  * @internal
+ * @noRailsEquivalent PERMANENT the JS stand-in for Module#module_parents (activesupport core_ext/module/introspection.rb:53).
  */
 export function moduleParentChain(moduleName: string | undefined): string[] {
   if (!moduleName) return [];
@@ -326,7 +328,10 @@ function lookupModuleDecoration(
   return undefined;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby walks module_parents calling table_name_prefix on each (core_ext/module/introspection.rb:53); JS has no module objects to send to.
+ */
 export function lookupModuleTableNamePrefix(moduleName: string | undefined): string | undefined {
   return lookupModuleDecoration(
     moduleName,
@@ -335,7 +340,10 @@ export function lookupModuleTableNamePrefix(moduleName: string | undefined): str
   );
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT Ruby walks module_parents calling table_name_suffix on each (core_ext/module/introspection.rb:53); JS has no module objects to send to.
+ */
 export function lookupModuleTableNameSuffix(moduleName: string | undefined): string | undefined {
   return lookupModuleDecoration(
     moduleName,
@@ -426,6 +434,7 @@ export function registerSubclass(klass: typeof Base): void {
  * `_has_attribute?`.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE distinguishes an STI-participating class from one that merely names an inheritance_column (inheritance.rb:311); Ruby reads _has_attribute? instead.
  */
 export function stiEnabled(modelClass: object): boolean {
   return (modelClass as any)._inheritanceColumn != null;
@@ -435,6 +444,7 @@ export function stiEnabled(modelClass: object): boolean {
  * Check if a model class is an STI subclass (not the base STI class).
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the `self != base_class` test Ruby writes inline (inheritance.rb:119).
  */
 export function isStiSubclass(modelClass: object): boolean {
   // Walk up the prototype chain to find if any parent has _inheritanceColumn
@@ -448,7 +458,6 @@ export function isStiSubclass(modelClass: object): boolean {
 
 /**
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class
- * @internal
  */
 export function baseClass(this: typeof Base): typeof Base {
   if (!Object.prototype.hasOwnProperty.call(this, "_computedBaseClass")) setBaseClass(this);
@@ -474,6 +483,7 @@ export class ClassMethods {
  * Get the STI base class for a model.
  *
  * @internal
+ * @noRailsEquivalent CONVERGEABLE Inheritance::ClassMethods#base_class (inheritance.rb:119) as a free function so callers without a Base-typed receiver can reach it.
  */
 export function getStiBase(modelClass: object): typeof Base {
   let current = modelClass as typeof Base;
@@ -543,6 +553,7 @@ const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
  * stale getter (property access then yields `undefined`, the trails analog).
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby answers a select alias through method_missing (active_model/attribute_methods.rb:507-486); JS has no method_missing.
  */
 export function defineDynamicSelectReaders(record: Base): void {
   const attrs = (record as any)._attributes as { keys(): Iterable<string> };
@@ -632,7 +643,10 @@ export function __resetPrimaryAbstractClass(): void {
   ActiveRecord.applicationRecordClass = null;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE resolves the ApplicationRecord constant Ruby names directly (core.rb:121).
+ */
 export function getApplicationRecordClass(): typeof Base | null {
   return ActiveRecord.applicationRecordClass as typeof Base | null;
 }
@@ -645,6 +659,7 @@ export function getApplicationRecordClass(): typeof Base | null {
  *
  * @internal
  * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
+ * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) as a free function; it also exists on Base, and one of the two should go.
  */
 export function applicationRecordClassQ(modelClass: typeof Base): boolean {
   if (ActiveRecord.applicationRecordClass) {
@@ -722,8 +737,6 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
  * Mirrors: ActiveRecord::Inheritance#initialize_dup (inheritance.rb:343-346) —
  * `super` then `ensure_proper_type`. `include Inheritance` is base.rb:303, so
  * this link sits directly above Core.
- *
- * @internal
  */
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
   super_(other);
@@ -1035,6 +1048,7 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
  * type.
  *
  * @internal Used by Base's constructor to dispatch `new` to a subclass.
+ * @noRailsEquivalent CONVERGEABLE Inheritance::ClassMethods#subclass_from_attributes (inheritance.rb:331-265) split out of `new` because our reflection can be cold.
  */
 export function subclassFromAttributesForNew(
   modelClass: typeof Base,

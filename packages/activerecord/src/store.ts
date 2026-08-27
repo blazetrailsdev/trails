@@ -10,7 +10,10 @@ import { getOrCreateModuleCarrier } from "./module-carrier.js";
 // coder: IndifferentCoder.new(...)` (store.rb:108).
 let serialize: ((klass: typeof Base, attr: string, opts: { coder: unknown }) => void) | null = null;
 
-/** @internal Called once by base.ts during module init. */
+/**
+ * @internal Called once by base.ts during module init.
+ * @noRailsEquivalent PERMANENT Ruby names `serialize` at call time from the `store` macro body (store.rb:108); a TS import would close a module cycle.
+ */
 export function registerSerializeFn(
   fn: (klass: typeof Base, attr: string, opts: { coder: unknown }) => void,
 ): void {
@@ -62,7 +65,10 @@ export class IndifferentCoder {
     return asIndifferentHash(value);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE Store::ClassMethods#store_accessor's accessor lookup (store.rb:112); Ruby reads the constant inline.
+   */
   accessor(): typeof IndifferentHashAccessor {
     return IndifferentHashAccessor;
   }
@@ -518,8 +524,6 @@ function asRegularHash(obj: unknown): Record<string, unknown> {
  * for nil/non-hash values, mirroring Rails' IndifferentCoder.as_indifferent_hash.
  *
  * Mirrors: ActiveRecord::Store::IndifferentCoder.as_indifferent_hash
- *
- * @internal
  */
 export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unknown> {
   if (obj instanceof HashWithIndifferentAccess) return obj;

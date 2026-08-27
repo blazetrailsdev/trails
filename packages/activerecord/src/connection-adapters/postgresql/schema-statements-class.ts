@@ -970,7 +970,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#validate_constraint (postgresql/schema_statements.rb:893); the port splits that file, so it scores misplaced.
+   */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = this.createAlterTable(tableName) as PgAlterTable;
     at.validateConstraint(constraintName);
@@ -1001,7 +1004,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return `${singularize(table)}_${columnName}`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#assert_valid_deferrable (postgresql/schema_statements.rb:1031); the port splits that file.
+   */
   assertValidDeferrable(deferrable: unknown): void {
     if (
       deferrable == null ||
@@ -1015,7 +1021,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#extract_foreign_key_action (postgresql/schema_statements.rb:1023); the port splits that file.
+   */
   override extractForeignKeyAction(
     specifier: string,
   ): "cascade" | "nullify" | "restrict" | undefined {
@@ -1031,7 +1040,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#extract_constraint_deferrable (postgresql/schema_statements.rb:1037); the port splits that file.
+   */
   extractConstraintDeferrable(
     deferrable: boolean,
     deferred: boolean,
@@ -1220,7 +1232,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#exclusion_constraint_name (postgresql/schema_statements.rb:1078); the port splits that file.
+   */
   exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
     const expression = (options.expression as string | undefined) ?? "";
@@ -1229,7 +1244,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return `excl_rails_${hashed}`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#exclusion_constraint_for (postgresql/schema_statements.rb:1088); the port splits that file.
+   */
   async exclusionConstraintFor(
     tableName: string,
     options: Record<string, unknown> = {},
@@ -1253,7 +1271,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#exclusion_constraint_for! (postgresql/schema_statements.rb:1093); the port splits that file.
+   */
   async exclusionConstraintForBang(
     tableName: string,
     expression?: string | null,
@@ -1358,7 +1379,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#unique_constraint_name (postgresql/schema_statements.rb:1098); the port splits that file.
+   */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
     const columnOrIndex = Array.isArray(options.column)
@@ -1373,7 +1397,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return `uniq_rails_${hashed}`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#unique_constraint_for (postgresql/schema_statements.rb:1108); the port splits that file.
+   */
   async uniqueConstraintFor(
     tableName: string,
     options: Record<string, unknown> = {},
@@ -1388,7 +1415,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return constraints.find((c) => c.definedFor({ name, ...options }));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#unique_constraint_for! (postgresql/schema_statements.rb:1113); the port splits that file.
+   */
   async uniqueConstraintForBang(
     tableName: string,
     column?: string | string[] | null,
@@ -1751,7 +1781,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE the sequence-name interpolation of PostgreSQL::SchemaStatements#default_sequence_name (postgresql/schema_statements.rb:301).
+   */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxIdentifierLength = this.maxIdentifierLength();
     const [, unqualifiedTable] = this.extractSchemaQualifiedName(tableName);

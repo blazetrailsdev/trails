@@ -325,6 +325,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * the declaration stays and concrete adapters override it with the real
    * body, the same split `getFullVersion` uses.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE Ruby reaches full_version by duck typing from abstract_mysql_adapter.rb:93; TS needs the declaration on the abstract class.
    */
   async fullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement fullVersion()`);
@@ -725,6 +726,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *   end
    *
    * @internal
+   * @noRailsEquivalent CONVERGEABLE Rails leaves `change_column_default_for_alter` on SchemaStatements (abstract/schema_statements.rb:1843) and gives MySQL only `build_change_column_default_definition` (abstract_mysql_adapter.rb:373); the port overrides the whole method on the adapter instead.
    */
   async changeColumnDefaultForAlter(
     tableName: string,
@@ -900,6 +902,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * @internal Mirrors: Mysql2Adapter#text_type? (mysql2_adapter.rb:140-142) —
    * `TYPE_MAP.lookup(type)`, resolved off the concrete adapter class so the
    * mysql2 map (mysql2_adapter.rb:53) is the one consulted.
+   * @noRailsEquivalent CONVERGEABLE Mysql2Adapter#text_type? (mysql2_adapter.rb:140-142) hoisted to the abstract class so the shared caller can reach it.
    */
   isTextType(type: string): boolean {
     const TYPE_MAP = (this.constructor as typeof AbstractMysqlAdapter).TYPE_MAP;
@@ -1051,7 +1054,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Mirrors: AbstractMysqlAdapter#case_sensitive_comparison.
    * A non-binary column with a case-insensitive collation needs an explicit
    * `BINARY` cast (Arel::Nodes::Bin) to force a case-sensitive comparison.
-   * @internal
    */
   override async caseSensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1069,6 +1071,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `can_perform_case_insensitive_comparison_for?` override. A column whose
    * collation is already case-insensitive needs no `LOWER()` wrapper.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:814) overridden async because the collation lookup queries.
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1255,10 +1258,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this._emulateBooleans = value;
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter::EXTENDED_TYPE_MAPS (abstract_mysql_adapter.rb:754) */
+  /** Mirrors: AbstractMysqlAdapter::EXTENDED_TYPE_MAPS (abstract_mysql_adapter.rb:754) */
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
-  /** @internal Mirrors: AbstractMysqlAdapter.extended_type_map */
+  /** Mirrors: AbstractMysqlAdapter.extended_type_map */
   static override extendedTypeMap(
     this: typeof AbstractMysqlAdapter,
     options: { defaultTimezone?: string; emulateBooleans: boolean },
@@ -1521,8 +1524,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * (abstract_mysql_adapter.rb:354-357) — one `DROP` statement for every table
    * name, with MySQL's `TEMPORARY` and `CASCADE` keywords the base adapter has
    * no arm for.
-   *
-   * @internal
    */
   override async dropTable(
     ...args:
@@ -1680,6 +1681,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * the live connection. Base implementation throws — callers must call
    * `getDatabaseVersion()` only after a subclass has wired this.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE the abstract seat for Mysql2Adapter#full_version (mysql2_adapter.rb:164-166), which Ruby needs no base declaration for.
    */
   async getFullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement getFullVersion()`);
@@ -1858,6 +1860,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
  * @param createInfo - Raw output of `SHOW CREATE TABLE`
  * @param tableComment - Pre-fetched table comment (pass null if no COMMENT= in createInfo)
  * @internal
+ * @noRailsEquivalent CONVERGEABLE the SHOW CREATE TABLE parsing of AbstractMysqlAdapter#table_options (abstract_mysql_adapter.rb:549), extracted for unit testing.
  */
 export function parseTableOptions(
   createInfo: string,

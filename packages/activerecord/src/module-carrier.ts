@@ -1,3 +1,6 @@
+/**
+ * @noRailsEquivalent PERMANENT Ruby includes an anonymous module into the class (enum.rb:326, store.rb:110); JS needs an explicitly interposed prototype.
+ */
 import type { Base } from "./base.js";
 
 /**
@@ -18,6 +21,7 @@ import type { Base } from "./base.js";
  * independently.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT Ruby includes an anonymous module into the class (enum.rb:326, store.rb:110); JS needs an explicitly interposed prototype.
  */
 export function getOrCreateModuleCarrier(
   modelClass: typeof Base,

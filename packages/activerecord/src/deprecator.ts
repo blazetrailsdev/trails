@@ -88,13 +88,19 @@ export class MigrationProxy {
     return !!this._migration.disableDdlTransaction;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE MigrationProxy#migration (migration.rb:1190) made async because the migration file loads through a dynamic import.
+   */
   migration(): Promise<Migration> {
     this._migrationPromise ??= this.loadMigrationAsync().then((m) => (this._migration = m));
     return this._migrationPromise;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE MigrationProxy#load_migration (migration.rb:1194); the sync arm kept for CJS migrations.
+   */
   loadMigration(): Migration {
     const req = createRequire(import.meta.url);
     delete req.cache[req.resolve(this.filename)];
@@ -118,6 +124,7 @@ export class MigrationProxy {
    * @internal
    * ESM-capable loader. Falls through to `require()` for CJS migrations and
    * uses `import(pathToFileURL(...))` for ESM files (ERR_REQUIRE_ESM).
+   * @noRailsEquivalent PERMANENT Ruby's `require` in load_migration is synchronous (migration.rb:1194); an ESM migration can only be loaded by await import().
    */
   async loadMigrationAsync(): Promise<Migration> {
     try {

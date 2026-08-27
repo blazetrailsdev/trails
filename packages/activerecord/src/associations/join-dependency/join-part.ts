@@ -21,12 +21,16 @@ export abstract class JoinPart {
    * `Aliases` value object can build column aliases (`node.table[col].as(...)`)
    * the way Rails' JoinPart#table does — no separate index-keyed table map.
    * @internal
+   * @noRailsEquivalent CONVERGEABLE stored form of JoinPart#table (join_dependency/join_part.rb:44), which Ruby recomputes off the base_klass each read.
    */
   arelTable: Table | Nodes.TableAlias | null = null;
   columns: string[] = [];
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE stored form of JoinAssociation#reflection (join_dependency/join_association.rb:10), kept on the part so Aliases can read it.
+   */
   nodeReflection: any | null = null;
   immediateAssocName = "";
   parentPath: string | null = null;

@@ -41,6 +41,14 @@ tester.run("unbacked-internal-needs-receipt", rule, {
       filename: inheritanceFile,
       code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT — a language fact.\n */\nexport function seam() {}\n`,
     },
+    // A file-level receipt in a DETACHED block — one a blank line separates from
+    // what follows — covers every name in an import-less file. TypeScript binds
+    // such a block to no declaration, so reading it as file-level widens no
+    // declaration's doc block (RFC 0121).
+    {
+      filename: inheritanceFile,
+      code: `/**\n * @noRailsEquivalent PERMANENT — no Rails file maps onto this one.\n */\n\n/** @internal */\nexport function seam() {}\n`,
+    },
     // A file-level receipt above the imports covers every name in the file.
     {
       filename: inheritanceFile,
@@ -86,11 +94,12 @@ tester.run("unbacked-internal-needs-receipt", rule, {
       code: `class Base {\n  /** @internal */\n  static seam() {}\n}\n`,
       errors: [{ messageId: "unbackedInternal" }],
     },
-    // A file header separated by a blank line is NOT the declaration's JSDoc,
-    // and a file-level receipt is read only above an import.
+    // A DETACHED header WITHOUT a receipt covers nothing — the declaration below
+    // it is still unbacked. (With a receipt it IS the file-level form; see the
+    // valid case above.)
     {
       filename: inheritanceFile,
-      code: `/**\n * @noRailsEquivalent PERMANENT — a header, not a file-level tag.\n */\n\n/** @internal */\nexport function seam() {}\n`,
+      code: `/**\n * A file header, and nothing more.\n */\n\n/** @internal */\nexport function seam() {}\n`,
       errors: [{ messageId: "unbackedInternal" }],
     },
   ],
