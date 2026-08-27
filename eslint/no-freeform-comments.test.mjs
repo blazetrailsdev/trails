@@ -177,3 +177,28 @@ tester.run("no-freeform-comments (directive comments are untouched)", rule, {
   ],
   invalid: [],
 });
+
+// `@empty` marks an intentionally-empty block. ESLint's `no-empty` ignores a
+// block containing a comment, so an empty Rails arm stayed legal only because
+// the sentence explaining it was there. `@empty` is that comment with the
+// English removed, and any prose written beside it is stripped like any other.
+tester.run("no-freeform-comments (@empty marks an intentionally-empty block)", rule, {
+  valid: [
+    { code: `if (a) {\n  /** @empty */\n}\n` },
+    { code: `try {\n  f();\n} catch {\n  /** @empty */\n}\n` },
+  ],
+  invalid: [
+    {
+      code: `if (a) {\n  /** @empty — Rails takes no action on this arm. */\n}\n`,
+      errors: prose,
+      output: `if (a) {\n  /** @empty */\n}\n`,
+    },
+    // Without the marker an explanatory comment is prose and goes, which is
+    // what empties the block.
+    {
+      code: `if (a) {\n  // Rails takes no action on this arm.\n}\n`,
+      errors: freeform,
+      output: `if (a) {\n}\n`,
+    },
+  ],
+});
