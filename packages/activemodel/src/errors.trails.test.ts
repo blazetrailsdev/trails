@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach, expectTypeOf } from "vitest";
 import {
   Model,
@@ -11,6 +15,8 @@ import {
 import { Error as ActiveModelError } from "./error.js";
 import type { ValidatableRecord } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("Errors — trails-only coverage", () => {
   it("add creates an error object and returns it", () => {
@@ -606,10 +612,15 @@ describe("ValidatableRecord<TBase> type tests", () => {
 
   it("Model subclass .errors resolves to Errors<ConcreteModel>", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person();
     expectTypeOf(p.errors).toEqualTypeOf<Errors<Person>>();
   });

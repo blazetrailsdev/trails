@@ -1,5 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   `Account` spells `include ActiveModel::Attributes` in its class body; the empty class/interface
+   merge beside it is how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { Model, ForbiddenAttributesError } from "@blazetrails/activemodel";
+import {
+  Attributes,
+  type AttributesClassHalf,
+  Model,
+  ForbiddenAttributesError,
+} from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 // A real ActionController::Parameters stores its data in a private field and
@@ -9,10 +18,14 @@ import { Parameters } from "../../metal/strong-parameters.js";
 // `return if new_attributes.empty?`), so an EMPTY wrapper is a construction
 // no-op rather than proceeding into sanitize_for_mass_assignment.
 class Account extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   static {
+    include(this, Attributes);
     this.attribute("name", "string");
   }
 }
+interface Account extends Attributes {}
 
 describe("MassAssignmentEmptyParametersTest", () => {
   it("empty Parameters is a no-op at construction", () => {

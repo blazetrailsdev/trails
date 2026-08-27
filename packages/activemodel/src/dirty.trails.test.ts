@@ -6,10 +6,14 @@ import { include } from "@blazetrails/activesupport";
 import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("Dirty across dup", () => {
   class Topic extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       include(this, Dirty);
       this.attribute("title", "string");
       this.attribute("body", "string");
@@ -18,7 +22,7 @@ describe("Dirty across dup", () => {
     declare title: string | null;
     declare body: string | null;
   }
-  interface Topic extends Dirty {}
+  interface Topic extends Attributes, Dirty {}
 
   it("dup carries the source's pending changes", () => {
     const t = new Topic({ title: "A" });
@@ -73,14 +77,17 @@ describe("Dirty across dup", () => {
 
 describe("DirtyTest extras", () => {
   class DirtyPerson extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       include(this, Dirty);
       this.attribute("name", "string");
       this.attribute("age", "integer");
       this.attribute("color", "string");
     }
   }
-  interface DirtyPerson extends Dirty {}
+  interface DirtyPerson extends Attributes, Dirty {}
 
   it("attributeChange returns null when attribute is unchanged", () => {
     const p = new DirtyPerson({ name: "Alice" });
@@ -91,13 +98,16 @@ describe("DirtyTest extras", () => {
 
 describe("Dirty Tracking", () => {
   class Person extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       include(this, Dirty);
       this.attribute("name", "string");
       this.attribute("age", "integer");
     }
   }
-  interface Person extends Dirty {}
+  interface Person extends Attributes, Dirty {}
 
   it("not changed initially", () => {
     const p = new Person({ name: "dean", age: 30 });
@@ -195,12 +205,15 @@ describe("Dirty Tracking", () => {
 
   it("cast-value-aware: same cast value = no change", () => {
     class Sized extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("size", "integer");
       }
     }
-    interface Sized extends Dirty {}
+    interface Sized extends Attributes, Dirty {}
     const s = new Sized({ size: "2" });
     s.changesApplied();
     s._writeAttribute("size", "2.3");
@@ -212,10 +225,14 @@ describe("Dirty Tracking", () => {
 describe("attributeBeforeTypeCast", () => {
   it("returns the raw value before type casting", () => {
     class Price extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("amount", "integer");
       }
     }
+    interface Price extends Attributes {}
 
     const price = new Price({ amount: "42" });
     expect(price._readAttribute("amount")).toBe(42);
@@ -224,10 +241,14 @@ describe("attributeBeforeTypeCast", () => {
 
   it("tracks raw values on writeAttribute", () => {
     class Price extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("amount", "integer");
       }
     }
+    interface Price extends Attributes {}
 
     const price = new Price({ amount: 10 });
     price._writeAttribute("amount", "99");
@@ -239,13 +260,16 @@ describe("attributeBeforeTypeCast", () => {
 describe("clearChangesInformation", () => {
   it("clear_changes_information should reset all changes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
 
     const p = new Person({ name: "Alice", age: 30 });
     p.changesApplied();
@@ -264,14 +288,17 @@ describe("clearChangesInformation", () => {
 describe("clearAttributeChanges clears forced-dirty state", () => {
   it("force-dirtied attribute is no longer dirty after clearAttributeChanges — forced flag must not leak", () => {
     class Metric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Metric extends Dirty {}
+    interface Metric extends Attributes, Dirty {}
     Metric.attribute("ratio", "float");
 
     const m = new Metric({ ratio: NaN });
@@ -288,13 +315,16 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
 describe("clearAttributeChanges", () => {
   it("clears changes for specific attributes only", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
 
     const p = new Person({ name: "Alice", age: 30 });
     p.changesApplied();
@@ -312,12 +342,15 @@ describe("clearAttributeChanges", () => {
 describe("attributeChanged with from/to options", () => {
   it("returns true when from/to match the change", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -326,12 +359,15 @@ describe("attributeChanged with from/to options", () => {
 
   it("returns false when from does not match", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -340,12 +376,15 @@ describe("attributeChanged with from/to options", () => {
 
   it("returns false when to does not match", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -354,12 +393,15 @@ describe("attributeChanged with from/to options", () => {
 
   it("supports only from option", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -369,12 +411,15 @@ describe("attributeChanged with from/to options", () => {
 
   it("supports only to option", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -386,12 +431,15 @@ describe("attributeChanged with from/to options", () => {
 describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
   it("attributePreviouslyChanged returns true for attributes changed in last save", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -401,12 +449,15 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
 
   it("attributePreviouslyChanged supports from/to options", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -417,12 +468,15 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
 
   it("attributePreviouslyWas returns value before last save", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface User extends Dirty {}
+    interface User extends Attributes, Dirty {}
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u._writeAttribute("name", "Bob");
@@ -434,14 +488,17 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
 describe("numeric type.isChanged integration via dirty tracking", () => {
   it("integer attribute set to non-numeric string still appears in changes — number_to_non_number? path", () => {
     class Item extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Item extends Dirty {}
+    interface Item extends Attributes, Dirty {}
     Item.attribute("count", "integer");
 
     const item = new Item({ count: 10 });
@@ -452,14 +509,17 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
   it("force-change is cleared by restoreAttributes — forced flag must not survive restore", () => {
     class Metric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Metric extends Dirty {}
+    interface Metric extends Attributes, Dirty {}
     Metric.attribute("ratio", "float");
 
     const m = new Metric({ ratio: NaN });
@@ -474,14 +534,17 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
   it("force-change is cleared by changesApplied — forced state must not leak across save boundaries", () => {
     class Metric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Metric extends Dirty {}
+    interface Metric extends Attributes, Dirty {}
     Metric.attribute("ratio", "float");
 
     const m = new Metric({ ratio: NaN });
@@ -496,14 +559,17 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
   it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
     class Metric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Metric extends Dirty {}
+    interface Metric extends Attributes, Dirty {}
     Metric.attribute("ratio", "float");
 
     const m = new Metric({ ratio: NaN });
@@ -516,14 +582,17 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
   it("float attribute NaN-to-NaN does NOT appear in changes — equal_nan? exemption", () => {
     class Metric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Metric extends Dirty {}
+    interface Metric extends Attributes, Dirty {}
     Metric.attribute("ratio", "float");
 
     const m = new Metric({ ratio: NaN });
@@ -535,14 +604,17 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
   it("integer same-cast-value write via boolean raw is still dirty — number_to_non_number? path at model level", () => {
     class Item extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Item extends Dirty {}
+    interface Item extends Attributes, Dirty {}
     Item.attribute("count", "integer");
 
     const item = new Item({ count: 1 });
@@ -553,14 +625,17 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
   it("float attribute NaN → non-NaN → NaN clears dirty state on revert", () => {
     class Metric extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
       }
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
       }
     }
-    interface Metric extends Dirty {}
+    interface Metric extends Attributes, Dirty {}
     Metric.attribute("ratio", "float");
 
     const m = new Metric({ ratio: NaN });

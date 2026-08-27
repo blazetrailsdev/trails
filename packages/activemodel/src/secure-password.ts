@@ -41,7 +41,7 @@ export function hasSecurePassword(
       if (isBlank(publicSend(record, digestAttr))) record.errors.add(attribute, ":blank");
     });
 
-    modelClass.validate((record: Model) => {
+    modelClass.validate((record: Model & { respondTo(method: string): boolean }) => {
       const challenge = publicSend(record, challengeAttr);
       if (challenge != null && challenge !== false) {
         const digestWas = record.respondTo(`${digestAttr}Was`)

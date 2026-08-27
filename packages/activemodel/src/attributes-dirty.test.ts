@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
@@ -6,16 +6,20 @@ import { include } from "@blazetrails/activesupport";
 import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("AttributesDirtyTest", () => {
   it("changing the attribute reports a change only when the cast value changes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("age", "integer");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
     const p = new Person({ age: 25 });
     p.changesApplied();
     p._writeAttribute("age", "25");
@@ -24,12 +28,15 @@ describe("AttributesDirtyTest", () => {
 
   it("changes accessible through both strings and symbols", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     p._writeAttribute("name", "Bob");
@@ -38,12 +45,15 @@ describe("AttributesDirtyTest", () => {
 
   it("be consistent with symbols arguments after the changes are applied", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     p._writeAttribute("name", "Bob");
@@ -54,13 +64,16 @@ describe("AttributesDirtyTest", () => {
 
   it("restore_attributes can restore only some attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
     const p = new Person({ name: "Alice", age: 25 });
     p.changesApplied();
     p._writeAttribute("name", "Bob");
@@ -71,14 +84,17 @@ describe("AttributesDirtyTest", () => {
   });
 
   class DirtyPerson extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       include(this, Dirty);
       this.attribute("name", "string");
       this.attribute("age", "integer");
       this.attribute("color", "string");
     }
   }
-  interface DirtyPerson extends Dirty {}
+  interface DirtyPerson extends Attributes, Dirty {}
 
   it("setting attribute will result in change", () => {
     const p = new DirtyPerson({ name: "Alice" });
@@ -201,12 +217,15 @@ describe("AttributesDirtyTest", () => {
   });
   it("attribute mutation", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     expect(p.isChanged).toBe(false);
@@ -217,12 +236,15 @@ describe("AttributesDirtyTest", () => {
 
   it("using attribute_will_change! with a symbol", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("name", "string");
       }
     }
-    interface Person extends Dirty {}
+    interface Person extends Attributes, Dirty {}
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     p._writeAttribute("name", "Bob");

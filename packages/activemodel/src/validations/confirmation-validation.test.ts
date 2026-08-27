@@ -1,59 +1,91 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model, I18n } from "../index.js";
 import { resetI18n } from "../test-helpers/i18n.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("ConfirmationValidationTest", () => {
   it("validates confirmation of with boolean attribute", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
+        include(this, Attributes);
         this.attribute("password", "string");
         this.validates("password", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ password: "secret", passwordConfirmation: "wrong" });
     expect(await p.isValid()).toBe(false);
   });
 
   it("validates confirmation of for ruby class", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("email", "string");
         this.validates("email", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ email: "a@b.com", emailConfirmation: "a@b.com" });
     expect(await p.isValid()).toBe(true);
   });
 
   it("does not override confirmation reader if present", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("email", "string");
         this.validates("email", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ email: "test@test.com" });
     expect(await p.isValid()).toBe(true);
   });
 
   it("does not override confirmation writer if present", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("email", "string");
         this.validates("email", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ email: "test@test.com" });
     expect(await p.isValid()).toBe(true);
   });
 
   it("no title confirmation", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ title: "A", titleConfirmation: "B" });
     expect(await p.isValid()).toBe(false);
     expect(p.errors.messagesFor("titleConfirmation")).toContain("doesn't match Title");
@@ -61,22 +93,32 @@ describe("ConfirmationValidationTest", () => {
 
   it("title confirmation", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ title: "A", titleConfirmation: "A" });
     expect(await p.isValid()).toBe(true);
   });
 
   it("title confirmation with case sensitive option true", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: { caseSensitive: true } });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ title: "Hello" });
     (p as any).titleConfirmation = "hello";
     expect(await p.isValid()).toBe(false);
@@ -84,11 +126,16 @@ describe("ConfirmationValidationTest", () => {
 
   it("title confirmation with case sensitive option false", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: { caseSensitive: false } });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ title: "Hello" });
     (p as any).titleConfirmation = "hello";
     expect(await p.isValid()).toBe(true);
@@ -105,11 +152,16 @@ describe("ConfirmationValidationTest", () => {
       },
     });
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ title: "We the People" });
     (p as any).titleConfirmation = "We the Robots";
     expect(await p.isValid()).toBe(false);
@@ -119,11 +171,16 @@ describe("ConfirmationValidationTest", () => {
 
   it("setup! auto-defines confirmation attribute", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("email", "string");
         this.validates("email", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     expect(Object.getOwnPropertyDescriptor(Person.prototype, "emailConfirmation")?.set).toBeTypeOf(
       "function",
     );
@@ -134,23 +191,34 @@ describe("ConfirmationValidationTest", () => {
 
   it("setup! does not override explicitly declared confirmation attribute", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
+        include(this, Attributes);
         this.attribute("email", "string");
         this.attribute("emailConfirmation", "string");
         this.validates("email", { confirmation: true });
       }
     }
+    interface Person extends Attributes {}
+
     expect(Person.attributeNames()).toContain("emailConfirmation");
   });
 });
 describe("ConfirmationValidator caseSensitive", () => {
   it("title confirmation with case sensitive option true", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: true });
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({ title: "Alice" });
     (u as any).titleConfirmation = "alice";
     expect(await u.isValid()).toBe(false);
@@ -158,11 +226,16 @@ describe("ConfirmationValidator caseSensitive", () => {
 
   it("title confirmation with case sensitive option false", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: { caseSensitive: false } });
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({ title: "Alice" });
     (u as any).titleConfirmation = "alice";
     expect(await u.isValid()).toBe(true);
@@ -170,11 +243,16 @@ describe("ConfirmationValidator caseSensitive", () => {
 
   it("still fails when values differ with caseSensitive: false", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: { caseSensitive: false } });
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({ title: "alice" });
     (u as any).titleConfirmation = "bob";
     expect(await u.isValid()).toBe(false);
@@ -184,13 +262,18 @@ describe("ConfirmationValidator caseSensitive", () => {
 describe("confirmation options pass-through", () => {
   it("passes custom interpolation vars through to errors.add", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", {
           confirmation: { message: "must match %{kind}", kind: "original" },
         });
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({ title: "alice" });
     (u as any).titleConfirmation = "bob";
     await u.isValid();
@@ -199,11 +282,16 @@ describe("confirmation options pass-through", () => {
 
   it("reserved key caseSensitive does not appear in error options", async () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { confirmation: { caseSensitive: false } });
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({ title: "alice" });
     (u as any).titleConfirmation = "bob";
     await u.isValid();

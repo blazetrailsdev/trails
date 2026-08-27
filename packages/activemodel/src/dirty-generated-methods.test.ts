@@ -6,16 +6,20 @@ import { include } from "@blazetrails/activesupport";
 import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("DirtyGeneratedMethods", () => {
   class Person extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       include(this, Dirty);
       this.attribute("name", "string");
       this.attribute("age", "integer");
     }
   }
-  interface Person extends Dirty {}
+  interface Person extends Attributes, Dirty {}
 
   it("<attr>Changed returns true after assignment", () => {
     const p = new Person({ name: "Alice" });
@@ -71,13 +75,18 @@ describe("DirtyGeneratedMethods", () => {
 
   it("does not shadow user-defined methods of the same name", () => {
     class Account extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("balance", "integer");
       }
       balanceChanged(): string {
         return "user override";
       }
     }
+    interface Account extends Attributes {}
+
     const a = new Account({ balance: 100 });
     expect((a as any).balanceChanged()).toBe("user override");
   });

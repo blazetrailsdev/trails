@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
 import {
   assert,
@@ -8,6 +12,7 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertRaises,
+  include,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
@@ -21,9 +26,13 @@ import {
 } from "./index.js";
 import type { ConditionalOptions } from "./validations.js";
 import { FormatValidator } from "./validations/format.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 class Topic extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   static {
+    include(this, Attributes);
     this.attribute("title", "string");
     this.attribute("author_name", "string");
     this.attribute("content", "string");
@@ -40,6 +49,7 @@ class Topic extends Model {
     this.afterValidationPerformed = true;
   }
 }
+interface Topic extends Attributes {}
 
 class Reply extends Topic {
   static {
@@ -77,10 +87,14 @@ class Reply extends Topic {
 }
 
 class Person extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   static {
+    include(this, Attributes);
     this.attribute("title", "string");
   }
 }
+interface Person extends Attributes {}
 
 class CustomReader extends Model {
   data: Record<string, unknown>;
@@ -315,11 +329,16 @@ describe("ValidationsTest", () => {
 
   it("strict validation in validates", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true, strict: true });
       }
     }
+    interface Person extends Attributes {}
+
     await expect(new Person({}).isValid()).rejects.toThrow();
   });
 
@@ -375,10 +394,15 @@ describe("ValidationsTest", () => {
 
   it("does not modify options argument", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const opts = { presence: true };
     Person.validates("name", opts);
     expect(opts).toEqual({ presence: true });
@@ -391,11 +415,16 @@ describe("ValidationsTest", () => {
 
   it("validates with bang", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person();
     await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
   });
@@ -513,11 +542,16 @@ describe("ValidationsTest", () => {
 
   it("strict validation in custom validator helper", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true, strict: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     await expect(p.isValid()).rejects.toThrow();
   });
@@ -611,21 +645,31 @@ describe("ValidationsTest", () => {
 
   it("strict validation particular validator", async () => {
     class Topic extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { presence: true, strict: true });
       }
     }
+    interface Topic extends Attributes {}
+
     await expect(new Topic({}).isValid()).rejects.toThrow();
   });
 
   it("strict validation custom exception", async () => {
     class Topic extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
         this.validates("title", { presence: true, strict: true });
       }
     }
+    interface Topic extends Attributes {}
+
     await expect(new Topic({}).isValid()).rejects.toThrow(/title/i);
   });
 });

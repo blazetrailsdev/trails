@@ -1,8 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Errors, Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { Error as ModelError } from "./error.js";
 import { resetI18n } from "./test-helpers/i18n.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("ErrorTest", () => {
   it("full_message uses default format", () => {
@@ -213,14 +219,19 @@ describe("ErrorTest", () => {
 
   it("generateMessage walks ancestor lookup chain", () => {
     class Parent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static i18nScope = "activemodel";
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
       static lookupAncestors() {
         return [this];
       }
     }
+    interface Parent extends Attributes {}
+
     class Child extends Parent {
       static override lookupAncestors() {
         return [this, Parent];
@@ -248,11 +259,16 @@ describe("ErrorTest", () => {
 
   it("generateMessage falls back to activemodel scope for non-activemodel i18nScope", () => {
     class ARModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static i18nScope = "activerecord";
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface ARModel extends Attributes {}
+
     const record = new ARModel({}) as any;
     const msg = ModelError.generateMessage("name", ":blank", record);
     expect(msg).toBe("can't be blank");

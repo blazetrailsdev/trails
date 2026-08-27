@@ -1,7 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model, Errors } from "./index.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 class Person {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   errors: Errors;
   name: string | null = null;
   age: number | null = null;
@@ -156,11 +164,16 @@ describe("ErrorsTest", () => {
 
   it("adding errors using conditionals with Person#validate!", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person();
     await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
   });
@@ -572,10 +585,15 @@ describe("ErrorsTest", () => {
 
   it("added? defaults message to :invalid", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({});
     u.errors.add("name", ":blank");
     expect(u.errors.added("name", ":blank")).toBe(true);

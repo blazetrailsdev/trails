@@ -860,6 +860,7 @@ export function arelTable(this: CoreHost): Table {
  */
 export function initInternals(
   this: CoreRecord & {
+    _attributes: import("@blazetrails/activemodel").AttributeSet;
     _newRecord: boolean;
     _readonly: boolean;
     _previouslyNewRecord: boolean;
@@ -887,6 +888,21 @@ export function initInternals(
   this._strictLoadingMode = klass.strictLoadingMode;
 
   klass.defineAttributeMethods();
+
+  // core.rb:474 — `@attributes = self.class._default_attributes.deep_dup`.
+  // ActiveRecord does not include `ActiveModel::Attributes` (base.rb:311 takes
+  // only `AttributeRegistration`), so the attribute bag is seeded in the body
+  // that stands in for `Core#initialize`. It reads AFTER
+  // `define_attribute_methods` rather than before it as Rails does, because
+  // that call is where trails lazily loads the schema — and loading it drops
+  // the memoized `_default_attributes` this line would otherwise have read.
+  this._attributes = (
+    this.constructor as unknown as {
+      _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+    }
+  )
+    ._defaultAttributes()
+    .deepDup();
 }
 
 /**

@@ -1,18 +1,29 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
 import { Builder } from "./attribute-set/builder.js";
 import { typeRegistry } from "./type/registry.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("AttributeSetTest", () => {
   it("building a new set from raw attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice", age: "25" });
     expect(p._readAttribute("name")).toBe("Alice");
     expect(p._readAttribute("age")).toBe(25);
@@ -20,30 +31,45 @@ describe("AttributeSetTest", () => {
 
   it("building with custom types", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("active", "boolean");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ active: "true" });
     expect(p._readAttribute("active")).toBe(true);
   });
 
   it("[] returns a null object", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._readAttribute("name")).toBe(null);
   });
 
   it("duping creates a new hash, but does not dup the attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     const attrs = p.attributes;
     attrs.name = "Bob";
@@ -72,10 +98,15 @@ describe("AttributeSetTest", () => {
 
   it("freezing cloned set does not freeze original", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     const attrs = Object.freeze({ ...p.attributes });
     p._writeAttribute("name", "Bob");
@@ -85,11 +116,16 @@ describe("AttributeSetTest", () => {
 
   it("to_hash returns a hash of the type cast values", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice", age: "25" });
     const hash = p.attributes;
     expect(hash.name).toBe("Alice");
@@ -98,12 +134,17 @@ describe("AttributeSetTest", () => {
 
   it("to_hash maintains order", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("first", "string");
         this.attribute("second", "string");
         this.attribute("third", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ first: "a", second: "b", third: "c" });
     const keys = Object.keys(p.attributes);
     expect(keys).toEqual(["first", "second", "third"]);
@@ -111,10 +152,15 @@ describe("AttributeSetTest", () => {
 
   it("values_before_type_cast", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ age: "25" });
     expect(p._attributes.getAttribute("age").valueBeforeTypeCast).toBe("25");
     expect(p._readAttribute("age")).toBe(25);
@@ -122,10 +168,15 @@ describe("AttributeSetTest", () => {
 
   it("known columns are built with uninitialized attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._attributes.isKey("name")).toBe(true);
     expect(p._readAttribute("name")).toBe(null);
@@ -133,10 +184,15 @@ describe("AttributeSetTest", () => {
 
   it("uninitialized attributes are not included in the attributes hash", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._readAttribute("name")).toBe(null);
     expect(p._readAttribute("name")).toBe(null);
@@ -144,10 +200,15 @@ describe("AttributeSetTest", () => {
 
   it("uninitialized attributes are not included in keys", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p.attributeNames()).toContain("name");
     expect(p._readAttribute("name")).toBe(null);
@@ -155,10 +216,15 @@ describe("AttributeSetTest", () => {
 
   it("uninitialized attributes return false for key?", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._attributes.isKey("name")).toBe(true);
     expect(p._readAttribute("name")).toBe(null);
@@ -166,50 +232,75 @@ describe("AttributeSetTest", () => {
 
   it("unknown attributes return false for key?", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._attributes.isKey("unknown")).toBe(false);
   });
 
   it("fetch_value returns the value for the given initialized attribute", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("fetch_value returns nil for unknown attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     expect(p.attribute("unknown")).toBe(null);
   });
 
   it("fetch_value returns nil for unknown attributes when types has a default", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p.attribute("missing")).toBe(null);
   });
 
   it("fetch_value uses the given block for uninitialized attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     const value = p._readAttribute("name") ?? "default";
     expect(value).toBe("default");
@@ -217,31 +308,46 @@ describe("AttributeSetTest", () => {
 
   it("fetch_value returns nil for uninitialized attributes if no block is given", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._readAttribute("name")).toBe(null);
   });
 
   it("the primary_key is always initialized", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._attributes.isKey("id")).toBe(true);
   });
 
   it("write_from_database sets the attribute with database typecasting", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     p._writeAttribute("age", "42");
     expect(p._readAttribute("age")).toBe(42);
@@ -249,10 +355,15 @@ describe("AttributeSetTest", () => {
 
   it("write_from_user sets the attribute with user typecasting", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     p._writeAttribute("age", "25");
     expect(p._readAttribute("age")).toBe(25);
@@ -260,11 +371,16 @@ describe("AttributeSetTest", () => {
 
   it("values_for_database", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice", age: "25" });
     expect(p._readAttribute("name")).toBe("Alice");
     expect(p._readAttribute("age")).toBe(25);
@@ -272,10 +388,15 @@ describe("AttributeSetTest", () => {
 
   it("freezing doesn't prevent the set from materializing", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     const frozen = Object.freeze({ ...p.attributes });
     expect(frozen.name).toBe("Alice");
@@ -283,10 +404,15 @@ describe("AttributeSetTest", () => {
 
   it("marshalling dump/load materialized attribute hash", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     const serialized = JSON.stringify(p.attributes);
     const deserialized = JSON.parse(serialized);
@@ -295,11 +421,16 @@ describe("AttributeSetTest", () => {
 
   it("#accessed_attributes returns only attributes which have been read", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice", age: 25 });
     const accessed = p._attributes.accessed();
     p._readAttribute("name");
@@ -309,10 +440,15 @@ describe("AttributeSetTest", () => {
 
   it("#map returns a new attribute set with the changes applied", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     const mapped = p._attributes.map((attr) => attr.withCastValue("Bob"));
     expect(mapped.fetchValue("name")).toBe("Bob");
@@ -321,10 +457,15 @@ describe("AttributeSetTest", () => {
 
   it("comparison for equality is correctly implemented", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const a = new Person({ name: "Alice" });
     const b = new Person({ name: "Alice" });
     expect(a.attributes).toEqual(b.attributes);
@@ -332,10 +473,15 @@ describe("AttributeSetTest", () => {
 
   it("==(other) is safe to use with any instance", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     const a = new Person({ name: "Alice" });
     expect(a.attributes).not.toBe(null);
     expect(a.attributes).not.toBe(undefined);
@@ -343,11 +489,16 @@ describe("AttributeSetTest", () => {
 
   it("#cast_types returns a hash of attribute types", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice", age: 25 });
     const types = p._attributes.castTypes();
     expect(types.name.name).toBe("string");
@@ -356,11 +507,16 @@ describe("AttributeSetTest", () => {
 
   it("#key? returns true for initialized attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     expect(p._attributes.isKey("name")).toBe(true);
     expect(p._attributes.isKey("age")).toBe(true);

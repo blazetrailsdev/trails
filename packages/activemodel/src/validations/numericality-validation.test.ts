@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
 import {
   assertPredicate,
@@ -5,12 +9,19 @@ import {
   BigDecimal,
   NumberHelper,
   Range,
+  include,
 } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Topic extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+  declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+  declare static defineAttributeMethod: AttributesClassHalf["defineAttributeMethod"];
+
   static {
+    include(this, Attributes);
     this.attribute("title", "string");
     this.attribute("content", "string");
     this.attribute("approved", "value");
@@ -41,12 +52,17 @@ class Topic extends Model {
     return this._attributes.getAttribute(attr).valueBeforeTypeCast;
   }
 }
+interface Topic extends Attributes {}
 
 class Person extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   static {
+    include(this, Attributes);
     this.attribute("karma", "value");
   }
 }
+interface Person extends Attributes {}
 
 class ActingAsNumeric {
   toF(): number {

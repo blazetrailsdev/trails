@@ -1,22 +1,38 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("ActiveModelI18nTests", () => {
   it("translated model attributes", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("first_name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     expect(Person.humanAttributeName("first_name")).toBe("First name");
   });
 
   it("translated model attributes with default", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     expect(Person.humanAttributeName("name")).toBe("Name");
   });
 

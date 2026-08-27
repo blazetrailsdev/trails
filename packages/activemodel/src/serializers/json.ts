@@ -28,7 +28,7 @@ export class JSON {
   /** @noRailsEquivalent PERMANENT */
   declare static moduleName?: string;
 
-  declare attributes: Record<string, unknown>;
+  declare readonly attributes: Record<string, unknown>;
 
   static [included](base: object): void {
     extend(base as { prototype: object }, Naming);

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { include, BigDecimal } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
 import { Model, Types } from "../index.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 const bd = (value: string) => new BigDecimal(value);
 
@@ -45,12 +46,15 @@ describe("DecimalTypeTrails", () => {
 
   it("treats a reverted decimal as unchanged", () => {
     class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         include(this, Dirty);
         this.attribute("price", "decimal");
       }
     }
-    interface MyModel extends Dirty {}
+    interface MyModel extends Attributes, Dirty {}
     const m = new MyModel({ price: "1.0" });
     m.changesApplied();
     m._writeAttribute("price", "1.0");

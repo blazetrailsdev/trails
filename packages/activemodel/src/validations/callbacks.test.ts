@@ -1,13 +1,22 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
+import { throwAbort, include } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Dog extends Model {
+  declare static attribute: AttributesClassHalf["attribute"];
+
   history: string[] = [];
   static {
+    include(this, Attributes);
     this.attribute("name", "string");
   }
 }
+interface Dog extends Attributes {}
 
 class DogValidatorWithOnCondition extends Dog {
   static {
@@ -59,7 +68,10 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
         this.beforeValidation(":setBeforeValidationMarker");
@@ -72,6 +84,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         order.push("after_validation");
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(order).toContain("before_validation");
@@ -81,7 +95,10 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called in declared order", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
           order.push("first_before");
@@ -97,6 +114,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(order.indexOf("first_before")).toBeLessThan(order.indexOf("second_before"));
@@ -106,7 +125,10 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("further callbacks should not be called if before validation throws abort", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
           order.push("before");
@@ -117,6 +139,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(order).toContain("before");
@@ -125,11 +149,16 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
 
   it("validation test should be done", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     expect(await p.isValid()).toBe(true);
     const p2 = new Person({});
@@ -188,13 +217,18 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("further callbacks should be called if before validation returns false", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation(() => {
           log.push("after");
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     await p.isValid();
     expect(log).toContain("after");
@@ -203,7 +237,10 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("further callbacks should be called if after validation returns false", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation(() => {
           log.push("first");
@@ -214,6 +251,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "test" });
     await p.isValid();
     expect(log).toContain("first");
@@ -244,7 +283,10 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called with proc", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
         this.beforeValidation((_r: any) => {
@@ -255,6 +297,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "Alice" });
     await p.isValid();
     expect(log).toContain("before_proc");
@@ -264,7 +308,10 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("if condition is respected for before validation", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(
           (_r: any) => {
@@ -274,6 +321,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
         );
       }
     }
+    interface Person extends Attributes {}
+
     const p1 = new Person({ name: "Alice" });
     await p1.isValid();
     expect(log).toEqual([]);

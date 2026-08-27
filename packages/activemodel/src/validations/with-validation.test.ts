@@ -1,6 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, vi } from "vitest";
 import { Model, Errors } from "../index.js";
 import { WithValidator } from "./with.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("ValidatesWithTest", () => {
   const ERROR_MESSAGE = "Validation error from validator";
@@ -19,11 +25,16 @@ describe("ValidatesWithTest", () => {
       }
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(CustomValidator, { minLength: 5 });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ name: "ab" });
     expect(await p.isValid()).toBe(false);
     const p2 = new Person({ name: "alice" });
@@ -46,13 +57,18 @@ describe("ValidatesWithTest", () => {
       }
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
         this.validatesWith(V1);
         this.validatesWith(V2);
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person();
     await p.isValid();
     expect(p.errors.count).toBe(2);
@@ -67,11 +83,16 @@ describe("ValidatesWithTest", () => {
       }
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(CustomValidator);
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
@@ -86,11 +107,16 @@ describe("ValidatesWithTest", () => {
       validate(_record: any) {}
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(CustomValidator, { custom: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(await p.isValid()).toBe(true);
   });
@@ -117,10 +143,15 @@ describe("ValidatesWithTest", () => {
       }
     }
     class Topic extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("title", "string");
       }
     }
+    interface Topic extends Attributes {}
+
     const topic = new Topic({});
     await topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatValidatesOptions, {
       field: "first_name",
@@ -130,10 +161,15 @@ describe("ValidatesWithTest", () => {
 
   it("each validator checks validity", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     Person.validatesEach(["name"], (record, attr, value) => {
       if (!value) record.errors.add(attr, ":blank");
     });
@@ -144,10 +180,15 @@ describe("ValidatesWithTest", () => {
 
   it("each validator expects attributes to be given", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     Person.validatesEach(["name"], (record, attr, value) => {
       if (!value) record.errors.add(attr, ":blank");
     });
@@ -158,10 +199,15 @@ describe("ValidatesWithTest", () => {
 
   it("each validator skip nil values if :allow_nil is set to true", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     Person.validatesEach(["name"], (record, attr, value) => {
       if (value !== null && value !== undefined && !value) {
         record.errors.add(attr, ":blank");
@@ -174,10 +220,15 @@ describe("ValidatesWithTest", () => {
 
   it("each validator skip blank values if :allow_blank is set to true", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface Person extends Attributes {}
+
     Person.validatesEach(["name"], (record, attr, value) => {
       if (value && typeof value === "string" && value.trim() === "") {
         return;
@@ -192,7 +243,10 @@ describe("ValidatesWithTest", () => {
 
   it("validates_with can validate with an instance method", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
       customValidation() {
@@ -201,6 +255,8 @@ describe("ValidatesWithTest", () => {
         }
       }
     }
+    interface Person extends Attributes {}
+
     Person.validate("customValidation");
     const p = new Person({});
     await p.isValid();
@@ -209,7 +265,10 @@ describe("ValidatesWithTest", () => {
 
   it("optionally pass in the attribute being validated when validating with an instance method", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
       checkName() {
@@ -218,6 +277,8 @@ describe("ValidatesWithTest", () => {
         }
       }
     }
+    interface Person extends Attributes {}
+
     Person.validate("checkName");
     const p = new Person({});
     await p.isValid();
@@ -226,11 +287,16 @@ describe("ValidatesWithTest", () => {
 
   it("validates_with each validator", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface Person extends Attributes {}
+
     Person.validatesEach(["name", "age"], (record, attr, value) => {
       if (value === null || value === undefined) {
         record.errors.add(attr, ":blank");
@@ -253,11 +319,16 @@ describe("ValidatesWithTest", () => {
       }
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(CustomValidator);
       }
     }
+    interface Person extends Attributes {}
+
     expect(await new Person({}).isValid()).toBe(false);
     expect(await new Person({ name: "Alice" }).isValid()).toBe(true);
   });
@@ -267,11 +338,16 @@ describe("ValidatesWithTest", () => {
       validate(_record: any) {}
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(PassValidator);
       }
     }
+    interface Person extends Attributes {}
+
     expect(await new Person({}).isValid()).toBe(true);
   });
 
@@ -291,7 +367,10 @@ describe("ValidatesWithTest", () => {
       }
     }
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.validatesWith(MinLenValidator, { minimum: 5, if: ":conditionIsTrue", foo: "bar" });
       }
@@ -299,6 +378,8 @@ describe("ValidatesWithTest", () => {
         return true;
       }
     }
+    interface Person extends Attributes {}
+
     expect(capturedOpts).toEqual({
       minimum: 5,
       if: ":conditionIsTrue",

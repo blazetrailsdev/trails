@@ -1,15 +1,24 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
-import { withIndifferentAccess } from "@blazetrails/activesupport";
+import { withIndifferentAccess, include } from "@blazetrails/activesupport";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("AccessTest", () => {
   class SliceModel extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
     static {
+      include(this, Attributes);
       this.attribute("name", "string");
       this.attribute("age", "integer");
       this.attribute("email", "string");
     }
   }
+  interface SliceModel extends Attributes {}
 
   it("slice", () => {
     const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });

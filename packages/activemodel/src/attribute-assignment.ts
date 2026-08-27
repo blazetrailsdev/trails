@@ -53,9 +53,9 @@ export function _assignAttribute(
       const result: unknown = method.call(this, v);
       return result instanceof Promise ? (result as Promise<void>) : undefined;
     }
-    const match = this.matchedAttributeMethod(setter);
+    const match = this.matchedAttributeMethod?.(setter);
     if (match) {
-      this.attributeMissing(match, v);
+      this.attributeMissing!(match, v);
       return;
     }
     throw new NoMethodError(
@@ -99,8 +99,8 @@ export interface AttributeAssignment {
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): Promise<void> | void;
-  matchedAttributeMethod(methodName: string): AttributeMethod | null;
-  attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
+  matchedAttributeMethod?(methodName: string): AttributeMethod | null;
+  attributeMissing?(match: AttributeMethod, ...args: unknown[]): unknown;
 }
 
 /**

@@ -4,7 +4,8 @@ import { Contexts } from "./contexts.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { encrypts } from "./encryptable-record.js";
-import { Model } from "@blazetrails/activemodel";
+import { AttributeRegistration, Model } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 import type { SchemeOptions } from "./scheme.js";
 
@@ -74,6 +75,10 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
     try {
       const modelClass = class extends Model {};
+      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
+      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
+      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
+      include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "isbn");
 
       expect(capturedKlass).toBe(modelClass);
@@ -96,6 +101,10 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       // Named class: filter key is "underscore(ClassName).attribute"
       class NamedPirate extends Model {}
       const modelClass = NamedPirate;
+      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
+      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
+      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
+      include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toContain("named_pirate.catchphrase");
@@ -117,6 +126,10 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       // Truly anonymous class (empty .name): filter key is just the attribute
       // name. Returned from a function so JS name inference doesn't kick in.
       const modelClass = (() => class extends Model {})();
+      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
+      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
+      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
+      include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toContain("catchphrase");
@@ -139,6 +152,10 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
     try {
       const modelClass = class extends Model {};
+      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
+      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
+      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
+      include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toEqual([]);
@@ -177,6 +194,10 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     try {
       class PaymentModel extends Model {}
       const modelClass = PaymentModel;
+      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
+      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
+      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
+      include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "card_number");
       encrypts.call(modelClass, "secret_token");
 

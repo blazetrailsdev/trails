@@ -9,12 +9,13 @@
  */
 
 import {
+  type AttributeSet,
   Model,
   MissingAttributeError,
   AttrNames,
   AttributeMethods,
 } from "@blazetrails/activemodel";
-import type { CodeGenerator } from "@blazetrails/activesupport";
+import { included, type CodeGenerator } from "@blazetrails/activesupport";
 import { completeHalfAccessor } from "./read.js";
 
 /**
@@ -27,12 +28,34 @@ export interface Write {
   _writeAttribute(name: string, value: unknown): void;
 }
 
+/** The host `include ActiveRecord::AttributeMethods::Write` needs. */
+interface WriteIncludeHost {
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+}
+
+/**
+ * `ActiveRecord::AttributeMethods::Write` — the module whose `included do` block
+ * (write.rb:9-11) declares the `=` writer pattern. Its instance methods are the
+ * `this`-typed functions below (CLAUDE.md, "Module mixins"), so the module
+ * object itself carries only the hook.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Write
+ */
+export const Write = {
+  [included](base: WriteIncludeHost): void {
+    base.attributeMethodSuffix("=", { parameters: "value" });
+  },
+};
+
+/** The `@attributes` bag `write_from_user` writes into (write.rb:36, :41). */
+type WriteRecord = Model & Write & { _attributes: AttributeSet };
+
 /**
  * Updates the attribute identified by `attrName` using the specified `value`.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Write#write_attribute (write.rb:31-38)
  */
-export function writeAttribute(this: Model, attrName: string, value: unknown): void {
+export function writeAttribute(this: WriteRecord, attrName: string, value: unknown): void {
   let name = (
     this.constructor as unknown as { resolveAttributeName(n: string): string }
   ).resolveAttributeName(String(attrName));
@@ -63,11 +86,10 @@ export function writeAttribute(this: Model, attrName: string, value: unknown): v
     }
   }
 
-  // write.rb:36 — `@attributes.write_from_user(name, value)`. `Model`'s
-  // `_writeAttribute` is that call plus trails' dirty bookkeeping; going through
+  // write.rb:36 — `@attributes.write_from_user(name, value)`. Going through
   // `this._writeAttribute` would instead re-enter
   // `HasReadonlyAttributes#_write_attribute`, a guard Rails does not run twice.
-  Model.prototype._writeAttribute.call(this, name, value);
+  this._attributes.writeFromUser(name, value);
 }
 
 /**
@@ -82,8 +104,9 @@ export function writeAttribute(this: Model, attrName: string, value: unknown): v
  *
  * Mirrors: ActiveRecord::AttributeMethods::Write#_write_attribute
  */
-export function _writeAttribute(this: Model, name: string, value: unknown): void {
-  Model.prototype._writeAttribute.call(this, name, value);
+export function _writeAttribute(this: WriteRecord, name: string, value: unknown): void {
+  // write.rb:41 — `@attributes.write_from_user(attr_name, value)`.
+  this._attributes.writeFromUser(name, value);
 }
 
 /**
@@ -113,7 +136,7 @@ export function setDefineMethodAttribute(
     writer: true,
   });
   const tempMethodName = AttributeMethods.ClassMethods.buildMangledName(methodName);
-  completeHalfAccessor(this, as, "set", function (this: Model, value: unknown) {
+  completeHalfAccessor(this, as, "set", function (this: WriteRecord, value: unknown) {
     this._writeAttribute(canonicalName, value);
   });
   owner.defineCachedMethod(
@@ -122,7 +145,7 @@ export function setDefineMethodAttribute(
     (batch) => {
       batch.push((mod) => {
         Object.defineProperty(mod, tempMethodName, {
-          value: function (this: Model, value: unknown) {
+          value: function (this: WriteRecord, value: unknown) {
             this._writeAttribute(canonicalName, value);
           },
           writable: true,

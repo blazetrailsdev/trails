@@ -6,15 +6,21 @@ import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { Serialization } from "../serialization.js";
 import { Model } from "../index.js";
+import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 describe("AcceptanceValidationTest", () => {
   it("eula", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("eula", "string");
         this.validates("eula", { acceptance: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ eula: "0" });
     expect(await p.isValid()).toBe(false);
     const p2 = new Person({ eula: "1" });
@@ -23,22 +29,32 @@ describe("AcceptanceValidationTest", () => {
 
   it("lazy attribute module included only once", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "boolean");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ terms: true });
     expect(await p.isValid()).toBe(true);
   });
 
   it("lazy attributes module included again if needed", async () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "boolean");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({ terms: false });
     await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
@@ -46,53 +62,78 @@ describe("AcceptanceValidationTest", () => {
 
   it("lazy attributes respond to?", () => {
     class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "boolean");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Person extends Attributes {}
+
     const p = new Person({});
     expect(p._attributes.isKey("terms")).toBe(true);
   });
 
   it("terms of service agreement no acceptance", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: "0" }).isValid()).toBe(false);
   });
 
   it("terms of service agreement", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: "1" }).isValid()).toBe(true);
   });
 
   it("terms of service agreement with accept value", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: { accept: ["yes", "I agree"] } });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: "yes" }).isValid()).toBe(true);
     expect(await new Terms({ terms: "no" }).isValid()).toBe(false);
   });
 
   it("terms of service agreement with multiple accept values", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: { accept: ["1", "yes", "true"] } });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: "1" }).isValid()).toBe(true);
     expect(await new Terms({ terms: "yes" }).isValid()).toBe(true);
     expect(await new Terms({ terms: "true" }).isValid()).toBe(true);
@@ -101,16 +142,28 @@ describe("AcceptanceValidationTest", () => {
 
   it("validates acceptance of true", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "boolean");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: true }).isValid()).toBe(true);
   });
 
   it("validates acceptance of for ruby class", async () => {
-    class Person extends Model {}
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+      }
+    }
+    interface Person extends Attributes {}
     Person.attribute("terms", "string");
     Person.validates("terms", { acceptance: true });
     const p = new Person({ terms: "no" });
@@ -121,22 +174,32 @@ describe("AcceptanceValidationTest", () => {
 
   it("validates acceptance with a scalar accept option", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: { accept: "yes" } });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: "yes" }).isValid()).toBe(true);
     expect(await new Terms({ terms: "y" }).isValid()).toBe(false);
   });
 
   it("validates acceptance with an iterable (Set) accept option", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: { accept: new Set(["yes", "ok"]) } });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({ terms: "yes" }).isValid()).toBe(true);
     expect(await new Terms({ terms: "ok" }).isValid()).toBe(true);
     expect(await new Terms({ terms: "no" }).isValid()).toBe(false);
@@ -144,6 +207,10 @@ describe("AcceptanceValidationTest", () => {
 
   it("setup! auto-defines attribute when not explicitly declared", async () => {
     class Agreement extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+
       static {
         this.validates("terms", { acceptance: true });
       }
@@ -158,13 +225,17 @@ describe("AcceptanceValidationTest", () => {
 
   it("setup! virtual attribute excluded from attributeNames and serialization", () => {
     class Agreement extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
+        include(this, Attributes);
         include(this, Serialization);
         this.attribute("name", "string");
         this.validates("terms", { acceptance: true });
       }
     }
-    interface Agreement extends Serialization {}
+    interface Agreement extends Attributes, Serialization {}
 
     expect(Agreement.attributeNames()).toContain("name");
     expect(Agreement.attributeNames()).not.toContain("terms");
@@ -176,22 +247,33 @@ describe("AcceptanceValidationTest", () => {
 
   it("setup! does not override explicitly declared attribute", () => {
     class Agreement extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "boolean");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Agreement extends Attributes {}
+
     expect(Agreement.attributeTypes()["terms"].name).toBe("boolean");
   });
 });
 describe("acceptance skips nil", () => {
   it("skips nil by default", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: true });
       }
     }
+    interface Terms extends Attributes {}
+
     expect(await new Terms({}).isValid()).toBe(true);
   });
 });
@@ -199,13 +281,18 @@ describe("acceptance skips nil", () => {
 describe("acceptance options pass-through", () => {
   it("passes custom interpolation vars through to errors.add", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", {
           acceptance: { accept: "yes", message: "must be %{kind}", kind: "accepted" },
         });
       }
     }
+    interface Terms extends Attributes {}
+
     const t = new Terms({ terms: "no" });
     await t.isValid();
     expect(t.errors.messagesFor("terms")).toContain("must be accepted");
@@ -213,11 +300,16 @@ describe("acceptance options pass-through", () => {
 
   it("reserved key accept does not appear in error options", async () => {
     class Terms extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("terms", "string");
         this.validates("terms", { acceptance: { accept: "yes" } });
       }
     }
+    interface Terms extends Attributes {}
+
     const t = new Terms({ terms: "no" });
     await t.isValid();
     expect(t.errors.count).toBeGreaterThan(0);

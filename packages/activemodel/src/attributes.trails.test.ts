@@ -1,13 +1,25 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
+   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
+   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { Model, ValueType } from "./index.js";
+import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { include } from "@blazetrails/activesupport";
 
 describe("Attributes#attribute_names", () => {
   class User extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+    declare static attributeNames: AttributesClassHalf["attributeNames"];
+    declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
     static {
+      include(this, Attributes);
       this.attribute("name", "string");
       this.attribute("token", "string");
     }
   }
+  interface User extends Attributes {}
 
   it("is the instance's @attributes keys, virtual attributes included", () => {
     expect(new User().attributeNames()).toEqual(["name", "token"]);
@@ -20,13 +32,18 @@ describe("Attributes#attribute_names", () => {
 
 describe("Attributes type casting and defaults", () => {
   class User extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+    declare static attributeNames: AttributesClassHalf["attributeNames"];
+
     static {
+      include(this, Attributes);
       this.attribute("name", "string");
       this.attribute("age", "integer", { default: 0 });
       this.attribute("score", "float");
       this.attribute("active", "boolean", { default: true });
     }
   }
+  interface User extends Attributes {}
 
   it("initializes with defaults", () => {
     const u = new User();
@@ -98,16 +115,24 @@ describe("Attributes type casting and defaults", () => {
   it("Proc default is called for each instance", () => {
     let counter = 0;
     class WithLambda extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("token", "string", { default: () => `tok_${++counter}` });
       }
     }
+    interface WithLambda extends Attributes {}
+
     expect(new WithLambda()._readAttribute("token")).toBe("tok_1");
     expect(new WithLambda()._readAttribute("token")).toBe("tok_2");
   });
 
   it("inheritance: children inherit parent attributes", () => {
     class Admin extends User {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
         this.attribute("role", "string", { default: "admin" });
       }
@@ -123,11 +148,16 @@ describe("Attributes type casting and defaults", () => {
 describe("attributesBeforeTypeCast", () => {
   it("returns all raw attribute values", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
     }
+    interface User extends Attributes {}
+
     const u = new User({ name: "Alice", age: "25" });
     const raw = u._attributes.valuesBeforeTypeCast();
     expect(raw.name).toBe("Alice");
@@ -139,23 +169,34 @@ describe("attributesBeforeTypeCast", () => {
 describe("typeForAttribute", () => {
   it(".type_for_attribute returns the default type when an unregistered attribute is specified", () => {
     class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("name", "string");
       }
     }
+    interface User extends Attributes {}
+
     expect(User.typeForAttribute("unknown")).toBeInstanceOf(ValueType);
   });
 });
 
 describe("Attributes", () => {
   class User extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+    declare static attributeNames: AttributesClassHalf["attributeNames"];
+
     static {
+      include(this, Attributes);
       this.attribute("name", "string");
       this.attribute("age", "integer", { default: 0 });
       this.attribute("score", "float");
       this.attribute("active", "boolean", { default: true });
     }
   }
+  interface User extends Attributes {}
 
   it("initializes with defaults", () => {
     const u = new User();
@@ -227,16 +268,24 @@ describe("Attributes", () => {
   it("Proc default is called for each instance", () => {
     let counter = 0;
     class WithLambda extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
       static {
+        include(this, Attributes);
         this.attribute("token", "string", { default: () => `tok_${++counter}` });
       }
     }
+    interface WithLambda extends Attributes {}
+
     expect(new WithLambda()._readAttribute("token")).toBe("tok_1");
     expect(new WithLambda()._readAttribute("token")).toBe("tok_2");
   });
 
   it("inheritance: children inherit parent attributes", () => {
     class Admin extends User {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeNames: AttributesClassHalf["attributeNames"];
+
       static {
         this.attribute("role", "string", { default: "admin" });
       }
