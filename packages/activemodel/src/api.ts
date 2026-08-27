@@ -7,6 +7,10 @@ import {
   _assignAttribute,
 } from "./attribute-assignment.js";
 import {
+  sanitizeForMassAssignment,
+  sanitizeForbiddenAttributes,
+} from "./forbidden-attributes-protection.js";
+import {
   Validations,
   ClassMethods as ValidationsClassMethods,
   contextForValidation,
@@ -48,12 +52,7 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 export function initialize(this: APIHost, attributes: Record<string, unknown> = {}): void {
   // AR's override of `_assign_attributes` can owe I/O; Rails' `initialize`
   // does not await it either — the writes drain on save (RFC 0087).
-  this._initializingAttributes = true;
-  try {
-    if (attributes != null) void this.assignAttributes(attributes);
-  } finally {
-    this._initializingAttributes = false;
-  }
+  if (attributes != null) void this.assignAttributes(attributes);
 }
 
 /**
@@ -77,13 +76,17 @@ export class API {
    *   end
    */
   static [included](base: IncludingClass): void {
-    // api.rb:61 — `include ActiveModel::AttributeAssignment`.
+    // api.rb:61 — `include ActiveModel::AttributeAssignment`, which itself
+    // includes `ForbiddenAttributesProtection` (attribute_assignment.rb:7);
+    // `include()` copies a module's own members, not its nested includes.
     include(base, {
       assignAttributes,
       setAttributes,
       attributeWriterMissing,
       _assignAttributes,
       _assignAttribute,
+      sanitizeForMassAssignment,
+      sanitizeForbiddenAttributes,
     });
 
     // api.rb:62 — `include ActiveModel::Validations`. Ruby's Concern brings
@@ -148,9 +151,21 @@ export interface API extends Conversion {
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): Promise<void> | void;
-
-  /** `include ActiveModel::Validations` (api.rb:62). */
+  /**
+   * `include ActiveModel::ForbiddenAttributesProtection`
+   * (attribute_assignment.rb:7).
+   *
+   * @internal
+   */
+  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
   /** @internal */
+  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+
+  /**
+   * `include ActiveModel::Validations` (api.rb:62).
+   *
+   * @internal
+   */
   contextForValidation(): ValidationContext;
   /** @internal */
   runValidationsBang(): Promise<boolean>;
@@ -190,11 +205,4 @@ export interface API extends Conversion {
 /** The host shape {@link initialize} assigns through. */
 interface APIHost {
   assignAttributes(newAttributes: unknown): Promise<void> | void;
-  /**
-   * True only while the constructor is assigning its initial attribute bag
-   * through `assign_attributes` (per-key setter dispatch). This flag lets the
-   * AR write path detect the window (e.g. composite-PK `id=` remap) without
-   * re-raising mid-construction.
-   */
-  _initializingAttributes: boolean;
 }

@@ -7,10 +7,6 @@ import {
 } from "./validations.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
-  sanitizeForMassAssignment as attrSanitize,
-  sanitizeForbiddenAttributes as forbiddenSanitize,
-} from "./forbidden-attributes-protection.js";
-import {
   Callbacks as ASCallbacks,
   defineCallbacks,
   runCallbacks,
@@ -128,17 +124,6 @@ export interface Model
   _writeAttribute(name: string, value: unknown): void;
   /** @internal */
   "attribute="(name: string, value: unknown): void;
-
-  /**
-   * The instance half of `include ActiveModel::ForbiddenAttributesProtection`
-   * (model.rb:12-14), installed by the `include(Model, …)` at the bottom of
-   * this file.
-   *
-   * @internal
-   */
-  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
-  /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
 
   /**
    * `ActiveModel::Attributes#attribute_names` (attributes.rb:146-148),
@@ -495,7 +480,12 @@ export class Model {
 
     this._attributes = ctor._defaultAttributes().deepDup();
 
-    apiInitialize.call(this, attrs);
+    this._initializingAttributes = true;
+    try {
+      apiInitialize.call(this, attrs);
+    } finally {
+      this._initializingAttributes = false;
+    }
 
     // Fire after_initialize callbacks. ActiveRecord intentionally uses the
     // duck-typed `_suppressInitializeCallback` hook during DB hydration so it
@@ -619,12 +609,6 @@ defineCallbacks(Model.prototype, "validation", {
 });
 
 include(Model, ToJsonWithActiveSupportEncoder);
-
-// model.rb:12-14 — `include ActiveModel::ForbiddenAttributesProtection`.
-include(Model, {
-  sanitizeForMassAssignment: attrSanitize,
-  sanitizeForbiddenAttributes: forbiddenSanitize,
-});
 
 // model.rb:44 — `include ActiveModel::Access`, the one thing `model.rb` does
 // beyond `include ActiveModel::API`.
