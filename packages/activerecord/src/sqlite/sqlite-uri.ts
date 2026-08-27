@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Rails leaves file:/:memory: handling to SQLITE_OPEN_URI inside the sqlite3 gem (sqlite3_adapter.rb:82); the JS drivers disagree about it, so trails resolves the URI itself.
+ */
+
+/**
  * True for SQLite in-memory database names per the SQLite URI spec
  * (https://www.sqlite.org/inmemorydb.html): `:memory:`, `file::memory:...`,
  * and named in-memory URIs whose query string carries a real `mode=memory`

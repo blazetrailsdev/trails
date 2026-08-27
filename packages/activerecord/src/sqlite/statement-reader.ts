@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Rails branches on stmt.column_count (sqlite3/database_statements.rb:38), which the drivers without column metadata do not expose, so the classification is approximated here.
+ */
+
+/**
  * Row-returning classification for drivers that cannot report a prepared
  * statement's real column count.
  *

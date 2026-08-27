@@ -37,20 +37,31 @@ import {
 
 /**
  * A whole file with no Rails counterpart carries ONE `@noRailsEquivalent` in a
- * JSDoc block above the imports, and it covers every otherwise-extra name in
- * the file (`fileLevelNoRailsEquivalentReason` in extract-ts-api.ts). Read it
- * the same way the extractor does — only when the first statement is an import,
- * since a block above a declaration is that declaration's own doc block.
+ * JSDoc block at the top, and it covers every otherwise-extra name in the file
+ * (`fileLevelNoRailsEquivalentReason` in extract-ts-api.ts). Read it the same
+ * way the extractor does — from a block above the imports, or from a DETACHED
+ * block (one a blank line separates from what follows). A block written
+ * directly above a declaration is that declaration's own doc block and is NOT
+ * file-level, which is the invariant the blank line preserves.
  */
 function hasFileLevelReceipt(sourceCode) {
   const first = sourceCode.ast.body[0];
-  if (!first || first.type !== "ImportDeclaration") return false;
-  return sourceCode
+  if (!first) return false;
+  const comments = sourceCode
     .getCommentsBefore(first)
-    .some(
-      (c) =>
-        c.type === "Block" && c.value.startsWith("*") && c.value.includes("@noRailsEquivalent"),
-    );
+    .filter((c) => c.type === "Block" && c.value.startsWith("*"));
+  if (comments.length === 0) return false;
+  if (first.type === "ImportDeclaration") {
+    return comments.some((c) => c.value.includes("@noRailsEquivalent"));
+  }
+  const followedBy = [...comments.slice(1), first];
+  for (let i = comments.length - 1; i >= 0; i--) {
+    // A blank line between the block and what follows means TypeScript binds it
+    // to nothing, so reading it as file-level widens no declaration's doc.
+    if (followedBy[i].loc.start.line - comments[i].loc.end.line < 2) continue;
+    return comments[i].value.includes("@noRailsEquivalent");
+  }
+  return false;
 }
 
 function check(context, node, name) {

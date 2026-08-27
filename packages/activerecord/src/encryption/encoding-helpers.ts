@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Ruby strings carry an Encoding object and re-encode with String#encode (encryption/encryptor.rb:112); JS strings carry none, so the encoding arms are modelled here.
+ */
+
+/**
  * Shared encoding normalization helpers used by Encryptor and
  * EncryptedAttributeType for deterministic encryption.
  */

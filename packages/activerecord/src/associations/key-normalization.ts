@@ -1,3 +1,7 @@
+/**
+ * @noRailsEquivalent PERMANENT Ruby's Integer == is width-agnostic (association_scope.rb:83); node-postgres splits an owner PK and a child FK across BigInt and number, so the port needs an explicit fold.
+ */
+
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 

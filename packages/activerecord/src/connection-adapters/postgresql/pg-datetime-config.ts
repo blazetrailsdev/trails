@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Rails keeps the datetime_type alias on the adapter class itself (postgresql_adapter.rb:87); TS cannot mutate a class-level type registry from the dumper, so the alias lives in its own module.
+ */
+
+/**
  * Shared mutable reference to PostgreSQLAdapter.datetimeType.
  * Mirrors: PostgreSQLAdapter.datetime_type class_attribute (default: :timestamp).
  * Stored here to break the circular import that would arise if OID::DateTime

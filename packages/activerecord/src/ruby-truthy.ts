@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Ruby truthiness is a language primitive JS disagrees with for "", 0 and NaN, so a ported `if x` guard cannot be a bare JS truthiness test (finder_methods.rb:110).
+ */
+
+/**
  * Ruby truthiness, for ports of Ruby conditionals.
  *
  * This has no Rails counterpart — it's a language primitive we have to model

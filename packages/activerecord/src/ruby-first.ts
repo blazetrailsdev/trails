@@ -1,4 +1,8 @@
 /**
+ * @noRailsEquivalent PERMANENT Ruby core Array#first, modelled so a ported body emits a call rather than an index read and the call-set gate can credit it (association_scope.rb:115).
+ */
+
+/**
  * Ruby `Array#first`, for ports of Ruby collection readers.
  *
  * This has no Rails counterpart — `Array#first` is Ruby core, the same way the
