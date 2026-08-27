@@ -22,6 +22,9 @@ import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
 import railsFileStructureMethodOrder, {
   isManifestAvailable as railsFileStructureManifestAvailable,
 } from "./eslint/rails-file-structure-method-order.mjs";
+import railsTestNameParity, {
+  isManifestAvailable as railsTestNamesManifestAvailable,
+} from "./eslint/rails-test-name-parity.mjs";
 import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
@@ -46,6 +49,18 @@ import { readFileSync } from "node:fs";
 // data the rule passes every file, so we register it only when the manifest
 // has data, and announce the skip instead of pretending to enforce.
 const railsFileStructureManifestReady = railsFileStructureManifestAvailable();
+// Same contract for rails-test-name-parity: without the Rails test names the
+// rule accepts every test, so it registers only where the manifest is real.
+const railsTestNamesManifestReady = railsTestNamesManifestAvailable();
+if (!railsTestNamesManifestReady) {
+  console.warn(
+    "[eslint.config] rails-test-name-parity NOT registered: " +
+      "eslint/rails-test-names.json has no Rails test names " +
+      "(run scripts/test-compare/extract-ruby-tests.rb, then " +
+      "`pnpm tsx scripts/build-rails-test-names-manifest.ts`). Test-name parity " +
+      "is enforced by the Rails API/Test Comparison CI job, not this run.",
+  );
+}
 if (!railsFileStructureManifestReady) {
   console.warn(
     "[eslint.config] rails-file-structure-method-order NOT registered: " +
@@ -249,6 +264,7 @@ export default defineConfig(
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
+          "rails-test-name-parity": railsTestNameParity,
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
           "require-table-teardown": requireTableTeardown,
@@ -412,6 +428,18 @@ export default defineConfig(
     },
   },
 
+  // arel's enrollment carries one extra ignore: `test-helpers/` mirrors Rails'
+  // `test/` tree, which the error-class manifest never reads, so its throws
+  // (assertion failures, test-double guards) have no ported class to reach for.
+  // Kept as its own block so the three packages above stay strictly gated.
+  {
+    files: ["packages/arel/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
+    rules: {
+      "blazetrails/rails-error-parity": "error",
+    },
+  },
+
   // ── rails-callback-invocations: a ported ActiveRecord method whose Rails
   //    counterpart fires lifecycle callbacks (`_run_<event>_callbacks` /
   //    `run_callbacks(:event)`) must keep firing them via
@@ -483,6 +511,22 @@ export default defineConfig(
           ignores: ["**/*.test.ts"],
           rules: {
             "blazetrails/rails-file-structure-method-order": "error",
+          },
+        },
+      ]
+    : []),
+
+  // ── rails-test-name-parity (per-package rollout, only-shrink) ──
+  // Every non-skipped test in a Rails-named test file must carry a Rails test
+  // name; TS-only tests belong in the file's `.trails.test.ts` twin. Marks in
+  // `eslint/rails-test-name-parity-mark.json` carry today's extras and only
+  // shrink (`pnpm parity:test:names:tighten`).
+  ...(railsTestNamesManifestReady
+    ? [
+        {
+          files: ["packages/arel/src/**/*.test.ts"],
+          rules: {
+            "blazetrails/rails-test-name-parity": "error",
           },
         },
       ]
@@ -759,7 +803,7 @@ export default defineConfig(
   //    inline `eslint-disable`. Disabling the rule must itself be an error —
   //    fix the `any`. No allowlist; applies to src and tests. ──
   {
-    files: ["packages/activerecord/src/**/*.ts"],
+    files: ["packages/activerecord/src/**/*.ts", "packages/arel/src/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
     },

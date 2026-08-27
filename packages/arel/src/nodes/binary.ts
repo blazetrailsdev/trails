@@ -12,6 +12,7 @@ import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 import type { SelectManager } from "../select-manager.js";
 import type { Table } from "../table.js";
+import { ArelError } from "../errors.js";
 
 // `ModelAttribute` is not an Arel node but occupies node slots in Rails:
 // `build_quoted` returns one unwrapped into the AST (casted.rb:50), and both
@@ -173,7 +174,7 @@ export class As extends Binary {
   /** Mirrors: `Arel::Nodes::As#to_cte` (binary.rb:43-45) — `Cte.new(left.name, right)`. */
   toCte(): Cte {
     if (!cteFactory) {
-      throw new Error(
+      throw new ArelError(
         'As.toCte() requires the Cte factory registry. Import from "@blazetrails/arel" instead of deep-importing node classes.',
       );
     }
@@ -187,7 +188,7 @@ export class Between extends Binary {}
 export class NotEqual extends Binary {
   invert(): Node {
     if (!_Equality) {
-      throw new Error(
+      throw new ArelError(
         'NotEqual.invert() requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.',
       );
     }
@@ -234,7 +235,7 @@ export class IsNotDistinctFrom extends Binary {
 export class NotIn extends Binary {
   invert(): Node {
     if (!_In) {
-      throw new Error(
+      throw new ArelError(
         'NotIn.invert() requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.',
       );
     }

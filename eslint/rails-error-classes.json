@@ -691,6 +691,28 @@
         "parent": "StandardError",
         "rubyFile": "active_support/message_pack/extensions.rb"
       }
+    ],
+    "arel": [
+      {
+        "name": "ArelError",
+        "parent": "StandardError",
+        "rubyFile": "arel/errors.rb"
+      },
+      {
+        "name": "BindError",
+        "parent": "ArelError",
+        "rubyFile": "arel/errors.rb"
+      },
+      {
+        "name": "EmptyJoinError",
+        "parent": "ArelError",
+        "rubyFile": "arel/errors.rb"
+      },
+      {
+        "name": "UnsupportedVisitError",
+        "parent": "StandardError",
+        "rubyFile": "arel/visitors/to_sql.rb"
+      }
     ]
   }
 }

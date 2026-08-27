@@ -25,6 +25,7 @@ scripts/api-compare/.rails-source
 # Generated from rails-api.json by scripts/build-rails-privates-manifest.ts
 eslint/rails-private-methods.json
 eslint/rails-file-structure-method-order.json
+eslint/rails-test-names.json
 .claude/skills
 
 .claude/scheduled_tasks.lock

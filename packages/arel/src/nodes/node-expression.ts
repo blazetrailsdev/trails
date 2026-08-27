@@ -1,5 +1,6 @@
 import { Node } from "./node.js";
 import { _buildQuoted } from "../node-slots.js";
+import { ArelError } from "../errors.js";
 
 /**
  * NodeExpression — common base for Arel nodes that behave as expressions
@@ -32,7 +33,7 @@ export abstract class NodeExpression extends Node {
    */
   quotedNode(other: unknown): Node {
     if (_buildQuoted) return _buildQuoted(other, this);
-    throw new Error(
+    throw new ArelError(
       'NodeExpression.quotedNode called before buildQuoted was registered. Import from "@blazetrails/arel" so Arel package initialization runs and wires node registries.',
     );
   }

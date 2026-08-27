@@ -4,6 +4,7 @@ import { cloneSlot, objectClone } from "./clone-support.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
+import { ArelError } from "./errors.js";
 
 /**
  * Methods from Arel::TreeManager::StatementMethods — mixed into
@@ -68,7 +69,7 @@ export abstract class TreeManager {
   toDot(): string {
     const collector = new PlainString();
     if (!_Dot) {
-      throw new Error(
+      throw new ArelError(
         'TreeManager#toDot requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing tree-manager.',
       );
     }

@@ -25,7 +25,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
   if (other && typeof other === "object") {
     if (_Attribute && other instanceof _Attribute) return other as Node;
-    if (_Table && other instanceof _Table) return other as Node;
+    if (_Table && other instanceof _Table) return other as unknown as Node;
     // Rails: casted.rb:50-51 — the `when ..., ActiveModel::Attribute` arm
     // returning `other` unwrapped. `visit_ActiveModel_Attribute`
     // (to_sql.rb:756) is what lands its value as a bind.
@@ -33,8 +33,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     const maybeAst = (other as { ast?: unknown }).ast;
     if (maybeAst instanceof Node) return other as Node;
   }
-  if (_Attribute && attribute instanceof _Attribute)
-    return new Casted(other, attribute as Attribute);
+  if (_Attribute && attribute instanceof _Attribute) return new Casted(other, attribute);
   return new Quoted(other);
 }
 

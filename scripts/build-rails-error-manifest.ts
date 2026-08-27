@@ -18,10 +18,10 @@ import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
-// All three packages are scanned (per the story) for a complete error
-// inventory; the rule currently enforces only the activerecord/activemodel
-// subset, so the activesupport entries await a future scope widening.
-const PACKAGES = ["activerecord", "activemodel", "activesupport"] as const;
+// Every enrolled package is scanned for a complete error inventory. `arel`
+// has no gem of its own — Rails vendors it under `activerecord/lib/arel` —
+// so it shares activerecord's lib tree and is separated by `PKG_NS`.
+const PACKAGES = ["activerecord", "activemodel", "activesupport", "arel"] as const;
 type Pkg = (typeof PACKAGES)[number];
 
 // Each package's own Ruby lib namespace. The closure runs over the whole lib
@@ -31,6 +31,17 @@ const PKG_NS: Record<Pkg, string> = {
   activerecord: "active_record/",
   activemodel: "active_model/",
   activesupport: "active_support/",
+  arel: "arel/",
+};
+
+// Arel has no gem of its own — Rails vendors it under
+// `activerecord/lib/arel`, so it scans activerecord's lib and is separated
+// from activerecord by `PKG_NS` alone.
+const PKG_GEM: Record<Pkg, string> = {
+  activerecord: "activerecord",
+  activemodel: "activemodel",
+  activesupport: "activesupport",
+  arel: "activerecord",
 };
 
 // Ruby exception bases that root our error hierarchy. A `class X < Base`
@@ -79,7 +90,7 @@ function lastSegment(qualified: string): string {
 }
 
 async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
-  const libDir = path.join(ROOT, "vendor/rails", pkg, "lib");
+  const libDir = path.join(ROOT, "vendor/rails", PKG_GEM[pkg], "lib");
   const files = await walkRubyFiles(libDir);
 
   // Pass 1: collect every `class X < Y` declaration with its source file.
@@ -138,7 +149,7 @@ async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
   const byName = new Map<string, ErrorClass>();
   for (const d of decls) {
     if (!known.has(d.name)) continue;
-    if (!d.rubyFile.startsWith(PKG_NS[pkg])) continue; // skip vendored foreign libs (Arel)
+    if (!d.rubyFile.startsWith(PKG_NS[pkg])) continue; // keep each package to its own namespace
     const existing = byName.get(d.name);
     if (existing && !d.fromErrorsFile) continue;
     byName.set(d.name, { name: d.name, parent: d.parent, rubyFile: d.rubyFile });
