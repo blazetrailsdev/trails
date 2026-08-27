@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import * as AttributeMethods from "./attribute-methods.js";
 import { Dirty, asJson as dirtyAsJson, initializeDup as dirtyInitializeDup } from "./dirty.js";
+import { API } from "./api.js";
 
 /**
  * The ivar table Ruby's `@name` / `@color` / `@size` / `@status` live in. A JS
@@ -26,13 +27,7 @@ const ivars = Symbol("ivars");
  * of `mutations_from_database` (dirty.rb:382-388) and tracks through
  * `ActiveModel::ForcedMutationTracker`, which is what this file exercises.
  *
- * The `include ActiveModel::API` half (dirty_test.rb:7) is not wired below:
- * trails' `api.ts` exports no instance-method bundle to `include()` — `Model`
- * carries that surface. Nothing in the file reaches it. The one member of it a
- * ported body could have needed is `initialize`, and the fixture overrides
- * that one (dirty_test.rb:11-17) without calling `super`, so `assign_attributes`
- * never runs; API's remaining surface (`persisted?`, `Conversion`, `Naming`)
- * would be present on the Ruby instance and is simply unexercised here. What IS wired is `AttributeMethods`, which Ruby gets
+ Also wired is `AttributeMethods`, which Ruby gets
  * from `Dirty`'s own `include ActiveModel::AttributeMethods` (dirty.rb:125);
  * trails' `include()` copies a module's own members, not its nested includes.
  *
@@ -140,7 +135,7 @@ class DirtyModel {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-interface DirtyModel extends Dirty {
+interface DirtyModel extends API, Dirty {
   [ivars]: Record<string, unknown>;
   name: unknown;
   color: unknown;
@@ -161,6 +156,9 @@ interface DirtyModel extends Dirty {
   restoreName(): void;
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
+
+// `include ActiveModel::API` (dirty_test.rb:7).
+include(DirtyModel, API);
 
 // `include ActiveModel::AttributeMethods`, which `define_attribute_methods`
 // and every `*_will_change!` come from (attribute_methods.rb:73).

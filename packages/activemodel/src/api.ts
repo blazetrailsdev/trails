@@ -1,84 +1,200 @@
+import { extend, include, included } from "@blazetrails/activesupport";
+import {
+  assignAttributes,
+  setAttributes,
+  attributeWriterMissing,
+  _assignAttributes,
+  _assignAttribute,
+} from "./attribute-assignment.js";
+import {
+  Validations,
+  ClassMethods as ValidationsClassMethods,
+  contextForValidation,
+  runValidationsBang,
+  raiseValidationError,
+  readAttributeForValidation,
+  freeze,
+  type ValidationContext,
+} from "./validations.js";
+import type { AttrNameArg } from "./validations/helper-methods.js";
+import {
+  ClassMethods as WithClassMethods,
+  validatesWith as withValidatesWith,
+} from "./validations/with.js";
+import * as Validates from "./validations/validates.js";
+import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import { Naming } from "./naming.js";
+import { Translation } from "./translation.js";
+
+/** The class Ruby's `included(base)` hook receives (api.rb:65). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
+
 /**
- * API mixin — minimal interface for models that need to work with
- * ActionPack but don't need the full ActiveRecord stack.
+ * Mirrors: ActiveModel::API#initialize (api.rb:78-81)
  *
- * Mirrors: ActiveModel::API
+ *   def initialize(attributes = {})
+ *     assign_attributes(attributes) if attributes
+ *     super()
+ *   end
  *
- * A class that includes API gets:
- *   - constructor that accepts a hash of attributes
- *   - persisted? (always false for ActiveModel)
- *
- * Model already implements this; this interface codifies the contract.
+ * Ruby's `initialize` on an included module runs as part of the host's
+ * constructor chain via `super`; TypeScript has no expression for that —
+ * `include()` copies prototype members and cannot install a constructor — so
+ * the port keeps the Rails name as an exported function each including class
+ * calls from its own constructor, the same shape
+ * `ActiveSupport::Messages::Rotator#initialize` already uses.
  */
-export interface API {
-  isPersisted(): boolean;
+export function initialize(this: APIHost, attributes: Record<string, unknown> = {}): void {
+  // AR's override of `_assign_attributes` can owe I/O; Rails' `initialize`
+  // does not await it either — the writes drain on save (RFC 0087).
+  this._initializingAttributes = true;
+  try {
+    if (attributes != null) void this.assignAttributes(attributes);
+  } finally {
+    this._initializingAttributes = false;
+  }
 }
 
-import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
-import {
-  initInternals as validationsInitInternals,
-  contextForValidation as validationsContextForValidation,
-  runValidationsBang as validationsRunValidationsBang,
-  raiseValidationError as validationsRaiseValidationError,
-} from "./validations.js";
-import { HelperMethods } from "./validations/helper-methods.js";
-import {
-  _assignAttributes as attrAssign,
-  _assignAttribute as attrAssignOne,
-} from "./attribute-assignment.js";
-import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
+/**
+ * Mirrors: ActiveModel::API (api.rb:58-98) — the Concern any class becomes a
+ * model with, by `include ActiveModel::API` (api.rb:14-17). A class module
+ * rather than a plain object because `include()`'s class branch is what carries
+ * accessor descriptors across the mixin.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
+export class API {
+  /**
+   * Mirrors: api.rb:60-68
+   *
+   *   include ActiveModel::AttributeAssignment
+   *   include ActiveModel::Validations
+   *   include ActiveModel::Conversion
+   *
+   *   included do
+   *     extend ActiveModel::Naming
+   *     extend ActiveModel::Translation
+   *   end
+   */
+  static [included](base: IncludingClass): void {
+    // api.rb:61 — `include ActiveModel::AttributeAssignment`.
+    include(base, {
+      assignAttributes,
+      setAttributes,
+      attributeWriterMissing,
+      _assignAttributes,
+      _assignAttribute,
+    });
+
+    // api.rb:62 — `include ActiveModel::Validations`. Ruby's Concern brings
+    // `ClassMethods` (validations.rb:57-307) along; `validations/with.rb:87`
+    // and `validations/validates.rb:110` reopen the same module, hence the
+    // further extends.
+    extend(base, ValidationsClassMethods);
+    extend(base, WithClassMethods);
+    extend(base, {
+      validates: Validates.validates,
+      validatesBang: Validates.validatesBang,
+      _validatesDefaultKeys: Validates._validatesDefaultKeys,
+      _parseValidatesOptions: Validates._parseValidatesOptions,
+    });
+    // The module's own `included do` block (validations.rb:40-50) runs from
+    // its `[included]` hook.
+    include(base, Validations);
+    include(base, {
+      contextForValidation,
+      runValidationsBang,
+      raiseValidationError,
+      readAttributeForValidation,
+      freeze,
+      validatesWith: withValidatesWith,
+    });
+
+    // api.rb:63 — `include ActiveModel::Conversion` and its `ClassMethods`
+    // half (conversion.rb:105-118); the `included do` block (:28-33) rides
+    // along from the module's own hook.
+    include(base, Conversion);
+    extend(base, ConversionClassMethods);
+
+    // api.rb:66-67 — the `included do` block. The `Naming.extended` hook
+    // (naming.rb:253-256) installs the instance delegate.
+    extend(base, Naming);
+    extend(base, Translation);
+  }
+
+  /**
+   * Mirrors: ActiveModel::API#persisted? (api.rb:95-97) — indicates if the
+   * model is persisted. Default is +false+.
+   */
+  isPersisted(): boolean {
+    return false;
+  }
+}
 
 /**
- * Rails: ActiveModel::API includes Validations (api.rb), so the
- * Validations private surface is part of API as well. Re-export the
- * canonical helpers so api-compare matches the shape of `api.rb` and
- * a host that mixes in only API still has the hooks.
- *
- * @internal Rails-private helper.
+ * The instance surface `include ActiveModel::API` contributes: the members of
+ * `AttributeAssignment`, `Validations` and `Conversion` (api.rb:61-63), plus
+ * `persisted?` (api.rb:95-97). `Conversion` and `Naming` arrive through the
+ * class modules themselves; the rest are declared here because `Included<>`
+ * cannot derive an accessor's type across the mixin.
  */
-export const initInternals = validationsInitInternals;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
+export interface API extends Conversion {
+  /** `include ActiveModel::AttributeAssignment` (api.rb:61). */
+  assignAttributes(newAttributes: unknown): Promise<void> | void;
+  setAttributes(newAttributes: unknown): Promise<void> | void;
+  attributeWriterMissing(name: string, value: unknown): void;
+  /** @internal */
+  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  /** @internal */
+  _assignAttribute(k: string, v: unknown): Promise<void> | void;
 
-/**
- * @internal Rails-private helper.
- */
-export const contextForValidation = validationsContextForValidation;
+  /** `include ActiveModel::Validations` (api.rb:62). */
+  /** @internal */
+  contextForValidation(): ValidationContext;
+  /** @internal */
+  runValidationsBang(): Promise<boolean>;
+  raiseValidationError(): never;
+  readAttributeForValidation(attribute: string): unknown;
+  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
+  readonly validationContext: string | string[] | null;
+  /** @internal */
+  _validationContext: string | string[] | null;
+  /** @internal */
+  _runValidateCallbacks(): Promise<void>;
+  freeze(): this;
 
-/**
- * @internal Rails-private helper.
- */
-export const runValidationsBang = validationsRunValidationsBang;
+  /**
+   * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
+   * and the instance `validates_*_of` shorthands `Validations.[included]`
+   * mixes in (validations.rb:46). The instance `validates_with` is async
+   * (RFC 0063), so these settle where Ruby's return straight away.
+   */
+  validatesWith: typeof withValidatesWith;
+  validatesPresenceOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesAbsenceOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesLengthOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesSizeOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesNumericalityOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesInclusionOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesExclusionOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesFormatOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesAcceptanceOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesConfirmationOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesComparisonOf(...attrNames: AttrNameArg[]): Promise<void>;
+}
 
-/**
- * @internal Rails-private helper.
- */
-export const raiseValidationError = validationsRaiseValidationError;
-
-/**
- * @internal Rails-private helper.
- */
-export const _mergeAttributes = HelperMethods._mergeAttributes;
-
-/**
- * @internal Rails-private helper.
- */
-export const _assignAttributes = attrAssign;
-
-/**
- * @internal Rails-private helper.
- */
-export const _assignAttribute = attrAssignOne;
-
-/**
- * @internal Rails-private helper.
- */
-export const sanitizeForMassAssignment = attrSanitize;
-
-/**
- * Rails: ActiveModel::API includes Validations, which extends Translation,
- * so `API.raise_on_missing_translations` reaches the Translation singleton
- * accessor (translation.rb:25). Surface the same accessor here so callers
- * can read/write it via `API.raiseOnMissingTranslations(...)`.
- */
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  return translationRaise(value);
+/** The host shape {@link initialize} assigns through. */
+interface APIHost {
+  assignAttributes(newAttributes: unknown): Promise<void> | void;
+  /**
+   * True only while the constructor is assigning its initial attribute bag
+   * through `assign_attributes` (per-key setter dispatch). This flag lets the
+   * AR write path detect the window (e.g. composite-PK `id=` remap) without
+   * re-raising mid-construction.
+   */
+  _initializingAttributes: boolean;
 }
