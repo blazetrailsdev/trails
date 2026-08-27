@@ -26,11 +26,6 @@ export async function dumpTemplateSchemaCache(
   pool: unknown,
   runToken: string,
 ): Promise<{ filename: string; fingerprint: string } | null> {
-  // The raw cache, not the bound handle: the fingerprint below is taken off
-  // `marshal_dump` (schema_cache.rb:416-418), which Rails puts on `SchemaCache`
-  // alone — `BoundSchemaReflection` (schema_cache.rb:150-200) has no such
-  // reader to forward to, so there is no one-arg form of this read to converge
-  // onto in either language.
   const cache = adapter.internalSchemaCache;
   if (!cache) return null;
   await cache.addAll(pool);
