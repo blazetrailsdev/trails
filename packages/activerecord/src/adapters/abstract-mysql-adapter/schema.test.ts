@@ -9,11 +9,13 @@ import {
   MYSQL_TEST_URL,
 } from "./test-helper.js";
 import { Base } from "../../base.js";
+
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
   });
+
   describe("SchemaTest", () => {
     it("float limits", async () => {
       // On MariaDB a bare FLOAT is normalized to DOUBLE in information_schema.columns
@@ -170,6 +172,7 @@ describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
     await ansi?.close();
     ansi = undefined;
   });
+
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
     // Rails reads the canonical `topics` its schema load laid; trails'

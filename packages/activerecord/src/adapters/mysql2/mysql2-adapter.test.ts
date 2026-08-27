@@ -177,34 +177,10 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("errors for bigint fks on integer pk table in alter table", async () => {
-    const error = await adapter
-      .addReference("engines", "old_car")
-      .then(() => adapter.addForeignKey("engines", "old_cars"))
-      .then(() => null)
-      .catch((e) => e);
-
-    expect(error).toBeInstanceOf(MismatchedForeignKey);
-    expect(error.message).toMatch(
-      /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
-    );
-    expect(error.message).toMatch(/which has type `int/i);
-    expect(error.message).toMatch(
-      /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
-    );
-    expect(error.cause).toBeInstanceOf(Error);
-    expect(error.connectionPool).toBe(adapter.pool);
-
-    // Rails: `ensure @conn.execute("ALTER TABLE engines DROP COLUMN old_car_id") rescue nil`
-    await adapter.executeMutation("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
-  });
-
-  // Rails: `skip "MariaDB does not return mismatched foreign key in error message" if @conn.mariadb?`
-  it.skipIf(isMariaDb)(
-    "errors for multiple fks on mismatched types for pk table in alter table",
-    async () => {
+    try {
       const error = await adapter
-        .addReference("engines", "person", { foreignKey: true })
-        .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
+        .addReference("engines", "old_car")
+        .then(() => adapter.addForeignKey("engines", "old_cars"))
         .then(() => null)
         .catch((e) => e);
 
@@ -213,13 +189,41 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
       );
       expect(error.message).toMatch(/which has type `int/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
+      );
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
+    } finally {
+      // Rails: `ensure @conn.execute("ALTER TABLE engines DROP COLUMN old_car_id") rescue nil`
+      await adapter.executeMutation("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
+    }
+  });
 
-      // Rails' `ensure` block: `@conn.remove_reference(:engines, :person)` /
-      // `@conn.remove_reference(:engines, :old_car)`.
-      await adapter.removeReference("engines", "person");
-      await adapter.removeReference("engines", "old_car");
+  // Rails: `skip "MariaDB does not return mismatched foreign key in error message" if @conn.mariadb?`
+  it.skipIf(isMariaDb)(
+    "errors for multiple fks on mismatched types for pk table in alter table",
+    async () => {
+      try {
+        const error = await adapter
+          .addReference("engines", "person", { foreignKey: true })
+          .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
+          .then(() => null)
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(MismatchedForeignKey);
+        expect(error.message).toMatch(
+          /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+        );
+        expect(error.message).toMatch(/which has type `int/i);
+        expect(error.cause).toBeInstanceOf(Error);
+        expect(error.connectionPool).toBe(adapter.pool);
+      } finally {
+        // Rails' `ensure` block: `@conn.remove_reference(:engines, :person)` /
+        // `@conn.remove_reference(:engines, :old_car)`.
+        await adapter.removeReference("engines", "person");
+        await adapter.removeReference("engines", "old_car");
+      }
     },
   );
 
