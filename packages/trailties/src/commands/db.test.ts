@@ -1081,7 +1081,12 @@ describe("db subcommand CLI actions", () => {
 
   it("db version prints 0 against a fresh database", async () => {
     await runDb(["version"]);
-    expect(logs).toContain("Current version: 0");
+    // Three puts, mirroring databases.rake:309-312: a leading blank line plus
+    // the `database:` header, the version line, and a trailing blank line.
+    const at = logs.indexOf("Current version: 0");
+    expect(at).toBeGreaterThan(0);
+    expect(logs[at - 1]).toMatch(/^\ndatabase: /);
+    expect(logs[at + 1]).toBe("");
   });
 
   it("db abort_if_pending_migrations is a no-op when no migrations exist", async () => {

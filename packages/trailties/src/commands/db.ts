@@ -771,11 +771,13 @@ export function dbCommand(): Command {
     .description("Print the current schema version")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, prefix }) => {
+      await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
         // `pool.migration_context.current_version` (`databases.rake:311`),
         // whose nil — a NoDatabaseError — interpolates to nothing.
         const version = (await migrationContextFor(adapter, []).currentVersion()) ?? "";
+        console.log(`\n${prefix}database: ${config.database}`);
         console.log(`${prefix}Current version: ${version}`);
+        console.log();
       });
     });
 

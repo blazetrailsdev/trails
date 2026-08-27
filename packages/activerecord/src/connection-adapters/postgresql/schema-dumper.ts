@@ -244,7 +244,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
       (adapter?.exclusionConstraints ? await adapter.exclusionConstraints(table) : []);
     this._cachedExclConstraints = undefined;
     if (constraints.length === 0) return;
-    const stripped = this.removePrefixAndSuffix(table);
     const stmts = constraints.map((ec) => {
       const opts: string[] = [];
       if (ec.where) opts.push(`where: ${JSON.stringify(ec.where)}`);
@@ -252,7 +251,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       if (ec.deferrable) opts.push(`deferrable: ${JSON.stringify(ec.deferrable)}`);
       if (ec.exportNameOnSchemaDump()) opts.push(`name: ${JSON.stringify(ec.name)}`);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      return `  await ctx.addExclusionConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(ec.expression)}${optStr});`;
+      return `    t.exclusionConstraint(${JSON.stringify(ec.expression)}${optStr});`;
     });
     stream.push(stmts.sort().join("\n"));
   }
@@ -274,7 +273,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
       (adapter?.uniqueConstraints ? await adapter.uniqueConstraints(table) : []);
     this._cachedUniqConstraints = undefined;
     if (constraints.length === 0) return;
-    const stripped = this.removePrefixAndSuffix(table);
     const stmts = constraints.map((uc) => {
       const opts: string[] = [];
       if (uc.nullsNotDistinct)
@@ -282,7 +280,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       if (uc.deferrable) opts.push(`deferrable: ${JSON.stringify(uc.deferrable)}`);
       if (uc.exportNameOnSchemaDump()) opts.push(`name: ${JSON.stringify(uc.name)}`);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      return `  await ctx.addUniqueConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(uc.column)}${optStr});`;
+      return `    t.uniqueConstraint(${JSON.stringify(uc.column)}${optStr});`;
     });
     stream.push(stmts.sort().join("\n"));
   }

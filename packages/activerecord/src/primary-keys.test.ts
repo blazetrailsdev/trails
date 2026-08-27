@@ -518,7 +518,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
     expect(schema).toMatch(
       /createTable\("barcodes", \{ primaryKey: "code", id: \{ type: "string", limit: 42 \}/,
     );
-    expect(schema).not.toMatch(/addIndex\("barcodes", \["code"\]/);
+    expect(schema).not.toMatch(/t\.index\(\["code"\]/);
   });
 
   it.skipIf(adapterType !== "mysql")("schema typed primary key column", async () => {
