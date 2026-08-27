@@ -41,9 +41,7 @@ import * as Validates from "./validations/validates.js";
 import { ClassMethods as WithClassMethods } from "./validations/with.js";
 import {
   Attributes,
-  attribute,
-  attributeNames,
-  setDefineMethodAttribute,
+  ClassMethods as AttributesClassMethods,
   initializeDup as attributesInitializeDup,
 } from "./attributes.js";
 import {
@@ -61,16 +59,8 @@ import { Access } from "./access.js";
 import { Naming } from "./naming.js";
 import { API, initialize as apiInitialize } from "./api.js";
 
-/**
- * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-101) — the
- * class half `include ActiveModel::Attributes` contributes, mixed onto `Model`
- * by the `extend()` at the bottom of this file.
- *
- */
 /** The class half of `include ActiveModel::AttributeMethods` (attribute_methods.rb:75-501). */
 type AttributeMethodsClassMethods = Extended<typeof AttributeMethods.ClassMethods>;
-
-const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeNames };
 
 /**
  * Anything `validates_with` accepts: a full `Validator`/`EachValidator`

@@ -205,14 +205,17 @@ export interface Attributes {
  *
  * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
  */
-/** The class Ruby's `included(base)` hook receives (attributes.rb:35). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
-
-/** A class with `ActiveModel::AttributeMethods` already extended onto it. */
-type AttributeMethodSuffixHost = AttributeMethodHost & {
-  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
-};
+/**
+ * The class Ruby's `included(base)` hook receives (attributes.rb:35), with the
+ * `attribute_method_suffix` macro AttributeMethods has just put on it.
+ */
+type AttributeMethodSuffixHost = AttributeMethodHost &
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+  (new (...args: any[]) => any) & { prototype: object } & {
+    attributeMethodSuffix(
+      ...suffixes: Array<string | { parameters?: string | null | false }>
+    ): void;
+  };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attributes {
@@ -231,12 +234,15 @@ export class Attributes {
     // win over the registration one (attribute_registration.rb:101-103).
     extend(base, AttributeRegistrationClassMethods);
     extend(base, AttributeMethodsClassMethods);
-    include(base as unknown as IncludingClass, AttributeMethodsInstanceMethods);
+    include(base, AttributeMethodsInstanceMethods);
 
     // attributes.rb:39 — the module's own `ClassMethods`, whose `attribute`
     // (:59-61) and `define_method_attribute=` (:92-104) override the
     // registration halves.
     extend(base, ClassMethods);
+    // CLAUDE.md § "Generated attribute readers are properties" — ActiveModel has
+    // no `define_method_attribute` hook, and needs one because a zero-arg Ruby
+    // reader ports as a property that `define_proxy_call` cannot emit.
     extend(base, { defineMethodAttribute });
 
     // attributes.rb:35 — the `included do` block.
@@ -245,10 +251,7 @@ export class Attributes {
     // attributes.rb:156-159 — `_write_attribute` and
     // `alias :attribute= :_write_attribute`, private instance methods this
     // file declares as free functions rather than on the prototype.
-    include(base as unknown as IncludingClass, {
-      _writeAttribute,
-      "attribute=": _writeAttribute,
-    });
+    include(base, { _writeAttribute, "attribute=": _writeAttribute });
   }
 
   _attributes: AttributeSet;
