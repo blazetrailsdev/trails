@@ -13,6 +13,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
+import { withConnection } from "../connection-handling.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
 const CASES: [string, string][] = [
@@ -41,6 +42,7 @@ async function missingRowDiagnostics(
   iteration: number,
   sent: string,
   returning: unknown,
+  writeConnection: unknown,
 ): Promise<string> {
   const connection = await Topic.leaseConnection();
   const id = connection.quoteColumnName("id");
@@ -59,6 +61,15 @@ async function missingRowDiagnostics(
   } catch (error) {
     probe = `raised ${error instanceof Error ? error.message : String(error)}`;
   }
+  const sameConnection = writeConnection === connection;
+  const rowsViaWriteLease = await withConnection.call(Topic as never, async (c: unknown) => {
+    const conn = c as typeof connection;
+    const result = await conn.execQuery(
+      `SELECT ${id} FROM ${conn.quoteTableName("topics")} ` +
+        `WHERE ${conn.quoteColumnName("author_name")} = 'colon'`,
+    );
+    return result.rows;
+  });
   return [
     `insert_all wrote a row that the next read did not find.`,
     `  iteration:        ${iteration} (sent ${JSON.stringify(sent)})`,
@@ -66,6 +77,8 @@ async function missingRowDiagnostics(
     `  openTransactions: ${connection.openTransactions}`,
     `  topics rows:      ${JSON.stringify(all.rows)}`,
     `  next insert:      ${probe}`,
+    `  same connection:  ${String(sameConnection)}`,
+    `  colon rows via write lease: ${JSON.stringify(rowsViaWriteLease)}`,
   ].join("\n");
 }
 
@@ -98,10 +111,13 @@ describe("leading-colon string writes", () => {
       const created = await Topic.create({ title: sent });
       expect((await Topic.find(created.id)).title).toBe(stored);
 
+      const writeConnection = await withConnection.call(Topic as never, (c: unknown) => c);
       const returning = await Topic.insertAll([{ title: sent, author_name: "colon" }]);
       const inserted = await Topic.where({ author_name: "colon" }).first();
       if (inserted == null) {
-        throw new Error(await missingRowDiagnostics(iteration, sent, returning.rows));
+        throw new Error(
+          await missingRowDiagnostics(iteration, sent, returning.rows, writeConnection),
+        );
       }
       expect(inserted.title).toBe(stored);
       await Topic.where({ author_name: "colon" }).deleteAll();
