@@ -5,6 +5,7 @@ import { RuleTester } from "eslint";
 import { describe, it, expect } from "vitest";
 import rule, {
   BANNED,
+  CANONICAL_ENTRY_POINT,
   isCanonicalSchemaModule,
   moduleBasename,
 } from "./no-internal-canonical-loaders.mjs";
@@ -43,7 +44,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // same-directory specifier it actually uses.
     {
       filename: OWN_TEST,
-      code: 'import { loadCanonicalSchema } from "./canonical-schema.js";',
+      code: 'import { loadCanonicalSchema, loadCanonicalArunit2Schema } from "./canonical-schema.js";',
     },
     // Same for the drop/rebuild half's own unit test, which owns
     // ensureCanonicalTables since the split.
@@ -79,6 +80,11 @@ tester.run("no-internal-canonical-loaders", rule, {
       filename: FILENAME,
       code: 'import { loadSchema } from "./support/load-schema-helper.js";',
       errors: [{ messageId: "banned", data: { name: "loadSchema" } }],
+    },
+    {
+      filename: FILENAME,
+      code: 'import { loadCanonicalArunit2Schema } from "./support/canonical-schema.js";',
+      errors: [{ messageId: "banned", data: { name: "loadCanonicalArunit2Schema" } }],
     },
     // Deeper relative path (adapters/mysql2/*.test.ts reaching up two levels).
     {
@@ -178,6 +184,7 @@ async function* workspaceSources(dir) {
  */
 const scan = (async () => {
   const byModule = new Map();
+  const loaderExports = new Map();
   const trees = new Set();
   for (const root of canonicalLoaderScanRoots) {
     for await (const file of workspaceSources(path.join(repoRoot, root))) {
@@ -189,11 +196,15 @@ const scan = (async () => {
           .join("/"),
       );
       const source = await fs.readFile(file, "utf8");
-      const banned = [...exportedNames(source)].filter((name) => BANNED.has(name)).sort();
+      const exported = exportedNames(source);
+      const banned = [...exported].filter((name) => BANNED.has(name)).sort();
       if (banned.length > 0) byModule.set(rel, banned);
+      if (canonicalLoaderModules.includes(moduleBasename(rel.replace(SOURCE_EXTENSION, "")))) {
+        loaderExports.set(rel, [...exported]);
+      }
     }
   }
-  return { byModule, trees };
+  return { byModule, loaderExports, trees };
 })();
 
 const bannedExportsByModule = scan.then(({ byModule }) => byModule);
@@ -255,6 +266,18 @@ describe("no-internal-canonical-loaders module matcher", () => {
       const enforced = canonicalLoaderEnforcedGlobs.some((glob) => glob.startsWith(`${root}/`));
       expect([root, enforced]).toEqual([root, !unlintable.includes(root)]);
     }
+  });
+
+  it("bans every canonical entry point the loader modules export", async () => {
+    const { loaderExports } = await scan;
+    const unbanned = [];
+    for (const [file, names] of loaderExports) {
+      for (const name of names) {
+        if (CANONICAL_ENTRY_POINT.test(name) && !BANNED.has(name))
+          unbanned.push(`${file}: ${name}`);
+      }
+    }
+    expect(unbanned).toEqual([]);
   });
 
   // Without this the allowlist is a silent hole of its own: if model-schema.ts
