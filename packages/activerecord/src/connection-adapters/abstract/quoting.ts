@@ -193,16 +193,11 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // Rails: `when BigDecimal then value.to_s("F")` — bound as a fixed-form string.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return value;
-  // Rails: `when nil, Numeric, String then value` (rb:102). A Ruby String here
-  // is frequently a BINARY/ASCII-8BIT one — `execute(sql, binds)` callers bind
-  // raw bytes that way, which is what sqlite3's `test_type_cast_binary_encoding_
-  // _without_logger` (test/cases/adapters/sqlite3/quoting_test.rb:32) and
-  // `test_type_cast_should_not_mutate_encoding` (sqlite3_adapter_test.rb:482)
-  // pass. A JS string is UTF-16 and cannot carry arbitrary bytes, so the byte
-  // views are this arm's analogue, not a fourth branch: they pass through
-  // untouched exactly as Rails passes the String through.
+  // Rails: `when nil, Numeric, String then value` (rb:102). Ruby's byte payloads
+  // reach `type_cast` as a BINARY/ASCII-8BIT String and land here; a JS string
+  // is UTF-16 and cannot carry arbitrary bytes, so trails' byte binds arrive
+  // wrapped in a `Type::Binary::Data` and are answered by the rb:96 arm above.
   if (typeof value === "string") return value;
-  if (ArrayBuffer.isView(value)) return value;
   // Rails dispatches `Type::Time::Value` through `self.quoted_time` and
   // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:103-104), the
   // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.

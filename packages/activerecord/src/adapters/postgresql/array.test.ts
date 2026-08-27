@@ -8,6 +8,8 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
+import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
+import { ValueType } from "@blazetrails/activemodel";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -471,12 +473,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("mutate array", async () => {
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [["one", "two"]]);
+      // PG's type_cast has one array arm, `when OID::Array::Data`
+      // (postgresql/quoting.rb:177-185), so a raw bind hands the same `Data`
+      // the write path produces (`OID::Array#serialize`, oid/array.rb:38-44).
+      const textArray = new OidArray(new ValueType());
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+        textArray.serialize(["one", "two"]),
+      ]);
       const rows = await adapter.execute(`SELECT id, tags FROM pg_arrays`);
       const id = rows[0].id;
       const tags = rows[0].tags as string[];
       tags.push("three");
-      await adapter.execute(`UPDATE pg_arrays SET tags = $1 WHERE id = $2`, [tags, id]);
+      await adapter.execute(`UPDATE pg_arrays SET tags = $1 WHERE id = $2`, [
+        textArray.serialize(tags),
+        id,
+      ]);
       const updated = await adapter.execute(`SELECT tags FROM pg_arrays WHERE id = $1`, [id]);
       expect(updated[0].tags).toEqual(["one", "two", "three"]);
     });

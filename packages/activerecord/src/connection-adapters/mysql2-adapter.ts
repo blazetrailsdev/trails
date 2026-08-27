@@ -578,7 +578,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             // `raw_execute` → `perform_query` (`:588-591` → `:552-558`) — one
             // perform_query primitive per adapter, not a second inline driver call.
             const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], driverBinds, {
-              prepare: options?.prepare,
+              // Rails' internal_exec_query defaults `prepare: false`
+              // (abstract/database_statements.rb:546); the flag is decided in
+              // to_sql_and_binds and threaded, never re-derived from bind count.
+              prepare: options?.prepare ?? false,
               notificationPayload: payload,
             });
             return this.castResult(raw);
@@ -863,6 +866,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
           const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
+            // Rails' raw_execute default (abstract/database_statements.rb:552).
+            prepare: false,
             notificationPayload: payload,
           });
           if (raw.rows == null) return [];
@@ -907,6 +912,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
           const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
+            // Rails' raw_execute default (abstract/database_statements.rb:552).
+            prepare: false,
             notificationPayload: payload,
           });
           // Source affected rows through the `affected_rows` port (reads the
@@ -1062,7 +1069,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     {
       materializeTransactions = true,
       allowRetry = false,
-      prepare: prepareOption,
+      // Rails' internal_execute defaults `prepare: false`
+      // (abstract/database_statements.rb:588).
+      prepare: prepareOption = false,
     }: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;

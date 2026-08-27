@@ -119,7 +119,6 @@ interface PerformQueryHost {
   _statements?: StatementPool | null;
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
-  preparedStatements?: boolean;
   _trackPrepared?(conn: unknown, sql: string): void;
 }
 
@@ -291,17 +290,19 @@ export async function performQuery(
   sql: string,
   binds: unknown[],
   typeCastedBinds: unknown[],
-  options: {
-    prepare?: boolean;
+  {
+    prepare,
+    notificationPayload,
+  }: {
+    // Required, as in Rails (mysql2/database_statements.rb:41) — the
+    // prepared-statement decision is made once in `to_sql_and_binds`
+    // (`prepared_statements && preparable`, abstract/database_statements.rb:74)
+    // and threaded down; `perform_query` never re-derives it.
+    prepare: boolean;
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
-  } = {},
+  },
 ): Promise<Mysql2RawResult> {
-  const { notificationPayload } = options;
-  // Rails' `raw_execute` always states `prepare:`; where a trails caller does
-  // not, fall back to Rails' own gate, `prepared_statements && preparable`
-  // (abstract/database_statements.rb:74).
-  const prepare = options.prepare ?? (this.preparedStatements === true && binds.length > 0);
   const hasBinds = binds != null && binds.length > 0;
 
   // Rails' prepared arm is `@statements[sql] ||= raw_connection.prepare(sql)`
