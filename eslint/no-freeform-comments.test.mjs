@@ -14,9 +14,10 @@ tester.run("no-freeform-comments", rule, {
     // JSDoc is where every port convention lives.
     { code: `/** Mirrors: ActiveRecord::Relation#where. */\nexport function where() {}\n` },
     { code: `/**\n * @internal\n */\nconst x = 1;\n` },
-    // A tagless JSDoc documenting a declaration is still JSDoc. This is also
-    // the rule's known limitation: it cannot tell this from narration that was
-    // reformatted to `/** */` to dodge the fix. See the rule's own doc.
+    // A tagless JSDoc documenting a declaration is still JSDoc. Ordinary API
+    // documentation looks exactly like this and is untouched; what closes the
+    // reformat-to-`/** */` bypass is position, not content — see the
+    // "JSDoc must document something" block below.
     { code: `/** The engine every manager compiles against. */\nexport const engine = 1;\n` },
     // Rails citations, in every spelling the packages actually use.
     { code: `// query_methods.rb:1604\nconst x = 1;\n` },
@@ -144,6 +145,74 @@ tester.run("no-freeform-comments (Rails' own comments are not privileged)", rule
     {
       code: `// The default format to use in full error messages.\nconst x = 1;\n`,
       output: `const x = 1;\n`,
+      errors: [{ messageId: "freeform" }],
+    },
+  ],
+});
+
+// Keep-rule 1 is positional: a JSDoc block is kept where it DOCUMENTS
+// something, and deleted where it documents nothing. That is what stops a
+// doomed `//` comment from buying a pass by being reformatted to `/** */`,
+// without touching the 94 pre-existing tagless API-doc blocks in arel and
+// activemodel — every one of which sits on a declaration.
+tester.run("no-freeform-comments (JSDoc must document something)", rule, {
+  valid: [
+    // Declarations, in the spellings the packages actually use.
+    { code: `/** The engine. */\nfunction f() {}\n` },
+    { code: `/** The engine. */\nclass C {}\n` },
+    { code: `/** A row. */\ntype Row = { id: number };\n` },
+    { code: `/** A row. */\ninterface Row {\n  /** Its key. */\n  id: number;\n}\n` },
+    { code: `/** Set the FROM table. */\nexport function from() {}\n` },
+    // Class and object members.
+    {
+      code: `class C {\n  /** Add GROUP BY. */\n  group() {}\n  /** The engine. */\n  engine = 1;\n}\n`,
+    },
+    { code: `const o = {\n  /** Wrap as EXISTS(subquery). */\n  exists: 1,\n};\n` },
+    // A parameter, which JSDoc documents in place as often as by `@param`.
+    { code: `function f(\n  /** The engine. */\n  engine: number,\n) {\n  return engine;\n}\n` },
+    // A block-taking call defines something, at top level or nested: the
+    // `describe(...)` file headers and `include(...)` mixin-wiring notes the
+    // packages already carry, and the `it(...)` headers inside them.
+    { code: `/** What this file covers. */\ndescribe("Relation", () => {});\n` },
+    { code: `/** Wires the query methods in. */\ninclude(Relation, QueryMethods);\n` },
+    {
+      code: `describe("Relation", () => {\n  /** Why this asserts the property and not the boot baseline. */\n  it("fingerprints deterministically", () => {});\n});\n`,
+    },
+    // A tag or a Rails reference keeps a block wherever it sits — the tags are
+    // the port's own conventions and tooling reads several of them.
+    { code: `function f() {\n  /**\n   * @internal\n   */\n  return 1;\n}\n` },
+    { code: `function f() {\n  /** Mirrors: query_methods.rb:1604. */\n  return 1;\n}\n` },
+    // A file with no statements has no documenting position to attach to, so
+    // its comments are the whole file and are kept rather than erased.
+    { code: `/** This file is intentionally empty. */\n` },
+  ],
+  invalid: [
+    // The bypass itself: narration reformatted from `//` to `/** */`.
+    {
+      code: `function f() {\n  /** now we add the two numbers */\n  return 1 + 1;\n}\n`,
+      output: `function f() {\n  return 1 + 1;\n}\n`,
+      errors: [{ messageId: "floatingJsDoc" }],
+    },
+    // Floating before a branch, before a bare call, and at the end of a block.
+    {
+      code: `function f(x) {\n  /** the guard below is load-bearing */\n  if (x) return 1;\n  return 2;\n}\n`,
+      output: `function f(x) {\n  if (x) return 1;\n  return 2;\n}\n`,
+      errors: [{ messageId: "floatingJsDoc" }],
+    },
+    {
+      code: `function f(o) {\n  /** flush first */\n  o.flush();\n}\n`,
+      output: `function f(o) {\n  o.flush();\n}\n`,
+      errors: [{ messageId: "floatingJsDoc" }],
+    },
+    {
+      code: `function f() {\n  return 1;\n  /** trailing narration */\n}\n`,
+      output: `function f() {\n  return 1;\n}\n`,
+      errors: [{ messageId: "floatingJsDoc" }],
+    },
+    // A non-JSDoc block in the same position is the plain free-form report.
+    {
+      code: `function f() {\n  /* now we add the two numbers */\n  return 1 + 1;\n}\n`,
+      output: `function f() {\n  return 1 + 1;\n}\n`,
       errors: [{ messageId: "freeform" }],
     },
   ],

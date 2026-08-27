@@ -31,20 +31,26 @@
  * rots on its own the moment Rails edits it — the same failure this rule
  * exists to prevent. Reference the Ruby; do not restate it.
  *
- * KNOWN LIMITATION: keep-rule 1 is unconditional, so reformatting a doomed
- * `//` comment as `/** ... *\/` bypasses the fix. That is deliberate and not
- * closable statically — JSDoc on a declaration is exactly where this repo puts
- * `Mirrors:`, `@internal` and `@noRailsEquivalent`, and no static check can
- * separate a real contract note from narration wearing the same syntax. The
- * check is review, not lint: a JSDoc block that documents nothing about the
- * declaration it sits on is the same drift this rule deletes, and should be
- * deleted in review.
+ * Keep-rule 1 is NOT unconditional. A JSDoc block is kept when it documents
+ * something — when it is the leading comment of a declaration, of a class /
+ * interface / object member, or of a top-level statement (a `describe(...)`
+ * file header, an `include(...)` mixin-wiring note). That is where every port
+ * convention lives and where ordinary API documentation lives, and neither is
+ * touched.
  *
- * Requiring a tag or a Rails reference on every JSDoc block was measured and
- * rejected: it flags 94 pre-existing blocks in these two packages that are
- * ordinary API documentation ("Set the FROM table.", "Add GROUP BY."), which
- * is JSDoc doing its job. Tracked as
- * 0023-surfaced-deviations/close-jsdoc-bypass-in-no-freeform-comments.
+ * A JSDoc block that is NOT in a documenting position — floating between
+ * statements inside a function body, before an `if` or a `return`, at the end
+ * of a block
+ * — documents no declaration. It is narration, and `/** *\/` is exactly the
+ * two-character reformatting that used to buy narration a pass. It is deleted
+ * like any other free-form comment, unless it carries a JSDoc tag, a Rails
+ * reference, or a tool directive on its own merits.
+ *
+ * The blanket alternative — "every JSDoc block must carry a tag or a Rails
+ * reference" — was measured and rejected: it flags 94 pre-existing blocks in
+ * arel and activemodel that are ordinary API documentation ("Set the FROM
+ * table.", "Add GROUP BY."), which is JSDoc doing its job. Position
+ * discriminates where content cannot: those 94 all sit on a declaration.
  *
  * The fix is destructive by design: the point is to run it, then read the diff
  * and rescue whatever turns out to be load-bearing. Run it with
@@ -128,10 +134,85 @@ function isJsDoc(comment) {
   return comment.type === "Block" && comment.value.startsWith("*");
 }
 
-function isKept(group) {
+/**
+ * A JSDoc tag (`@internal`, `@param`, `@noRailsEquivalent`, ...). A tagged
+ * block is kept wherever it sits: the tags are the port's own conventions and
+ * several of them are read by tooling.
+ */
+const JSDOC_TAG_RE = /^[\s*]*@\w/mu;
+
+/**
+ * Node types that a JSDoc block can document: declarations, class / interface
+ * / object members, and enum members. Anything whose parent is `Program` also
+ * counts — a top-level `describe(...)` file header or an `include(...)`
+ * mixin-wiring note documents the file, which is a real documenting position
+ * even though it is a statement rather than a declaration. So does a
+ * block-taking call at any depth (see `isBlockTakingCall`).
+ */
+const DOCUMENTABLE_TYPES = new Set([
+  "VariableDeclaration",
+  "FunctionDeclaration",
+  "ClassDeclaration",
+  "ClassExpression",
+  "TSDeclareFunction",
+  "TSTypeAliasDeclaration",
+  "TSInterfaceDeclaration",
+  "TSEnumDeclaration",
+  "TSEnumMember",
+  "TSModuleDeclaration",
+  "ImportDeclaration",
+  "ExportNamedDeclaration",
+  "ExportDefaultDeclaration",
+  "ExportAllDeclaration",
+  "MethodDefinition",
+  "PropertyDefinition",
+  "AccessorProperty",
+  "StaticBlock",
+  "TSAbstractMethodDefinition",
+  "TSAbstractPropertyDefinition",
+  "TSPropertySignature",
+  "TSMethodSignature",
+  "TSIndexSignature",
+  "TSCallSignatureDeclaration",
+  "TSConstructSignatureDeclaration",
+  "Property",
+]);
+
+/**
+ * A call that takes a function is Ruby-block-shaped: `describe(...)`,
+ * `it(...)`, `include(Model, Mixin)` all DEFINE something, so a JSDoc block
+ * above one documents that definition the same way one above a `function`
+ * documents the function. Narration sits above an `if`, a `return`, an
+ * assignment or a bare call — none of which define anything.
+ */
+function isBlockTakingCall(node) {
+  if (node.type !== "ExpressionStatement") return false;
+  const call = node.expression;
+  if (call?.type !== "CallExpression") return false;
+  return call.arguments.some(
+    (arg) => arg.type === "FunctionExpression" || arg.type === "ArrowFunctionExpression",
+  );
+}
+
+/** A function parameter, which JSDoc documents in place as often as by `@param`. */
+function isParameter(node) {
+  return Array.isArray(node.parent?.params) && node.parent.params.includes(node);
+}
+
+function isDocumentable(node) {
+  if (DOCUMENTABLE_TYPES.has(node.type)) return true;
+  if (node.parent?.type === "Program") return true;
+  if (isParameter(node)) return true;
+  return isBlockTakingCall(node);
+}
+
+function isKept(group, attachedJsDoc) {
   return group.some((comment) => {
     const text = comment.value;
-    if (isJsDoc(comment)) return true;
+    if (isJsDoc(comment)) {
+      if (JSDOC_TAG_RE.test(text)) return true;
+      if (attachedJsDoc.has(comment)) return true;
+    }
     if (DIRECTIVE_RE.test(text)) return true;
     return RAILS_REF_RE.test(text);
   });
@@ -177,6 +258,8 @@ const rule = {
       },
     ],
     messages: {
+      floatingJsDoc:
+        "JSDoc block in a non-documenting position. It documents no declaration, so it is narration: attach it to what it documents, cite the Rails file, or delete it.",
       freeform:
         "Free-form comment. trails is a line-by-line Rails port: cite the Rails file, promote it to JSDoc, or delete it.",
     },
@@ -184,14 +267,24 @@ const rule = {
   create(context) {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     const reportOnly = context.options[0]?.report === true;
+    const attachedJsDoc = new Set();
     return {
-      Program() {
+      "*"(node) {
+        if (!isDocumentable(node)) return;
+        for (const comment of sourceCode.getCommentsBefore(node)) {
+          if (isJsDoc(comment)) attachedJsDoc.add(comment);
+        }
+      },
+      "Program:exit"(program) {
+        // A file with no statements has no documenting position to attach to,
+        // so its comments are the whole file and are kept rather than erased.
+        if (program.body.length === 0) return;
         for (const group of groupLineComments(sourceCode.getAllComments(), sourceCode)) {
-          if (isKept(group)) continue;
+          if (isKept(group, attachedJsDoc)) continue;
           const range = removalRange(group, sourceCode);
           context.report({
             loc: { start: group[0].loc.start, end: group[group.length - 1].loc.end },
-            messageId: "freeform",
+            messageId: group.some(isJsDoc) ? "floatingJsDoc" : "freeform",
             fix: reportOnly ? undefined : (fixer) => fixer.removeRange(range),
           });
         }
