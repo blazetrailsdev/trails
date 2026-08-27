@@ -178,9 +178,16 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
-    if (migrationContext.migrations.length === 0) {
+    const migrations = migrationContext.migrations;
+    if (migrations.length === 0) {
       log("No migrations found in db/migrate/.");
       return;
+    }
+    // The Migrator asks AR's connection handler for a pool before it loads any
+    // migration file, so a runtime with no eval context would report "No
+    // database connection defined." instead of the real limitation.
+    for (const proxy of migrations) {
+      await proxy.migration();
     }
     // Migration output goes to stdout (Rails' Migration#write is `puts`), and
     // the browser has no process — so the shim's stdout is pointed at this
