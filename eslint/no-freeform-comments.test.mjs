@@ -305,3 +305,16 @@ tester.run("no-freeform-comments (a quoted tag in prose is not a tag)", rule, {
     },
   ],
 });
+
+// `drift-ok:` is read by `scripts/mixin-declaration-drift.ts` (its `WAIVER`),
+// which waives a declared-vs-mixin signature difference. Deleting the one on
+// `buildCreateIndexDefinition` red every AR lane, and the failure named a type
+// mismatch rather than a missing comment.
+tester.run("no-freeform-comments (drift-ok: is a directive)", rule, {
+  valid: [
+    {
+      code: `interface I {\n  /**\n   * drift-ok: concrete adapters may return \`undefined\`, so the declared\n   * return type widens the base.\n   */\n  f(): void;\n}\n`,
+    },
+  ],
+  invalid: [],
+});

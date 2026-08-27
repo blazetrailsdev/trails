@@ -277,7 +277,12 @@ export interface AbstractAdapter {
     type: ColumnType,
     options?: ColumnOptions,
   ): Promise<string | [string, () => Promise<void>]>;
-  /** @internal */
+  /**
+   * drift-ok: concrete adapters may return `undefined` (MySQL short-circuits
+   * `ifNotExists` when the index already exists), so the declared return type
+   * widens the SchemaStatements base, which always returns a definition.
+   * @internal
+   */
   buildCreateIndexDefinition(
     tableName: string,
     columnName: string | string[],

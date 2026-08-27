@@ -50,9 +50,14 @@
  * `@nie disposition=` is likewise read by `eslint/nie-requires-annotation.mjs`,
  * which REQUIRES it on every `throw new NotImplementedError(...)` — deleting
  * one reds that rule.
+ *
+ * `drift-ok:` is read by `scripts/mixin-declaration-drift.ts` (its `WAIVER`),
+ * which waives a declared-vs-mixin signature difference. Deleting the one on
+ * `buildCreateIndexDefinition` reds that check on every AR lane, and the
+ * failure names a type mismatch rather than a missing comment (#7132).
  */
 const DIRECTIVE_RE =
-  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=/iu;
+  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:/iu;
 
 /**
  * The repo's own JSDoc flags, the only tags that survive. Each is read by a
