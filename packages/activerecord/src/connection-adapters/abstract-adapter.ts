@@ -2266,7 +2266,11 @@ export class AbstractAdapter implements Quoting {
     return [cmds[0], ...args];
   }
 
-  static dbconsole(_config?: unknown): void {}
+  /** Opens a database console session. Mirrors: AbstractAdapter.dbconsole (abstract_adapter.rb:119-121). */
+  static dbconsole(_config?: unknown, _options?: unknown): unknown {
+    // @nie disposition=TODO
+    throw new NotImplementedError("dbconsole");
+  }
 
   // --- Type registration (Rails: class << self private) ---
 

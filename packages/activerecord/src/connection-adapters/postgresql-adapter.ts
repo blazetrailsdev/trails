@@ -249,12 +249,14 @@ export class PostgreSQLAdapter
     return pgQuoteTableName(name);
   }
 
-  // Mirrors Rails' PostgreSQLAdapter.dbconsole (postgresql_adapter.rb:73-90),
-  // which exports PG* env vars and then execs the configured client with the
-  // database name. We can't mutate the process environment (no process.*
-  // access), so both effects come back as values: `env` is the map the exec
-  // would have set, `argv` is `find_cmd_and_exec`'s result. PGPASSWORD is
-  // included only when `includePassword` is set, matching Rails.
+  /**
+   * Mirrors: PostgreSQLAdapter.dbconsole (postgresql_adapter.rb:73-90), which
+   * exports PG* env vars and then execs the configured client with the database
+   * name. We can't mutate the process environment (no `process.*` access), so
+   * both effects come back as values: `env` is the map the exec would have set,
+   * `argv` is `find_cmd_and_exec`'s result. PGPASSWORD is included only when
+   * `includePassword` is set, matching Rails.
+   */
   static override dbconsole(
     config: Record<string, unknown> = {},
     options: { includePassword?: boolean } = {},
@@ -281,7 +283,7 @@ export class PostgreSQLAdapter
     }
     const argv = this.findCmdAndExec(
       ActiveRecord.databaseCli["postgresql"],
-      String(config.database ?? ""),
+      config.database as string,
     );
     return { env, argv };
   }

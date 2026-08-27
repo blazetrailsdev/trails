@@ -54,9 +54,6 @@ describe("SQLite3Adapter.dbconsole option keys", () => {
 });
 
 describe("dbconsole reads ActiveRecord.databaseCli", () => {
-  // sqlite3_adapter.rb:51, abstract_mysql_adapter.rb:82 and
-  // postgresql_adapter.rb:89 all pass `ActiveRecord.database_cli[...]` to
-  // `find_cmd_and_exec`, so configuring it swaps the client trails names.
   const original = ActiveRecord.databaseCli;
   afterEach(() => {
     ActiveRecord.databaseCli = original;

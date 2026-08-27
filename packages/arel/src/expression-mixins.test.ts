@@ -83,8 +83,6 @@ describe("WindowPredications.over (mixed into Function)", () => {
   });
 
   it("quotes a string window name through the adapter, not a hard-coded quote", () => {
-    // to_sql.rb:306-307 goes through `quote_column_name`, so the identifier
-    // quote is the adapter's — backticks on MySQL, not double quotes.
     const fn = new Nodes.NamedFunction("MY_FN", [new Nodes.SqlLiteral("x")]);
     const mysql = new Visitors.ToSql(mysqlTestConnection);
     expect(mysql.compile(fn.over("w"))).toBe("MY_FN(x) OVER `w`");

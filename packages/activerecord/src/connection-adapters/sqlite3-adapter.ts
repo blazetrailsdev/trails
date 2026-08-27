@@ -1503,10 +1503,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new this(config.database ?? ":memory:", { readonly: config.readonly });
   }
 
-  // Mirrors Rails' SQLite3Adapter.dbconsole (sqlite3_adapter.rb:44-52):
-  // `-#{mode}` / `-header` flags precede the database path, then the whole argv
-  // goes to `find_cmd_and_exec` with the configured sqlite client. Only the
-  // `exec` inside that helper is unported — see AbstractAdapter.findCmdAndExec.
+  /**
+   * Mirrors: SQLite3Adapter.dbconsole (sqlite3_adapter.rb:44-52) — the
+   * `-#{mode}` / `-header` flags precede the database path, then the whole argv
+   * goes to `find_cmd_and_exec` with the configured sqlite client. Only the
+   * `exec` inside that helper is unported; see AbstractAdapter.findCmdAndExec.
+   */
   static override dbconsole(
     config?: { database?: string },
     options: { mode?: string; header?: boolean } = {},
