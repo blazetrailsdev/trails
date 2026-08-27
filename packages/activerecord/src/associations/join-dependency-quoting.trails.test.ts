@@ -15,6 +15,7 @@ import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes, Table } from "@blazetrails/arel";
+import "../test-helpers/models/company.js";
 
 /** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
@@ -132,29 +133,22 @@ describe("JoinDependency Arel node construction", () => {
   });
 
   it("emits OuterJoin with STI subclass IN-list predicate", () => {
-    class Vehicle extends Base {
+    // Canonical `companies` STI: `SpecialClient < Client < Company`, all on the
+    // `type` column the schema really has (schema.rb `create_table :companies`).
+    // A `columns_hash` is a pure DB read (model_schema.rb:592-594), so the STI
+    // type_condition only fires for a model whose table carries the column.
+    class ClientOwner extends Base {
       static {
-        this.attribute("type", "string");
-        this.attribute("owner_id", "integer");
+        this._tableName = "owners";
+        this._primaryKey = "owner_id";
+        this.hasMany("clients", { className: "Client", foreignKey: "owner_id" });
       }
     }
-    class Car extends Vehicle {}
-    class ElectricCar extends Car {}
-    Vehicle.inheritanceColumn = "type";
-    registerSubclass(Car);
-    registerSubclass(ElectricCar);
-    (Vehicle as any)._reflections = {};
-    (Car as any)._reflections = {};
-    (ElectricCar as any)._reflections = {};
-    registerModel(Vehicle);
-    registerModel(Car);
-    registerModel(ElectricCar);
+    registerModel(ClientOwner);
 
-    Associations.hasMany.call(Owner, "cars", { className: "Car", foreignKey: "owner_id" });
-
-    const jd = new JoinDependency(Owner, null, "cars", Nodes.OuterJoin);
+    const jd = new JoinDependency(ClientOwner, null, "clients", Nodes.OuterJoin);
     const joins = jd.joinConstraints([]);
-    const node = nodeAt(jd, "cars");
+    const node = nodeAt(jd, "clients");
     expect(node).not.toBeNull();
     expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
@@ -170,8 +164,8 @@ describe("JoinDependency Arel node construction", () => {
     expect(eq).toBeInstanceOf(Nodes.Equality);
     expect((eq.left as any).name).toBe("owner_id");
 
-    // Second child: STI IN-list (Car has descendant ElectricCar, so
-    // type_condition produces an IN over [Car, ElectricCar]). Rails builds this
+    // Second child: STI IN-list (Client has descendants, so type_condition
+    // produces an IN over the subclass names). Rails builds this
     // via `predicate_builder.build(sti_column, sti_names)` (inheritance.rb:326),
     // whose multi-value array branch is an `Arel::Nodes::HomogeneousIn`.
     const inNode = and.children[1] as Nodes.HomogeneousIn;

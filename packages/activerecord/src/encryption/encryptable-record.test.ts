@@ -21,12 +21,12 @@ import {
   withoutEncryption,
   Decryption,
   Encryption,
-  AUTHOR_NAME_LIMIT,
   Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
 import { Model as ActiveModel } from "@blazetrails/activemodel";
 import { itIfSupports } from "../support/supports.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import {
@@ -458,12 +458,20 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
   });
 
-  it("validate column sizes", async () => {
+  // `if author_name_limit = EncryptedAuthor.columns_hash["name"].limit`
+  // (encryptable_record_test.rb:301-309) — "Only run for adapters that add a
+  // default string limit when not provided (MySQL, 255)"; `validate_column_size`
+  // reads that same DB limit (encryptable_record.rb:138-142), so on SQLite and
+  // PostgreSQL there is nothing to validate against.
+  it.runIf(currentAdapter("Mysql2Adapter", "TrilogyAdapter"))("validate column sizes", async () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
+    await Author.loadSchema();
+    const authorNameLimit = (Author.columnsHash()["name"] as { limit: number }).limit;
+    const tooLong = "a".repeat(authorNameLimit + 1);
     expect(await new Author({ name: "jorge" }).isValid()).toBe(true);
-    expect(await new Author({ name: "a".repeat(AUTHOR_NAME_LIMIT + 1) }).isValid()).toBe(false);
-    const author = await Author.create({ name: "a".repeat(AUTHOR_NAME_LIMIT + 1) });
+    expect(await new Author({ name: tooLong }).isValid()).toBe(false);
+    const author = await Author.create({ name: tooLong });
     expect(await author.isValid()).toBe(false);
   });
 
@@ -1097,17 +1105,19 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
   // full encrypts → encryptAttribute → preserveOriginalEncrypted wiring.
   it("Base.encrypts ignoreCase raises ConfigurationError when original_<name> is missing", async () => {
     const adapter = await freshAdapter();
+    const Model = class extends Base {
+      static _tableName = "authors";
+      static {
+        this.adapter = adapter;
+      }
+    } as any;
+    // The check reads `column_names` (encryptable_record.rb:150-159), which is
+    // `columns.map(&:name)` — a pure DB read (model_schema.rb:437-441). Reflect
+    // first so it sees the real `authors` columns; the deferred cold-schema case
+    // is the next test.
+    await Model.loadSchema();
     expect(() => {
-      const Model = class extends Base {
-        static _tableName = "authors";
-        static {
-          this.attribute("id", "integer");
-          this.attribute("name", "string");
-          this.adapter = adapter;
-          this.encrypts("name", { deterministic: true, ignoreCase: true });
-        }
-      } as any;
-      new Model();
+      Model.encrypts("name", { deterministic: true, ignoreCase: true });
     }).toThrow(/must create an additional column named 'original_name'/);
   });
 

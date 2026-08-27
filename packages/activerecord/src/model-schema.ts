@@ -980,7 +980,27 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  */
 export function loadSchema(this: SchemaHost): void {
   if (ownSchemaMemo(this, "_schemaLoaded")) return;
-  loadSchemaBang.call(this);
+  // `return if @columns_hash` (model_schema.rb:534-546): the guard that stops a
+  // `columns_hash` read from inside `load_schema!` re-entering the load it is
+  // already inside of.
+  if (ownSchemaMemo(this, "_columnsHash") != null) return;
+  try {
+    loadSchemaBang.call(this);
+  } catch (error) {
+    // `rescue; reload_schema_from_cache; raise` (:541-544) — a load that failed
+    // half way through must not leave its partial state behind.
+    reloadSchemaFromCache.call(this);
+    throw error;
+  }
+  if (!ownSchemaMemo(this, "_schemaLoaded")) {
+    // Same reset, for the failure mode Rails cannot have: its
+    // `schema_cache.columns_hash` blocks, so `load_schema!` either reflects or
+    // raises. trails' is async, so a cold cache leaves the load incomplete —
+    // the anchor set `@columns_hash` for re-entrancy but never reflected. Reset
+    // it so a later `loadSchema`, once the cache is warm, runs the real read
+    // instead of serving the empty hash forever.
+    reloadSchemaFromCache.call(this);
+  }
 }
 
 /**
