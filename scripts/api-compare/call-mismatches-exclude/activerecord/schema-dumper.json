@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
-    "rubyName": "table",
-    "call": "order:tableOptions,removePrefixAndSuffix",
-    "reason": "Rails calls `@connection.table_options(table)` at `schema_dumper.rb:187`, after `remove_prefix_and_suffix`; trails must read it before the column-spec chain because it prefills the table-collation cache that MySQL's `schemaCollation` compares against — Rails fetches that lazily inside `schema_collation` (`mysql/schema_dumper.rb:66-71`), which is an async query in trails and cannot be issued from the sync spec chain."
-  }
-]

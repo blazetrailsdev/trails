@@ -3,16 +3,17 @@
  *
  * Mirrors: ActiveRecord::Tasks::SQLiteDatabaseTasks.
  *
- * Unlike Rails (which shells out to the `sqlite3` CLI for structureDump /
- * structureLoad), trails runs structureDump/structureLoad through the
- * SQLite3Adapter so the same code works under sqlite-wasm + the
- * activesupport vfs adapter. The exported `runCmd` helper shells out via
- * `sqlite3` only for Rails API parity and is not invoked by the public
- * task methods above.
+ * `structureDump` shells out to the `sqlite3` CLI as Rails does
+ * (`sqlite_database_tasks.rb:44-58`), materialising an in-memory database with
+ * `VACUUM INTO` first so there is one dump path. `structureLoad` still routes
+ * an in-memory database through the SQLite3Adapter: SQLite has no inverse of
+ * `VACUUM INTO`, so nothing can pull a file's schema back into the live
+ * connection that owns the database.
  */
 
 import {
   getFs,
+  getFsAsync,
   getPath,
   getChildProcessAsync,
   type SpawnSyncResult,
@@ -135,18 +136,12 @@ export class SQLiteDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    // Rails has no in-memory lane, so `sqlite3 :memory: .schema` is a database
-    // the CLI just created and immediately discards. See
-    // `inMemoryStructureDump`.
-    if (isInMemoryDatabase(this.dbConfig.database as string))
-      return this.inMemoryStructureDump(filename);
-
     const args: string[] = [];
     if (extraFlags != null) args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    args.push(this.dbConfig.database as string);
 
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
     let ignoreTables = SchemaDumper.ignoreTables;
+    let dumpSpec = ".schema --nosys";
     if (ignoreTables.length > 0) {
       const connection = await this.connection();
       ignoreTables = (await connection.dataSources()).filter((table) =>
@@ -160,13 +155,35 @@ export class SQLiteDatabaseTasks {
         }),
       );
       const condition = ignoreTables.map((table) => connection.quote(table)).join(", ");
-      args.push(
-        `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`,
-      );
-    } else {
-      args.push(".schema --nosys");
+      dumpSpec = `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`;
     }
-    await runCmd("sqlite3", args, filename);
+
+    // `sqlite_database_tasks.rb:44-58` shells out unconditionally, because
+    // Rails has no in-memory SQLite lane. An in-memory database belongs to the
+    // connection that opened it, so a child `sqlite3` has no file to attach —
+    // it is materialised with `VACUUM INTO` (SQLite 3.27+) and the CLI is
+    // pointed at that copy, so there is still one dump path and one emitted
+    // format.
+    let database = this.dbConfig.database as string;
+    let materialized: string | undefined;
+    if (isInMemoryDatabase(database)) {
+      const connection = await this.connection();
+      materialized = `${filename}.dump.sqlite3`;
+      const fs = await getFsAsync();
+      if (await fs.exists(materialized)) await fs.unlink!(materialized);
+      await connection.execute(`VACUUM INTO ${connection.quote(materialized)}`);
+      database = materialized;
+    }
+
+    try {
+      args.push(database, dumpSpec);
+      await runCmd("sqlite3", args, filename);
+    } finally {
+      if (materialized !== undefined) {
+        const fs = await getFsAsync();
+        if (await fs.exists(materialized)) await fs.unlink!(materialized);
+      }
+    }
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
@@ -185,58 +202,7 @@ export class SQLiteDatabaseTasks {
   }
 
   /**
-   * The one deviation from Rails' CLI path, and the only place the bespoke
-   * ordering and `sqlite_%` filter survive.
-   *
-   * An in-memory database belongs to the connection that opened it, so there is
-   * no file for a child `sqlite3` to attach: `sqlite3 :memory: ".schema"` dumps
-   * a database it just created and throws away, which is how this arm reached
-   * CI as an empty dump. Rails has no in-memory lane and so no counterpart —
-   * `sqlite_database_tasks.rb:43-58` shells out unconditionally.
-   *
-   * Two things differ from Rails' query, both forced by re-executing the dump
-   * as a script rather than feeding it to the sqlite3 shell. Rails orders by
-   * `type DESC`, relying on the shell to resolve forward-referenced triggers
-   * lazily; `db.exec` applies statements strictly in order, so tables and views
-   * have to precede the indexes and triggers that reference them. And `.schema`
-   * omits SQLite's internal tables implicitly, where a direct `sqlite_master`
-   * read has to exclude them by name or emit reserved-name CREATEs that fail on
-   * load.
-   */
-  private async inMemoryStructureDump(filename: string): Promise<void> {
-    const adapter = await this.connection();
-    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    const ignoreTables = SchemaDumper.ignoreTables;
-
-    const typeOrder =
-      "CASE type WHEN 'table' THEN 0 WHEN 'view' THEN 1 " +
-      "WHEN 'index' THEN 2 WHEN 'trigger' THEN 3 ELSE 4 END";
-    let where = "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'";
-    let binds: unknown[] = [];
-
-    if (ignoreTables.length > 0) {
-      const excluded = (await adapter.dataSources()).filter((table) =>
-        ignoreTables.some((pattern) => {
-          if (!(pattern instanceof RegExp)) return pattern === table;
-          pattern.lastIndex = 0;
-          return pattern.test(table);
-        }),
-      );
-      if (excluded.length > 0) {
-        where += ` AND tbl_name NOT IN (${excluded.map(() => "?").join(", ")})`;
-        binds = excluded;
-      }
-    }
-
-    const rows = await adapter.execute(
-      `SELECT sql || ';' AS sql FROM sqlite_master ${where} ORDER BY ${typeOrder}, tbl_name, name`,
-      binds,
-    );
-    getFs().writeFileSync(filename, rows.map((r) => String(r.sql ?? "")).join("\n"));
-  }
-
-  /**
-   * The in-memory counterpart to {@link inMemoryStructureDump}.
+   * The in-memory counterpart to `structureLoad`'s CLI path.
    *
    * `exec` runs the whole script in one shot, so a dump carrying a trigger body
    * (`CREATE TRIGGER ... BEGIN ...; ...; END`) survives, where splitting on

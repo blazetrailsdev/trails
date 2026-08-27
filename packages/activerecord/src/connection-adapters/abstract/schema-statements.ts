@@ -485,9 +485,6 @@ export class SchemaStatements {
     const hasOptions = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
     const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
-    if (tableNames.length === 0) {
-      throw new ArgumentError("dropTable requires at least one table name");
-    }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     for (const tableName of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(tableName);

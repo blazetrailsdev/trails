@@ -205,9 +205,10 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
 });
 
 // trails-only: an in-memory database has no file for a child `sqlite3` to
-// attach, so structureDump/structureLoad take the named non-CLI fallback
-// (`inMemoryStructureDump` / `inMemoryStructureLoad`). Rails has no in-memory
-// lane and so no counterpart test.
+// attach, so structureDump materialises it with `VACUUM INTO` before shelling
+// out and structureLoad takes the named non-CLI fallback
+// (`inMemoryStructureLoad`). Rails has no in-memory lane and so no counterpart
+// test.
 //
 // Both tests seed through `structureLoad` rather than a second connection:
 // better-sqlite3 takes a plain filename, not a SQLite URI, so a `:memory:`
