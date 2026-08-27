@@ -150,12 +150,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: enum.current_mood = :happy (Ruby symbol → string via EnumType cast)
       // TS has no symbol type; write the mapped string value directly.
       // The cast path (symbol → string) is not exercisable in TS.
+      // Rails' `PostgresqlEnum.new` reflects `postgresql_enums` synchronously
+      // (model_schema.rb:592-594); trails' cache read is async, and this table
+      // is created per-test rather than warmed at boot, so reflect it first —
+      // `columns_hash` is a pure DB read and the enum needs its column.
+      await PostgresqlEnum.loadSchema();
       const enumRecord = new PostgresqlEnum();
       (enumRecord as any).writeAttribute("current_mood", "happy");
       expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
     });
 
     it("assigning enum to nil", async () => {
+      await PostgresqlEnum.loadSchema();
       const model = new PostgresqlEnum();
       (model as any).writeAttribute("current_mood", null);
       expect((model as any).readAttribute("current_mood")).toBeNull();
