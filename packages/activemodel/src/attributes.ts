@@ -226,15 +226,25 @@ export class Attributes {
    *   end
    */
   static [included](base: AttributeMethodSuffixHost): void {
-    // attributes.rb:32-33 — `include ActiveModel::AttributeRegistration` and
-    // `include ActiveModel::AttributeMethods`. Both are Concerns whose whole
-    // contribution is a `ClassMethods` extend (attribute_registration.rb has no
+    // concern.rb:135 — `@_dependencies.each { |dep| base.include(dep) }`, this
+    // module's `include`s at attributes.rb:32-33. AttributeRegistration is all
+    // `ClassMethods` (attribute_registration.rb has no instance half and no
     // `included do` block); AttributeMethods lands second, which is what makes
     // its alias-resolving `resolve_attribute_name` (attribute_methods.rb:396-398)
-    // win over the registration one (attribute_registration.rb:101-103).
+    // win over the registration one (attribute_registration.rb:101-103), and
+    // carries its own `included do` (attribute_methods.rb:70-73) in the plain
+    // module object's `[included]` hook.
     extend(base, AttributeRegistrationClassMethods);
     extend(base, AttributeMethodsClassMethods);
     include(base, AttributeMethodsInstanceMethods);
+
+    // concern.rb:136 — `super`, the module's own instance methods, which land
+    // before the `ClassMethods` extend (:137) and the `included do` block
+    // (:138). `include()` has already copied this class module's prototype;
+    // these are the rest of it — attributes.rb:156-159's `_write_attribute` and
+    // `alias :attribute= :_write_attribute`, which this port spells as free
+    // functions rather than prototype methods.
+    include(base, { _writeAttribute, "attribute=": _writeAttribute });
 
     // attributes.rb:39 — the module's own `ClassMethods`, whose `attribute`
     // (:59-61) and `define_method_attribute=` (:92-104) override the
@@ -247,11 +257,6 @@ export class Attributes {
 
     // attributes.rb:35 — the `included do` block.
     base.attributeMethodSuffix("=", { parameters: "value" });
-
-    // attributes.rb:156-159 — `_write_attribute` and
-    // `alias :attribute= :_write_attribute`, private instance methods this
-    // file declares as free functions rather than on the prototype.
-    include(base, { _writeAttribute, "attribute=": _writeAttribute });
   }
 
   _attributes: AttributeSet;

@@ -128,8 +128,23 @@ export class Validations {
    * `lookup_ancestors` and `i18n_scope` (translation.rb:20, :27, :44).
    */
   static [included](base: IncludingClass): void {
-    // `ActiveSupport::Concern#append_features` extends `ClassMethods` before it
-    // class_evals the `included do` block, so the macros land first. Ruby's
+    // `ActiveSupport::Concern#append_features` (concern.rb:135-138) mixes the
+    // module's own instance methods (`super`, :136) before it extends
+    // `ClassMethods` (:137) and class_evals the `included do` block (:138).
+    // `include()` has already copied this class module's prototype; these are
+    // the rest of `super` — the members validations.rb declares on the module
+    // itself (:296-306, :376, :437, :467-471, :589) and `with.rb:144-151`,
+    // which this port spells as free functions rather than prototype methods.
+    include(base, {
+      contextForValidation,
+      runValidationsBang,
+      raiseValidationError,
+      readAttributeForValidation,
+      freeze,
+      validatesWith: withValidatesWith,
+    });
+
+    // concern.rb:137 — `base.extend const_get(:ClassMethods)`. Ruby's
     // reopenings of the same module (`validations/with.rb:87`,
     // `validations/validates.rb:110`) ride along on the one `extend`; each
     // reopening lives in the `.ts` matching its `.rb`, so they are separate
@@ -149,19 +164,6 @@ export class Validations {
     include(base, HelperMethods);
     defineCallbacks(base.prototype, "validate", { scope: ["name"] });
     classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
-
-    // The module's own instance methods that this file (and
-    // `validations/with.rb:144-151`) declares as free functions rather than on
-    // the `Validations` prototype — `include()` copies a class module's
-    // prototype, so these need the second call.
-    include(base, {
-      contextForValidation,
-      runValidationsBang,
-      raiseValidationError,
-      readAttributeForValidation,
-      freeze,
-      validatesWith: withValidatesWith,
-    });
   }
 
   declare errors: Errors;
