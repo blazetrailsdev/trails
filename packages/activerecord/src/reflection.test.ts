@@ -28,6 +28,7 @@ import {
 } from "./test-helpers/models/company-in-module.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { NullColumn } from "./connection-adapters/column.js";
 import { create as createReflection } from "./reflection.js";
 import { Customer } from "./test-helpers/models/customer.js";
@@ -47,7 +48,7 @@ import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 
-fixtures(["topics"]);
+fixtures(["topics", "subscribers"]);
 
 describe("ReflectionTest", () => {
   function makeModels() {
@@ -939,33 +940,18 @@ describe("ReflectionTest", () => {
     expect(Post.name).toBe("Post");
   });
 
-  it("column string type and limit", () => {
-    class Article extends Base {
-      declare title: string | null;
-
-      static {
-        // Use a table absent from the canonical schema so columnsHash() falls
-        // back to the declared attributes instead of the DB schema cache.
-        this._tableName = "refl_articles";
-        this.attribute("title", "string");
-      }
-    }
-    const cols = (Article as any).columnsHash();
-    expect(cols["title"]).toBeDefined();
-    expect(cols["title"].type).toBe("string");
+  it("column string type and limit", async () => {
+    await CanonicalTopic.loadSchema();
+    expect((CanonicalTopic as any).columnForAttribute("title").type).toBe("string");
+    expect(CanonicalTopic.typeForAttribute("title").name).toBe("string");
+    expect(CanonicalTopic.typeForAttribute("heading").name).toBe("string");
+    expect((CanonicalTopic as any).columnForAttribute("title").limit).toBe(250);
   });
 
-  it("column null not null", () => {
-    class Article extends Base {
-      declare title: string | null;
-
-      static {
-        this._tableName = "refl_articles";
-        this.attribute("title", "string");
-      }
-    }
-    const cols = (Article as any).columnsHash();
-    expect(Object.keys(cols).length).toBeGreaterThan(0);
+  it("column null not null", async () => {
+    await Subscriber.loadSchema();
+    expect((Subscriber as any).columnForAttribute("name").null).toBe(true);
+    expect((Subscriber as any).columnForAttribute("nick").null).toBe(false);
   });
 
   it("human name for column", async () => {
@@ -975,32 +961,26 @@ describe("ReflectionTest", () => {
     );
   });
 
-  it("integer columns", () => {
-    class Article extends Base {
-      declare views: number | null;
-
-      static {
-        this._tableName = "refl_articles";
-        this.attribute("views", "integer");
-      }
-    }
-    const cols = (Article as any).columnsHash();
-    expect(cols["views"]).toBeDefined();
-    expect(cols["views"].type).toBe("integer");
+  it("integer columns", async () => {
+    await CanonicalTopic.loadSchema();
+    // Rails asserts `:integer` outright (reflection_test.rb:94-99): its PG
+    // adapter maps `int8` onto Type::Integer with `limit: 8` rather than a
+    // distinct type. trails names it `big_integer`, so a bigserial/bigint PK
+    // reports differently per adapter — tracked debt, not ratified here:
+    // story pg-bigserial-pk-reflects-as-big-integer-not-integer (RFC 0023).
+    expect(["integer", "big_integer"]).toContain(
+      (CanonicalTopic as any).columnForAttribute("id").type,
+    );
+    expect(["integer", "big_integer"]).toContain(CanonicalTopic.typeForAttribute("id").name);
   });
 
-  it("non existent columns return null object", () => {
-    class Article extends Base {
-      declare title: string | null;
-
-      static {
-        this._tableName = "refl_articles";
-        this.attribute("title", "string");
-      }
-    }
-    const cols = (Article as any).columnsHash();
-    const nonExistent = cols["does_not_exist"];
-    expect(nonExistent).toBeUndefined();
+  it("non existent columns return null object", async () => {
+    await CanonicalTopic.loadSchema();
+    const column = (CanonicalTopic as any).columnForAttribute("attribute_that_doesnt_exist");
+    expect(column).toBeInstanceOf(NullColumn);
+    expect(column.name).toBe("attribute_that_doesnt_exist");
+    expect(column.sqlType).toBeNull();
+    expect(column.type).toBeNull();
   });
 
   it("belongs to inferred foreign key from assoc name", () => {

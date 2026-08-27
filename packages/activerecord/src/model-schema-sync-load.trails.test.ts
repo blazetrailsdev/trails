@@ -52,16 +52,16 @@ describe("sync loadSchema / columnsHash", () => {
     expect(hash.secret).toBeUndefined();
   });
 
-  it("falls back to synthesized hash when no schema cache is available", () => {
+  it("returns an empty hash when no schema cache is available", () => {
     class Widget extends Base {
       static override tableName = "widgets";
       static {
         this.attribute("name", "string");
       }
     }
-    // No adapter — loadSchema's fallback path kicks in.
-    const hash = Widget.columnsHash();
-    expect(hash.name.type).toBe("string");
+    // No adapter, so nothing reflected. `columns_hash` is a pure DB read
+    // (model_schema.rb:592-594): a declared attribute is not a column.
+    expect(Widget.columnsHash()).toEqual({});
   });
 
   it("STI subclass reflects its own table into its own defs", () => {
@@ -129,21 +129,6 @@ describe("sync loadSchema / columnsHash", () => {
 
     const hash = Circle.columnsHash();
     expect(hash.guid).toBe(cols.guid);
-  });
-
-  it("synthesized columnsHash fallback filters ignoredColumns", () => {
-    class Widget extends Base {
-      static override tableName = "widgets";
-      static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-      }
-    }
-    (Widget as unknown as { _ignoredColumns: string[] })._ignoredColumns = ["secret"];
-
-    const hash = Widget.columnsHash();
-    expect(hash.name).toBeDefined();
-    expect(hash.secret).toBeUndefined();
   });
 
   it("marks the reflecting class as _schemaLoaded, not its STI base", () => {

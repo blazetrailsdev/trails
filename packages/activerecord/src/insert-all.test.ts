@@ -1207,6 +1207,11 @@ describe("InsertAllTest", () => {
 
     let raised: unknown;
     try {
+      // Rails' `load_schema!` blocks, so the db-qualified table reflects on
+      // first touch (model_schema.rb:592-594). trails' cache read is async and
+      // the qualified name has no cache entry yet, so reflect it explicitly —
+      // `columns_hash` is a pure DB read and Book's enums need their columns.
+      await Book.loadSchema();
       await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
     } catch (e) {
       raised = e;

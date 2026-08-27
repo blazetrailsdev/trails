@@ -8,6 +8,7 @@ import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
+import "../test-helpers/models/company.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
@@ -193,46 +194,34 @@ describe("AssociationScope", () => {
   it("applies STI type_condition on subclass targets (compensates for our unscoped)", () => {
     // Rails' klass.unscoped applies STI type_condition via core.rb's
     // relation() override; ours doesn't, so AssociationScope re-adds it.
+    // Canonical `companies` STI: `VerySpecialClient < SpecialClient < Client`,
+    // a leaf, on the
+    // `type` column the schema really has. `columns_hash` is a pure DB read
+    // (model_schema.rb:592-594), so the type_condition only fires for a model
+    // whose table carries that column.
     class StiOwner extends Base {
-      declare sti_specials: AssociationProxy<StiSpecial>;
+      declare very_special_clients: AssociationProxy<Base>;
 
       static {
-        this.attribute("id", "integer");
-        this.hasMany("sti_specials", {
-          className: "StiSpecial",
-          foreignKey: "sti_owner_id",
+        this._tableName = "owners";
+        this._primaryKey = "owner_id";
+        this.hasMany("very_special_clients", {
+          className: "VerySpecialClient",
+          foreignKey: "client_of",
         });
       }
     }
-    class StiBase extends Base {
-      declare "type": string | null;
-      declare sti_owner_id: number | null;
-
-      static {
-        this.attribute("type", "string");
-        this.attribute("sti_owner_id", "integer");
-        this._tableName = "sti_things";
-        StiBase.inheritanceColumn = "type";
-      }
-    }
-    class StiSpecial extends StiBase {
-      static {
-        registerModel(StiSpecial);
-        registerSubclass(StiSpecial);
-      }
-    }
     registerModel(StiOwner);
-    registerModel(StiBase);
 
-    const owner = new StiOwner({ id: 3 });
-    const reflection = (StiOwner as any)._reflectOnAssociation("sti_specials");
+    const owner = new StiOwner({ owner_id: 3 });
+    const reflection = (StiOwner as any)._reflectOnAssociation("very_special_clients");
     const scope: any = AssociationScope.scope({
       owner,
       reflection,
       klass: reflection.klass,
     });
 
-    expect(scope.toSql()).toMatch(/["`]type["`]\s*=\s*'StiSpecial'/);
+    expect(scope.toSql()).toMatch(/["`]type["`]\s*=\s*'VerySpecialClient'/);
   });
 
   it("loadHasMany merges target's scope_for_association (default_scope flows through)", async () => {

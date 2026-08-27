@@ -115,6 +115,7 @@ describe("loadSchemaFromAdapter", () => {
       internalSchemaCache: {
         dataSourceExists: async () => undefined,
         columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
+        getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
       },
       lookupCastTypeFromColumn: () => new UuidType(),
     };

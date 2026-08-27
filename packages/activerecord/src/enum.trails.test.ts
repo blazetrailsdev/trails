@@ -23,6 +23,12 @@ import { Book } from "./test-helpers/models/book.js";
 import { Lion } from "./test-helpers/models/cat.js";
 
 describe("Enum name conflict detection", () => {
+  // `books` is loaded so the models below reflect real columns: `columns_hash`
+  // is a pure DB read (model_schema.rb:592-594), so a cold model has no
+  // `status` column and `enum` raises "Undeclared attribute type" before it
+  // ever reaches the conflict check under test.
+  fixtures(["books"]);
+
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
   // which only flags names in `Base.instance_methods` — NOT user methods on the
   // model or an intermediate ancestor. An enum named after such a user method
@@ -118,7 +124,7 @@ describe("Enum name conflict detection", () => {
       class Child extends Parent {
         static {
           // `active` reuses the value method the parent enum generated.
-          this.enum("state", { active: 0, closed: 1 });
+          this.enum("difficulty", { active: 0, closed: 1 });
         }
       }
       new Child();

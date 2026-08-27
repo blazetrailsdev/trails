@@ -13,19 +13,19 @@
  * This lives in its own file, and calls no `fixtures()`, because the defect only
  * exists while reflection is COLD: anything that warms the hierarchy's schema —
  * including a `fixtures()` hook in an earlier describe of the same file — makes
- * `VerySpecialClient._hasAttribute("type")` true, at which point even the
+ * `DeadParrot._hasAttribute("parrot_sti_class")` true, at which point even the
  * unpatched gate falls through to the raising resolver and the test passes for
  * the wrong reason. The precondition is asserted below so a future reordering
  * trips loudly rather than silently going green.
  */
 import { describe, it, expect } from "vitest";
 import { SubclassNotFound } from "./errors.js";
-import { VerySpecialClient } from "./test-helpers/models/company.js";
+import { DeadParrot } from "./test-helpers/models/parrot.js";
 
 describe("new() STI dispatch gate", () => {
   it("raises SubclassNotFound for a bad type on a cold STI leaf", () => {
-    expect(VerySpecialClient._hasAttribute("type")).toBe(false);
+    expect(DeadParrot._hasAttribute("parrot_sti_class")).toBe(false);
 
-    expect(() => VerySpecialClient.new({ type: "InvalidType" })).toThrow(SubclassNotFound);
+    expect(() => DeadParrot.new({ parrot_sti_class: "InvalidType" })).toThrow(SubclassNotFound);
   });
 });
