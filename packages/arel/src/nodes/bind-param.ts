@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
 /**
@@ -20,6 +21,16 @@ export class BindParam extends Node {
   constructor(value?: unknown) {
     super();
     this.value = value;
+  }
+
+  // Mirrors Arel::Nodes::BindParam#hash / #eql? / #== (bind_param.rb:12-21) —
+  // the `eql?` arm is `is_a?`, not a class comparison, so a subclass matches.
+  hash(): number {
+    return rbHash([this.constructor, this.value]);
+  }
+
+  eql(other: unknown): boolean {
+    return other instanceof BindParam && rbEqual(this.value, other.value);
   }
 
   /**

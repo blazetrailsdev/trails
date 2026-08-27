@@ -1,4 +1,4 @@
-import { include, type Included } from "@blazetrails/activesupport";
+import { include, rbEqual, rbHash, type Included } from "@blazetrails/activesupport";
 import { _setAttribute } from "../node-slots.js";
 import { Node } from "../nodes/node.js";
 import { As } from "../nodes/binary.js";
@@ -77,6 +77,28 @@ export class Attribute extends Node {
 
   isAbleToTypeCast(): boolean {
     return this.relation.isAbleToTypeCast();
+  }
+
+  /**
+   * `Arel::Attributes::Attribute < Struct.new :relation, :name`
+   * (attribute.rb:5), so `==` / `eql?` / `hash` are `Struct`'s, over the two
+   * members in order.
+   *
+   * @noRailsEquivalent PERMANENT: inherited from `Struct`, so no
+   * `attribute.rb` method declares either; TypeScript has no `Struct` to
+   * subclass, so the inherited pair has to be written out.
+   */
+  hash(): number {
+    return rbHash([this.constructor, this.relation, this.name]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Attribute &&
+      this.constructor === other.constructor &&
+      rbEqual(this.relation, other.relation) &&
+      rbEqual(this.name, other.name)
+    );
   }
 
   /**

@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { JoinSource } from "./join-source.js";
@@ -51,6 +52,37 @@ export class SelectCore extends Node {
   /** Mirrors: `alias :froms= :from=` (select_core.rb:32). */
   set froms(value: Node | null) {
     this.from = value;
+  }
+
+  // Mirrors Arel::Nodes::SelectCore#hash / #eql? / #== (select_core.rb:44-64).
+  hash(): number {
+    return rbHash([
+      this.source,
+      this.setQuantifier,
+      this.projections,
+      this.optimizerHints,
+      this.wheres,
+      this.groups,
+      this.havings,
+      this.windows,
+      this.comment,
+    ]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof SelectCore &&
+      this.constructor === other.constructor &&
+      rbEqual(this.source, other.source) &&
+      rbEqual(this.setQuantifier, other.setQuantifier) &&
+      rbEqual(this.optimizerHints, other.optimizerHints) &&
+      rbEqual(this.projections, other.projections) &&
+      rbEqual(this.wheres, other.wheres) &&
+      rbEqual(this.groups, other.groups) &&
+      rbEqual(this.havings, other.havings) &&
+      rbEqual(this.windows, other.windows) &&
+      rbEqual(this.comment, other.comment)
+    );
   }
 
   // Mirrors Arel::Nodes::SelectCore#initialize_copy (select_core.rb:35-43),

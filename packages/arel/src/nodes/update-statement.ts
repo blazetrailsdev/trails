@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 
@@ -28,6 +29,35 @@ export class UpdateStatement extends Node {
     this.limit = null;
     this.offset = null;
     this.key = null;
+  }
+
+  // Mirrors Arel::Nodes::UpdateStatement#hash / #eql? / #== (update_statement.rb:26-43).
+  hash(): number {
+    return rbHash([
+      this.relation,
+      this.wheres,
+      this.values,
+      this.orders,
+      this.limit,
+      this.offset,
+      this.key,
+    ]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof UpdateStatement &&
+      this.constructor === other.constructor &&
+      rbEqual(this.relation, other.relation) &&
+      rbEqual(this.wheres, other.wheres) &&
+      rbEqual(this.values, other.values) &&
+      rbEqual(this.groups, other.groups) &&
+      rbEqual(this.havings, other.havings) &&
+      rbEqual(this.orders, other.orders) &&
+      rbEqual(this.limit, other.limit) &&
+      rbEqual(this.offset, other.offset) &&
+      rbEqual(this.key, other.key)
+    );
   }
 
   // Mirrors Arel::Nodes::UpdateStatement#initialize_copy

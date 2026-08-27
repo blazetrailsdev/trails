@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -48,6 +49,21 @@ export class Cte extends Binary {
   ) {
     super(name, relation);
     this.materialized = materialized;
+  }
+
+  // Mirrors Arel::Nodes::Cte#hash / #eql? / #== (cte.rb:14-25).
+  override hash(): number {
+    return rbHash([this.name, this.relation, this.materialized]);
+  }
+
+  override eql(other: unknown): boolean {
+    return (
+      other instanceof Cte &&
+      this.constructor === other.constructor &&
+      rbEqual(this.name, other.name) &&
+      rbEqual(this.relation, other.relation) &&
+      rbEqual(this.materialized, other.materialized)
+    );
   }
 
   toCte(): Cte {

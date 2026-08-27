@@ -34,7 +34,10 @@ describe("TestNodes", () => {
     const badNodeDescendants = nodeDescendants.filter((subnode) => {
       const eqlOwner = owner(subnode, "eql");
       const hashOwner = owner(subnode, "hash");
-      return eqlOwner !== hashOwner;
+      // Ruby's `eqeq_method.super_method` arm — a node still on the default
+      // `Object#==` is bad. In JS the default lives on no prototype at all, so
+      // "not using it" reads as: some class in the chain owns the pair.
+      return eqlOwner === null || eqlOwner !== hashOwner;
     });
 
     const problemMsg =

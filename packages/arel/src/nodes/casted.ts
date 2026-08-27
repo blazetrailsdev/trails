@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { _Attribute, _Table, _setBuildQuoted } from "../node-slots.js";
@@ -77,6 +78,20 @@ export class Casted extends NodeExpression {
       return this.attribute.typeCastForDatabase(this.value);
     }
     return this.value;
+  }
+
+  // Mirrors Arel::Nodes::Casted#hash / #eql? / #== (casted.rb:24-34).
+  hash(): number {
+    return rbHash([this.constructor, this.value, this.attribute]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Casted &&
+      this.constructor === other.constructor &&
+      rbEqual(this.value, other.value) &&
+      rbEqual(this.attribute, other.attribute)
+    );
   }
 }
 

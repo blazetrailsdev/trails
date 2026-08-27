@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 
@@ -25,6 +26,22 @@ export class InsertStatement extends Node {
     this.columns = [];
     this.values = null;
     this.select = null;
+  }
+
+  // Mirrors Arel::Nodes::InsertStatement#hash / #eql? / #== (insert_statement.rb:22-34).
+  hash(): number {
+    return rbHash([this.relation, this.columns, this.values, this.select]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof InsertStatement &&
+      this.constructor === other.constructor &&
+      rbEqual(this.relation, other.relation) &&
+      rbEqual(this.columns, other.columns) &&
+      rbEqual(this.select, other.select) &&
+      rbEqual(this.values, other.values)
+    );
   }
 
   // Mirrors Arel::Nodes::InsertStatement#initialize_copy

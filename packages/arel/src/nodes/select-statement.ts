@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -28,6 +29,24 @@ export class SelectStatement extends NodeExpression {
     this.offset = null;
     this.lock = null;
     this.with = null;
+  }
+
+  // Mirrors Arel::Nodes::SelectStatement#hash / #eql? / #== (select_statement.rb:24-38).
+  hash(): number {
+    return rbHash([this.cores, this.orders, this.limit, this.lock, this.offset, this.with]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof SelectStatement &&
+      this.constructor === other.constructor &&
+      rbEqual(this.cores, other.cores) &&
+      rbEqual(this.orders, other.orders) &&
+      rbEqual(this.limit, other.limit) &&
+      rbEqual(this.lock, other.lock) &&
+      rbEqual(this.offset, other.offset) &&
+      rbEqual(this.with, other.with)
+    );
   }
 
   // Mirrors Arel::Nodes::SelectStatement#initialize_copy

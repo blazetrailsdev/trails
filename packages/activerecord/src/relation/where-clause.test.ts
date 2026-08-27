@@ -1,3 +1,4 @@
+import { rbEqual } from "@blazetrails/activesupport";
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -172,7 +173,7 @@ describe("ActiveRecord::Relation", () => {
       const predicates = [t.get("id").in([1, 2, 3]), t.get("name").eq(bindParam(null))];
       const whereClause = new WhereClause(predicates);
       const expected = new Nodes.And(predicates);
-      expect(whereClause.ast.eql(expected)).toBe(true);
+      expect(rbEqual(whereClause.ast, expected)).toBe(true);
     });
 
     it("ast wraps any SQL literals in parenthesis", () => {
@@ -191,7 +192,7 @@ describe("ActiveRecord::Relation", () => {
       const t = table();
       const whereClause = new WhereClause([t.get("id").in([1, 2, 3])]);
       const whereClauseWithEmpty = new WhereClause([t.get("id").in([1, 2, 3]), ""]);
-      expect(whereClause.ast.eql(whereClauseWithEmpty.ast)).toBe(true);
+      expect(rbEqual(whereClause.ast, whereClauseWithEmpty.ast)).toBe(true);
     });
 
     it("or joins the two clauses using OR", () => {

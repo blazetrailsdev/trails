@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 
@@ -26,6 +27,34 @@ export class DeleteStatement extends Node {
     this.limit = null;
     this.offset = null;
     this.key = null;
+  }
+
+  // Mirrors Arel::Nodes::DeleteStatement#hash / #eql? / #== (delete_statement.rb:25-41).
+  hash(): number {
+    return rbHash([
+      this.constructor,
+      this.relation,
+      this.wheres,
+      this.orders,
+      this.limit,
+      this.offset,
+      this.key,
+    ]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof DeleteStatement &&
+      this.constructor === other.constructor &&
+      rbEqual(this.relation, other.relation) &&
+      rbEqual(this.wheres, other.wheres) &&
+      rbEqual(this.orders, other.orders) &&
+      rbEqual(this.groups, other.groups) &&
+      rbEqual(this.havings, other.havings) &&
+      rbEqual(this.limit, other.limit) &&
+      rbEqual(this.offset, other.offset) &&
+      rbEqual(this.key, other.key)
+    );
   }
 
   // Mirrors Arel::Nodes::DeleteStatement#initialize_copy

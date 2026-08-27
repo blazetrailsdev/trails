@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -53,6 +54,21 @@ export class Window extends Node {
       return this.frame(new Range(expr));
     }
   }
+
+  // Mirrors Arel::Nodes::Window#hash / #eql? / #== (window.rb:54-65).
+  hash(): number {
+    return rbHash([this.orders, this.framing]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Window &&
+      this.constructor === other.constructor &&
+      rbEqual(this.orders, other.orders) &&
+      rbEqual(this.framing, other.framing) &&
+      rbEqual(this.partitions, other.partitions)
+    );
+  }
 }
 
 /**
@@ -64,6 +80,15 @@ export class NamedWindow extends Window {
   constructor(name: string) {
     super();
     this.name = name;
+  }
+
+  // Mirrors Arel::Nodes::NamedWindow#hash / #eql? / #== (window.rb:80-88).
+  override hash(): number {
+    return (super.hash() ^ rbHash(this.name)) >>> 0;
+  }
+
+  override eql(other: unknown): boolean {
+    return super.eql(other) && rbEqual(this.name, (other as NamedWindow).name);
   }
 }
 
@@ -90,7 +115,16 @@ export class Following extends Unary {
   }
 }
 
-export class CurrentRow extends Node {}
+export class CurrentRow extends Node {
+  // Mirrors Arel::Nodes::CurrentRow#hash / #eql? / #== (window.rb:103-111).
+  hash(): number {
+    return rbHash(this.constructor);
+  }
+
+  eql(other: unknown): boolean {
+    return other instanceof CurrentRow && this.constructor === other.constructor;
+  }
+}
 
 export class Rows extends Unary {
   declare expr: Node | null;

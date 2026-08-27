@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { _setAnd, _setOr } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -28,6 +29,19 @@ export class Nary extends NodeExpression {
       }
       return false;
     });
+  }
+
+  // Mirrors Arel::Nodes::Nary#hash / #eql? / #== (nary.rb:24-33).
+  hash(): number {
+    return rbHash([this.constructor, this.children]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Nary &&
+      this.constructor === other.constructor &&
+      rbEqual(this.children, other.children)
+    );
   }
 }
 
