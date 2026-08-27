@@ -83,7 +83,10 @@ const KEPT_TAG_RE =
  * switch on. It is the only argument a tag keeps; the English reason after it
  * is prose.
  */
-const PERMANENCE_RE = /^\s*(PERMANENT|CONVERGEABLE)\b/u;
+const PERMANENCE_RE = /^\s*[—:-]?\s*(PERMANENT|CONVERGEABLE)\b/u;
+
+/** Tags whose permanence claim the extractors switch on. */
+const REQUIRES_PERMANENCE = new Set(["noRailsEquivalent", "missingRailsCall", "missingRailsArgs"]);
 
 /**
  * A contiguous run of `//` comments is one human comment that happens to wrap,
@@ -147,20 +150,61 @@ function hasDirective(comment) {
 }
 
 function keptLines(comment) {
+  const lines = comment.value.split("\n");
   const kept = [];
-  for (const line of comment.value.split("\n")) {
+  // A tag's arguments wrap across lines, so each tag is gathered as a block —
+  // from its own line up to the next tag — and the data is read from the join.
+  let block = null;
+  let unreducible = false;
+  const flush = () => {
+    if (block) {
+      const rendered = renderTag(block);
+      if (rendered === null) unreducible = true;
+      else kept.push(rendered);
+    }
+    block = null;
+  };
+  for (const line of lines) {
     if (DIRECTIVE_RE.test(line)) {
+      flush();
       kept.push(line);
       continue;
     }
     const tag = KEPT_TAG_RE.exec(line);
-    if (!tag) continue;
-    const indent = /^[\s*]*/u.exec(line)[0];
-    const name = tag[1];
-    const permanence = PERMANENCE_RE.exec(line.slice(tag.index + tag[0].length));
-    kept.push(`${indent}@${name}${permanence ? ` ${permanence[1]}` : ""}`);
+    if (tag) {
+      flush();
+      block = { name: tag[1], text: line.slice(tag.index + tag[0].length) };
+      continue;
+    }
+    if (block) block.text += ` ${line.replace(/^[\s*]*/u, "")}`;
   }
-  return kept;
+  flush();
+  return unreducible ? null : kept;
+}
+
+/**
+ * One tag rendered as its data alone.
+ *
+ * `@missingRailsCall` / `@missingRailsArgs` are `<ruby_call> — <reason>`: the
+ * ruby_call NAMES which Rails call is unmade and is the tag's whole subject, so
+ * it is data and stays. `@noRailsEquivalent` takes the permanence token
+ * directly. Everything after the permanence claim is the English reason.
+ */
+function renderTag({ name, text }) {
+  const [subject, rest = ""] = text.split(/\s+—\s+/u, 2);
+  const takesSubject = name === "missingRailsCall" || name === "missingRailsArgs";
+  const rubyCall = takesSubject ? subject.trim() : "";
+  const permanence = PERMANENCE_RE.exec(takesSubject ? rest : text);
+  // A tag whose required argument is missing cannot be reduced to data: a bare
+  // `@noRailsEquivalent` or `@missingRailsCall` fails the empty-reason contract
+  // (scripts/api-compare/missing-rails-call-tags.ts, extract-ts-api.ts), and
+  // inventing the permanence claim would fabricate a reviewed judgement. Such a
+  // tag is left exactly as written, for a human to classify.
+  if (REQUIRES_PERMANENCE.has(name) && !permanence) return null;
+  if (takesSubject && rubyCall === "") return null;
+  return [`@${name}`, rubyCall, rubyCall && permanence && "—", permanence?.[1]]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -235,6 +279,7 @@ const rule = {
           // which the second pass no longer recognised and deleted.
           if (group.some(hasDirective)) continue;
           const rewrites = group.map((comment) => [comment, keptLines(comment)]);
+          if (rewrites.some(([, kept]) => kept === null)) continue;
           const anyKept = rewrites.some(([, kept]) => kept.length > 0);
           const changed = rewrites.some(
             ([comment, kept]) => kept.join("\n") !== comment.value.replace(/^\*/u, ""),

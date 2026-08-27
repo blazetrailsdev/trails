@@ -237,3 +237,54 @@ tester.run("no-freeform-comments (@deprecated survives)", rule, {
     },
   ],
 });
+
+// A tag's arguments are data and stay; only the English reason after the
+// permanence claim goes. `@missingRailsCall`'s ruby_call NAMES which Rails
+// call is unmade — dropping it left the tag saying nothing, and
+// `scripts/api-compare/build.ts` fails the run on a tag with no subject.
+tester.run("no-freeform-comments (tag arguments are data)", rule, {
+  valid: [
+    { code: `/** @missingRailsCall with_connection — PERMANENT */\nconst x = 1;\n` },
+    { code: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n` },
+  ],
+  invalid: [
+    {
+      code: `/** @missingRailsCall with_connection — PERMANENT: Rails is \`@arel ||= ...\`. */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @missingRailsCall with_connection — PERMANENT */\nconst x = 1;\n`,
+    },
+    // The reason wraps across lines; the data is still read from the whole tag.
+    {
+      code: `/**\n * @missingRailsArgs change — PERMANENT: time/calculations.rb:256-263 passes\n *   a different hash here.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @missingRailsArgs change — PERMANENT */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * @noRailsEquivalent PERMANENT — Ruby's \`@connection\` is duck-typed, so no\n * Ruby file declares the shape.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n`,
+    },
+    // Several tags in one block each keep their own data.
+    {
+      code: `/**\n * Prose.\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE: not yet ported.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/**\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE\n */\nconst x = 1;\n`,
+    },
+  ],
+});
+
+// A tag whose required argument is missing cannot be reduced to data. A bare
+// `@noRailsEquivalent` / `@missingRailsCall` fails the empty-reason contract
+// that `scripts/api-compare/missing-rails-call-tags.ts` and `extract-ts-api.ts`
+// enforce, and inventing the permanence claim would fabricate a reviewed
+// judgement — so the comment is left exactly as written.
+tester.run("no-freeform-comments (an unclassifiable tag is left alone)", rule, {
+  valid: [
+    { code: `/** @noRailsEquivalent Ruby needs no name for a duck type. */\nconst x = 1;\n` },
+    {
+      code: `/**\n * @noRailsEquivalent Serves trails' awaitable \`serializable_hash\`.\n */\nconst x = 1;\n`,
+    },
+    { code: `/** @missingRailsCall merge! — it is inlined here. */\nconst x = 1;\n` },
+  ],
+  invalid: [],
+});
