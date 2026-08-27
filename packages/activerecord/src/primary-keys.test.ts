@@ -7,7 +7,6 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";
 import { Keyboard } from "./test-helpers/models/keyboard.js";
@@ -29,17 +28,6 @@ describe("PrimaryKeysTest", () => {
   beforeAll(async () => {
     registerModel(Reply);
     registerModel(SillyReply);
-    await rebuildCanonicalTables(Base.connection, [
-      "topics",
-      "subscribers",
-      "movies",
-      "dashboards",
-      "non_primary_keys",
-      "developers",
-      "developers_projects",
-      "cpk_books",
-      "countries",
-    ]);
   });
 
   it("to key with default primary key", async () => {

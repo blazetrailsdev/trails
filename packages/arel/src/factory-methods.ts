@@ -1,4 +1,5 @@
 import type { Node } from "./nodes/node.js";
+import type { Table } from "./table.js";
 import { And } from "./nodes/nary.js";
 import { buildQuoted } from "./nodes/casted.js";
 import type { Join, NodeOrValue } from "./nodes/binary.js";
@@ -32,11 +33,11 @@ import { On } from "./nodes/unary.js";
 export interface FactoryMethodsModule {
   createTrue(): True;
   createFalse(): False;
-  createTableAlias(relation: Node, name: string | SqlLiteral): TableAlias;
+  createTableAlias(relation: Node | Table, name: string | SqlLiteral): TableAlias;
   createJoin(
-    to: Node | string,
+    to: Node | Table | string,
     constraint?: Node | string | null,
-    klass?: new (left: Node, right: Node | null) => Join,
+    klass?: new (left: Node | Table, right: Node | null) => Join,
   ): Join;
   createStringJoin(to: string | Node): StringJoin;
   createAnd(clauses: (Node | string)[]): And;
@@ -56,16 +57,16 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new False();
   },
 
-  createTableAlias(relation: Node, name: string | SqlLiteral): TableAlias {
+  createTableAlias(relation: Node | Table, name: string | SqlLiteral): TableAlias {
     return new TableAlias(relation, name);
   },
 
   // Rails' create_join/create_and are duck-typed and its own tests exercise
   // them with bare strings, so the params admit `string` like Table#createJoin.
   createJoin(
-    to: Node | string,
+    to: Node | Table | string,
     constraint?: Node | string | null,
-    klass?: new (left: Node, right: Node | null) => Join,
+    klass?: new (left: Node | Table, right: Node | null) => Join,
   ): Join {
     const JoinKlass = klass ?? InnerJoin;
     return new JoinKlass(to as Node, (constraint ?? null) as Node | null);

@@ -45,7 +45,7 @@ export interface TypeCaster {
  * Mirrors: Arel::Table
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Table extends Node {
+export class Table {
   /** Mirrors: `Arel::Table.engine` (table.rb:8-9, `class << self; attr_accessor
    *  :engine`). Rails assigns `ActiveRecord::Base` from
    *  `active_record.rb:562-564`; trails assigns it at the bottom of
@@ -70,7 +70,6 @@ export class Table extends Node {
     name: string | Node,
     options?: { as?: string; klass?: TableKlass; typeCaster?: unknown },
   ) {
-    super();
     this.name = name;
     const as = options?.as ?? null;
     this.tableAlias = as === name ? null : as;
@@ -97,8 +96,8 @@ export class Table extends Node {
    * Mirrors: Arel::Table#join
    */
   join(
-    relation: Node | string | null | undefined,
-    klass: new (left: Node, right: Node | null) => Join = InnerJoin,
+    relation: Node | Table | string | null | undefined,
+    klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
   ): SelectManager {
     if (relation == null) return this.from();
 
@@ -108,7 +107,7 @@ export class Table extends Node {
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       const text = typeof relation === "string" ? relation : relation.value;
       if (text.length === 0) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
+      klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
     }
 
     return this.from().join(relation, klass);
@@ -119,7 +118,7 @@ export class Table extends Node {
    *
    * Mirrors: Arel::Table#outer_join
    */
-  outerJoin(relation: Node | string): SelectManager {
+  outerJoin(relation: Node | Table | string): SelectManager {
     return this.join(relation, OuterJoin);
   }
 
@@ -224,22 +223,6 @@ export class Table extends Node {
 
   isAbleToTypeCast(): boolean {
     return this.typeCaster != null;
-  }
-
-  /**
-   * Factory: create a Join node (defaults to InnerJoin).
-   * Arguments are passed directly to the join constructor, matching
-   * Ruby's Arel::FactoryMethods#create_join.
-   *
-   * Mirrors: Arel::Table#create_join
-   */
-  createJoin(
-    to: Node | string,
-    constraint?: Node | string | null,
-    klass?: new (left: Node, right: Node | null) => Join,
-  ): Join {
-    const JoinClass = klass ?? InnerJoin;
-    return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 }
 

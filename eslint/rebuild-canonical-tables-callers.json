@@ -1,16 +1,6 @@
 {
-  "//": "RFC 0079 (drop-rebuild-canonical-tables) only-shrink baseline: repo-relative path -> number of rebuildCanonicalTables call sites that file is allowed. Enforced by eslint/no-new-rebuild-canonical-tables.mjs. Entries ONLY shrink: a burndown PR that removes a call decrements the count, or deletes the line when it reaches 0. Never add a row, and never raise a count -- if lint sent you here, stop dropping the canonical table instead. There is no reseed script, by design. Baseline: 26 call sites across 22 files, measured on origin/main at f5d2641f6 (2026-08-26). The helper is deleted, with this file, by the RFC final story.",
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/schema.test.ts": 1,
-  "packages/activerecord/src/adapters/mysql2/mysql2-adapter.test.ts": 1,
-  "packages/activerecord/src/adapters/mysql2/mysql2-adapter.trails.test.ts": 1,
-  "packages/activerecord/src/bind-parameter.test.ts": 1,
-  "packages/activerecord/src/custom-locking.test.ts": 1,
-  "packages/activerecord/src/date.test.ts": 1,
-  "packages/activerecord/src/dirty.test.ts": 1,
-  "packages/activerecord/src/dirty.trails.test.ts": 1,
-  "packages/activerecord/src/locking.test.ts": 2,
+  "//": "RFC 0079 (drop-rebuild-canonical-tables) only-shrink baseline: repo-relative path -> number of rebuildCanonicalTables call sites that file is allowed. Enforced by eslint/no-new-rebuild-canonical-tables.mjs. Entries ONLY shrink: a burndown PR that removes a call decrements the count, or deletes the line when it reaches 0. Never add a row, and never raise a count -- if lint sent you here, stop dropping the canonical table instead. There is no reseed script, by design. Baseline: 3 call sites across 3 files. The helper is deleted, with this file, by the RFC final story.",
   "packages/activerecord/src/migration/exclusion-constraint.test.ts": 1,
   "packages/activerecord/src/migration/unique-constraint.test.ts": 1,
-  "packages/activerecord/src/primary-keys.test.ts": 1,
   "packages/activerecord/src/schema-dumper.test.ts": 1
 }

@@ -12,7 +12,6 @@ import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base, RecordNotFound } from "./index.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -80,18 +79,6 @@ describe("BindParameterTest", () => {
   fixtures(["topics", "authors", "authorAddresses", "posts"]);
 
   beforeAll(async () => {
-    // A sibling file (e.g. coders/json.test.ts's SerializedTopic) physically
-    // replaces `topics` with a bespoke shape lacking `author_name`. The worker's
-    // canonical-schema preload keeps the signature cache warm, so the fixtures'
-    // own load then fails with "table topics has no column named author_name".
-    // Drop + recreate the canonical shape verbatim (mirrors the shield in
-    // locking.test.ts / dirty.test.ts).
-    await rebuildCanonicalTables(Base.connection, [
-      "topics",
-      "authors",
-      "author_addresses",
-      "posts",
-    ]);
     registerModel(Author);
     registerModel(Post);
   });

@@ -1,6 +1,7 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
+import type { Table } from "../table.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
 
@@ -21,7 +22,7 @@ export class SelectStatement extends NodeExpression {
   lock: Node | null;
   with: Node | null;
 
-  constructor(relation: Node | null = null) {
+  constructor(relation: Node | Table | null = null) {
     super();
     this.cores = [new SelectCore(relation)];
     this.orders = [];

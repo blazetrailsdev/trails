@@ -9,16 +9,14 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 type Rec = Base & Record<string, unknown>;
 
 describe("Dirty restore of an in-place mutation", () => {
-  fixtures([]);
+  fixtures(["topics"]);
 
   beforeAll(async () => {
-    await rebuildCanonicalTables(Base.connection, ["topics"]);
     await Topic.first();
   });
 

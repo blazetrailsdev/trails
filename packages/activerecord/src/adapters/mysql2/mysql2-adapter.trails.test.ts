@@ -32,7 +32,6 @@ import {
   ValueTooLong,
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
-import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
 import { Base } from "../../base.js";
 
@@ -237,11 +236,9 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   it("#exec_query queries with an empty result set still return the columns", async () => {
     // Mirrors adapter_test.rb: a zero-row SELECT must still report its
     // columns from the field descriptors, not collapse to an empty Result.
-    // Rails runs this against the canonical `subscribers` fixture table; this
-    // suite does not bootstrap the canonical schema, so lay the canonical table
-    // through the canonical loader rather than hand-rolling its DDL. It is left in place afterwards on purpose: this suite shares the
-    // per-worker database with every other file.
-    await rebuildCanonicalTables(adapter, ["subscribers"]);
+    // Rails runs this against the canonical `subscribers` fixture table, which
+    // its schema load lays; trails' per-worker boot (`test-setup-dy.ts`) lays
+    // the same canonical schema, so the table is already there.
     const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
     expect(result).toBeInstanceOf(Result);
     expect(result.rows).toEqual([]);

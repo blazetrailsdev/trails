@@ -1,6 +1,7 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
+import type { Table } from "../table.js";
 
 /**
  * DeleteStatement — DELETE FROM ... WHERE ...
@@ -8,7 +9,7 @@ import { Node } from "./node.js";
  * Mirrors: Arel::Nodes::DeleteStatement
  */
 export class DeleteStatement extends Node {
-  relation: Node | null;
+  relation: Node | Table | null;
   wheres: Node[];
   orders: Node[];
   groups: Node[];
@@ -17,7 +18,7 @@ export class DeleteStatement extends Node {
   offset: Node | null;
   key: Node | Node[] | null;
 
-  constructor(relation: Node | null = null, wheres: Node[] = []) {
+  constructor(relation: Node | Table | null = null, wheres: Node[] = []) {
     super();
     this.relation = relation;
     this.wheres = wheres;

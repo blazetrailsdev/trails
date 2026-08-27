@@ -10,8 +10,9 @@ export interface ArelEngine {
 }
 
 /** Backing store for `Arel::Table.engine`. It lives here, not in table.ts,
- *  because `Table extends Node` — a static `import { Table }` from this module
- *  would make table.ts evaluate against a half-initialised node.ts. `Table`
+ *  because `Node#toSql` defaults its engine from it — a static
+ *  `import { Table }` from this module would close a cycle back through
+ *  table.ts's own node imports. `Table`
  *  exposes it as the Rails-named `Table.engine` accessor. */
 export const _engine: { current: ArelEngine | null } = { current: null };
 

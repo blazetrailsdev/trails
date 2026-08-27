@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/schema_test.rb
  */
-import { describe, it, beforeEach, afterEach, afterAll, expect } from "vitest";
+import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
@@ -9,28 +9,11 @@ import {
   MYSQL_TEST_URL,
 } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
-
-/**
- * The four canonical tables this file force-recreates in a bespoke shape, all
- * restored together from one literal list: `require-canonical-rebuild` reads
- * the list at the call site, so forwarding it through a parameter would leave
- * every drop in the file unproven.
- */
-async function restoreCanonicalTables(): Promise<void> {
-  const adapter = await leaseMysqlAdapter();
-  await rebuildCanonicalTables(adapter, ["posts", "topics", "students", "lessons_students"]);
-}
-
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
   });
-  afterAll(async () => {
-    await restoreCanonicalTables();
-  });
-
   describe("SchemaTest", () => {
     it("float limits", async () => {
       // On MariaDB a bare FLOAT is normalized to DOUBLE in information_schema.columns
@@ -71,39 +54,22 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     async function withOmgPost(
       fn: (omgPost: typeof Base, db: string) => Promise<void>,
     ): Promise<void> {
-      // Mirror schema.rb's canonical `posts` create_table (the table @omgpost
-      // rides). Rails loads the whole schema on the shared connection; here the
-      // per-test adapter lays just this table and drops it in the finally.
-      await adapter.createTable("posts", { force: true }, (t: any) => {
-        t.integer("author_id");
-        t.string("title", { null: false });
-        t.text("body", { null: false });
-        t.string("type");
-        t.integer("legacy_comments_count", { default: 0 });
-        t.integer("taggings_with_delete_all_count", { default: 0 });
-        t.integer("taggings_with_destroy_count", { default: 0 });
-        t.integer("tags_count", { default: 0 });
-        t.integer("indestructible_tags_count", { default: 0 });
-        t.integer("tags_with_destroy_count", { default: 0 });
-        t.integer("tags_with_nullify_count", { default: 0 });
-      });
-      try {
-        const db = await adapter.currentDatabase();
-        // Mirror Rails' `def self.name; "Post"` override on the anonymous
-        // @omgpost class. Safe to override the class name here: trails' model
-        // registry is opt-in via registerModel() (no auto-`inherited` hook), and
-        // OmgPost is never registered, so this cannot collide with a canonical
-        // Post.
-        class OmgPost extends Base {
-          static _tableName = `${db}.posts`;
-          static name = "Post";
-        }
-        OmgPost.inheritanceColumn = "disabled";
-        OmgPost.adapter = adapter;
-        await fn(OmgPost, db);
-      } finally {
-        await adapter.dropTable("posts", { ifExists: true });
+      // Rails' schema load lays the canonical `posts` @omgpost rides
+      // (schema_test.rb:19-20 reads `Post.table_name`); trails' per-worker boot
+      // lays the same canonical schema, so ride it rather than re-laying it.
+      const db = await adapter.currentDatabase();
+      // Mirror Rails' `def self.name; "Post"` override on the anonymous
+      // @omgpost class. Safe to override the class name here: trails' model
+      // registry is opt-in via registerModel() (no auto-`inherited` hook), and
+      // OmgPost is never registered, so this cannot collide with a canonical
+      // Post.
+      class OmgPost extends Base {
+        static _tableName = `${db}.posts`;
+        static name = "Post";
       }
+      OmgPost.inheritanceColumn = "disabled";
+      OmgPost.adapter = adapter;
+      await fn(OmgPost, db);
     }
 
     it("schema", async () => {
@@ -115,8 +81,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           "INSERT INTO `posts` (`title`, `body`, `type`) " +
             "VALUES ('Welcome to the weblog', 'Such a lovely day', 'Post')",
         );
-        const first = await (OmgPost as any).first();
-        expect(first).toBeTruthy();
+        try {
+          const first = await (OmgPost as any).first();
+          expect(first).toBeTruthy();
+        } finally {
+          await adapter.executeMutation(
+            "DELETE FROM `posts` WHERE `title` = 'Welcome to the weblog'",
+          );
+        }
       });
     });
 
@@ -198,65 +170,29 @@ describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
     await ansi?.close();
     ansi = undefined;
   });
-  afterAll(async () => {
-    await restoreCanonicalTables();
-  });
-
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
-    // Mirror schema.rb's canonical `topics` create_table.
-    await a.createTable("topics", { force: true }, (t: any) => {
-      t.string("title", { limit: 250 });
-      t.string("author_name");
-      t.string("author_email_address");
-      // MySQL upgrades bare DATETIME to DATETIME(6) (Rails datetime-with-precision),
-      // matching the boot-laid canonical `topics` — pass precision explicitly.
-      t.datetime("written_on", { precision: 6 });
-      t.time("bonus_time");
-      t.date("last_read");
-      t.text("content");
-      t.text("important");
-      t.binary("binary_content");
-      t.boolean("approved", { default: true });
-      t.integer("replies_count", { default: 0 });
-      t.integer("unique_replies_count", { default: 0 });
-      t.integer("parent_id");
-      t.string("parent_title");
-      t.string("type");
-      t.string("group");
-      t.datetime("created_at", { null: true, precision: 6 });
-      t.datetime("updated_at", { null: true, precision: 6 });
-      t.index(["author_name", "title"]);
-    });
-    try {
-      expect(await a.primaryKey("topics")).toBe("id");
-    } finally {
-      await a.dropTable("topics", { ifExists: true });
-    }
+    // Rails reads the canonical `topics` its schema load laid; trails'
+    // per-worker boot lays the same table, so read it in place.
+    expect(await a.primaryKey("topics")).toBe("id");
   });
 
   it("foreign keys method with ansi quotes", async () => {
     const a = ansi!;
-    // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
-    // student_id referencing students(id) — both from the canonical schema.
-    await a.createTable("students", { force: true }, (t: any) => {
-      t.string("name");
-      t.boolean("active");
-      t.integer("college_id");
-    });
-    await a.createTable("lessons_students", { force: true, id: false }, (t: any) => {
-      t.bigint("lesson_id");
-      t.bigint("student_id");
-    });
+    // Rails' schema.rb:715-726 lays `lessons_students` / `students` AND the
+    // `add_foreign_key :lessons_students, :students, on_delete: :cascade` this
+    // reads. trails' canonical schema lays the two tables but not the FK yet
+    // (`canonical-schema.ts:1074`), so add it here and take it back off again —
+    // the canonical shape is shared, and no rebuild is needed to restore it.
+    await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
     try {
-      await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
       const fks = await a.foreignKeys("lessons_students");
       expect(fks).toHaveLength(1);
       expect(fks[0].fromTable).toBe("lessons_students");
       expect(fks[0].toTable).toBe("students");
       expect(fks[0].onDelete).toBe("cascade");
     } finally {
-      await a.dropTable("lessons_students", "students", { ifExists: true });
+      await a.removeForeignKey("lessons_students", "students");
     }
   });
 });
