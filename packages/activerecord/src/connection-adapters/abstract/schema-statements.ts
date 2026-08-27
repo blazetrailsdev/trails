@@ -947,8 +947,12 @@ export class SchemaStatements {
   async dropJoinTable(
     table1: string,
     table2: string,
-    options: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" } = {},
+    kwargs: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" } = {},
   ): Promise<void> {
+    // Ruby's `**options` (schema_statements.rb:427) collects a FRESH hash, so
+    // `find_join_table_name`'s `options.delete(:table_name)` cannot reach the
+    // caller's. A TS object is passed by reference, so copy it here.
+    const options = { ...kwargs };
     const joinTableName = this.findJoinTableName(table1, table2, options);
     await this.dropTable(joinTableName, options);
   }
