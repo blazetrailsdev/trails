@@ -1,9 +1,3 @@
-/**
- * SQLite3 schema dumper — SQLite-specific schema dump logic.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper
- */
-
 import type { ColumnInfo } from "../../schema-dumper.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
@@ -41,7 +35,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column) === "integer";
   }
 
-  /** @internal Mirrors Rails sqlite `explicit_primary_key_default?` (`column.bigint?`). */
+  /** @internal */
   protected override isExplicitPrimaryKeyDefault(column: Column): boolean {
     return this.isBigint(column);
   }

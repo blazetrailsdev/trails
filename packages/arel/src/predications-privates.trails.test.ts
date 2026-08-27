@@ -2,13 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Table, Nodes, SelectManager } from "./index.js";
 import { Predications } from "./predications.js";
 
-// Audit follow-up: cover the Predications private helpers that mirror
-// Arel::Predications' private API (grouping_any, grouping_all,
-// infinity?, unboundable?, open_ended?). Trails surfaces them on the
-// mixin object for Rails-fidelity / parity:api privates coverage;
-// these tests pin their behavior. The three predicate helpers delegate to
-// the single implementation on the mixin in predications.ts.
-
 const users = new Table("users");
 
 describe("Predications.groupingAny / groupingAll", () => {
@@ -32,10 +25,6 @@ describe("Predications.groupingAny / groupingAll", () => {
   });
 
   it("folds an empty `others` to Grouping(NULL) / Grouping(And([]))", () => {
-    // Pins the empty-array edge across the *_any/*_all → groupingAny/groupingAll
-    // rerouting: Ruby's `Or.inject` on [] returns nil (rendered `NULL`), and an
-    // empty `And` renders `()`. Both must survive the delegation unchanged,
-    // since `NULL OR FALSE` is NULL while `FALSE OR FALSE` is FALSE.
     const attr = users.get("id");
     const any = Predications.groupingAny.call(attr, "eq", []);
     expect(any.expr).toBeInstanceOf(Nodes.SqlLiteral);
@@ -49,14 +38,8 @@ describe("Predications.groupingAny / groupingAll", () => {
   });
 
   it("threads *extras through to the dispatched predicate", () => {
-    // predications.rb:139-145 forwards escape + case_sensitive to matches,
-    // and 155-161 forwards only escape to does_not_match. The extras arm of
-    // grouping_any exists for exactly these four callers, so pin that the
-    // arguments actually reach the built node.
     const attr = users.get("name");
 
-    // matches.rb:11 stores `escape && build_quoted(escape)`, so the arrival
-    // shape is a Quoted, not the bare string.
     const m = attr.matchesAny(["a%"], "!", true).expr as Nodes.Matches;
     expect(m.escape).toEqual(new Nodes.Quoted("!"));
     expect(m.caseSensitive).toBe(true);
@@ -90,8 +73,6 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   const isOpenEnded = (v: unknown) => Predications.isOpenEnded.call(host, v);
 
   it("isInfinity yields the sign for ±Infinity, 0 otherwise", () => {
-    // Mirrors `Float#infinite?` returning 1 / -1 / nil — the sign is what
-    // Predications#between reads to pick which side of the range collapses.
     expect(isInfinity(Infinity)).toBe(1);
     expect(isInfinity(-Infinity)).toBe(-1);
     expect(isInfinity(0)).toBe(0);
@@ -104,17 +85,12 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   });
 
   it("isInfinity reaches a Quoted through its own infinite?, not a structural unwrap", () => {
-    // casted.rb:43-45 duck-types the wrapped value, so a Quoted around anything
-    // answering `infinite?` (e.g. a QueryAttribute) reports the sign. predications.rb:248-250
-    // is a plain dispatch — it does not know Quoted exists.
     expect(isInfinity(new Nodes.Quoted({ isInfinite: () => 1 as const }))).toBe(1);
     expect(isInfinity(new Nodes.Quoted({ isInfinite: () => -1 as const }))).toBe(-1);
     expect(isInfinity(new Nodes.Quoted(3))).toBe(0);
   });
 
   it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
-    // casted.rb:5-35 — Casted has no `infinite?`, so open_ended?(Casted(INFINITY))
-    // is false in Rails and must stay false here.
     expect(isInfinity(new Nodes.Casted(Infinity, users.get("id")))).toBe(0);
     expect(isOpenEnded(new Nodes.Casted(Infinity, users.get("id")))).toBe(false);
   });
@@ -126,8 +102,6 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   });
 
   it("isUnboundable is 0 for values with no unboundable? — including ±Infinity", () => {
-    // Float has no `unboundable?` in Ruby, so a bare ±Infinity is open-ended
-    // via infinity?, NOT unboundable.
     expect(isUnboundable(Infinity)).toBe(0);
     expect(isUnboundable(undefined)).toBe(0);
     expect(isUnboundable(1)).toBe(0);
@@ -144,18 +118,12 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   });
 
   it("isOpenEnded dispatches infinity?/unboundable? through `this` so host overrides win", () => {
-    // predications.rb:255-257 calls both on self, so an including class that
-    // overrides either is honored.
     const overridden = { ...host, isInfinity: () => 1 as const };
     expect(Predications.isOpenEnded.call(overridden, 42)).toBe(true);
     expect(Predications.isOpenEnded.call(host, 42)).toBe(false);
   });
 
   it("isOpenEnded dispatches Ruby's leading `value.nil?` onto the node", () => {
-    // predications.rb:255-257 opens with `value.nil?`, which the node classes
-    // override to report on the wrapped value (bind_param.rb:23-25,
-    // casted.rb:16,41) — so a nil-wrapping bound is open-ended, and
-    // between(BindParam(nil), 3) is lteq(3) rather than a Between over a nil bind.
     expect(isOpenEnded(new Nodes.BindParam(null))).toBe(true);
     expect(isOpenEnded(new Nodes.Quoted(null))).toBe(true);
     expect(isOpenEnded(new Nodes.Casted(null, users.get("id")))).toBe(true);
@@ -165,9 +133,6 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
 });
 
 describe("Attribute private helpers (mirror Predications)", () => {
-  // The helpers are `protected` for Rails-fidelity / parity:api
-  // coverage, not as a public surface. Tests cast to access them —
-  // same pattern as HomogeneousIn#ivars / SelectManager#collapse.
   type AttributePrivates = Nodes.Attribute & {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
@@ -201,9 +166,6 @@ describe("Attribute private helpers (mirror Predications)", () => {
 });
 
 describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () => {
-  // predications.rb:38-51 calls unboundable? / open_ended? / infinity? on self,
-  // exactly as open_ended? (255-257) calls infinity? / unboundable? on self — so
-  // an including class that overrides one is honored by the decision tree too.
   class OverridingAttribute extends Nodes.Attribute {
     override isInfinity(_value: unknown): 1 | -1 | 0 {
       return 1;
@@ -227,9 +189,6 @@ describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () 
 });
 
 describe("SelectManager#collapse (Rails-fidelity helper)", () => {
-  // Mirrors Arel::SelectManager#collapse — compacts a list of exprs,
-  // wraps bare strings as SqlLiteral, returns the single survivor or
-  // an `And` of all of them.
   class TestManager extends SelectManager {
     callCollapse(exprs: unknown[]): Nodes.Node {
       return (this as unknown as { collapse(e: unknown[]): Nodes.Node }).collapse(exprs);
@@ -256,11 +215,6 @@ describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   });
 
   it("returns an empty And when every input is null/undefined (Rails parity)", () => {
-    // Mirrors Rails: `exprs.compact` then `create_and exprs` — an
-    // empty array hits the `else` branch and yields an empty `And`
-    // node. Rails-side `WHERE ()` is similarly invalid for the same
-    // reason; the limitation is shared with Rails. Callers are
-    // expected to filter empty conditions before reaching `where`.
     const out = mgr.callCollapse([null, undefined]);
     expect(out).toBeInstanceOf(Nodes.And);
     expect((out as Nodes.And).children).toHaveLength(0);
@@ -271,8 +225,6 @@ describe("HomogeneousIn#ivars (Rails-fidelity helper)", () => {
   it("returns the [attribute, values, type] tuple Rails uses for hash/eql", () => {
     const attr = users.get("id");
     const node = new Nodes.HomogeneousIn([1, 2, 3], attr, "in");
-    // ivars is `protected` so cast to access. The point: the tuple
-    // shape matches Rails' `[@attribute, @values, @type]`.
     const ivars = (node as unknown as { ivars(): [Nodes.Node, unknown[], "in" | "notin"] }).ivars();
     expect(ivars[0]).toBe(attr);
     expect(ivars[1]).toEqual([1, 2, 3]);

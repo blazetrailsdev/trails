@@ -1,26 +1,3 @@
-/**
- * Composite-key eager count / aggregate folds onto the shared `build_joins`
- * emitter.
- *
- * Two composite-key paths in `calculations.ts` previously skipped the eager
- * JoinDependency fold that `singleAggregate` / `executeGroupedCalculation` use, diverging
- * from Rails `apply_join_dependency` (which routes all arities through the one
- * `build_joins` path):
- *
- *   1. `performCount`'s eager branch guarded the DISTINCT-on-pk fan-out block
- *      with `if (!Array.isArray(pk))`, so a composite-PK model's
- *      `eager_load(:assoc).count` fell through to the plain count and never
- *      joined / de-duplicated (Rails `calculate`, calculations.rb:231-238, sets
- *      `select_values = Array(model.primary_key)` and counts distinctly).
- *   2. `groupedCompositeAssoc` (grouped calc keyed by a composite-FK belongs_to)
- *      emitted `buildJoins(manager)` WITHOUT the `eagerJd` argument, so
- *      `eager_load(:x).group(:composite_fk_belongs_to).count/.sum` never folded
- *      its eager JD through the shared emitter.
- *
- * Both now take their relation from `apply_join_dependency` and emit through
- * `buildJoins(manager)`, so one `AliasTracker` spans the manual joins
- * and the eager JD (a coinciding association dedups via `walk`).
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
@@ -29,8 +6,6 @@ import { captureSql } from "../testing/sql-capture.js";
 import type { Base } from "../index.js";
 
 describe("CpkBook eager count / aggregate build_joins fold", () => {
-  // Rails creates CPK rows inline; ride the canonical, empty cpk tables and let
-  // transactional rollback clean up each insert.
   fixtures([]);
 
   beforeAll(() => {
@@ -53,9 +28,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     const sqls = await captureSql(async () => {
       count = (await CpkBook.eagerLoad(":chapters").count()) as number;
     });
-    // Rails folds the eager JD into a LEFT OUTER JOIN and de-duplicates via a
-    // DISTINCT-pk-columns subquery; 2 chapters on book 1 fan to 3 joined rows,
-    // collapsed back to the 2 distinct books.
     expect(count).toBe(2);
     const countSql = sqls.find((s) => /count/i.test(s)) ?? "";
     expect(countSql).toMatch(/LEFT OUTER JOIN .*cpk_chapters/i);
@@ -64,7 +36,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:assoc).count matches the un-joined count", async () => {
     await seedBooksWithChapters();
-    // Rails: Cpk::Book.count == Cpk::Book.includes(:chapters).references(:chapters).count
     expect(await CpkBook.eagerLoad(":chapters").count()).toBe(await CpkBook.count());
   });
 
@@ -75,10 +46,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   async function seedBooksDuplicateRevisions(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
-    // Two rows share revision 5; the third has 9. This distinguishes bounding
-    // ROWS (Rails) from bounding distinct VALUES: limit(2) by pk order picks
-    // books 1 & 2 (rev 5, 5) → COUNT(DISTINCT revision) = 1, whereas truncating
-    // the distinct value list {5, 9} to 2 would (wrongly) yield 2.
     await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 5 });
     await CpkBook.create({ id: [1, 2], title: "Beta", revision: 5 });
     await CpkBook.create({ id: [1, 3], title: "Gamma", revision: 9 });
@@ -95,19 +62,9 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
         .limit(2)
         .count("cpk_books.revision")) as number;
     });
-    // Rails `distinct_relation_for_primary_key` materializes the limited DISTINCT
-    // pk tuples (books 1 & 2) then re-counts COUNT(DISTINCT revision) over
-    // `WHERE pk IN (...)` — the two rows both have revision 5, so the answer is 1.
-    // Value-bounding (`DISTINCT revision LIMIT 2`) would wrongly return 2.
     expect(count).toBe(2 - 1);
     const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT/i.test(s));
     expect(idSql).toBeTruthy();
-    // The recount restricts via per-column IN (author_id IN ... AND id IN ...),
-    // mirroring Rails' `where!(pk.zip(ids.transpose).to_h)`.
-    // `select_values` is the two pk columns Rails' `calculate` installs
-    // (calculations.rb:238), so `build_count_subquery?` (calculations.rb:659)
-    // wraps the DISTINCT count in a subquery rather than emitting the
-    // multi-column `COUNT(DISTINCT a, b)` SQLite and PG reject.
     const countSql = sqls.find((s) => /COUNT\(/i.test(s) && /IN \(/i.test(s)) ?? "";
     expect(countSql).toMatch(/DISTINCT/i);
     expect(countSql).toMatch(/author_id.*IN/i);
@@ -163,11 +120,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksWithOrders();
     let result!: Map<unknown, unknown>;
     const sqls = await captureSql(async () => {
-      // Counted over a named column: with no column Rails' `calculate` installs
-      // `select_values = Array(model.primary_key)` (calculations.rb:238), and a
-      // grouped calculation has no count-subquery arm, so the composite key
-      // would reach Arel as the multi-column `COUNT(DISTINCT author_id, id)`
-      // SQLite and PostgreSQL reject.
       result = (await CpkBook.eagerLoad(":order").group("order").count("cpk_books.id")) as Map<
         unknown,
         unknown

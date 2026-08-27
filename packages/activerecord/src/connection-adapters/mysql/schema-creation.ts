@@ -1,9 +1,3 @@
-/**
- * MySQL schema creation — MySQL-specific DDL generation.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation
- */
-
 import {
   SchemaCreation as AbstractSchemaCreation,
   type SchemaCreationConn,
@@ -43,16 +37,12 @@ interface MysqlColumnOptions extends Record<string, unknown> {
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
-/** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches.
- * Rails' `SchemaCreation#initialize(conn)` always receives the live adapter, so the quoting
- * half is required and dispatches polymorphically. */
+/** @internal */
 export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationConn {
   supportsCheckConstraints(): Promise<boolean>;
   supportsIndexesInCreate(): boolean;
   isMariadb(): Promise<boolean>;
   quote(value: unknown): string;
-  /** Rails' `index_in_create` builds the IndexDefinition through `@conn.add_index_options`
-   * (mysql/schema_creation.rb:99). */
   addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -61,23 +51,21 @@ export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationC
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  /** @internal Widened from the base `SchemaQuoter` to the full `@conn` surface: the
-   * `supports*` flags and `quote` for `add_sql_comment!`. */
+  /** @internal */
   declare protected conn: VisitorHostAdapter;
 
   constructor(host: VisitorHostAdapter) {
     super(host);
   }
 
-  /** @internal Live MariaDB lookup — consults the host adapter every call so a late
-   * `getFullVersion()` flip (lazy detection on first probe) is honored. */
+  /** @internal */
   protected async isMariadb(): Promise<boolean> {
     return this.conn.isMariadb();
   }
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby's SchemaCreation delegates type_to_sql to the adapter (abstract/schema_creation.rb:16-20); ours must override to route back.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     if (options.array && type !== "primary_key") {
@@ -180,19 +168,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
     );
   }
 
-  /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
+  /** @internal */
   protected supportsIndexesInCreate(): boolean {
     return this.conn.supportsIndexesInCreate();
   }
 
-  /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
+  /** @internal */
   protected async supportsCheckConstraints(): Promise<boolean> {
     return this.conn.supportsCheckConstraints();
   }
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby dispatches visit_#{o.class} dynamically (abstract/schema_creation.rb:11); our manual chain must be extended per adapter.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override accept(
     o:
@@ -265,7 +253,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE MySQL::SchemaCreation#add_column_options! (mysql/schema_creation.rb:62) without the Ruby bang suffix.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const mo = options as MysqlColumnOptions;

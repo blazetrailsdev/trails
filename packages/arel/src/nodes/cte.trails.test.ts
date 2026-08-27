@@ -2,10 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
 import { testConnection } from "../test-helpers/connection.js";
 
-// TS-only: no Rails counterpart. Pins that a `Cte` whose name is a
-// `SqlLiteral` (as produced by `TableAlias#toCte`) preserves the literal
-// through `toTable()`, matching Rails' `Arel::Table.new(name)` pass-through
-// (cte.rb:31-32) — the resulting table name renders bare, not quoted.
 describe("Cte#toTable", () => {
   it("preserves a SqlLiteral name as a bare table name", () => {
     const cte = new Nodes.Cte(
@@ -23,10 +19,6 @@ describe("Cte#toTable", () => {
   });
 });
 
-// TS-only: Ruby gets this for free from `alias :name :left` (cte.rb:6-7) and
-// `alias :relation :left` / `alias :name :right` (table_alias.rb:6-7) — one
-// ivar per pair, so `Binary#eql` (binary.rb:19-27) sees a write through either
-// spelling.
 describe("Cte / TableAlias alias the Binary slots", () => {
   it("Cte#name and #relation are the left/right slots", () => {
     const relation = new Table("bar").project(new Nodes.SqlLiteral("*"));

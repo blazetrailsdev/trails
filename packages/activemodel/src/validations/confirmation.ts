@@ -4,44 +4,18 @@ import { except, humanize, mergeBang } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
-/**
- * Mirrors: ActiveModel::Validations::ConfirmationValidator (confirmation.rb)
- */
 export class ConfirmationValidator extends EachValidator {
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare setupBang: typeof setupBang;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isConfirmationValueEqual: typeof isConfirmationValueEqual;
 
-  /**
-   * Mirrors: confirmation.rb:6-9
-   *   def initialize(options)
-   *     super({ case_sensitive: true }.merge!(options))
-   *     setup!(options[:class])
-   *   end
-   *
-   * The `case_sensitive` default is applied lazily in `isConfirmationValueEqual`
-   * (so it survives an explicit `undefined`), so the constructor's remaining job
-   * is calling `setupBang(options.class)` — the host class threaded through by
-   * `validatesWith`.
-   */
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
     super(options);
     this.setupBang(options.class);
   }
 
-  /**
-   * Mirrors: confirmation.rb:11-18. The pair is read through the reader
-   * `setup!` installs — `record.public_send("#{attribute}_confirmation")`
-   * (:12) — which is a zero-arg Ruby method, so trails' `public_send` of it is
-   * a property read (CLAUDE.md § "Generated attribute readers are properties").
-   *
-   * @missingRailsArgs merge! — PERMANENT: `Hash#merge!` is a receiver method
-   * on the hash `except` returns; trails ports Ruby's Hash
-   * core methods as free functions taking the hash first
-   * (`hash-utils.ts:140`), which JS requires short of monkey-patching
-   * `Object.prototype`, so the receiver arrives as the first argument.
-   */
+  /** @missingRailsArgs merge! — PERMANENT */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;
@@ -67,21 +41,7 @@ interface ConfirmationHost {
   attributes: readonly string[];
 }
 
-/**
- * Mirrors: confirmation.rb:21-29
- *   def setup!(klass)
- *     klass.attr_reader(*attributes.filter_map { |a| :"#{a}_confirmation" unless klass.method_defined?(:"#{a}_confirmation") })
- *     klass.attr_writer(*attributes.filter_map { |a| :"#{a}_confirmation" unless klass.method_defined?(:"#{a}_confirmation=") })
- *   end
- *
- * Defines virtual `${attribute}Confirmation` reader/writer accessors on
- * the host class so the comparison side of the pair is reachable. In
- * trails, `validate_each` reads the pair through that reader, so this helper
- * materializes matching prototype accessors on the host class, keeping a
- * per-instance backing slot under `_${attr}Confirmation`.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function setupBang(this: ConfirmationHost, klass: unknown): void {
   if (typeof klass !== "function") return;
   const ctor = klass as { prototype: object };
@@ -90,11 +50,6 @@ export function setupBang(this: ConfirmationHost, klass: unknown): void {
     const inherited = inspectAccessor(ctor.prototype, confirmationAttr);
     if (inherited.hasGetter && inherited.hasSetter) continue;
     const slot = `_${confirmationAttr}`;
-    // Rails checks reader and writer separately (method_defined? for
-    // both `:#{a}_confirmation` and `:#{a}_confirmation=`). Install
-    // only the missing half. When one side IS inherited (anywhere in
-    // the prototype chain), reuse it on the new descriptor so
-    // overriding doesn't shadow it.
     Object.defineProperty(ctor.prototype, confirmationAttr, {
       configurable: true,
       get:
@@ -111,18 +66,7 @@ export function setupBang(this: ConfirmationHost, klass: unknown): void {
   }
 }
 
-/**
- * Mirrors: confirmation.rb:32-38
- *   def confirmation_value_equal?(record, attribute, value, confirmed)
- *     if !options[:case_sensitive] && value.is_a?(String)
- *       value.casecmp(confirmed) == 0
- *     else
- *       value == confirmed
- *     end
- *   end
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isConfirmationValueEqual(
   this: { options: Record<string, unknown> },
   _record: ValidatableRecord,
@@ -140,15 +84,6 @@ export function isConfirmationValueEqual(
 ConfirmationValidator.prototype.setupBang = setupBang;
 ConfirmationValidator.prototype.isConfirmationValueEqual = isConfirmationValueEqual;
 
-/**
- * Mirrors: ActiveModel::Validations::HelperMethods (confirmation.rb:80-82) — Ruby reopens the
- * one `HelperMethods` module here, so the TS half of it lives here too and
- * `validations.ts` reassembles them.
- *
- * As with acceptance, `validatesWith` invokes the validator's `setupBang`
- * (Rails' `setup!`), which defines the `${attr}Confirmation` accessors on the
- * prototype.
- */
 export const HelperMethods = {
   validatesConfirmationOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
     return this.validatesWith(ConfirmationValidator, this._mergeAttributes(attrNames));

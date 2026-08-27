@@ -1,9 +1,3 @@
-/**
- * PostgreSQL type map initializer — populates a type map from pg_type rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TypeMapInitializer
- */
-
 import { ArgumentError, type Type } from "@blazetrails/activemodel";
 
 import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
@@ -19,12 +13,6 @@ export interface PgTypeRow {
   typdelim: string;
   typtype: string;
   typbasetype: number | string;
-  /**
-   * typarray is a column on pg_type but Rails' load_types_queries
-   * doesn't SELECT it and TypeMapInitializer doesn't read it. Keep it
-   * optional so PgTypeRow matches the adapter-fetched row shape
-   * (otherwise callers get a silent `undefined` at runtime).
-   */
   typarray?: number | string;
   typinput?: string;
   rngsubtype?: number | string;
@@ -59,9 +47,6 @@ export class TypeMapInitializer {
   }
 
   queryConditionsForKnownTypeNames(): string {
-    // Divergence: Rails interpolates type names unescaped (they're internal
-    // keys, not user input). We single-quote-escape defensively since the
-    // output is still SQL and the cost is negligible.
     const knownTypeNames = this.store.keys().map((key) => `'${String(key).replace(/'/g, "''")}'`);
     return `WHERE\n  t.typname IN (${knownTypeNames.join(", ")})\n`;
   }
@@ -72,9 +57,6 @@ export class TypeMapInitializer {
 
   queryConditionsForArrayTypes(): string {
     const knownTypeOids = this.store.keys().filter((key) => typeof key !== "string");
-    // Divergence: Rails emits `t.typelem IN ()` for an empty OID set, which
-    // is invalid SQL. We short-circuit to `WHERE 1=0` to return zero rows
-    // instead of erroring.
     if (knownTypeOids.length === 0) return "WHERE\n  1=0\n";
     return `WHERE\n  t.typelem IN (${knownTypeOids.join(", ")})\n`;
   }
@@ -87,10 +69,6 @@ export class TypeMapInitializer {
     this.registerWithSubtype(
       row.oid,
       toInt(row.rngsubtype ?? 0),
-      // Rails' OID::Range#type_cast_single calls @subtype.deserialize. If the
-      // registered subtype doesn't implement deserialize, Ruby would raise
-      // NoMethodError at cast time; we preserve that failure mode rather than
-      // silently routing through cast.
       (subtype) => new RangeType(subtype as unknown as RangeSubtype, row.typname),
     );
   }
@@ -114,10 +92,6 @@ export class TypeMapInitializer {
   }
 
   private registerArrayType(row: PgTypeRow): void {
-    // Skip-on-miss via registerWithSubtype, mirroring Rails' register_array_type.
-    // The eager full load run by configureConnection aliases every scalar OID
-    // (its by-typname pass) before this array pass, so the element type is in
-    // the store and the array never falls through to a ValueType.
     this.registerWithSubtype(
       row.oid,
       toInt(row.typelem),
@@ -178,7 +152,6 @@ interface OidSubtype {
 }
 
 function toInt(value: number | string): number {
-  // Mirrors Ruby's String#to_i: non-numeric strings coerce to 0 rather than NaN.
   if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : 0;
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? 0 : parsed;

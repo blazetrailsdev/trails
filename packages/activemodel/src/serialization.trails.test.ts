@@ -2,12 +2,6 @@
    Each model below spells `include ActiveModel::Serializers::JSON` in its class body, the way the
    Rails test model it mirrors does; the empty class/interface merge beside it is how
    `include()` surfaces those members on the type side. */
-/**
- * Serialization tests — TS-only coverage with no counterpart in
- * vendor/rails/activemodel/test/cases/serialization_test.rb. Relocated here
- * verbatim under RFC 0115 so serialization.test.ts holds Rails test names only
- * and a renamed or split Rails test stays visible in review.
- */
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { Dirty } from "./dirty.js";
@@ -16,11 +10,6 @@ import { Model } from "./index.js";
 import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
 import { NoMethodError } from "./attribute-assignment.js";
 
-// Plain ActiveModel serializes `include:` entries via `send(association)` —
-// the value behind a Ruby `attr_accessor :address` / `:friends` (see Rails'
-// serialization_test.rb). The trails analog is a plain property on the
-// instance; serialization reads it through the same `send` baseline. (For
-// activerecord, `send` reaches the generated association reader instead.)
 function setAssociationAccessors(record: unknown, entries: Record<string, unknown>): void {
   for (const [name, value] of Object.entries(entries)) {
     (record as Record<string, unknown>)[name] = value;
@@ -28,8 +17,6 @@ function setAssociationAccessors(record: unknown, entries: Record<string, unknow
 }
 
 describe("Serialization — trails-only coverage", () => {
-  // Duplicated from serialization.test.ts rather than moved: the Rails tests
-  // there use it too.
   class Post extends Model {
     static {
       include(this, SerializersJSON);
@@ -41,9 +28,6 @@ describe("Serialization — trails-only coverage", () => {
   interface Post extends SerializersJSON {}
 
   it("read_attribute_for_serialization dispatches the accessor, not a stale attributes hash", () => {
-    // Rails default `alias :read_attribute_for_serialization :send`: a host
-    // whose `attributes` only names keys while values live in accessors must
-    // serialize the accessor value, not re-read the hash.
     const host = {
       attributes: { name: "STALE" },
       get name(): string {
@@ -55,8 +39,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("read_attribute_for_serialization honors an overridden attribute reader (send)", () => {
-    // Rails `send(:name)` calls the reader, so a model overriding a declared
-    // attribute's getter serializes the override, not the raw store value.
     class Person extends Model {
       static {
         include(this, SerializersJSON);
@@ -73,8 +55,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("read_attribute_for_serialization invokes a method reader (send), not the attributes hash", () => {
-    // Rails' `send(:name)` calls the `name` method; a plain host with a method
-    // reader must serialize its return, not a stale `attributes[:name]`.
     const host = {
       attributes: { name: "STALE" },
       name(): string {
@@ -86,8 +66,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("read_attribute_for_serialization returns undefined for a present reader that returns undefined", () => {
-    // Ruby `send` keys off method existence, not return value: a reader that
-    // exists and returns nil yields nil, it does not raise.
     const host = {
       get name(): string | undefined {
         return undefined;
@@ -98,8 +76,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("read_attribute_for_serialization raises NoMethodError-style for a missing reader", () => {
-    // Ruby `send(:nope)` raises NoMethodError; a name with no reader and no
-    // store/hash entry fails loud rather than silently serializing undefined.
     const host = {
       attributes: { name: "x" },
       constructor: { name: "Host" },
@@ -109,9 +85,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("read_attribute_for_serialization raises NoMethodError-style for a reader-less attributes key", () => {
-    // Rails `alias :… :send` has no `attributes`-hash fallback: a storeless host
-    // that names a key in `attributes` but exposes no reader for it fails loud
-    // like `send(:name)`, not silently serialize the hash value.
     const host = {
       attributes: { name: "x" },
       constructor: { name: "Host" },
@@ -121,9 +94,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("read_attribute_for_serialization invokes a method reader on an _attributes-backed record", () => {
-    // Rails `send(:greeting)` calls the method even on a record with an attribute
-    // store; a genuine method (not a declared attribute) is invoked, not read
-    // from the store.
     class Person extends Model {
       static {
         include(this, SerializersJSON);
@@ -142,10 +112,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("a caller option named __sync does not hijack the internal sync re-entry", () => {
-    // The synchronous re-entry flag is a separate function parameter, not an
-    // option. A caller passing a castable option literally named `__sync` cannot
-    // reach it: the include-bearing call still returns the awaitable thenable
-    // (Rails' lazy `to_ary` contract) rather than building eagerly.
     class Person extends Model {
       static {
         include(this, SerializersJSON);
@@ -162,8 +128,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("only include with scalar coerces via Array() like an array", () => {
-    // Rails `Array(only).map(&:to_s)`: `only: "name"` equals `only: ["name"]`
-    // (serialization.rb:130). trails must not substring-match a scalar string.
     class Person extends Model {
       static {
         include(this, SerializersJSON);
@@ -228,10 +192,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   it("awaited nested include preloads through an attributes-less PORO", async () => {
-    // A singular `include` whose reader returns a plain PORO (no `_attributes`)
-    // that itself carries a nested, unloaded `include`. The `await` path must
-    // recurse through the PORO and lazy-load its nested collection (Rails'
-    // `to_ary`), even though the sync pass emits the PORO raw.
     const comment = { _attributes: new Map([["text", "Nice"]]) };
     const comments = {
       loaded: false,
@@ -256,12 +216,6 @@ describe("Serialization — trails-only coverage", () => {
   });
 
   describe("asJson type coercion (Rails ActiveSupport::JSON parity)", () => {
-    // Rails' JSON encoder routes every value through `as_json` — BigDecimal
-    // → string, Time/Date → ISO8601, Symbol → string. Our helper ports
-    // the subset that actually occurs in JS: BigInt → string, Date →
-    // ISO8601 (so the hash form already contains strings, not Date
-    // objects), and recursive coercion within arrays/objects.
-
     it("asJson coerces Temporal attributes to ISO 8601 strings", () => {
       class Event extends Model {
         static {
@@ -273,8 +227,6 @@ describe("Serialization — trails-only coverage", () => {
 
       const e = new Event({ startsAt: "2026-04-24T10:00:00.123456Z" });
       const json = e.asJson();
-      // `Time#as_json` renders at `ActiveSupport::JSON::Encoding.time_precision`
-      // (json.rb:200-208), which defaults to 3 (encoding.rb:135).
       expect(json["startsAt"]).toBe("2026-04-24T10:00:00.123Z");
     });
 

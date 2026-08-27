@@ -6,11 +6,6 @@ import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 
-/**
- * InsertManager — chainable API for building INSERT statements.
- *
- * Mirrors: Arel::InsertManager
- */
 export class InsertManager extends TreeManager {
   readonly ast: InsertStatement;
 
@@ -19,54 +14,24 @@ export class InsertManager extends TreeManager {
     this.ast = new InsertStatement(table ?? null);
   }
 
-  /**
-   * Set the target table.
-   */
   into(table: Table): this {
     this.ast.relation = table;
     return this;
   }
 
-  /**
-   * Return the current columns list.
-   *
-   * Mirrors: Arel::InsertManager#columns
-   */
   get columns(): Node[] {
     return this.ast.columns;
   }
 
-  /**
-   * Mirrors: Arel::InsertManager `values=` (insert_manager.rb).
-   */
   set values(val: Node | null) {
     this.ast.values = val;
   }
 
-  /**
-   * Set a SelectManager as the source for INSERT ... SELECT.
-   *
-   * Mirrors: Arel::InsertManager#select — stores the manager itself
-   * rather than unwrapping to its inner `.ast`. The visitor handles
-   * either shape (raw Node or SelectManager-shaped duck-type) via
-   * `visit`.
-   */
   select(select: InsertSelectSource): this {
     this.ast.select = select;
     return this;
   }
 
-  /**
-   * Set column/value pairs.
-   *
-   * Mirrors: Arel::InsertManager#insert (insert_manager.rb).
-   * - returns early when `fields` is empty (Rails: `return if fields.empty?`)
-   * - string form stores `Nodes::SqlLiteral.new(fields)` on `ast.values`
-   * - infers `ast.relation` from the first column when not yet set
-   *   (Rails: `@ast.relation ||= fields.first.first.relation`)
-   * - values pass through raw — no `Quoted` wrap (Rails preserves them
-   *   for the dialect-specific value visitor to quote)
-   */
   insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
     if (fields == null) return this;
 
@@ -91,23 +56,10 @@ export class InsertManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Create a ValuesList from a single row and columns.
-   *
-   * Mirrors: Arel::InsertManager#create_values
-   */
   createValues(values: unknown[]): ValuesList {
     return new ValuesList([values]);
   }
 
-  /**
-   * Create a ValuesList from multiple rows.
-   *
-   * Mirrors: Arel::InsertManager#create_values_list — rows carry arbitrary
-   * values, not necessarily Nodes (`create_values_list([%w{ a b }, %w{ c d }])`,
-   * insert_manager_test.rb:10); the visitor quotes raw entries (to_sql.rb:112).
-   * Matches `createValues` and the ValuesList node, which both take `unknown`.
-   */
   createValuesList(rows: unknown[][]): ValuesList {
     return new ValuesList(rows);
   }

@@ -1,13 +1,3 @@
-/**
- * Translation mixin — provides human_attribute_name and i18n_scope.
- *
- * Mirrors: ActiveModel::Translation
- *
- * In Rails this is a module included into ActiveModel::Model that provides
- * i18n-aware attribute name translation. The class-level methods (i18nScope,
- * humanAttributeName, lookupAncestors) are on the Model constructor; we
- * express the contract here as an interface for the static side.
- */
 import { humanize, isPresent } from "@blazetrails/activesupport";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
@@ -26,26 +16,13 @@ export interface TranslationClassMethods {
   humanAttributeName(attr: string, options?: HumanAttributeNameOptions): string;
 }
 
-/**
- * Mirrors: ActiveModel::Translation (translation.rb:11-73) — the module a host
- * gains by `extend ActiveModel::Translation` (validations.rb:43, api.rb:67).
- */
 export class Translation {
-  /**
-   * Mirrors: ActiveModel::Translation#i18n_scope (translation.rb:20-22)
-   *
-   *   def i18n_scope
-   *     :activemodel
-   *   end
-   */
   static get i18nScope(): string {
     return "activemodel";
   }
 
-  /** Mirrors: ActiveModel::Translation#lookup_ancestors (translation.rb:27-29). */
   static lookupAncestors = lookupAncestors;
 
-  /** Mirrors: ActiveModel::Translation#human_attribute_name (translation.rb:44-72). */
   static humanAttributeName = humanAttributeName;
 }
 
@@ -60,29 +37,17 @@ interface TranslationHost {
   lookupAncestors(): Array<{ new (...args: never[]): unknown; modelName: ModelName }>;
 }
 
-/** @internal Mirrors ActiveModel::Translation::MISSING_TRANSLATION */
+/** @internal */
 const MISSING_TRANSLATION = -(2 ** 60);
 
 let _raiseOnMissingTranslations = false;
 
-/**
- * Walk the class prototype chain collecting constructors that expose a
- * modelName static (i.e. those that include ActiveModel::Naming in Rails).
- *
- * Mirrors: ActiveModel::Translation#lookup_ancestors (translation.rb:36-38).
- */
 export function lookupAncestors(
   this: object,
 ): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
   return _walkAncestors(this);
 }
 
-/**
- * Transforms attribute names into a more human format, such as "First name"
- * instead of "first_name".
- *
- * Mirrors: ActiveModel::Translation#human_attribute_name
- */
 export function humanAttributeName(
   this: TranslationHost,
   attribute: string,

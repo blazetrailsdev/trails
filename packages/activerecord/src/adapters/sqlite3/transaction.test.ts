@@ -1,11 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/transaction_test.rb
- *
- * Note: better-sqlite3 does not expose SQLite's SQLITE_OPEN_SHAREDCACHE flag,
- * so cross-connection read_uncommitted visibility cannot be tested here. Tests
- * that require shared-cache cross-connection reads are kept as close to Rails
- * semantics as possible within that constraint.
- */
 import { it, expect, afterEach } from "vitest";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -88,7 +80,6 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     await conn2.rollbackDbTransaction();
 
     await conn1.rollbackDbTransaction();
-    // SHARED_CACHE_DB is in-memory and dies with the connection.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await conn1.exec(`DROP TABLE IF EXISTS "zines"`);
   });

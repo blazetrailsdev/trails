@@ -13,7 +13,6 @@ export class In extends Binary {
   }
 }
 
-// Mirrors `include FetchAttribute` (in.rb:6).
 include(
   In as unknown as new (...args: unknown[]) => object,
   FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,

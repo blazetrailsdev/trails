@@ -12,12 +12,6 @@ import {
   structuralUnionEq,
 } from "./query-methods.js";
 
-/**
- * Merges two Relations together, combining their conditions,
- * joins, and other clauses.
- *
- * Mirrors: ActiveRecord::Relation::Merger
- */
 export class Merger {
   readonly relation: any;
   readonly values: Record<string, unknown>;
@@ -29,17 +23,6 @@ export class Merger {
     this.values = typeof other.values === "function" ? other.values() : {};
   }
 
-  /**
-   * Mirrors: `ActiveRecord::Relation::Merger::NORMAL_VALUES`
-   * (merger.rb:52-56) — `Relation::VALUE_METHODS - Relation::CLAUSE_METHODS -
-   * [...]`.
-   *
-   * Ruby resolves `Relation::VALUE_METHODS` in the class body under Zeitwerk;
-   * ESM would have to evaluate `relation.ts` while it is still mid-eval
-   * (relation.ts -> spawn-methods.ts -> merger.ts -> relation.ts), so the
-   * constant is read at call time — where Ruby's autoload resolves it — via a
-   * static getter. See CLAUDE.md, "Call-time constant resolution".
-   */
   static get NORMAL_VALUES(): readonly ValueMethod[] {
     return Relation.VALUE_METHODS.filter(
       (name) =>
@@ -59,12 +42,6 @@ export class Merger {
     );
   }
 
-  // Rails' Merger#merge mutates the relation it is given and returns it
-  // (merger.rb) — it does NOT clone. Non-destructive `merge` gets its fresh copy
-  // from `spawn` before ever reaching here (SpawnMethods#merge = `spawn.merge!`),
-  // while `merge!` hands `self` straight in. Mirroring that in-place contract is
-  // what lets both entry points share this single algorithm; see mergeBang /
-  // performMerge in spawn-methods.ts.
   merge(): any {
     const rel = this.relation;
     for (const name of Merger.NORMAL_VALUES) {
@@ -87,21 +64,8 @@ export class Merger {
     return rel;
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
-   *   `other.select_values.empty?` (merger.rb:85) — `empty?` on a Ruby Array,
-   *   whose faithful JS spelling is `xs.length === 0`. That emits no callee, so
-   *   no TS call can ever credit the Ruby one. The gate flags it only because
-   *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
-   *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
-   *   nothing in the TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   private mergeSelectValues(rel: any): void {
-    // Mirrors Rails' Merger#merge_select_values: union (`|=`) the other
-    // relation's select_values into ours rather than replacing. When the two
-    // relations target different models, the other side's bare columns are
-    // first resolved against *its own* table via arel_columns so a symbol like
-    // `:body` qualifies to `comments.body` instead of the receiver's table.
     const otherSelect = this.other.selectValues;
     if (otherSelect == null || otherSelect.length === 0) return;
     const columns =
@@ -109,16 +73,7 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
-   *   `other.preload_values.empty?` / `other.includes_values.empty?`
-   *   (merger.rb:97,100,101,107,111) — `empty?` on a Ruby Array, whose faithful
-   *   JS spelling is `xs.length === 0`. That emits no callee, so no TS call can
-   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
-   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
-   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
-   *   TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   private mergePreloads(rel: any): void {
     if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
 
@@ -157,22 +112,12 @@ export class Merger {
     }
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
-   *   `other.joins_values.empty?` (merger.rb:118) — `empty?` on a Ruby Array,
-   *   whose faithful JS spelling is `xs.length === 0`. That emits no callee, so
-   *   no TS call can ever credit the Ruby one. The gate flags it only because
-   *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
-   *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
-   *   nothing in the TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   private mergeJoins(rel: any): void {
     const other = this.other;
     const joinsValues = other.joinsValues ?? [];
     if (joinsValues.length === 0) return;
     if (other.model === rel.model) {
-      // merger.rb:121 `relation.joins_values |= other.joins_values` — one union
-      // over the whole store, named and raw alike.
       for (const v of joinsValues) {
         if (!rel.joinsValues.some((existing: unknown) => structuralUnionEq(existing, v)))
           rel.joinsValues = [...rel.joinsValues, v];
@@ -180,8 +125,6 @@ export class Merger {
       return;
     }
 
-    // merger.rb:122-126 — `partition { |join| case join when Hash, Symbol,
-    // Array; true end }`. A Ruby Symbol is a leading-colon string in trails.
     const associations: unknown[] = [];
     const others: unknown[] = [];
     for (const v of joinsValues) {
@@ -199,15 +142,7 @@ export class Merger {
     QueryMethodBangs.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
-   *   `other.left_outer_joins_values.empty?` (merger.rb:137) — `empty?` on a
-   *   Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no
-   *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
-   *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`,
-   *   which takes arguments since it gained Rails' `async:` kwarg
-   *   (result.rb:94-100) — nothing in the TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   private mergeOuterJoins(rel: any): void {
     const other = this.other;
     const otherLeft = other.leftOuterJoinsValues ?? [];
@@ -237,13 +172,7 @@ export class Merger {
     QueryMethodBangs.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
-  // Mirrors merge_multi_values (merger.rb:154-167).
-  /**
-   * @missingRailsCall any? — PERMANENT. Verified per-site (RFC 0106):
-   *   `other.order_values.any?` (merger.rb:159) and `extensions.any?` (:165) —
-   *   `any?` on Ruby Arrays, whose falsiness test is `length > 0` in TS, not a
-   *   call.
-   */
+  /** @missingRailsCall any? — PERMANENT */
   private mergeMultiValues(rel: any): void {
     if (this.other.reorderingValue) {
       rel.reorderBang(...this.other.orderValues);
@@ -257,7 +186,6 @@ export class Merger {
     if (extensions.length > 0) rel.extendingBang(...extensions);
   }
 
-  // Mirrors merge_single_values (merger.rb:169-174).
   private mergeSingleValues(rel: any): void {
     if (this.other.lockValue) rel.lockValue ||= this.other.lockValue;
 
@@ -281,9 +209,6 @@ export class Merger {
   private isReplaceFromClause(): boolean {
     const relationFrom = this.relation.fromClause;
     const otherFrom = this.other.fromClause;
-    // Rails replace_from_clause? also requires same base_class, so a cross-model
-    // merge (e.g. Comment.merge(Post.from("posts"))) keeps the receiver's own
-    // FROM (its base table) rather than swapping in the other model's table.
     return (
       (!relationFrom || relationFrom.isEmpty()) &&
       !!otherFrom &&
@@ -293,20 +218,11 @@ export class Merger {
   }
 }
 
-/**
- * Merges a hash of value-method directives into a Relation.
- *
- * Mirrors: ActiveRecord::Relation::HashMerger. Rails validates the hash keys
- * against `Relation::VALUE_METHODS` (raising ArgumentError on any unknown key),
- * then builds a relation from the hash by dispatching each key to its
- * value-method bang setter and merges that via `Merger`.
- */
 export class HashMerger {
   readonly relation: any;
   readonly hash: Record<string, unknown>;
 
   constructor(relation: any, hash: Record<string, unknown>) {
-    // Rails `HashMerger#initialize`: `hash.assert_valid_keys(*VALUE_METHODS)`.
     assertValidKeys(hash, Relation.VALUE_METHODS as string[]);
     this.relation = relation;
     this.hash = hash;
@@ -316,24 +232,12 @@ export class HashMerger {
     return new Merger(this.relation, this.other()).merge();
   }
 
-  // Rails `HashMerger#other`: build a fresh relation and apply each hash value
-  // to it via `public_send("#{k}!", *v)` so where-value interpolation etc.
-  // happens on the built relation rather than by directly merging raw values.
   private other(): any {
-    // `Relation.create(relation.model, table:, predicate_builder:)`
-    // (merger.rb:26-30).
     const other: any = Relation.create(this.relation.model, {
       table: this.relation.table,
       predicateBuilder: this.relation.predicateBuilder,
     });
     for (const [key, value] of Object.entries(this.hash)) {
-      // `select` dispatches to `_select!` (Rails renames `:select` → `:_select`
-      // to avoid Enumerable#select!); trails mirrors this with `_selectBang`.
-      // Every other key routes to its `#{key}!` value-method, exactly as Rails'
-      // `other.public_send("#{k}!", *v)`. Note `:reordering` is in VALUE_METHODS
-      // but Rails defines no `reordering!` (only `reorder!`, query_methods.rb:760),
-      // so `merge(reordering: ...)` raises there too — we let it fall through and
-      // fail the same way rather than inventing a working path.
       const method = key === "select" ? "_selectBang" : `${key}Bang`;
       if (Array.isArray(value)) {
         other[method](...value);

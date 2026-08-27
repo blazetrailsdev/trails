@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/with_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import "../index.js";
@@ -23,20 +18,10 @@ const POSTS_WITH_TAGS_AND_MULTIPLE_COMMENTS = POSTS_WITH_MULTIPLE_COMMENTS.filte
   POSTS_WITH_TAGS.includes(id),
 ).sort((a, b) => a - b);
 
-// Rails asserts `relation.order(:id).pluck(:id)`. trails' `pluck` now threads
-// the `from("cte AS posts")` / CTE clause through its manager, so it reads from
-// the CTE source like Rails. Cast to Number since adapters may surface ids as
-// strings (e.g. PG bigint).
 function toIds(ids: any[]): number[] {
   return ids.map((id) => Number(id));
 }
 
-// trails collapses Ruby Symbol and String to one JS string type; a genuine
-// Symbol is how a caller signals "association/CTE name" (vs a raw SQL fragment)
-// to the join partitioner (query_methods.ts `selectNamedJoins`).
-// ==========================================================================
-// WithTest — targets relation/with_test.rb
-// ==========================================================================
 describeIfSupports("common_table_expressions", "WithTest", () => {
   fixtures(["comments", "posts", "companies"]);
 
@@ -126,8 +111,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with when invalid params are passed", async () => {
-    // Rails validates in `build_with_expression_from_value` at `build_arel`
-    // time, so the raise lands on `load` — which is a promise here.
     await expect(Post.with({ posts_with_tags: null as any }).load()).rejects.toThrow(
       /Unsupported argument type/,
     );
@@ -183,9 +166,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with joins", async () => {
-    // Rails: `.joins(:commented_posts)`. trails routes a CTE-name symbol in
-    // joins() to build_with_join_node(name, InnerJoin) — an
-    // `INNER JOIN commented_posts ON commented_posts.post_id = posts.id`.
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() }).joins(
       ":commented_posts",
     );
@@ -194,14 +174,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with joins routes a cte symbol to an inner join", () => {
-    // Rails routes a symbol joins() arg matching a `with(...)` CTE name to a
-    // `build_with_join_node(name, Arel::Nodes::InnerJoin)` join_node
-    // (query_methods.rb:1865-1873), which joins on
-    // `cte[model.foreign_key] = table[model.primary_key]`. trails mirrors this in
-    // `emitJoinPlan`' `selectNamedJoins` block — a `CTEJoin` becomes
-    // `buildWithJoinNode(name, Nodes.InnerJoin)`. Lock the InnerJoin routing: the
-    // CTE symbol must emit an INNER JOIN to the CTE
-    // (`commented_posts.post_id = posts.id`), not a LEFT OUTER JOIN.
     const sql = (
       Post.with({
         commented_posts: Comment.select("post_id").distinct(),
@@ -233,17 +205,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with left joins routes a cte symbol to a left outer join", () => {
-    // Rails routes a symbol left-outer arg matching a `with(...)` CTE name to a
-    // `build_with_join_node(name, Arel::Nodes::OuterJoin)` join_node
-    // (query_methods.rb:1830-1836), which joins on
-    // `cte[model.foreign_key] = table[model.primary_key]`. trails mirrors this in
-    // `buildJoinBuckets`' `selectNamedJoins` block — a `CTEJoin` becomes
-    // `buildWithJoinNode(name, Nodes.OuterJoin)`. The same partition runs on the
-    // live `buildJoins` path, so `with(...).leftOuterJoins(cte)` emits
-    // the LEFT OUTER JOIN directly (no `from(...)` subquery wrapper). Lock the
-    // OuterJoin routing: the CTE symbol must emit a LEFT OUTER JOIN to the CTE
-    // (`commented_posts.post_id = posts.id`), not an INNER JOIN. (trails Symbol
-    // is `":name"`.)
     const relation = Post.with({
       commented_posts: Comment.select("post_id").distinct(),
     })
@@ -262,11 +223,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with left joins routes a cte symbol before a raw joins node", () => {
-    // Rails' build_join_buckets pushes the CTE join_node in the left-outer
-    // section (query_methods.rb:1832) BEFORE the joins_values loop appends its
-    // nodes to the same bucket (query_methods.rb:1852-1863), so the CTE LEFT
-    // OUTER JOIN precedes a raw `.joins("...")` node in the emitted SQL. Lock
-    // that order on the live path when both are present.
     const relation = Post.with({
       commented_posts: Comment.select("post_id").distinct(),
     })
@@ -285,8 +241,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("raises when using block", () => {
-    // Rails passes a literal block (`Post.with(attributes_for_inspect: :id) { }`);
-    // the TS equivalent of a Ruby block is a trailing function argument.
     expect(() => (Post as any).with({ attributes_for_inspect: "id" }, () => {})).toThrow(
       /does not accept a block/,
     );
@@ -303,13 +257,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 });
 
-// Rails' `else` branch for adapters lacking CTE support is ungated (it asserts
-// the no-CTE-support fallback), so it stays OUTSIDE the describeIfSupports gate
-// above to mirror Rails exactly.
 describe("WithTest", () => {
-  it.skip("common table expressions are unsupported", () => {
-    // PERMANENT-SKIP: Rails' `else` branch for adapters lacking CTE support.
-    // Every adapter trails exercises (SQLite/PG/MySQL) supports CTEs, so this
-    // branch is unreachable here.
-  });
+  it.skip("common table expressions are unsupported", () => {});
 });

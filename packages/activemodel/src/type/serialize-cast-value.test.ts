@@ -2,16 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Type } from "./value.js";
 import { SerializeCastValue } from "./serialize-cast-value.js";
 
-/**
- * Mirrors `include SerializeCastValue` / `prepend SerializeCastValue`
- * (activemodel/lib/active_model/type/serialize_cast_value.rb:6,22-24):
- * `DefaultImplementation#serialize_cast_value` is installed unless the class
- * already defines one (Ruby's `method_defined?` — the whole ancestor chain,
- * which `in` is), alongside `itself_if_serialize_cast_value_compatible` and
- * the `ClassMethods` `serialize_cast_value_compatible?`. TypeScript has no
- * `include`, so the settled trails idiom applies: assign the module's members
- * directly to the class (CLAUDE.md "Module mixins").
- */
 function includeSerializeCastValue(klass: { prototype: object }): void {
   const proto = klass.prototype as Record<string, unknown>;
   if (!("serializeCastValue" in proto)) {
@@ -22,10 +12,6 @@ function includeSerializeCastValue(klass: { prototype: object }): void {
     Type.serializeCastValueCompatible;
 }
 
-/**
- * Mirrors Ruby's `DelegateClass(klass)` (stdlib `delegate`): a fresh class
- * wrapping one object and forwarding `klass`'s public instance methods to it.
- */
 function DelegateClass(protoToForward: object): {
   new (delegated: object): { __getobj__: object };
   prototype: object;
@@ -59,8 +45,6 @@ describe("SerializeCastValueTest", () => {
 
   class IncludesModule extends DoesNotIncludeModule {
     serializeCastValue(value: unknown): string {
-      // Rails: `"serialize_cast_value(#{super})"` — `super` is
-      // `DefaultImplementation#serialize_cast_value`, the identity.
       return `serialize_cast_value(${SerializeCastValue.serializeCastValue(value)})`;
     }
 
@@ -132,10 +116,6 @@ describe("SerializeCastValueTest", () => {
   });
 
   it("uses #serialize when a delegate class does not include SerializeCastValue", () => {
-    // The delegate forwards `itself_if_serialize_cast_value_compatible` to the
-    // wrapped object, so it answers the *wrapped* object, never the delegate —
-    // `type.equal?(...)` is false and `serialize` is used. This is the case the
-    // comment at serialize_cast_value.rb:26-29 is guarding.
     const delegateClass = DelegateClass(IncludesModule.prototype);
     assertSerializesUsing("serialize", new delegateClass(new IncludesModule()));
   });

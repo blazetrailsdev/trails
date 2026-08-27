@@ -1,4 +1,3 @@
-/** Per-adapter `NATIVE_DATABASE_TYPES`, transcribed from Rails. */
 export interface NativeDatabaseType {
   name?: string;
   limit?: number;
@@ -6,11 +5,6 @@ export interface NativeDatabaseType {
   scale?: number;
 }
 
-/**
- * A whole hash. Rails stores `:primary_key` as a bare String and every other
- * entry as a Hash; `type_to_sql` branches on `native.is_a?(Hash)`
- * (abstract/schema_statements.rb:1387-1388), so both shapes are load-bearing.
- */
 export type NativeDatabaseTypes = Record<string, string | NativeDatabaseType>;
 
 export const SQLITE3_NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
@@ -93,19 +87,11 @@ export const POSTGRESQL_NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
   enum: {},
 };
 
-/**
- * Mirrors `PostgreSQLAdapter.native_database_types` (postgresql_adapter.rb:404-408):
- * duplicates the constant and replaces the raw `datetime: {}` placeholder with
- * the entry named by `datetime_type` before any caller reads it. `type_to_sql`
- * never sees the unresolved placeholder.
- */
 export function postgresqlNativeDatabaseTypes(
   datetimeType: string,
   overrides: NativeDatabaseTypes = {},
 ): NativeDatabaseTypes {
   const types: NativeDatabaseTypes = { ...POSTGRESQL_NATIVE_DATABASE_TYPES, ...overrides };
-  // Rails assigns with no default, so a `datetime_type` naming no entry leaves
-  // `:datetime` nil and `type_to_sql(:datetime)` falls through to "datetime".
   types["datetime"] = types[datetimeType];
   return types;
 }

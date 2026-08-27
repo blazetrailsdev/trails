@@ -3,14 +3,6 @@ import { runCallbacks, throwAbort } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { type CallbackConditions } from "./callbacks.js";
 
-/**
- * `define_model_callbacks` generates its macros with `define_singleton_method`
- * (activemodel/lib/active_model/callbacks.rb:130, :137, :144), so the names
- * exist only once the macro has run and TypeScript cannot see them on the
- * class. `generated()` is the single place this suite crosses that gap: it
- * names the shape those methods have rather than reaching for a cast at each
- * call site.
- */
 type GeneratedMacro<F> = (...args: Array<F | object | string | CallbackConditions>) => void;
 
 interface GeneratedModelCallbacks {
@@ -29,9 +21,6 @@ function generated(klass: typeof Model): GeneratedModelCallbacks {
   return klass as unknown as GeneratedModelCallbacks;
 }
 
-/**
- * Mirrors: ActiveModel::CallbacksTest::Violin (callbacks_test.rb:117-130).
- */
 class Violin extends Model {
   static {
     this.defineModelCallbacks("create");
@@ -50,13 +39,6 @@ class Violin extends Model {
 }
 describe("CallbacksTest", () => {
   it("after callbacks are not executed if the block returns false", async () => {
-    // Faithful port of Rails ModelCallbacks (callbacks_test.rb:6-87): an
-    // around_create returning false, an after_create returning false, and a
-    // final after_create, with `create` running run_callbacks(:create) whose
-    // block returns @valid. With valid: false the block returns false, and
-    // ActiveModel's after-model-callback `v != false` conditional skips both
-    // after_create callbacks — exercising the block-return mechanism the test
-    // name describes, not a throw :abort.
     class CallbackValidator {
       aroundCreate(model: any, proceed: () => void) {
         model.callbacks.push("before_around_create");

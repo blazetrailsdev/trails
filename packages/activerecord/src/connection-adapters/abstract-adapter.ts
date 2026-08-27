@@ -1,9 +1,3 @@
-/**
- * Abstract adapter — base class for all database adapters.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
- */
-
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
@@ -30,11 +24,7 @@ import {
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
 
-/**
- * The instrumenter surface `#log` drives — `ActiveSupport::Notifications`'
- * `Instrumenter` or a `FutureResult::EventBuffer` standing in for it.
- * @internal
- */
+/** @internal */
 type AdapterInstrumenter = {
   instrumentAsync<T>(
     name: string,
@@ -145,19 +135,11 @@ import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 
-/**
- * Normalized adapter family name used for dialect branching.
- *
- * Mirrors: the three families Rails branches on throughout
- * ActiveRecord (sqlite3, postgresql, mysql2).
- */
 export type AdapterName = "sqlite" | "postgres" | "mysql2";
 
 /**
- * Map a database.yml `adapter:` config string to the normalized `AdapterName` family.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the adapter-name normalization Ruby does inline in ConnectionAdapters.resolve (connection_adapters.rb:34-39).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
   switch (configAdapter?.toLowerCase()) {
@@ -174,24 +156,9 @@ export function adapterNameFromConfig(configAdapter: string | undefined): Adapte
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
- */
 export class Version {
-  /** Rails' `@version` (abstract_adapter.rb:249). */
   private _version: number[];
 
-  /**
-   * Rails: `attr_reader :full_version_string` (abstract_adapter.rb:246).
-   *
-   * Nullable because Rails' own `initialize` defaults it to `nil`
-   * (abstract_adapter.rb:248) and an adapter really does build one that way:
-   * `SQLite3Adapter#get_database_version` passes only the version string
-   * (sqlite3_adapter.rb:477). The MySQL side is the one that must always carry
-   * it, and does — `get_database_version` passes both
-   * (abstract_mysql_adapter.rb:86-90) — which is why `Mysql2Adapter#full_version`
-   * needs no arm for the nil (mysql2_adapter.rb:164-166).
-   */
   readonly fullVersionString: string | null;
 
   constructor(versionString: string, fullVersionString: string | null = null) {
@@ -203,14 +170,6 @@ export class Version {
     return this._version.join(".");
   }
 
-  /**
-   * Mirrors Rails' `<=>` (abstract_adapter.rb:252-254): `@version <=>
-   * version_string.split(".").map(&:to_i)`. Ruby's `Array#<=>` compares
-   * element by element and falls back to length, which is what the loop and
-   * the trailing length comparison spell out here. Rails' `>=` / `<` come
-   * from `include Comparable`; TS has no operator overloading, so call sites
-   * spell them `compare(...) >= 0` / `compare(...) < 0`.
-   */
   compare(versionString: string): number {
     const other = versionString.split(".").map((part) => parseInt(part, 10) || 0);
     for (let i = 0; i < Math.min(this._version.length, other.length); i++) {
@@ -221,19 +180,6 @@ export class Version {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
- *
- * Rails: `class AbstractAdapter ... include DatabaseStatements`.
- * We do the same with `include(AbstractAdapter, DatabaseStatements)`
- * after the class body (see bottom of file) — no synthetic base.
- */
-// Method-signature interface mirrors `DatabaseStatements` (declared via
-// include() below). Using method signatures (not property-typed
-// functions from `Included<>`) lets concrete adapter subclasses
-// override with method syntax without tripping TS2425.
-// SchemaStatements methods mixed in via include() at the bottom of this file.
-// Rails: `AbstractAdapter` includes `SchemaStatements` so `connection.create_table(...)` works.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter {
   createTable(
@@ -297,11 +243,6 @@ export interface AbstractAdapter {
     allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void>;
-  /**
-   * Rails' `add_columns(table_name, *column_names, type:, **options)`
-   * (schema_statements.rb:643) — the trailing hash carries `type` plus the
-   * per-column options, so it is the last vararg, not a per-column record.
-   */
   addColumns(
     tableName: string,
     ...args: [...string[], { type: ColumnType } & ColumnOptions]
@@ -329,12 +270,7 @@ export interface AbstractAdapter {
       [key: string]: unknown;
     },
   ): Promise<[IndexDefinition, string | undefined, boolean]>;
-  /**
-   * schema_statements.rb:1837. PostgreSQL returns `[sql, proc]` when a
-   * `:comment` is present (postgresql/schema_statements.rb:1046-1049), hence
-   * the union.
-   * @internal
-   */
+  /** @internal */
   addColumnForAlter(
     tableName: string,
     columnName: string,
@@ -414,8 +350,6 @@ export interface AbstractAdapter {
   tableExists(tableName: string): Promise<boolean | null>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   internalStringOptionsForPrimaryKey(): Record<string, unknown>;
-  // Rails' `column_exists?(table, column, type = nil, **options)` narrows the
-  // match by column `type` and the columnOptionsKeys when given.
   columnExists(
     tableName: string,
     columnName: string,
@@ -435,13 +369,7 @@ export interface AbstractAdapter {
   viewExists(viewName: string): Promise<boolean | null>;
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /**
-   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
-   * callable with the kwargs alone, and TypeScript cannot skip a leading
-   * positional, so the options object may arrive in its place.
-   *
-   * @internal
-   */
+  /** @internal */
   dataSourceSql(options: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
@@ -453,10 +381,7 @@ export interface AbstractAdapter {
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_options
-   * @internal
-   */
+  /** @internal */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,
@@ -469,14 +394,12 @@ export interface AbstractAdapter {
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
-  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
   addBelongsTo(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   removeReference(
     tableName: string,
     refName: string,
     options?: RemoveReferenceOptions,
   ): Promise<void>;
-  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
   removeBelongsTo(
     tableName: string,
     refName: string,
@@ -490,10 +413,7 @@ export interface AbstractAdapter {
     options?: { name?: string; validate?: boolean; ifNotExists?: boolean; [key: string]: unknown },
   ): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_options
-   * @internal
-   */
+  /** @internal */
   checkConstraintOptions(
     tableName: string,
     expression: string,
@@ -516,10 +436,7 @@ export interface AbstractAdapter {
     options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string): Promise<void>;
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#valid_column_definition_options
-   * @internal
-   */
+  /** @internal */
   validColumnDefinitionOptions(): string[];
   updateTableDefinition(tableName: string, base?: unknown): Table;
   assumeMigratedUptoVersion(version: number | string): Promise<void>;
@@ -566,24 +483,13 @@ export interface AbstractAdapter {
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   dataSources(): Promise<string[]>;
   dataSourceExists(name: string): Promise<boolean | null>;
-  /** Mirrors `DatabaseStatements#sanitize_limit` (abstract/database_statements.rb). */
   sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
-  /**
-   * Reset the transaction manager, discarding any open transactions. With a
-   * callback, reconfigures the connection in a fresh transaction context and
-   * (when `restore`) swaps the restorable manager back in afterwards.
-   * Mirrors `DatabaseStatements#reset_transaction`.
-   */
   resetTransaction(): void;
   resetTransaction(options: { restore: true }): Promise<void>;
   resetTransaction(
     options: { restore?: boolean },
     callback: () => Promise<unknown>,
   ): Promise<unknown>;
-  /**
-   * Compile an Arel node/TreeManager to a SQL string via this connection's
-   * visitor. Mirrors `DatabaseStatements#to_sql`.
-   */
   toSql(arel: unknown, binds?: unknown[]): string;
   /** @internal */
   toSqlAndBinds(arel: unknown, binds?: unknown[]): [string, unknown[]];
@@ -651,7 +557,6 @@ export interface AbstractAdapter {
     binds?: unknown[],
     opts?: { returning?: string[] | null },
   ): Promise<unknown>;
-  /** Rails: `alias create insert`. */
   create(
     arel: unknown,
     name?: string | null,
@@ -665,12 +570,9 @@ export interface AbstractAdapter {
   delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
   truncate(tableName: string, name?: string | null): Promise<unknown>;
   truncateTables(...tableNames: string[]): Promise<void>;
-  /** @internal Extracts the RETURNING values from an INSERT result. Adapters
-   *  override for full-row dispatch (PG/SQLite/MySQL); the base yields a single
-   *  value. Mirrors DatabaseStatements#returning_column_values. */
+  /** @internal */
   returningColumnValues?(result: Result): unknown[] | undefined | Promise<unknown[] | undefined>;
-  /** @internal Builds the per-table TRUNCATE statement; SQLite overrides with
-   *  `DELETE FROM`. Mirrors DatabaseStatements#build_truncate_statement. */
+  /** @internal */
   buildTruncateStatement(tableName: string): string;
   /** @internal */
   rawExecute(
@@ -718,37 +620,6 @@ export interface AbstractAdapter {
     name?: string,
     opts?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
-  /**
-   * CANONICAL DEVIATION — `execute` / `executeMutation` split.
-   *
-   * Rails has ONE query primitive per adapter, `perform_query`, which branches
-   * on `stmt.column_count.zero?` to decide whether it returns rows
-   * (sqlite3/database_statements.rb:78-112; abstract/database_statements.rb:561,
-   * postgresql/database_statements.rb:135, mysql2/database_statements.rb:41).
-   * Affected-row counts come from a separate `raw_connection.changes` read, not
-   * from the result.
-   *
-   * trails splits that into two: `execute` (row-returning, wired to the dirty
-   * query cache) and `executeMutation` (row-count / lastInsertRowid, readonly
-   * guard, materializes transactions). **The split itself is the deviation** —
-   * it is not a naming difference. It cannot be collapsed by rerouting callers:
-   * sqlite's `execute` runs `stmt.all()`, and better-sqlite3 throws
-   * "This statement does not return data. Use run() instead" on a non-reader
-   * statement, so `execute` must first grow the `column_count.zero?` branch.
-   *
-   * Convergence lives in **RFC 0076 `execute-primitive-convergence`** — e.g.
-   * `inline-mysql-exec-mutation-indirection`, `sqlite-truncate-through-execute`,
-   * `converge-vestigial-postgresql-perform-query`. Do NOT cite RFC 0023
-   * `unify-execute-mutation-into-perform-query` here: that story and its
-   * per-adapter siblings are already `done` (the shared `performQuery`
-   * primitive exists on all three adapters and DDL in
-   * `abstract/schema-statements.ts` already routes through `execute`), so it
-   * will not delete anything further and sends readers chasing a closed story.
-   *
-   * The concrete adapters' `executeMutation` overrides (postgresql-adapter.ts,
-   * sqlite3-adapter.ts) carry the same rationale by pointing here — do not
-   * restate it there, and do not add a third primitive.
-   */
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   beginTransaction(): Promise<void>;
   commit(): Promise<void>;
@@ -759,39 +630,17 @@ export interface AbstractAdapter {
   currentSavepointName(): string | null;
   readonly inTransaction: boolean;
   changeTableComment?(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
-  /**
-   * Rails defines `current_database` only on PostgreSQL::SchemaStatements
-   * (postgresql/schema_statements.rb:220) and AbstractMysqlAdapter
-   * (abstract_mysql_adapter.rb:296) — SQLite has none, which is why
-   * migration.ts guards every call with a `typeof` check.
-   */
   currentDatabase?(): Promise<string>;
   /** @internal */
   createAlterTable?(name: string): AlterTable;
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
-   * — Rails: `def explain(arel, binds = [], options = [])`; the implementation
-   * renders `arel` via `to_sql(arel, binds)` before executing, so the base
-   * input is an Arel node/AST (`unknown`), not a pre-rendered SQL string.
-   */
   explain?(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#dump_schema_information
-   */
   dumpSchemaInformation?(): Promise<string | null>;
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition
-   *
-   * @internal
-   */
+  /** @internal */
   createTableDefinition?(name: string, options?: Record<string, unknown>): TableDefinition;
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#schema_creation
-   */
   readonly schemaCreation?: SchemaCreation;
 }
 /** @internal */
@@ -803,23 +652,11 @@ interface ConnectionCallback {
   method: (this: AbstractAdapter) => void;
 }
 
-/**
- * Deprecation message emitted when a concrete adapter is constructed with the
- * deprecated raw-connection overload (a pre-opened driver connection as the
- * leading positional argument). Mirrors the soft-deprecated raw-connection
- * branch of `AbstractAdapter#initialize` (abstract_adapter.rb:141).
- */
 export const RAW_CONNECTION_DEPRECATION_MESSAGE =
   "Initializing a connection adapter with a pre-opened raw connection is " +
   "deprecated and will be removed. Pass a configuration hash (or connection " +
   "string) and let the adapter open and manage the connection itself.";
 
-/**
- * The base `ColumnMethods` shorthands every adapter's `change_table` proxy
- * exposes, mirroring `abstract/schema_definitions.rb:324` (`define_column_methods`
- * plus the `:blob`/`:numeric` aliases). Adapter-specific names are appended in
- * each adapter's `_columnMethodNames()` override.
- */
 export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
   "bigint",
   "binary",
@@ -844,28 +681,14 @@ export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
 
   /**
-   * @missingRailsCall build_statement_pool — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: the base ctor takes no
-   *   config (concrete adapters assign `_config`), so Rails' config-derived
-   *   initialize tail has nowhere to run here; converging it is the constructor
-   *   reshape owned by RFC 0094 (abstract_adapter.rb:155-172).
-   * @missingRailsCall fetch — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: config-derived initialize tail — see the
-   *   build_statement_pool row; blocked on the RFC 0094 constructor reshape
-   *   (abstract_adapter.rb:159-166).
-   * @missingRailsCall type_cast_config_to_boolean — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: config-derived
-   *   initialize tail — see the build_statement_pool row; blocked on the RFC
-   *   0094 constructor reshape (abstract_adapter.rb:159-166).
-   * @missingRailsCall validate_default_timezone — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: config-derived
-   *   initialize tail — see the build_statement_pool row; blocked on the RFC
-   *   0094 constructor reshape (abstract_adapter.rb:167).
+   * @missingRailsCall build_statement_pool — CONVERGEABLE
+   * @missingRailsCall fetch — CONVERGEABLE
+   * @missingRailsCall type_cast_config_to_boolean — CONVERGEABLE
+   * @missingRailsCall validate_default_timezone — CONVERGEABLE
    */
   constructor() {
     ensureAbstractAdapterMixinsApplied();
-    // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor
     this._visitor = this.arelVisitor();
-    // Mirrors Rails abstract_adapter.rb:153 — @pool = NullPool.new. A standalone
-    // adapter carries a NullPool until a real ConnectionPool claims it (the pool
-    // overwrites `pool` when it owns the connection), so `connection_pool` on a
-    // connect-time error is a NullPool rather than null.
     this.pool = new NullPool();
   }
 
@@ -873,171 +696,61 @@ export class AbstractAdapter implements Quoting {
   protected _connection: AbstractAdapter | null = null;
   private _owner: string | null = null;
   private _inUse = false;
-  // Rails' `@prepared_statements` holds whatever `type_cast_config_to_boolean`
-  // left (abstract_adapter.rb:65-71, :159) — only the string `"false"` becomes
-  // `false`; every other config value passes through unchanged, so a
-  // `prepared_statements: 0` stays `0` and reads as truthy.
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
   protected _verified = false;
-  // Mirrors Rails @unconfigured_connection: a connection handle that has been
-  // opened but not yet run through configure_connection. verifyBang() promotes
-  // it (into `_connection`) via attemptConfigureConnection() before marking the
-  // adapter verified. Typed `AbstractAdapter | null` to match `_connection`'s
-  // surface, since trails routes raw-connection access through the adapter.
-  //
-  // In Rails the only writer is the soft-deprecated `initialize` path that
-  // accepts a pre-opened connection instead of a config hash
-  // (abstract_adapter.rb:141), ported via `_acceptDeprecatedRawConnection`
-  // (wired into PostgreSQLAdapter / Mysql2Adapter constructors). The base
-  // verifyBang() read-side promotes it into `_connection`. PostgreSQLAdapter
-  // overrides verifyBang and does not yet consume it; Mysql2Adapter inherits
-  // the base promotion but runs queries through a separate `_ensureClient()`
-  // pool the stash isn't wired into. So on both, the deprecated overload
-  // currently stashes-and-warns without being usable for queries (a tracked
-  // connection-acquisition follow-up).
   protected _unconfiguredConnection: AbstractAdapter | null = null;
-  // Mirrors Rails @raw_connection_dirty. Setters land with the per-adapter
-  // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
-  // the default-false here matches Rails' fresh-adapter state.
   protected _rawConnectionDirty = false;
   protected _config: Record<string, unknown> = {};
-  // Mirrors Rails @advisory_locks_enabled (abstract_adapter.rb:163), derived
-  // from `config.fetch(:advisory_locks, true)` at construction. Concrete
-  // adapters with config (PG/MySQL) set this from their adapter options; the
-  // default `true` matches Rails' fetch fallback.
   protected _advisoryLocksEnabled = true;
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
   _queryCache: Store | null = null;
 
-  // Rails' @pool is a ConnectionPool once one owns the connection and a
-  // NullPool until then (abstract_adapter.rb:153).
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
-  /**
-   * Rails installs the monitor in `lock_thread=` (abstract_adapter.rb:181-192),
-   * picking `ThreadLoadInterlockAwareMonitor` / `LoadInterlockAwareMonitor` /
-   * `NullLock` by what owns the connection. trails has one concurrency model —
-   * the async chain — so the Fiber arm's monitor is the only one there is.
-   */
   lock: LoadInterlockAwareMonitor = new LoadInterlockAwareMonitor();
 
-  /**
-   * Rails' `@statements`, assigned once from `build_statement_pool`
-   * (abstract_adapter.rb:156) and read under that name by every adapter and by
-   * `clear_cache!` (abstract_adapter.rb:739-748). Adapters that build no pool
-   * leave it unset, which is the `if @statements` guard's false arm.
-   *
-   * @internal
-   */
+  /** @internal */
   _statements?: StatementPool | null;
-  /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
+  /** @internal */
   private _inspectId?: number;
   private static _inspectSeq?: number;
 
-  /**
-   * Quote a value for inclusion in a SQL literal. Concrete adapters
-   * override to use their own string-escape rules (SQLite: `'' only`;
-   * PG: `E'\\' escape form`; MySQL: escapes `\0 \n \r \Z \\`). The
-   * abstract default is SQL-92 with `'' only`, suitable for
-   * identifier-quoting tests and for adapters that haven't specialized
-   * yet.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
-   */
   quote(value: unknown): string {
-    // `.call(this)` so Rails' `quote` → `self.quoted_date`/`self.quoted_time`
-    // dispatch reaches adapter overrides (abstract/quoting.rb:84-85).
     return abstractQuote.call(this, value);
   }
 
-  /**
-   * Cast a value to the primitive form drivers expect for binds.
-   * Returns an **unquoted** primitive suitable for passing as a bind
-   * value (distinct from `quote()`, which returns a SQL literal with
-   * surrounding quotes attached).
-   *
-   * Abstract defaults mirror `abstract/quoting.ts`:
-   * - booleans pass through as `true` / `false` (adapters override —
-   *   SQLite / MySQL collapse to `1` / `0`, PG keeps `true` / `false`)
-   * - Date → unquoted `"YYYY-MM-DD HH:MM:SS"` with optional
-   *   `.microseconds` when milliseconds > 0 (no surrounding quotes;
-   *   matches Rails' `value.to_formatted_s(:db)`)
-   * - null → returned unchanged; undefined passes through too at
-   *   the abstract level (SQLite overrides to coerce `undefined →
-   *   null` for its nullable-column semantics)
-   * - strings / numbers / bigints → passed through
-   *
-   * Used by `Relation#_renderExplainBinds` to mirror Rails'
-   * `render_bind(c, attr)` which does
-   * `connection.type_cast(attr.value_for_database)`.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
-   */
   typeCast(value: unknown): unknown {
-    // `.call(this)` so Rails' `type_cast` → `self.quoted_date`/`self.quoted_time`
-    // dispatch reaches adapter overrides (abstract/quoting.rb:93-101).
     return abstractTypeCast.call(this, value);
   }
 
-  /**
-   * Assigned by `include(AbstractAdapter, QuotingMixin)` below; declared here so
-   * payload producers can self-dispatch it (Rails' single `type_casted_binds`,
-   * abstract/quoting.rb:224) and pick up an adapter's `typeCast` override.
-   *
-   * Rails marks `type_casted_binds` `private` (quoting.rb:223). TS has no
-   * equivalent for a mixed-in member that adapters must still dispatch through
-   * `this`, so it is public on the class but flagged `@internal` — it is not
-   * part of the supported surface.
-   * @internal
-   */
+  /** @internal */
   declare typeCastedBinds: (binds: unknown[] | null | undefined) => unknown[] | undefined;
 
-  /**
-   * Default identifier and bool-literal quoting — delegates to the
-   * abstract quoting module. Concrete adapters override the dialect-
-   * specific methods (PG/SQLite double-quote vs. MySQL backtick;
-   * SQLite `"1"` bools).
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting (mixed into
-   * AbstractAdapter).
-   */
   quoteString(s: string): string {
     return abstractQuoteString(s);
   }
 
-  /**
-   * Mirrors: Quoting::ClassMethods#quote_column_name (abstract/quoting.rb:60-63)
-   * — the raise every adapter must override.
-   */
   static quoteColumnName(name: string): string {
     return abstractQuoteColumnName(name);
   }
 
-  /**
-   * Mirrors: Quoting::ClassMethods#quote_table_name (abstract/quoting.rb:65-68)
-   * — `quote_column_name(table_name)`, sent on the class.
-   */
   static quoteTableName(name: string): string {
     return abstractQuoteTableName.call(this, name);
   }
 
   quoteTableName(name: string): string {
-    // Rails: `self.class.quote_table_name(table_name)` (abstract/quoting.rb:140-143).
     return (this.constructor as typeof AbstractAdapter).quoteTableName(name);
   }
 
   quoteColumnName(name: string): string {
-    // Rails: `self.class.quote_column_name(column_name)` (abstract/quoting.rb:135-138).
     return (this.constructor as typeof AbstractAdapter).quoteColumnName(name);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {
-    // Rails dispatches through quote_table_name on self (abstract/quoting.rb:157),
-    // which MySQL's table.column override relies on.
     return this.quoteTableName(`${table}.${attr}`);
   }
 
@@ -1061,19 +774,10 @@ export class AbstractAdapter implements Quoting {
     return abstractUnquotedFalse();
   }
 
-  /**
-   * Rails' `quote` / `type_cast` self-send `quoted_date` and `quoted_time`
-   * (abstract/quoting.rb:84-85, :101-102), so both must be real members of the
-   * receiver here — an adapter override (PostgreSQL's BC-suffixing `quotedDate`,
-   * SQLite's 2000-01-01 `quotedTime`) then resolves off the receiver.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date (rb:184-199)
-   */
   quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
     return abstractQuotedDate(value);
   }
 
-  /** Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time (rb:201-204) */
   quotedTime(value: QuotedTimeValue): string {
     return abstractQuotedTime.call(this, value);
   }
@@ -1089,9 +793,6 @@ export class AbstractAdapter implements Quoting {
   sanitizeAsSqlComment(value: unknown): string {
     return abstractSanitizeAsSqlComment(value);
   }
-
-  // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---
-  // Single source of truth lives in abstract/query-cache.ts; these delegate.
 
   private _ensureQueryCache(): Store {
     if (!this._queryCache) {
@@ -1153,11 +854,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   set preparedStatements(value: unknown) {
-    // Rails has no writer here — `@prepared_statements` is assigned once, in
-    // `initialize` (abstract_adapter.rb:159), where the global
-    // `ActiveRecord.disable_prepared_statements` is folded in. This setter is
-    // therefore a plain assignment: each constructor applies the global flag at
-    // its own config-reading site, exactly as Rails' single `initialize` does.
     this._preparedStatements = value;
   }
 
@@ -1166,9 +862,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   lease(): void {
-    // Mirrors Rails' `lease` (abstract_adapter.rb:267). Rails branches the
-    // message on whether `@owner` is the current execution context; trails is
-    // single-threaded so the lease always belongs to the current "thread".
     if (this._inUse) {
       throw new ActiveRecordError(
         "Cannot lease connection, it is already leased by the current thread.",
@@ -1178,9 +871,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   expire(): void {
-    // Mirrors Rails' `expire` (abstract_adapter.rb:303): raise rather than
-    // silently no-op when the connection isn't currently leased. Rails'
-    // "owned by a different thread" branch can't arise single-threaded.
     if (!this._inUse) {
       throw new ActiveRecordError("Cannot expire connection, it is not currently leased.");
     }
@@ -1189,28 +879,11 @@ export class AbstractAdapter implements Quoting {
     this._idleSince = Date.now();
   }
 
-  // --- Checkout / Checkin callbacks ---
-  //
-  // Mirrors Rails' `define_callbacks :checkout, :checkin` (abstract_adapter.rb:33).
-  // A deliberately minimal registry: each phase keeps an ordered list of named
-  // callbacks tagged `before`/`after`, so callers (the pool, the QueryCache
-  // mixin) register checkout/checkin hooks through one generic API instead of
-  // the pool hard-coding the effects inline.
-  //
-  // Per-class clone-on-write: subclasses inherit `AbstractAdapter`'s registry
-  // through the static prototype chain (shared static behavior, matching Rails
-  // today). A subclass that registers its own callback gets its own copy first,
-  // mirroring Rails' `define_callbacks` deep-dup on inheritance — so a concrete
-  // adapter's hooks never leak back onto `AbstractAdapter` or its siblings.
   protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
     checkout: [],
     checkin: [],
   };
 
-  /**
-   * Register a `:checkout`/`:checkin` callback. Mirrors Rails'
-   * `set_callback(phase, kind, method)`.
-   */
   static setCallback(
     phase: ConnectionCallbackPhase,
     kind: ConnectionCallbackKind,
@@ -1230,7 +903,6 @@ export class AbstractAdapter implements Quoting {
     const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
     for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
     block();
-    // Rails runs `:after` callbacks in reverse registration order.
     for (let i = callbacks.length - 1; i >= 0; i--) {
       if (callbacks[i].kind === "after") callbacks[i].method.call(this);
     }
@@ -1246,13 +918,6 @@ export class AbstractAdapter implements Quoting {
     this._runCallbacks("checkin", block);
   }
 
-  // RFC 0010 adapterName typing decision: the base getter returns `string`
-  // (Rails-faithful — `AbstractAdapter#adapter_name` is the literal "Abstract",
-  // which is NOT a member of the normalized `AdapterName` family). The deleted
-  // `DatabaseAdapter` interface typed this `AdapterName`; rather than force that
-  // infidelitous narrow type onto the base, concrete adapters already override
-  // the getter to return `AdapterName` (sqlite3/postgresql/mysql2), and the few
-  // downstream sites that need the narrow family narrow/guard at the call site.
   get adapterName(): string {
     return "Abstract";
   }
@@ -1261,29 +926,10 @@ export class AbstractAdapter implements Quoting {
     return this._connection !== null;
   }
 
-  // Disconnects from the database if already connected, and establishes a new
-  // connection. Mirrors Rails' `reconnect!` (abstract_adapter.rb): drive the
-  // raw `reconnect()`, re-enable lazy transactions, mark verified, then reset
-  // the transaction manager and reconfigure the connection (clearing the
-  // statement cache) with no transaction state in the way. With
-  // `restoreTransactions`, any restorable transaction stack is swapped back in
-  // once the connection is fully reconfigured. Transient connection errors are
-  // retried per `connectionRetries` / `retryDeadline` with exponential
-  // `backoff`, exactly as Rails' `reconnect!`.
-  //
-  // The raw reconnect itself lives in `reconnect()`; concrete adapters that
-  // reuse this lifecycle override `reconnect()` (not this method) to close and
-  // reopen the driver connection — they inherit the retry loop for free.
   async reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
     let retriesAvailable = this.connectionRetries;
     const deadline = this.retryDeadline !== null ? Date.now() + this.retryDeadline * 1000 : null;
 
-    // Rails wraps the whole retry loop in `@lock.synchronize`
-    // (abstract_adapter.rb:666-676) precisely because `reconnect` and
-    // `attempt_configure_connection` block on I/O. Every `await` below is a
-    // scheduling point at which a second `reconnectBang`/`verifyBang` could
-    // enter and race `_connection` / `_verified`, so the lock is a real
-    // guarantee to port, not a no-op for a single-threaded runtime.
     return this.lock.synchronize(async () => {
       for (;;) {
         try {
@@ -1315,8 +961,6 @@ export class AbstractAdapter implements Quoting {
             }
           }
 
-          // Leave the adapter in a consistent unverified state and raise the
-          // translated exception (Rails' `raise translated_exception`).
           this._lastActivity = 0;
           this._verified = false;
           throw translatedException;
@@ -1325,42 +969,20 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /**
-   * @internal
-   * Detects the deprecated raw-connection `initialize` overload
-   * (abstract_adapter.rb:141): the leading positional argument is a
-   * pre-opened raw driver connection (a class instance) rather than a
-   * configuration hash or connection string. Plain config objects (whose
-   * prototype is `Object.prototype` or `null`), strings, and arrays are NOT
-   * treated as raw connections — mirroring Rails' `is_a?(Hash)` discriminator.
-   */
+  /** @internal */
   protected static _isDeprecatedRawConnectionArg(arg: unknown): boolean {
     if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
     const proto = Object.getPrototypeOf(arg) as object | null;
     return proto !== Object.prototype && proto !== null;
   }
 
-  /**
-   * @internal
-   * Stashes a pre-opened raw connection in `_unconfiguredConnection` (promoted
-   * to the live connection by `verifyBang`), mirroring the deprecated
-   * raw-connection branch of `AbstractAdapter#initialize`. `config` mirrors
-   * Rails' trailing `deprecated_config` positional. Concrete adapters emit the
-   * deprecation warning before delegating here.
-   */
+  /** @internal */
   protected _acceptDeprecatedRawConnection(
     rawConnection: unknown,
     config: Record<string, unknown> | null = {},
   ): void {
     this._unconfiguredConnection = rawConnection as AbstractAdapter | null;
-    // Mirrors Rails' `(deprecated_config || {}).symbolize_keys`
-    // (abstract_adapter.rb:142) — a `nil`/`null` config normalizes to `{}`.
     this._config = { ...config };
-    // Rails' common-tail `@prepared_statements` (abstract_adapter.rb:159) runs
-    // for the deprecated path too, derived from `@config` falling back to
-    // `default_prepared_statements`. advisory_locks / default_timezone are read
-    // lazily from `_config` by their getters, so only prepared_statements needs
-    // applying here (it's cached into `_preparedStatements` at construction).
     const configured =
       "preparedStatements" in this._config
         ? this._config.preparedStatements
@@ -1371,8 +993,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   disconnectBang(): void {
-    // Mirrors Rails AbstractAdapter#disconnect! (abstract_adapter.rb): the
-    // raw-connection-dirty reset is what lets the next reconnect restore.
     void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
     this._rawConnectionDirty = false;
@@ -1381,17 +1001,7 @@ export class AbstractAdapter implements Quoting {
 
   async verifyBang(): Promise<void> {
     if (!(await this.active())) {
-      // Rails takes `@lock.synchronize` for exactly this branch
-      // (abstract_adapter.rb:759-772) and releases before the trailing
-      // `@verified = true`. Without it two concurrent verifies both observe
-      // `!active()`, both claim `_unconfiguredConnection`, and one handle is
-      // dropped — or both take the reconnect path and reconnect twice.
       const promoted = await this.lock.synchronize(async () => {
-        // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
-        // connection (opened by the pool but never run through
-        // configure_connection) is promoted here rather than reconnected. If
-        // configure_connection fails, attemptConfigureConnection disconnects so
-        // the next verify takes the reconnect path.
         if (this._unconfiguredConnection) {
           this._connection = this._unconfiguredConnection;
           this._unconfiguredConnection = null;
@@ -1403,25 +1013,11 @@ export class AbstractAdapter implements Quoting {
         await this.reconnectBang({ restoreTransactions: true });
         return false;
       });
-      // Rails `return`s from inside the synchronize block on the promotion
-      // path, skipping the trailing `@verified = true`/`verified!`.
       if (promoted) return;
     }
-    // Mirrors Rails: `connect_with_retry` calls `verified!` after a
-    // successful (re)connect; verifyBang is the abstract-side entry
-    // point that drives that flow.
     this.verifiedBang();
   }
 
-  /**
-   * Clear the connection's prepared-statement cache. Rails' `clear_cache!` is
-   * synchronous because `dealloc` blocks on libpq; node's DEALLOCATE / finalize
-   * is a promise, so this hands back the pool's chain and every call site that
-   * can await does.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#clear_cache!
-   * (abstract_adapter.rb:739-748)
-   */
   clearCacheBang({
     newConnection = false,
   }: { newConnection?: boolean } = {}): void | Promise<void> {
@@ -1437,16 +1033,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
-   * The key under which `sql` is stored in the connection's statement pool.
-   * The identity default mirrors the adapters whose `StatementPool` keys by the
-   * raw SQL (SQLite, MySQL); only PostgreSQL defines a real `#sql_key` (it
-   * prefixes the schema search path), which it overrides here. Hoisting the
-   * identity default to the abstract adapter lets `respond_to?(:sql_key)`-style
-   * introspection — `@connection.respond_to?(:sql_key) ? sql_key(sql) : sql` —
-   * resolve uniformly across adapters.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE identity default for PostgreSQLAdapter#sql_key (postgresql_adapter.rb:914); Ruby reaches it by respond_to?, TS needs a declared base.
+   * @noRailsEquivalent CONVERGEABLE
    */
   sqlKey(sql: string): string {
     return sql;
@@ -1460,16 +1048,8 @@ export class AbstractAdapter implements Quoting {
     return this.pool.shard;
   }
 
-  /**
-   * Mirrors Rails' AbstractAdapter#inspect: surfaces the pool's
-   * env_name/name/role/shard but never secrets (password, host). No Ruby
-   * object_id, so the `:0x…` slot uses a stable per-instance hex; role/shard
-   * render as quoted strings, not symbols.
-   */
   inspect(): string {
     const q = (v: string): string => JSON.stringify(String(v));
-    // Rails renders a NullConfig's nil answers as `nil`
-    // (abstract/connection_pool.rb:17-22); trails defaults them.
     const dbConfig = this.pool.dbConfig;
     const envName = dbConfig.envName ?? "test";
     const configName = dbConfig.name;
@@ -1480,12 +1060,7 @@ export class AbstractAdapter implements Quoting {
     return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=${q(this.role)}${shardField}>`;
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:174` —
-   *   Ruby's inspection hook is `def inspect`, a plain method name already matched).
-   * Node inspection hook — a JS runtime protocol, not a Rails method
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
@@ -1494,35 +1069,11 @@ export class AbstractAdapter implements Quoting {
     if (type == null) return false;
     const types = this.nativeDatabaseTypes();
     if (types[type] != null) return true;
-    // Rails keys `native_database_types` by the same snake_case symbol that
-    // `Column#type` returns, so membership is a direct hit. trails instead keys
-    // by its camelCase DSL name (e.g. `bitVarying`) while `Column#type` stays
-    // Rails-snake (`bit_varying`); bridge the two spellings so a legit native
-    // type isn't misread as unmapped by `valid_type?` (schema dumper gate).
     const camel = type.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
     return camel !== type && types[camel] != null;
   }
 
-  /**
-   * The column-type shorthand names this adapter mixes into the `change_table`
-   * proxy — i.e. the methods generated by Rails' `define_column_methods`
-   * (`abstract/schema_definitions.rb` ColumnMethods). The `change_table`
-   * recorder uses these to surface `t.<type>` shorthands faithfully.
-   *
-   * Mirrors the explicit `ColumnMethods` list in
-   * `abstract/schema_definitions.rb:324` (`define_column_methods` plus the
-   * `blob`/`numeric` aliases) — NOT `Object.keys(nativeDatabaseTypes())`, which
-   * is only an approximation (it surfaces `primary_key` and omits `virtual`).
-   * Adapters whose `ColumnMethods` list adds more (MySQL, PostgreSQL) override
-   * this and append their own names to `super._columnMethodNames()`.
-   *
-   * @internal Rails spells this list as the `ColumnMethods` modules'
-   * `define_column_methods` metaprogramming
-   * (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as public
-   * API. TypeScript has no `define_method`, so trails reifies the list; each adapter appends to
-   * `super._columnMethodNames()` exactly where Rails' adapter-specific ColumnMethods module extends
-   * the abstract one.
-   */
+  /** @internal */
   _columnMethodNames(): string[] {
     return [...ABSTRACT_COLUMN_METHOD_NAMES];
   }
@@ -1539,12 +1090,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
-   * @internal The raw `SchemaCache` behind this connection's schema reflection.
-   * Rails has no adapter-level accessor for it — its `@schema_cache` slot holds
-   * the bound reflection (see {@link schemaCache}) — so this is the
-   * trails-internal name for the sync peeks and pool-arg-taking reads that our
-   * async `BoundSchemaReflection` can't serve.
-   * @noRailsEquivalent CONVERGEABLE the raw schema-cache slot behind AbstractAdapter#schema_cache (abstract_adapter.rb:298); needed while our reflection reads are async.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   get internalSchemaCache(): SchemaCache {
     const reflection = this._poolSchemaReflection();
@@ -1552,16 +1099,6 @@ export class AbstractAdapter implements Quoting {
     return reflection.loadedCache;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
-   *
-   * Rails: `@pool.schema_cache || (@schema_cache ||=
-   * BoundSchemaReflection.for_lone_connection(@pool.schema_reflection, self))`.
-   * Pool-backed adapters reuse the pool's BoundSchemaReflection; standalone
-   * adapters (a NullPool, i.e. tests and bare adapters) wrap themselves as the
-   * pool so reflection methods that need a pool handle call back into this
-   * adapter.
-   */
   get schemaCache(): BoundSchemaReflection {
     const schemaCache = this.pool.schemaCache;
     if (schemaCache instanceof BoundSchemaReflection) return schemaCache;
@@ -1572,11 +1109,7 @@ export class AbstractAdapter implements Quoting {
     return this._schemaCache;
   }
 
-  /**
-   * @internal Rails' `@pool.schema_reflection` — ConnectionPool delegates to its
-   * PoolConfig and NullPool answers a bare `SchemaReflection.new(nil)`
-   * (connection_pool.rb:34-36).
-   */
+  /** @internal */
   private _poolSchemaReflection(): SchemaReflection {
     return this.pool.schemaReflection;
   }
@@ -1588,11 +1121,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   async unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> {
-    // Rails' `cache = prepared_statements_disabled_cache.add?(object_id) if
-    // @prepared_statements` (abstract_adapter.rb:344-349) — `Set#add?` returns
-    // nil when already present, so only the outermost block clears the entry on
-    // exit. JS has no `object_id`: the Set is keyed by the adapter instance
-    // itself, which is the same identity `object_id` stands for in Ruby.
     let cache: Set<unknown> | undefined;
     if (
       this._preparedStatements != null &&
@@ -1692,16 +1220,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  /**
-   * Raw reconnect primitive driven by `reconnectBang()` — Rails' private
-   * `reconnect` (abstract_adapter.rb), which raises `NotImplementedError`.
-   * Trails keeps a no-op default so adapters without a driver-level reconnect
-   * (e.g. SQLite3's in-memory database) still run the `reconnectBang()`
-   * lifecycle. Concrete adapters with a real connection (PostgreSQL, MySQL2)
-   * override this to close and reopen the driver handle.
-   *
-   * @internal
-   */
+  /** @internal */
   reconnect(): void | Promise<void> {}
 
   disconnect(): void {
@@ -1759,11 +1278,6 @@ export class AbstractAdapter implements Quoting {
     return this._transactionManager.withinNewTransaction(opts, fn as any);
   }
 
-  /**
-   * Run a block inside a database transaction.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#transaction
-   */
   async transaction<T>(
     fnOrOpts?:
       | ((tx?: unknown) => Promise<T> | T)
@@ -1788,9 +1302,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   close(): void | Promise<void> {
-    // Mirrors Rails' `close` (abstract_adapter.rb:830): `pool.checkin self`.
-    // NullPool#checkin is a no-op in Rails; trails expires a leased connection
-    // on that arm instead.
     const pool = this.pool;
     if (!(pool instanceof NullPool)) {
       pool.checkin(this);
@@ -1803,15 +1314,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#raw_connection
-   * (abstract_adapter.rb). Materializes any pending transaction and disables
-   * lazy transactions for this connection, marking it `_rawConnectionDirty` so
-   * the `:checkin` callback re-enables lazy transactions when the connection
-   * returns to the pool. Async because materialization runs `BEGIN` SQL —
-   * Rails' `raw_connection` is synchronous, but the trails transaction manager
-   * materializes through an async path.
-   */
   async rawConnection(): Promise<AbstractAdapter | null> {
     return this.withRawConnection(async (conn) => {
       await this.disableLazyTransactionsBang();
@@ -1844,27 +1346,16 @@ export class AbstractAdapter implements Quoting {
     return this.pool.connectionDescriptor;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter — `attr_reader :visitor`
-   */
   get visitor(): Visitors.ToSql {
     return this._visitor;
   }
 
-  /**
-   * Factory — builds a new Arel visitor for this adapter's SQL dialect.
-   * Subclasses override to return dialect-specific visitors.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#arel_visitor
-   *
-   * @internal
-   */
+  /** @internal */
   arelVisitor(): Visitors.ToSql {
     return new Visitors.ToSql(this);
   }
 
   get preparedStatementsDisabledCache(): Set<unknown> {
-    // Rails: `IsolatedExecutionState[:active_record_prepared_statements_disabled_cache] ||= Set.new`
     return IsolatedExecutionState.fetch(
       "active_record_prepared_statements_disabled_cache",
       () => new Set<unknown>(),
@@ -1875,9 +1366,6 @@ export class AbstractAdapter implements Quoting {
     if (!this._inUse) {
       throw new ActiveRecordError("Cannot steal connection, it is not currently leased.");
     }
-    // Mirrors Rails' `steal!` (abstract_adapter.rb:319): the connection stays
-    // in use; only the owning thread is reassigned. Do NOT call `lease()` — it
-    // raises when already leased.
     this._owner = null;
   }
 
@@ -1896,13 +1384,6 @@ export class AbstractAdapter implements Quoting {
   resetBang(): void {
     void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
-    // Rails' `reset!` ends in `attempt_configure_connection`
-    // (abstract_adapter.rb:725-731). `resetBang` is sync per the pool's
-    // contract, so the async hop is scheduled rather than awaited, and a sync
-    // caller has nowhere to receive the re-raise
-    // (abstract_adapter.rb:1216-1221) — the connection is already disconnected
-    // by then, so the next lease reconnects and surfaces the real error. The
-    // rejection itself goes to the error reporter rather than being dropped.
     void this.attemptConfigureConnection().catch((error: Error) => {
       ActiveSupport.errorReporter.report(error, { handled: true });
     });
@@ -1920,11 +1401,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  // Mirrors Rails' `abstract_adapter.rb:834#default_index_type?`
-  // (`index.using.nil?`), the predicate `SchemaDumper#index_parts` reads to
-  // decide whether to print `using:` (schema_dumper.rb:275). PostgreSQL and
-  // MySQL override to also treat `:btree` as the default; SQLite inherits this
-  // nil-only check, so a non-nil `using` on sqlite still dumps.
   defaultIndexType(index: IndexDefinition): boolean {
     return index.using == null;
   }
@@ -2024,16 +1500,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  /**
-   * Does the database for this adapter exist? Mirrors Rails'
-   * `AbstractAdapter.database_exists?(config)` (abstract_adapter.rb:358):
-   * `new(config).database_exists?`.
-   *
-   * Deviation: the instance is disconnected before returning. Ruby lets the
-   * throw-away adapter's socket close when it is collected; JS has no such
-   * finalizer, so a probe that connected would leak the handle (and keep the
-   * event loop alive) forever. Mysql2Adapter's static already does this.
-   */
   static async databaseExists(config: unknown): Promise<boolean> {
     const ctor = this as unknown as new (config: unknown) => AbstractAdapter;
     const adapter = new ctor(config);
@@ -2044,13 +1510,6 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /**
-   * Mirrors Rails' `AbstractAdapter#database_exists?` (abstract_adapter.rb:362):
-   * prove the database is there by connecting to it, and read only
-   * `NoDatabaseError` as "it isn't". Reachability, not a cached handle — a
-   * never-connected adapter on a live database answers true, and a stale
-   * handle to a dropped database answers false.
-   */
   async databaseExists(): Promise<boolean> {
     try {
       await this.connectBang();
@@ -2071,21 +1530,10 @@ export class AbstractAdapter implements Quoting {
 
   async dropEnum(_name: string): Promise<void> {}
 
-  // No `createRange`/`dropRange` here on purpose. Rails stubs only the enum
-  // helpers on the abstract base (create_enum/drop_enum/rename_enum/
-  // add_enum_value/rename_enum_value, abstract_adapter.rb:576-593) — there is no range-type
-  // DDL anywhere in Rails, so a no-op base stub would be inventing an abstract
-  // hook Rails never had. The trails-only range helpers live where the DDL is
-  // actually emitted, PostgreSQL::SchemaStatements (postgresql/
-  // schema-statements-class.ts), with their justification at that call site.
-
   async renameEnum(_oldName: string, _newName: string): Promise<void> {}
 
   async addEnumValue(_enumName: string, _value: string): Promise<void> {}
 
-  // Rails' `def rename_enum_value(...)` uses a splat so concrete adapters
-  // can define their own signature (PG takes `(type_name, **options)`).
-  // Keep the TS signature permissive to match.
   async renameEnumValue(..._args: unknown[]): Promise<void> {}
 
   async createVirtualTable(
@@ -2096,10 +1544,6 @@ export class AbstractAdapter implements Quoting {
 
   async dropVirtualTable(_name: string): Promise<void> {}
 
-  // Mirrors AbstractAdapter#advisory_locks_enabled? (abstract_adapter.rb:603).
-  // `supportsAdvisoryLocks()` is false on SQLite, so this returns false there
-  // (Rails' `respond_to?`/`supports_advisory_locks?` gate); PG/MySQL combine
-  // that capability with the `:advisory_locks` config flag.
   isAdvisoryLocksEnabled(): boolean {
     return this.supportsAdvisoryLocks() && this._advisoryLocksEnabled;
   }
@@ -2127,23 +1571,10 @@ export class AbstractAdapter implements Quoting {
   async checkAllForeignKeysValidBang(): Promise<void> {}
 
   throwAwayBang(): void {
-    // Mirrors Rails AbstractAdapter#throw_away! (abstract_adapter.rb:733):
-    // `pool.remove self; disconnect!`. Removing from the pool is what evicts
-    // the connection so it can't be leased again after a transaction failure;
-    // NullPool#remove is a no-op.
     this.pool.remove(this);
     this.disconnectBang();
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#connect!
-   * (abstract_adapter.rb:778-781) — `verify!; self`, and nothing more. It is
-   * NOT a bare raw-connect primitive: routing through `verifyBang` is what
-   * promotes an unconfigured pool-opened connection instead of reconnecting,
-   * and what gives a `configure_connection` failure its `connection_retries`
-   * re-attempts through `reconnectBang`'s retry loop (adapter_test.rb:852).
-   * The raw open lives in each adapter's private `connect`, as in Rails.
-   */
   async connectBang(): Promise<this> {
     await this.verifyBang();
     return this;
@@ -2184,10 +1615,6 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_insert_sql.
-  // The base adapter only knows plain inserts; adapters that support upsert /
-  // skip-duplicates override this. `into()` already bundles the VALUES list,
-  // mirroring `"INSERT #{insert.into} #{insert.values_list}"`.
   async buildInsertSql(insert: InsertBuilder): Promise<string> {
     if (insert.skipDuplicates() || insert.updateDuplicates()) {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:843
@@ -2198,20 +1625,10 @@ export class AbstractAdapter implements Quoting {
     return `INSERT ${insert.into()}`;
   }
 
-  // Rails' `get_database_version` returns whatever the adapter uses to
-  // represent a server version. PG returns the `server_version` integer;
-  // SQLite returns a `Version`. Other adapters may be async (PG's
-  // implementation queries `SHOW server_version_num`).
   getDatabaseVersion(): Version | number | Promise<Version | number> {
     return new Version("0.0.0");
   }
 
-  // Mirrors: AbstractAdapter#database_version (`abstract_adapter.rb:854-856`)
-  // — `pool.server_version(self)`, the pool-level memo that makes every
-  // adapter's `get_database_version` a pure fetch run at most once. The memo
-  // is filled on demand, so this reads correctly from an adapter that has
-  // never connected; the fetch it may have to run is what makes the value
-  // awaitable. Overrides may narrow to `Version` or `number`.
   get databaseVersion(): Version | number | Promise<Version | number> {
     return this.pool.serverVersion(this) as Version | number | Promise<Version | number>;
   }
@@ -2237,22 +1654,9 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
-   * Mirrors: AbstractAdapter.find_cmd_and_exec (abstract_adapter.rb:91-117).
-   *
-   * @missingRailsCall exec — PERMANENT: Rails stats every candidate in `commands`
-   *   against `$PATH` and `exec`s the first executable one. Both halves need
-   *   `process.*` (`ENV["PATH"]`, `exec`), which this package forbids, so the
-   *   resolved command name is returned at the head of the argv for the CLI
-   *   layer to spawn instead. The portable half — `Array(commands)` and reading
-   *   whatever `ActiveRecord.databaseCli` names — is ported, so an application
-   *   that configures `databaseCli` is honored exactly as in Rails.
-   * @missingRailsCall split — PERMANENT: `ENV["PATH"].to_s.split(File::PATH_SEPARATOR)`
-   *   (abstract_adapter.rb:93) is the first half of that same PATH scan, and
-   *   reading the process environment is forbidden here.
-   * @missingRailsCall empty? — PERMANENT: `RbConfig::CONFIG["EXEEXT"].empty?`
-   *   (abstract_adapter.rb:94) appends Ruby's platform executable suffix before
-   *   the PATH scan. There is no `RbConfig` analogue, and with the scan itself
-   *   unported the suffix has nothing to apply to.
+   * @missingRailsCall exec — PERMANENT
+   * @missingRailsCall split — PERMANENT
+   * @missingRailsCall empty? — PERMANENT
    */
   static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
     const cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
@@ -2264,31 +1668,11 @@ export class AbstractAdapter implements Quoting {
     return [cmds[0], ...args];
   }
 
-  /** Opens a database console session. Mirrors: AbstractAdapter.dbconsole (abstract_adapter.rb:119-121). */
   static dbconsole(_config?: unknown, _options?: unknown): unknown {
     // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
     throw new NotImplementedError("dbconsole");
   }
 
-  // --- Type registration (Rails: class << self private) ---
-
-  /**
-   * Mirrors: AbstractAdapter::TYPE_MAP (abstract_adapter.rb:942)
-   *
-   * Declared only here, as in Rails: `PostgreSQLAdapter` and
-   * `AbstractMysqlAdapter` define no `TYPE_MAP` constant, so `self::TYPE_MAP`
-   * resolves to this one for them and their `initialize_type_map` never
-   * re-runs.
-   *
-   * Rails additionally declares `TYPE_MAP` on `Mysql2Adapter`
-   * (mysql2_adapter.rb:53) and `SQLite3Adapter` (sqlite3_adapter.rb:505), plus
-   * `EXTENDED_TYPE_MAPS` on `SQLite3Adapter` (506) and `AbstractMysqlAdapter`
-   * (abstract_mysql_adapter.rb:754); each is declared on its own class here too.
-   *
-   * Built on first read rather than at class-definition time because the type
-   * classes `initializeTypeMap` registers sit on a circular import edge and are
-   * still in their temporal dead zone while this module evaluates.
-   */
   static get TYPE_MAP(): TypeMap {
     return (abstractTypeMap ??= (() => {
       const m = new TypeMap();
@@ -2297,10 +1681,8 @@ export class AbstractAdapter implements Quoting {
     })());
   }
 
-  /** Mirrors: AbstractAdapter::EXTENDED_TYPE_MAPS (abstract_adapter.rb:943) */
   static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
-  /** Mirrors: AbstractAdapter.extended_type_map */
   static extendedTypeMap(
     this: typeof AbstractAdapter,
     options: { defaultTimezone?: string },
@@ -2389,14 +1771,12 @@ export class AbstractAdapter implements Quoting {
     return Number.isNaN(n) ? 0 : n;
   }
 
-  // --- Connection lifecycle privates (Rails abstract_adapter.rb 946–1234) ---
-
-  /** @internal Mirrors: AbstractAdapter#reconnect_can_restore_state? */
+  /** @internal */
   isReconnectCanRestoreState(): boolean {
     return this._transactionManager.isRestorable() && !this._rawConnectionDirty;
   }
 
-  /** @internal Mirrors: AbstractAdapter#with_raw_connection */
+  /** @internal */
   async withRawConnection<T>(
     optsOrCallback:
       | { allowRetry?: boolean; materializeTransactions?: boolean }
@@ -2413,8 +1793,6 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = opts.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
-      // Rails: `connect! if @raw_connection.nil? && reconnect_can_restore_state?`
-      // (abstract_adapter.rb:985), and `connect!` is `verify!` (rb:778-781).
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
       await this.awaitRawConnectionReady();
       if (materializeTransactions) await this.materializeTransactions();
@@ -2460,55 +1838,24 @@ export class AbstractAdapter implements Quoting {
       }
     };
 
-    // withRawConnection and the transaction manager share ONE reentrant lock,
-    // mirroring Rails where a single @lock.synchronize wraps both
-    // with_raw_connection (abstract_adapter.rb:984) and every TransactionManager
-    // critical section (abstract/transaction.rb). Using two separate locks
-    // deadlocks (ABBA): a bare write takes the raw lock then materialize_
-    // transactions wants the tx lock, while a transaction block holds the tx
-    // lock then its inner write wants the raw lock. Routing through
-    // synchronize() — which is reentrant per async chain — collapses them into
-    // one lock, so materialize_transactions and a write nested inside a
-    // transaction both re-enter directly (Rails' Monitor reentrancy,
-    // abstract_adapter.rb:972-981).
     return this.lock.synchronize(run);
   }
 
-  /**
-   * @internal
-   * Overridable async seam yielding the raw connection on each iteration of
-   * withRawConnection's retry loop. The default returns _connection, which
-   * is set by the pre-loop connectBang() call and updated by reconnectBang()
-   * on retry. Mysql2Adapter overrides this to re-await its driver-level
-   * connect so reconnectBang() + continue picks up a fresh handle. PG no
-   * longer overrides it: connectBang()/reconnect() populate _connection
-   * eagerly and awaitRawConnectionReady() re-opens a torn-down socket pre-loop.
-   *
-   * Mirrors: AbstractAdapter#with_raw_connection (yield @raw_connection)
-   */
+  /** @internal */
   protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
     return this._connection;
   }
 
-  /**
-   * @internal
-   * Overridable readiness barrier awaited once per `withRawConnection` call,
-   * after the eager `connectBang()` and before any query. Default no-op.
-   * PostgreSQLAdapter overrides it to re-open a socket a failed reconfigure
-   * tore down and to drain orphaned prepared statements, so the connection
-   * yielded by the loop is guaranteed live and configured. Serializing against
-   * `reset!` is not its job — that runs under the same lock this call is
-   * already inside (postgresql_adapter.rb:372).
-   */
+  /** @internal */
   protected async awaitRawConnectionReady(): Promise<void> {}
 
-  /** @internal Mirrors: AbstractAdapter#verified! */
+  /** @internal */
   verifiedBang(): void {
     this._lastActivity = Date.now();
     this._verified = true;
   }
 
-  /** @internal Mirrors: AbstractAdapter#retryable_connection_error? */
+  /** @internal */
   isRetryableConnectionError(exception: unknown): boolean {
     if (
       exception instanceof ConnectionNotEstablished &&
@@ -2519,7 +1866,7 @@ export class AbstractAdapter implements Quoting {
     return exception instanceof ConnectionFailed;
   }
 
-  /** @internal Mirrors: AbstractAdapter#invalidate_transaction */
+  /** @internal */
   invalidateTransaction(exception: unknown): void {
     if (!(exception instanceof TransactionRollbackError)) return;
     if (!this.isSavepointErrorsInvalidateTransactions()) return;
@@ -2527,7 +1874,7 @@ export class AbstractAdapter implements Quoting {
     tx.invalidateBang?.();
   }
 
-  /** @internal Mirrors: AbstractAdapter#retryable_query_error? */
+  /** @internal */
   isRetryableQueryError(exception: unknown): boolean {
     const tx = this.currentTransaction() as { isInvalidated?: () => boolean };
     if (tx.isInvalidated?.()) return false;
@@ -2535,22 +1882,19 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
-   * @internal Mirrors: AbstractAdapter#backoff (100ms × counter)
-   *
-   * @missingRailsCall sleep — PERMANENT: RFC 0106: Ruby's Kernel#sleep has no TS
-   *   counterpart — the body is the setTimeout promise that is the only way to
-   *   suspend an async chain (abstract_adapter.rb:1078-1080).
+   * @internal
+   * @missingRailsCall sleep — PERMANENT
    */
   backoff(counter: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 100 * counter));
   }
 
-  /** @internal Mirrors: AbstractAdapter#any_raw_connection */
+  /** @internal */
   anyRawConnection(): AbstractAdapter | null | Promise<AbstractAdapter | null> {
     return this._connection ?? this.validRawConnection();
   }
 
-  /** @internal Mirrors: AbstractAdapter#valid_raw_connection */
+  /** @internal */
   validRawConnection(): AbstractAdapter | null | Promise<AbstractAdapter | null> {
     if (this._verified && this._connection) return this._connection;
     return this.withRawConnection(
@@ -2559,43 +1903,32 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
-  /** @internal Mirrors: AbstractAdapter#extended_type_map_key */
+  /** @internal */
   extendedTypeMapKey(): Record<string, unknown> | null {
-    // Rails parity: `if @default_timezone` — Ruby treats "" as truthy,
-    // so check for the type rather than JS truthiness.
     const tz = this._config.defaultTimezone;
     return typeof tz === "string" ? { defaultTimezone: tz } : null;
   }
 
   /**
-   * @internal Mirrors: AbstractAdapter#type_map
-   *
-   * @missingRailsCall compute_if_absent — PERMANENT: Verified per-site (RFC 0106):
-   *   `EXTENDED_TYPE_MAPS.compute_if_absent(key) { ... }`
-   *   (`connection_adapters/abstract_adapter.rb:1114`) —
-   *   `Concurrent::Map#compute_if_absent` is an atomic memoize with no JS
-   *   analogue; the body spells the same memoize as a `get`/`set` pair on a
-   *   plain `Map`, keyed on the serialized option hash because JS Maps key on
-   *   reference identity.
+   * @internal
+   * @missingRailsCall compute_if_absent — PERMANENT
    */
   get typeMap(): unknown {
     const ctor = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
     if (!key) return ctor.TYPE_MAP;
-    // Rails keys `EXTENDED_TYPE_MAPS` on the option hash itself; JS Maps use
-    // reference identity, so the serialized hash stands in for it.
     const cacheKey = JSON.stringify(key);
     let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
     if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
     return m;
   }
 
-  /** @internal Mirrors: AbstractAdapter#configure_connection (`abstract_adapter.rb:1212-1214`) */
+  /** @internal */
   configureConnection(..._args: unknown[]): void | Promise<void> {
     return this.checkVersion();
   }
 
-  /** @internal Mirrors: AbstractAdapter#translate_exception_class */
+  /** @internal */
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
     if (nativeError instanceof ActiveRecordError) return nativeError;
     const name = (nativeError as any)?.constructor?.name ?? "Error";
@@ -2608,36 +1941,12 @@ export class AbstractAdapter implements Quoting {
     });
     if (arError !== nativeError && arError instanceof Error && nativeError instanceof Error) {
       arError.stack = nativeError.stack;
-      // Ruby's raise site sets `Exception#cause` from `$!` implicitly, so no
-      // translator names the driver error in its argument list
-      // (`translate_exception` in each adapter). JS chains nothing at a `throw`,
-      // so the driver error is attached here — beside the `set_backtrace`
-      // analogue (abstract_adapter.rb:1130) — rather than in the call.
       if (arError.cause === undefined) arError.cause = nativeError;
     }
     return arError;
   }
 
-  /**
-   * Mirrors: AbstractAdapter#log
-   *
-   * `block` receives the notification payload, mirroring Rails' `yield payload`.
-   * It is the same object subscribers read after the block returns, so a block
-   * reports back by mutating it — which is how Rails' `raw_execute` hands
-   * `notification_payload` to `perform_query` for `row_count`/`statement_name`.
-   *
-   * This is the single `sql.active_record` payload producer, as in Rails where
-   * `raw_execute` is its only caller (abstract/database_statements.rb:554); the
-   * adapters' query paths route through here rather than building the payload
-   * literal themselves. Rails' one other producer is the *cached* payload,
-   * `QueryCache#cache_notification_info` (query_cache.rb:308), which stays
-   * separate here too.
-   *
-   * @missingRailsCall instrument — PERMANENT: RFC 0106: the receiver now converges to
-   *   `this.instrumenter`; the method is `instrumentAsync` because Rails' sync
-   *   `Instrumenter#instrument` cannot await the query block
-   *   (abstract_adapter.rb:1134-1146).
-   */
+  /** @missingRailsCall instrument — PERMANENT */
   async log<T>(
     sql: string,
     name: string | null = "SQL",
@@ -2647,9 +1956,6 @@ export class AbstractAdapter implements Quoting {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     try {
-      // Rails: `current_transaction.user_transaction.presence`. Transaction
-      // aliases `blank?` to `closed?` (transaction.rb:122), so a closed
-      // transaction reports as nil rather than as itself.
       const userTx = this.currentTransaction().userTransaction;
       const presentTx = userTx.isBlank() ? null : userTx;
       return (await this.instrumenter.instrumentAsync(
@@ -2674,13 +1980,7 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /**
-   * @internal Mirrors: AbstractAdapter#instrumenter (abstract_adapter.rb:1151-1153)
-   *
-   * A scheduled `FutureResult` swaps in its `EventBuffer` here for the duration
-   * of its query, so the events it emits carry `lock_wait` when the foreground
-   * finally flushes them (future_result.rb:110-111).
-   */
+  /** @internal */
   get instrumenter(): AdapterInstrumenter {
     return IsolatedExecutionState.fetch<AdapterInstrumenter>(
       ACTIVE_RECORD_INSTRUMENTER,
@@ -2688,7 +1988,7 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
-  /** @internal Mirrors: AbstractAdapter#translate_exception */
+  /** @internal */
   translateException(
     exception: unknown,
     opts: { message: string; sql: string; binds: unknown[] },
@@ -2701,7 +2001,7 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /** @internal Mirrors: AbstractAdapter#column_for */
+  /** @internal */
   async columnFor(tableName: string, columnName: string): Promise<import("./column.js").Column> {
     const cols = await (this as any).columns(tableName);
     const col = (cols as import("./column.js").Column[]).find((c) => c.name === columnName);
@@ -2709,20 +2009,17 @@ export class AbstractAdapter implements Quoting {
     return col;
   }
 
-  /** @internal Mirrors: AbstractAdapter#column_for_attribute */
+  /** @internal */
   async columnForAttribute(attribute: {
     relation: { name: string | Nodes.Node };
     name: string | Nodes.Node | null;
   }): Promise<import("./column.js").Column | undefined> {
     const tableName = String(attribute.relation.name);
-    // `schemaCache` is Rails' `schema_cache` (abstract_adapter.rb:298): the
-    // pool's BoundSchemaReflection, or one bound to this connection when the
-    // adapter stands alone on a NullPool.
     const hash = await this.schemaCache.columnsHash(tableName);
     return hash?.[toS(attribute.name)];
   }
 
-  /** @internal Mirrors: AbstractAdapter#collector */
+  /** @internal */
   collector(): Collectors.Composite | Collectors.SubstituteBinds {
     if (this.preparedStatements) {
       return new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
@@ -2730,12 +2027,12 @@ export class AbstractAdapter implements Quoting {
     return new Collectors.SubstituteBinds(this as any, new Collectors.SQLString());
   }
 
-  /** @internal Mirrors: AbstractAdapter#build_statement_pool */
+  /** @internal */
   buildStatementPool(..._args: unknown[]): unknown {
     return undefined;
   }
 
-  /** @internal Mirrors: AbstractAdapter#build_result */
+  /** @internal */
   buildResult(
     columns: string[],
     rows: unknown[][],
@@ -2744,7 +2041,7 @@ export class AbstractAdapter implements Quoting {
     return new Result(columns, rows, columnTypes);
   }
 
-  /** @internal Mirrors: AbstractAdapter#attempt_configure_connection */
+  /** @internal */
   async attemptConfigureConnection(): Promise<void> {
     try {
       await this.configureConnection();
@@ -2754,47 +2051,29 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /** @internal Mirrors: AbstractAdapter#default_prepared_statements */
+  /** @internal */
   defaultPreparedStatements(): boolean {
     return true;
   }
 
-  /** @internal Mirrors: AbstractAdapter#warning_ignored? */
+  /** @internal */
   isWarningIgnored(warning: {
     message?: string;
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
     return ActiveRecord.dbWarningsIgnore.some((warningMatcher) => {
-      // Ruby's `String#match?` takes a Regexp OR a String, and a String
-      // argument is a regexp SOURCE, not a substring (abstract_adapter.rb:1229).
       const matcher =
         typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
       return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));
     });
   }
 
-  /**
-   * Implemented in `abstract/quoting.ts`, the file Rails declares it in
-   * (abstract/quoting.rb:234-236); dispatched here like `quote` / `typeCast`
-   * above so adapter overrides of `typeMap` are honoured.
-   *
-   * The `Promise<Type>` arm is not Rails: `PostgreSQLAdapter#lookupCastType`
-   * resolves a sql_type with a live regtype query, so its override is async
-   * (tracked by `pg-lookup-cast-type-async-divergence`). It is spelled out
-   * rather than erased behind `unknown`, so a caller cannot silently
-   * duck-type past it.
-   * @internal
-   */
+  /** @internal */
   lookupCastType(sqlType: string | null): Type | Promise<Type> {
-    // The quoting helper constrains its receiver to a `TypeMap`-bearing host;
-    // the base `typeMap` getter is `unknown` because PostgreSQL's override
-    // returns a `HashLookupTypeMap`, which is a separate class in Rails too
-    // (type/hash_lookup_type_map.rb) — and PG overrides this method anyway.
     return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
   }
 
-  /** Mirrors: AbstractAdapter#lookup_cast_type_from_column */
   lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> {
     return this.lookupCastType(column.sqlType);
   }
@@ -2804,50 +2083,22 @@ let abstractAdapterMixinsApplied = false;
 
 let abstractTypeMap: TypeMap | undefined;
 
-// Rails applies all of the wiring below as plain `include`s in the class body
-// (abstract_adapter.rb:50-56). trails defers it to the first `AbstractAdapter`
-// construction because at module-evaluation time this cycle leaves the mixin
-// classes in their temporal dead zone:
-//
-//   abstract/schema-statements.ts -> migration/join-table.ts -> model-schema.ts
-//     -> connection-handling.ts -> connection-adapters.ts -> abstract-adapter.ts
-//
-// Entered through `SchemaStatements`, `include(AbstractAdapter,
-// SchemaStatements)` below then reads it uninitialised. PR #5775 removed the
-// `-> base.ts ->` leg this comment used to cite, but not this one:
-// `Migration::JoinTable#join_table_name` delegates to
-// `ModelSchema.derive_join_table_name` (migration/join_table.rb:11-13), so the
-// edge is Rails' own, resolved there by autoload at call time. Tracked by
-// `abstract-adapter-mixin-wiring-restore-module-eval` (RFC 0119).
-/** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
+/** @internal */
 function ensureAbstractAdapterMixinsApplied(): void {
   if (abstractAdapterMixinsApplied) return;
   abstractAdapterMixinsApplied = true;
 
-  // Rails: `include DatabaseStatements` inside the class body.
   include(AbstractAdapter, DatabaseStatements);
-  // Rails: `include SchemaStatements` inside the class body.
   include(AbstractAdapter, SchemaStatements);
-  // Rails: `include Quoting` inside the class body.
   include(AbstractAdapter, QuotingMixin);
-  // Rails: `include QueryCache` inside the class body.
   include(AbstractAdapter, QueryCacheMixin);
-  // Rails: `QueryCache.included` runs `set_callback :checkin, :after, :unset_query_cache!`
-  // (query_cache.rb:17). We have no `included` hook, so register it here at the
-  // include site instead.
   AbstractAdapter.setCallback("checkin", "after", function () {
     (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
   });
-  // Rails: `set_callback :checkin, :after, :enable_lazy_transactions!`
-  // (abstract_adapter.rb:53), registered after the QueryCache include — so as an
-  // `:after` callback (run in reverse registration order) it fires *before*
-  // unset_query_cache!.
   AbstractAdapter.setCallback("checkin", "after", function () {
     this.enableLazyTransactionsBang();
   });
-  // Rails: `include Savepoints` inside the class body.
   include(AbstractAdapter, SavepointsMixin);
-  // Rails: `include DatabaseLimits` inside the class body.
   include(AbstractAdapter, {
     maxIdentifierLength,
     tableNameLength,
@@ -2856,14 +2107,6 @@ function ensureAbstractAdapterMixinsApplied(): void {
     bindParamsLength,
   });
 
-  // Rails' `QueryCache#select_all` overrides the base `select_all` and calls
-  // `super` for the uncached path (query_cache.rb:236). The base `selectAll`
-  // was just mixed in from DatabaseStatements above; capture it and reinstall a
-  // cache-aware wrapper that delegates back to it. We do this here, after the
-  // includes, rather than letting `include()` carry a `selectAll` — `include()`
-  // never replaces a method the class already has, so the wrapping must be
-  // explicit. Concrete adapters don't override `selectAll` (only `execQuery` /
-  // `execute`), so every adapter shares this cached entry point.
   {
     const baseSelectAll = AbstractAdapter.prototype.selectAll;
     Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
@@ -2874,23 +2117,6 @@ function ensureAbstractAdapterMixinsApplied(): void {
     });
   }
 
-  // `dirties_query_cache base, :exec_query, :execute, :create, :insert, :update,
-  //  :delete, :truncate, :truncate_tables, :rollback_to_savepoint,
-  //  :rollback_db_transaction, :restart_db_transaction, :exec_insert_all`
-  // (query_cache.rb:13-15). The clear sits on the PUBLIC statement methods, above
-  // every adapter's arm-splitting override — which is what covers PostgreSQL's
-  // `use_insert_returning? == false` arm (postgresql/database_statements.rb:48-59),
-  // an arm that never reaches `AbstractAdapter#execInsert` at all.
-  //
-  // Wire here the methods NOT overridden by a concrete adapter — they're only
-  // defined on AbstractAdapter, and a subclass prototype doesn't yet inherit them
-  // when the per-adapter module runs (circular-import load order), so they must be
-  // wired on AbstractAdapter. The OVERRIDDEN write methods (`execute`,
-  // `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's `truncate`) are
-  // wired on each concrete adapter instead — wiring them here too would leave the
-  // override unwrapped. Reads route through `internalExecQuery` and never trip the
-  // wrapper, and the low-level `exec*` funnels stay unwrapped, so a logical write
-  // clears exactly once.
   dirtiesQueryCache(
     AbstractAdapter,
     "execQuery",

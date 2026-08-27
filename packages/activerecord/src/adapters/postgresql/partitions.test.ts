@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/partitions_test.rb
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
   describeIfPg,

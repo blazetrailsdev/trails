@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/connection_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
@@ -19,10 +16,6 @@ import {
 } from "../../errors.js";
 import mysql from "mysql2/promise";
 
-// The leased connection memoizes the server version on first read, so the
-// version tests below have to drop that memo both before stubbing (the real
-// version is already cached) and after (their stubbed one must not outlive the
-// test). Rails' @connection is likewise long-lived; its stubs re-run the query.
 function clearVersionCache(adapter: Mysql2Adapter): void {
   (
     adapter.pool as unknown as { poolConfig: { setServerVersion: (v: unknown) => void } }
@@ -37,9 +30,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     Notifications.unsubscribeAll();
-    // Several tests here disconnect/discard the leased connection (as Rails'
-    // connection_test.rb does to `Base.lease_connection`); verify it back so the
-    // next test in this worker gets a live one.
     clearVersionCache(adapter);
     await adapter.verifyBang();
   });
@@ -48,8 +38,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("bad connection", async () => {
       const u = new URL(MYSQL_TEST_URL);
       u.pathname = "/inexistent_activerecord_unittest";
-      // Stays self-built: Rails builds this connection in-test too — it points
-      // at a database that does not exist.
       const badAdapter = new Mysql2Adapter(u.toString());
       try {
         await expect(badAdapter.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
@@ -79,9 +67,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await singleConn.execute("SET SESSION wait_timeout=1");
         expect(await singleConn.active()).toBe(true);
         await new Promise((r) => setTimeout(r, 2000));
-        // Rails' reconnect! is synchronous; trails' reconnectBang is async, so
-        // await it before probing `active()` — which only reports true once
-        // reconnectBang's _ensureClient has re-established the handle.
         await singleConn.reconnectBang();
         expect(await singleConn.active()).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
@@ -96,8 +81,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(await singleConn.active()).toBe(true);
         await new Promise((r) => setTimeout(r, 2000));
         expect(await singleConn.active()).toBe(false);
-        // active is false → verifyBang calls reconnectBang(). Await it (async in
-        // trails, unlike Rails' synchronous verify!) before probing again.
         await singleConn.verifyBang();
         expect(await singleConn.active()).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
@@ -117,9 +100,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("active after disconnect", async () => {
-      // Rails' @connection is a live pooled connection (raw_connection set), so
-      // establish one here before disconnecting — the sync `active` getter now
-      // tracks real connection state (`_client !== null`) like Rails' active?.
       await adapter.execute("SELECT 1");
       expect(await adapter.active()).toBe(true);
       adapter.disconnectBang();
@@ -152,8 +132,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       )?.connection?.stream;
       try {
         adapter.discardBang();
-        // Rails' discard! must not communicate with the server: the abandoned
-        // handle is dropped without an end()/close() that would shut the socket.
         expect(endSpy).not.toHaveBeenCalled();
         expect(await adapter.active()).toBe(false);
       } finally {
@@ -228,8 +206,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("passing arbitrary flags to adapter", async () => {
-      // mirrors Rails: flags.push "FOUND_ROWS" appended when not already present
-      // Stays self-built: the connect flags it is constructed with are the assertion.
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: ["COMPRESS"] });
       try {
         expect(testAdapter._testOnlyPoolFlags()).toEqual(["COMPRESS", "FOUND_ROWS"]);
@@ -238,9 +214,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("passing flags by array to adapter", async () => {
-      // mirrors Rails: FOUND_ROWS not duplicated when already present in the array
-      // Stays self-built: the connect flags this adapter is constructed with
-      // are the assertion.
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         flags: ["FOUND_ROWS", "COMPRESS"],

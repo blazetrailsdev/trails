@@ -105,8 +105,6 @@ describe("Errors — trails-only coverage", () => {
 
     it("uses model-specific attribute format when present", () => {
       ActiveModelError.i18nCustomizeFullMessage = true;
-      // Rails consults `activemodel.errors.models.*` only when the base's class
-      // responds to `i18n_scope` (error.rb:25) — a bare class never does.
       class User extends Model {}
       I18n.backend().storeTranslations("en", {
         activemodel: {
@@ -186,7 +184,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("copy! replaces existing errors rather than appending", () => {
-    // Rails errors.rb:138 — `@errors = other.errors.deep_dup`.
     const e1 = new Errors(null);
     const e2 = new Errors(null);
     e2.add("name", ":blank");
@@ -197,9 +194,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("copy! deep-dups nested option values (matches Rails deep_dup)", () => {
-    // Rails errors.rb:138 calls `other.errors.deep_dup`, which recurses into
-    // Hash/Array values. A shallow spread would leave nested values shared,
-    // so mutating the source after copy would leak into the target.
     const source = new Errors({});
     const nested = { range: { min: 1, max: 5 } };
     source.add("age", ":out_of_range", nested);
@@ -210,8 +204,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("copy! preserves NestedError class on duplicated errors", () => {
-    // Rails `deep_dup` preserves dynamic class; a NestedError dup is still
-    // a NestedError with its innerError reachable.
     const source = new Errors({});
     source.add("age", ":invalid");
     const wrapper = new Errors({});
@@ -222,8 +214,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   describe("where/delete/added/import option-aware filtering (Rails fidelity)", () => {
-    // Rails errors.rb:189-194, 215-222, 372-388, 154-161 —
-    // where/delete/added?/import accept **options and filter on them.
     it("where filters by options subset match", () => {
       const errors = new Errors({});
       errors.add("age", ":too_short", { count: 3 });
@@ -243,7 +233,6 @@ describe("Errors — trails-only coverage", () => {
     });
 
     it("added? distinguishes between option values", () => {
-      // Rails behavior: different option values are different errors.
       const errors = new Errors({});
       errors.add("age", ":too_short", { count: 3 });
       expect(errors.added("age", ":too_short", { count: 3 })).toBe(true);
@@ -251,8 +240,6 @@ describe("Errors — trails-only coverage", () => {
     });
 
     it("where matches structurally-equal array options (not just by reference)", () => {
-      // Rails `Array#==` is elementwise; option values like
-      // `in: [1,2,3]` must match a differently-allocated `[1,2,3]`.
       const errors = new Errors({});
       errors.add("role", ":inclusion", { in: [1, 2, 3] });
       expect(errors.where("role", ":inclusion", { in: [1, 2, 3] })).toHaveLength(1);
@@ -275,9 +262,6 @@ describe("Errors — trails-only coverage", () => {
     });
 
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {
-      // Rails `NestedError#initialize` (activemodel/lib/active_model/nested_error.rb:8-15):
-      // @type is the override, @raw_type is inner's. Message generation
-      // uses raw_type so the inner error's i18n key is still resolvable.
       const source = new Errors({});
       source.add("name", ":invalid");
       const target = new Errors({});
@@ -297,11 +281,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("copy! dups each error without recursing into a NestedError's inner error", () => {
-    // `@errors = other.errors.deep_dup` (errors.rb:139). ActiveSupport's
-    // `Object#deep_dup` is `duplicable? ? dup : self`, and only Array/Hash
-    // override it to recurse — so an Error element gets a plain `dup` plus
-    // `initialize_dup` (error.rb:111-116), which deep-dups `@options` and
-    // leaves every other ivar, `@inner_error` included, shared.
     const source = new Errors({});
     source.add("age", ":out_of_range", { range: { min: 1 } });
     const wrapper = new Errors({});
@@ -330,8 +309,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("merge! appends imported errors as NestedError", () => {
-    // Rails errors.rb:174-180 — `other.errors.each { import(error) }`;
-    // `import` wraps as NestedError (errors.rb:160).
     const e1 = new Errors({});
     e1.add("name", ":blank");
     const e2 = new Errors({});
@@ -362,9 +339,6 @@ describe("Errors — trails-only coverage", () => {
   });
 
   describe("add strict + Enumerable (Rails fidelity)", () => {
-    // Rails errors.rb:342-354 — `add` returns the new Error and raises
-    // when `strict:` is passed. `include Enumerable` (errors.rb:62) makes
-    // the collection iterable.
     it("add returns the new Error object", () => {
       const errors = new Errors({});
       const err = errors.add("name", ":blank");
@@ -406,10 +380,6 @@ describe("Errors — trails-only coverage", () => {
       expect(Array.from(errors, (e) => e.attribute)).toEqual(["name", "age"]);
     });
   });
-
-  // =========================================================================
-  // P9 — Rails shape alignment tests
-  // =========================================================================
 
   it("delete returns array of removed errors when present", () => {
     const e = new Errors(null);
@@ -566,7 +536,6 @@ describe("Errors<TBase> type parameter", () => {
     }
     const userErrors = new Errors<User>({ name: "Alice", age: 30 });
     const postErrors = new Errors<Post>({ title: "Hello" });
-    // Must compile: cross-model copy is valid (Rails copy! just rebinds base).
     expectTypeOf(userErrors.copyBang<Post>).toBeFunction();
     userErrors.copyBang(postErrors);
   });

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/optimizer_hints_test.rb
- */
 import { it, expect, beforeAll } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
@@ -10,20 +7,11 @@ import { Base } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
-// Rails wraps the whole PostgresqlOptimizerHintsTest body in
-// `if supports_optimizer_hints?` (true only when the pg_hint_plan extension is
-// installed), so the examples never run on a server that lacks it. Mirror that
-// with a conditional describe.
 describeIfPg("PostgreSQLAdapter", () => {
   describeIfSupports("optimizer_hints", "PostgresqlOptimizerHintsTest", () => {
-    // Mirrors Rails' `fixtures :posts`. Rails' posts.yml uses literal
-    // `author_id: 1` (David); our ported posts fixture references the author by
-    // label, so authors must be declared first for that ref to resolve to
-    // David's id (1) rather than the label-hash fallback.
     fixtures(["authors", "posts"]);
 
     beforeAll(async () => {
-      // Mirrors Rails setup: enable_extension!("pg_hint_plan")
       await (Base.connection as PostgreSQLAdapter).enableExtension("pg_hint_plan");
     });
 
@@ -36,9 +24,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           const posts = Post.optimizerHints("SeqScan(posts)")
             .select("id")
             .where({ author_id: [0, 1] });
-          // `explain` runs the underlying SELECT (emitting the hinted query the
-          // regex matches) and then EXPLAINs it — mirrors Rails calling
-          // `posts.explain` inside the assert_queries_match block.
           const plan = await posts.explain();
           expect(plan).toContain("Seq Scan on posts");
         },
@@ -75,10 +60,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         },
       );
 
-      // Rails' upstream regex expects the pre-CVE strip; the current
-      // `sanitize_as_sql_comment` neutralizes delimiters by spacing (`**//` → `** //`).
-      // This example never re-runs in Rails CI (needs pg_hint_plan), so that regex
-      // went stale — we assert the faithful output (no `*/`/`/*` escapes the comment).
       await assertQueriesMatch(
         /^SELECT \/\*\+ \*\* \/\/ "posts"\.\*, \/\/ \*\* \*\//,
         undefined,

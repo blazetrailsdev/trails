@@ -1,12 +1,5 @@
 import { Binary } from "./binary.js";
 
-/**
- * Filter — FILTER (WHERE ...) clause for aggregate functions.
- *
- * Mirrors: Arel::Nodes::Filter (extends Binary), which includes
- * Arel::WindowPredications (filter.rb:6). Runtime mixin wiring lives in
- * ../index.ts.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Filter extends Binary {}
 

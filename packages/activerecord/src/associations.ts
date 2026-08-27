@@ -1,16 +1,4 @@
 import type { Base } from "./base.js";
-/**
- * Evaluate `relation.ts` before anything below reaches
- * `relation/query-methods.ts` on its own: `relation.ts`'s module body runs
- * `include(Relation, QueryMethodBangs)` (`relation.rb:68`), so a graph entered
- * at THIS module that reaches query-methods first sees `QueryMethodBangs` in
- * TDZ. `relation.ts` already imports this module (relation -> insert-all ->
- * model-schema -> associations), so this closes no NEW cycle, and nothing here
- * touches `Relation` at module scope. It replaces the side-effect imports of
- * Relation SUBCLASSES that used to sit here and made entering at `relation.ts`
- * impossible; those now load through their zero-import slots (CLAUDE.md,
- * "Call-time constant resolution (Ruby autoload -> the zero-import slot)").
- */
 import "./relation.js";
 import type { Relation } from "./relation.js";
 import { SpellChecker } from "@blazetrails/did-you-mean";
@@ -56,32 +44,13 @@ import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-
 import * as Reflection from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 
-/**
- * **Rails parity note:** Rails' `Associations.eager_load!` uses Ruby's
- * `ActiveSupport::Autoload` to force-load `BelongsToAssociation`,
- * `HasManyAssociation`, `Preloader`, `JoinDependency`, `AssociationScope`,
- * etc. In TypeScript/ESM there is no `autoload` — every one of those modules
- * is statically imported (the side-effect imports at the top of this file
- * cover the late-binding slots), so they are always present already.
- *
- * Mirrors: ActiveRecord::Associations.eager_load!
- */
 export async function eagerLoadBang(): Promise<void> {}
 
-/**
- * One `before_add`/`after_add`/`before_remove`/`after_remove` entry. Mirrors
- * the three arms Rails' `Builder::CollectionAssociation.define_callback`
- * accepts (builder/collection_association.rb:44-52): a method name on the
- * owner, a callable, or an object that responds to the callback kind itself.
- */
 export type CollectionCallback<K extends string> =
   | string
   | ((owner: Base, record: Base) => void | false)
   | { [P in K]: (owner: Base, record: Base) => void | false };
 
-/**
- * Association options.
- */
 export interface AssociationOptions {
   foreignKey?: string | string[];
   className?: string;
@@ -106,53 +75,18 @@ export interface AssociationOptions {
   validate?: boolean;
   required?: boolean;
   optional?: boolean;
-  /** belongs_to-only: sets the association from this block when the foreign
-   * key is nil. Mirrors Rails' before_validation default
-   * (associations/builder/belongs_to.rb#add_default_callbacks): the block fills
-   * the FK before validation, so `belongsTo(name, { default, optional: false })`
-   * saves cleanly — the required-association presence validation sees the
-   * defaulted target. A possibly-async block (e.g. `() => Developer.first()`) is
-   * resolved in an async pre-validation phase on save; a synchronous block also
-   * fires during a standalone `valid?`. */
   default?: (owner: Base) => Base | null | Promise<Base | null>;
   beforeAdd?: CollectionCallback<"beforeAdd"> | CollectionCallback<"beforeAdd">[];
   afterAdd?: CollectionCallback<"afterAdd"> | CollectionCallback<"afterAdd">[];
   beforeRemove?: CollectionCallback<"beforeRemove"> | CollectionCallback<"beforeRemove">[];
   afterRemove?: CollectionCallback<"afterRemove"> | CollectionCallback<"afterRemove">[];
-  /** Mixes methods into the association's CollectionProxy and every
-   * relation spawned from it, mirroring Rails' `has_many :things,
-   * extend: ModA` / `extend: [ModA, ModB]`. A module is an object whose
-   * function values become callable on `owner.things` (and
-   * `owner.things.where(...)`). Rails always stores extensions as Modules
-   * — `Reflection#extensions` is `Array(options[:extend])`, and even the
-   * block form (`has_many :things do ... end`) is compiled to a Module
-   * via `Module.new(&block)` — so the TS surface is the object-of-methods
-   * form, not a relation-mutating callback. */
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
     | Record<string, (...args: unknown[]) => unknown>[];
-  /** Load through associations via multiple queries instead of JOIN.
-   * Currently a no-op since through loading already uses multi-query by default.
-   * Exists for Rails API parity — Rails uses this to switch between JOIN and
-   * multi-query strategies. */
   disableJoins?: boolean;
-  /** HABTM-only: target-side FK column on the join table. Overrides the
-   * `class_name.foreign_key` default. Mirrors Rails'
-   * `has_and_belongs_to_many :tags, association_foreign_key: ...`. */
   associationForeignKey?: string;
-  /** Overrides the column used to store the polymorphic type string.
-   * Mirrors Rails' `belongs_to :thing, polymorphic: true, foreign_type: "sponsorable_type"`.
-   * When absent the default is `${underscore(associationName)}_type`. */
   foreignType?: string;
-  /** When true, records loaded through this association are marked
-   * strict-loading, causing further lazy loads on them to raise.
-   *
-   * Mirrors Rails' `has_many :foo, strict_loading: true` — checked via
-   * `reflection.strict_loading?` during query execution. */
   strictLoading?: boolean;
-  /** When true (or `:nested_attributes_order`), propagated validation errors
-   * include the child record's position in the collection. Mirrors Rails'
-   * `index_errors` option on collection associations. */
   indexErrors?: boolean | "nestedAttributesOrder";
 }
 
@@ -160,70 +94,23 @@ export interface AssociationDefinition {
   type: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
   name: string;
   options: AssociationOptions & { joinTable?: string };
-  /**
-   * Rails' `MacroReflection#scope` (`attr_reader :scope`, reflection.rb:376),
-   * assigned from the macro's second POSITIONAL argument beside — never
-   * inside — the options hash: `initialize(name, scope, options,
-   * active_record)` sets `@scope` and `@options` separately
-   * (reflection.rb:388-392), which is the object
-   * `Reflection.create(macro, name, scope, options, model)`
-   * (`associations/builder/association.rb:48-49`) and
-   * `HasAndBelongsToManyReflection.new(name, scope, options, ...)`
-   * (`associations.rb:1871`) build. A scope inside `options` is what
-   * `assert_valid_keys` rejects (`association.rb:21,70`).
-   */
   scope?: ((...args: any[]) => any) | null;
-  /**
-   * Rails' `MacroReflection#macro`. Present on the rich reflection an
-   * `Association` resolves off the owner's class in its constructor
-   * (`association.rb:32`), absent on the lightweight definitions the
-   * declaration macros build — on a reflection `type` is the polymorphic
-   * `*_type` column, not the macro, so bodies that branch on the macro must
-   * read this.
-   */
   macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
-  /** Rails' `MacroReflection#extensions`. See {@link macro}. */
   extensions?: () => any[];
-  /** Rails' `AbstractReflection#scope_for`. See {@link macro}. */
   scopeFor?: (relation: any, owner?: any) => any;
-  /** Rails' `AssociationReflection#foreign_key`. See {@link macro}. */
   foreignKey?: string | string[];
-  /** Rails' `AssociationReflection#association_primary_key`. See {@link macro}. */
   associationPrimaryKey?: (klass?: typeof Base) => string | string[];
-  /** Rails' `AssociationReflection#counter_cache_column`. See {@link macro}. */
   counterCacheColumn?: () => string | null;
-  /** Rails' `AssociationReflection#has_cached_counter?`. See {@link macro}. */
   hasCachedCounter?: () => boolean;
-  /** Rails' `AssociationReflection#has_active_cached_counter?`. See {@link macro}. */
   hasActiveCachedCounter?: () => boolean;
-  /** Rails' `AssociationReflection#counter_must_be_updated_by_has_many?`. See {@link macro}. */
   isCounterMustBeUpdatedByHasMany?: () => boolean;
-  /** Rails' `AbstractReflection#inverse_of` → `inverse_name`. See {@link macro}. */
   inverseName?: () => string | null;
-  /**
-   * Rails' `AbstractReflection#inverse_updates_counter_cache?` (reflection.rb:297,
-   * an alias of `inverse_which_updates_counter_cache`). See {@link macro}.
-   */
   isInverseUpdatesCounterCache?: () => unknown;
-  /** Rails' `AbstractReflection#klass`. See {@link macro}. */
   klass?: typeof Base;
-  /**
-   * Rails' `AssociationReflection#foreign_type` — the polymorphic `*_type`
-   * column (`attr_reader`, reflection.rb:514; assigned at :520). Carried on the
-   * lightweight definitions too
-   * (`builder/association.rb`'s `Reflection.create` result answers it), so a
-   * polymorphic `belongs_to` reaches it the way Rails does. See {@link macro}.
-   */
   foreignType?: string | null;
 }
 
-/**
- * Structural view of the reflection fields consumed within associations.ts.
- * Avoids importing the concrete `AssociationReflection`/`ThroughReflection`
- * types so the dep arrow stays one-way (this file already imports the
- * Reflection namespace for HABTM registration, but that's value-side only).
- * @internal
- */
+/** @internal */
 export interface ReflectionLike {
   joinForeignKey: string | string[];
   throughReflection?: { joinForeignKey: string | string[] } | null;
@@ -235,18 +122,7 @@ export interface ReflectionLike {
   sourceReflection?: { belongsTo?: () => boolean; isPolymorphic?: () => boolean } | null;
 }
 
-/**
- * Ruby has no model registry at all — Zeitwerk resolves a constant when the
- * method naming it runs, and a reload discards the model classes and their
- * reflection objects together, so a reflection memo can never outlive the class
- * it resolved against. trails keeps one long-lived registry per worker instead,
- * which is what makes a memo formed under a still-INCOMPLETE registry
- * reachable. The answer is Rails' own `||=` (reflection.rb:422, :989, :261,
- * :1113): a resolution that failed writes no memo and is retried, so it heals
- * itself once the missing model registers. Do not add an invalidation counter
- * here — memoizing a negative resolution is what needs one.
- * @internal
- */
+/** @internal */
 class ModelRegistry extends Map<string, typeof Base> {
   override set(name: string, model: typeof Base): this {
     registerModelConstant(name, model);
@@ -266,20 +142,9 @@ class ModelRegistry extends Map<string, typeof Base> {
   }
 }
 
-/**
- * Registry to hold model classes by name. Models must be registered
- * here so associations can resolve class references.
- */
 export const modelRegistry = new ModelRegistry();
 
-/**
- * Find the framework `Base` class in `model`'s prototype chain without
- * importing the `Base` value (which would create a module-init cycle). `Base`
- * is the single class that *owns* the `_isActiveRecordBase` sentinel; subclasses
- * inherit it. Falls back to `null` for the (impossible-in-practice) case of a
- * class that never reaches `Base`.
- * @internal
- */
+/** @internal */
 function frameworkBase(model: typeof Base): typeof Base | null {
   let c: unknown = model;
   while (typeof c === "function" && c !== Function.prototype) {
@@ -289,15 +154,7 @@ function frameworkBase(model: typeof Base): typeof Base | null {
   return null;
 }
 
-/**
- * Reject a class that does not descend from `Base`. Rails has no analogue —
- * everything that reaches `ActiveRecord::Base.descendants` bookkeeping IS a
- * `Base` subclass, and so always carries the `class_attribute` defaults its
- * concerns declared (`counter_cache.rb:9-10`, `reflection.rb:11`). Ported
- * readers rely on that, so the registry enforces it rather than making every
- * reader re-supply the default.
- * @internal
- */
+/** @internal */
 function assertActiveRecordBase(model: typeof Base): void {
   if (!frameworkBase(model)) {
     throw new Error(
@@ -306,15 +163,7 @@ function assertActiveRecordBase(model: typeof Base): void {
   }
 }
 
-/**
- * Throw when a bespoke class is registered under a name a canonical model
- * already owns. The registry is global and never torn down between tests, so
- * such a shadow silently poisons every later test that resolves the name as an
- * association target (a wrong value, not an error). Fires only when the name is
- * in the canonical autoload index AND the class differs, so re-registering the
- * canonical class itself (self-registration or autoload fault-in) still passes.
- * @internal
- */
+/** @internal */
 function guardCanonicalNameShadow(name: string, model: typeof Base): void {
   const canonical = canonicalModelAutoloadIndex?.get(name);
   if (canonical && canonical !== model) {
@@ -327,51 +176,15 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
 }
 
 /**
- * The single path that binds a model class to a name in Active Support's
- * constant table. Every constant write for a model class goes through here —
- * {@link registerModel} and every other `modelRegistry.set` caller reach it via
- * `ModelRegistry.set`, `registerSubclass` and `Base.adapter=` call it directly —
- * so the shadow guard covers every writer, and a name in the registry is always
- * a registered constant (`delete`/`clear` unregister the matching constant).
- *
- * Deliberately narrow: it does NOT write `modelRegistry` (the constant table is
- * the wider, fallback-only namespace — `registerSubclass` and `Base.adapter=`
- * must not promote a throwaway subclass into association resolution).
  * @internal
- * @noRailsEquivalent PERMANENT Ruby resolves a model name through `type_name.constantize` and lets Zeitwerk define the constant (inheritance.rb:196); JS has no constant table to register into.
+ * @noRailsEquivalent PERMANENT
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
   guardCanonicalNameShadow(name, model);
   registerConstant(name, model);
 }
 
-/**
- * Register a model class for association resolution.
- *
- * Three forms:
- * - `registerModel(Model)` — register a single class by its `.name`.
- * - `registerModel("Name", Model)` — register under an explicit name.
- * - `registerModel([A, B, C])` — batch-register an array of classes. Each is
- *   registered as in the single form, and any STI subclass (one whose direct
- *   prototype is another AR model rather than `Base` itself) is additionally
- *   routed through {@link registerSubclass} so it lands in its parent's
- *   `_subclasses`. STI on the parent must still be enabled explicitly via
- *   `Parent.inheritanceColumn = ...` — the array form does not set it.
- *
- * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/reflection.rb:434,
- *   :490` — `compute_class` is `name.constantize`; ESM has no constant namespace to walk and no
- *   autoload hook).
- * trails-only model registry with no Rails analogue:
- * `register_model` is defined nowhere in the Rails source (verified by grep over
- * vendor/rails). Ruby resolves an association's class through constant lookup —
- * Reflection#compute_class (reflection.rb:434 and :490) into Object.const_get,
- * backed by ActiveSupport autoloading — so Rails never registers models
- * anywhere. ESM has no constant namespace to walk and no autoload hook, so
- * trails must be told which classes exist. Deliberately public (re-exported from
- * index.ts) because application code has to call it, so marking it internal
- * would be a lie rather than a fix. Kept in associations.ts because association
- * class resolution is its only consumer path.
- */
+/** @noRailsEquivalent PERMANENT */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
 export function registerModel(models: (typeof Base)[]): void;
@@ -400,12 +213,6 @@ export function registerModel(
   } else {
     assertActiveRecordBase(nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
-    // A namespaced model carries its Ruby module path via `static moduleName`;
-    // derive the `::`-qualified registry key from it (e.g.
-    // "MyApplication::Billing::Firm") so cross-namespace `className` resolution
-    // finds the flattened JS class without a hand-written `registerModel(name, …)`
-    // call. `qualifiedName` returns the bare `.name` for non-namespaced models,
-    // so the extra registration only happens when it actually differs.
     const qualified = qualifiedName(nameOrModel);
     if (qualified !== nameOrModel.name) {
       registerModel(qualified, nameOrModel);
@@ -414,41 +221,19 @@ export function registerModel(
   }
 }
 
-/**
- * Zeitwerk analog: a fallback name→class index populated by the canonical
- * test-models barrel. When {@link autoloadModel} or reflection's `computeClass`
- * miss {@link modelRegistry}, they consult this index to autoload a canonical
- * model by name — the trails equivalent of Rails autoloading a constant on
- * first reference from an already-indexed `test/models/` tree. It stays
- * undefined in production (no index installed), so a genuine miss still throws.
- * @internal
- */
+/** @internal */
 let canonicalModelAutoloadIndex: ReadonlyMap<string, typeof Base> | undefined;
 
-/**
- * Install the eager canonical-model autoload index. Called once, as a side
- * effect, by the canonical test-models index module.
- * @internal
- */
+/** @internal */
 export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeof Base>): void {
   canonicalModelAutoloadIndex = index;
 }
 
 /**
- * Fault a canonical model into the constant table by name — the registration
- * half of constant resolution, and all that is left of trails' old registry
- * lookup. Ruby's `const_get` (so `constantize`) runs the autoloader on a miss;
- * trails' constant table has no such hook, so callers fault the name in here
- * and then resolve it with {@link constantize} exactly the way Rails spells it.
- * No-op when the name already resolves or the index has no entry, so a genuine
- * miss still leaves `constantize` to raise.
  * @internal
- * @noRailsEquivalent PERMANENT `constantize` runs Zeitwerk's autoloader on a miss (inheritance.rb:196); JS module resolution has no such hook.
+ * @noRailsEquivalent PERMANENT
  */
 export function autoloadModel(name: string): void {
-  // `constantize` strips a leading `::` itself; the registry and the index are
-  // keyed unprefixed, so strip here too or `compute_class("::#{class_name}")`
-  // (reflection.rb:427) can never fault one in.
   const bare = name.replace(/^::/, "");
   if (modelRegistry.has(bare)) return;
   const autoloaded = canonicalModelAutoloadIndex?.get(bare);
@@ -456,13 +241,8 @@ export function autoloadModel(name: string): void {
 }
 
 /**
- * Resolve the target model for an association using the rich reflection's
- * namespace-aware klass when available, falling back to a flat constant lookup.
- * Skips `.klass` for polymorphic associations (checked via `isPolymorphic()`)
- * because polymorphic reflections intentionally throw on `.klass` access.
- * Non-polymorphic errors (e.g. not-an-AR-subclass) propagate unchanged.
  * @internal
- * @noRailsEquivalent CONVERGEABLE MacroReflection#klass (reflection.rb:422) and the `name.constantize` its `_klass` falls through to (reflection.rb:434); the polymorphic arm is pre-checked here rather than rescued from AssociationReflection#compute_class's raise (reflection.rb:490).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function resolveAssocClass(
   recordOrClass: Base | typeof Base,
@@ -486,11 +266,8 @@ export function resolveAssocClass(
 }
 
 /**
- * Validate that an inverse_of association exists on the target model.
- * Throws InverseOfAssociationNotFoundError if not found.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the InverseOfAssociationNotFoundError raise of Association#initialize (association.rb:41), extracted from the macro path.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function validateInverseOf(
   owner: typeof Base,
@@ -505,15 +282,7 @@ export function validateInverseOf(
   throw new InverseOfAssociationNotFoundError(owner._reflectOnAssociation(assocName), targetModel);
 }
 
-/**
- * Resolve the inverse association name for a load — combines an explicit
- * `inverseOf` option with reflection-based automatic detection so both
- * paths wire the parent reference back onto the child.
- *
- * Mirrors: ActiveRecord::Reflection::AssociationReflection#inverse_name
- *
- * @internal
- */
+/** @internal */
 export function _resolveInverseName(
   ownerCtor: typeof Base,
   assocName: string,
@@ -526,27 +295,10 @@ export function _resolveInverseName(
   return refl?.inverseName?.() ?? null;
 }
 
-/**
- * Cache `owner` on `child` under `inverseName`. Centralizes inverse caching so
- * every load/set path routes a singular inverse to its holder and a collection
- * inverse to its proxy.
- *
- * Mirrors: ActiveRecord::Associations::Association#inversed_from
- *
- * @internal
- */
+/** @internal */
 export function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
   const childCtor = child.constructor as typeof Base;
   const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
-  // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:158-161):
-  // when the inverse is a has_many, wiring is gated on `inverse.klass.has_many_inversing`
-  // — the has_many's OWN target class, which is also the class
-  // `CollectionAssociation#target=` reads the flag off.
-  // Without the flag, Rails does NOT touch the parent collection. With it, the
-  // write is `set_inverse_instance`'s own `inverse.inversed_from(owner)`
-  // (association.rb:132-137, 153-155), whose `self.target = record` reaches
-  // `CollectionAssociation#target=` (collection_association.rb:284-296) and so
-  // `replace_on_target(record, true, replace: true, inversing: true)`.
   if (inverseRefl?.macro === "hasMany") {
     if (!inverseRefl.klass?.hasManyInversing) return;
     (
@@ -557,57 +309,18 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
   _cacheSingularTarget(child, inverseName, owner);
 }
 
-/**
- * Write an inverse target onto the record's holder for `assocName`, reached
- * via `record.association(name)` and stored there as `target` — the trails
- * analog of Rails' `@target` living on the association object
- * (`@association_cache[name]`). Every write is Rails'
- * one inverse write, `set_inverse_instance` -> `inversed_from`
- * (`association.rb:132-137, 153-155`); a collection name reaches
- * `CollectionAssociation#target=` (`collection_association.rb:284-295`)
- * through it.
- *
- * RFC 0022: writers and inverse-of seeders route through the holder, which is
- * the single source of truth — surfaced to readers via `Base#_associationCache`.
- *
- * An inverse name with no declared singular reflection is not cached at all:
- * `@association_cache` holds only `Association` instances built from a
- * reflection (associations.rb:290-296), and Rails cannot reach that state —
- * `inverse_of` resolution yields a reflection or nothing.
- *
- * @internal
- */
+/** @internal */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
   const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
     const assoc = record.association(assocName);
-    // Route through `inversedFrom`, not `setTarget`, to mirror Rails'
-    // `set_inverse_instance` → `inversed_from`. For belongs_to this runs
-    // `replace_keys` (writing the owner FK) *before* the `_staleState`
-    // snapshot taken by `loadedBang`, so `isStaleTarget()` is authoritative
-    // for the cached target rather than over-reporting against a nil/stale FK.
-    // For has_one the FK lives on the target, so `inversedFrom` is equivalent
-    // to `setTarget` (assign + loadedBang) with no owner FK write.
     assoc.inversedFrom(target);
     return;
   }
   record._associationInstances.get(assocName)?.inversedFrom(target);
 }
 
-/**
- * Read the preloaded/eager-loaded target for `assocName` from the real holder
- * (`record.association(name)`, Rails' `@target`) — the RFC 0022 successor to the
- * legacy `record._preloadedAssociations` shadow `Map`. Returns a one-key box
- * (`{ value }`) on a hit so a preloaded-nil target (the preloader stores
- * `setTarget(null)` for a belongs_to that resolved to no record) is
- * distinguished from a miss. Gates on Rails' own pair — `loaded?`
- * (`association.rb:81-83`) and `@stale_state && stale_target?`
- * (`association.rb:97-99`), the exact condition `load_target`
- * (`association.rb:189-190`) re-queries on — so a target whose owner key moved
- * under it re-queries rather than reading back stale.
- *
- * @internal
- */
+/** @internal */
 export function _preloadedHolderTarget(
   record: Base,
   assocName: string,
@@ -625,12 +338,7 @@ export function _preloadedHolderTarget(
   return { value: instance.target ?? null };
 }
 
-/**
- * @internal
- * Builds a HasManyThroughAssociationNotFoundError with DidYouMean-style
- * `corrections` derived from the owner's existing association names —
- * mirrors `ActiveRecord::HasManyThroughAssociationNotFoundError#corrections`.
- */
+/** @internal */
 export function _hmtNotFound(
   ctor: typeof Base,
   assocName: string,
@@ -641,39 +349,19 @@ export function _hmtNotFound(
   return new HasManyThroughAssociationNotFoundError(ctor.name, through, assocName, corrections);
 }
 
-/**
- * @internal
- * Builds an AssociationNotFoundError with DidYouMean-style `corrections`
- * derived from the record's declared association names — mirrors
- * `ActiveRecord::AssociationNotFoundError#corrections`, which spell-checks
- * the failing name against `record.class.reflections.keys`.
- */
+/** @internal */
 export function _associationNotFound(record: Base, name: string): AssociationNotFoundError {
   const dictionary = Object.keys(Reflection.reflections(record.constructor as typeof Base));
   const corrections = _correctNames(dictionary, name);
   return new AssociationNotFoundError(record, name, corrections);
 }
 
-/**
- * @internal
- * Shared helper for did_you_mean-style name corrections used by the
- * association error call sites (and reflection.ts).
- */
+/** @internal */
 export function _correctNames(dictionary: string[], input: string): string[] {
   return new SpellChecker({ dictionary }).correct(input);
 }
 
-/**
- * Associations mixin — adds belongsTo, hasOne, hasMany to a model class.
- *
- * Mirrors: ActiveRecord::Associations::ClassMethods
- */
 export class Associations {
-  /**
-   * Define a belongs_to association.
-   *
-   * Mirrors: ActiveRecord::Associations::ClassMethods#belongs_to
-   */
   static belongsTo(
     name: string,
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
@@ -688,11 +376,6 @@ export class Associations {
     Reflection.addReflection(this as any, name, reflection);
   }
 
-  /**
-   * Define a has_one association.
-   *
-   * Mirrors: ActiveRecord::Associations::ClassMethods#has_one
-   */
   static hasOne(
     name: string,
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
@@ -707,11 +390,6 @@ export class Associations {
     Reflection.addReflection(this as any, name, reflection);
   }
 
-  /**
-   * Define a has_many association.
-   *
-   * Mirrors: ActiveRecord::Associations::ClassMethods#has_many
-   */
   static hasMany(
     name: string,
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
@@ -726,32 +404,12 @@ export class Associations {
     Reflection.addReflection(this as any, name, reflection);
   }
 
-  /**
-   * Define a has_and_belongs_to_many association.
-   *
-   * Like Rails, this internally creates an anonymous join model and wires up
-   * two has_many associations (a "middle" pointing at the join model and a
-   * "through" pointing at the target). All HABTM operations then go through
-   * normal ActiveRecord persistence on the join model — no raw SQL.
-   *
-   * Mirrors: ActiveRecord::Associations::ClassMethods#has_and_belongs_to_many
-   *
-   * @missingRailsCall include — PERMANENT: `include Module.new { def
-   *   destroy_associations ... super end }` (associations.rb:1886-1894). JS has
-   *   no anonymous-module include and no `super` for a mixed-in method, so the
-   *   override is layered onto `prototype.destroyAssociations` with the previous
-   *   implementation captured as the `super` chain — the same effect Ruby gets
-   *   from inserting a module into the ancestor chain.
-   */
+  /** @missingRailsCall include — PERMANENT */
   static hasAndBelongsToMany(
     name: string,
     scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
     options: AssociationOptions & { joinTable?: string } = {},
   ): void {
-    // Builder::Association.build's options-object shift, which
-    // `Builder::HasAndBelongsToMany` does not inherit in Rails either
-    // (associations.rb:1870) — so it happens at the macro rather than in the
-    // builder.
     if (
       typeof scope === "object" &&
       scope !== null &&
@@ -761,11 +419,6 @@ export class Associations {
       options = scope;
       scope = null;
     }
-    // `class_name` Symbol coercion is handled generically in
-    // MacroReflection#normalizeOptions (mirroring Rails' AbstractReflection#
-    // class_name `.to_s`), but the HABTM builder reads `options.className`
-    // directly for foreign-key and join-table derivation — before any
-    // reflection is constructed — so the same coercion is repeated here.
     const rawClassName = (options as { className?: unknown }).className;
     if (typeof rawClassName === "symbol") {
       options = { ...options, className: rawClassName.description ?? "" };
@@ -785,8 +438,6 @@ export class Associations {
 
     const joinModel = builder.throughModel();
 
-    // `const_set` + `private_constant` (associations.rb:1876-1877) against the
-    // registry that stands in for Ruby's constant table.
     const registryKey = `${self.name}::${joinModel.name}`;
     modelRegistry.set(registryKey, joinModel);
     privateConstant(registryKey);
@@ -797,18 +448,6 @@ export class Associations {
     Reflection.addReflection(self, middleName, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
-    // Mirrors Rails associations.rb:1886-1894 — instead of registering a
-    // bare `before_destroy` callback per HABTM, Rails includes an anonymous
-    // module that overrides `destroy_associations` and chains with `super`.
-    // Each HABTM declaration layers its own override; multiple HABTMs on
-    // the same class chain naturally through the captured `prev` reference.
-    // `destroyAssociations` is invoked by the standard destroy flow
-    // (`Base#_destroyRow` → after before_destroy, before the row delete), so
-    // this override is all that's needed — no `before_destroy` bridge.
-    // Per-association guard: re-declaring the same HABTM (same `name` on
-    // the same class) would otherwise layer a duplicate wrapper around the
-    // existing chain, causing the join cleanup to run twice. Track the set
-    // of names already wrapped on this class's prototype and short-circuit.
     const HABTM_WRAPPED_NAMES = Symbol.for("blazetrails.habtm.destroyAssociations.names");
     const ownWrappedNames: Set<string> = Object.prototype.hasOwnProperty.call(
       self.prototype,
@@ -829,11 +468,6 @@ export class Associations {
       }): Promise<void> {
         await this.association(middleName).handleDependency();
         this.association(name).reset();
-        // Rails' `association(:name).reset` only clears the Association
-        // instance's loaded state. In this codebase, collection readers are
-        // additionally memoized in `_collectionProxies` (see associations.ts
-        // ~2334), so the user-facing reader would still return the stale
-        // proxy unless we evict it too.
         this._collectionProxies?.delete(name);
         if (typeof prevDestroyAssociations === "function") {
           await prevDestroyAssociations.call(this);
@@ -866,32 +500,11 @@ export class Associations {
   }
 }
 
-/**
- * Returns true if an Association instance (the wrapper that owns
- * load/build/create for a given macro) has already been built for this
- * record. Rails' `@association_cache` stores wrapper instances, populated
- * by `record.association(name)` — see
- * `activerecord/lib/active_record/associations.rb:51-67`. Our equivalent
- * caches are `_associationInstances` (singular: belongsTo/hasOne) and
- * `_collectionProxies` (collection: hasMany/habtm).
- *
- * Mirrors: ActiveRecord::Associations#association_cached?
- */
 export function isAssociationCached(record: Base, assocName: string): boolean {
   if (record._associationInstances.has(assocName)) return true;
   return record._collectionProxies.has(assocName);
 }
 
-/**
- * Decide whether a `:through` reflection's load can route through
- * AssociationScope's JOIN-based path. PR 3b only handles the simplest
- * shape: source is non-polymorphic `belongsTo`, no `sourceType`, no
- * `disableJoins`. Other shapes (has_many/has_one source, polymorphic
- * source, sourceType, disable-joins) need machinery this PR doesn't
- * yet provide and stay on the existing 2-step IN-list loaders.
- *
- * Shared by findTarget and loadHasOne so the gating rules can't drift.
- */
 export function _canRouteThroughViaAssociationScope(
   reflection: ReflectionLike | null | undefined,
   options: AssociationOptions,
@@ -903,14 +516,6 @@ export function _canRouteThroughViaAssociationScope(
   }
   const src = reflection.sourceReflection;
   if (!src) return false;
-  // Nested-through (through-a-through) shapes — either the throughReflection
-  // OR the sourceReflection is itself a ThroughReflection. Rails routes ALL
-  // nested-through associations through the JOIN-based AssociationScope:
-  // `reflection.chain` flattens any nesting into a uniform list of join
-  // steps (association_scope.rb `add_constraints` walks that list with no
-  // `nested?` special-case). Route them here unconditionally — the
-  // per-step poly guards below target the chain-length-2 direct-source
-  // shape and don't apply to the flattened multi-step walk.
   if (typeof reflection.isNested === "function" && reflection.isNested()) return true;
   if (
     typeof src.isPolymorphic === "function" &&
@@ -925,22 +530,7 @@ export function _canRouteThroughViaAssociationScope(
   return true;
 }
 
-/**
- * Record-aware routing decision for a `:through` load. Layers the owner's
- * persistence state on top of the structural `_canRouteThroughViaAssociationScope`
- * gate.
- *
- * A nested-through association on an UNSAVED owner is kept on the 2-step
- * `HasManyThroughAssociation#findTarget` / IN-subquery loader: the SQL JOIN can only see through
- * rows already in the database, not an in-memory-assigned through target
- * (`post.author = mary` before save). Rails resolves those from the loaded
- * through target via `find_target?`; our 2-step loader mirrors that. Once the
- * owner is persisted the JOIN path (Rails' flattened `reflection.chain` walk)
- * is authoritative. Non-nested shapes route regardless of owner state — their
- * through rows only exist once the owner has a PK, so an unsaved owner
- * short-circuits to an empty result either way.
- * @internal
- */
+/** @internal */
 export function _routeThroughViaAssociationScope(
   record: Base,
   reflection: ReflectionLike | null | undefined,
@@ -953,16 +543,7 @@ export function _routeThroughViaAssociationScope(
   return true;
 }
 
-/**
- * The owner-adjacent step of a through chain. Rails orders `reflection.chain`
- * target→owner, so the LAST element carries the owner's key column in its
- * `joinForeignKey` — the column the null-FK short-circuit must read to decide
- * whether the owner is loadable. For a simple (chain-length-2) through that's
- * the through_reflection; for a nested-through-through the through_reflection
- * is itself a through whose `joinForeignKey` delegates to its own source (a
- * column NOT on the owner), so only `chain.last` reads the right owner column.
- * @internal
- */
+/** @internal */
 export function _ownerChainReflection(reflection: any): any {
   const chain = reflection?.chain;
   return (
@@ -973,18 +554,7 @@ export function _ownerChainReflection(reflection: any): any {
   );
 }
 
-/**
- * Rails' `klass.scope_for_association` — returns the association-aware base
- * relation for the target model. Unlike `all()`, this deliberately drops the
- * enclosing `current_scope`: when a current_scope is active it returns
- * `default_scoped` off a fresh relation (named.rb:36-42), so only default
- * scopes apply to association reads, never the caller's `.scoping` block.
- * `scopeForAssociation` is wired onto Base via `extend()` but its `this:
- * NamedHost` constraint doesn't fully overlap `typeof Base` statically, so
- * the call site needs a structural cast. Centralising it here avoids
- * repeating the cast at every loader.
- * @internal
- */
+/** @internal */
 export function _scopeForAssociation(model: typeof Base): Relation<Base> {
   return (
     (model as unknown as { scopeForAssociation?(): Relation<Base> }).scopeForAssociation?.() ??
@@ -993,30 +563,8 @@ export function _scopeForAssociation(model: typeof Base): Relation<Base> {
 }
 
 /**
- * Apply a caller-supplied association `scope:` lambda to a built relation.
- *
- * Mirrors Rails' `AssociationScope#eval_scope`
- * (`activerecord/lib/active_record/associations/association_scope.rb:169-172`):
- *
- *   relation.instance_exec(owner, &scope) || relation
- *
- * The owner is passed as a positional arg so JS scopes can declare
- * `(rel, owner) => rel.where({user_id: owner.id})` — arity-0/1 scopes
- * (the common `(rel) => rel.where(...)` shape used throughout this
- * codebase) silently ignore the extra argument. A falsy return falls
- * back to the input relation, matching Rails' `|| relation` so scopes
- * with conditional bodies (`if owner.foo then rel.where(...); end`)
- * don't accidentally null out the chain.
- *
- * When `reflectionScope` is provided, skip application if `scope` is
- * the exact same function reference. AssociationScope already merges
- * `reflection.scope` (the macro-time lambda) via `scopeFor`; re-applying
- * would double-merge. Callers that synthesize a NEW lambda (e.g.
- * `HasManyThroughAssociation#findTarget` wrapping with `sourceType` filtering) pass a
- * different reference and still run.
- *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby applies the scope with instance_exec (association_scope.rb:169-172); JS cannot rebind a lambda's self.
+ * @noRailsEquivalent PERMANENT
  */
 export function applyAssociationScope<R>(
   rel: R,
@@ -1026,44 +574,16 @@ export function applyAssociationScope<R>(
 ): R {
   if (!scope) return rel;
   if (reflectionScope !== undefined && scope === reflectionScope) return rel;
-  // See `invokeScopeLambda` in association-scope.ts for the arity /
-  // `this`-binding contract. `|| rel` (not `??`) mirrors Ruby's
-  // `instance_exec(owner, &scope) || relation` — truthiness-based, so a
-  // scope returning `false` (idiomatic JS `cond && rel.where(...)`
-  // short-circuit) falls back to the input.
   return invokeScopeLambda(scope, rel, owner) || rel;
 }
 
-/**
- * Build (or return cached) base AssociationScope. When the owner has
- * a registered `Association` instance for this name, route through
- * its `scope()` so calls hit Rails' `@association_scope`-style
- * memoization (cleared on `reload()`). Without an instance, fall back
- * to a fresh `AssociationScope.scope(...)` build — matches test paths
- * that exercise loaders without going through `record.association(name)`.
- *
- * Disable-joins associations bypass the cache (Rails' `Association#scope`
- * creates a fresh `DisableJoinsAssociationScope` per call,
- * association.rb:107-117). The disableJoins routing is already
- * handled above this call site, so falling through to the fresh
- * `AssociationScope.scope(...)` here only matters if a future caller
- * stretches the contract.
- *
- * @internal
- */
+/** @internal */
 export function _builtAssociationScope(
   record: Base,
   assocName: string,
   reflection: ReflectionLike,
   targetModel: typeof Base,
 ): Relation<Base> {
-  // Materialize the Association instance if missing — proxy paths
-  // (CollectionProxy, AssociationProxy) call loaders directly without
-  // first going through `record.association(name)`, so an instance-
-  // only cache wouldn't hit in the common case. Rails caches on the
-  // Association instance too, but Rails' proxy IS the Association so
-  // the instance always exists. Calling `record.association(name)`
-  // here bridges that gap.
   let instance: { disableJoins?: boolean; scope?: () => unknown } | undefined;
   const assocFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
@@ -1087,28 +607,6 @@ export function _builtAssociationScope(
   }) as Relation<Base>;
 }
 
-/**
- * Mirror of Rails' `Association#skip_statement_cache?`
- * (`associations/association.rb:391-396`): the singular-load statement cache
- * is bypassed when the compiled SQL/binds would not be stable across owners.
- *
- *   reflection.has_scope? ||
- *   scope.eager_loading? ||
- *   klass.scope_attributes? ||
- *   reflection.source_reflection.active_record.default_scopes.any?
- *
- * `scope.eager_loading?` is not a distinct check: on the singular load path the
- * scope's eager-loading can only come from a reflection/macro scope lambda
- * (subsumed by `reflection.has_scope?` / the definition's scope) or a target default
- * scope carrying `includes` (subsumed by the `klass.scope_attributes?` arm
- * below), so the remaining arms cover it.
- *
- * Multi-step (through) chains statement-cache too, matching Rails — the base
- * scope in `_loadSingularViaStatementCache` is the association's `target_scope`
- * (which folds each intermediate reflection's `scope_for_association`, carrying
- * the join model's STI `type_condition`), so the compiled SQL is complete and
- * stable across owners.
- */
 export function _skipSingularStatementCache(
   reflection: ReflectionLike,
   targetModel: typeof Base,
@@ -1120,12 +618,6 @@ export function _skipSingularStatementCache(
     sourceReflection?: { activeRecord?: { defaultScopes?: unknown[] } } | null;
   };
   if (typeof refl.hasScope === "function" && refl.hasScope()) return true;
-  // `klass.scope_attributes?` (`scoping/default.rb:55`) =
-  // `current_scope || default_scopes.any? || respond_to?(:default_scope)`. A
-  // thread-local scope, any default scope, OR a method-form `default_scope`
-  // override makes the relation owner/context-dependent. Mirror all three arms
-  // (the third — `hasDefaultScopeOverride` — covers a `def self.defaultScope`
-  // that never lands in `defaultScopes`).
   const klass = targetModel as unknown as {
     currentScope?(): unknown;
     defaultScopes?: unknown[];
@@ -1141,20 +633,6 @@ export function _skipSingularStatementCache(
   return false;
 }
 
-/**
- * Load a singular association target through a per-association statement
- * cache, mirroring Rails' `Association#find_target` →
- * `reflection.association_scope_cache(klass, owner) { ... }` /
- * `sc.execute(binds, c)` (`associations/association.rb:243-252`).
- *
- * The cache (memoized on the target class via `cachedFindByStatement`,
- * bucketed by the connection's `prepared_statements`) compiles the
- * association scope ONCE — with `params.bind()` Substitutes standing in for
- * the owner's key values — and on every later load only re-binds the owner's
- * current key values (`AssociationScope.getBindValues`), avoiding an
- * AST/SQL rebuild. Emitted SQL and the unordered LIMIT-1 semantics are
- * identical to the `take()` path this replaces.
- */
 export async function _loadSingularViaStatementCache(
   record: Base,
   assocName: string,
@@ -1171,20 +649,6 @@ export async function _loadSingularViaStatementCache(
     }
   }
   const connection = (targetModel as unknown as { connection: unknown }).connection;
-  // Rails: `sc = reflection.association_scope_cache(klass, owner) { |params|
-  // target_scope.merge!(AssociationScope.create { params.bind }.scope(self)) }`.
-  // `associationScopeCache` memoizes the compiled StatementCache on the target
-  // class (keyed by reflection + polymorphic owner type).
-  //
-  // The base is the association's `target_scope`, NOT a bare
-  // `_scopeForAssociation(targetModel)`. For a through association
-  // `ThroughAssociation#target_scope` folds each intermediate reflection's
-  // `klass.scope_for_association` into the query (through_association.rb) — this
-  // is what carries the join model's STI `type_condition` (e.g.
-  // `memberships.type = 1` for a `CurrentMembership` join) that
-  // `AssociationScope` alone does not emit. Falling back to
-  // `_scopeForAssociation` only when no Association instance exists (low-level
-  // loader paths that bypass `record.association(name)`).
   const baseScope = (): Relation<Base> =>
     (typeof instance?.targetScope === "function"
       ? (instance.targetScope() as Relation<Base>)
@@ -1213,10 +677,8 @@ export async function _loadSingularViaStatementCache(
 }
 
 /**
- * Sync loaded result to the association instance if one exists.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE writes the loaded target Ruby sets inline via `association.target =` (association.rb:102).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
   const holder = record._associationInstances.get(assocName) as
@@ -1235,19 +697,7 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
   holder._setTargetFromLoader(result as Base | Base[] | null);
 }
 
-/**
- * Resolve the owner-side key for an inline (no-reflection) association
- * fallback, mirroring `reflection.activeRecordPrimaryKey` semantics
- * (reflection.rb:587 `active_record_primary_key`): for a composite-FK
- * query_constraints owner with a scalar primary key, key on the owner's
- * query_constraints list rather than the scalar `id`; for a composite-PK
- * owner without query_constraints, collapse the PK array to `"id"` when it
- * contains it, else keep the full composite PK (reflection.rb:597-600).
- * `primaryKey` already reflects any explicit `options.primaryKey`, so only
- * widen the default.
- *
- * @internal
- */
+/** @internal */
 export function _inlineOwnerKey(
   ctor: typeof Base,
   options: AssociationOptions,
@@ -1259,11 +709,6 @@ export function _inlineOwnerKey(
   if (options.queryConstraints || hasQueryConstraints.call(ctor as any)) {
     return queryConstraintsList.call(ctor as any) ?? primaryKey;
   }
-  // Mirror reflection.rb:597-600 active_record_primary_key composite_primary_key?
-  // branch: a composite-PK owner without query_constraints collapses to "id"
-  // when the PK array contains it, else keeps the full composite PK. (After the
-  // options.primaryKey early return, primaryKey === ctor.primaryKey, so an array
-  // PK already implies ctor.compositePrimaryKey.)
   if (Array.isArray(primaryKey)) {
     return primaryKey.includes("id") ? "id" : primaryKey;
   }
@@ -1343,16 +788,7 @@ export function _inlinePolymorphicKeys(
   return { fkCols: [scalarFk], ownerKeyCols: [scalarOwnerKey] };
 }
 
-/**
- * `Preloader::Association#associate_records_to_owner`
- * (`preloader/association.rb:245-256`), written through the association's
- * `target=` (`association.rb:100-103`), which is what flips `loaded`. Rails has
- * no proxy-side hook for this. The owner lookup Rails does inline
- * (`owner.association(reflection.name)`, :247) is the caller's, so the
- * association arrives resolved.
- *
- * @internal
- */
+/** @internal */
 export function _associateRecordsToOwner(association: AssociationInstance, records: Base[]): void {
   if (association.isCollection()) {
     const target = association.target;
@@ -1365,10 +801,6 @@ export function _associateRecordsToOwner(association: AssociationInstance, recor
   }
 }
 
-/**
- * Factory to get a CollectionProxy for a has_many association.
- * Returns a cached proxy if one exists on the record.
- */
 export function association<T extends Base = Base>(
   record: Base,
   assocName: string,
@@ -1382,9 +814,6 @@ export function association<T extends Base = Base>(
         _associateRecordsToOwner(existing.proxyAssociation, records as T[]);
       }
     }
-    // collection_association.rb:41 — `reader` ends in `@proxy.reset_scope`,
-    // including on the cached-proxy path. Called for effect: `reset_scope`
-    // returns the raw proxy, and callers must keep holding the JS Proxy wrapper.
     (existing as unknown as { resetScope(): unknown }).resetScope();
     return existing;
   }
@@ -1395,15 +824,6 @@ export function association<T extends Base = Base>(
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
   validateThroughReflection(ctor, assocName);
-  // Rails only ever builds a CollectionProxy for a collection reflection: its
-  // one construction site is `CollectionAssociation#reader`
-  // (`collection_association.rb:34-41`), and `@association`
-  // (`collection_proxy.rb:31-35`) is therefore always a has_many/habtm
-  // association. A singular reflection has no path into this class at all —
-  // `SingularAssociation#reader` (`singular_association.rb:11-17`) returns the
-  // record, and `owner.association(name)` (`associations.rb:288-294`) returns
-  // the association object itself. So hand that back rather than wrapping a
-  // `SingularAssociation` in a proxy whose mutations are all array-shaped.
   const instance = record.association(assocName) as unknown as { isCollection(): boolean };
   if (!instance.isCollection()) {
     throw new TypeError(
@@ -1440,15 +860,6 @@ export function association<T extends Base = Base>(
   return wrapped;
 }
 
-/**
- * Wrap a CollectionProxy in a Proxy that delegates unknown property access
- * to the underlying Relation (via scope()). This mirrors Ruby's
- * CollectionProxy#method_missing which delegates to the association scope.
- *
- * Priority:
- * 1. Own/prototype properties (CollectionProxy methods, extend methods)
- * 2. Relation query methods + named scopes (via scope()'s own proxy)
- */
 const NUMERIC_INDEX_PATTERN = /^(0|[1-9]\d*)$/;
 
 function wrapCollectionProxy<T extends Base = Base>(
@@ -1457,11 +868,6 @@ function wrapCollectionProxy<T extends Base = Base>(
   return new Proxy(proxy, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
-      // Curated `to: :records` delegations (`each`, `join`, `reverse`, …) are now
-      // real *async* methods on the Relation base. On a *loaded* proxy they must
-      // keep Rails' synchronous `records` delegation, so fall through to the sync
-      // record delegate below. CollectionProxy-specialized names (slice/reduce/
-      // indexOf/…) are absent from DELEGATION_RECORD_METHOD_NAMES, so they win here.
       const preferSyncRecordDelegate =
         typeof prop === "string" && target.loaded && DELEGATION_RECORD_METHOD_NAMES.has(prop);
       if (typeof prop === "symbol") return value;
@@ -1472,23 +878,6 @@ function wrapCollectionProxy<T extends Base = Base>(
         return target.target[Number(prop)];
       }
 
-      // Class-method delegations resolve through the `Reflect.get(scope, prop,
-      // scope)` fallback below: `target.scope()` returns an `AssociationRelation`
-      // wrapped by `wrapWithScopeProxy`, whose miss path runs the
-      // `classMethodDelegator` (delegation.rb:118-131). This CollectionProxy
-      // delegate class is NOT yet on the per-model prototype carrier — only the
-      // base `Relation` is (story
-      // `delegation-remaining-delegate-class-prototype-carriers` tracks the
-      // rest) — so no real-method / side-table branch belongs here.
-
-      // Array-method delegation (sync fast-path) — when already loaded, delegate
-      // synchronously against `target.target` (the hydrated records array).
-      // Checked before scope lookup so it matches `wrapWithScopeProxy`'s pattern
-      // and returns the same sync value a caller expects post-load. The curated
-      // `to: :records` set (Rails names: `each`, `index`, `to_sentence`, …) goes
-      // first so a loaded proxy delegates those to its records synchronously
-      // (delegation.rb:101), matching Rails; the JS-name array delegate covers
-      // the broader Enumerable surface (map/filter/sort/…).
       if (target.loaded) {
         const recordDelegate =
           typeof prop === "string"
@@ -1499,16 +888,6 @@ function wrapCollectionProxy<T extends Base = Base>(
         if (arrayDelegate) return arrayDelegate;
       }
 
-      // Enumerable-method delegation — async + self-loading, checked before
-      // scope lookup so it routes to the collection cache via
-      // `target.records()` rather than the scope relation's `_records`.
-      // Covers `partition` and all DELEGATED_ARRAY_METHODS on *unloaded*
-      // proxies (the sync path above handles loaded proxies). Rails resolves
-      // every `to: :records` delegate through `CollectionProxy#records`
-      // (collection_proxy.rb:1024-1026), which is `load_target` — it merges
-      // `find_target` into the in-memory target rather than replacing it
-      // (collection_association.rb:270-278), so a proxy holding
-      // built-but-unsaved records answers with them included.
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
@@ -1518,13 +897,6 @@ function wrapCollectionProxy<T extends Base = Base>(
         return (...args: any[]) => scopeVal.apply(scope, args);
       }
 
-      // Rails delegation.rb:118-131 (ClassSpecificRelation#method_missing):
-      // if the scope doesn't respond to the method, check the model class and
-      // delegate via `scoping { model.public_send(method, ...) }`.
-      // Sync methods (returning Relation) restore the scope immediately so
-      // the Relation is directly chainable. Async methods (returning a native
-      // Promise) defer restoration until the promise settles — mirrors Rails'
-      // synchronous block-scoping across the full method body.
       const modelClass = target.model;
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
@@ -1537,8 +909,6 @@ function wrapCollectionProxy<T extends Base = Base>(
 
       return scopeVal;
     },
-    // delegation.rb:150-152 — `super || model.respond_to?(method)`, over the
-    // names the `get` trap above fabricates.
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
@@ -1550,60 +920,18 @@ function wrapCollectionProxy<T extends Base = Base>(
   });
 }
 
-/**
- * Per-instance association-cache reset hook. Rails initializes
- * `@association_cache = {}` here; our equivalents are pre-allocated by the
- * `Base` class fields, so this only needs to clear them when called on an
- * existing record (e.g. from `initialize_dup`). Routes through the single
- * `Base#_resetAssociationCaches` lifecycle seam (RFC-0022 b5).
- *
- * Mirrors: ActiveRecord::Associations#init_internals
- *
- * @internal
- */
+/** @internal */
 export function initInternals(this: Base, super_: () => void): void {
   super_();
   this._resetAssociationCaches();
 }
 
-/**
- * Empties the copy's association cache, then hands control down the chain.
- *
- * Mirrors: ActiveRecord::Associations#initialize_dup (associations.rb:69-72) —
- * `@association_cache = {}` then `super`. `include Associations` is base.rb:317,
- * so this is the outermost link of the `initialize_dup` chain.
- */
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
   this._resetAssociationCaches();
   super_(other);
 }
 
-/**
- * Returns the cached `Association` wrapper for `name`, or `null` if none
- * has been built yet.
- *
- * Rails is a one-liner here — `@association_cache[name]` — because every
- * writer that produces cached target data (the preloader, the collection
- * proxy, `Relation#exec_queries`) routes through `association_instance_set`,
- * so the cache is the single place the data can be. trails' preloader and
- * `CollectionProxy` still write their targets to the proxy /
- * preloaded-holder layers instead, so a bare `_associationInstances.get`
- * misses cached data that Rails would have found. Until those writers route
- * through `associationInstanceSet` (tracked separately), this reader
- * consults those layers and materializes the `Association` wrapper for them
- * so the singular reads its callers make (`isLoaded`, `isUpdated`,
- * `isStaleTarget`, `setInverseInstance`, `loadedBang`) are reachable.
- *
- * Only `AssociationNotFoundError` is swallowed — that is the case Rails'
- * `association_instance_get` answers with a nil return. Configuration
- * errors (`validateThroughReflection`, `constantize` for an unregistered
- * target class, inverse-of validity) propagate, matching Rails'
- * `Reflection#check_validity!`.
- *
- * Mirrors: ActiveRecord::Associations#association_instance_get
- *
- * @internal
- */
+/** @internal */
 export function associationInstanceGet(this: Base, name: string): unknown {
   const record = this as Base & {
     association?(name: string): unknown;
@@ -1615,12 +943,6 @@ export function associationInstanceGet(this: Base, name: string): unknown {
   if (typeof record.association !== "function") {
     return existing?.isLoaded() ? existing : null;
   }
-  // Rails' `replace_on_target` (collection_association.rb:457-490) does NOT
-  // permanently flip `@loaded` — it uses an ephemeral `@_was_loaded` flag
-  // reset in `ensure`. So `CollectionProxy#build` records sit in
-  // `proxy._target` while `loaded === false`, and Rails' callers gate only on
-  // `if association = association_instance_get(...)` being truthy, never on
-  // `loaded?` (autosave_association.rb:420).
   const proxy = record._collectionProxies?.get?.(name) as
     | { loaded?: boolean; target?: unknown[] }
     | undefined;
@@ -1653,17 +975,7 @@ export function associationInstanceGet(this: Base, name: string): unknown {
   }
 }
 
-/**
- * Stores the built `Association` wrapper for `name` in the canonical
- * `_associationInstances` cache, mirroring Rails'
- * `@association_cache[name] = association`. The Trails-specific
- * `_collectionProxies` wrapper map is populated separately by the
- * collection-proxy machinery, not here.
- *
- * Mirrors: ActiveRecord::Associations#association_instance_set
- *
- * @internal
- */
+/** @internal */
 export function associationInstanceSet(this: Base, name: string, association: unknown): void {
   this._associationInstances.set(name, association as AssociationInstance);
 }

@@ -9,13 +9,6 @@ import {
 import { Model } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
-// Rails' Topic declares `attr_accessor :approved` with no type, which is the
-// untyped ValueType here (type/registry.ts:47). `price` is an `attr_writer`
-// plus a `number_to_currency` reader, NOT an attribute, so it is a plain field
-// whose raw value is reached through Rails' `attribute_before_type_cast`
-// override (topic.rb:56-58), reached through the `_before_type_cast` suffix
-// Topic declares for itself (topic.rb:10-11).
 class Topic extends Model {
   static {
     this.attribute("title", "string");
@@ -25,10 +18,6 @@ class Topic extends Model {
     this.defineAttributeMethod("price");
   }
 
-  // Rails' `@price` ivar. Declared without an initializer because
-  // `_assignAttributes` runs inside Model's constructor, before a subclass
-  // field initializer would have run — an initialized `#price` is unwritable
-  // at that point.
   declare _price: unknown;
 
   set price(value: unknown) {
@@ -47,26 +36,18 @@ class Topic extends Model {
     return false;
   }
 
-  // Mirrors: topic.rb:56-58 — the dispatch target of the `_before_type_cast`
-  // suffix, reading the ivar directly.
   attributeBeforeTypeCast(attr: string): unknown {
     if (attr === "price") return this._price;
     return this._attributes.getAttribute(attr).valueBeforeTypeCast;
   }
 }
 
-// Mirrors: activemodel/test/models/person.rb — `attr_accessor :karma`.
 class Person extends Model {
   static {
     this.attribute("karma", "value");
   }
 }
 
-/**
- * Mirrors `test_validates_numericality_with_object_acting_as_numeric`'s
- * anonymous `Class.new { def to_f; 123.54; end }` — `Kernel.Float` honors
- * `to_f` on a non-Numeric object, so numericality accepts it.
- */
 class ActingAsNumeric {
   toF(): number {
     return 123.54;
@@ -96,11 +77,6 @@ describe("NumericalityValidationTest", () => {
     "90e-5",
   ];
   const INTEGER_STRINGS = ["0", "+0", "-0", "10", "+10", "-10", "0090", "-090"];
-  // Rails' list is [0.0, 10.0, 10.5, -10.5, -0.0001]. JS has one numeric type,
-  // so `0.0 === 0` and `10.0 === 10` — a "Float that happens to be integral" is
-  // not expressible, and those two entries would be NUMERIC_INTEGERS members
-  // rather than the integer-only-rejecting Floats Rails means them to be. The
-  // distinction is still covered by FLOAT_STRINGS' "0.0" / "10.0".
   const NUMERIC_FLOATS = [10.5, -10.5, -0.0001];
   const NUMERIC_INTEGERS = [0, 10, -10];
   const FLOATS = [...NUMERIC_FLOATS, ...FLOAT_STRINGS];
@@ -523,27 +499,22 @@ interface MaxApproved {
   maxApproved(): number;
 }
 
-/** Rails' `Topic.define_method(:allow_only_integers?) { false }`. */
 function defineIsAllowOnlyIntegers(): void {
   (Topic.prototype as unknown as AllowOnlyIntegers).isAllowOnlyIntegers = () => false;
 }
 
-/** Rails' `Topic.define_method(:min_approved) { 5 }`. */
 function defineMinApproved(): void {
   (Topic.prototype as unknown as MinApproved).minApproved = () => 5;
 }
 
-/** Rails' `ensure Topic.remove_method :min_approved`. */
 function removeMinApproved(): void {
   delete (Topic.prototype as unknown as Partial<MinApproved>).minApproved;
 }
 
-/** Rails' `Topic.define_method(:max_approved) { 5 }`. */
 function defineMaxApproved(): void {
   (Topic.prototype as unknown as MaxApproved).maxApproved = () => 5;
 }
 
-/** Rails' `ensure Topic.remove_method :max_approved`. */
 function removeMaxApproved(): void {
   delete (Topic.prototype as unknown as Partial<MaxApproved>).maxApproved;
 }

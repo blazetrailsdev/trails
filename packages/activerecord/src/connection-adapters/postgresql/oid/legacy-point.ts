@@ -1,9 +1,3 @@
-/**
- * PostgreSQL legacy point type — represents a geometric point as [x, y].
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::LegacyPoint
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType<[number, number]> {

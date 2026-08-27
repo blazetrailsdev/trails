@@ -1,12 +1,3 @@
-/**
- * Smoke test: SchemaStatements methods are accessible directly on the adapter.
- * Rails: `AbstractAdapter` includes `SchemaStatements`, so
- * `connection.create_table(...)` works without going through MigrationContext.
- *
- * DDL behaviors with a Rails counterpart run against the ambient connection;
- * only the mixin-wiring smoke cases (untestable in Rails, where `include` is
- * native) keep a throwaway `:memory:` adapter.
- */
 import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
@@ -27,13 +18,6 @@ afterEach(async () => {
   adapter = undefined;
 });
 
-/**
- * Minimal stub adapter that extends AbstractAdapter but overrides nothing from
- * SchemaStatements. Used to exercise the self-delegation guard: methods like
- * foreignKeys/removeForeignKey check whether this.adapter.<method> is the
- * mixed-in SchemaStatements version and, if so, skip delegation and execute
- * the base SQL directly (or return the base fallback).
- */
 class StubAdapter extends AbstractAdapter {
   get adapterName() {
     return "sqlite" as const;
@@ -46,12 +30,6 @@ class StubAdapter extends AbstractAdapter {
   }
 }
 
-/**
- * Stub whose adapterName drives the dialect switch in tables()/views() and
- * captures the SQL passed to execute(), so we can assert the postgres fallback
- * arm matches Rails' data_source_sql shape (relkind IN ('r','p'), scoped via
- * current_schemas(false)) rather than the pg_tables/'public' deviation.
- */
 class CapturingAdapter extends AbstractAdapter {
   lastSql = "";
   lastParams: unknown[] = [];
@@ -76,14 +54,6 @@ class CapturingAdapter extends AbstractAdapter {
   }
 }
 
-/**
- * SQLite-flavoured capturing stub: records every SQL string so the
- * introspection-PRAGMA arms can be asserted against the exact output. Inherits
- * AbstractAdapter's quote (string literal) and, like Rails' SQLite3 adapter,
- * defines its own double-quote `quote_column_name` in ClassMethods
- * (sqlite3/quoting.rb:44) — where the inherited instance methods send it
- * (quoting.rb:135-143), the abstract one raising NotImplementedError.
- */
 class SqliteCapturingAdapter extends AbstractAdapter {
   allSql: string[] = [];
   static override quoteColumnName(name: string): string {
@@ -117,8 +87,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   fixtures([], { useTransactionalTests: false });
 
   it("tableAliasFor resolves tableAliasLength via the DatabaseLimits mixin", () => {
-    // SchemaStatements no longer defines tableAliasLength (Rails keeps it only
-    // in DatabaseLimits); the mixed-in adapter still resolves it to 64.
     const stub = new StubAdapter();
     expect(stub.tableAliasLength()).toBe(64);
     expect(stub.tableAliasFor("a.very.long.schema.qualified.table.name")).toBe(
@@ -128,13 +96,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.tableAliasFor(long)).toBe("x".repeat(64));
   });
 
-  // Ruby's `drop_table(*table_names, **options)` iterates an empty array
-  // (abstract/schema_statements.rb:540-545), and kwargs never land in
-  // `table_names`, so both calls are no-ops. The TS parameter tuple still
-  // requires a first name, so the zero-name call is reachable only through
-  // untyped dispatch (`CommandRecorder#replay`, `methodMissing`) — which is the
-  // path the deleted ArgumentError used to raise on. Rails has no counterpart
-  // test.
   it("dropTable with no table names is a no-op, with or without options", async () => {
     const sqlite = new SqliteCapturingAdapter();
     const dropTable = sqlite.dropTable.bind(sqlite) as (...args: unknown[]) => Promise<void>;
@@ -154,10 +115,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
     const sqlite = new SqliteCapturingAdapter([{ name: 'idx"x', unique: 1 }]);
     await sqlite.indexes("things");
-    // Converged with SQLite3Adapter: between index_list and index_info the
-    // shared impl reads the index SQL (to recover WHERE/expression indexes),
-    // and index_info quotes the index name the way Rails does — `quote`, a
-    // string literal — so embedded `"` passes through unescaped.
     expect(sqlite.allSql).toEqual([
       'PRAGMA index_list("things")',
       `SELECT sql FROM sqlite_master WHERE name = 'idx"x' AND type = 'index' ` +
@@ -174,7 +131,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("createTable is callable directly on the adapter", async () => {
-    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("things", (t) => {
       t.string("name");
@@ -189,7 +145,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("dropTable removes the table", async () => {
-    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("temp_table", (t) => {
       t.string("value");
@@ -200,7 +155,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addColumn and columnExists work on adapter", async () => {
-    // Mixin-wiring smoke test (no Rails counterpart): `:memory:` is deliberate.
     adapter = new BetterSQLite3Adapter(":memory:");
     await adapter.createTable("widgets", { id: false }, (t) => {
       t.string("title");
@@ -212,28 +166,15 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("delegating methods (foreignKeys, removeForeignKey) do not infinitely recurse on base adapter", async () => {
-    // Regression guard: before the self-delegation fix, mixed-in SchemaStatements
-    // methods checked `this.adapter.<method>` — which returned `this` — and called
-    // themselves again, causing a stack overflow. This test uses StubAdapter, which
-    // does NOT override foreignKeys or removeForeignKey, so it hits the base
-    // SchemaStatements code paths (not a concrete adapter shortcut).
-    // AbstractAdapter.supports_foreign_keys? is false by default (Rails), which
-    // would short-circuit removeForeignKey via the use_foreign_keys? guard; opt
-    // in so the recursion-prone base path is actually exercised.
     class FkStub extends StubAdapter {
       useForeignKeys() {
         return true;
       }
     }
     const stub = new FkStub();
-    // The base body raises (schema_statements.rb:1103) when the adapter has no
-    // override; a recursion regression would surface as a stack overflow instead.
     await expect(stub.foreignKeys("any_table")).rejects.toThrow(
       new NotImplementedError("foreign_keys is not implemented"),
     );
-    // removeForeignKey base path resolves the real constraint via
-    // foreign_key_for! (Rails-faithful), so it surfaces that same raise promptly
-    // rather than recursing into a stack overflow.
     await expect(
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
     ).rejects.toThrow(new NotImplementedError("foreign_keys is not implemented"));
@@ -285,13 +226,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("removeForeignKey ifExists probe matches on to_table only, not name (Rails)", async () => {
-    // Rails' remove_foreign_key checks existence with only the positional
-    // to_table, then resolves the exact constraint (with column/name) via
-    // foreign_key_for!. So an ifExists removal targeting an existing FK to
-    // `other` under the WRONG name must NOT short-circuit to a no-op — it
-    // finds the FK (name ignored for existence) and then raises from the
-    // resolution when the name doesn't match. If the ifExists probe wrongly
-    // sliced in `name`, this would silently no-op instead.
     class FkStub extends StubAdapter {
       useForeignKeys() {
         return true;
@@ -309,10 +243,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
-    // Rails: add_foreign_key begins with `return unless use_foreign_keys?`.
-    // StubAdapter inherits AbstractAdapter.supports_foreign_keys? == false, so
-    // use_foreign_keys? is false through the real composition (no stubbing of
-    // the aggregate) — the guard must short-circuit before any SQL is emitted.
     let executed = false;
     class NoFkAdapter extends StubAdapter {
       executeMutation(_sql: string) {
@@ -327,9 +257,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("removeForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
-    // Rails: remove_foreign_key begins with `return unless use_foreign_keys?`.
-    // Without the guard this would reach foreign_key_for! and raise; the guard
-    // makes it a silent no-op when the adapter doesn't support foreign keys.
     let executed = false;
     class NoFkAdapter extends StubAdapter {
       executeMutation(_sql: string) {
@@ -346,11 +273,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addForeignKey/removeForeignKey no-op when config foreign_keys:false despite supports_foreign_keys?", async () => {
-    // Rails: use_foreign_keys? == supports_foreign_keys? && foreign_keys_enabled?,
-    // where foreign_keys_enabled? reads @config.fetch(:foreign_keys, true). An
-    // adapter that supports FKs but is configured `foreign_keys: false` must
-    // still no-op the FK mutators. isForeignKeysEnabled reads the adapter's real
-    // config hash (_config), so this exercises the config-driven disable path.
     let executed = false;
     class DisabledFkAdapter extends StubAdapter {
       constructor() {
@@ -377,17 +299,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("isForeignKeysEnabled defaults to true when config omits foreign_keys (Rails fetch default)", () => {
-    // Rails: foreign_keys_enabled? is @config.fetch(:foreign_keys, true), so a
-    // config with no :foreign_keys key yields true.
     const stub = new StubAdapter();
     expect((stub as any).isForeignKeysEnabled()).toBe(true);
   });
 
   it("isForeignKeysEnabled is false when config stores foreign_keys: nil (Rails fetch semantics)", () => {
-    // Hash#fetch(:foreign_keys, true) returns the STORED value whenever the key
-    // is present, so an explicit `foreign_keys: nil` is falsy in Ruby and
-    // disables foreign keys. `??` / `!== false` would answer true here — this is
-    // the one input that distinguishes the two expressions.
     class NullFkAdapter extends StubAdapter {
       constructor() {
         super();
@@ -454,8 +370,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("addForeignKey with ifNotExists creates a second FK to the same table on a different column", async () => {
-    // foreign_key_test.rb:237: Rails slices :column into the existence check,
-    // so a same-target FK on a different column is NOT short-circuited.
     const conn = await ambientConnection();
     await withRocketTables(conn, async () => {
       await conn.addForeignKey("astronauts", "rockets");

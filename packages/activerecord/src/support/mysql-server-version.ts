@@ -7,11 +7,6 @@ export const MYSQL_TEST_URL = mysqlUrl();
 let mariaDb = false;
 let mysqlVersionStr = "";
 
-// Reads VERSION() once at load: the supports* gates below mirror Rails'
-// version-keyed `supports_*?` predicates, which have no static answer (the
-// mysql lane may be MySQL 8 or the MariaDB CI stand-in). An unreachable server
-// yields an empty version, so every gate reads false — it never skips a suite,
-// which is describeIfMysqlAdapter's job alone.
 async function checkMysql(): Promise<{ isMariaDb: boolean; version: string }> {
   let conn: Awaited<ReturnType<typeof mysql.createConnection>> | undefined;
   try {
@@ -28,9 +23,7 @@ async function checkMysql(): Promise<{ isMariaDb: boolean; version: string }> {
 
 ({ isMariaDb: mariaDb, version: mysqlVersionStr } = await checkMysql());
 
-/** true when the connected server is MariaDB; false on MySQL or when MySQL is unavailable. */
 export const isMariaDb = mariaDb;
-/** Raw VERSION() string from the connected MySQL/MariaDB server (empty when unavailable). */
 export const mysqlVersion = mysqlVersionStr;
 
 function parseMysqlVersion(full: string): Version | null {
@@ -39,81 +32,33 @@ function parseMysqlVersion(full: string): Version | null {
 }
 const _serverVersion = parseMysqlVersion(mysqlVersionStr);
 
-/** The port of `connection.database_version`; null when MySQL is unavailable. */
 export const serverVersion = _serverVersion;
 
-/**
- * Mirrors AbstractMysqlAdapter#supports_optimizer_hints?: MySQL ≥ 5.7.7 only;
- * never MariaDB. Lets adapter tests gate on hint support the way the Rails
- * suite wraps `OptimizerHintsTest` in `if supports_optimizer_hints?`.
- */
 export const supportsOptimizerHints = !mariaDb && (_serverVersion?.compare("5.7.7") ?? -1) >= 0;
 
-/**
- * Mirrors `supports_default_expression?` (adapter_helper.rb:23) for MySQL: an
- * expression/function column default needs MariaDB ≥ 10.2.1 or MySQL ≥ 8.0.13.
- * Gates the `defaults` table's `uuid` / `char2_concatenated` expression columns
- * exactly as Rails' mysql2_specific_schema.rb does.
- */
 export const supportsDefaultExpression = mariaDb
   ? (_serverVersion?.compare("10.2.1") ?? -1) >= 0
   : (_serverVersion?.compare("8.0.13") ?? -1) >= 0;
 
-/**
- * Mirrors AbstractMysqlAdapter#supports_expression_index?
- * (abstract_mysql_adapter.rb:104): MySQL ≥ 8.0.13 only; never MariaDB. Feeds
- * the `expression_index` entry in support/supports.ts, which cannot bake
- * the answer into a static adapterType table — the mysql lane may be MySQL 8
- * (true) or the MariaDB CI stand-in (false).
- */
 export const supportsExpressionIndex = !mariaDb && (_serverVersion?.compare("8.0.13") ?? -1) >= 0;
 
-/**
- * Mirrors AbstractMysqlAdapter#supports_rename_index?
- * (abstract_mysql_adapter.rb:896-901): MariaDB ≥ 10.5.2, MySQL ≥ 5.7.6. Lets a
- * test reproduce Rails' `skip "Cannot drop index, needed in a foreign key
- * constraint" if current_adapter?(:Mysql2Adapter) && !supports_rename_index?`
- * without hiding the supported MySQL path behind a blanket adapter skip.
- */
 export const supportsRenameIndex = mariaDb
   ? (_serverVersion?.compare("10.5.2") ?? -1) >= 0
   : (_serverVersion?.compare("5.7.6") ?? -1) >= 0;
 
-/** Mirrors Mysql2Adapter#supports_json? (mysql2_adapter.rb:70): MySQL ≥ 5.7.8; never MariaDB. */
 export const supportsJson = !mariaDb && (_serverVersion?.compare("5.7.8") ?? -1) >= 0;
 
-/**
- * Mirrors AbstractMysqlAdapter#supports_insert_returning?
- * (abstract_mysql_adapter.rb:173): MariaDB ≥ 10.5.0 only; never MySQL.
- */
 export const supportsInsertReturning = mariaDb && (_serverVersion?.compare("10.5.0") ?? -1) >= 0;
 
-/**
- * Mirrors `supports_text_column_with_default?` (adapter_helper.rb:42) for the
- * MySQL family: MariaDB ≥ 10.2.1 only.
- */
 export const supportsTextColumnWithDefault =
   mariaDb && (_serverVersion?.compare("10.2.1") ?? -1) >= 0;
 
-/**
- * Mirrors `supports_non_unique_constraint_name?` (adapter_helper.rb:33) for the
- * MySQL family: MariaDB only, no version floor.
- */
 export const supportsNonUniqueConstraintName = mariaDb;
 
-/**
- * Mirrors `supports_sql_standard_drop_constraint?` (adapter_helper.rb:51) for the
- * MySQL family: MariaDB ≥ 10.3.13, MySQL ≥ 8.0.19.
- */
 export const supportsSqlStandardDropConstraint = mariaDb
   ? (_serverVersion?.compare("10.3.13") ?? -1) >= 0
   : (_serverVersion?.compare("8.0.19") ?? -1) >= 0;
 
-/**
- * Mirrors AbstractMysqlAdapter#supports_check_constraints?
- * (abstract_mysql_adapter.rb:128-132): MySQL ≥ 8.0.16; MariaDB ≥ 10.3.10 or a
- * pre-10.3 series from 10.2.22 (10.3.0–10.3.9 is excluded).
- */
 export const supportsCheckConstraints = mariaDb
   ? (_serverVersion?.compare("10.3.10") ?? -1) >= 0 ||
     ((_serverVersion?.compare("10.3") ?? 0) < 0 && (_serverVersion?.compare("10.2.22") ?? -1) >= 0)

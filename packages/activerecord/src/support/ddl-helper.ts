@@ -5,7 +5,6 @@ interface DdlConnection {
   dropTable(name: string): Promise<unknown>;
 }
 
-/** Mirrors: DdlHelper#with_example_table */
 export async function withExampleTable<T>(
   connection: AbstractAdapter,
   tableName: string,

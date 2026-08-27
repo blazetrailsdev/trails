@@ -5,16 +5,6 @@ import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 const qualifiedName = escapeRegExp(quoteTableName("customers.name"));
 
-/**
- * Locks the string-vs-symbol order-arg deviation resolved by
- * 0023-surfaced-deviations/relation-order-string-arg-stays-bare.
- *
- * Rails passes a string order arg through as a bare `Arel::Nodes::SqlLiteral`
- * (`preprocess_order_args`' `else` branch) — no table qualification, no column
- * quoting. Only Symbol/Hash order args route through column resolution and
- * qualify. trails previously parsed a string fragment and qualified it like a
- * symbol.
- */
 describe("order string arg stays bare", () => {
   fixtures([]);
 
@@ -24,14 +14,11 @@ describe("order string arg stays bare", () => {
   });
 
   it("keeps each of multiple string args bare — no direction pairing", () => {
-    // Rails maps every String arg through unchanged (no pairing of a trailing
-    // "asc"/"desc" string), so `order("name", "desc")` is two bare terms.
     const sql = Customer.order("name", "desc").toSql();
     expect(sql).toContain("ORDER BY name, desc");
   });
 
   it("dedupes repeated order terms, like Rails order_values |= args", () => {
-    // Rails' order! runs `order_values |= args`, deduping repeated terms.
     const dupString = Customer.order("name", "name").toSql();
     expect(dupString.match(/ORDER BY name/g)).toHaveLength(1);
     const dupSymbol = Customer.order(":name", ":name").toSql();

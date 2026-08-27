@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/uuid_test.rb
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
@@ -18,11 +15,6 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// The `uuid_data_type` table needs raw DDL because the `guid` column's
-// DEFAULT is `gen_random_uuid()` (from the `pgcrypto` extension set up
-// in beforeAll) — a function-call default that createTable's typed builder
-// can't express. It is created via raw DDL below (mirroring Rails'
-// `@connection.create_table "uuid_data_type"`).
 fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -617,9 +609,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uniqueness validation ignores uuid", async () => {
-      // Rails: can_perform_case_insensitive_comparison_for? returns false for uuid
-      // (no lower(uuid) in PG), so case_insensitive_comparison falls back to eq().
-      // Our fix: check typeForAttribute("guid").type === "uuid" and skip LOWER().
       await adapter.exec(`DROP TABLE IF EXISTS uuid_uniqueness_validation_test`);
       await adapter.exec(`
         CREATE TABLE uuid_uniqueness_validation_test (
@@ -807,15 +796,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key default in legacy migration", () => {
-      // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
-      // semantics are not implemented. Once an id: :uuid table is created via the legacy
-      // migrator (with implicit gen_random_uuid default), schema dump emission already
-      // works (see "schema dumper for uuid primary key default" above).
-      // PERMANENT-SKIP: Migration[x.y] legacy version-compatibility semantics are
-      // out of scope pre-1.0 (see the uuid_test.rb entry in
-      // scripts/api-compare/unported-files.ts).
-    });
+    it.skip("schema dumper for uuid primary key default in legacy migration", () => {});
   });
 
   describe("PostgreSQLUUIDTestNilDefault", () => {
@@ -854,14 +835,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {
-      // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
-      // semantics are not implemented. Schema dump emission for `id: :uuid, default: nil`
-      // is already covered by "schema dumper for uuid primary key with default override via nil".
-      // PERMANENT-SKIP: Migration[x.y] legacy version-compatibility semantics are
-      // out of scope pre-1.0 (see the uuid_test.rb entry in
-      // scripts/api-compare/unported-files.ts).
-    });
+    it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {});
   });
 
   describe("PostgreSQLUUIDTestInverseOf", () => {
@@ -968,8 +942,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         static tableName = "pg_uuid_dj_forums";
         static {
           this.attribute("id", "uuid");
-          // Rails: has_many :uuid_posts, -> { order("title DESC") } — the
-          // ordering scope exercises the delegate-cache path the test name calls out.
           this.hasMany("uuidPosts", (rel: any) => rel.order("title DESC"), {
             className: "UuidPostDj",
             foreignKey: "uuid_forum_id",
@@ -1046,7 +1018,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const comment22 = await post2.uuidComments.createBang({});
       const comment23 = await post2.uuidComments.createBang({});
 
-      // Rails: uuid_forum.uuid_comments_without_joins.order(:id).to_a.map(&:id).sort
       const noJoins = await forum.uuidCommentsWithoutJoins.order("id").toArray();
       const actual = noJoins.map((c: any) => c.id).sort();
       const expected = [

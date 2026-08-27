@@ -1,24 +1,7 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/transaction_nested_test.rb
- *
- * Rails drives these through `Sample.transaction(requires_new: true)` (a real
- * SAVEPOINT) on `samples`/`bits`; this port drives the same SQLSTATE ->
- * exception mapping at the adapter level, dirtying the parent via a read on
- * `bits` (`make_parent_transaction_dirty` / `Bit.take`).
- *
- * Scope of the "recoverable" tests: PostgreSQL dooms the *whole* serializable /
- * deadlocked transaction on 40001 / 40P01 — ROLLBACK TO SAVEPOINT cannot recover
- * it (verified: a post-failure outer write raises 40001 again). Rails' Model/
- * TransactionManager savepoint-scoped recovery + final-state asserts ([10,10] /
- * [2]+[1]) are out of scope; the adapter layer verifies the CONNECTION recovers
- * from the aborted state — see assertConnectionRecovers.
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
 import { SerializationFailure, Deadlocked } from "../../errors.js";
 
-// Rails' inline `samples`/`bits`, renamed per suite — see suiteTable for why the
-// shared names race across vitest workers on the one CI database.
 const SAMPLES = suiteTable("samples", "transaction_nested");
 const BITS = suiteTable("bits", "transaction_nested");
 
@@ -32,7 +15,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTransactionNestedTest", () => {
-    // Mirrors Rails' setup (samples + bits, value col); created post-reset.
     beforeEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}, ${BITS}`);
       await adapter.exec(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
@@ -44,8 +26,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}, ${BITS}`);
     });
 
-    // Mirrors make_parent_transaction_dirty (Bit.take): reads `bits`, not the
-    // contended `samples` rows.
     async function makeParentTransactionDirty(conn: PostgreSQLAdapter): Promise<void> {
       await conn.execute(`SELECT * FROM ${BITS} LIMIT 1`);
     }

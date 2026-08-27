@@ -3,11 +3,6 @@ import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 import { SqlLiteral } from "./sql-literal.js";
 
-/**
- * Window — a SQL window specification for OVER clauses.
- *
- * Mirrors: Arel::Nodes::Window
- */
 export class Window extends Node {
   orders: Node[];
   partitions: Node[];
@@ -30,10 +25,6 @@ export class Window extends Node {
     return this;
   }
 
-  /**
-   * Mirrors `frame` (nodes/window.rb:30-32), whose value is the assignment —
-   * the framing node itself, which `rows`/`range` hand back to their caller.
-   */
   frame(expr: Node): Node {
     this.framing = expr;
     return expr;
@@ -55,7 +46,6 @@ export class Window extends Node {
     }
   }
 
-  // Mirrors Arel::Nodes::Window#hash / #eql? / #== (window.rb:54-65).
   hash(): number {
     return rbHash([this.orders, this.framing]);
   }
@@ -71,9 +61,6 @@ export class Window extends Node {
   }
 }
 
-/**
- * NamedWindow — a named window definition (WINDOW w AS (...))
- */
 export class NamedWindow extends Window {
   name: string;
 
@@ -82,7 +69,6 @@ export class NamedWindow extends Window {
     this.name = name;
   }
 
-  // Mirrors Arel::Nodes::NamedWindow#hash / #eql? / #== (window.rb:80-88).
   override hash(): number {
     return (super.hash() ^ rbHash(this.name)) >>> 0;
   }
@@ -92,31 +78,19 @@ export class NamedWindow extends Window {
   }
 }
 
-// Row-based frame bounds. Mirrors Rails (window.rb): `Preceding`,
-// `Following`, `Rows`, `Range` all extend Unary; only `CurrentRow`
-// extends Node directly (it carries no expr).
 export class Preceding extends Unary {
-  /**
-   * Rails' `Preceding.new(expr = nil)` (window.rb) puts no bound on the expr — the
-   * frame offset is commonly a bare Integer — so it keeps `Unary`'s `expr`.
-   */
   constructor(expr: unknown = null) {
     super(expr);
   }
 }
 
 export class Following extends Unary {
-  /**
-   * Rails' `Following.new(expr = nil)` (window.rb) puts no bound on the expr — the
-   * frame offset is commonly a bare Integer — so it keeps `Unary`'s `expr`.
-   */
   constructor(expr: unknown = null) {
     super(expr);
   }
 }
 
 export class CurrentRow extends Node {
-  // Mirrors Arel::Nodes::CurrentRow#hash / #eql? / #== (window.rb:103-111).
   hash(): number {
     return rbHash(this.constructor);
   }

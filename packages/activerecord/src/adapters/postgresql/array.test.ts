@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/array_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -11,11 +8,6 @@ import { Temporal } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 
-// PG's `type_cast` has one array arm, `when OID::Array::Data then
-// encode_array(value)` (postgresql/quoting.rb:177-185), because a pg-ruby bind
-// is an already-encoded String by then. Raw `execute(sql, binds)` callers below
-// hand the same `Data` the write path produces (`OID::Array#serialize`,
-// oid/array.rb:38-44) rather than a bare JS array.
 const textArray = new OidArray(new ValueType());
 
 beforeAll(() => {
@@ -26,11 +18,6 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// The pg_arrays table uses PG array columns (e.g. integer[],
-// numeric(10,2)[]) which are not expressible via createTable's typed
-// builder; it is created via raw DDL below (mirroring Rails'
-// `@connection.create_table "pg_arrays"`). The outer per-test transaction
-// rolls back inserts and any addColumn DDL done inside it() bodies.
 fixtures([]);
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -59,22 +46,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("column", async () => {
       const columns = await adapter.columns("pg_arrays");
       const column = columns.find((c) => c.name === "tags")!;
-      // Rails: assert_equal :string, @column.type (semantic type from OID cast)
       expect(column.type).toBe("string");
-      // Rails: assert_equal "character varying(255)", @column.sql_type (stripped, no [])
       expect(column.sqlType).toBe("character varying(255)");
       expect((column as any).isArray()).toBe(true);
-      // Rails: assert_not_predicate @type, :binary? — OID::Array is not binary
       expect(column.type).not.toBe("binary");
 
       const ratingsColumn = columns.find((c) => c.name === "ratings")!;
-      // Rails: assert_equal :integer, ratings_column.type
       expect(ratingsColumn.type).toBe("integer");
       expect((ratingsColumn as any).isArray()).toBe(true);
     });
     it("not compatible with serialize array", async () => {
-      // Rails: serialize :tags, type: Array on an OID::Array column raises
-      // ColumnNotSerializableError (type_incompatible_with_serialize?).
       class PgArrayNotSerializable extends Base {
         static tableName = "pg_arrays";
       }
@@ -85,8 +66,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }).toThrow(ColumnNotSerializableError);
     });
     it("array with serialized attributes", async () => {
-      // Rails: a class-coder (MyTags.load/MyTags.dump) layered over an OID::Array
-      // column round-trips through Type::Serialized on write + reload.
       class MyTags {
         constructor(public tags: string[]) {}
         toArray(): string[] {
@@ -129,14 +108,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       try {
-        // Rails: PgArray.reset_column_information (array_test.rb:85)
         await PgArrays.resetColumnInformation();
-        // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
         expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
-        // Rails: assert_equal([4, 4, 2], PgArray.new.score)
         expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
       } finally {
-        // Rails: ensure PgArray.reset_column_information (array_test.rb:90)
         void PgArrays.resetColumnInformation();
       }
     });
@@ -152,14 +127,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       try {
-        // Rails: PgArray.reset_column_information (array_test.rb:95)
         await PgArrays.resetColumnInformation();
-        // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
         expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
-        // Rails: assert_equal(["foo", "bar"], PgArray.new.names)
         expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
       } finally {
-        // Rails: ensure PgArray.reset_column_information (array_test.rb:100)
         void PgArrays.resetColumnInformation();
       }
     });
@@ -207,8 +178,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
       expect(column.type).toBe("text");
-      // column.default holds the raw default literal (Rails' extract_value_from_default);
-      // the empty-array default reflects back as the PG array literal "{}".
       expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
@@ -222,18 +191,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
       expect(column.type).toBe("text");
-      // column.default holds the raw default literal (Rails' extract_value_from_default);
-      // the empty-array default reflects back as the PG array literal "{}".
       expect((column as any).default).toBe("{}");
       expect((column as any).isArray()).toBe(true);
     });
     it("change column cant make non array column to array", async () => {
       await adapter.addColumn("pg_arrays", "a_string", "string");
-      // PG rejects casting a scalar column to an array (SQLSTATE 42804,
-      // "cannot be cast automatically"). The DDL runs via the bare `exec()`
-      // path, which now translates driver errors to StatementInvalid. Rails
-      // wraps the failing change_column in its own transaction so the abort
-      // is savepoint-scoped and the per-test fixture transaction survives.
       await expect(
         adapter.transaction(async () => {
           await adapter.changeColumn("pg_arrays", "a_string", "string", { array: true });
@@ -248,9 +210,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("id", "integer");
         }
       }
-      // Rails: PgArray.reset_column_information (array_test.rb:139)
       await PgArrays.resetColumnInformation();
-      // Rails: assert_equal [], PgArray.column_defaults["tags"]
       expect((PgArrays as any).columnDefaults["tags"]).toEqual([]);
     });
 
@@ -412,7 +372,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrays.loadSchema();
       const last = await (PgArrays as any).last();
-      // Rails: assert_equal(PgArray.last.tags, tag_values)
       expect(last.tags).toEqual(tagValues);
     });
     it("attribute for inspect for array field", async () => {
@@ -508,7 +467,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("mutate value in array", async () => {
-      // Rails: x = PgArray.create!(hstores: [{ a: "a" }, { b: "b" }]); x.hstores.first["a"] = "c"
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
@@ -523,7 +481,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await x.save();
       await x.reload();
       expect(x.hstores).toEqual([{ a: "c" }, { b: "b" }]);
-      // Rails: assert_not_predicate x, :changed?
       expect(x.isChanged).toBe(false);
     });
     it("datetime with timezone awareness", async () => {
@@ -616,10 +573,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrays.loadSchema();
       const tags = ["black", "blue"];
-      // Rails: record = PgArray.create!(tags: tags);
-      //        assert_equal record, PgArray.where(tags: tags).take
-      // force_equality? on the array type routes `where(tags: [..])` to a single
-      // `tags = $1` bind ('{black,blue}'), NOT `tags IN ('black', 'blue')`.
       const record = await (PgArrays as any).create({ tags });
       const relation = (PgArrays as any).where({ tags });
       expect(relation.toSql()).toContain('"tags" = ');
@@ -639,14 +592,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       await PgArrays.loadSchema();
 
       const tags = ["black", "blue"];
-      // Rails: e1 = klass.create("tags" => ["black", "blue"]); assert_predicate e1, :persisted?
       const e1 = await (PgArrays as any).create({ tags });
       expect(e1.isPersisted()).toBe(true);
 
-      // Rails: e2 = klass.create("tags" => ["black", "blue"]); assert_not e2.persisted?
       const e2 = await (PgArrays as any).create({ tags });
       expect(e2.isPersisted()).toBe(false);
-      // Rails: assert_equal ["has already been taken"], e2.errors[:tags]
       expect(e2.errors.where("tags").map((e: any) => e.message)).toEqual([
         "has already been taken",
       ]);
@@ -662,7 +612,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("precision is respected on timestamp columns", async () => {
-      // Rails: time = Time.now.change(usec: 123); record = PgArray.create!(timestamps: [time])
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
@@ -675,21 +624,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         .with({ microsecond: 123, nanosecond: 0 })
         .toInstant();
       const record = await (PgArrays as any).create({ timestamps: [time] });
-      // Rails: assert_equal 1, record.timestamps.count
       expect(record.timestamps).toHaveLength(1);
-      // Rails: assert_equal 123, record.timestamps.first.usec
       expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
       await record.reload();
       expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
     });
   });
 
-  // Trails-only coverage with no counterpart in Rails' PostgresqlArrayTest.
-  // Kept in this file (reusing its single `pg_arrays` owner) rather than a
-  // `*.trails.test.ts` sibling: a second file dropping/creating `pg_arrays` in
-  // beforeAll/afterAll would race the mirror on the shared PG database (multi-
-  // fork, single PG_TEST_URL). The distinct describe name keeps it out of the
-  // `PostgresqlArrayTest` → Rails parity:test mapping.
   describe("array datetime inline-quoting (trails)", () => {
     it("inlines a proleptic-year datetime[] element as a quoted_date BC literal", async () => {
       class PgArrays extends Base {

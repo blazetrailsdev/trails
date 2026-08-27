@@ -1,25 +1,3 @@
-/**
- * Eager-load pluck over a composite-PK collection association.
- *
- * `JoinDependency`'s join builder used to bail for any composite source PK, so a
- * composite-PK model's composite-FK collection (`CpkBook.hasMany("chapters",
- * { foreignKey: ["author_id", "book_id"] })`, `primaryKey = ["author_id", "id"]`)
- * fell out of the join tree and trails preloaded where Rails JOINs. That is now
- * converged: `JoinAssociation#joinConstraints` builds the composite FK↔PK tuple
- * ON clause (`cpk_chapters.author_id = cpk_books.author_id AND
- * cpk_chapters.book_id = cpk_books.id`), so `eagerLoad("chapters")` JOINs like
- * Rails and `pluck` reads from the joined query.
- *
- * The composite-FK `belongsTo` direction is likewise converged: a nested spec
- * whose inner segment is a composite-FK `belongsTo` (`{ chapters: "book" }`)
- * now JOINs both segments (`joinConstraints` keys
- * `target.association_primary_key = source.foreign_key` per column).
- *
- * A limit/offset over the joined collection is converged too: `apply_join_dependency`
- * routes it through the adapter's `distinct_relation_for_primary_key`
- * (schema_statements.rb:1429), whose `Array(primary_key).zip(limited_ids.transpose)`
- * rewrite is per-column, so a composite PK materializes as one `IN` per key column.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
@@ -31,8 +9,6 @@ import "../associations/collection-proxy.js";
 import "../association-relation.js";
 
 describe("CpkBook eager pluck / cache_version over a composite-FK collection", () => {
-  // Rails creates CPK rows inline; no cpk fixtures exist. Ride the canonical,
-  // empty cpk tables and let transactional rollback clean up each insert.
   fixtures([]);
 
   beforeAll(() => {
@@ -66,8 +42,6 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       "order",
       Nodes.OuterJoin,
     );
-    // The ON is built when the joins are emitted (Rails `make_constraints`,
-    // join_dependency.rb:189-211), not at tree construction.
     const joins = jd.joinConstraints([]);
     const node = jd.nodes.find((n) => n.assocName === "order");
     expect(node).not.toBeNull();
@@ -115,10 +89,6 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
 
   it("pluck over eagerLoad('chapters') with a limit materializes the composite primary keys", async () => {
     await seedBooks();
-    // Rails materializes the limited DISTINCT primary keys
-    // (distinct_relation_for_primary_key, schema_statements.rb:1429) and
-    // re-queries with one `IN` per key column, so the LIMIT bounds PARENTS —
-    // not the fanned-out joined rows.
     const titles = await CpkBook.eagerLoad(":chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .limit(2)

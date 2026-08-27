@@ -1,13 +1,3 @@
-/**
- * Calculation methods: count, sum, average, minimum, maximum, pluck, pick, ids.
- *
- * These are the real implementations behind Relation's calculation methods.
- * Each function uses this-typing so it can be assigned to Relation.prototype
- * directly, accessing internal state through `this`.
- *
- * Mirrors: ActiveRecord::Calculations
- */
-
 import { Collectors, Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
@@ -27,10 +17,6 @@ import {
   eachJoinDependencies,
 } from "./query-methods.js";
 
-/**
- * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
- * (calculations.rb:8-47).
- */
 export class ColumnAliasTracker {
   private connection: AliasingConnection;
   private aliases: Map<string, number> = new Map();
@@ -52,15 +38,6 @@ export class ColumnAliasTracker {
     }
   }
 
-  /**
-   * Converts the given field to the value that the database adapter returns as
-   * a usable column name:
-   *
-   *   columnAliasFor("users.id")                 // => "users_id"
-   *   columnAliasFor("sum(id)")                  // => "sum_id"
-   *   columnAliasFor("count(distinct users.id)") // => "count_distinct_users_id"
-   *   columnAliasFor("count(*)")                 // => "count_all"
-   */
   private columnAliasFor(field: string): string {
     let columnAlias = field;
     columnAlias = columnAlias.replace(/\*/g, "all");
@@ -75,7 +52,7 @@ export class ColumnAliasTracker {
   }
 }
 
-/** The connection surface {@link ColumnAliasTracker} needs. @internal */
+/** @internal */
 interface AliasingConnection {
   tableAliasFor(tableName: string): string;
   tableAliasLength(): number;
@@ -95,7 +72,6 @@ interface CalculationConnection {
     orders?: (string | Nodes.Node)[],
   ): string | string[];
   execute(sql: string): Promise<Record<string, unknown>[]>;
-  /** Rails `select_all(arel, name, binds)` (database_statements.rb:69-71). */
   selectAll(
     arel: unknown,
     name?: string | null,
@@ -105,104 +81,66 @@ interface CalculationConnection {
 
 interface CalculationRelation {
   model: CalculationRelation["_model"];
-  /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
   _model: {
     arelTable: any;
     primaryKey: string | string[];
     name: string;
     typeForAttribute?(name: string, block?: () => ColumnType): ColumnType;
-    /** Mirrors `Model.attribute_types` (attribute_registration.rb) — Rails' hash-with-default. */
     attributeTypes(): Record<string, ColumnType>;
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: CalculationConnection;
-    /** Mirrors `Model.load_schema` — `type_cast_pluck_values` needs attribute_types. */
     ensureSchemaLoaded(): Promise<void>;
-    /** Rails `model.disallow_raw_sql!` (calculations.rb:313). */
     disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
-    /** Mirrors `Model.attribute_names` — stands in for `columns_hash.key?`. */
     attributeNames(): string[];
   };
-  /**
-   * The connection threaded by the enclosing `withConnection` wrap, else
-   * the model's `.connection`. Mirrors `Relation#_conn`; reading it instead of
-   * `_model.connection` keeps internal reads off the deprecated getter.
-   * @internal
-   */
+  /** @internal */
   _conn(): CalculationConnection;
-  /** Rails `delegate :with_connection, to: :model` (delegation.rb:106). */
   withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
   limitValue: number | string | null;
   offsetValue: number | string | null;
   optimizerHintsValues: string[];
   _isNone: boolean;
-  /** @internal Rebase-then-report none short-circuit; see Relation. */
+  /** @internal */
   isNullRelation(): boolean;
   distinctValue: boolean;
-  /** Mirrors `Relation#distinct!` (query_methods.rb). */
   distinctBang(value?: boolean): unknown;
-  /** Mirrors `Relation#unscope` (query_methods.rb). */
   unscope(...args: unknown[]): CalculationRelation;
-  /** Mirrors `SpawnMethods#except` (spawn_methods.rb:59). */
   except(...skips: string[]): CalculationRelation;
-  /** Mirrors `Relation#arel` (query_methods.rb:1594). */
   arel(): SelectManager;
-  /** Mirrors `Relation#build_subquery` (query_methods.rb:1605). */
   buildSubquery(subqueryAlias: string, selectValue: unknown): SelectManager;
-  /** Mirrors `Relation#spawn` (spawn_methods.rb:10). */
   spawn(): CalculationRelation;
-  /** Rails `@values` (relation.rb:86) — the hash behind every value method. */
   _values: Record<string, unknown>;
-  /** Mirrors `Relation#group_values`. */
   groupValues: Array<string | Nodes.Node>;
-  /**
-   * Mirrors `Relation#order_values`; read by the count-column resolution and
-   * cleared by `calculate`'s has_include? arm.
-   */
   orderValues: Array<string | Nodes.Node>;
   whereClause: { isContradiction(): boolean };
-  /** Mirrors `Relation#having_clause`; grouped calculations ride the relation's own arel. */
   havingClause: { isEmpty(): boolean; ast: Nodes.Node };
-  /** Mirrors `Relation#select_values`; folded into a grouped projection when HAVING is present. */
   selectValues: (string | symbol | Nodes.Node)[];
   withValues: Array<Record<string, unknown>>;
-  /** @internal Rails `apply_join_dependency` (block form); see Relation. */
+  /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
     block: (relation: CalculationRelation, joinDependency: JoinDependency) => R | Promise<R>,
   ): Promise<R>;
-  /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
   calculate(operation: string, columnName?: string | Nodes.Node | number | null): Promise<unknown>;
   _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
-  // --- read by pluck / pick / ids (calculations.rb:291-412) ---
-  /** Mirrors `Relation#loaded?`. */
   loaded: boolean;
-  /** Mirrors `Relation#records` (relation.rb:250). */
   records(): Promise<
     Array<{ _readAttribute(name: string): unknown; get(attrName: string): unknown }>
   >;
-  /** Mirrors `Relation#table`. */
   table: Table;
-  /** Mirrors `Relation#limit` (query_methods.rb:407). */
   limit(value: number | null): CalculationRelation;
-  /** Mirrors `Relation#where` (query_methods.rb:668). */
   where(opts: unknown): CalculationRelation;
-  /** Mirrors `Relation#group` (query_methods.rb:390). */
   group(...args: unknown[]): CalculationRelation;
-  /** Mirrors `QueryMethods#left_outer_joins` (query_methods.rb:341). */
   leftOuterJoins(...args: unknown[]): CalculationRelation;
-  /** Mirrors `Calculations#pluck` — the recursive arms re-enter through the prototype. */
   pluck(
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]>;
-  /** Mirrors `Calculations#pick`. */
   pick(
     ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown>;
-  /** Mirrors `Calculations#ids` — the has_include? arm recurses through the prototype. */
   ids(): Promise<unknown[]>;
-  /** Mirrors `Calculations#count` / `#sum` / `#average` / `#minimum` / `#maximum`. */
   count(columnName?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
@@ -210,43 +148,30 @@ interface CalculationRelation {
   average(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   minimum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   maximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  /** Mirrors `Relation#arel_columns` (query_methods.rb:1735). */
   arelColumns(columns: unknown[]): unknown[];
-  /** Mirrors `Relation#flattened_args` (relation.rb). */
   flattenedArgs(args: unknown[]): unknown[];
-  /** Mirrors `Relation#skip_query_cache_if_necessary` (relation.rb:1000). */
   skipQueryCacheIfNecessary<R>(fn: () => Promise<R>): Promise<R>;
-  /** @internal trails: resolves deferred distinct-PK markers; see Relation. */
+  /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
-  /** @internal trails: the eager-load spec stores backing `has_include?`. */
+  /** @internal */
   eagerLoadValues: unknown[];
   includesValues: unknown[];
-  /** @internal trails: `spawn` without the scoping re-application; see Relation. */
+  /** @internal */
   clone(): CalculationRelation;
-  /** Mirrors `Relation#limit_or_offset?`. */
   hasLimitOrOffset: boolean;
-  /** @internal Relation#eager_loading? (relation.ts). */
+  /** @internal */
   readonly isEagerLoading: boolean;
-  /** Mirrors `Relation#except`. */
   except(...values: string[]): CalculationRelation;
-  /** Mirrors `Relation#group`. */
   group(...args: unknown[]): CalculationRelation;
-  /** Mirrors `Relation#ids`. */
   ids(): Promise<unknown[]>;
-  /** @internal Rails `build_arel` (query_methods.rb:1750). */
+  /** @internal */
   arel(aliases?: unknown): SelectManager;
 }
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 
-/** The `&block` of `Calculations#sum` (calculations.rb:172): one record in, a summable out. */
 export type SumBlock = (record: any) => number | bigint;
 
-/**
- * Mirror of Ruby's `TypeError`, as `attribute-assignment.ts` and `cache/store.ts`
- * carry it — what `Array#sum` raises when its initial value cannot be added to
- * the block results.
- */
 class TypeError extends globalThis.Error {
   constructor(message: string) {
     super(message);
@@ -256,9 +181,6 @@ class TypeError extends globalThis.Error {
 
 function isCoerceNumericTypeName(name: string | undefined): boolean {
   if (!name) return true;
-  // Rails maps :integer + :decimal to value&.to_d. BigInteger inherits
-  // Integer.type → :integer in Rails; our BigIntegerType.name === "big_integer"
-  // so list it explicitly. UnsignedInteger / Float are also numeric-coerce.
   return (
     name === "integer" ||
     name === "big_integer" ||
@@ -269,28 +191,10 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
   );
 }
 
-/**
- * Whether this adapter needs a CAST-to-TEXT subquery to get a bigint
- * aggregate value back as a string rather than a lossy JS number.
- *
- * SQLite's SUM/MIN/MAX on computed columns has no declared type, so
- * `_maybeEnableSafeIntegers` doesn't trigger. The driver returns a lossy
- * JS number for values above Number.MAX_SAFE_INTEGER.
- *
- * PG: pg-types returns int8 aggregate as a string natively.
- * MySQL: supportBigNumbers:true returns large sums as strings.
- * Both are handled by BigIntegerType.cast without any SQL wrapping.
- */
 function needsBigintCast(rel: CalculationRelation): boolean {
   return rel._conn().adapterName === "sqlite";
 }
 
-/**
- * Wrap a bigint aggregate SQL in CAST(... AS TEXT) so SQLite returns
- * a decimal string instead of a lossy number. Only used when
- * needsBigintCast() is true. Aliases are quoted to match SQLite's
- * identifier quoting convention.
- */
 function wrapBigintAgg(
   innerSql: string,
   groupAliases: string[] | null = null,
@@ -318,19 +222,11 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
     bindParamsLength?(): number;
   };
   const visitor = conn.visitor;
-  // Rails' non-prepared `to_sql_and_binds` branch (database_statements.rb:44):
-  // the collector is a `SubstituteBinds`, so every value inlines and no binds
-  // are sent — not just the over-limit case below.
   if (conn.preparedStatements === false) return [conn.toSql(manager), []];
   if (visitor?.compile) {
     const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
     const [sql, rawBinds] = visitor.compile(manager.ast, collector);
     const binds = rawBinds.map(typeCastCalcBind);
-    // Mirrors Rails to_sql_and_binds (database_statements.rb:36-38): when the
-    // bind count exceeds the adapter's parameter cap, fall back to an inlined
-    // (unprepared) compile so the driver's variable limit isn't overflowed.
-    // Reachable via multi-value `IN`/`NOT IN` (`HomogeneousIn`) over large id
-    // arrays — see BindParameterTest "too many binds".
     if (exceedsBindParamsLimit(conn, binds.length)) {
       return [conn.toSql(manager), []];
     }
@@ -352,27 +248,17 @@ function isBigintColumn(
   return table.typeForAttribute?.(String(column)) instanceof BigIntegerType;
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#count (calculations.rb:94-104). Rails'
- * block form (`count { |r| ... }`) is `Enumerable#count` on the loaded
- * records; every other arm is `calculate(:count, column_name)`.
- */
 export async function performCount(
   this: CalculationRelation,
   columnName?: string | Nodes.Node,
   ...rest: unknown[]
 ): Promise<number | Map<unknown, number>> {
-  // Ruby's `def count(column_name = nil)` arity check; JS silently drops the
-  // extra arguments, so the ArgumentError has to be raised explicitly.
   if (rest.length > 0) {
     throw new ArgumentError(`wrong number of arguments (given ${rest.length + 1}, expected 0..1)`);
   }
   return this.calculate("count", columnName as string) as Promise<number | Map<unknown, number>>;
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_count (calculations.rb:108).
- */
 export function asyncCount(
   this: CalculationRelation,
   columnName?: string,
@@ -384,18 +270,9 @@ export async function performAverage(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  // Returns `unknown` (not just number) because non-numeric column types
-  // — interval (Duration), money, time — route through the column type's
-  // deserialize and yield a domain object. Rails' AVG return type is
-  // similarly polymorphic (BigDecimal for integer/decimal, Duration for
-  // interval, etc.). Numeric averages still narrow to JS number at the
-  // call site.
   return this.calculate("average", column as string);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_average (calculations.rb:122).
- */
 export function asyncAverage(
   this: CalculationRelation,
   columnName: string,
@@ -410,9 +287,6 @@ export async function performMinimum(
   return this.calculate("minimum", column as string);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_minimum (calculations.rb:137).
- */
 export function asyncMinimum(
   this: CalculationRelation,
   columnName: string,
@@ -427,9 +301,6 @@ export async function performMaximum(
   return this.calculate("maximum", column as string);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_maximum (calculations.rb:152).
- */
 export function asyncMaximum(
   this: CalculationRelation,
   columnName: string,
@@ -437,35 +308,6 @@ export function asyncMaximum(
   return this.maximum(columnName);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#sum (calculations.rb:171-177).
- *
- * The identity default falls through `aggregate_column` -> `arel_column`, whose
- * `field.to_s` (query_methods.rb:1993) makes it the SQL literal summed over, so
- * the no-argument answer comes out of `calculate` rather than a guard.
- *
- * The block arm is `map(&block).sum(initial_value_or_column)`
- * (calculations.rb:172-173): `Enumerable#map` loads the relation — a no-op when
- * it is already loaded — and `Array#sum` seeds the accumulation with the
- * initial value. Ruby's trailing `&block` has no TS slot, so it rides the
- * argument list: a function in the first position is the block with the default
- * identity, and `sum(1000, block)` is the explicit-initial-value form.
- */
-/**
- * Ruby's `Integer#+` across the numeric tower, which is what `Array#sum` folds
- * with: an Integer and a Bignum add exactly, and a Float operand takes the sum
- * to Float. JS has no tower — `0 + 1n` is a TypeError — so a `bigint` operand
- * pulls a whole-number partner up to `bigint`, and a fractional `number` pulls
- * both down to `number`, which is where Ruby's Float arm lands too.
- *
- * A non-numeric memo is the seed of a `sum(column) { … }` call, and Ruby raises
- * it here rather than up front — from `String#+`, at the FIRST addition, so
- * `[].sum("age")` still answers `"age"` and only `[1].sum("age")` raises. The
- * `rails-error-parity` rule keys on the constructor name, so it flags this
- * throw whether the class is the global `TypeError` or the ported mirror above;
- * `attribute-assignment.ts` and `cache/store.ts` carry the same suppression for
- * the same reason.
- */
 function sumAdd(memo: number | bigint, value: number | bigint): number | bigint {
   if (typeof memo !== "number" && typeof memo !== "bigint") {
     // eslint-disable-next-line blazetrails/rails-error-parity
@@ -501,9 +343,6 @@ export async function performSum(
   return (sum as number | bigint) ?? 0;
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_sum (calculations.rb:182).
- */
 export function asyncSum(
   this: CalculationRelation,
   identityOrColumn: string | Nodes.Node | number | null = null,
@@ -511,9 +350,6 @@ export function asyncSum(
   return this.sum(identityOrColumn);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#calculate (calculations.rb:217-246).
- */
 export async function calculate(
   this: CalculationRelation,
   operation: string,
@@ -521,10 +357,6 @@ export async function calculate(
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
-  // Rails' `@none`. `isNullRelation()` is the shared none-short-circuit
-  // chokepoint: on an AssociationRelation it first rebases a stale new-owner
-  // `1=0` seed onto the live association scope, so a calculation on a relation
-  // spawned off a new owner picks up the persisted FK after `save`.
   if (this.isNullRelation()) {
     switch (operation) {
       case "count":
@@ -538,9 +370,6 @@ export async function calculate(
   }
 
   if (hasInclude(this, columnName ?? null)) {
-    // Rails takes `relation = apply_join_dependency`; a trails `Relation` is
-    // thenable, so the joined relation is delivered to a block instead (the
-    // block form `apply_join_dependency` also has).
     return this.applyJoinDependency({}, async (relation) => {
       if (operation === "count") {
         if (
@@ -566,20 +395,12 @@ export async function calculate(
   }
 }
 
-/**
- * Pluck values for columns.
- *
- * Mirrors: ActiveRecord::Calculations#pluck (calculations.rb:291).
- */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
 ): Promise<unknown[]> {
   if (this.isNullRelation()) return [];
 
-  // calculations.rb:300 — a loaded relation whose plucked columns are all
-  // attributes reads the materialized records instead of issuing SQL, the same
-  // arm `pick` carries (:353).
   if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
     const records = await this.records();
     return records.map((record) =>
@@ -590,20 +411,9 @@ export async function pluck(
   }
 
   return this.withConnection(async () => {
-    // Mirrors Calculations#pluck: a contradictory where-clause (`where(col: [])`,
-    // an empty `IN`) returns `ActiveRecord::Result.empty` without issuing SQL.
     if (this.whereClause.isContradiction()) {
       return await typeCastPluckValues(Result.empty(), columnNames, this as any);
     }
-    // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
-    // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
-    // the eager values) and recurses, so the plucked columns can reference the
-    // joined tables. Rails builds the JoinDependency over `eager_load_values |
-    // includes_values` (finder_methods.rb:457); we model that with leftOuterJoins
-    // over the cleared specs below. The cleared recursion takes the plain (else)
-    // branch, so there is no infinite loop. For a limit/offset over a collection
-    // reflection we also materialize the limited DISTINCT primary keys
-    // (distinct_relation_for_primary_key) before recursing.
     const firstColumnName =
       columnNames.length === 0
         ? null
@@ -611,11 +421,6 @@ export async function pluck(
           ? columnNames[0]
           : "\0arel";
     if (hasInclude(this as any, firstColumnName)) {
-      // Rails: `relation = apply_join_dependency; relation.pluck(*column_names)`
-      // (calculations.rb:310-311). The relation is taken from the block because
-      // a trails `Relation` is thenable and cannot cross a `Promise` boundary.
-      // The yielded relation has `:includes`/`:eager_load` cleared, so the
-      // recursive `pluck` takes the plain branch below — no infinite loop.
       return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
     }
 
@@ -624,16 +429,10 @@ export async function pluck(
     );
 
     const table = this.table;
-    // Rails columns_hash.key? — qualify a bare known column to the base table.
     const knownColumns = new Set(this._model.attributeNames());
     const isKnownColumn = (name: string): boolean => knownColumns.has(name);
     const columns = columnNames.map((c) => {
       if (c instanceof Nodes.SqlLiteral) {
-        // Rails' Arel::Nodes::SqlLiteral subclasses String, so arel_columns routes
-        // it through arel_column: a bare known-column literal is qualified to the
-        // base table (e.g. "id" → "posts"."id"), which keeps pluck unambiguous once
-        // apply_join_dependency adds a LEFT OUTER JOIN. Complex or unknown literals
-        // (functions, dotted names, non-columns) pass through verbatim.
         const v = c.value.trim();
         return /^\w+$/.test(v) && isKnownColumn(v) ? table.get(v) : c;
       }
@@ -652,43 +451,21 @@ export async function pluck(
         c.includes("::") ||
         /\s+AS\s+/i.test(c);
       if (isComplex) return new Nodes.SqlLiteral(c);
-      // Mirrors Rails arel_column: only a column in the base model's
-      // columns_hash is qualified to the base table. A bare column absent
-      // from columns_hash stays unqualified so the database resolves it
-      // against a joined table (test_pluck_not_auto_table_name_prefix_if_column_*).
       return isKnownColumn(c) ? table.get(c) : new Nodes.SqlLiteral(c);
     });
-    // Rails' pluck spawns, sets select_values = columns, then executes the full
-    // relation arel (calculations.rb), so build the same manager as a normal
-    // read — joins/wheres/order/group/having/from/lock/optimizer-hints thread
-    // through identically — but with the pluck columns as the select. Clearing
-    // the spawn's select before building is essential: resolving the discarded
-    // select list would mutate referencesValues and could promote includes
-    // (adding joins Rails would not add for the pluck columns).
     const rel = this.spawn();
     delete rel._values.select;
-    // calculations.rb:315-316 — `relation.select_values = columns; relation.arel`.
-    // Going through `select_values` (rather than overwriting `manager.projections`)
-    // is what makes a zero-column `pluck` project `table[Arel.star]` via
-    // `build_select`'s else arm instead of emitting a projection-less `SELECT FROM`.
     rel.selectValues = columns as any;
     const manager = rel.arel();
 
-    // Rails: `select_all(relation.arel, "#{model.name} Pluck")` (calculations.rb:317).
     const result = await this.skipQueryCacheIfNecessary(() =>
       this._conn().selectAll(manager, `${this.model.name} Pluck`),
     );
 
-    // Type-cast results positionally through each result column's type
-    // (model attribute type → join dependency → driver OID → identity),
-    // mirroring Rails' Calculations#type_cast_pluck_values.
     return await typeCastPluckValues(result, columns, this as any);
   });
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_pluck (calculations.rb:334).
- */
 export function asyncPluck(
   this: CalculationRelation,
   ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
@@ -696,11 +473,6 @@ export function asyncPluck(
   return this.pluck(...columnNames);
 }
 
-/**
- * Pick values for columns from the first matching record.
- *
- * Mirrors: ActiveRecord::Calculations#pick (calculations.rb:352).
- */
 export async function pick(
   this: CalculationRelation,
   ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
@@ -718,9 +490,6 @@ export async function pick(
   return values[0] ?? null;
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_pick (calculations.rb:363).
- */
 export function asyncPick(
   this: CalculationRelation,
   ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
@@ -728,11 +497,6 @@ export function asyncPick(
   return this.pick(...columnNames);
 }
 
-/**
- * Pluck the primary key values.
- *
- * Mirrors: ActiveRecord::Calculations#ids (calculations.rb:371).
- */
 export async function ids(this: CalculationRelation): Promise<unknown[]> {
   const primaryKey = this.model.primaryKey as string | string[] | null;
   const primaryKeyArray = Array.isArray(primaryKey)
@@ -742,9 +506,6 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
       : [primaryKey];
 
   if (this.loaded) {
-    // calculations.rb:373 `records.map` — the `records` seam, not `@records`,
-    // so a `load_async` relation (loaded? with its rows still parked,
-    // relation.rb:1149) drains the future here instead of mapping over nothing.
     const result = (await this.records()).map((record) => {
       if (primaryKeyArray.length === 1) {
         return record._readAttribute(primaryKeyArray[0]);
@@ -755,11 +516,6 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
   }
 
   if (hasInclude(this as any, primaryKey as string)) {
-    // Rails: `relation = apply_join_dependency.group(*primary_key_array); relation.ids`
-    // (calculations.rb:386-387). The relation comes out of the block because a
-    // trails `Relation` is thenable and cannot cross a `Promise` boundary; the
-    // yielded relation has `:includes`/`:eager_load` cleared, so the recursive
-    // `ids` takes the plain branch below.
     return this.applyJoinDependency({}, (relation) => relation.group(...primaryKeyArray).ids());
   }
 
@@ -779,24 +535,10 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
   return await typeCastPluckValues(result, columns, this as any);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_ids (calculations.rb:409).
- */
 export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
   return this.ids();
 }
 
-/**
- * Interface for the calculation methods mixed into Relation. Declared as
- * **method-syntax** (not property-syntax) so subclasses — CollectionProxy,
- * AssociationRelation, DisableJoinsAssociationRelation — can override
- * `count` / `sum` / `average` / `minimum` / `maximum` with narrower
- * signatures and added behavior (loaded-target fast path, strict-loading
- * gating, DJAR chain-walker). Do NOT replace this with
- * `Included<typeof Calculations>` on the `Relation` interface:
- * `Included<>` emits property-syntax members, and TS's strict variance
- * rules then reject every subclass override.
- */
 export interface CalculationMethods {
   calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
   calculate(
@@ -809,9 +551,7 @@ export interface CalculationMethods {
   ): Promise<unknown | null | Map<unknown, unknown>>;
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
-  /** `sum { |record| … }` — the block arm on the default identity. */
   sum(block: SumBlock): Promise<number | bigint>;
-  /** `sum(1000) { |record| … }` — the block arm on an explicit initial value. */
   sum(initialValue: number, block: SumBlock): Promise<number | bigint>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
@@ -842,15 +582,6 @@ export interface CalculationMethods {
   asyncIds(): Promise<unknown[]>;
 }
 
-/**
- * Wrap a calculation method so its query runs inside `with_connection`; see
- * {@link withConnection}. Releases the connection afterwards instead of
- * permanently leasing it via the deprecated `.connection` getter under
- * `permanent_connection_checkout = :deprecated | :disallowed`.
- *
- * It also carries {@link withDeferredDistinctPkPredicates}, so no aggregate
- * body spells the materialization Rails has no counterpart for.
- */
 function inQueryConnection<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
@@ -861,18 +592,6 @@ function inQueryConnection<A extends unknown[], R>(
   };
 }
 
-/**
- * Resolve any deferred distinct-PK subquery marker to a literal id list before
- * the wrapped method compiles its where clause, so the query emits
- * `pk IN (ids)` rather than the inline `IN (SELECT … LIMIT n)` MySQL rejects.
- *
- * Rails materializes these at `.where()`-build time
- * (finder_methods.rb:463) and so has no counterpart in any calculation body;
- * trails' `.where()` is sync, so the marker resolves in this wrap instead of in
- * the ported bodies. It leases nothing and issues no query when the where
- * clause carries no marker, which is what keeps `pluck`/`ids`' pre-query fast
- * paths (calculations.rb:293-304/373-382) as connection-free as Rails'.
- */
 function withDeferredDistinctPkPredicates<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
@@ -904,16 +623,7 @@ export const Calculations = {
   asyncIds,
 } as const;
 
-// ---------------------------------------------------------------------------
-// Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
-// ---------------------------------------------------------------------------
-
-/**
- * Split a pluck argument on a top-level comma — one outside every quote and
- * paren nesting. Backs the comma-separated-list rejection in `pluck`, which
- * Rails gets for free because `arel_column` never sees a list.
- * @internal
- */
+/** @internal */
 function hasTopLevelComma(s: string): boolean {
   let depth = 0;
   let quote: '"' | "'" | "`" | null = null;
@@ -949,16 +659,9 @@ export function aggregateColumn(
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
   const table = rel._model.arelTable;
-  // Ruby `when :all then Arel.star` (calculations.rb:418-419) — ":all" is
-  // spelled "*"/"all" here. "1" is the count-subquery's literal projection.
   if (columnName === "*" || columnName === "all" || columnName === "1") {
     return new Nodes.SqlLiteral(columnName === "1" ? "1" : "*");
   }
-  // Mirrors Rails' aggregate_column → arel_column: a known column
-  // qualifies onto the model's own table, a "table.column" string resolves
-  // through the join dependencies onto the joined table, and the primary key
-  // falls back to the base table (our test models omit the implicit PK from
-  // columns_hash). Anything else passes through as raw SQL.
   const pk = rel._model.primaryKey;
   const pks = Array.isArray(pk) ? pk : [pk];
   return arelColumn.call(rel as never, columnName, (field: string) =>
@@ -976,12 +679,7 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
   return isEmpty(columnNames.map(String).filter((c) => !known.has(c)));
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#has_include? (calculations.rb:430-432) —
- * `eager_loading? || (includes_values.present? && column_name && column_name != :all)`.
- * Only the `:all` Symbol is excluded; an explicit `"*"` is not.
- * @internal
- */
+/** @internal */
 export function hasInclude(
   rel: CalculationRelation,
   columnName: string | Nodes.Node | number | null,
@@ -992,15 +690,7 @@ export function hasInclude(
   );
 }
 
-/**
- * Narrows the resolved `column_name` to what `aggregate_column` accepts. Rails
- * hands its own resolved value straight through (calculations.rb:414-423) — nil
- * included, which is how `async_sum`'s identity default reaches `arel_column`
- * as `""` — so a composite `primary_key` reaches Arel as an array and emits
- * broken SQL there too; the join here picks one spelling for that already-
- * degenerate case rather than pretending trails supports it.
- * @internal
- */
+/** @internal */
 function aggregateTarget(
   columnName: string | string[] | Nodes.Node | number | null,
 ): string | Nodes.Node | number | null {
@@ -1015,10 +705,6 @@ export async function performCalculation(
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
-  // Mirrors Rails `perform_calculation` (calculations.rb:434-458): resolve the
-  // effective `distinct` flag and count column before dispatching. `:all` is
-  // spelled "*"/"all" here (the JS analogue Rails' aggregate_column maps to
-  // Arel.star — calculations.rb:414-423).
   let distinct: boolean | null = rel.distinctValue;
   if (operation === "count") {
     columnName ??= await selectForCount(rel);
@@ -1061,12 +747,7 @@ export function operationOverAggregateColumn(
   return typeof column[operation] === "function" ? column[operation]() : column;
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#build_count_subquery
- * (calculations.rb:662-678).
- *
- * @internal
- */
+/** @internal */
 function buildCountSubquery(
   relation: CalculationRelation,
   columnName: string | Nodes.Node | number | null,
@@ -1095,14 +776,8 @@ function buildCountSubquery(
 
 /**
  * @internal
- *
- * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106):
- *   `result.cast_values.first` (calculations.rb:510) — Ruby `Array#first` on the
- *   cast-values Array, which TS indexes as `castValues()[0]`.
- * @missingRailsCall wrap — CONVERGEABLE (story port-load-async-future-result-for-select-async-arm): Verified per-site (RFC 0106): calculations.rb:491 is
- *   `FutureResult.wrap(ActiveRecord::Result.empty)`, the async arm of the
- *   contradiction short-circuit. trails has no FutureResult (see the same row on
- *   relation.ts `exec_main_query`), so both arms return `Result.empty()`.
+ * @missingRailsCall first — PERMANENT
+ * @missingRailsCall wrap — CONVERGEABLE
  */
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
@@ -1110,16 +785,11 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean | null,
 ): Promise<unknown> {
-  // DIVERGENCE (calculations.rb:469-511): each arm compiles to SQL + binds
-  // instead of handing Rails' `query_builder` to `select_all` — the
-  // count-subquery arm compiles its inner manager here (buildCountSubquery) and
-  // the CTE prefix is applied to the compiled SQL.
   let sql: string;
   let binds: unknown[];
   let column: unknown = null;
 
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
-    // Shortcut when limit is zero (calculations.rb:471-472).
     if (rel.limitValue === 0) return 0;
 
     const queryBuilder = buildCountSubquery(
@@ -1129,8 +799,6 @@ export async function executeSimpleCalculation(
     );
     [sql, binds] = compileManagerWithBinds(rel, queryBuilder);
   } else {
-    // Rails routes aggregates through apply_join_dependency when eager loading,
-    // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
     rel._checkEagerLoadable();
     let joined = rel;
     if (rel.isEagerLoading) {
@@ -1138,8 +806,6 @@ export async function executeSimpleCalculation(
         joined = r;
       });
     }
-    // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
-    // (calculations.rb:477-478).
     const relation = joined.unscope("order").distinctBang(false) as CalculationRelation;
 
     column = aggregateColumn(relation, aggregateTarget(columnName));
@@ -1154,10 +820,6 @@ export async function executeSimpleCalculation(
     const castsBigint =
       isBigintColumn(relation, operation.toLowerCase() as AggFn, target) &&
       needsBigintCast(relation);
-    // Rails' `relation.select_values = [select_value]` (calculations.rb:484) —
-    // `selectValues` is a reader in trails, so the assignment lands on its
-    // store. DIVERGENCE: the "val" alias is the anchor the SQLite bigint CAST
-    // wrapper reads back, so it is added only on that path.
     relation.selectValues = [castsBigint ? selectValue.as("val") : selectValue];
 
     const [rawSql, managerBinds] = compileManagerWithBinds(relation, relation.arel());
@@ -1165,11 +827,6 @@ export async function executeSimpleCalculation(
     binds = managerBinds;
   }
 
-  // calculations.rb:487-497: a contradictory where clause (`where(col: [])`,
-  // which compiles to an empty `IN`) yields `ActiveRecord::Result.empty` with no
-  // query at all, and `type_cast_calculated_value` folds that empty result to
-  // the operation's identity. Checked after the query builder is chosen, as
-  // Rails does.
   const queryResult = rel.whereClause.isContradiction()
     ? Result.empty()
     : await (
@@ -1197,15 +854,8 @@ export async function executeSimpleCalculation(
 }
 
 /**
- * Mirrors: ActiveRecord::Calculations#execute_grouped_calculation
- * (calculations.rb:514-593)
  * @internal
- *
- * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106): calculations.rb:569 is
- *   `calculated_data.column_types.fetch(aliaz, Type.default_value)`. A JS record
- *   has no `fetch`, so the port spells Hash#fetch's key-presence semantics with
- *   `Object.hasOwn` (a stored value wins over the default even when it is null)
- *   — same behaviour, no call the extractor can see.
+ * @missingRailsCall fetch — PERMANENT
  */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
@@ -1216,40 +866,19 @@ export async function executeGroupedCalculation(
   const fn = operation.toLowerCase() as AggFn;
   columnName = aggregateTarget(columnName);
   rel._checkEagerLoadable();
-  // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
-  // group field, uniq'ing only when there is more than one. A belongs_to
-  // reflection is attempted from a LONE field, which then expands to that
-  // association's foreign key; the result is keyed by the loaded associated
-  // records rather than by the raw key values.
   let groupFields: unknown[] = rel.groupValues;
-  // `uniq` — spelled as a filter rather than `new Set(...)` so the body's first
-  // constructor call stays `ColumnAliasTracker.new` (calculations.rb:528), as it
-  // is in Rails.
   if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
-  // calculations.rb:518-522 — `group_fields.first.respond_to?(:to_sym)` is the
-  // String/Symbol arm. `association` holds ANY reflection and `associated` the
-  // narrower belongs_to gate: the key-records query below runs for either
-  // (:561), while only `associated` expands the foreign key and re-keys the
-  // result (:589).
   let association: any = null;
   let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
     association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
     associated = association != null && association.belongsTo?.() === true;
-    // calculations.rb:521 — `Array(association.foreign_key)` expands a
-    // composite-key belongs_to to every FK column; the rest of the body
-    // carries whatever arity that produces.
     if (associated) {
       groupFields = Array.isArray(association.foreignKey)
         ? [...(association.foreignKey as string[])]
         : [association.foreignKey as string];
     }
   }
-  // calculations.rb:524 takes `except(:group).distinct!(false)` on a relation
-  // `apply_join_dependency` (calculations.rb:232) has already folded the eager
-  // JoinDependency into. trails re-derives it here, capturing the yielded
-  // relation out of the block because a `Relation` is thenable; `eager_loading:
-  // false`, since this arm only ever runs grouped.
   let joined = rel;
   if (rel.isEagerLoading) {
     await rel.applyJoinDependency({ eagerLoading: false }, (r) => {
@@ -1257,10 +886,6 @@ export async function executeGroupedCalculation(
     });
   }
   const relation = joined.except("group").distinctBang(false) as CalculationRelation;
-  // calculations.rb:525 resolves the group fields through the plural
-  // `arel_columns` — so a `from(subquery, alias)` leaves the group column
-  // unqualified (matching the subquery alias) instead of pinning it to the
-  // original model table, and a raw Arel node passes straight through.
   const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
 
   return rel.withConnection(async (connection) => {
@@ -1282,12 +907,6 @@ export async function executeGroupedCalculation(
     );
     const selectValue = operationOverAggregateColumn(column, fn, distinct ?? false) as any;
 
-    // calculations.rb:541-551: the aggregate, then the relation's own
-    // `select_values` whenever the having clause is non-empty — that is what
-    // makes an aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`)
-    // referencable from HAVING — then the aliased group columns. Grouped only:
-    // `execute_simple_calculation` REPLACES `select_values` with the lone
-    // aggregate (calculations.rb:484).
     const selectValues: Nodes.Node[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
     if (!rel.havingClause.isEmpty()) {
       selectValues.push(
@@ -1301,9 +920,6 @@ export async function executeGroupedCalculation(
       ),
     );
 
-    // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
-    // `from(subquery)` group column stays unqualified instead of being re-pinned
-    // to the model's table by `build_group`.
     relation.groupValues = groupNodes;
     relation.selectValues = selectValues as (string | Nodes.Node)[];
 
@@ -1313,9 +929,6 @@ export async function executeGroupedCalculation(
         ? wrapBigintAgg(rawSql, groupAliases, columnAlias)
         : rawSql;
     const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-    // calculations.rb:555-557: the grouped SELECT runs inside
-    // skip_query_cache_if_necessary, so `uncached`/`skip_query_cache!` relations
-    // bypass the query cache exactly as the simple arm does.
     const calculatedData = await (
       rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
     ).skipQueryCacheIfNecessary(() =>
@@ -1323,13 +936,7 @@ export async function executeGroupedCalculation(
     );
     const rows = calculatedData.toArray();
 
-    // NUL-join so string-valued key components cannot collide across the tuple
-    // boundary (e.g. ["a b","c"] vs ["a","b c"]) — Ruby compares the Array key
-    // itself, JS Maps compare by reference.
     const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
-    // calculations.rb:559-565: gated on `association`, not `associated` — a
-    // single-field group naming a non-belongs_to association still runs this
-    // query in Rails; only `associated` re-keys the result by the record.
     let keyRecords: Map<string, unknown> | null = null;
     if (association) {
       const klass = association.klass.baseClass ?? association.klass;
@@ -1339,35 +946,22 @@ export async function executeGroupedCalculation(
       const keyIds = rows
         .map((row) => groupAliases.map((aliaz) => row[aliaz]))
         .filter((vals) => vals.every((v) => v != null));
-      // `where(cols, tuples)` is the trails spelling of the Array-key hash Rails
-      // passes here (calculations.rb:562-563), one-column key included
-      // (predicate_builder.rb:87-90).
       const records: any[] = await klass.where(primaryKey, keyIds).toArray();
       keyRecords = new Map(
         records.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
       );
     }
 
-    // calculations.rb:567-570 — `col_name.try(:type_caster) || type_for(col_name)
-    // { calculated_data.column_types.fetch(aliaz, Type.default_value) }`.
     const keyTypes = groupColumns.map(
       ([aliaz, colName]) =>
         (typeCasterFor(colName) ??
-          typeFor(
-            rel,
-            colName,
-            // Ruby `column_types.fetch(aliaz, Type.default_value)` — the STORED
-            // value whenever the key exists, the default only when it does not.
-            () =>
-              Object.hasOwn(calculatedData.columnTypes, aliaz)
-                ? calculatedData.columnTypes[aliaz]
-                : defaultValue(),
+          typeFor(rel, colName, () =>
+            Object.hasOwn(calculatedData.columnTypes, aliaz)
+              ? calculatedData.columnTypes[aliaz]
+              : defaultValue(),
           )) as { deserialize?(v: unknown): unknown } | null,
     );
 
-    // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
-    // own type caster, then a type discovered through the join dependencies, then
-    // Type.default_value, with an EnumType unwrapped to its subtype.
     let type: unknown;
     if (fn !== "count") {
       type =
@@ -1379,10 +973,6 @@ export async function executeGroupedCalculation(
 
     const result = new Map<unknown, unknown>();
     for (const row of rows) {
-      // Rails `key = group_aliases.map { ... }; key = key.first if key.size == 1;
-      // key = key_records[key] if associated` (calculations.rb:586-589). JS arrays
-      // compare by reference as Map keys, so callers locate a multi-field key by
-      // its component values, not identity.
       const key = groupAliases.map((aliaz, i) => {
         const raw = row[aliaz];
         const keyType = keyTypes[i];
@@ -1396,21 +986,12 @@ export async function executeGroupedCalculation(
       if (associated) {
         resultKey = key.every((v) => v != null) ? (keyRecords?.get(keyOf(key)) ?? null) : null;
       }
-      // calculations.rb:591: every group's aggregate folds through the same
-      // type_cast_calculated_value the ungrouped arm uses.
       result.set(resultKey, typeCastCalculatedValue(row[columnAlias] ?? null, fn, type));
     }
     return result;
   });
 }
 
-/**
- * Ruby `column.try(:type_caster)` (calculations.rb:505). An Arel attribute
- * carries its relation's caster and a SqlLiteral does not, so `tryCall` covers
- * Rails' `try` — except that a join-built `Table` is constructed with no caster
- * (relation.ts:731) and `Table#typeForAttribute` would raise rather than answer
- * nil, so the caster is asked for only when the relation can type-cast.
- */
 function typeCasterFor(column: unknown): unknown {
   const relation = (column as { relation?: { isAbleToTypeCast?(): boolean } } | null)?.relation;
   if (relation?.isAbleToTypeCast?.() !== true) return null;
@@ -1419,19 +1000,13 @@ function typeCasterFor(column: unknown): unknown {
 
 /**
  * @internal
- *
- * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106):
- *   `field.to_s.split(".").last` (calculations.rb:598) — Ruby `Array#last` on
- *   the split parts, spelled by indexing the final element in TS.
+ * @missingRailsCall last — PERMANENT
  */
 export function typeFor(
   rel: CalculationRelation,
   field: string | Nodes.Node | number,
   block?: () => ColumnType,
 ): unknown {
-  // Ruby `field.respond_to?(:name)` (calculations.rb:595): an Arel attribute
-  // answers its column name; a SqlLiteral (a String) does not and falls to the
-  // last `.`-segment.
   const fieldName =
     (field as unknown as { name?: unknown }).name != null
       ? String((field as unknown as { name: unknown }).name)
@@ -1441,12 +1016,7 @@ export function typeFor(
 
 /**
  * @internal
- *
- * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
- *   `join.base_klass.attribute_types.fetch(name, nil)` (calculations.rb:604) — a
- *   Hash#fetch whose default is `nil`, i.e. a plain missing-key read; the TS
- *   spelling is the `castTypeFromKlass` own-property lookup
- *   (calculations.ts:1444), not a `fetch` call.
+ * @missingRailsCall fetch — PERMANENT
  */
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
@@ -1456,9 +1026,6 @@ export function lookupCastTypeFromJoinDependencies(
   let found: unknown = null;
   eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {
     if (found != null) return;
-    // Ruby `return type if type` returns from lookup_cast_type_from_join_dependencies
-    // itself (calculations.rb:596); a TS callback cannot, so the first hit is kept
-    // and later joins are skipped.
     const type = castTypeFromKlass(join.baseKlass, name);
     if (type) found = type;
   });
@@ -1474,32 +1041,9 @@ function castTypeFromKlass(klass: any, name: string): unknown {
 }
 
 /**
- * Cast each plucked value through the type of its result column, mirroring
- * Rails `Calculations#type_cast_pluck_values`. The cast type for column `i`
- * resolves in Rails' priority order: the model's own attribute type, then a
- * type discovered through the join dependencies, then the driver's OID-based
- * `Result#column_types`, then identity. `Result#castValues` returns a flat
- * array for a single column and an array-of-rows for several, matching
- * `pluck`'s contract.
- *
- * Ruby resolves `model.attribute_types` (calculations.rb:611) lazily through
- * `load_schema` on the very read below; trails' load is async, so this awaits
- * it at that same point rather than having `pluck`/`ids` pre-load it.
- *
- * APPROXIMATION: Arel attribute `type_caster`s are not consulted — our
- * projection nodes don't carry one, and the model-attribute-type path covers
- * the same columns.
- *
  * @internal
- *
- * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
- *   `model.attribute_types.fetch(name) { ... }` (calculations.rb:617) —
- *   Hash#fetch WITH A BLOCK, whose TS spelling is the miss test
- *   `pluckCastTypeForKnownColumn(...)` followed by the block body
- *   (calculations.ts:1490-1497); JS has no fetch-with-block call to make.
- * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106): `result.columns.size !=
- *   columns.size` (calculations.rb:611) — Ruby `Array#size` on two plain Arrays,
- *   spelled `.length` in TS.
+ * @missingRailsCall fetch — PERMANENT
+ * @missingRailsCall size — PERMANENT
  */
 export async function typeCastPluckValues(
   result: Result,
@@ -1508,17 +1052,10 @@ export async function typeCastPluckValues(
 ): Promise<unknown[]> {
   await rel.model.ensureSchemaLoaded();
   if (result.columns.length !== columns.length) {
-    // Rails: `model.attribute_types` wholesale (calculations.rb:611-612). Its
-    // unknown-name default never reaches `Result#column_type`, which asks with
-    // `fetch` — so an unlisted column still falls through to the driver's
-    // `column_types`, exactly as `name in typeOverrides` does here.
     return result.castValues(rel.model.attributeTypes());
   }
   let joinDependencies: JoinDependency[] | undefined;
   const castTypes = result.columns.map((name, i) => {
-    // Rails' `model.attribute_types.fetch(name) { ... }` (calculations.rb:611):
-    // the block runs only when the model owns no such attribute, and it builds
-    // the join dependencies at most once for the whole column list.
     const known = pluckCastTypeForKnownColumn(rel.model, name);
     if (known) return known;
     joinDependencies ??= buildJoinDependencies.call(rel as any);
@@ -1530,11 +1067,6 @@ export async function typeCastPluckValues(
   return result.castValues(castTypes);
 }
 
-/**
- * The cast type for a column the model owns: a serialized attribute's coder
- * (Rails wraps these in a Serialized type) or the declared attribute type.
- * Returns null when the model has no such attribute.
- */
 function pluckCastTypeForKnownColumn(
   model: CalculationRelation["_model"],
   name: string,
@@ -1545,24 +1077,7 @@ function pluckCastTypeForKnownColumn(
   return model.typeForAttribute?.(name) ?? null;
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#type_cast_calculated_value
- * (calculations.rb:627-643).
- *
- *   - count   → `value.to_i`, a JS number. A SQL COUNT() above 2^53-1 loses
- *               precision (Rails returns an arbitrary-precision Integer).
- *   - sum     → `type.deserialize(value || 0)`; a big_integer column yields a
- *               bigint, every other type coerces to a JS number (a documented
- *               Rails-→JS limitation, since Rails returns BigDecimal here).
- *   - average → Rails maps :integer/:decimal to `value&.to_d` (BigDecimal);
- *               trails coerces those to a JS number and routes every other
- *               type — interval, time, money — through `type.deserialize` so
- *               callers get the domain object rather than the driver string.
- *   - else    → `type.deserialize(value)` for minimum/maximum: big_integer
- *               returns bigint, datetime a Temporal instant, and so on.
- *
- * @internal
- */
+/** @internal */
 export function typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
   switch (operation) {
     case "count":
@@ -1590,7 +1105,6 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 
 /** @internal */
 export async function selectForCount(rel: CalculationRelation): Promise<string> {
-  // "*" is the JS analogue of Rails' `:all` symbol (calculations.rb:646-654).
   if (isEmpty(rel.selectValues)) return "*";
   return rel.withConnection((conn) =>
     (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
@@ -1599,13 +1113,7 @@ export async function selectForCount(rel: CalculationRelation): Promise<string> 
   );
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#build_count_subquery?
- * (calculations.rb:655-661) — SQLite and older MySQL cannot `COUNT DISTINCT`
- * over `*` or multiple columns, so those cases go through a subquery.
- *
- * @internal
- */
+/** @internal */
 export function isBuildCountSubquery(
   rel: CalculationRelation,
   operation: string,

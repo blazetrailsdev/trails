@@ -1,7 +1,3 @@
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Jsonb
- */
-
 import { MutableModule } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
 import { Json } from "../../../type/json.js";

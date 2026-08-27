@@ -13,12 +13,6 @@ export interface BranchOptions {
   scope: any;
 }
 
-/**
- * Represents a single branch in the preloader tree — one association
- * on a set of records, potentially with nested children.
- *
- * Mirrors: ActiveRecord::Associations::Preloader::Branch
- */
 export class Branch {
   readonly association: string | null;
   readonly children: Branch[];
@@ -39,15 +33,10 @@ export class Branch {
     this._loaders = null;
   }
 
-  /** Mirrors: Preloader::Branch#preloaded_records= — `attr_writer`
-   *  (`preloader/branch.rb:9`). A JS property setter cannot pair with the
-   *  awaitable reader below, so the writer keeps the Rails name in `set` form. */
   setPreloadedRecords(records: Base[]): void {
     this._preloadedRecords = records;
   }
 
-  /** Mirrors: Preloader::Branch#preloaded_records
-   *  (`preloader/branch.rb:68-70`). */
   async preloadedRecords(): Promise<Base[]> {
     if (this._preloadedRecords !== undefined) return this._preloadedRecords;
     if (this.parent == null) {
@@ -200,9 +189,6 @@ export class Branch {
     reflection: AbstractReflection,
     reflectionRecords: Base[],
   ): Association[] {
-    // Rails groups on the `[klass, reflection_scope]` pair, whose Ruby Array
-    // equality is structural; JS has no such key, so the scope half is keyed on
-    // its SQL and the groups are kept as an ordered list of buckets.
     const groups: {
       key: string;
       klass: typeof Base;
@@ -214,13 +200,6 @@ export class Branch {
       const klass: typeof Base = (record as any).association(this.association!).klass;
 
       let reflectionScope: any = undefined;
-      // Rails: `if reflection.scope && reflection.scope.arity != 0`
-      // (`preloader/branch.rb:95`). A trails scope lambda takes the relation as
-      // its first parameter where Ruby's takes none (`invokeScopeLambda`,
-      // `associations/association-scope.ts:20-49`), so Ruby's `arity != 0` is
-      // `length > 1` here. Only an instance-dependent scope is grouped per
-      // record; every other one is recomputed lazily by
-      // `Preloader::Association#reflectionScope`.
       if (reflection.scope && reflection.scope.length > 1) {
         const scopes = (reflection as any).joinScopes(
           klass.arelTable,
@@ -245,8 +224,6 @@ export class Branch {
     }
 
     return groups.map(({ klass: rhsKlass, reflectionScope, records: rs }) => {
-      // Rails' `preloader_for(reflection).new(...)`; the receiver is resolved
-      // into a local because a TS `new (expr)(...)` reads the constructor first.
       const preloaderClass = this.preloaderFor(reflection);
       return new preloaderClass(
         rhsKlass,
@@ -282,11 +259,8 @@ export class Branch {
 
   private buildChildren(children: any): Branch[] {
     return wrap(children).flatMap((assoc: any) => {
-      // `Array(nil)` is `[]` in Ruby, so nil entries inside an includes/preload
-      // spec are silently dropped (e.g. `includes(nil)`, `includes([:posts, nil])`).
       if (assoc == null) return [];
 
-      // Flatten nested arrays, mirroring Rails' `Array.wrap` + `Array(...)`.
       if (Array.isArray(assoc)) {
         return this.buildChildren(assoc);
       }
@@ -306,8 +280,6 @@ export class Branch {
           );
       }
 
-      // Scalar leaf: string/symbol pass; any other type raises ArgumentError
-      // through _normalizeAssociationName, mirroring Rails' `association.to_sym`.
       return [
         new Branch({
           parent: this,
@@ -329,16 +301,11 @@ export class Branch {
       }
       return description;
     }
-    // Rails coerces the name with `association.to_sym`; anything that doesn't
-    // respond to it (e.g. an Integer) raises ArgumentError (branch.rb:11-18).
     if (typeof association !== "string") {
       throw new ArgumentError(
         `Association names must be Symbol or String, got: ${rubyClassName(association)}`,
       );
     }
-    // Ruby `association.to_sym` (branch.rb:11-18): a Symbol and the equivalent
-    // String name the same association, so a Symbol — spelled `":comments"` —
-    // drops its colon here, as JoinDependency.walkTree does for joins.
     return association.startsWith(":") ? association.slice(1) : association;
   }
 
@@ -352,10 +319,7 @@ export class Branch {
   }
 }
 
-/**
- * Ruby class name for an invalid association specifier (e.g. `10` → "Integer").
- * @internal
- */
+/** @internal */
 function rubyClassName(value: unknown): string {
   if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
   return (value as any)?.constructor?.name ?? typeof value;

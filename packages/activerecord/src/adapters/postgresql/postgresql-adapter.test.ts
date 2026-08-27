@@ -1,27 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/postgresql_adapter_test.rb
- *
- * Faithful, word-for-word port: describe/it names match the Rails test method
- * names verbatim and the bodies reproduce the Rails assertions in Rails' file
- * order. trails-only extensions (bind-param `?`→`$1` rewriting, Temporal value
- * decoding, PG-error → ActiveRecord exception translation, executeMutation
- * auto-RETURNING, column reflection, and the top-level adapter helpers) live in
- * the sibling postgresql-adapter.trails.test.ts.
- *
- * Rails' `with_example_table` (support/ddl_helper.rb) is reproduced below as
- * `withExampleTable`: it creates the ephemeral `ex` table, runs the block, and
- * drops it in a finally.
- *
- * test_serial_sequence / test_default_sequence_name run against the canonical
- * `accounts` table ("public.accounts_id_seq"), as in Rails, where the table is
- * laid globally by test/schema/schema.rb. trails provisions it through the
- * canonical `fixtures(["accounts"])` surface at suite scope (the describe tree
- * stays flat, matching Rails). The `error.connection_pool`
- * (NullPool / pool identity) assertions from Rails' connection-error,
- * serial-sequence, and invalid-index tests are ported faithfully — a standalone
- * trails adapter carries a NullPool that connect-time and query-time errors
- * surface via `connection_pool`.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
@@ -45,8 +21,6 @@ import { Name } from "../../connection-adapters/postgresql/utils.js";
 
 const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
 
-// Mirrors Rails support/ddl_helper.rb#with_example_table: create the `ex`
-// table, run the block, and always drop it afterwards.
 async function withExampleTable(
   adapter: PostgreSQLAdapter,
   fn: () => Promise<void>,
@@ -60,7 +34,6 @@ async function withExampleTable(
   }
 }
 
-// Mirrors Rails' connection_without_insert_returning helper.
 function connectionWithoutInsertReturning(): PostgreSQLAdapter {
   return new PostgreSQLAdapter({ connectionString: PG_TEST_URL, insertReturning: false });
 }
@@ -119,11 +92,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLAdapterTest", () => {
-    // Rails' `accounts` table exists globally from test/schema/schema.rb; the
-    // serial-sequence tests read only the `id` column's sequence, no fixture
-    // rows. Provision the canonical `accounts` through the fixtures helper at
-    // the suite scope — Rails nests no extra class around those tests, so the
-    // describe tree stays flat to match.
     fixtures(["accounts"], { useTransactionalTests: false });
 
     it("connection error", async () => {
@@ -138,11 +106,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("reconnection error", async () => {
-      // Rails stubs PG.connect to raise "actual bad connection error" and
-      // asserts reconnect! re-raises it as ConnectionNotEstablished. Our adapter
-      // connects lazily on first use and wraps pg.Client, so stub Client.connect
-      // to reject with that message and assert the translated
-      // ConnectionNotEstablished carries it through.
       const pgModule = (await import("pg")).default;
       const fakeClient = {
         connect: () => Promise.reject(new Error("actual bad connection error")),
@@ -186,10 +149,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reconnect after bad connection on check version", async () => {
       expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
-      // Mimic a connection that hasn't checked and cached the server version yet
-      // (Rails: connection.pool.instance_variable_set(:@server_version, nil)).
       (adapter.pool as unknown as { _serverVersion: unknown })._serverVersion = null;
-      // Stub server_version to 0 (Rails: raw_connection.stub(:server_version, 0)).
       const versionSpy = vi.spyOn(adapter, "_serverVersion").mockResolvedValue(0);
       const error = await adapter.reconnectBang().then(
         () => null,
@@ -563,9 +523,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("index with opclass", async () => {
       await withExampleTable(adapter, async () => {
-        // Rails passes `opclass: "varchar_pattern_ops"` (a bare string applied
-        // to every column); trails' addIndex types opclass as a column→opclass
-        // map, so it is spelled `{ data: ... }` — semantically identical.
         await adapter.addIndex("ex", "data", { opclass: { data: "varchar_pattern_ops" } });
         let index = (await adapter.indexes("ex")).find((idx) => idx.name === "index_ex_on_data");
         expect(index!.columns).toEqual(["data"]);
@@ -681,24 +638,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("translate no connection exception to not established", async () => {
       const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
       const pid = (pidRows[0] as { pid: number }).pid;
-      // Terminate this backend from a separate connection. After the single
-      // persistent client's backend is gone, the next query on it surfaces a
-      // connection error that translates to a retryable connection error —
-      // rather than transparently retrying (allowRetry defaults to false).
-      //
-      // DEVIATION (node-pg): Rails asserts ConnectionNotEstablished here, but
-      // only because its test explicitly pre-sends a query with the raw libpq
-      // connection to flip PG::Connection#status to CONNECTION_BAD, forcing the
-      // "no connection to the server" message that translate_exception maps to
-      // ConnectionNotEstablished (postgresql_adapter.rb:801-821). Without that
-      // libpq-status trick — which the pure-JS node-pg driver has no analogue
-      // for — the natural post-terminate query surfaces node-pg's single
-      // "Client has encountered a connection error and is not queryable" string,
-      // indistinguishable from a mid-query sever. trails maps that query-path
-      // connection error to the retryable ConnectionFailed (see
-      // postgresql-adapter.ts _translateException). Both are retryable
-      // connection errors (retryable_connection_error? covers each), so the
-      // reconnect-on-next-use behavior is unchanged.
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
@@ -758,10 +697,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         async () => {
           const cols = await adapter.columns("ex");
           const numberCol = cols.find((c) => c.name === "number")!;
-          // Rails: arithmetic-expression defaults — extract_value_from_default and
-          // extract_default_function both return nil; the column carries neither a
-          // literal default nor a SQL function. The DB still applies the default
-          // on INSERT, so save! must NOT emit `number = NULL`.
           expect(numberCol.default).toBeNull();
           expect(numberCol.defaultFunction == null).toBe(true);
           await adapter.exec(`INSERT INTO ex DEFAULT VALUES`);

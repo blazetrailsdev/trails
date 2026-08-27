@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_prevent_writes_test.rb
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -11,7 +8,6 @@ import { ReadOnlyError } from "../../errors.js";
 
 let adapter: SQLite3Adapter;
 
-// -- Rails test class: sqlite3_adapter_prevent_writes_test.rb --
 describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   fixtures([], { useTransactionalTests: false });
 
@@ -74,9 +70,3 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
     });
   });
 });
-
-// -- Rails test class: statement_pool_test.rb --
-// All tests null-overridden (Ruby process model)
-
-// -- Rails test class: transaction_test.rb --
-// All tests null-overridden (shared-cache mode not supported by better-sqlite3)

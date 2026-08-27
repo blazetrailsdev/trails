@@ -22,7 +22,6 @@ import {
 import type { ConditionalOptions } from "./validations.js";
 import { FormatValidator } from "./validations/format.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
   static {
     this.attribute("title", "string");
@@ -42,7 +41,6 @@ class Topic extends Model {
   }
 }
 
-// Mirrors: activemodel/test/models/reply.rb
 class Reply extends Topic {
   static {
     this.validate("errorsOnEmptyContent");
@@ -78,14 +76,12 @@ class Reply extends Topic {
   }
 }
 
-// Mirrors: activemodel/test/models/person.rb — the subset this file exercises.
 class Person extends Model {
   static {
     this.attribute("title", "string");
   }
 }
 
-// Mirrors: activemodel/test/models/custom_reader.rb
 class CustomReader extends Model {
   data: Record<string, unknown>;
 
@@ -374,7 +370,6 @@ describe("ValidationsTest", () => {
     const hash: Record<string, string[]> = {};
     hash.title = ["can't be blank"];
     hash.content = ["can't be blank"];
-    // Deviation: Rails' `to_json` is the `Object#to_json` core_ext, unported.
     expect(JSON.stringify(t.errors.asJson())).toEqual(JSON.stringify(hash));
   });
 

@@ -58,13 +58,6 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     return true;
   }
 
-  /**
-   * Rails' FakeAdapter gets this from `include SchemaStatements`. Here it is
-   * reached through the module prototype: PostgreSQLAdapter redeclares the name
-   * with a four-argument signature, so AbstractAdapter cannot carry it in the
-   * mixin interface, and this class's deliberate `columns` divergence rules out
-   * declaration merging.
-   */
   private fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
     return SchemaStatements.prototype.fetchTypeMetadata.call(
       this as unknown as SchemaStatements,

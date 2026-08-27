@@ -1,17 +1,6 @@
-/**
- * SQL statement classification — shared utilities for determining
- * whether a SQL statement is a read or write query.
- *
- * Used by both AbstractAdapter and DatabaseStatements module to avoid
- * duplicating the logic.
- */
-
 const READ_ONLY_STATEMENTS =
   /^(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|DESCRIBE|DESC|USE|KILL|CLOSE|DECLARE|FETCH|MOVE)$/;
 
-/**
- * Strip SQL block comments and line comments.
- */
 export function stripSqlComments(sql: string): string {
   let result = sql.replace(/\/\*[\s\S]*?\*\//g, "");
   result = result
@@ -25,12 +14,6 @@ export function stripSqlComments(sql: string): string {
   return result;
 }
 
-/**
- * Determine whether a SQL statement is a write query.
- * Handles comments, leading parentheses, and WITH/CTE clauses.
- *
- * Mirrors the logic in AbstractAdapter#isWriteQuery.
- */
 export function isWriteQuerySql(sql: string): boolean {
   const stripped = stripSqlComments(sql).replace(/^\s*\(+\s*/, "");
 

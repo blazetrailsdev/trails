@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/virtual_column_test.rb
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
@@ -10,9 +7,6 @@ import { SchemaDumper } from "../../schema-dumper.js";
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
 
-  // The table is built per test (in beforeEach, after the global drop-all reset)
-  // because the adapter dir runs under the AR setup, which wipes all tables before
-  // every test. Mirrors Rails' `setup`/`teardown` create_table/drop_table dance.
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
     await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
@@ -77,8 +71,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(output).toMatch(
         /t\.virtual\("profile_email", \{ type: "string", as: "json_extract\(`profile`,\w*?'\$\.email'\)", stored: true \}\);/i,
       );
-      // `time_mirror` may carry `precision: null` before `as` (datetime); match the
-      // line ending in the self-referential expression, mirroring Rails' `$`-anchor.
       expect(output).toMatch(
         /t\.virtual\("time_mirror", \{ type: "datetime",.*as: "`time`" \}\);/i,
       );

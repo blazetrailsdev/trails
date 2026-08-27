@@ -29,11 +29,6 @@ import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
 
-// `quotedScope` / `dataSourceSql` / `foreignKeys` self-send `quote`
-// (mysql/schema_statements.rb), and MySQL — which has no `quote` override — self-sends
-// `quote_string` from the inherited abstract `quote` (abstract/quoting.rb:76). So the
-// receiver has to be a real MySQL adapter, as it is in Rails, not an object carrying a
-// pre-bound `quote`.
 const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
   Object.assign(Object.create(AbstractMysqlAdapter.prototype), overrides);
 
@@ -559,9 +554,6 @@ describe("MySQL::SchemaStatements", () => {
         Collation: "D",
       },
     ]).indexes("pages");
-    // Mirrors Rails' final `.map`: a functional index collapses its columns
-    // into a single SQL string via add_options_for_index_columns, with the
-    // DESC order baked inline and no separate orders/lengths Records.
     expect(idx[0].columns).toBe("(lower(`title`)) DESC");
     expect(idx[0].orders).toEqual({});
     expect(idx[0].lengths).toEqual({});
@@ -596,10 +588,6 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("indexes: omits functional-index order when sort order is unsupported", async () => {
-    // Mirrors Rails' add_options_for_index_columns super gate on
-    // supports_index_sort_order? — false on MariaDB < 10.8.1 / MySQL < 8.0.1,
-    // which drops the DESC/ASC suffix even when Collation="D". Prefix length
-    // (via MySQL's add_index_length, ungated) is still baked in.
     const idx = await indexHost(
       [
         {
@@ -629,11 +617,6 @@ describe("MySQL::SchemaStatements", () => {
   });
 });
 
-// parseMysqlName is a trails-specific guard (no Rails counterpart): MySQL has no
-// nested-catalog concept, so an identifier must be exactly "table" or
-// "schema.table". Every introspection helper routes table names through it
-// before COALESCE(?, database()); a malformed name that lexed leniently would
-// silently scan a different catalog/table than the caller intended.
 describe("parseMysqlName", () => {
   it("accepts a bare table name", () => {
     expect(parseMysqlName("widgets")).toEqual({ table: "widgets" });
@@ -674,7 +657,6 @@ describe("parseMysqlName", () => {
 
 describe("MySQL::SchemaStatements#tableAliasLength", () => {
   it("table alias length", () => {
-    // mysql/schema_statements.rb:135 — 256, not max_identifier_length (64).
     expect(tableAliasLength()).toBe(256);
   });
 });

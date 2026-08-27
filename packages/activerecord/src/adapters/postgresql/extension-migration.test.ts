@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/extension_migration_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../index.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
@@ -71,8 +68,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
     }, 60000);
     it("enable extension migration ignores prefix and suffix", async () => {
-      // Rails: table_name_prefix/suffix don't affect extension names
-      // TS: same — extension names pass through unmodified
       class EnableCitext extends Migration {
         async change() {
           await this.enableExtension("citext");
@@ -82,8 +77,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBe(true);
     });
     it("enable extension migration with schema", async () => {
-      // Rails: enable_extension "other_schema.hstore" creates it in that schema
-      // Our adapter parses schema-qualified names: "public.citext" → SCHEMA public
       class EnableCitext extends Migration {
         async change() {
           await this.enableExtension("public.citext");

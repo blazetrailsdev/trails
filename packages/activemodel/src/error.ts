@@ -2,15 +2,12 @@ import { humanize, deepDup, except, isPlainObject } from "@blazetrails/activesup
 import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
-/** The model instance that owns this error. Rails tests pass null for base-only errors. */
 type ModelBase = object | null;
 
-/** `ActiveModel::Validations#read_attribute_for_validation`, aliased to `send` in Rails. */
 interface ValidatableBase {
   readAttributeForValidation(attribute: string): unknown;
 }
 
-/** Shape of a model class accessed for I18n/human-attribute lookups. */
 interface ModelClass {
   name?: string;
   i18nScope?: string;
@@ -19,11 +16,6 @@ interface ModelClass {
   lookupAncestors?: () => ModelClass[];
 }
 
-// Rails `CALLBACKS_OPTIONS` / `MESSAGE_OPTIONS` — option keys that are
-// stripped from the identity of an error for strict-match / hash purposes
-// (activemodel/lib/active_model/error.rb:10-11). Both snake and camel
-// spellings are accepted since our codebase normalizes to camel while
-// Rails-ported code may leak snake-cased keys.
 const CALLBACKS_OPTIONS: string[] = [
   "if",
   "unless",
@@ -36,21 +28,6 @@ const CALLBACKS_OPTIONS: string[] = [
 ];
 const MESSAGE_OPTIONS: string[] = ["message"];
 
-/**
- * Ruby `==`, which JS `===` is not. Rails leans on it throughout `error.rb` —
- * `match?` compares option values with `!=` (:171), `strict_match?` compares
- * whole hashes with `==` (:187), and `==` compares the `attributes_for_hash`
- * arrays elementwise (:181) — and every one of those is `Array#==` / `Hash#==`
- * value equality that JS gives no operator for.
- *
- * Dispatch mirrors Ruby's: `Array#==` and `Hash#==` recurse (a Ruby Hash is a
- * plain object here), `Regexp#==` compares source + flags, and everything else
- * is sent `==` — which for an object that defines one means its own equality,
- * and otherwise falls back to `BasicObject#==` identity. That last arm is why
- * `attributes_for_hash`'s `@base` slot compares correctly through this: two
- * distinct model instances are not `==` in Ruby either unless the model says
- * so.
- */
 function optionsEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -59,9 +36,6 @@ function optionsEqual(a: unknown, b: unknown): boolean {
     for (let i = 0; i < a.length; i++) if (!optionsEqual(a[i], b[i])) return false;
     return true;
   }
-  // Ruby `Regexp#==` compares source + options. JS RegExp's enumerable keys
-  // are empty, so the plain-object path below would always return true —
-  // handle explicitly before it.
   if (a instanceof RegExp && b instanceof RegExp) {
     return a.source === b.source && a.flags === b.flags;
   }
@@ -83,19 +57,9 @@ function optionsEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/**
- * Represents one single error.
- *
- * Mirrors: ActiveModel::Error
- */
 export class Error {
   static i18nCustomizeFullMessage: boolean = false;
 
-  // Rails exposes these as `attr_reader` over plain ivars (error.rb:101), which
-  // `initialize_dup` (:111-115) and `Errors#copy!`'s
-  // `instance_variable_set(:@base, ...)` (errors.rb:141) both write through.
-  // TS has no `instance_variable_set` escape hatch from a `readonly` field, so
-  // the ivars are declared writable exactly as Ruby has them.
   base: ModelBase;
   attribute: string;
   type: string;
@@ -145,7 +109,6 @@ export class Error {
     }) as string;
   }
 
-  /** Mirrors: ActiveModel::Error.generate_message (error.rb:64). */
   static generateMessage(
     attribute: string,
     type: string,
@@ -153,9 +116,6 @@ export class Error {
     options: Record<string, unknown> = {},
   ): string {
     const msgOpt = options.message;
-    // error.rb:65 `type = options.delete(:message) if options[:message].is_a?(Symbol)`:
-    // a Ruby Symbol keeps its leading colon, so a plain String stays in
-    // `options[:message]` and becomes the default below, exactly as in Rails.
     if (typeof msgOpt === "string" && msgOpt.startsWith(":")) {
       const { message: _msg, ...rest } = options;
       type = msgOpt;
@@ -164,9 +124,6 @@ export class Error {
     const typeName = type.slice(1);
 
     const baseClass = base?.constructor as ModelClass | undefined;
-    // error.rb:66. Rails aliases `read_attribute_for_validation` to `send`
-    // (validations.rb:436), so a base that does not define it — a plain object,
-    // which Ruby's base never is — is read as `send` would read it.
     const value =
       attribute !== "base" && base != null
         ? "readAttributeForValidation" in base
@@ -233,20 +190,12 @@ export class Error {
   ) {
     this.base = base;
     this.attribute = attribute;
-    // Rails `NestedError#initialize` keeps `@raw_type = inner_error.raw_type`
-    // while allowing `@type` to be overridden via `override_options[:type]`
-    // (activemodel/lib/active_model/nested_error.rb:8-15). Message
-    // generation keys off `raw_type` so i18n lookups still resolve the
-    // original error's key even when the surface `type` has been renamed.
-    // `rawType` defaults to `type` for the common case where they match.
     this.rawType = rawType ?? type;
     this.type = type || ":invalid";
     this.options = options;
   }
 
   get message(): string {
-    // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
-    // A Ruby Symbol reaches us as a colon-prefixed string (`":blank"`), which is the discriminator.
     if (this.rawType.startsWith(":")) {
       return Error.generateMessage(
         this.attribute,
@@ -273,15 +222,6 @@ export class Error {
     return Error.fullMessage(this.attribute, this.message, this.base);
   }
 
-  /**
-   * See if this error matches `attribute`, `type`, and `options`. Mirrors
-   * Rails `Error#match?` (activemodel/lib/active_model/error.rb:166-174):
-   * subset match — every key in `options` must equal (Ruby `==`, i.e.
-   * structural for Array/Hash, value-equal for primitives) the
-   * corresponding value in `this.options`; extra keys on the error are
-   * ignored. Not Ruby's case-equality (`===`), which would imply
-   * RegExp/Range-style matching — Rails' `match?` uses `!=`.
-   */
   match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
     if (this.attribute !== attribute) return false;
     if (type !== undefined && this.type !== type) return false;
@@ -293,16 +233,6 @@ export class Error {
     return true;
   }
 
-  /**
-   * Strict match — Rails `Error#strict_match?`
-   * (activemodel/lib/active_model/error.rb:184-190):
-   *
-   *   return false unless match?(attribute, type)
-   *   options == @options.except(*CALLBACKS_OPTIONS + MESSAGE_OPTIONS)
-   *
-   * `optionsEqual` stands in for Ruby's `Hash#==`, which JS `===` does not
-   * provide.
-   */
   strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
     if (!this.match(attribute, type)) return false;
 
@@ -312,13 +242,6 @@ export class Error {
     );
   }
 
-  /**
-   * Mirrors: ActiveModel::Error#== / #eql? (error.rb:190-193):
-   *
-   *   def ==(other)
-   *     other.is_a?(self.class) && attributes_for_hash == other.attributes_for_hash
-   *   end
-   */
   equals(other: Error): boolean {
     return (
       other instanceof this.constructor &&
@@ -326,44 +249,15 @@ export class Error {
     );
   }
 
-  /**
-   * Identity tuple used by `==` and `hash`. Mirrors Rails
-   * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
-   * `[@base, @attribute, @raw_type, @options.except(*CALLBACKS_OPTIONS)]`.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 
-  /**
-   * Mirrors: ActiveModel::Error#initialize_dup
-   * (activemodel/lib/active_model/error.rb:111-116):
-   *
-   *   def initialize_dup(other)
-   *     @attribute = @attribute.dup
-   *     @raw_type  = @raw_type.dup
-   *     @type      = @type.dup
-   *     @options   = @options.deep_dup
-   *   end
-   *
-   * `@attribute` / `@raw_type` / `@type` are Ruby Strings, whose `dup` exists
-   * to unshare mutable storage; a JS string is a primitive and already
-   * unshared, so only the options hash needs the copy. `@base` is deliberately
-   * left shared, as in Rails.
-   */
   initializeDup(_other: Error): void {
     this.options = deepDup(this.options);
   }
 
-  /**
-   * Mirrors: `Object#deep_dup`
-   * (activesupport/lib/active_support/core_ext/object/deep_dup.rb:29-31) —
-   * `duplicable? ? dup : self`. JS has no `Object#dup`, so the shallow
-   * class-preserving copy Ruby gets for free is spelled out, followed by the
-   * `initialize_dup` hook Ruby runs for it.
-   */
   deepDup(): this {
     const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
     copy.initializeDup(this);

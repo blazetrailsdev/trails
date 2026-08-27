@@ -1,11 +1,3 @@
-/**
- * Shared internal helper for the validator setupBang ports
- * (acceptance.ts, confirmation.ts). TS-only plumbing — no Rails
- * counterpart. Walks the prototype chain to capture the first-found
- * accessor shape for `name` so callers can install only the missing
- * half of a getter/setter pair without shadowing inherited accessors.
- */
-
 export interface InheritedAccessor {
   hasGetter: boolean;
   hasSetter: boolean;
@@ -13,14 +5,6 @@ export interface InheritedAccessor {
   setter?: (this: object, value: unknown) => void;
 }
 
-/**
- * Distinguishes accessor descriptors (`get`/`set`) from data
- * descriptors (`"value" in desc` — handles the `value: undefined`
- * case correctly). For data properties, synthesizes a getter that
- * reads through the captured prototype via `Reflect.get` (avoids
- * recursing into the accessor the caller is about to install), and a
- * setter that writes via own-property `defineProperty`.
- */
 export function inspectAccessor(prototype: object, name: string): InheritedAccessor {
   let proto: object | null = prototype;
   while (proto && proto !== Object.prototype) {

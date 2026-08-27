@@ -1,8 +1,3 @@
-/**
- * Trails-only: the deferred distinct-pk / excluding-ids markers are a trails
- * invention (Rails materializes ids eagerly inside a synchronous `.where()`),
- * so these inversion-preservation pins have no Rails counterpart.
- */
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
 import { WhereClause } from "../where-clause.js";

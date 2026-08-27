@@ -1,9 +1,3 @@
-/**
- * Trails-only companion to `sqlite-rake.test.ts`: Ruby's `Regexp#===` carries
- * no state, a JS regex with the `g` flag advances `lastIndex` on every `.test()`
- * — so an `ignoreTables` pattern reused across tables can silently miss the
- * second one. Rails has no counterpart because the trap does not exist there.
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";

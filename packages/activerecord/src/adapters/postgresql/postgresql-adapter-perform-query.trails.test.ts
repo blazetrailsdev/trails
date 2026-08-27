@@ -1,13 +1,3 @@
-/**
- * trails-only coverage for the unified `perform_query` primitive.
- *
- * Rails' PostgreSQL adapter has one SQL primitive, perform_query
- * (postgresql/database_statements.rb:135), which both `execute` and
- * `executeMutation` now delegate to; affected rows come from a separate
- * `affected_rows` read rather than the statement result. These assert the
- * shared branch, the affected-rows source, and that PG's RETURNING-append +
- * readonly guard survive the fold.
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
@@ -82,19 +72,12 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
 
   it("re-applies the session timezone on a reconnected session", async () => {
-    // update_typemap_for_default_timezone is guarded on @mapped_default_timezone
-    // (postgresql_adapter.rb:1094). A reconnect opens a fresh session at
-    // PostgreSQL's default timezone, so the cache must be cleared in
-    // configure_connection (:1112) or the guard would skip reconfiguring it.
     await adapter.execute(`SELECT 1`);
     const spy = vi.spyOn(adapter, "reconfigureConnectionTimezone");
     await adapter.reconnect();
     await adapter.execute(`SELECT 1`);
     expect(spy).toHaveBeenCalled();
   });
-  // Rails' internal_execute forwards `prepare:` to raw_execute → perform_query
-  // (abstract/database_statements.rb:552-558, 589-591). PG reaches preparation
-  // through `_runQuery`, whose `prepareHint` these two assert both ways.
   it("internalExecute prepares when prepare is true", async () => {
     const bind = new QueryAttribute("", 1, new Value());
     const subscriber = new SQLSubscriber();

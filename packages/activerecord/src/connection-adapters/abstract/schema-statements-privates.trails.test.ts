@@ -25,17 +25,12 @@ function makeStatements(
 ) {
   const adapter: Record<string, unknown> = {
     adapterName: "sqlite" as const,
-    // Every real host is an AbstractAdapter, which always seats `@config`
-    // (`abstract_adapter.rb:132`); `foreign_keys_enabled?` reads it with `fetch`.
     _config: {},
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => `${v}`,
     execute: vi.fn().mockResolvedValue([]),
     executeMutation: vi.fn().mockResolvedValue(undefined),
-    // Every real host is an AbstractAdapter, which mixes in Quoting's
-    // lookup_cast_type; the stub carries the base implementation so
-    // fetchTypeMetadata dispatches through it as schema_statements.rb:1718 does.
     lookupCastType: (sqlType: string | null) => AbstractAdapter.TYPE_MAP.lookup(sqlType),
     config: {},
     schemaCache: { clearDataSourceCacheBang: vi.fn().mockResolvedValue(undefined) },
@@ -53,9 +48,6 @@ function makeStatements(
         "SCHEMA",
       )) as Record<string, unknown>[],
     );
-  // `SchemaCreation` delegates every capability probe to `@conn`
-  // (abstract/schema_creation.rb:16-21); the stub answers as SQLite3Adapter
-  // does, matching the `adapterName` it reports.
   adapter["supportsCheckConstraints"] ??= async () => true;
   adapter["supportsIndexesInCreate"] ??= () => false;
   adapter["supportsPartialIndex"] ??= () => true;
@@ -70,8 +62,6 @@ function makeStatements(
     name == null
       ? "SELECT name FROM catalog"
       : `SELECT name FROM catalog WHERE name = '${String(name).replace(/'/g, "''")}'`;
-  // Likewise for AbstractAdapter#queryValues: project the stub's object rows
-  // onto their first column, as Rails' `query(...).map(&:first)` does.
   adapter["queryValues"] ??= async (sql: string, _name?: string | null, binds: unknown[] = []) => {
     const rows = (await (
       adapter["execute"] as (s: string, b?: unknown[], n?: string) => Promise<unknown>
@@ -168,9 +158,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("indexNameForRemove resolves a positional expression via generate_index_name", async () => {
-    // Rails: `options[:name] = index_name(table, column_name)` — the expression
-    // is scanned for \w+ words, joined with "_", and passed through
-    // generate_index_name, yielding `index_users_on_lower_email`.
     const ss = makeStatements({
       indexes: vi
         .fn()
@@ -201,8 +188,6 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("foreignKeyColumnFor strips table_name_prefix/suffix before singularizing", () => {
     const ss = makeStatements({ tableNamePrefix: "app_", tableNameSuffix: "_v2" });
-    // Rails foreign_key_column_for strips prefix/suffix, so the prefixed
-    // to_table `app_rockets_v2` yields `rocket_id`, not `app_rocket_v2_id`.
     expect(ss.foreignKeyColumnFor("app_rockets_v2")).toBe("rocket_id");
     expect(ss.foreignKeyColumnFor("app_rockets_v2", "uuid")).toBe("rocket_uuid");
     expect(makeStatements().foreignKeyColumnFor("rockets")).toBe("rocket_id");
@@ -238,9 +223,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("checkConstraintName returns an explicitly supplied nullish name instead of deriving", () => {
-    // `options.fetch(:name) { derive }` (schema_statements.rb:1787-1795) runs the
-    // block only for an ABSENT key: `{name: nil, expression: "x"}.fetch(:name) { "d" }`
-    // is nil in Ruby.
     const ss = makeStatements();
     expect(ss.checkConstraintName("users", { name: undefined, expression: "age > 0" })).toBe(
       undefined,
@@ -257,9 +239,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("checkConstraintOptions derives a name only when the key is absent", () => {
-    // Rails' `options[:name] ||= ...` (schema_statements.rb:1305-1309) is the
-    // truthy counterpart, but its derive call splats the same options back
-    // through `fetch`, so an explicit nil stays nil.
     const ss = makeStatements();
     expect(ss.checkConstraintOptions("users", "age > 0", {})).toEqual({
       name: ss.checkConstraintName("users", { expression: "age > 0" }),
@@ -270,9 +249,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("checkConstraintExists guards on key presence, not truthiness", async () => {
-    // `!options.key?(:name) && !options.key?(:expression)`
-    // (schema_statements.rb:1341-1343): an explicit `name: ""` is supplied, so
-    // it falls through to the lookup and simply matches nothing.
     const ss = makeStatements();
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
       new CheckConstraintDefinition("users", "age > 0", { name: "chk_rails_x" }),
@@ -317,11 +293,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("checkConstraintExists returns false when an explicit undefined name is supplied", async () => {
-    // Rails: check_constraint_for passes `defined_for?(name: chk_name, **options)`,
-    // where an explicit `name: nil` in options overrides chk_name; defined_for?
-    // then compares `self.name == nil.to_s` ("") — false for any real constraint.
-    // An explicit `undefined` is the JS analogue, so it must not match, and must
-    // not raise on `name.toString()`.
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
@@ -392,9 +363,6 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(frags).toEqual([`DROP COLUMN "updated_at"`, `DROP COLUMN "created_at"`]);
   });
 
-  // Mirrors change_column_default_for_alter (schema_statements.rb:1843): the
-  // abstract helper only routes builder → schema_creation.accept; the SQL
-  // shapes live in the PG/MySQL visitors (visit_ChangeColumnDefaultDefinition).
   it("changeColumnDefaultForAlter routes the built definition through schema_creation.accept", async () => {
     const ss = makeStatements();
     const cd = { marker: true };
@@ -406,8 +374,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("changeColumnDefaultForAlter raises NotImplementedError without an adapter builder", async () => {
-    // Rails: the abstract build_change_column_default_definition raises
-    // (schema_statements.rb:738-739); only PG/MySQL override it.
     const ss = makeStatements();
     await expect(ss.changeColumnDefaultForAlter("users", "status", null)).rejects.toThrow(
       "build_change_column_default_definition is not implemented",
@@ -442,8 +408,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("joinTableName with schema-qualified names passes through dot (Rails-faithful)", () => {
-    // Rails derive_join_table_name does not strip schema qualifiers; neither do we.
-    // The [_.] in the regex covers '.' so common schema prefixes are still deduped.
     const ss = makeStatements();
     expect(ss.joinTableName("public.users", "public.roles")).toBe("public.roles_users");
     expect(ss.joinTableName("public.users", "posts")).toBe("posts_public.users");
@@ -460,8 +424,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   it("fetchTypeMetadata returns SqlTypeMetadata with sqlType", () => {
     const meta = makeStatements().fetchTypeMetadata("varchar(255)");
     expect(meta.sqlType).toBe("varchar(255)");
-    // `Type#type` is a method, so the metadata must carry its result, not the
-    // function object (schema_statements.rb:1721 `cast_type.type`).
     expect(meta.type).toBe("string");
     expect(meta.limit).toBe(255);
   });
@@ -629,9 +591,6 @@ describe("indexNameForRemoveFrom early return", () => {
 });
 
 describe("distinctRelationForPrimaryKey", () => {
-  // Rails hands `select_rows` the ARel node (schema_statements.rb:1440) so the
-  // adapter compiles and binds it; a node with no `toSql` would flatten to
-  // "[object Object]" on the way through a string-compiling port.
   const arelNode = { __arel: true };
   const quoter = {
     quoteColumnName: (n: string) => `"${n}"`,
@@ -650,8 +609,6 @@ describe("distinctRelationForPrimaryKey", () => {
       offsetValue: 2,
       reselect(...cols: unknown[]) {
         calls.reselect = cols;
-        // Rails reselect spawns a clone; return a distinct object so a stray
-        // distinctBang on the original would be observable.
         return {
           ...this,
           distinctBang() {
@@ -661,7 +618,6 @@ describe("distinctRelationForPrimaryKey", () => {
         };
       },
       arel: () => arelNode,
-      // Rails uses where! (in-place); mirror that with whereBang.
       whereBang(c: Record<string, unknown>) {
         calls.where.push(c);
         return this;
@@ -689,7 +645,6 @@ describe("distinctRelationForPrimaryKey", () => {
   });
 
   it("keeps only the trailing pk value when columns_for_distinct prepends order columns", async () => {
-    // PG/MySQL prepend `order AS alias_n` columns; Rails takes results.last(pk.length).
     const selectRows = vi.fn().mockResolvedValue([
       ["2026-01-01", 10],
       ["2026-01-02", 20],
@@ -986,7 +941,6 @@ describe("buildCreateTableDefinition routing", () => {
     const ss = makeStatements();
     const spy = vi.spyOn(ss, "buildCreateTableDefinition");
 
-    // No teardown: `makeStatements` has a mocked `execute`, so no table is ever created.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await ss.createTable("users", { id: "bigint", primaryKey: "guid", limit: 8 }, (t) => {
       t.column("name", "string");

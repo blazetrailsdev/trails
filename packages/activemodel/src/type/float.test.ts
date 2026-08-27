@@ -26,10 +26,6 @@ describe("FloatTest", () => {
     expect(type.isChanged(500.0, 500.0, "0.5E+4")).toBeFalsy();
     expect(type.isChanged(null, null, null)).toBeFalsy();
     expect(type.isChanged(NaN, NaN, NaN)).toBeFalsy();
-    // Rails passes `BigDecimal("0.0") / 0` for the new value and the raw value;
-    // trails' NaN decimal is the "NaN" sentinel (see decimal.test.ts). A Float
-    // NaN over a BigDecimal NaN is still a change — Rails' `equal_nan?` guard
-    // requires `old_value.instance_of?(new_value.class)` (numeric.rb:39).
     expect(type.isChanged(NaN, "NaN", "NaN")).toBeTruthy();
   });
 });

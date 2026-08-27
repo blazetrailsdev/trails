@@ -61,9 +61,6 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     expect(compile(new Nodes.Bin(users.get("name")))).toBe("CAST(`users`.`name` AS BINARY)");
   });
 
-  // AbstractMysqlAdapter#case_sensitive_comparison wraps the *bind* in
-  // Arel::Nodes::Bin, so the visitor has to dispatch on an
-  // ActiveModel::Attribute the same way `visit` does everywhere else.
   it("Bin visits a bind attribute rather than stringifying it", () => {
     const bind = AMAttribute.fromDatabase("name", "x", new StringType());
     expect(compile(new Nodes.Bin(bind))).toBe("CAST(? AS BINARY)");
@@ -211,10 +208,6 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
       expect(sql).not.toContain("DISTINCT");
     });
 
-    // Full-shape regression for the JOIN+GROUP+HAVING path: pins the
-    // exact subselect wrapping (DISTINCT, `__active_record_temp` alias,
-    // outer projection of the quoted key column) so any future
-    // visitor change that drifts from Rails will be caught here.
     it("JOIN + GROUP BY + HAVING produces the full Rails-shaped subselect", () => {
       const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
       const out = prep.prepareUpdateStatement(stmt);

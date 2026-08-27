@@ -15,8 +15,6 @@ import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
 const HOST = Object.create(AbstractMysqlAdapter.prototype) as QuotingDispatchHost;
-// Rails' MySQL adapter defines no `quote` (mysql/quoting.rb); MySQL value
-// quoting is the inherited abstract `quote` plus the overrides it self-sends.
 const quote = (value: unknown): string => HOST.quote(value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -40,11 +38,6 @@ describe("MySQL quoting — quote", () => {
   });
 
   it("renders non-finite numbers bare (Rails' MySQL adapter has no non-finite override)", () => {
-    // Rails' MySQL adapter defines no `quote` override, so non-finite numbers
-    // fall through to the abstract `when Numeric then value.to_s`
-    // (abstract/quoting.rb:82) and render bare — only PostgreSQL string-quotes
-    // them (postgresql/quoting.rb:111-115). This is invalid SQL on MySQL, but it
-    // is exactly what Rails emits; trails converges rather than mirror PG here.
     expect(quote(Number.POSITIVE_INFINITY)).toBe("Infinity");
     expect(quote(Number.NEGATIVE_INFINITY)).toBe("-Infinity");
     expect(quote(NaN)).toBe("NaN");
@@ -63,13 +56,6 @@ describe("MySQL quoting — quote", () => {
 });
 
 describe("MySQL quoting — quote dispatches date/time through the adapter", () => {
-  // The standalone `quote` delegates non-MySQL-specific branches to the abstract
-  // `quote`, which dispatches date/time onto the adapter's `quotedDate`
-  // (microsecond-capped) and the inherited `quotedTime`. These guard that an
-  // adapter-bound `quote(Temporal)` never emits 7–9 fractional digits (rejected
-  // by MySQL TIME/DATETIME/TIMESTAMP in strict mode). Exercised via the prototype
-  // so no live connection is needed — `quote` only touches `this.quotedDate` /
-  // `this.quotedTime`. No Rails counterpart: this is trails dispatch plumbing.
   const proto = AbstractMysqlAdapter.prototype as unknown as { quote(v: unknown): string };
   const host = Object.create(AbstractMysqlAdapter.prototype) as object;
 
@@ -150,7 +136,6 @@ describe("MySQL quoting — quotedBinary", () => {
   });
 
   it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
-    // mysql/quoting.rb:80 is `quoted_binary(value)` → `x'#{value.hex}'`.
     expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
   });
 
@@ -168,9 +153,6 @@ describe("MySQL quoting — quoteColumnName", () => {
     expect(quoteColumnName("foo`bar")).toBe("`foo``bar`");
   });
 
-  // Rails' quote_column_name is unconditional (mysql/quoting.rb:46-47) — a star
-  // projection never reaches it, because Arel's to_sql renders it as a
-  // SqlLiteral (arel/src/visitors/to-sql.ts).
   it("quotes * like any other name", () => {
     expect(quoteColumnName("*")).toBe("`*`");
   });
@@ -213,18 +195,12 @@ describe("MySQL quoting — castBoundValue", () => {
     expect(castBoundValue("hello")).toBe("hello");
   });
 
-  // A BigDecimal is Numeric in Ruby, so it lands on `when Numeric` (rb:58-59)
-  // and renders through `to_s` with no format — engineering notation, not the
-  // fixed form `when BigDecimal` (rb:60-61) asks for and never reaches. MRI:
-  // `BigDecimal("123456.789").to_s` => "0.123456789e6".
   it("renders a BigDecimal in Ruby's engineering-notation default", () => {
     expect(castBoundValue(new BigDecimal("123456.789"))).toBe("0.123456789e6");
     expect(castBoundValue(new BigDecimal("1234.5"))).toBe("0.12345e4");
     expect(castBoundValue(new BigDecimal(0))).toBe("0.0");
   });
 
-  // rb:56-57 `when Rational then value.to_f.to_s`. Ruby's Float#to_s always
-  // carries a fractional part, so an integral value keeps its ".0".
   it("renders a Rational as its Float to_s", () => {
     expect(castBoundValue(new Rational(0, 1))).toBe("0.0");
     expect(castBoundValue(new Rational(3, 2))).toBe("1.5");

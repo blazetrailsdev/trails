@@ -1,18 +1,3 @@
-/**
- * trails-only cover for `loadSchema`'s arm-probe guard.
- *
- * Rails needs none of this: `load_schema_helper.rb` has one mechanism, and no
- * Ruby test stubs `create_table` to capture the DDL a schema file would emit.
- * trails' arm-content covers do, and one of them (PR #5676) was routed through
- * `loadSchema` in a PR that was green on its own base — the breakage existed
- * only in the merge with #5678, and only on the PG lane.
- * `blazetrails/no-load-schema-with-stubbed-ddl` closes that hole lexically for
- * an activerecord test file; the guard closes it for every other caller, and
- * this file pins it in both directions.
- *
- * Runs on whichever lane is active: the sqlite adapter is in-memory, and the
- * two rejection cases throw before any DDL.
- */
 import { describe, expect, it } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";

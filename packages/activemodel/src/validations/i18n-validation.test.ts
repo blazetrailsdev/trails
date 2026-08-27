@@ -5,8 +5,6 @@ import { I18n } from "../i18n.js";
 import { resetI18n } from "../test-helpers/i18n.js";
 
 describe("I18nValidationTest", () => {
-  // Rails' setup/teardown pair
-  // (activemodel/test/cases/validations/i18n_validation_test.rb:11-28).
   const originalI18nCustomizeFullMessage = ModelError.i18nCustomizeFullMessage;
   let oldLoadPath: string[];
   beforeEach(() => {
@@ -53,9 +51,6 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages uses format", () => {
-    // Rails clears `I18n.load_path` in setup (i18n_validation_test.rb:12) so the
-    // framework `en.yml` cannot overwrite the stored `errors.format`; the
-    // teardown above restores it.
     I18n.loadPath().length = 0;
     I18n.setBackend(new I18n.Simple());
     I18n.backend().storeTranslations("en", {

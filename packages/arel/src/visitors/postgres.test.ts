@@ -9,7 +9,6 @@ describe("PostgresTest", () => {
   const table = new Table("users");
   const attr = table.get("id");
 
-  // Mirrors `def compile(node)` (visitors/postgres_test.rb:14-16).
   const compile = (node: Nodes.Node): string =>
     visitor.compile(node, new Collectors.SQLString()) as unknown as string;
 

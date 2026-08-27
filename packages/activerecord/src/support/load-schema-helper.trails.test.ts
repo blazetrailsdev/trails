@@ -1,13 +1,3 @@
-/**
- * trails-only guard on the boot-laid table snapshot `support/drop-all-tables.ts`
- * takes: the set its boot reset TRUNCATEs rather than DROPs.
- *
- * Rails needs no such set — `load_schema_helper.rb` runs the `.rb` schema file
- * and nothing drops schema tables afterwards. trails' boot reset does, so a
- * table the `<adapter>_specific_schema.rb` arm lays but the snapshot misses is
- * silently dropped on a worker recycled onto an already-loaded database. That
- * direction is what this file catches, on whichever lane is running.
- */
 import { describe, expect, it, test } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
@@ -65,8 +55,6 @@ describe("LoadSchemaHelper", () => {
       expect(tables).toContain("topics");
       expect(tables).toContain("posts");
       expect(tables).not.toContain("chat_messages");
-      // The sqlite arm of ADAPTER_SPECIFIC_SCHEMAS: sqlite_specific_schema.rb's
-      // only table.
       expect(tables).toContain("defaults");
     } finally {
       await (adapter as unknown as BetterSQLite3Adapter).close();

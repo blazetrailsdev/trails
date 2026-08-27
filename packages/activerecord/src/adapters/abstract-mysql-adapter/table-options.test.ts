@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/table_options_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -13,10 +10,6 @@ import {
   Mysql2Adapter,
 } from "./test-helper.js";
 
-// Rails: `skip "..." if @connection.database_version >= "5.7.22"`. We add
-// MariaDB to the skip list since MariaDB never supported NO_TABLE_OPTIONS.
-// Probed at module load so the conditional can sit on it.skipIf instead of
-// inside the test body (which the lint rule forbids).
 const skipNoTableOptions =
   isMariaDb ||
   mysqlVersion === "" ||
@@ -130,10 +123,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("legacy migrations contain default ENGINE=InnoDB option", async () => {
-      // Rails 5.1 migrations add ENGINE=InnoDB explicitly to CREATE TABLE.
-      // The schema dump should show charset: but strip bare ENGINE=InnoDB (the default),
-      // matching Rails expected: /charset: "utf8mb4"(..., options: "ENGINE=InnoDB ROW_FORMAT=DYNAMIC")?, force: :cascade/
-      // We simulate a legacy migration result by creating a table with explicit ENGINE=InnoDB.
       await adapter.createTable("mysql_table_options", {
         force: true,
         options: "ENGINE=InnoDB",

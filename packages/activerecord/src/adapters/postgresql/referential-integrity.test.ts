@@ -1,18 +1,10 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/referential_integrity_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { InvalidForeignKey, StatementInvalid } from "../../errors.js";
 
-// Mirrors the Ruby IS_REFERENTIAL_INTEGRITY_SQL lambda — matches the joined
-// "ALTER TABLE … DISABLE/ENABLE TRIGGER ALL" string disable_referential_integrity runs.
 const isReferentialIntegritySql = (sql: unknown): boolean =>
   typeof sql === "string" && (/DISABLE TRIGGER ALL/.test(sql) || /ENABLE TRIGGER ALL/.test(sql));
 
-// Mirrors `module MissingSuperuserPrivileges`: when the DISABLE/ENABLE TRIGGER
-// statement runs, poison the transaction with a broken statement (rescued) then
-// raise — simulating a connection lacking superuser privileges.
 function extendMissingSuperuserPrivileges(adapter: PostgreSQLAdapter): void {
   const original = adapter.execute.bind(adapter);
   (adapter as { execute: PostgreSQLAdapter["execute"] }).execute = async (sql, ...rest) => {
@@ -24,8 +16,6 @@ function extendMissingSuperuserPrivileges(adapter: PostgreSQLAdapter): void {
   };
 }
 
-// Mirrors `module ProgrammerMistake`: a non-ActiveRecord error raised while
-// toggling referential integrity must bubble straight up.
 function extendProgrammerMistake(adapter: PostgreSQLAdapter): void {
   const original = adapter.execute.bind(adapter);
   (adapter as { execute: PostgreSQLAdapter["execute"] }).execute = async (sql, ...rest) => {
@@ -45,7 +35,6 @@ async function withDummyTable(adapter: PostgreSQLAdapter, fn: () => Promise<void
   }
 }
 
-// Mirrors `assert_transaction_is_not_broken`: a live transaction can still query.
 async function assertTransactionIsNotBroken(adapter: PostgreSQLAdapter): Promise<void> {
   const rows = await adapter.execute("SELECT 1 AS n");
   expect(rows[0].n).toBe(1);
@@ -140,7 +129,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
-    // Mirrors: test_all_foreign_keys_valid_having_foreign_keys_in_multiple_schemas
     it("all foreign keys valid having foreign keys in multiple schemas", async () => {
       await adapter.execute(`DROP SCHEMA IF EXISTS referential_integrity_test_schema CASCADE`);
       await adapter.execute(`CREATE SCHEMA referential_integrity_test_schema`);

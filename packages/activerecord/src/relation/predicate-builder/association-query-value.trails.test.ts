@@ -1,10 +1,3 @@
-/**
- * AssociationQueryValue — predicate-builder/association_query_value_test.rb mirror.
- *
- * Focused on `convertToId` semantics: scalar PK extraction, array-PK tuple
- * extraction (the query_constraints feature), and the queries() hash shape
- * that PredicateBuilder consumes downstream.
- */
 import { describe, it, expect } from "vitest";
 import { AssociationQueryValue } from "./association-query-value.js";
 
@@ -68,8 +61,6 @@ describe("AssociationQueryValue", () => {
     });
 
     it("uses readAttribute('id') when a pk column is literally 'id' (id_value parity)", () => {
-      // Composite-PK records expose `id` as the full tuple, while Rails
-      // `id_value` reads the scalar id column. We mirror via readAttribute('id').
       const record = {
         blog_id: 5,
         id: [5, 99],
@@ -88,8 +79,6 @@ describe("AssociationQueryValue", () => {
     });
 
     it("emits per-column subqueries for a Relation value (Batch 71 deviation)", () => {
-      // Rails synchronously plucks tuples from the relation; our sync queries()
-      // can't await pluck, so we emit one reselected subquery per FK column.
       const reselected: string[] = [];
       const fakeRelation = {
         _model: {},

@@ -1,9 +1,3 @@
-/**
- * Connection pool — manages a pool of database connections.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool
- */
-
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import { Executor, synchronize, type MonitorMixin } from "@blazetrails/activesupport";
@@ -33,12 +27,6 @@ import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
 
-/**
- * A connection that supports transaction management.
- * An AbstractAdapter with the pin/unpin surface the pool needs; expressed as
- * an intersection because an interface cannot `extends` the class without
- * inheriting its private/protected members (TS2430).
- */
 type TransactionAwareConnection = AbstractAdapter & {
   transactionManager: TransactionManager;
   verifyBang(): void;
@@ -52,18 +40,11 @@ interface PoolManagedConnection {
 
 export { withExecutionContext } from "./connection-pool/execution-context.js";
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractPool
- */
 export interface AbstractPool {
   get schemaCache(): unknown;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::NullPool::NullConfig
- */
 export class NullConfig {
-  // `method_missing` answers nil for every key (abstract/connection_pool.rb:17-22).
   [key: string]: null | undefined;
 
   get schemaCache(): null {
@@ -73,89 +54,23 @@ export class NullConfig {
 
 const NULL_CONFIG = new NullConfig();
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
- */
 export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
 
-  /**
-   * Mirrors: `@mutex = Mutex.new` (`abstract/connection_pool.rb:26`) — the lock
-   * `server_version` memoizes under, so two concurrent first callers issue one
-   * version query rather than two.
-   *
-   * Ruby's is a plain `Mutex`, which is not re-entrant; the port holds the
-   * re-entrant `MonitorMixin#synchronize` `PoolConfig` also carries, because
-   * trails' `getDatabaseVersion` is async where Ruby's is sync: the fetch opens
-   * the connection, whose `configureConnection` (`abstract_adapter.rb:1212`)
-   * reads the version back through this same method from inside the fetch.
-   * Ruby never reaches that re-entry — its adapter is already connected by the
-   * time `get_database_version` runs — so a literal `Mutex` would deadlock on a
-   * path Rails does not have.
-   */
   private readonly _mutex: MonitorMixin = { synchronize };
 
   private _serverVersion: unknown = null;
   private _schemaReflection: SchemaReflection | null = null;
 
-  /**
-   * Type-only, emitted nowhere. Ruby's NullPool answers neither `role` nor
-   * `shard` (`abstract/connection_pool.rb:14-51`), so `AbstractAdapter#role`'s
-   * bare `@pool.role` (`abstract_adapter.rb:288`) raises NoMethodError on a
-   * pool-less adapter. TS cannot read a property absent from one member of the
-   * `ConnectionPool | NullPool` union, so the member is declared as the type
-   * that produces no value — `never` — and `declare` keeps it out of the class,
-   * so it really is absent and the constructor's dispatch below raises on it.
-   */
   declare readonly role: never;
   declare readonly shard: never;
 
-  /**
-   * Same shape and same reason as `role`/`shard` above. Ruby's NullPool answers
-   * neither `schema_migration` nor `internal_metadata`
-   * (`abstract/connection_pool.rb:14-51`), so `#truncate_tables`' bare
-   * `pool.schema_migration.table_name` (`abstract/database_statements.rb:222-223`)
-   * raises NoMethodError on a pool-less adapter rather than truncating against
-   * a hardcoded default.
-   */
   declare readonly schemaMigration: never;
   declare readonly internalMetadata: never;
 
-  /**
-   * Same shape and same reason again. Ruby's NullPool answers no
-   * `with_connection` (`abstract/connection_pool.rb:14-51`), so
-   * `SchemaMigration#with_connection`'s bare `@pool.with_connection`
-   * (`schema_migration.rb:22-24`) and `InternalMetadata`'s
-   * (`internal_metadata.rb:42`) raise NoMethodError on a pool-less
-   * collaborator rather than silently doing nothing.
-   */
   declare readonly withConnection: never;
 
-  /**
-   * Mirrors: ConnectionPool::NullPool#initialize
-   * (`abstract/connection_pool.rb:24-28`).
-   *
-   * The Proxy is a language shortcoming, not a Rails shape: Ruby's NullPool is
-   * a plain object, so a send it has no method for raises NoMethodError, while
-   * a JS read of a missing property is silently `undefined` — which is what let
-   * a pool-less adapter's `role` (`abstract_adapter.rb:288`) answer `undefined`
-   * and `inspect` (`:174-181`) render `shard="undefined"`. It is the only shape
-   * that raises *without* adding a `role`/`shard` member Rails' NullPool does
-   * not have.
-   *
-   * Ruby does not override `method_missing`, so *every* send NullPool has no
-   * method for raises — not a fixed set of names.
-   *
-   * A symbol key is the one carve-out the language forces: a JS `Symbol` cannot
-   * spell a Ruby send, so `Symbol.iterator`/`Symbol.toPrimitive` and friends are
-   * not sends NullPool is missing a method for and read through to `undefined`.
-   * String keys get no such carve-out — `pool.then` and `pool.toJSON` are a
-   * NoMethodError in Ruby and are one here. What Ruby *does* answer, it answers
-   * through the ancestor chain: `to_s` arrives as `Object.prototype.toString`
-   * and so satisfies `prop in target`, and {@link inspect} is declared below for
-   * the same reason.
-   */
   constructor() {
     return new Proxy(this, {
       get(target, prop, receiver) {
@@ -169,44 +84,15 @@ export class NullPool implements AbstractPool {
     });
   }
 
-  /**
-   * Ruby's `Object#inspect`, which `NullPool` inherits: it defines no `inspect`
-   * of its own and overrides no `method_missing`
-   * (`abstract/connection_pool.rb:14-51`), so the send resolves up the ancestor
-   * chain and answers a String rather than raising. JS has no `Object.prototype`
-   * member of that name for `prop in target` to find, so the inherited method is
-   * declared here to keep the send answering.
-   *
-   * `Object#inspect` dumps the class name and every instance variable as
-   * `@name=value`. Ruby's NullPool carries two (`abstract/connection_pool.rb:24-28`)
-   * and this renders the one the port also carries. `@mutex` is absent rather
-   * than placeheld: JS has no thread to lock against, so the port has no such
-   * field, and printing a key for state that does not exist would be the larger
-   * divergence. The `0x…` address is dropped for the same reason
-   * `AbstractAdapter#inspect` has to synthesize its own — `object_id` has no
-   * counterpart — and no caller reads either.
-   */
   inspect(): string {
     const v = this._serverVersion;
     return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
   }
 
-  /**
-   * Mirrors: ConnectionPool::NullPool#server_version
-   * (`abstract/connection_pool.rb:30-32`) — the same `@server_version ||=`
-   * memo the real pool keeps on its PoolConfig. The promise arm is the trails
-   * async shape documented on `PoolConfig#serverVersion`.
-   */
   async serverVersion(connection: DatabaseAdapter): Promise<unknown> {
     return (
       this._serverVersion ??
       (await this._mutex.synchronize(async () => {
-        // Only the resolved value is memoized, never the in-flight promise: the
-        // fetch opens the connection, whose `configureConnection`
-        // (`abstract_adapter.rb:1212`) reads back through here, and handing that
-        // nested call the promise it is itself inside would deadlock. The
-        // re-entrant lock lets that nested call recompute against a still-null
-        // memo exactly as Ruby's `@server_version ||=` would.
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
       }))
@@ -251,9 +137,6 @@ export class NullPool implements AbstractPool {
   disconnect(): void {}
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Lease
- */
 export class Lease {
   connection: DatabaseAdapter | null = null;
   sticky: boolean | null = null;
@@ -275,9 +158,6 @@ export class Lease {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry
- */
 export class LeaseRegistry {
   private _map = new Map<string, Lease>();
 
@@ -290,23 +170,6 @@ export class LeaseRegistry {
     return lease;
   }
 
-  /**
-   * Non-creating lookup — the clear-only counterpart of {@link get} (Rails'
-   * `[]`, which memoizes a fresh `Lease` on miss). Both callers only want to
-   * drop a connection from a lease *if one exists*:
-   * `removeConnectionFromThreadCache` and `_clearReloadableConnections`.
-   *
-   * Rails writes `@leases[owner_thread].clear(conn)` (connection_pool.rb:889)
-   * and can afford `[]` because `@map` is a `WeakThreadKeyMap` keyed by live
-   * Thread objects — an entry created for a thread that never leased dies with
-   * the thread. Trails' `_map` is a plain `Map` keyed by the *string*
-   * `executionContextId()`, which nothing ever collects, so `get`-on-miss would
-   * permanently insert a dead `Lease` every time one of these paths runs on a
-   * context that never leased.
-   *
-   * `_`-prefixed (repo Rails-private convention): file-internal, no callers
-   * outside connection-pool.ts.
-   */
   _peek(context: string): Lease | undefined {
     return this._map.get(context);
   }
@@ -316,14 +179,6 @@ export class LeaseRegistry {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::ExecutorHooks
- *
- * In Rails, complete() iterates connection pools and releases connections
- * whose transactions are closed or not joinable. This requires
- * Base.connectionHandler which creates a circular dependency at module level.
- * Wired up when ConnectionHandler is complete (PR 6).
- */
 type ConnectionHandlerLike = {
   eachConnectionPool(block: (pool: ConnectionPool) => void): void;
   eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
@@ -333,33 +188,22 @@ export class ExecutorHooks {
   private static _getConnectionHandler: (() => ConnectionHandlerLike | null) | null = null;
 
   /**
-   * Install the lazy resolver backing {@link connectionHandler}. Rails needs no
-   * such hook: `complete` just references the `ActiveRecord::Base` constant,
-   * which Ruby resolves at call time. In TS an import of `Base` from this
-   * module would be a module-level cycle (Base → connection handling → pool),
-   * so `index.ts` — the one module that has both sides loaded — calls this once
-   * at wire-up time to hand the pool a getter instead.
-   *
-   * @internal Wiring only; called exactly once, from `index.ts`.
-   * @noRailsEquivalent PERMANENT Ruby resolves the ActiveRecord::Base constant at call time (connection_pool.rb:199); a TS import would close a module cycle.
+   * @internal
+   * @noRailsEquivalent PERMANENT
    */
   static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
     ExecutorHooks._getConnectionHandler = resolver;
   }
 
   /**
-   * Resolves the current connection handler (lazily wired from `Base` in
-   * index.ts to avoid a module-level cycle), or `null` before it is wired.
    * @internal
-   * @noRailsEquivalent PERMANENT the lazily-wired read of the same call-time constant Ruby names directly (connection_pool.rb:199).
+   * @noRailsEquivalent PERMANENT
    */
   static connectionHandler(): ConnectionHandlerLike | null {
     return ExecutorHooks._getConnectionHandler?.() ?? null;
   }
 
-  static run(): void {
-    // noop — matches Rails
-  }
+  static run(): void {}
 
   static complete(): void {
     const handler = ExecutorHooks._getConnectionHandler?.();
@@ -390,18 +234,8 @@ export class ConnectionPool implements ReapablePool {
   automaticReconnect = true;
   checkoutTimeout: number;
   /**
-   * Resolves once the adapter class for this pool has been loaded by the
-   * async ConnectionAdapters resolver. Set by sync entry points like
-   * `connectsTo` so callers can await preload before issuing real queries;
-   * defaults to a resolved promise until `establish_connection` kicks the
-   * async adapter resolve off.
-   *
-   * @internal Adapter-loading plumbing, not a Rails surface: Rails' `require` is
-   * synchronous, so `establish_connection` returns with the adapter class
-   * already resolvable. Retiring this field is part of the pool async/sync
-   * surface convergence (it disappears once adapter resolution no longer
-   * straddles a sync entry point), not a permanent exception.
-   * @noRailsEquivalent CONVERGEABLE Ruby's `require` in ConnectionAdapters.resolve is synchronous (connection_adapters.rb:34-39); this disappears with the pool sync/async convergence.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   adapterReady: Promise<unknown> = Promise.resolve();
 
@@ -410,27 +244,9 @@ export class ConnectionPool implements ReapablePool {
   private _checkedOut = new Set<DatabaseAdapter>();
   private _leases: LeaseRegistry | null = new LeaseRegistry();
   private _idleTimeout: number | null;
-  /**
-   * Async `driver.close()` calls fired by synchronous discard paths that cannot
-   * await them under their `void`/throwing contract — currently the
-   * checkout-failure swap discard in {@link checkoutAndVerify}. Each promise
-   * removes itself once settled so the set stays bounded; {@link drainPendingCloses}
-   * lets a caller await the lot before re-opening the same DB.
-   */
   private _pendingCloseDrains = new Set<Promise<void>>();
   private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
-  /**
-   * Pool-scoped fixture pin. Separate from {@link _pinnedConnections} (which is
-   * keyed by `executionContextId()` for per-request isolation in Rails-shape).
-   *
-   * Test fixtures need a different lifetime: a single pin that spans
-   * `beforeEach` / `it()` / `afterEach`, which under vitest can each resolve to
-   * different `AsyncLocalStorage` contexts. Tracking it as a pool-level field
-   * makes the pin visible from any context, matching what Rails gets for free
-   * because Ruby tests run on a single thread that owns the pin.
-   *
-   * @internal
-   */
+  /** @internal */
   private _fixturePin: { connection: DatabaseAdapter; depth: number } | null = null;
   private _cacheConfig: ConnectionPoolConfiguration;
 
@@ -465,12 +281,7 @@ export class ConnectionPool implements ReapablePool {
     return this.inspect();
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/connection_adapters/abstract/connection_pool.rb:278`
-   *   — Ruby's inspection hook is `def inspect`, a plain method name already matched).
-   * Node inspection hook — a JS runtime protocol, not a Rails method
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
@@ -479,22 +290,6 @@ export class ConnectionPool implements ReapablePool {
     return this.poolConfig.schemaReflection;
   }
 
-  /**
-   * Mirrors: `ActiveRecord::ConnectionAdapters::ConnectionPool#schema_reflection=`
-   * (`connection_pool.rb:289-292`) — swap the underlying reflection and bust the
-   * cached `BoundSchemaReflection` so the next `schemaCache` access wraps the new
-   * reflection, not the stale one. Assigning a reflection constructed *with* a
-   * cache (`SchemaReflection.new(path, cache)`, `schema_cache.rb:16-19`) is how
-   * Rails installs an already-loaded dump; a caller holding an adapter reaches it
-   * through `adapter.pool`.
-   *
-   * The lazy-load guards reset too, so the new reflection's on-disk cache path
-   * gets loaded on the next first-connection event where the old reflection had
-   * already tripped them. The raw cache needs no reset: `poolConfig.schemaCache`
-   * reads through to the reflection's own slot, so a reflection arriving without
-   * a cache already reads null — and nulling it blindly would discard a
-   * preloaded one.
-   */
   set schemaReflection(value: SchemaReflection) {
     this.poolConfig.schemaReflection = value;
     this._boundSchemaCache = undefined;
@@ -504,18 +299,6 @@ export class ConnectionPool implements ReapablePool {
     this._eagerWarmPromise = null;
   }
 
-  /**
-   * Bound schema-cache handle for this pool. Mirrors Rails'
-   * `ConnectionPool#schema_cache`, which returns a
-   * `BoundSchemaReflection` wrapping the pool's SchemaReflection plus
-   * the pool itself. DatabaseTasks.dumpSchemaCache detects the
-   * reflection shape (dumpTo without addAll) and delegates straight
-   * to it — same code path Rails' `conn_or_pool.schema_cache.dump_to`
-   * drives.
-   *
-   * Memoized per-pool so callers consistently see the same reflection
-   * across invocations, matching Rails.
-   */
   private _boundSchemaCache?: BoundSchemaReflection;
   get schemaCache(): BoundSchemaReflection {
     if (!this._boundSchemaCache) {
@@ -539,37 +322,18 @@ export class ConnectionPool implements ReapablePool {
       const pool = this;
       this._adapterProxy = new Proxy({} as DatabaseAdapter, {
         get(_target, prop) {
-          // A data property on every real adapter, not a method: answering a
-          // `withConnection` dispatcher here would hand callers a function
-          // where `abstract_adapter.rb:153`'s `@pool` is expected.
           if (prop === "pool") return pool;
           if (prop === "adapterName")
             return (
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
-          // A JS `Symbol` cannot spell a Ruby send — the one carve-out the
-          // language forces, as on `NullPool` above.
           if (typeof prop === "symbol") return undefined;
-          // The send set is the adapter's, as it is in Ruby — no name list. A
-          // live connection answers for it whenever one exists (it does
-          // whenever a translated error was raised); with none yet, the base
-          // class every adapter extends stands in, because Ruby knows the
-          // adapter's class without a connection and JS has no class here to
-          // ask until one is checked out.
           const sample: object =
             pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;
-          // `constructor` is the object plumbing every JS walker reads to name
-          // a value's class, not a Ruby send: dispatching it would call the
-          // adapter class without `new`.
           if (prop === "constructor") return (sample as any).constructor;
-          // What Ruby *does* answer, it answers through the ancestor chain, as
-          // `NullPool` lets `to_s` arrive as `Object.prototype.toString`.
           if (prop in _target) return Reflect.get(_target, prop);
           if (typeof (sample as any)[prop] !== "function") {
-            // `AbstractAdapter` overrides no `method_missing`
-            // (`abstract_adapter.rb`), so a send it has no method for raises,
-            // exactly as `NullPool`'s trap raises for its own.
             throw new NoMethodError(
               `undefined method '${prop}' for an instance of ` +
                 `ActiveRecord::ConnectionAdapters::${(sample as any).constructor.name}`,
@@ -585,9 +349,6 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get migrationsPaths(): string[] {
-    // `DatabaseConfig#migrationsPaths` answers a bare string for a single-path
-    // config; Rails wraps in `Array(migrations_paths)` before globbing
-    // (migration.rb:1369), and without that a string iterates per character.
     const paths = (this.dbConfig as any).migrationsPaths ?? Migrator.migrationsPaths;
     return Array.isArray(paths) ? paths : [paths];
   }
@@ -603,14 +364,6 @@ export class ConnectionPool implements ReapablePool {
   get migrationContext(): MigrationContext {
     return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
-
-  // --- Query cache (delegated to ConnectionPoolConfiguration) ---
-  //
-  // Rails wires ConnectionPool with `include QueryCache::ConnectionPoolConfiguration`.
-  // Trails composes via the `_cacheConfig` field; these forwarders give the
-  // pool the same surface so connection-level QueryCache mixin methods
-  // (cache, enableQueryCacheBang, ...) can detect `this.pool.<method>` and
-  // delegate.
 
   get queryCache(): Store {
     return this._cacheConfig.queryCache;
@@ -669,9 +422,6 @@ export class ConnectionPool implements ReapablePool {
     executor.registerHook(ExecutorHooks);
   }
 
-  // Async for the same reason as `checkout` (see its comment): the pinned-reuse
-  // path routes through `checkout`, which awaits `verifyBang`. Intentional
-  // NAME+semantics fidelity to Rails' `lease_connection`, not the sync return.
   async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this.connectionLease();
     lease.sticky = true;
@@ -682,24 +432,8 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Synchronous lease for the genuinely-sync accessors that cannot await. The
-   * Rails-named `leaseConnection` / `checkout` are now async (they await
-   * per-checkout `verifyBang` — see {@link checkout}), so the handful of
-   * synchronous accessors that mirror Rails' sync `lease_connection` —
-   * `Migration#connection`'s bare-migration fallback (base.ts `_arConfig`,
-   * `DatabaseTasks.migrationConnection`) and the deprecated sync `.connection`
-   * getter (connection-handling.ts) — route through this instead. It mirrors
-   * the pre-async sync lease: it establishes/returns the lease connection
-   * *without* the async per-checkout verify (`checkoutAndVerify` still runs on a
-   * fresh non-pinned checkout, as the old sync `checkout()` did). The test
-   * adapter factories no longer use this — they `await` the async
-   * `leaseConnection`. NOT part of the Rails surface — do not use on
-   * production/query paths; those go through async `leaseConnection` /
-   * `withConnection`. The lost self-heal on the deprecated `.connection` getter
-   * is tracked by `converge-sync-connection-lease-per-checkout-verify`.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the pre-async ConnectionPool#lease_connection (connection_pool.rb:315-319) for the sync accessors; retires with RFC 0073.
+   * @noRailsEquivalent CONVERGEABLE
    */
   leaseConnectionSync(): DatabaseAdapter {
     const lease = this.connectionLease();
@@ -735,10 +469,6 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async pinConnectionBang(_lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
-    // Accept `pinConnectionBang(true)` (Rails-compat boolean), `pinConnectionBang()`,
-    // and `pinConnectionBang({ fixture: true })`. The boolean form is retained for
-    // call sites that mirror Rails' `lock_thread` parameter — we do not actually
-    // use it (node has no thread-locking) so the flag is recorded but not enforced.
     const fixture =
       typeof _lockThread === "object" && _lockThread !== null
         ? Boolean(_lockThread.fixture)
@@ -750,7 +480,6 @@ export class ConnectionPool implements ReapablePool {
 
     const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
     const leasedConnection = fixtureSharedConnection ?? this.connectionLease().connection;
-    // connection_pool.rb:326 — `@pinned_connection ||= (connection_lease&.connection || checkout)`.
     const connection = pin?.connection ?? leasedConnection ?? (await this.checkout());
     const newlyCheckedOut = !pin && leasedConnection == null;
 
@@ -771,12 +500,6 @@ export class ConnectionPool implements ReapablePool {
       }
 
       if (isTransactionAware(connection)) {
-        // Rails eagerly validates here (connection_pool.rb:336,
-        // `@pinned_connection.verify!`) *before* opening the transaction and
-        // lets a failure raise out of pin_connection!. This method is async, so
-        // unlike the sync checkout() path we can await and propagate that
-        // failure faithfully — a dead connection aborts the pin (the catch
-        // below decrements _pinnedCount and rethrows) rather than being pinned.
         await connection.verifyBang();
         await connection.transactionManager.beginTransaction({
           joinable: false,
@@ -801,13 +524,6 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async unpinConnectionBang(): Promise<boolean> {
-    // Prefer the per-context pin when one exists for the current execution
-    // context — that's the Rails-shape request-isolation case and the caller
-    // is unpinning *their* pin, not the fixture-wide one. Fall back to the
-    // pool-level fixture pin only when no context pin is registered. Without
-    // this priority order, an unpin call from a context that owns a per-
-    // context pin would silently roll back the fixture pin instead, leaving
-    // the context pin in place for a double-rollback on the next call.
     const ctxId = executionContextId();
     const contextPin = this._pinnedConnections.get(ctxId);
     const fromFixture = contextPin ? null : this._fixturePin;
@@ -819,14 +535,7 @@ export class ConnectionPool implements ReapablePool {
     const connection = pin.connection;
     let clean = true;
 
-    // The block Rails runs under `@pinned_connection.lock.synchronize`
-    // (connection_pool.rb:344-362). trails' `rollbackTransaction` is a real
-    // await, so without the lock a second unpin enters while the pin is half
-    // torn down and rolls the same transaction back again.
     const block = async () => {
-      // connection_pool.rb:345-347 — the depth is decremented and the pin
-      // cleared BEFORE the transaction is inspected, so anything re-entering
-      // during the rollback sees an already-unpinned pool.
       pin.depth--;
       if (pin.depth === 0) {
         if (fromFixture) {
@@ -837,8 +546,6 @@ export class ConnectionPool implements ReapablePool {
         this._cacheConfig.decrementPinnedCount();
       }
 
-      // connection_pool.rb:349-355 — the `else` arm is Rails' "something
-      // committed or rolled back the transaction" case.
       if (isTransactionAware(connection)) {
         if (connection.transactionManager.currentTransaction.open) {
           await connection.transactionManager.rollbackTransaction();
@@ -848,20 +555,11 @@ export class ConnectionPool implements ReapablePool {
         }
       }
 
-      // connection_pool.rb:357-361 — a plain trailing statement, NOT an
-      // ensure: a raising rollback propagates with the connection left checked
-      // out. `steal!` / `lock_thread = nil` have no trails counterpart
-      // (single-threaded runtime), so only the checkin survives that arm.
       if (pin.depth === 0) {
         this.checkin(connection);
       }
     };
 
-    // Rails: `@pinned_connection.lock.synchronize do … end`
-    // (connection_pool.rb:344-362). The monitor is re-entrant on the async
-    // chain, so the nested `rollbackTransaction` (same lock) cannot
-    // self-deadlock. A connection with no transaction manager has neither a
-    // lock to take nor a transaction.
     if (isTransactionAware(connection)) {
       await connection.lock.synchronize(block);
     } else {
@@ -871,45 +569,14 @@ export class ConnectionPool implements ReapablePool {
     return clean;
   }
 
-  // `checkout` is async in trails even though Rails' `ConnectionPool#checkout`
-  // (connection_pool.rb:547) is synchronous. This is an intentional, documented
-  // divergence: trails' `verifyBang` issues a real backend liveness round-trip
-  // and is async, whereas Rails' `verify!` (abstract_adapter.rb:759) is sync.
-  // To reconnect-on-drop on *every* pinned checkout the way Rails does, we must
-  // await `verifyBang`, so the whole method returns a Promise. Fidelity here is
-  // the method NAME + semantics (per-checkout verify/self-heal), NOT the sync
-  // return type — do not "converge back" to a sync return. See RFC
-  // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
-  /**
-   * @missingRailsCall lock — PERMANENT: connection_pool.rb:550-551 wraps the
-   *   pinned branch in `@pinned_connection.lock.synchronize { synchronize
-   *   { ... } }`. Both monitors guard against concurrent *threads*, and the
-   *   section they close is unreachable here: the branch has exactly one yield
-   *   point (`verifyBang`), and everything after it — the `@connections`
-   *   membership read and the push that follows — runs in a single
-   *   synchronous continuation, so no second checkout can observe the pool
-   *   between the two. A body that mutates only before its first `await`, or
-   *   only after its last one, needs no JS analogue of the mutex.
-   */
+  /** @missingRailsCall lock — PERMANENT */
   async checkout(timeout?: number): Promise<DatabaseAdapter> {
     const checkoutTimeout = timeout ?? this.checkoutTimeout;
     const pinned = this._resolvePinnedConnection();
-    // Rails' guard clause: `return checkout_and_verify(acquire_connection(
-    // checkout_timeout)) unless @pinned_connection` (connection_pool.rb:548).
-    // Rails re-reads `@pinned_connection` a second time inside the lock
-    // (:552, "may have been cleaned up before we synchronized") and falls back
-    // to the same acquire on nil; with no lock to acquire, the two reads are
-    // one read here — nothing can clear the pin between them.
     if (!pinned) {
       return checkoutAndVerify(this, await this.acquireConnection(checkoutTimeout));
     }
 
-    // Mirrors Rails' pinned branch (connection_pool.rb:553-563): verify!,
-    // ensure membership in @connections, and return —
-    // no checkout_and_verify / QueryCache wiring on the pinned connection.
-    // verifyBang is async in trails (Rails' verify! is sync); await it on the
-    // async path so verification completes before the connection is handed out
-    // and a rejection surfaces here rather than as an unhandled rejection.
     await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
     if (this._connections && !this._connections.includes(pinned)) {
       this._connections.push(pinned);
@@ -918,24 +585,10 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * The synchronous seams' entry into `acquire_connection`
-   * (connection_pool.rb:862): the same sequence — poll, try a new connection,
-   * reap, retry — minus the blocking `@available.poll(checkout_timeout)`, which
-   * has no synchronous spelling in JS. Where Rails' thread would block and then
-   * raise on expiry, this raises straight away with the same error. The
-   * blocking wait itself lives in {@link acquireConnection}; this exists only
-   * for {@link leaseConnectionSync} and `checkout_for_exclusive_access`, whose
-   * callers (`disconnect!`, `reload`, `Migration#connection`) are synchronous
-   * all the way up.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT Rails' `acquire_connection` blocks the calling
-   *   thread; a JS function that cannot await has no way to wait, so the wait
-   *   branch collapses to its timeout arm.
+   * @noRailsEquivalent PERMANENT
    */
   acquireConnectionSync(checkoutTimeout: number): DatabaseAdapter {
-    // Stands in for `checkout`'s `unless @pinned_connection` guard
-    // (connection_pool.rb:548), which is where both sync seams enter Rails.
     const pinned = this._resolvePinnedConnection();
     if (pinned) return pinned;
     if (this.isDiscarded()) {
@@ -961,9 +614,6 @@ export class ConnectionPool implements ReapablePool {
     this.connectionLease().clear(conn);
     if (this._checkedOut.has(conn)) {
       this._checkedOut.delete(conn);
-      // Mirrors `conn._run_checkin_callbacks { conn.expire }`: expire is the
-      // block; the `:after` callbacks (unset_query_cache!, enable_lazy_transactions!)
-      // fire afterwards via the registry.
       const c = conn as unknown as PoolManagedConnection & {
         _runCheckinCallbacks?: (block: () => void) => void;
       };
@@ -1017,14 +667,7 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
-  /**
-   * @missingRailsCall count — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   connection_pool.rb:687-689 derives busy/dead/idle with three
-   *   `@connections.count { ... }` passes keyed on `owner.alive?`; trails keeps
-   *   the same numbers as maintained sets (`_checkedOut.size`,
-   *   `_available.length`) and has no `dead` bucket because there are no dead
-   *   owner threads.
-   */
+  /** @missingRailsCall count — PERMANENT */
   stat(): {
     size: number;
     connections: number;
@@ -1043,30 +686,14 @@ export class ConnectionPool implements ReapablePool {
     };
   }
 
-  /**
-   * Converges Rails' `ConnectionPool#disconnect`: tears down synchronously, then
-   * awaits each adapter's pending async `driver.close()` (async-only SQLite
-   * drivers) before resolving, so the underlying handle is fully closed before
-   * the caller re-opens the same DB. Resolves immediately for sync drivers. The
-   * `Promise` return is an intentional, documented divergence from Rails'
-   * synchronous `disconnect` (forced by promise-returning `driver.close()`),
-   * NOT a regression to revert.
-   */
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
   }
 
-  /**
-   * Synchronous teardown shared by `disconnect`. Returns the pending async-close
-   * drains surfaced by adapters whose `driver.close()` is promise-returning
-   * (async-only SQLite drivers); sync drivers contribute nothing. `disconnect`
-   * awaits them so no close is left in flight.
-   */
   private _disconnect(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
     this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
       for (const conn of this._connections ?? []) {
-        // connection_pool.rb:456-459 — `if conn.in_use? then conn.steal!; checkin conn`.
         if (conn.inUse) {
           conn.stealBang();
           this.checkin(conn);
@@ -1075,11 +702,6 @@ export class ConnectionPool implements ReapablePool {
         const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
         if (drain) draining.push(drain);
       }
-      // No pin clearing here: `disconnect` (connection_pool.rb:454-465) clears
-      // `@connections`, `@leases` and `@available` only. Rails clears
-      // `@pinned_connection` in `initialize` (:267) and `unpin_connection!`
-      // (:347) and nowhere else, so a pool disconnected mid-test still unpins
-      // cleanly at fixture teardown.
       if (this._connections) this._connections.length = 0;
       this._available?.rejectAll(
         new ConnectionNotEstablished("Connection pool has been disconnected"),
@@ -1095,56 +717,26 @@ export class ConnectionPool implements ReapablePool {
     await this.disconnect(false);
   }
 
-  /**
-   * Converges Rails' `ConnectionPool#discard!`: discards synchronously, then
-   * awaits any adapter's in-flight async `driver.close()` before resolving, so
-   * the handle is fully closed before the caller re-opens the same DB. Resolves
-   * immediately for sync drivers (or when nothing is in flight). The `Promise`
-   * return is an intentional, documented divergence from Rails' synchronous
-   * `discard!` (forced by promise-returning `driver.close()`), NOT a regression.
-   */
   async discardBang(): Promise<void> {
     await Promise.all(this._discardBang());
   }
 
   /**
-   * Drain-carrying variant of `discardBang` for `PoolConfig`'s async discard
-   * sweep: performs the same synchronous discard but returns the in-flight
-   * async-close drains so the caller can await them after every pool has been
-   * discarded. Not a Rails counterpart — Rails' `discard!` is fully synchronous.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE ConnectionPool#discard! (connection_pool.rb:484) with the async close drains Ruby's fully-synchronous discard has nothing to return.
+   * @noRailsEquivalent CONVERGEABLE
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();
   }
 
-  /**
-   * Synchronous discard shared by `discardBang`/`discardBangDraining`. Returns
-   * the pending async-close drains surfaced by adapters with an async-only
-   * `driver.close()` already in flight (e.g. fired by a prior `disconnectBang`
-   * on a still-pooled conn). Rails' `discard!` abandons the raw handle without
-   * closing it, so SQLite's `discardBang()` fires no new close; but dropping our
-   * `_connections` reference here would orphan any in-flight close, leaking the
-   * handle past teardown and racing a re-open. `discardBang` awaits the drains;
-   * `discardBangDraining` surfaces them for the `PoolConfig` sweep to await.
-   */
   private _discardBang(): Array<Promise<void>> {
     if (this.isDiscarded()) return [];
     const draining: Array<Promise<void>> = [];
-    // Mirrors Rails' `@connections.each { |conn| conn.discard! }`
-    // (connection_pool.rb#discard!). `discard!` abandons the raw handle without
-    // closing it, so SQLite's adapter `discardBang` is a no-op and fires no
-    // `driver.close()`; collect any close already in flight (e.g. from a prior
-    // `disconnectBang`) so dropping `_connections` below doesn't orphan it.
     for (const conn of this._connections ?? []) {
       (conn as unknown as { discardBang?: () => void }).discardBang?.();
       const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
       if (drain) draining.push(drain);
     }
-    // As in `_disconnect`: `discard!` (connection_pool.rb:484-492) nils
-    // `@connections`/`@available`/`@leases` only, never the pin.
     this._connections = null;
     this._available?.rejectAll(new ConnectionNotEstablished("Connection pool has been discarded"));
     this._available?.clear();
@@ -1154,25 +746,10 @@ export class ConnectionPool implements ReapablePool {
     return draining;
   }
 
-  /**
-   * Converges Rails' `ConnectionPool#clear_reloadable_connections`: clears
-   * reloadable connections synchronously, then awaits each reloaded adapter's
-   * in-flight async `driver.close()` before resolving, so an async-only driver's
-   * handle is fully closed before the caller re-opens the same DB. Resolves
-   * immediately for sync drivers. The `Promise` return is an intentional,
-   * documented divergence from Rails' synchronous `clear_reloadable_connections`
-   * (forced by promise-returning `driver.close()`), NOT a regression to revert.
-   */
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
   }
 
-  /**
-   * Synchronous reload-clear shared by the awaitable `clearReloadableConnections`
-   * and its `Bang` alias. Returns the pending async-close drains surfaced by
-   * reloadable adapters whose `driver.close()` (fired by `disconnectBang` below)
-   * is promise-returning, for the public method to await.
-   */
   private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
     this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
@@ -1183,10 +760,6 @@ export class ConnectionPool implements ReapablePool {
         }
       }
       for (const conn of this._connections ?? []) {
-        // connection_pool.rb:509-512 — `if conn.in_use? then conn.steal!; checkin conn`.
-        // The exclusive acquisition above leased every conn to us; release
-        // them now so survivors are eligible to re-enter _available via
-        // withNewConnectionsBlocked's reseed.
         if (conn.inUse) {
           conn.stealBang();
           this.checkin(conn);
@@ -1210,52 +783,24 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * @missingRailsCall checkin — PERMANENT: Per-site verified (RFC 0106 wave 4b): reap
-   *   recovers connections whose OWNER THREAD died (connection_pool.rb:628-642).
-   *   JS has no threads, so trails' reap (connection-pool.ts:1237-1241) has no
-   *   stale set to steal, reset and check back in; the guard is the discarded?
-   *   early return Rails also has.
-   * @missingRailsCall remove — PERMANENT: Per-site verified (RFC 0106 wave 4b): see
-   *   `reap`/`checkin` above — the dead-owner branch of connection_pool.rb:640
-   *   cannot arise in a single-threaded runtime.
-   * @missingRailsCall select — PERMANENT: Per-site verified (RFC 0106 wave 4b): see
-   *   `reap`/`checkin` above — connection_pool.rb:628-633 selects on
-   *   `conn.owner.alive?`, which has no JS analogue.
+   * @missingRailsCall checkin — PERMANENT
+   * @missingRailsCall remove — PERMANENT
+   * @missingRailsCall select — PERMANENT
    */
   reap(): void {
     if (this.isDiscarded()) return;
-    // In Rails, reap recovers connections whose owner thread has died.
-    // JS is single-threaded so there are no dead-owner connections to recover.
   }
 
-  /**
-   * Converges Rails' `ConnectionPool#flush`: evicts idle connections
-   * synchronously, then awaits each evicted adapter's in-flight async
-   * `driver.close()` before resolving, so an async-only driver's handle is fully
-   * closed before the caller re-opens the same DB. Resolves immediately for sync
-   * drivers. The `Promise` return is an intentional, documented divergence from
-   * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
-   * NOT a regression to revert.
-   */
   async flush(minimumIdle?: number | null): Promise<void> {
     await Promise.all(this._flush(minimumIdle));
   }
 
-  /**
-   * Synchronous flush shared by the awaitable `flush` and `flushBang`. Returns
-   * the pending async-close drains surfaced by flushed adapters whose
-   * `driver.close()` (fired by `disconnectBang` below) is promise-returning, for
-   * the public method to await.
-   */
   private _flush(minimumIdle?: number | null): Array<Promise<void>> {
     if (minimumIdle === undefined) minimumIdle = this._idleTimeout;
     if (minimumIdle === null) return [];
     if (this.isDiscarded()) return [];
     if (!this._connections || !this._available) return [];
 
-    // connection_pool.rb:651-661 — select the idle connections off
-    // `@connections`, then lease each and remove it from `@available` and
-    // `@connections`.
     const idleConnections = this._connections.filter(
       (conn) => !conn.inUse && conn.secondsIdle >= minimumIdle,
     );
@@ -1280,14 +825,7 @@ export class ConnectionPool implements ReapablePool {
     await this.flush(-1);
   }
 
-  /**
-   * Record an in-flight async `driver.close()` fired by a synchronous discard
-   * path (the checkout-failure swap) so {@link drainPendingCloses} can await it.
-   * The promise self-removes once settled, keeping the set bounded; a sync
-   * driver's resolved/no-op `whenClosed()` is dropped immediately.
-   *
-   * @internal
-   */
+  /** @internal */
   _trackCloseDrain(drain: Promise<void> | undefined): void {
     if (!drain) return;
     this._pendingCloseDrains.add(drain);
@@ -1298,71 +836,18 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Await every async close stashed by {@link _trackCloseDrain} (currently the
-   * checkout-failure swap discard) so an async-only driver's handle is fully
-   * closed before the caller re-opens the same DB. Resolves immediately when
-   * nothing is in flight (the sync-driver case).
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE awaits the closes Ruby's synchronous `conn.disconnect!` completes in place (connection_pool.rb:530).
+   * @noRailsEquivalent CONVERGEABLE
    */
   async drainPendingCloses(): Promise<void> {
     await Promise.all(this._pendingCloseDrains);
   }
 
-  /**
-   * Mirrors Rails:
-   *
-   *   def new_connection
-   *     connection = db_config.new_connection
-   *     connection.pool = self
-   *     connection
-   *   end
-   */
   newConnection(): DatabaseAdapter {
     const conn = this.dbConfig.newConnection() as DatabaseAdapter;
-    // Set the back-reference so AbstractAdapter#schemaCache can reach
-    // pool.poolConfig.schemaCache to share the raw SchemaCache across
-    // every connection in this pool. Rails' AbstractAdapter has the
-    // same owner/pool reference threaded in via its connection
-    // constructor; trails' factory signature doesn't expose it, so
-    // we assign it post-hoc here.
-    //
-    // CRITICAL: gate on `instanceof AbstractAdapter`, not a
-    // generic `"pool" in conn` duck-type. Several driver-backed
-    // adapters (PostgreSQLAdapter, Mysql2Adapter) declare their own
-    // `pool` field holding the underlying pg.Pool / mysql.Pool —
-    // writing `this` over that would clobber the driver pool and
-    // break every subsequent query. Only AbstractAdapter's
-    // `pool: unknown = null` slot is safe to commandeer for this
-    // back-reference, and it's the only class that actually reads
-    // it (via `this.pool.poolConfig.schemaCache` etc.).
     if (conn instanceof AbstractAdapter) {
       (conn as unknown as { pool: unknown }).pool = this;
     }
-    // Lazily load the on-disk schema cache when the first connection
-    // for this pool is adopted. Mirrors Rails'
-    // `ConnectionPool#adopt_connection`:
-    //
-    //     if @schema_cache.nil? && ActiveRecord.lazily_load_schema_cache
-    //       schema_cache.load!
-    //     end
-    //
-    // Trails' equivalent is `SchemaReflection.lazilyLoadSchemaCache`
-    // (static flag, off by default — apps opt in). The load is
-    // fire-and-forget because newConnection is sync and the load
-    // involves async work (schemaVersion introspection for version-
-    // check). SchemaReflection.loadCache already swallows errors
-    // internally (console.warn on version mismatch, returns null on
-    // file-not-found / parse failure), so the .catch here is purely
-    // defensive — it should never fire in practice. Callers can
-    // observe the pending/resolved load via _lazyLoadPromise (used
-    // by tests to await the actual completion instead of timing hacks).
-    // Skip the disk-only lazy load when eager warming is on: loadAllBang
-    // below already consults the on-disk dump as a base before introspecting,
-    // so eager warming subsumes the lazy path. Running both would double-load
-    // the dump and (because the lazy block sets _lazyLoadTriggered) would
-    // otherwise suppress the eager introspection top-up entirely.
     if (
       SchemaReflection.lazilyLoadSchemaCache &&
       !SchemaReflection.eagerLoadSchemaCache &&
@@ -1387,23 +872,6 @@ export class ConnectionPool implements ReapablePool {
           );
         });
     }
-    // Eagerly warm the schema cache by DB introspection when
-    // SchemaReflection.eagerLoadSchemaCache is on — the production analogue of
-    // Rails' `schema_cache.addAll(pool)` at boot. Unlike the lazy-load above
-    // (disk dump only), this populates real DB columns even with no
-    // schema_cache.json on disk, so a synchronous Model.columnNames() on a
-    // connected model excludes virtual attribute() declarations without a
-    // prior `await ensureSchemaLoaded()`.
-    //
-    // loadAllBang first consults the on-disk dump (if any) as a base, so
-    // eager warming subsumes lazy loading — when this flag is on, the lazy
-    // block above is skipped so eager wins. Fire-and-forget for the same
-    // reason as the lazy path: newConnection is sync. The whole warm is
-    // best-effort, not per-table: addAll loops `add` without per-table
-    // rescue (mirroring Rails' SchemaCache#add_all), so a single table's
-    // reflection failure rejects the warm and abandons the rest — the .catch
-    // logs and swallows it, leaving any not-yet-reflected tables to fall back
-    // to the synthesized columnsHash branch on first access.
     if (
       SchemaReflection.eagerLoadSchemaCache &&
       !this._eagerWarmTriggered &&
@@ -1430,29 +898,14 @@ export class ConnectionPool implements ReapablePool {
     return conn;
   }
 
-  /**
-   * Set once per pool when the lazy-load trigger fires, so subsequent
-   * connections don't re-run the load. Mirrors Rails'
-   * `@schema_cache.nil?` guard on `adopt_connection`.
-   */
   private _lazyLoadTriggered = false;
 
-  /**
-   * @internal Exposed so tests (and eager-boot callers) can await the
-   * lazy load's completion. Null when no lazy load was triggered.
-   */
+  /** @internal */
   _lazyLoadPromise: Promise<void> | null = null;
 
-  /**
-   * Set once per pool when the eager-warm trigger fires, so subsequent
-   * connections don't re-introspect. Counterpart to {@link _lazyLoadTriggered}.
-   */
   private _eagerWarmTriggered = false;
 
-  /**
-   * @internal Exposed so tests (and eager-boot callers) can await the eager
-   * warm's completion. Null when no eager warm was triggered.
-   */
+  /** @internal */
   _eagerWarmPromise: Promise<void> | null = null;
 
   remove(conn: DatabaseAdapter): void {
@@ -1491,21 +944,7 @@ export class ConnectionPool implements ReapablePool {
     this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
-  /**
-   * Rails builds a `Concurrent::ThreadPoolExecutor` here, sized from the
-   * database config for `:multi_thread_pool` and shared process-wide for
-   * `:global_thread_pool` (connection_pool.rb:714-728). JS has one thread, so
-   * both arms resolve to the same thing: a queue that defers the query off the
-   * caller's stack. The config value still selects between "async enabled" and
-   * "run everything inline", which is the behavioral distinction
-   * `async_enabled?` reads (abstract_adapter.rb:562).
-   *
-   * @missingRailsArgs new — PERMANENT: connection_pool.rb:717-722 sizes the
-   * executor with `min_threads`/`max_threads`/`max_queue`/`fallback_policy`.
-   * With one thread there is no pool to size, no queue to bound and no
-   * caller-runs fallback to choose, so the four kwargs have no receiver. The
-   * `max_threads > 0` guard Rails wraps this in IS ported.
-   */
+  /** @missingRailsArgs new — PERMANENT */
   private buildAsyncExecutor(): AsyncExecutor | null {
     switch (ActiveRecord.asyncQueryExecutor) {
       case "multi_thread_pool":
@@ -1525,28 +964,13 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
-  /**
-   * Resolve the connection that all checkouts in the current execution
-   * context should route to while a pin is active. Centralizes the lookup
-   * used by `checkout` and `acquireConnectionSync` so every
-   * lease entry point honors `pinConnectionBang` consistently — mirrors
-   * Rails' `@pinned_connection` short-circuit in
-   * `ConnectionPool#checkout` (connection_pool.rb:547).
-   *
-   * @internal
-   */
+  /** @internal */
   private _resolvePinnedConnection(): DatabaseAdapter | undefined {
     if (this._fixturePin) return this._fixturePin.connection;
     if (this._pinnedConnections.size === 0) return undefined;
     return this._pinnedConnections.get(executionContextId())?.connection;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease
-   * (`connection_pool.rb:711`, private) — the per-execution-context lease
-   * record. Carries the Rails name directly rather than sitting behind an
-   * `_`-prefixed alias, so the call sites read as Rails' do.
-   */
   private connectionLease(): Lease {
     if (!this._leases) {
       this._leases = new LeaseRegistry();
@@ -1554,10 +978,6 @@ export class ConnectionPool implements ReapablePool {
     return this._leases.get(String(executionContextId()));
   }
 
-  // Rails' private ConnectionPool instance methods (`connection_pool.rb:862-930`),
-  // defined below as `this`-typed functions and mixed in here (CLAUDE.md "Module
-  // mixins"), so every call site carries Rails' argument list —
-  // `try_to_checkout_new_connection` takes none, not an explicit pool.
   private bulkMakeNewConnections = bulkMakeNewConnections;
   private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
   private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
@@ -1578,44 +998,15 @@ function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConn
   );
 }
 
-// ---------------------------------------------------------------------------
-// Rails-named pool privates. Trails' pool runs in single-threaded JS, so a
-// number of these collapse to thinner equivalents than Rails' multi-thread
-// implementation — but the Rails surface and call shape are preserved so
-// future async/concurrent extensions can drop in without renaming. Each
-// helper takes the pool as `pool` (the Rails `self`).
-// ---------------------------------------------------------------------------
-
-// `Pool` is a structural alias used by the @internal helpers below to reach
-// private state (`_connections`, `_leases`, `_available`, etc.) on
-// the host without widening the public API. `any` is intentional — the
-// helpers mirror Rails' file-private surface and shouldn't constrain the
-// public class declaration.
+// @internal
 type Pool = any;
 
-/**
- * Builds the async-query executor. JS runs single-threaded, so a real
- * thread pool is not applicable here — return null. Rails returns
- * `Concurrent::ThreadPoolExecutor` or the global pool depending on
- * `ActiveRecord.async_query_executor`.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#build_async_executor
- *
- * @internal
- */
+/** @internal */
 function buildAsyncExecutor(_pool: Pool): null {
   return null;
 }
 
-/**
- * Sequentially attempts `numNewConnsNeeded` `try_to_checkout_new_connection`s
- * and checks each one in. Mirrors Rails comment: "this is unfortunately
- * not concurrent" — same here, JS is single-threaded.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#bulk_make_new_connections
- *
- * @internal
- */
+/** @internal */
 function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): void {
   for (let i = 0; i < numNewConnsNeeded; i++) {
     const conn = this.tryToCheckoutNewConnection();
@@ -1623,15 +1014,7 @@ function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): void {
   }
 }
 
-/**
- * Wraps `block` with `withNewConnectionsBlocked` and forces every existing
- * connection to be checked out by the current context, so a "group" action
- * (reload/disconnect) can run safely.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#with_exclusively_acquired_all_connections
- *
- * @internal
- */
+/** @internal */
 function withExclusivelyAcquiredAllConnections<R>(
   this: Pool,
   raiseOnAcquisitionTimeout: boolean,
@@ -1643,17 +1026,7 @@ function withExclusivelyAcquiredAllConnections<R>(
   });
 }
 
-/**
- * Walks every connection on the pool, leasing any not already owned by the
- * current execution context. Trails has no thread/isolation queue so the
- * "wait for owners to release" loop collapses to a single sweep. Releases
- * newly-acquired connections on error unless `raiseOnAcquisitionTimeout`
- * is false (then it swallows timeouts and retains held connections).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#attempt_to_checkout_all_existing_connections
- *
- * @internal
- */
+/** @internal */
 function attemptToCheckoutAllExistingConnections(
   this: Pool,
   raiseOnAcquisitionTimeout: boolean,
@@ -1701,15 +1074,7 @@ function attemptToCheckoutAllExistingConnections(
   }
 }
 
-/**
- * Synchronized checkout that converts a `ConnectionTimeoutError` into the
- * more specific `ExclusiveConnectionTimeoutError` describing which other
- * contexts hold the conflicting connections.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_for_exclusive_access
- *
- * @internal
- */
+/** @internal */
 function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
   try {
     return pool.acquireConnectionSync(checkoutTimeout);
@@ -1724,17 +1089,7 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
   }
 }
 
-/**
- * Increments `_threads_blocking_new_connections` for the duration of
- * `block`, then drains the available queue and re-makes any connections
- * needed by waiters when the count returns to zero. Trails maps Rails'
- * thread counter to a simple per-pool integer; the available-queue
- * draining is a no-op when no waiters exist.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#with_new_connections_blocked
- *
- * @internal
- */
+/** @internal */
 function withNewConnectionsBlocked<R>(this: Pool, block: () => R): R {
   this._threadsBlockingNewConnections = (this._threadsBlockingNewConnections ?? 0) + 1;
   try {
@@ -1756,16 +1111,7 @@ function withNewConnectionsBlocked<R>(this: Pool, block: () => R): R {
   }
 }
 
-/**
- * Acquires a connection by 1) polling the available queue, 2) creating a
- * new connection if under capacity, or 3) waiting on the queue with the
- * configured timeout. Reaps once between immediate-acquire failures and
- * the blocking poll. Re-tagged `ConnectionTimeoutError` with this pool.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#acquire_connection
- *
- * @internal
- */
+/** @internal */
 function acquireConnection(
   this: Pool,
   checkoutTimeout: number,
@@ -1820,15 +1166,7 @@ function acquireConnection(
   }
 }
 
-/**
- * Clears the lease registry entry for `conn` on `ownerThread` (defaults to
- * the connection's recorded owner). Trails uses execution-context ids as
- * the registry key. Aliased as `release` to match Rails.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#remove_connection_from_thread_cache
- *
- * @internal
- */
+/** @internal */
 function removeConnectionFromThreadCache(
   pool: Pool,
   conn: DatabaseAdapter,
@@ -1843,15 +1181,7 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: string | numbe
   removeConnectionFromThreadCache(pool, conn, ownerThread);
 }
 
-/**
- * Establishes a new connection if the pool isn't at `_size` capacity and
- * new-connection blocking isn't engaged; returns the leased connection or
- * undefined when no slot is available.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#try_to_checkout_new_connection
- *
- * @internal
- */
+/** @internal */
 function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
   if ((this._threadsBlockingNewConnections ?? 0) > 0) return null;
   if (!this._connections || this._connections.length >= this.size) return null;
@@ -1865,20 +1195,10 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
   this.adoptConnection(conn);
   this._checkedOut.add(conn);
   (conn as unknown as PoolManagedConnection).lease?.();
-  // connection_pool.rb:885-899 — `try_to_checkout_new_connection` returns the
-  // leased connection; `checkout_and_verify` is the caller's (`checkout`) job.
   return conn;
 }
 
-/**
- * Registers `conn` as a pool-owned connection. Sets `conn.pool = pool` and
- * appends to `_connections`. Schema-cache lazy-load fires on the first
- * adopted connection only.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#adopt_connection
- *
- * @internal
- */
+/** @internal */
 function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
   if (conn instanceof AbstractAdapter) {
     (conn as unknown as { pool?: ConnectionPool }).pool = this;
@@ -1888,15 +1208,7 @@ function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
   }
 }
 
-/**
- * Establishes a new database connection (via the host's `newConnection`)
- * after asserting `_automatic_reconnect` is enabled. Throws
- * `ConnectionNotEstablished` when reconnects are disabled — matches Rails.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_new_connection
- *
- * @internal
- */
+/** @internal */
 function checkoutNewConnection(this: Pool): DatabaseAdapter {
   if (!this.automaticReconnect) {
     throw new ConnectionNotEstablished(
@@ -1907,23 +1219,7 @@ function checkoutNewConnection(this: Pool): DatabaseAdapter {
   return this.newConnection();
 }
 
-/**
- * Runs the connection's `_run_checkout_callbacks` block (clean! in Rails).
- * Verifies/cleans the connection; on any error the connection is removed
- * from the pool and disconnected, then the error is rethrown so the caller
- * can retry from a fresh slot.
- *
- * We have no generic `define_callbacks :checkout` dispatcher, but the block
- * still runs both effects Rails' :checkout chain produces in core AR: the
- * `clean!` block body (cleanBang) and the only registered :checkout callback,
- * QueryCache's cache wiring (query_cache.rb:132), ported here as
- * `_cacheConfig.checkoutAndVerify`. The railties `set_callback(:checkout)` in
- * console_sandbox.rb is sandbox-only and out of scope.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify
- *
- * @internal
- */
+/** @internal */
 function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
   try {
     const conn = c as unknown as {
@@ -1931,16 +1227,12 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
       clean?: () => void;
       _runCheckoutCallbacks?: (block: () => void) => void;
     };
-    // Mirrors `c._run_checkout_callbacks { c.clean! }`: clean! is the block body;
-    // core AR registers no `:checkout` callbacks on the connection.
     const cleanBlock = () => {
       if (typeof conn.cleanBang === "function") conn.cleanBang();
       else conn.clean?.();
     };
     if (typeof conn._runCheckoutCallbacks === "function") conn._runCheckoutCallbacks(cleanBlock);
     else cleanBlock();
-    // Pool-level QueryCache wiring (Rails: QueryCache::ConnectionPoolConfiguration
-    // #checkout_and_verify), not a connection `:checkout` callback.
     pool._cacheConfig.checkoutAndVerify(c as unknown as QueryCacheHost);
     return c;
   } catch (err) {

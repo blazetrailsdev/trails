@@ -25,9 +25,6 @@ import {
   typeCast as typeCastFn,
 } from "./quoting.js";
 
-// `quoteDefaultExpression`'s non-Proc arm delegates to the abstract body, which
-// self-sends `lookup_cast_type` (`abstract/quoting.rb:161`); the bare prototype
-// carries no instance config, so wire the SQLite3 type map here.
 const TYPE_MAP = new TypeMap();
 SQLite3Adapter.initializeTypeMap(TYPE_MAP);
 
@@ -216,7 +213,6 @@ describe("SQLite3::Quoting", () => {
     });
 
     it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
-      // sqlite3/quoting.rb:79 is `quoted_binary(value)` → `value.hex`.
       expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
       expect(quotedBinary(new Uint8Array([0xde, 0xad]).buffer)).toBe("x'dead'");
     });
@@ -246,28 +242,15 @@ describe("SQLite3::Quoting", () => {
     });
 
     it("serializes a non-Proc default through the column's cast type", () => {
-      // `sqlite3/quoting.rb:107` is `super`, i.e. `abstract/quoting.rb:161`'s
-      // `lookup_cast_type(column.sql_type).serialize(value)` — a structured
-      // `json` default must reach the JSON text, not `String({})`.
       expect(quoteDefaultExpression.call(HOST, {}, { sqlType: "json" })).toBe("'{}'");
       expect(quoteDefaultExpression.call(HOST, { a: 1 }, { sqlType: "json" })).toBe("'{\"a\":1}'");
     });
 
     it("quotes a binary default through SQLite's quotedBinary", () => {
-      // Binary self-dispatches through the host, so it must reach the `x'..'`
-      // hex form, not the abstract byte-string fallback. Cover all three shapes
-      // that reach here — the `BinaryData` that `BinaryType#serialize` returns
-      // (activemodel/.../binary.rb:31) and the raw `Uint8Array` view, which
-      // takes the abstract `ArrayBuffer.isView` branch back to `quotedBinary`.
       expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]), {})).toBe("x'dead'");
       expect(
         quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])), {}),
       ).toBe("x'dead'");
-      // A *bare* `ArrayBuffer` has no Rails counterpart — Rails only ever
-      // reaches `quote` with a `Type::Binary::Data`, and `ArrayBuffer.isView`
-      // is false for a bare buffer — so it falls to the abstract
-      // `else raise TypeError, "can't quote ..."` (abstract/quoting.rb:87) like
-      // any other unquotable object. Hand a view instead.
       expect(() =>
         quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer, {}),
       ).toThrow(/can't quote ArrayBuffer/);
@@ -296,10 +279,6 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(-7)).toBe(-7n);
     });
 
-    // Rails' SQLite `type_cast` has no Symbol arm — it falls to `else super`
-    // (sqlite3/quoting.rb:122-123), so the abstract `when Symbol ... value.to_s`
-    // (abstract/quoting.rb:95-96) is what runs. The SQLite-local `?? null`
-    // this used to pin was the duplicated chain's own invention.
     it("casts a symbol through the inherited abstract arm", () => {
       expect(typeCast(Symbol("foo"))).toBe("foo");
       expect(typeCast(Symbol())).toBe("Symbol()");

@@ -16,7 +16,6 @@ function isAppendableCollector(c: unknown): c is AppendableCollector {
   return typeof obj.append === "function" && typeof obj.value === "string";
 }
 
-/** Mirrors `Arel::Visitors::Dot::Node` — a labeled box with side-fields. */
 export class Node {
   readonly name: string;
   readonly id: number;
@@ -29,12 +28,6 @@ export class Node {
   }
 }
 
-/**
- * Mirrors `Arel::Visitors::Dot::Edge` (a Struct of name/from/to).
- * `to` is `undefined` between construction (in `edge()`) and the inner
- * `withNode()` call that supplies the destination. `toDot` asserts it's
- * populated by the time the graph is rendered.
- */
 export class Edge {
   readonly name: string;
   readonly from: Node;
@@ -46,15 +39,6 @@ export class Edge {
   }
 }
 
-/**
- * Dot visitor — renders the AST as a Graphviz dot graph.
- *
- * Mirrors: Arel::Visitors::Dot (activerecord/lib/arel/visitors/dot.rb).
- * Each visit method names the children it should walk; `visit_edge`
- * follows a named field, allocating a Node + Edge per traversed value.
- * `visit__no_edges` and `visit__children` / `visit__regexp` are aliased
- * by multiple node types, mirroring Rails' `alias`.
- */
 export class Dot extends Visitor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
@@ -63,12 +47,6 @@ export class Dot extends Visitor {
   private seen: Map<unknown, Node> = new Map();
   private nextId = 0;
 
-  /**
-   * Sentinel key for `null`/`undefined` in the seen-map. Rails treats
-   * `nil` as a singleton via `nil.object_id`; we collapse JS `null` and
-   * `undefined` onto one entry so a graph with both produces a single
-   * NilClass node, matching Rails' shape.
-   */
   private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
 
   override accept(object: Nodes.Node, collector?: unknown): { value: string } {
@@ -115,25 +93,16 @@ export class Dot extends Visitor {
     this.visitEdge(o, "right");
   }
 
-  /** Aliased to Regexp / NotRegexp in dispatch (Rails: `alias`). */
   protected visitRegexp(o: Nodes.Regexp | Nodes.NotRegexp): void {
     this.visitEdge(o, "left");
     this.visitEdge(o, "right");
     this.visitEdge(o, "caseSensitive");
   }
 
-  // ---------------------------------------------------------------------
-  // Rails-named alias visitors (dot.rb). Ruby reaches these via `alias`;
-  // TS has no method-alias, so each delegates to the shared ported helper
-  // and is wired into the dispatch table under its own node type.
-  // ---------------------------------------------------------------------
-
-  /** Rails: `alias :visit_Arel_Nodes_Regexp :visit__regexp` (dot.rb:65). */
   protected visitArelNodesRegexp(o: Nodes.Regexp): void {
     this.visitRegexp(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_NotRegexp :visit__regexp` (dot.rb:66). */
   protected visitArelNodesNotRegexp(o: Nodes.NotRegexp): void {
     this.visitRegexp(o);
   }
@@ -173,15 +142,12 @@ export class Dot extends Visitor {
     this.visitEdge(o, "name");
   }
 
-  /** Aliased to CurrentRow / Distinct in dispatch (Rails: `alias`). */
   protected visitNoEdges(_o: Nodes.Node): void {}
 
-  /** Rails: `alias :visit_Arel_Nodes_CurrentRow :visit__no_edges` (dot.rb:104). */
   protected visitArelNodesCurrentRow(o: Nodes.Node): void {
     this.visitNoEdges(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_Distinct :visit__no_edges` (dot.rb:105). */
   protected visitArelNodesDistinct(o: Nodes.Node): void {
     this.visitNoEdges(o);
   }
@@ -265,37 +231,24 @@ export class Dot extends Visitor {
     this.visitEdge(o, "name");
   }
 
-  /** Aliased to And / Or / With in dispatch (Rails: `alias`). */
   protected visitChildren(o: { children: ReadonlyArray<unknown> }): void {
     o.children.forEach((child, i) => {
       this.edge(String(i), () => this.visit(child));
     });
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_And :visit__children` (dot.rb:193). */
   protected visitArelNodesAnd(o: { children: ReadonlyArray<unknown> }): void {
     this.visitChildren(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_Or :visit__children` (dot.rb:194). */
   protected visitArelNodesOr(o: { children: ReadonlyArray<unknown> }): void {
     this.visitChildren(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_With :visit__children` (dot.rb:195). */
   protected visitArelNodesWith(o: { children: ReadonlyArray<unknown> }): void {
     this.visitChildren(o);
   }
 
-  /**
-   * Aliased to String / Time / Date / Integer / etc. — stash the value as a
-   * side-field on the current node. Rails' `visit_Arel_Nodes_SqlLiteral` is
-   * an alias of `visit_String` and works because `SqlLiteral < String` in
-   * Ruby; Trails wraps the string in `node.value`, so we unwrap here.
-   *
-   * `null`/`undefined` render as `""` to match Rails' `nil.to_s` ("") that
-   * `to_dot`'s `quote field` produces — not JS's `String(null)` ("null").
-   */
   protected visitString(o: unknown): void {
     const top = this.nodeStack[this.nodeStack.length - 1];
     if (!top) return;
@@ -303,62 +256,46 @@ export class Dot extends Visitor {
     top.fields.push(value == null ? "" : String(value));
   }
 
-  // Rails aliases `visit_String` to every primitive leaf (dot.rb:199-208).
-  // The runtime never dispatches on raw JS primitives — `visit()` routes
-  // them through `visitString` directly — but the names exist so the AST is
-  // documented to stash each as a side-field, matching Rails' shape.
-
-  /** Rails: `alias :visit_Time :visit_String` (dot.rb:200). */
   protected visitTime(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Date :visit_String` (dot.rb:201). */
   protected visitDate(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_DateTime :visit_String` (dot.rb:202). */
   protected visitDateTime(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_NilClass :visit_String` (dot.rb:203). */
   protected visitNilClass(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_TrueClass :visit_String` (dot.rb:204). */
   protected visitTrueClass(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_FalseClass :visit_String` (dot.rb:205). */
   protected visitFalseClass(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Integer :visit_String` (dot.rb:206). */
   protected visitInteger(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_BigDecimal :visit_String` (dot.rb:207). */
   protected visitBigDecimal(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Float :visit_String` (dot.rb:208). */
   protected visitFloat(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Symbol :visit_String` (dot.rb:209). */
   protected visitSymbol(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_SqlLiteral :visit_String` (dot.rb:210). */
   protected visitArelNodesSqlLiteral(o: Nodes.SqlLiteral): void {
     this.visitString(o);
   }
@@ -371,12 +308,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "valueBeforeTypeCast");
   }
 
-  /**
-   * Mirrors Rails: `visit_Hash` (dot.rb:227). The outer edge label is
-   * `pair_#{i}`; the inner `visit pair` dispatches to `visit_Array` so
-   * each key and value becomes a child node under the pair, preserving
-   * both halves of the entry in the graph.
-   */
   protected visitHash(o: Record<string, unknown>): void {
     Object.entries(o).forEach((pair, i) => {
       this.edge(`pair_${i}`, () => this.visit(pair));
@@ -389,7 +320,6 @@ export class Dot extends Visitor {
     });
   }
 
-  /** Rails: `alias :visit_Set :visit_Array` (dot.rb:231). */
   protected visitSet(o: ReadonlySet<unknown>): void {
     this.visitArray([...o]);
   }
@@ -404,13 +334,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "default");
   }
 
-  /**
-   * Mirrors Rails' Dot#visit_edge — descend into a named field. Rails uses
-   * `o.send(method)`, which raises `NoMethodError` on a typo; we mirror
-   * that by checking the property exists (allowing `null`/`undefined` when
-   * the field is declared but unset). A typo'd field would otherwise
-   * silently emit a NilClass leaf and obscure the visitor bug.
-   */
   protected visitEdge(o: object, method: string): void {
     if (!(method in o)) {
       const klass = (o as { constructor?: { name?: string } }).constructor?.name ?? "Object";
@@ -420,28 +343,7 @@ export class Dot extends Visitor {
     this.edge(method, () => this.visit((o as Record<string, unknown>)[method]));
   }
 
-  /**
-   * Mirrors Rails' Dot#visit. Reuses an already-emitted node (sets the
-   * incoming edge's `to` to the seen node) and recurses through
-   * super.visit (the dispatch table) to fire the per-class handler.
-   */
   protected override visit(object: unknown, _collector?: unknown): unknown {
-    // Rails keys @seen by `object_id` — preserves per-instance identity
-    // for heap objects (two `String.new("foo")` get distinct entries) but
-    // dedupes Ruby singletons (nil / true / false / Symbols / small
-    // Integers / Floats / Bignums all share a stable object_id).
-    //
-    // JS Map's primitive equality is value-based, which would falsely
-    // collapse two Tables that share a `name` string. Memoize:
-    //   - reference-typed values, by reference identity;
-    //   - null/undefined, collapsed onto NIL_SENTINEL so a single
-    //     NilClass node represents Rails' nil singleton;
-    //   - booleans / numbers / bigints / symbols, via typed-prefix keys
-    //     so repeated equal scalar edges (e.g. Regexp#caseSensitive) reuse
-    //     one Node the way Rails does;
-    //   - strings are explicitly excluded — they DON'T dedupe in Ruby
-    //     (each String.new gets its own object_id), and a value-based
-    //     dedupe would wrongly collapse same-named Tables.
     const seenKey: unknown = (() => {
       if (object === null || object === undefined) return Dot.NIL_SENTINEL;
       const t = typeof object;
@@ -467,29 +369,17 @@ export class Dot extends Visitor {
       }
     }
 
-    // Mirrors Rails' Dot#visit: every value (including primitives) gets a
-    // Node entry whose `name` is the value's class. visit_String / visit_Hash
-    // / visit_Array then mutate the new node's fields/edges.
     const node = new Node(this.classNameOf(object), this.nextId++);
     if (seenKey !== undefined) {
       this.seen.set(seenKey, node);
     }
     this.nodes.push(node);
     this.withNode(node, () => {
-      // visitor.rb:39 — no ancestor answered the dispatch. Since #5002,
-      // Visitor#visit's no-handler arm already throws Ruby's
-      // `TypeError, "Cannot visit <Class>"` directly, so it propagates
-      // unchanged. A class whose own dispatch entry names a missing method
-      // no longer raises here either: Visitor#visit falls through to an
-      // ancestor's handler (respond_to? check, visitor.rb:36-37).
-      // UnsupportedVisitError is unreachable: Dot registers no
-      // `unsupported`-aliased handler, so no super.visit path produces it.
       super.visit(object);
     });
     return undefined;
   }
 
-  /** Mirrors Rails' Dot#edge — push edge, run block, pop. */
   protected edge(name: string, block: () => void): void {
     const edge = new Edge(name, this.nodeStack[this.nodeStack.length - 1]);
     this.edgeStack.push(edge);
@@ -501,7 +391,6 @@ export class Dot extends Visitor {
     }
   }
 
-  /** Mirrors Rails' Dot#with_node — link incoming edge then push node. */
   protected withNode(node: Node, block: () => void): void {
     const e = this.edgeStack[this.edgeStack.length - 1];
     if (e) e.to = node;
@@ -513,16 +402,10 @@ export class Dot extends Visitor {
     }
   }
 
-  /** Mirrors Rails' Dot#quote — escape `"` for inclusion in a label. */
   protected quote(string: unknown): string {
     return String(string).replace(/"/g, '\\"');
   }
 
-  /**
-   * Mirrors Rails' Dot#to_dot — emits the digraph header, one
-   * `id [label="..."]` line per node, then one `from -> to [label="..."]`
-   * line per edge.
-   */
   protected toDot(): string {
     const header = 'digraph "Arel" {\nnode [width=0.375,height=0.25,shape=record];';
     const nodeLines = this.nodes.map((n) => {
@@ -541,37 +424,15 @@ export class Dot extends Visitor {
     return [header, ...nodeLines, ...edgeLines, "}"].join("\n");
   }
 
-  /** Convenience entry that returns the dot string directly. */
   compile(node: Nodes.Node): string {
     return this.accept(node).value;
   }
 
-  /**
-   * Trails' Exists is a standalone Node with `expressions: Node` (single)
-   * and `alias` — not a Function subclass like Rails. Walk only the two
-   * fields it actually has; the generic visitArelNodesFunction would emit
-   * a `distinct` edge that doesn't exist on this node.
-   */
   protected visitArelNodesExists(o: Nodes.Exists): void {
     this.visitEdge(o, "expressions");
     this.visitEdge(o, "alias");
   }
 
-  /**
-   * Rails: `o.class.name`. We use the JS ctor name for objects and emit
-   * Rails-style class names for primitives and nil values — `String`,
-   * `Integer`, `Float`, `TrueClass`, `FalseClass`, `NilClass`, `Symbol`,
-   * `Time` — so leaf nodes match Rails' shape.
-   *
-   * Values matching the Hash analogue (see isHashAnalogue) are named `Hash` rather
-   * than JS's ctor name `Object`. Rails labels the node `o.class.name`
-   * (dot.rb:253), so a *named* Hash subclass would be "MyHash" — but no
-   * value reaching this arm can supply such a name: isHashAnalogue admits only
-   * object literals, `Object.create(null)`, and records derived from those,
-   * every one of which reports a ctor name of `Object`. Class instances,
-   * the only objects with a distinct ctor name, are Ruby's `Config < Object`
-   * and never route here. So "Hash" is the whole of the analogue's range.
-   */
   private classNameOf(o: unknown): string {
     if (o === null) return "NilClass";
     if (o === undefined) return "NilClass";
@@ -588,17 +449,10 @@ export class Dot extends Visitor {
     return ctor?.name ?? "Object";
   }
 
-  /**
-   * Seeds this visitor's dispatch cache. Called once, lazily, the first time
-   * the cache is built — see the note in `Visitor.dispatchCache`.
-   *
-   * @internal
-   */
+  /** @internal */
   static registerDispatch(): void {
     const reg = (ctor: NodeCtor, m: string) => Dot.dispatchCache().set(ctor, m);
     reg(Nodes.Function, "visitArelNodesFunction");
-    // Each aggregate has its own Rails alias chain; Trails dispatches them
-    // explicitly to keep the Rails-named helper visible.
     reg(Nodes.Sum, "visitArelNodesFunction");
     reg(Nodes.Max, "visitArelNodesFunction");
     reg(Nodes.Min, "visitArelNodesFunction");
@@ -637,10 +491,6 @@ export class Dot extends Visitor {
     reg(Nodes.BindParam, "visitArelNodesBindParam");
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.Case, "visitArelNodesCase");
-    // Non-Arel classes Rails dispatches on too: `visit_ActiveModel_Attribute`
-    // (dot.rb:216) and `alias :visit_Set :visit_Array` (dot.rb:231). Neither
-    // has a Ruby-class name `rubyClassName` can synthesize, so both go in the
-    // ctor-keyed table (the prototype walk covers Attribute subclasses).
     reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Set, "visitSet");
     reg(Nodes.Quoted, "visitNoEdges");

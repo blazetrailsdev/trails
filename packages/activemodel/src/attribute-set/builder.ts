@@ -20,16 +20,6 @@ export class Builder {
   }
 }
 
-/**
- * Mirrors: ActiveModel::LazyAttributeSet
- *
- * Rails' `types` here is `attribute_types`, a Hash whose `default` is
- * `Type.default_value` (attribute_registration.rb:37-41), so
- * `additional_types.fetch(name, types[name])` still resolves a type for a name
- * the model does not declare — an extra/computed select column. A JS `Map` has
- * no such default, so it is applied at each of those lookups here and in
- * {@link LazyAttributeHash}.
- */
 export class LazyAttributeSet extends AttributeSet {
   private values: Record<string, unknown>;
   private types: Map<string, Type>;
@@ -73,8 +63,6 @@ export class LazyAttributeSet extends AttributeSet {
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = this._attributes.get(name);
     if (attr) {
-      // builder.rb:43 `attr.value(&block)`. trails' `Attribute#value` is a getter,
-      // so `Uninitialized#value`'s yield-the-name arm lives at the call site.
       if (block !== undefined && attr instanceof Uninitialized) return block(name);
       return attr.value;
     }
@@ -110,13 +98,6 @@ export class LazyAttributeSet extends AttributeSet {
     return this._attributes;
   }
 
-  /**
-   * Mirrors `LazyAttributeSet#default_attribute` (builder.rb:69-88). Ruby
-   * defaults `value` to `values.fetch(name) { value_present = false }`,
-   * evaluated only when the caller omits it, and `Attribute#initialize` keeps
-   * its computed-value slot empty when the 4th argument is nil
-   * (attribute.rb:37) — hence the two guards below.
-   */
   protected override defaultAttribute(
     name: string,
     valuePresent?: boolean,
@@ -148,11 +129,6 @@ export class LazyAttributeSet extends AttributeSet {
   }
 }
 
-/**
- * Lazy hash of attribute objects, materializes on demand.
- *
- * Mirrors: ActiveModel::LazyAttributeHash
- */
 export class LazyAttributeHash {
   private delegate: Map<string, Attribute>;
   private types: Map<string, Type>;
@@ -161,35 +137,16 @@ export class LazyAttributeHash {
   private defaultAttributes: Map<string, Attribute>;
   private materialized: boolean;
 
-  /**
-   * Return a new map applying `fn` to each materialized Attribute.
-   *
-   * Mirrors: `delegate :transform_values, to: :materialize` — Hash#transform_values
-   * (generic over the block result, e.g. `attributes.transform_values(&:type)`).
-   */
   transformValues<T>(fn: (attr: Attribute) => T): Map<string, T> {
     const result = new Map<string, T>();
     for (const [name, attr] of this.materialize()) result.set(name, fn(attr));
     return result;
   }
 
-  /**
-   * Yield each materialized Attribute value.
-   *
-   * Mirrors: `delegate :each_value, to: :materialize` — Hash#each_value.
-   */
   eachValue(fn: (attr: Attribute) => void): void {
     for (const attr of this.materialize().values()) fn(attr);
   }
 
-  /**
-   * Fetch the materialized Attribute under `name`. Mirrors Ruby `Hash#fetch`:
-   * with a block (function) the block result is the fallback; with a plain
-   * default value that value is returned; with neither, an absent key throws
-   * KeyError.
-   *
-   * Mirrors: `delegate :fetch, to: :materialize`.
-   */
   fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
     const materialized = this.materialize();
     const attr = materialized.get(name);
@@ -201,11 +158,6 @@ export class LazyAttributeHash {
     throw err;
   }
 
-  /**
-   * Return a copy of the materialized hash with `names` removed.
-   *
-   * Mirrors: `delegate :except, to: :materialize` — Hash#except.
-   */
   except(...names: string[]): Map<string, Attribute> {
     const drop = new Set(names);
     const result = new Map<string, Attribute>();
@@ -230,26 +182,18 @@ export class LazyAttributeHash {
     this.delegate = delegateHash;
   }
 
-  /** Mirrors: `def key?(key)` (builder.rb:106-108). */
   isKey(key: string): boolean {
     return this.delegate.has(key) || Object.hasOwn(this.values, key) || this.types.has(key);
   }
 
-  /** Mirrors: `def [](key)` (builder.rb:110-112). */
   getAttribute(key: string): Attribute {
     return this.delegate.get(key) ?? this.assignDefaultValue(key);
   }
 
-  /** Mirrors: `def []=(key, value)` (builder.rb:114-116). */
   set(key: string, value: Attribute): void {
     this.delegate.set(key, value);
   }
 
-  /**
-   * Mirrors: `def deep_dup` (builder.rb:118-122) — `dup` (which copies the
-   * delegate hash, builder.rb:124-127) with every entry replaced by its own
-   * `Attribute#dup`. `types`/`values` stay shared, as Ruby's shallow `dup` does.
-   */
   deepDup(): LazyAttributeHash {
     const delegateHash = new Map<string, Attribute>();
     for (const [name, attr] of this.delegate) delegateHash.set(name, attr.dup());
@@ -262,11 +206,6 @@ export class LazyAttributeHash {
     );
   }
 
-  /**
-   * Mirrors: LazyAttributeHash#each_key (builder.rb:129-132) — unions
-   * `types | values | delegate_hash` and yields every key. Unlike `keys`, it
-   * does not drop uninitialized attributes.
-   */
   eachKey(fn: (key: string) => void): void {
     const keys = new Set([
       ...this.types.keys(),
@@ -298,15 +237,7 @@ export class LazyAttributeHash {
     return new LazyAttributeHash(data[0], data[1], data[2], data[3], data[4]);
   }
 
-  /**
-   * Force every value/type key into the delegate hash and return it.
-   *
-   * Mirrors: LazyAttributeHash#materialize (protected) — `values.each_key`
-   * and `types.each_key` resolve through `self[key]`, then `delegate_hash`
-   * is returned.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   protected materialize(): Map<string, Attribute> {
     if (!this.materialized) {
       for (const key of Object.keys(this.values)) this.getAttribute(key);
@@ -318,18 +249,12 @@ export class LazyAttributeHash {
     return this.delegate;
   }
 
-  /** @internal Rails-private helper. Mirrors: LazyAttributeHash#delegate_hash (attr_reader) */
+  /** @internal */
   delegateHash(): Map<string, Attribute> {
     return this.delegate;
   }
 
-  /**
-   * @internal Rails-private helper. Mirrors: `def assign_default_value(name)`
-   * (builder.rb:165-180). Ruby's implicit `nil` when `name` is in neither table
-   * is `Attribute.null(name)` here, the null object `AttributeSet#default_attribute`
-   * (attribute_set.rb:114-116) returns for the same case — `[]` is typed to an
-   * Attribute, and TS has no nil that answers `value`.
-   */
+  /** @internal */
   assignDefaultValue(name: string): Attribute {
     const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
     let valuePresent = true;

@@ -2,11 +2,6 @@ import { Node } from "./node.js";
 import { Binary, type NodeOrValue } from "./binary.js";
 import { buildQuoted } from "./casted.js";
 
-/**
- * Represents a custom infix operation: left OP right.
- *
- * Mirrors: Arel::Nodes::InfixOperation
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InfixOperation extends Binary {
   readonly operator: string;
@@ -20,53 +15,42 @@ export class InfixOperation extends Binary {
     this.right = right;
   }
 
-  /**
-   * Mirrors: Arel::Predications#quoted_node. No type-cast context on an
-   * InfixOperation — fall through to a plain Quoted wrap.
-   *
-   * @internal
-   */
+  /** @internal */
   quotedNode(other: unknown): Node {
     return buildQuoted(other, this);
   }
 }
 
-/** Bitwise AND: left & right */
 export class BitwiseAnd extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("&", left, right);
   }
 }
 
-/** Bitwise OR: left | right */
 export class BitwiseOr extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("|", left, right);
   }
 }
 
-/** Bitwise XOR: left ^ right */
 export class BitwiseXor extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("^", left, right);
   }
 }
 
-/** Bitwise Shift Left: left << right */
 export class BitwiseShiftLeft extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("<<", left, right);
   }
 }
 
-/** Bitwise Shift Right: left >> right */
 export class BitwiseShiftRight extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super(">>", left, right);
   }
 }
 
-/** Math operations — these live here to match Rails infix_operation.rb */
 export class Addition extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("+", left, right);
@@ -91,21 +75,18 @@ export class Division extends InfixOperation {
   }
 }
 
-/** String concatenation: left || right */
 export class Concat extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("||", left, right);
   }
 }
 
-/** PostgreSQL @> contains operator */
 export class Contains extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("@>", left, right);
   }
 }
 
-/** PostgreSQL && overlaps operator */
 export class Overlaps extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("&&", left, right);

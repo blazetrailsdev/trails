@@ -7,13 +7,6 @@ import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 
-/**
- * Rails' `DirtyModel` (attributes_dirty_test.rb:6-21) is built with no
- * attributes and assigned test-by-test. Each fixture here seeds through the
- * constructor instead, which IS a dirtying `FromUser` write
- * (dirty.rb:382-388 → attribute.rb:139-141), so it takes that seeding as its
- * baseline with `changes_applied` (dirty.rb:271-278).
- */
 describe("AttributesDirtyTest", () => {
   it("changing the attribute reports a change only when the cast value changes", () => {
     class Person extends Model {

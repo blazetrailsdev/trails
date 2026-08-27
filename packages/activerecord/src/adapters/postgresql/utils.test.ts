@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/utils_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { PgName, extractSchemaQualifiedName } from "./utils.js";
@@ -49,8 +46,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         '"schema"."table_name"': ["schema", "table_name"],
         '"even spaces".table': ["even spaces", "table"],
         'schema."table.name"': ["schema", "table.name"],
-        // Rails `schema, table = string.scan(...)` keeps only the first two
-        // scanned parts; a 3+ dotted input retains schema + table, not table only.
         "database.schema.table": ["database", "schema"],
       };
       for (const [given, [expectedSchema, expectedName]] of Object.entries(cases)) {

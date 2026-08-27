@@ -5,7 +5,6 @@ import { AttributeSet } from "./attribute-set.js";
 function cloneValue(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
   // boundary: Date is mutable — clone to protect dirty tracking when a legacy
-  // caller hands in a Date attribute value. Temporal types are immutable.
   if (value instanceof Date) return new Date(value.getTime());
   if (
     value instanceof Temporal.Instant ||
@@ -32,12 +31,6 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
-/**
- * Tracks attribute mutations by comparing current Attribute state
- * against original values.
- *
- * Mirrors: ActiveModel::AttributeMutationTracker
- */
 export class AttributeMutationTracker {
   protected attributes: AttributeSet;
   protected forcedChanges: Map<string, unknown> = new Map();
@@ -111,10 +104,6 @@ export class AttributeMutationTracker {
   }
 
   forceChange(attrName: string): unknown {
-    // Intentionally store the live value (no clone) to match Rails:
-    // in-place mutations after forceChange must surface via dirty tracking.
-    // Ruby's assignment expression is the method's value, which
-    // `attribute_will_change!` (dirty.rb:409-411) hands back to its caller.
     const value = this.fetchValue(attrName);
     this.forcedChanges.set(attrName, value);
     return value;
@@ -139,30 +128,14 @@ export class AttributeMutationTracker {
   }
 }
 
-/**
- * The object Rails hands `ForcedMutationTracker` — the model itself, not an
- * `AttributeSet` (dirty.rb:385), read through `_read_attribute`
- * (attribute_mutation_tracker.rb:140-142).
- */
 export interface ForcedMutationTrackerHost {
   /** @internal */
   _readAttribute(attrName: string): unknown;
 }
 
-/**
- * Tracks forced mutations only — used during persistence callbacks.
- *
- * Mirrors: ActiveModel::ForcedMutationTracker
- */
 export class ForcedMutationTracker extends AttributeMutationTracker {
   private finalizedChanges: Record<string, [unknown, unknown]> | null = null;
 
-  /**
-   * Ruby stores the model in the inherited `@attributes` slot (dirty.rb:385).
-   * TypeScript cannot retype an inherited field, so the widening happens once
-   * here: every base member that reads `attributes` as an `AttributeSet` is
-   * overridden below, `fetchValue` included.
-   */
   constructor(attributes: ForcedMutationTrackerHost) {
     super(attributes as unknown as AttributeSet);
   }
@@ -219,13 +192,7 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 }
 
-/**
- * Null object pattern — always reports no changes.
- *
- * Mirrors: ActiveModel::NullMutationTracker
- */
 export class NullMutationTracker {
-  /** Mirrors Ruby's `include Singleton` (attribute_mutation_tracker.rb:157). */
   static readonly instance = new NullMutationTracker();
 
   changedAttributeNames(): string[] {

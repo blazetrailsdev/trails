@@ -9,7 +9,6 @@ describe("AttributeTest", () => {
   const users = new Table("users");
   const visitor = new Visitors.ToSql(fakeRecordConnection);
 
-  // Mirrors Rails' private `quoted_range` (attribute_test.rb:1163-1169).
   function quotedRange(beginVal: unknown, endVal: unknown, exclude: boolean) {
     return {
       begin: new Nodes.Quoted(beginVal),
@@ -18,7 +17,6 @@ describe("AttributeTest", () => {
     };
   }
 
-  // Mimic PG::TextDecoder::Array casting (attribute_test.rb:1171-1181).
   function fakePgCaster() {
     return {
       typeCastForDatabase(attrName: string, value: unknown) {
@@ -124,8 +122,6 @@ describe("AttributeTest", () => {
       mgr.where(relation.get("name").gt("fake_name"));
       expect(mgr.toSql()).toMatch(`"users"."name" > 'fake_name'`);
 
-      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
-      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
       const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
       mgr.where(relation.get("created_at").gt(currentTime));
       expect(mgr.toSql()).toMatch(`"users"."created_at" > '2024-01-01 00:00:00 +0000'`);
@@ -183,8 +179,6 @@ describe("AttributeTest", () => {
       mgr.where(relation.get("name").gteq("fake_name"));
       expect(mgr.toSql()).toMatch(`"users"."name" >= 'fake_name'`);
 
-      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
-      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
       const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
       mgr.where(relation.get("created_at").gteq(currentTime));
       expect(mgr.toSql()).toMatch(`"users"."created_at" >= '2024-01-01 00:00:00 +0000'`);
@@ -242,8 +236,6 @@ describe("AttributeTest", () => {
       mgr.where(relation.get("name").lt("fake_name"));
       expect(mgr.toSql()).toMatch(`"users"."name" < 'fake_name'`);
 
-      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
-      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
       const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
       mgr.where(relation.get("created_at").lt(currentTime));
       expect(mgr.toSql()).toMatch(`"users"."created_at" < '2024-01-01 00:00:00 +0000'`);
@@ -301,8 +293,6 @@ describe("AttributeTest", () => {
       mgr.where(relation.get("name").lteq("fake_name"));
       expect(mgr.toSql()).toMatch(`"users"."name" <= 'fake_name'`);
 
-      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
-      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
       const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
       mgr.where(relation.get("created_at").lteq(currentTime));
       expect(mgr.toSql()).toMatch(`"users"."created_at" <= '2024-01-01 00:00:00 +0000'`);

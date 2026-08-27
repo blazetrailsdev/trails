@@ -5,12 +5,6 @@ import { Base } from "../base.js";
 import { connect, restoreWorkerConnection, testConfigurationHashes } from "./connection.js";
 import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "./config.js";
 
-// Only the cases asserting `connect`'s own side effects call it; everything
-// that merely checks which entry `ARCONN` resolves to uses
-// `testConfigurationHashes`, which is the resolver alone. `connect` mirrors
-// `ARTest.connect` and so establishes the primary pool (`connection.rb:31-33`),
-// and a resolver assertion has no business opening one for a backend this
-// worker is not running against.
 describe("connect", () => {
   const originalConfigurations = Base.configurations();
 
@@ -21,11 +15,6 @@ describe("connect", () => {
     await Base.removeConnection();
     Base._adapter = null;
     vi.unstubAllEnvs();
-    // `connect()` establishes BOTH worker pools from whatever ARCONN this case
-    // stubbed (`connection.rb:32-33`), displacing the worker's own same-named
-    // pools for every later file in the vitest worker — invisible on the sqlite
-    // lane, a different database on the others. `restoreWorkerConnection()`
-    // covers both.
     await restoreWorkerConnection();
   });
 
@@ -71,10 +60,6 @@ describe("connect", () => {
   });
 
   it("turns prepared statements on for mysql2 when MYSQL_PREPARED_STATEMENTS is set", async () => {
-    // config.example.yml:7-11,27-31 — the var flips arunit and arunit2 only;
-    // the third entry carries no prepared_statements key on mysql2, so it
-    // falls back to Mysql2Adapter#default_prepared_statements
-    // (mysql2_adapter.rb:186-188), which is false.
     vi.stubEnv("ARCONN", "mysql2");
     vi.stubEnv("MYSQL_PREPARED_STATEMENTS", undefined);
     const off = (await testConfigurationHashes()).configurationHashes;
@@ -139,14 +124,6 @@ describe("connect", () => {
     expect(envConfig.pool).toBe(5);
   });
 
-  // `config.example.yml:88-90` spells the second sqlite file out rather than
-  // deriving it, and `expand_config` fills a `database` in only when the entry
-  // carries none (`support/config.rb:30-36`). The third entry carries none on
-  // every lane, and Rails defaults it to `activerecord_unittest` — the same
-  // name `arunit` defaults to (`support/config.rb:28-29`), i.e. the same
-  // database. `expandConfig` keeps that identity by pointing it at whatever
-  // `arunit` resolved to, because trails' `arunit` name is worker-scoped where
-  // Rails' is a constant.
   it("names the configured second database on the sqlite3 arunit2 entry", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
@@ -175,9 +152,6 @@ describe("connect", () => {
     expect(envConfig.database).toBe("/tmp/ar-test-worker.sqlite3");
   });
 
-  // `config.example.yml:93-99` carries `adapter` and `database` alone, so the
-  // built hash must too — no `pool:`, and therefore Rails' default pool size,
-  // the same one the file-backed lane above inherits.
   it("builds the sqlite3_mem entries from adapter and database alone", async () => {
     vi.stubEnv("ARCONN", "sqlite3_mem");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
@@ -207,10 +181,6 @@ describe("connect", () => {
     await expect(testConfigurationHashes()).rejects.toThrow(/Connection "oracle" not found/);
   });
 
-  // The adapter-name guard (`connection.rb:35-37`) used to be tripped by a
-  // missing `*_TEST_URL`. Sub-settings always carry defaults, so there is no
-  // absent-details state left to trip it; what it now asserts is the structural
-  // invariant over the connections table, exercised here for every entry.
   it.each(["sqlite3", "sqlite3_mem", "postgresql", "mysql2"])(
     "builds an adapter whose name is contained in the connection name (%s)",
     async (name) => {

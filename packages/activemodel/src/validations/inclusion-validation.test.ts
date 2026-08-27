@@ -87,8 +87,6 @@ describe("InclusionValidationTest", () => {
   });
 
   it("validates inclusion of with allow nil", async () => {
-    // Mirrors Rails inclusion_validation_test.rb:100-106 — allow_nil: true
-    // skips nil; non-nil values still validate against the set.
     class Person extends Model {
       static {
         this.attribute("karma", "string");
@@ -221,8 +219,6 @@ describe("InclusionValidationTest", () => {
 });
 describe("inclusion allowNil", () => {
   it("validates inclusion of with allow nil", async () => {
-    // Mirrors Rails inclusion_validation_test.rb#test_validates_inclusion_of_with_allow_nil
-    // which sets `allow_nil: true` explicitly.
     class WithNil extends Model {
       static {
         this.attribute("status", "string");

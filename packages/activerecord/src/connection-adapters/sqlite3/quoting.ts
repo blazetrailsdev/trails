@@ -42,20 +42,9 @@ export function unquotedFalse(): number {
   return 0;
 }
 
-/**
- * Mirrors: SQLite3::Quoting::QUOTED_COLUMN_NAMES / QUOTED_TABLE_NAMES
- * (sqlite3/quoting.rb:9-10) — the `Concurrent::Map`s the class-side quoters memoize
- * through. Keyed on the name exactly as passed, as in Ruby (sqlite3/quoting.rb:44-50).
- */
 const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
 const QUOTED_TABLE_NAMES = new Map<unknown, string>();
 
-/**
- * Mirrors: SQLite3::Quoting#quote_table_name (sqlite3/quoting.rb:48-50) —
- * `%Q("#{name.to_s.gsub('"', '""').gsub(".", "\".\"")}")`. The whole name is
- * wrapped in double quotes with `.` rewritten as `"."` so `foo.bar` →
- * `"foo"."bar"`.
- */
 export function quoteTableName(name: unknown): string {
   let quoted = QUOTED_TABLE_NAMES.get(name);
   if (quoted === undefined) {
@@ -74,35 +63,11 @@ export function quoteColumnName(name: unknown): string {
   return quoted;
 }
 
-/**
- * Mirrors: Quoting#quote_string — SQLite3 has no override, so this is the
- * abstract contract (abstract/quoting.rb:131-133) minus the backslash arm:
- * SQLite treats a backslash as an ordinary character, so only `'` is doubled.
- * **Escape-only** — `quote` adds the surrounding quotes (rb:75-76).
- *
- * @missingRailsCall quote — PERMANENT: sqlite3/quoting.rb's `quote_string`
- *   delegates to the driver's `::SQLite3::Database.quote`; better-sqlite3, the
- *   trails driver, exposes no such entry point at all, so the port applies that
- *   driver method's own `''`-doubling rule inline.
- */
+/** @missingRailsCall quote — PERMANENT */
 export function quoteString(value: string): string {
   return value.replace(/'/g, "''");
 }
 
-/**
- * Mirrors: SQLite3::Quoting#quote. Rails only special-cases non-finite
- * Numerics (`"'#{value}'"`) and otherwise calls `super`, letting the abstract
- * quoter dispatch date/time literals back through `self.quoted_time` /
- * `self.quoted_date` — which SQLite overrides to keep a `2000-01-01` prefix on
- * times. We thread `this` (the adapter) so that dispatch lands on SQLite's
- * `quotedTime`. A host receiver is required — every invocation routes through
- * an adapter via `.call(this, value)`.
- *
- * Strings, symbols
- * and booleans have no arm here, exactly as in Rails: they ride the inherited
- * abstract branches, which self-dispatch `quote_string` / `quoted_true` /
- * `quoted_false` (rb:75-78) back onto SQLite's overrides.
- */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" && !Number.isFinite(value)) return `'${String(value)}'`;
   return abstractQuote.call(this, value);
@@ -113,11 +78,8 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
 }
 
 /**
- * Identical to the abstract quoter — SQLite3 overrides only `quoted_time`
- * (sqlite3/quoting.rb:74) and inherits `quoted_date` — so the redeclaration
- * exists only to give the inherited dispatch a `self.quoted_date` to land on.
  * @internal
- * @noRailsEquivalent CONVERGEABLE SQLite3 inherits Quoting#quoted_date (abstract/quoting.rb:184) and overrides only `quoted_time` (sqlite3/quoting.rb:74); this redeclares it so the inherited dispatch has a receiver-local method to land on.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function quotedDate(
   value:
@@ -131,16 +93,6 @@ export function quotedDate(
   return abstractQuotedDate(value);
 }
 
-/**
- * Mirrors: SQLite3::Quoting#quoted_time —
- * `value.change(year: 2000, ...); quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "2000-01-01 ")`.
- * Unlike the abstract `quoted_time` (which strips the date to a bare
- * `HH:MM:SS`), SQLite normalises the date to 2000-01-01, routes through
- * `quoted_date`, then re-prefixes — so SQLite can round-trip times as datetime
- * strings. Returns the bare literal (no surrounding quotes); the inherited
- * `quote` wraps it. A `Type::Time::Value` is unwrapped in `default_timezone`
- * first, as the abstract `quotedTime` does.
- */
 export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
     value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
@@ -163,9 +115,6 @@ export function quotedTime(value: QuotedTimeValue): string {
 }
 
 export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {
-  // Rails' signature is `quoted_binary(value)` taking the Type::Binary::Data
-  // itself (`value.hex`, sqlite3/quoting.rb:79). Accept it alongside the raw
-  // views our `quote` unwraps to, so the Rails-shaped call works too.
   const bytes = toBytes(value);
   if (!bytes) {
     throw new TypeError(
@@ -185,10 +134,6 @@ export function quoteDefaultExpression(
   value: unknown,
   column: { sqlType?: string | null },
 ): string {
-  // Rails' Proc arm (`sqlite3/quoting.rb:100-105`): call the Proc, and wrap a
-  // bare function call in parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`).
-  // In Ruby `SqlLiteral < String`, so a SqlLiteral result runs through the same
-  // `match?` regex — unwrap it rather than special-casing it.
   if (typeof value === "function") {
     const result = (value as () => unknown)();
     const str = typeof result === "string" ? result : isSqlLiteral(result) ? result.value : null;
@@ -199,66 +144,20 @@ export function quoteDefaultExpression(
     }
     return /^\w+\(.*\)$/.test(str) ? `(${str})` : str;
   }
-  // Rails: `else super` (`sqlite3/quoting.rb:107`) — the abstract body, which
-  // serializes through the column's cast type (`abstract/quoting.rb:161`) before
-  // quoting. `quote` is self-sent there, so binary / date / time defaults still
-  // reach SQLite's own quotedBinary / quotedDate overrides via this receiver.
   return abstractQuoteDefaultExpression.call(this, value, column);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {
   if (value === null || value === undefined) return null;
-  // Rails routes booleans through `type_cast` to `unquoted_true` /
-  // `unquoted_false`, which SQLite defines as the Ruby Integers `1` / `0`
-  // (sqlite3/quoting.rb) — so they bind as SQLITE_INTEGER just like any other
-  // integer. Return BigInt so better-sqlite3 binds INTEGER rather than FLOAT;
-  // otherwise `LOWER(?)` on a boolean bind would serialize `1.0` / `0.0` and a
-  // `case_sensitive: false` uniqueness check on a boolean column would miss
-  // collisions (the same divergence the integer branch below fixes).
-  // Self-dispatched (rb:98-99) so the pair resolves through SQLite's
-  // `unquotedTrue`/`unquotedFalse` overrides. The BigInt wrapper is why this arm
-  // cannot simply delegate to the abstract `type_cast`: it must stay here.
   if (typeof value === "boolean") return BigInt(value ? this.unquotedTrue() : this.unquotedFalse());
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null;
-    // better-sqlite3 binds every JS number as SQLITE_FLOAT (there is no
-    // integer/float distinction in JS), so an integer-valued number like `1`
-    // binds as `real` and `LOWER(?)` yields `'1.0'`. MRI's sqlite3 gem binds a
-    // Ruby Integer as SQLITE_INTEGER, so `LOWER(1)` yields `'1'`. Handing the
-    // driver a BigInt makes it bind SQLITE_INTEGER, converging the text-forcing
-    // (e.g. `LOWER(col) = LOWER(?)`) path with Rails. Non-integer numbers keep
-    // binding as float.
-    //
-    // MRI keys the INTEGER/FLOAT choice off the Ruby object class (Integer vs
-    // Float) set by the type-cast layer, whereas both arrive here as an
-    // indistinguishable JS number. `_driverBind` recovers the distinction from
-    // the bind's cast type and sets `bindsAsFloat` for Float columns, so
-    // a whole-valued float (e.g. `2.0`) stays a JS number and better-sqlite3
-    // binds it as SQLITE_FLOAT (`typeof(?) => 'real'`, `LOWER(?) => '2.0'`) —
-    // matching MRI's Float → SQLITE_FLOAT dispatch. Absent type info (a bare
-    // number bind), fall back to the value heuristic: whole numbers bind as
-    // SQLITE_INTEGER via BigInt so `LOWER(1)` yields `'1'` like a Ruby Integer.
     if (bindsAsFloat) return value;
     return Number.isInteger(value) ? BigInt(value) : value;
   }
-  // Rails SQLite3::Quoting#type_cast: `when BigDecimal, Rational then value.to_f`
-  // (sqlite3/quoting.rb:114-115) — a float, NOT the abstract adapter's
-  // `value.to_s("F")` string. (quote() still emits the fixed-form string via the
-  // inherited abstract quoter.)
   if (value instanceof BigDecimal) return Number(value.toString("F"));
-  // Rails: `else super` (sqlite3/quoting.rb:122-123). Every remaining arm —
-  // Symbol/`Type::Binary::Data` (rb:95-96), String, the `quoted_time` /
-  // `quoted_date` dispatch (rb:102-104) and the terminal raise (rb:105) — is
-  // inherited from the abstract `type_cast` rather than duplicated here, so a
-  // new abstract arm costs exactly one edit. `this` is threaded so the
-  // self-dispatched arms still land on SQLite's overrides.
   return abstractTypeCast.call(this, value);
 }
-
-// Rails uses recursive regex \g<2> to match nested function calls like
-// COALESCE(a, b) or COUNT(DISTINCT name). JS doesn't support recursive
-// regex patterns, so we use a function-based matcher that walks balanced
-// parentheses to arbitrary depth.
 
 const DANGEROUS_KEYWORDS =
   /\b(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|INTO|FROM|WHERE|EXEC|EXECUTE)\b/i;
@@ -345,7 +244,6 @@ function matchColumnList(s: string, allowOrder: boolean): boolean {
     if (exprEnd === -1) return false;
     i = skipWhitespace(s, exprEnd);
 
-    // optional [AS] alias — Rails: (?:(?:\s+AS)?\s+(?:\w+|"\w+"))?
     {
       const saved = i;
       let hasAs = false;

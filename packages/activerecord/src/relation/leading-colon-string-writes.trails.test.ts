@@ -1,16 +1,3 @@
-/**
- * TS-only regression coverage: a string whose first character is a colon must
- * round-trip verbatim through every write path, before and after the model's
- * attribute types are loaded.
- *
- * `ActiveModel::Type::ImmutableString#serialize`
- * (activemodel/lib/active_model/type/immutable_string.rb:52-58) routes
- * `::Symbol` through `to_s`. A trails Symbol is a `":name"` string, so keying
- * that arm off a leading colon made it fire on ordinary String data too and
- * ate one colon per write — but only once `type_for_attribute` had a real
- * string type to serialize through, which is why the `find_by` below comes
- * first.
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";

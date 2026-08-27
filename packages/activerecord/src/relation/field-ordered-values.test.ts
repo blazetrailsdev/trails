@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/field_ordered_values_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -13,8 +8,6 @@ import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("FieldOrderedValuesTest", () => {
-  // Mirrors Rails `fixtures :posts`. The enum/string/nil book tests destroy_all
-  // and create their own rows, so `books`/`authors` are defined (no fixtures).
   fixtures(["posts"]);
   registerModel(Author);
   registerModel(Book);
@@ -117,8 +110,6 @@ describe("FieldOrderedValuesTest", () => {
     await bob.books.create();
     await anna.books.create();
 
-    // Rails: `books.map { |book| book.author.name }` lazily loads each author.
-    // The trails belongsTo reader is async, so mirror the lazy load explicitly.
     const authorNames = async (rel: any) =>
       Promise.all(
         (await rel.toArray()).map(

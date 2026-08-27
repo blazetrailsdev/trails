@@ -14,8 +14,6 @@ import { Base } from "../../base.js";
 import type { TableDefinitionConn } from "./schema-definitions.js";
 import type { SchemaCreationConn } from "./schema-creation.js";
 
-// Rails hands `TableDefinition#initialize` an `ActiveRecord::Base.lease_connection`
-// (migration/columns_test.rb). Nothing below asserts one dialect's SQL.
 let conn: TableDefinitionConn & SchemaCreationConn;
 
 beforeAll(async () => {
@@ -166,9 +164,6 @@ describe("ReferenceDefinition#add", () => {
     expect(calls[2][3]).toMatchObject({ name: "index_taggings_on_taggable" });
   });
 
-  // `polymorphic_options` forwards `options.slice(:null, :first, :after)`
-  // (schema_definitions.rb:259), so MySQL positioning applies to BOTH halves of
-  // the pair rather than splitting them.
   it("forwards first/after positioning onto the polymorphic type column", async () => {
     const { calls, connection } = recorder();
     await new ReferenceDefinition("taggable", { polymorphic: true, after: "id" }).add(
@@ -364,7 +359,6 @@ describe("IndexDefinition#concise_options", () => {
 describe("IndexDefinition#defined_for?", () => {
   it("falls back to the :column option when positional columns are absent", () => {
     const idx = new IndexDefinition("t", "i", false, ["a"]);
-    // Mirrors Rails: `columns = options[:column] if columns.blank?`
     expect(idx.isDefinedFor(undefined, { column: "a" })).toBe(true);
     expect(idx.isDefinedFor(undefined, { column: "b" })).toBe(false);
   });
@@ -400,7 +394,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 
   it("generically compares remaining option keys with to_s coercion", () => {
-    // Mirrors defined_for?'s `options.all? { ... to_s == to_s }`.
     expect(fk().isDefinedFor({ primaryKey: "pk" })).toBe(true);
     expect(fk().isDefinedFor({ primaryKey: "id" })).toBe(false);
     expect(fk().isDefinedFor({ onDelete: "cascade" })).toBe(true);
@@ -418,9 +411,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 
   it("ignores a validate lookup when the definition did not store :validate", () => {
-    // mysql/sqlite introspection (and add/DSL paths that didn't pass validate)
-    // leave :validate absent. Rails' `options.fetch(:validate, validate)` then
-    // falls back to the lookup value, so any validate lookup matches.
     const noValidate = new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", "fk_x");
     expect(noValidate.storesValidate).toBe(false);
     expect(noValidate.isDefinedFor({ validate: false })).toBe(true);
@@ -458,15 +448,11 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 
   it("slices out lookup keys the definition does not store", () => {
-    // Mirrors `options = options.slice(*self.options.keys)`: a key the FK never
-    // carried is dropped before the generic compare, so it is ignored.
     const fkDef = new TableDefinition(conn, "astronauts").newForeignKeyDefinition("rockets");
     expect(fkDef.isDefinedFor({ primaryKey: "wrong" })).toBe(true);
     expect(fkDef.isDefinedFor({ onDelete: "cascade" })).toBe(true);
     expect(fkDef.isDefinedFor({ onUpdate: "cascade" })).toBe(true);
     expect(fkDef.isDefinedFor({ deferrable: "deferred" })).toBe(true);
-    // column and name are always stored (Rails foreign_key_options fills them),
-    // so they still compare.
     expect(fkDef.isDefinedFor({ column: "rocket_id" })).toBe(true);
     expect(fkDef.isDefinedFor({ column: "wrong_id" })).toBe(false);
     const withPk = new TableDefinition(conn, "astronauts").newForeignKeyDefinition("rockets", {
@@ -477,8 +463,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 
   it("respects adapter-specific stored option keys (mysql lacks deferrable, sqlite lacks name)", () => {
-    // Rails' MySQL foreign_keys options hash has no :deferrable, so that key is
-    // sliced out of the compare and matches regardless.
     const mysqlFk = new ForeignKeyDefinition(
       "astronauts",
       "rockets",
@@ -488,14 +472,11 @@ describe("ForeignKeyDefinition#defined_for?", () => {
       undefined,
       undefined,
       undefined,
-      // Rails' MySQL foreign_keys options hash has no :validate.
       undefined,
       ["column", "name", "primaryKey", "onDelete", "onUpdate"],
     );
     expect(mysqlFk.isDefinedFor({ deferrable: "deferred" })).toBe(true);
     expect(mysqlFk.isDefinedFor({ name: "wrong" })).toBe(false);
-    // Rails' SQLite foreign_keys options hash has no :name (we synthesize one),
-    // so a name lookup is sliced out and matches.
     const sqliteFk = new ForeignKeyDefinition(
       "astronauts",
       "rockets",
@@ -505,7 +486,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
       undefined,
       undefined,
       undefined,
-      // Rails' SQLite foreign_keys options hash has no :validate.
       undefined,
       ["column", "primaryKey", "onDelete", "onUpdate", "deferrable"],
     );
@@ -534,8 +514,6 @@ describe("TableDefinition#new_foreign_key_definition", () => {
   });
 
   it("maps a composite primaryKey array to a composite column array (bare-adapter fallback)", () => {
-    // Mirrors foreign_key_options' array branch: each PK column gets its own
-    // singularized foreign-key column.
     const fk = new TableDefinition(conn, "astronauts").newForeignKeyDefinition("rockets", {
       primaryKey: ["tenant_id", "id"],
     });
@@ -543,8 +521,6 @@ describe("TableDefinition#new_foreign_key_definition", () => {
   });
 
   it("add_composite_foreign_key_raises_if_column_and_primary_key_sizes_mismatch", () => {
-    // Mirrors foreign_key_options' arity guard (schema_statements.rb:1258-1266):
-    // a composite primaryKey must be matched by an equal-arity column.
     expect(() =>
       new TableDefinition(conn, "astronauts").newForeignKeyDefinition("rockets", {
         column: "rocket_id",

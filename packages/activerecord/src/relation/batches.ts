@@ -1,8 +1,3 @@
-/**
- * Batch processing methods: findEach, findInBatches, inBatches.
- *
- * Mirrors: ActiveRecord::Batches
- */
 import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray as Array } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
@@ -17,11 +12,6 @@ export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
     "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
 
-  /**
-   * Yields individual records in batches for memory efficiency.
-   *
-   * Mirrors: ActiveRecord::Batches#find_each (batches.rb:36)
-   */
   findEach<T extends Base>(
     this: any,
     {
@@ -55,8 +45,6 @@ export class Batches {
         }
       }
     })() as AsyncGenerator<T> & { size(): Promise<number> };
-    // Rails' `enum_for(:find_each, ...) { ... }` size block (batches.rb:90-95);
-    // see findInBatches below for why it lives on the iterator.
     enumerator.size = async (): Promise<number> => {
       cursor = Array(cursor);
       return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
@@ -64,11 +52,6 @@ export class Batches {
     return enumerator;
   }
 
-  /**
-   * Yields arrays of records in batches.
-   *
-   * Mirrors: ActiveRecord::Batches#find_in_batches (batches.rb:96)
-   */
   findInBatches<T extends Base>(
     this: any,
     {
@@ -88,10 +71,6 @@ export class Batches {
     } = {},
   ): AsyncGenerator<T[]> & { size(): Promise<number> } {
     const relation = this;
-    // Rails' `to_enum(:find_in_batches, ...) { ... }` size block
-    // (batches.rb:161-168). An async iterator has no `Enumerator#size`, so the
-    // block hangs off the returned iterator under the same name; `size` is
-    // async here only because the count reaches the database.
     const size = async (): Promise<number> => {
       cursor = Array(cursor);
       const total = await applyLimits(
@@ -121,14 +100,6 @@ export class Batches {
     return enumerator;
   }
 
-  /**
-   * Returns a BatchEnumerator that yields Relations scoped to each batch.
-   * Unlike findInBatches which yields arrays of records, this yields
-   * Relation objects that can be further refined, and supports batch-level
-   * operations like deleteAll/updateAll.
-   *
-   * Mirrors: ActiveRecord::Batches#in_batches (batches.rb:167)
-   */
   inBatches<T extends Base>(
     this: any,
     opts: InBatchesOptions,
@@ -178,9 +149,6 @@ export class Batches {
     let remaining: number | null = null;
     let batchLimit = of;
     if (this.limitValue !== null) {
-      // Rails batches.rb `remaining = limit_value` then `remaining < batch_limit`.
-      // `limit!` is a bare assignment, so a String limit_value reaches the
-      // comparison and raises `ArgumentError` in Ruby's `Comparable`.
       const limitValue = this.limitValue;
       if (typeof limitValue !== "number") {
         throw new ArgumentError(`comparison of String with ${batchLimit} failed`);
@@ -195,9 +163,6 @@ export class Batches {
     } else if (this.loaded) {
       generator = async function* () {
         await ensureValidOptions();
-        // Rails' `if loaded?` arm batches the relation's own `records` in
-        // memory; that read drains a parked `@future_result` (relation.rb:1149),
-        // which is why the branch is taken inside the async generator.
         const loadedBatches = await batchOnLoadedRelation({
           relation: self,
           start,
@@ -236,8 +201,6 @@ export class Batches {
           );
           const tuples = batchRows.map((r) => cursor.map((c) => r.readAttribute(c)));
           if (batchUseRanges && !load && cursor.length === 1 && tuples.length > 0) {
-            // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
-            // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
             const col = cursor[0];
             const dir = batchOrders[0][1];
             const first = tuples[0][0];
@@ -279,7 +242,7 @@ export class Batches {
     return enumerator!;
   }
 
-  /** Mirrors: ActiveRecord::Batches#act_on_ignored_order (batches.rb:474-482). @internal */
+  /** @internal */
   actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
     const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
     if (raise) {
@@ -292,12 +255,7 @@ export class Batches {
 
 /**
  * @internal
- *
- * @missingRailsCall size — PERMANENT: batches.rb:306-312 compares
- *   `Array(start).size != cursor.size`. `Array()` here is Ruby's `Kernel#Array`,
- *   which this file imports as `kernelArray as Array` (line 7) — so the TS reads
- *   identically and `#size` is its `.length`. The global `Array` is spelled
- *   `globalThis.Array` everywhere in this file for exactly that reason.
+ * @missingRailsCall size — PERMANENT
  */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
@@ -317,12 +275,6 @@ export async function ensureValidOptionsForBatchingBang(
     }
   }
 
-  // Rails batches.rb:316-324: when the cursor omits any primary-key column the
-  // batch order is only stable if some other full, non-partial unique index
-  // covers the cursor. `schema_cache.indexes` is async here, which is why the
-  // whole check (and so this method) is a promise.
-  // Ruby `Array(nil)` is `[]`, so a model with no primary key subtracts to an
-  // empty set and skips the check entirely (batches.rb:314).
   if (Array<string>(relation.primaryKey).some((key) => !cursor.includes(key))) {
     const model = relation.model;
     const indexes = (await model.schemaCache().indexes(relation.tableName)) as {
@@ -342,10 +294,6 @@ export async function ensureValidOptionsForBatchingBang(
   }
 
   if (Array(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
-    // `:order` takes Symbols, which trails spells as bare strings (CLAUDE.md,
-    // "A Ruby Symbol is a JS string"), so the colon Ruby's `order.inspect`
-    // prints at batches.rb:324 has to be restored here for the message to read
-    // as it does in Rails.
     const inspected = globalThis.Array.isArray(order)
       ? `[${order.map((o) => `:${o}`).join(", ")}]`
       : `:${order}`;
@@ -403,10 +351,6 @@ export function batchCondition(
 ): any {
   const table = relation._model.arelTable;
 
-  // Build lexicographic WHERE matching Rails' cursor_positions.reverse_each logic:
-  // Single column: col OP val
-  // Multi-column: (col1 STRICT_OP val1) OR (col1 = val1 AND <rest>)
-  // where STRICT_OP is the strict variant of OP (lteq→lt, gteq→gt).
   const cursorPositions = cursor.map(
     (column, i) => [column, Array(values)[i], operators[i]] as const,
   );
@@ -469,11 +413,7 @@ export async function batchOnLoadedRelation(opts: {
 
 /**
  * @internal
- *
- * @missingRailsCall slice — PERMANENT: `record.attributes.slice(*cursor).values`
- *   (batches.rb:408-409) — Ruby `Hash#slice` keeps only the keys it finds and
- *   `#values` reads them in cursor order, which over a JS object is a `filter`
- *   by key membership and a `map`, not a call.
+ * @missingRailsCall slice — PERMANENT
  */
 export function recordCursorValues(record: any, cursor: string[]): unknown[] {
   const attributes = record.attributes;
@@ -512,9 +452,6 @@ export async function* batchOnUnloadedRelation(opts: {
   let { batchLimit } = opts;
   let remaining: number | null | undefined = opts.remaining;
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
-  // Apply start/finish limits once on the base relation; advance cursor per
-  // iteration — matching Rails' batch_condition(relation, ...) pattern where
-  // `relation` is always the original scoped relation, not the previous batch.
   let relation = opts.relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
   relation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders);
   const emptyScope = opts.relation.toSql() === opts.relation.model.unscoped().all().toSql();
@@ -524,8 +461,6 @@ export async function* batchOnUnloadedRelation(opts: {
     const rows = await (opts.load ? batchRelation : batchRelation.select(...cursor)).toArray();
     if (rows.length === 0) break;
 
-    // batches.rb:456-459 `values.flatten.any?(nil)`, read off each record: trails
-    // yields the records where Rails yields `pluck`'s values.
     if (rows.some((record: any) => cursor.some((column) => record.attributes[column] == null))) {
       throw new ArgumentError(
         "Not all of the batch cursor columns were included in the custom select clause " +

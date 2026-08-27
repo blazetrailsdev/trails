@@ -1,12 +1,3 @@
-/**
- * trails-only companions to `translation.test.ts`, which mirrors
- * `activemodel/test/cases/translation_test.rb` and holds only Rails test
- * names. Everything here has no Rails counterpart: the duplicate-name TS
- * copies that used to sit beside the mirrored cases, the dotted-attribute /
- * options / ancestor-walk coverage of `human_attribute_name`
- * (`activemodel/lib/active_model/translation.rb:44-70`), and the
- * `raise_on_missing_translations` singleton accessor (`translation.rb:25`).
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
 import { I18n } from "./i18n.js";
@@ -87,8 +78,6 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
 
   it("looks up dotted attribute in i18n before falling back", () => {
     class User extends Model {}
-    // Rails key: "activemodel.attributes.user/address.street"
-    // I18n path: ["activemodel", "attributes", "user/address", "street"]
     I18n.backend().storeTranslations("en", {
       activemodel: { attributes: { "user/address": { street: "Street Address" } } },
     });
@@ -158,9 +147,6 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
 });
 
 describe("raise_on_missing_translations accessor", () => {
-  // Mirrors the singleton attr_accessor :raise_on_missing_translations
-  // from translation.rb:25 — reachable through the host modules that
-  // include/extend Translation in Rails (api.rb, validations.rb).
   it("toggles the shared singleton via Translation and Validations", async () => {
     const translation = await import("./translation.js");
     const validations = await import("./validations.js");

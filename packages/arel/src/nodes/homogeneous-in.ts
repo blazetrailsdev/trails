@@ -15,8 +15,6 @@ export class HomogeneousIn extends Node {
     this.type = type;
   }
 
-  // Mirrors Arel::Nodes::HomogeneousIn#hash / #eql? / #== (homogeneous_in.rb:13-21).
-  // `super` there is `Object#eql?` — identity — since Node defines none.
   hash(): number {
     return rbHash(this.ivars());
   }
@@ -42,14 +40,6 @@ export class HomogeneousIn extends Node {
     return this.attribute;
   }
 
-  // Mirrors Arel::Nodes::HomogeneousIn#right (homogeneous_in.rb):
-  //   `attribute.quoted_array(values)`
-  // which routes through Predications#quoted_array → quoted_node →
-  // `Nodes.build_quoted(other, attribute)` — non-Node values become
-  // `Casted` (carrying the attribute's type-cast context), not bare
-  // Quoted. Use the attribute's own `quotedArray` when present so any
-  // host-class override participates; otherwise fall through to the
-  // shared buildQuoted with the attribute as the casting context.
   get right(): Node[] {
     const attr = this.attribute as Node & { quotedArray?: (vs: unknown[]) => Node[] };
     if (typeof attr.quotedArray === "function") {
@@ -58,13 +48,6 @@ export class HomogeneousIn extends Node {
     return this.values.map((v) => buildQuoted(v, this.attribute));
   }
 
-  // Mirrors Arel::Nodes::HomogeneousIn#casted_values (homogeneous_in.rb:39-47):
-  //   type = attribute.type_caster
-  //   values.map { |raw| type.serialize(raw) if type.serializable?(raw) }.compact
-  // The `isSerializable` guard drops out-of-range / non-serializable values
-  // (e.g. a bignum id past the column's range) before they can reach a bind,
-  // and `compact` drops any that serialize to null — so `id IN [1, 2**63]`
-  // collapses to `IN (1)` and `id IN [2**63]` to an empty list (`1=0`).
   get castedValues(): unknown[] {
     const attr = this.attribute as unknown as {
       typeCaster?: {
@@ -88,8 +71,6 @@ export class HomogeneousIn extends Node {
   }
 
   get procForBinds(): (value: unknown) => unknown {
-    // Rails: -> value { ActiveModel::Attribute.with_cast_value(
-    //   attribute.name, value, ActiveModel::Type.default_value) }
     return (value: unknown) =>
       AMAttribute.withCastValue(
         (this.attribute as unknown as { name?: string }).name ?? "",
@@ -103,9 +84,6 @@ export class HomogeneousIn extends Node {
     return undefined;
   }
 
-  // Mirrors Arel::Nodes::HomogeneousIn#ivars — protected helper Rails
-  // uses to fold this node's identity into hash/eql? comparisons.
-  // `hash` / `eql?` above both fold through it, as Rails does.
   protected ivars(): [Node, unknown[], HomogeneousIn["type"]] {
     return [this.attribute, this.values, this.type];
   }

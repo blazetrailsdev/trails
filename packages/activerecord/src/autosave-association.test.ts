@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
@@ -47,12 +43,6 @@ import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
-// Rails' assignment (`client.firm = apple`) routes through the association
-// WRITER, which for belongs_to is `replace` (belongs_to_association.rb:96) and
-// marks the association `updated?` — what the autosave FK propagation is gated
-// on (autosave_association.rb:560). `setTarget` is the LOADER path and leaves
-// `updated?` false, so a belongs_to assignment must not use it. The belongs_to
-// writer is synchronous, so it needs no await here.
 function setAssociationTarget(record: Base, name: string, value: unknown) {
   const association = record.association(name) as any;
   if (typeof association.isUpdated === "function") association.writer(value as any);
@@ -66,10 +56,6 @@ function cacheAssoc(record: Base, name: string, value: unknown) {
 fixtures([], { useTransactionalTests: false });
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  // Transactional fixtures roll back every persisted pirate/ship/parrot per test
-  // so this block does not pollute the shared worker DB for sibling blocks
-  // (e.g. TestAutosaveAssociationOnACollectionRemoveCallbacks) — Rails'
-  // `use_transactional_tests`.
   fixtures([]);
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -146,7 +132,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
       await ship.destroy();
       throw new Error("Oh noes!");
     };
-    // Mirror Rails: @ship.name_will_change! — force ship dirty so autosaveHasOne calls save
     ship.name = "Pearl Changed";
     cacheAssoc(pirate, "ship", ship);
     await expect(pirate.save()).rejects.toThrow("Oh noes!");
@@ -229,7 +214,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
       await pirate.destroy();
       throw new Error("Oh noes!");
     };
-    // Mirror Rails: @ship.pirate.catchphrase = "Changed Catchphrase" — make pirate dirty
     pirate.catchphrase = "Changed Catchphrase";
     cacheAssoc(ship, "pirate", pirate);
     await expect(ship.save()).rejects.toThrow("Oh noes!");
@@ -364,8 +348,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(parrots.some((p) => p.markedForDestruction())).toBe(false);
     for (const p of parrots) p.markForDestruction();
 
-    // Rails `assert_no_difference "Parrot.count"`: HABTM mark_for_destruction
-    // removes the join row, it does NOT destroy the associated record.
     const before = Number(await Parrot.count());
     await pirate.save();
     expect(Number(await Parrot.count())).toBe(before);
@@ -387,9 +369,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
     for (const p of parrots) p.markForDestruction();
 
-    // Rails `assert_not_called(parrot, :valid?)`: a marked-for-destruction child
-    // is skipped by `association_valid?` before validation runs, so `valid?`
-    // must not fire on it during the owner save.
     const validatedIds: unknown[] = [];
     for (const p of parrots) {
       const origIsValid = p.isValid.bind(p);
@@ -479,8 +458,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const before = (await proxy).map((p) => p.id).sort();
     for (const p of await proxy) p.markForDestruction();
 
-    // Mirror Rails: override the parrots association's `destroy` to raise after
-    // running the real destroy, so the whole save transaction rolls back.
     const inst = (pirate as any).association("parrots");
     const origDestroy = inst.destroy.bind(inst);
     inst.destroy = async (...args: unknown[]) => {
@@ -576,13 +553,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("circular autosave does not validate children", async () => {
-    // Rails builds an anonymous `Class.new(ActiveRecord::Base)` on `readers`
-    // that self-names "Reader" via `def self.name`. We cannot reuse that name:
-    // the canonical `Reader` model owns it and `registerModel` refuses a
-    // canonical-name shadow. That forces the explicit `foreignKey` on
-    // `children`: Rails derives `reader_id` from its "Reader" self-name, we
-    // would derive `circular_reader_id`. `reader_id` is likewise a declared
-    // attribute, not a `readers` column — Rails declares it the same way.
     class CircularReader extends Base {
       declare catch_phrase: string | null;
       declare reader_id: number | null;
@@ -637,9 +607,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     reply.sillyUniqueReplies.build([{ content: "Best content" }, { content: "Best content" }]);
 
     expect(await reply.save()).toBe(false);
-    // `propagateErrors` underscores the camelCase reflection name so the
-    // humanized message matches Rails ("Silly unique replies is invalid"),
-    // making the error attribute Rails' own `:silly_unique_replies`.
     expect(reply.errors.messagesFor("silly_unique_replies")).toEqual(["is invalid"]);
 
     const built = await reply.sillyUniqueReplies;
@@ -705,9 +672,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(clients.map((c) => c.id)).toContain(companies("second_client").id);
   });
   it("assign ids with belongs to cpk model", async () => {
-    // Rails: order has a CPK [shop_id, id]; order_agreements is a single-column
-    // FK has_many keyed on the "id" component (primaryKey: :id). Assigning the
-    // child ids must populate order_id with the owner's "id" component.
     class AiCpkOrder extends Base {
       declare shop_id: number | null;
       declare status: string | null;
@@ -763,9 +727,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(loadedAgreements.map((a) => a.id)).toContain(a2.id);
   });
   it("assign ids with cpk for two models", async () => {
-    // Rails: order has a CPK [shop_id, id]; books is a composite-FK has_many
-    // keyed on [shop_id, order_id] auto-derived from the owner's CPK. The child
-    // (book) is itself CPK [author_id, id], so its ids arrive as tuples.
     class AiCpkTwoOrder extends Base {
       declare shop_id: number | null;
       declare status: string | null;
@@ -839,9 +800,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(loadedTitles).toContain("Second");
   });
   it("has one cpk has one autosave with id", async () => {
-    // Rails: test "has_one cpk has_one autosave with id" — when the parent has a CPK
-    // and the has_one uses a non-composite single-column FK, autosave should propagate
-    // the "id" component of the composite PK into the child's FK column.
     class CpkOrderPk extends Base {
       declare shop_id: number | null;
       declare status: string | null;
@@ -997,10 +955,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel(IrisWithReadOnlyForeignKey);
   });
 
-  // Rails' Firm declares `has_one :account, foreign_key: "firm_id",
-  // dependent: :destroy, validate: true` (test/models/company.rb) — validated
-  // but NOT autosaved. A new child still persists on owner.save via the
-  // unconditionally-registered has_one autosave callback.
   function makeModels() {
     return { Firm: Firm, Account };
   }
@@ -1223,8 +1177,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel("PolyChild", PolyChild);
     const parent = new PolyParent({ name: "P" });
     const child = new PolyChild({});
-    // Mirrors Rails HasOneAssociation#set_owner_attributes which writes the
-    // polymorphic _type column at assignment time (before save).
     child._writeAttribute("employable_type", "PolyParent");
     cacheAssoc(parent, "polyChild", child);
     await parent.save();
@@ -1339,8 +1291,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel("PolyAsChild", PolyAsChild);
     const parent = new PolyAsParent({ name: "P" });
     const child = new PolyAsChild({});
-    // Mirrors Rails BelongsToPolymorphicAssociation#replace_keys which
-    // writes the polymorphic _type column at assignment time.
     child._writeAttribute("employable_type", "PolyAsParent");
     cacheAssoc(child, "employable", parent);
     await child.save();
@@ -1451,9 +1401,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should not ignore different error messages on the same attribute", async () => {
-    // Rails: test "should not ignore different error messages on the same attribute"
-    // When multiple validators fire on the same child attribute, all messages
-    // should be merged onto the parent under the dotted attribute key.
     class DualValidShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
@@ -1507,8 +1454,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should allow to bypass validations on associated models at any depth", async () => {
-    // Rails: test "should allow to bypass validations on associated models at any depth"
-    // save(validate: false) should skip validation on the parent and all nested records.
     class DeepPart extends Base {
       declare name: string | null;
       declare ship_id: number | null;
@@ -1939,8 +1884,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("composite primary key autosave", async () => {
-    // Rails: test "composite primary key autosave" — creating a has_one child
-    // via autosave propagates composite FK columns from parent to child.
     class CpkOrder2 extends Base {
       declare shop_id: number | null;
       declare status: string | null;
@@ -1978,7 +1921,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     }
     registerModel("CpkOrder2", CpkOrder2);
     registerModel("CpkBook2", CpkBook2);
-    // Provide explicit composite PK values (Rails: Order.create!(id: [1, 2], ...))
     const order = new CpkOrder2({ id: [1, 2], status: "pending" });
     const book = new CpkBook2({ id: [77, 77], title: "Composite Key Book" });
     cacheAssoc(order, "cpkBook2", book);
@@ -2464,9 +2406,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("autosave does not pass through non custom validation contexts", async () => {
-    // Rails: test "autosave does not pass through non custom validation contexts"
-    // When autosave validates an associated record, it should NOT pass the owner's
-    // standard (:create/:update) validation context — only custom contexts propagate.
     class ContextPerson extends Base {
       declare first_name: string | null;
 
@@ -2838,8 +2777,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("ShipCyclic", ShipCyclic);
     registerModel("PrisonerCyclic", PrisonerCyclic);
-    // Wire _ensureNoDuplicateErrors as after_validation on ShipCyclic (mirrors Rails'
-    // AssociationBuilderExtension.build → add_autosave_association_callbacks).
     const prisonersRef = ShipCyclic.reflectOnAssociation("prisoners");
     addAutosaveAssociationCallbacks.call(ShipCyclic, prisonersRef);
 
@@ -3759,8 +3696,6 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
   fixtures([]);
 
-  // Mirrors Rails' nested Post/Comment classes (posts/comments tables) with a
-  // Comment after_save callback that reads back the inverse `post.comments`.
   function makeModels() {
     class Post extends Base {
       declare title: string | null;
@@ -4631,9 +4566,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
 });
 
 describe("computePrimaryKey", () => {
-  // Unit tests for the computePrimaryKey helper, which mirrors
-  // Rails autosave_association.rb:576-587 (compute_primary_key).
-
   function makeRecord(opts: {
     primaryKey?: string | string[];
     queryConstraintsList?: string[];
@@ -4655,7 +4587,6 @@ describe("computePrimaryKey", () => {
   });
 
   it("returns class-level queryConstraintsList when reflection has queryConstraints option", () => {
-    // Mirrors: elsif reflection.options[:query_constraints] && (qcl = record.class.query_constraints_list)
     const record = makeRecord({
       primaryKey: "id",
       queryConstraintsList: ["tenant_id", "id"],
@@ -4666,7 +4597,6 @@ describe("computePrimaryKey", () => {
   });
 
   it("returns queryConstraintsList when record class has_query_constraints? and no FK option", () => {
-    // Mirrors: elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
     const record = makeRecord({
       primaryKey: "id",
       queryConstraintsList: ["shop_id", "id"],
@@ -4677,8 +4607,6 @@ describe("computePrimaryKey", () => {
   });
 
   it("does not use queryConstraintsList when reflection has explicit foreignKey option", () => {
-    // Mirrors: elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
-    // — the !:foreign_key guard prevents queryConstraintsList from being used.
     const record = makeRecord({
       primaryKey: "id",
       queryConstraintsList: ["shop_id", "id"],
@@ -4694,14 +4622,12 @@ describe("computePrimaryKey", () => {
   });
 
   it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
-    // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
     const record = makeRecord({ primaryKey: ["shop_id", "id"] });
     const result = computePrimaryKey({ options: {} }, record);
     expect(result).toBe("id");
   });
 
   it("returns full composite PK when CPK has no 'id' column", () => {
-    // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
     const record = makeRecord({ primaryKey: ["shop_id", "status"] });
     const result = computePrimaryKey({ options: {} }, record);
     expect(result).toEqual(["shop_id", "status"]);
@@ -4714,11 +4640,6 @@ describe("computePrimaryKey", () => {
   });
 });
 
-// vendor/rails/activerecord/test/cases/autosave_association_test.rb:1444-1477 —
-// add/remove callbacks fire when a marked-for-destruction child is destroyed as
-// part of the owner save. Exercises the collection-level destroy path
-// (save_collection_association -> association.destroy(record)) which fires the
-// before_remove/after_remove callbacks, not record-level child.destroy().
 describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
   fixtures([], { useTransactionalTests: false });
   beforeAll(() => {

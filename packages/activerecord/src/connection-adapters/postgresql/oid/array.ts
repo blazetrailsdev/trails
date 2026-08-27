@@ -1,10 +1,3 @@
-/**
- * PostgreSQL array type — casts between PG array literals and JS arrays.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Array
- * (Rails: `class Array < Type::Value; include Helpers::Mutable`).
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 
 const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
@@ -23,14 +16,7 @@ function encodeArrayElement(text: string | null, delimiter: string): string {
   return text;
 }
 
-/**
- * The pg gem's `PG::TextEncoder::Array`, which Rails' OID::Array holds as
- * `@pg_encoder` and hands to `Data` (`oid/array.rb:20`, `:51`).
- *
- * @noRailsEquivalent PERMANENT — the pg gem ships this class in C, so there is
- * no Ruby file in any Rails gem for the port to mirror, and node-postgres
- * offers no equivalent encoder/decoder pair.
- */
+/** @noRailsEquivalent PERMANENT */
 export class PgTextEncoderArray {
   readonly name: string;
   readonly delimiter: string;
@@ -50,15 +36,7 @@ export class PgTextEncoderArray {
   }
 }
 
-/**
- * The pg gem's `PG::TextDecoder::Array`, which Rails' OID::Array holds as
- * `@pg_decoder` (`oid/array.rb:21`) and calls from `deserialize` and `cast`.
- * It only splits the literal: the element casting is `type_cast_array`'s job.
- *
- * @noRailsEquivalent PERMANENT — the pg gem ships this class in C, so there is
- * no Ruby file in any Rails gem for the port to mirror, and node-postgres
- * offers no equivalent encoder/decoder pair.
- */
+/** @noRailsEquivalent PERMANENT */
 export class PgTextDecoderArray {
   readonly name: string;
   readonly delimiter: string;
@@ -71,8 +49,6 @@ export class PgTextDecoderArray {
   decode(str: string): unknown[] {
     const trimmed = str.trim();
     if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-      // Ruby's core TypeError, which oid/array.rb:39 rescues by name — there
-      // is no Rails error class to port here.
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`malformed array literal: "${str}"`);
     }
@@ -165,7 +141,6 @@ export class Array extends ValueType<unknown> {
     this.pgDecoder = new PgTextDecoderArray({ name: `${this.type()}[]`, delimiter: delimiter });
   }
 
-  /** Rails: `delegate :limit, :precision, :scale, to: :subtype` — live read-through. */
   override get limit(): number | undefined {
     return this.subtype.limit;
   }
@@ -178,19 +153,10 @@ export class Array extends ValueType<unknown> {
     return this.subtype.scale;
   }
 
-  /**
-   * Rails: `delegate :user_input_in_time_zone, to: :subtype`. A real delegation
-   * calls the subtype method (or raises if absent), so call directly rather
-   * than optional-chaining to `undefined`.
-   */
   userInputInTimeZone(value: unknown): unknown {
     return this.subtype.userInputInTimeZone!(value);
   }
 
-  /**
-   * Rails: `delegate :type, ... to: :subtype`. Array's type() returns
-   * the subtype's type — e.g. an int4 array reports :integer.
-   */
   override type(): string {
     const subtypeType = this.subtype.type;
     if (typeof subtypeType === "function") return subtypeType.call(this.subtype) ?? "array";
@@ -198,7 +164,6 @@ export class Array extends ValueType<unknown> {
     return "array";
   }
 
-  /** Rails' Helpers::Mutable. */
   override isMutable(): boolean {
     return true;
   }
@@ -228,10 +193,6 @@ export class Array extends ValueType<unknown> {
       return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
     }
     if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
-    // Rails' `super` arm is unreachable: `PG::TextDecoder::Array` always hands
-    // `deserialize` a String. node-pg parses array OIDs itself, so this arm IS
-    // reachable here, and routing it through `super` would run the subtype's
-    // `cast` per element where `deserialize` is owed (oid/array.rb:24-31).
     if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
     return super.deserialize(value);
   }
@@ -278,7 +239,6 @@ export class Array extends ValueType<unknown> {
   }
 }
 
-/** Rails: `Data = Struct.new(:encoder, :values)` (oid/array.rb:11). */
 export class Data {
   readonly encoder: PgTextEncoderArray;
   readonly values: unknown[];

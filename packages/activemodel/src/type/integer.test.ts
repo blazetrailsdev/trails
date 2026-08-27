@@ -22,7 +22,6 @@ describe("IntegerTest", () => {
   it("random objects cast to nil", () => {
     const type = new Types.IntegerType();
     expect(type.cast([1, 2])).toBeNull();
-    // Rails' `1 => 2` Hash and `1..2` Range are both receivers with no `to_i`.
     expect(type.cast({ 1: 2 })).toBeNull();
     expect(type.cast(new Range(1, 2))).toBeNull();
   });

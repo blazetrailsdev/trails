@@ -54,9 +54,6 @@ describe("SQLite3::Column JSON round-trip", () => {
     const back = Object.create(Column.prototype) as Column;
     back.initWith(JSON.parse(JSON.stringify(coder)));
 
-    // sqlite3/column.rb:35-42 carries `auto_increment` ALONE; `rowid` and
-    // `@generated_type` are dropped by a round-trip upstream too, so the
-    // restored ivars are nil/absent and every predicate over them is falsy.
     expect(Object.keys(coder).sort()).toEqual(
       [
         "auto_increment",

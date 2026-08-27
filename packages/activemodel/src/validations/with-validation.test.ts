@@ -95,10 +95,6 @@ describe("ValidatesWithTest", () => {
     expect(await p.isValid()).toBe(true);
   });
 
-  // with_validation_test.rb:112-117. The instance `validates_with`
-  // (with.rb:143-151) builds each validator from a `dup` of the options and
-  // runs it against `self` right away, so a validator that clears the hash it
-  // was handed cannot blind the next one.
   it("instance validates_with method preserves validator options", async () => {
     class ValidatorThatDoesNotAddErrors {
       validate(_record: any) {}
@@ -280,8 +276,6 @@ describe("ValidatesWithTest", () => {
   });
 
   it("passes all configuration options to the validator class", async () => {
-    // Mirrors with_validation_test.rb:80-88: the full options hash (including
-    // condition keys) plus `class: self` reaches the validator constructor.
     let capturedOpts: Record<string, unknown> | undefined;
     class MinLenValidator {
       min: number;
@@ -339,10 +333,6 @@ describe("WithValidator arity dispatch", () => {
     expect(capturedArg).toBe("name");
   });
 
-  // JS Function.length excludes rest and default parameters (both yield length 0),
-  // so such methods are dispatched without the attribute — unlike Ruby where
-  // *args or optional args give negative arity and Rails passes the attribute.
-  // Documented divergence; detecting these via Function.toString() is fragile.
   it("known divergence: rest-param method called without args (JS length 0 vs Ruby arity -1)", () => {
     const received: unknown[] = [];
     const record = {

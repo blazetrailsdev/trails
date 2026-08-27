@@ -58,7 +58,6 @@ describe("extract_limit / extract_precision / extract_scale", () => {
   });
 
   it("tolerates whitespace inside the parens, like Rails' to_i", () => {
-    // Rails' /\((.*)\)/ + to_i accepts "varchar( 255 )" and "numeric(10, 2)".
     expect(extractLimit("varchar( 255 )")).toBe(255);
     expect(extractPrecision("numeric(10, 2)")).toBe(10);
     expect(extractScale("numeric(10, 2)")).toBe(2);
@@ -137,9 +136,6 @@ describe("initialize_type_map seeds the PG type_map with known types", () => {
   });
 
   it("registers numeric as DecimalWithoutScale when fmod scale bits are zero", () => {
-    // Rails: `if fmod && (fmod - 4 & 0xffff).zero?` — a scale-less NUMERIC(10)
-    // stores atttypmod where the low 16 bits of (fmod - 4) are zero.
-    // fmod = 4 → (4-4)&0xffff = 0 → DecimalWithoutScale.
     const type = m.lookup("numeric", 4, "numeric(10)") as DecimalWithoutScale;
     expect(type).toBeInstanceOf(DecimalWithoutScale);
     expect(type.precision).toBe(10);

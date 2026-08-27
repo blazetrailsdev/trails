@@ -7,7 +7,6 @@ interface AssociationLike {
   isCollection?(): boolean;
   target?: unknown[];
   nestedAttributesTarget?: unknown[];
-  // Rails index_errors: true = association order, :nested_attributes_order = write order
   options?: Record<string, unknown>;
 }
 
@@ -20,17 +19,8 @@ interface InnerErrorLike {
   base?: unknown;
 }
 
-/**
- * Wraps validation errors from nested associations, rewriting the
- * attribute so it reads as `association.attr` (or `association[i].attr`
- * when `index_errors` is enabled on a collection association).
- *
- * Mirrors: ActiveRecord::Associations::NestedError
- */
 export class NestedError extends ActiveModelNestedError {
   private readonly _association: AssociationLike;
-  // Narrows the base class' `innerError` to the AR shape — `index` reads
-  // `inner_error.base` (nested_error.rb:34).
   declare readonly innerError: InnerErrorLike;
 
   constructor(association: AssociationLike, innerError: InnerErrorLike) {
@@ -39,7 +29,7 @@ export class NestedError extends ActiveModelNestedError {
     this._association = association;
   }
 
-  /** Mirrors Rails' `attr_reader :association` (nested_error.rb:16). @internal */
+  /** @internal */
   get association(): AssociationLike {
     return this._association;
   }
@@ -48,11 +38,6 @@ export class NestedError extends ActiveModelNestedError {
     association: AssociationLike,
     innerError: InnerErrorLike,
   ): string {
-    // Ruby runs `compute_attribute` as an instance method inside the
-    // constructor — after `@association` and `@inner_error` are set but *before*
-    // `super` (nested_error.rb:8-12). TS forbids touching `this` before
-    // `super`, so the readers below run against a receiver carrying exactly the
-    // two ivars Ruby has at that point.
     const self: NestedError = Object.assign(Object.create(NestedError.prototype) as NestedError, {
       _association: association,
       innerError,
@@ -72,16 +57,7 @@ export class NestedError extends ActiveModelNestedError {
   }
 }
 
-// Rails marks the readers below `private`, so they stay module-local functions
-// rather than prototype methods; `this`-typing keeps their signature identical
-// to Ruby's zero-arg instance methods.
-
-/**
- * Mirrors Rails' `index_errors_setting` (nested_error.rb:29-32):
- * `association.options.fetch(:index_errors, ActiveRecord.index_nested_attribute_errors)`.
- * Options may sit on `association.options` or `association.reflection.options`.
- * @internal
- */
+/** @internal */
 function indexErrorsSetting(this: NestedError): boolean | "nestedAttributesOrder" {
   const opts = this.association.options ?? this.association.reflection.options;
   if (opts && "indexErrors" in opts) {
@@ -90,12 +66,7 @@ function indexErrorsSetting(this: NestedError): boolean | "nestedAttributesOrder
   return ActiveRecord.indexNestedAttributeErrors;
 }
 
-/**
- * Mirrors Rails' `index` (nested_error.rb:33-35) —
- * `ordered_records&.find_index(inner_error.base)`, reading `inner_error` off
- * the instance.
- * @internal
- */
+/** @internal */
 function index(this: NestedError): number | undefined {
   const records = orderedRecords.call(this);
   const base = this.innerError.base;
@@ -104,12 +75,7 @@ function index(this: NestedError): number | undefined {
   return idx >= 0 ? idx : undefined;
 }
 
-/**
- * Mirrors Rails' `ordered_records` (nested_error.rb:37-44): `true` means
- * association order (`target`), `:nested_attributes_order` means write order
- * (`nested_attributes_target`), anything else means no indexing at all.
- * @internal
- */
+/** @internal */
 function orderedRecords(this: NestedError): unknown[] | null {
   const setting = indexErrorsSetting.call(this);
   const assoc = this.association;

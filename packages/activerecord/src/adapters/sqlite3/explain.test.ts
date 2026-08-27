@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/explain_test.rb
- */
 import { it, expect } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -8,13 +5,7 @@ import { fixtures } from "../../test-fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
 import "../../support/canonical-model-index.js";
 
-// -- Rails test class: explain_test.rb (ActiveRecord::SQLite3TestCase) --
-// Pinned to the SQLite backend: the `EXPLAIN for: … "authors" …` header quoting
-// and the `SEARCH … authors USING … PRIMARY KEY` plan shape are SQLite-specific,
-// so this must skip when the handler connection is PG/MySQL in the CI matrix.
 describeIfSqlite("SQLite3ExplainTest", () => {
-  // Rails `fixtures :authors, :author_addresses`. The canonical tables come
-  // from the template clone.
   const { authors } = fixtures(["authors", "authorAddresses"]);
 
   it("explain for one query", async () => {

@@ -1,10 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite_rake_test.rb.
- *
- * Despite the file name nothing here drives Rake: every test calls
- * `ActiveRecord::Tasks::DatabaseTasks` directly, which is why the structure
- * dump/load classes port straight across.
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -28,18 +21,11 @@ function awesomeFile(): string {
   return path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
 }
 
-/** Rails seeds these fixtures with backticked `sqlite3` calls. */
 function runSqlite3(database: string, sql: string): void {
   const result = activesupport.getChildProcess().spawnSync("sqlite3", [database, sql]);
   if (result.status !== 0) throw new Error(`sqlite3 failed: ${result.stderr}`);
 }
 
-/**
- * Rails swaps `$stdout` / `$stderr` for a `StringIO` in `setup` and reads
- * `.string` back (`sqlite_rake_test.rb:15-16, 86-87`). trails' analogue is the
- * activesupport process adapter's streams, which is what `DatabaseTasks`
- * writes its messages to.
- */
 function captureStreams(): { out: () => string; err: () => string } {
   let outString = "";
   let errString = "";
@@ -73,9 +59,6 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   });
 
   it("db checks database exists", async () => {
-    // `assert_called_with(File, :exist?, [@database], returns: false)`
-    // (`sqlite_rake_test.rb:25`) — trails reads the filesystem through the
-    // activesupport FsAdapter seam, so the spy sits there rather than on `fs`.
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     const existsSync = vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(false);
 
@@ -157,11 +140,6 @@ describeIfSqlite("SqliteDBDropTest", () => {
       database: databaseRoot,
     });
     SQLiteDatabaseTasks.register();
-    // Rails passes the root as `DatabaseTasks.drop @configuration, @root`'s
-    // trailing `*arguments`, which `database_adapter_for` forwards to the task
-    // constructor (`database_tasks.rb:566-572`). trails registers task
-    // singletons, so the root reaches `SQLiteDatabaseTasks` through
-    // `DatabaseTasks.root`.
     previousRoot = DatabaseTasks.root;
     DatabaseTasks.root = root;
     streams = captureStreams();
@@ -190,8 +168,6 @@ describeIfSqlite("SqliteDBDropTest", () => {
     await DatabaseTasks.drop(configurationRoot);
 
     expect(unlinkSync).toHaveBeenCalledWith(databaseRoot);
-    // Rails removes the two sidecars in one `FileUtils.rm_f([shm, wal])`
-    // (`sqlite_rake_test.rb:102`); trails unlinks each on its own.
     expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-shm`);
     expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-wal`);
   });
@@ -244,10 +220,6 @@ describeIfSqlite("SqliteDBCharsetTest", () => {
   });
 
   it("db retrieves charset", async () => {
-    // Rails stubs `Base.lease_connection` with an object whose only member is
-    // `encoding` and asserts the send lands (`sqlite_rake_test.rb:142-146`);
-    // trails' `charset` leases the ambient connection, so the spy goes on its
-    // `encoding` getter (`sqlite_database_tasks.rb:39-41`).
     const connection = await Base.connectionPool().leaseConnection();
     const encoding = vi.spyOn(connection as unknown as { encoding: string }, "encoding", "get");
 
@@ -270,8 +242,6 @@ describeIfSqlite("SqliteDBCollationTest", () => {
   });
 
   it("db retrieves collation", async () => {
-    // `database_tasks.rb:342-345` sends `collation` and SQLiteDatabaseTasks
-    // defines none, so the send raises.
     await expect(DatabaseTasks.collation(configuration)).rejects.toBeInstanceOf(NoMethodError);
   });
 });
@@ -281,10 +251,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
   let database: string;
   let configuration: HashConfig;
 
-  // `structure_dump` reads `data_sources` off the ambient connection, so the
-  // fixture database has to be the established one. Rails stubs the call
-  // instead (`sqlite_rake_test.rb:195`) because its `Base` is pinned to arunit;
-  // establishing keeps the assertion lane-independent.
   let previous: ReturnType<typeof Base.removeConnection>;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
 
@@ -305,7 +271,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    // `with_structure_dump_flags`' ensure (`sqlite_rake_test.rb:238-239`).
     DatabaseTasks.structureDumpFlags = previousFlags;
     SchemaDumper.ignoreTables = [];
     Base.removeConnection();
@@ -335,9 +300,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const dbfile = database;
     const filename = awesomeFile();
     created.push(filename);
-    // Rails stubs `data_sources` to add these two (`sqlite_rake_test.rb:195`);
-    // trails' structureDump reads the list off the live connection, so they
-    // have to exist for the ignore patterns to have anything to match.
     runSqlite3(database, "CREATE TABLE prefix_foo(id INTEGER)");
     runSqlite3(database, "CREATE TABLE ignored_foo(id INTEGER)");
     SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
@@ -356,9 +318,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const filename = awesomeFile();
     created.push(filename);
 
-    // Rails pins the argv through `assert_called_with(Kernel, :system, ...)`;
-    // `runCmd` builds the same argv and hands it to the child-process adapter,
-    // which is where the spy sits.
     const childProcess = await activesupport.getChildProcessAsync();
     const spawnSync = vi.spyOn(childProcess, "spawnSync");
 
@@ -369,10 +328,6 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
         message = e.message;
         throw e;
       }),
-      // `assert_raise(RuntimeError)` (`sqlite_rake_test.rb:221`). Ruby's
-      // `fail "<msg>"` in `run_cmd` raises RuntimeError, the class a bare
-      // `raise "string"` produces; `runCmd`'s `throw new Error(...)` is its
-      // analogue, so the class is asserted rather than left open.
     ).rejects.toThrow(Error);
 
     expect(spawnSync).toHaveBeenCalledWith(

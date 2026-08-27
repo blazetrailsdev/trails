@@ -1,11 +1,3 @@
-/**
- * trails-only regression coverage for SchemaStatements#viewExists.
- *
- * Rails runs the probe as `query_values(data_source_sql(...), "SCHEMA")`, so
- * the query is named "SCHEMA" and query counting skips it. trails previously
- * probed through `execute`, which names the query "SQL" and inflated
- * `assertQueries` counts in any suite that straddled a view-existence check.
- */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../../index.js";
 import type { AbstractAdapter } from "../abstract-adapter.js";

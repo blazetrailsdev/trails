@@ -4,12 +4,6 @@ import { except } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
-/**
- * Manages lazily-defined virtual attributes for acceptance validation.
- * These attributes exist only for validation and aren't persisted.
- *
- * Mirrors: ActiveModel::Validations::AcceptanceValidator::LazilyDefineAttributes
- */
 export class LazilyDefineAttributes {
   /** @internal */
   readonly attributes: readonly string[];
@@ -32,22 +26,7 @@ export class LazilyDefineAttributes {
   }
 }
 
-/**
- * Mirrors: acceptance.rb:18-22
- *   def setup!(klass)
- *     define_attributes = LazilyDefineAttributes.new(attributes)
- *     klass.include(define_attributes) unless klass.included_modules.include?(define_attributes)
- *   end
- *
- * Rails lazily materializes attr_reader/attr_writer for the acceptance
- * attributes on first access via method_missing. Trails has no
- * method_missing, so install accessors eagerly on the prototype with
- * a per-instance backing slot. Skips attributes that already define
- * both accessor sides; if only one side exists, defines the missing
- * half while preserving the existing accessor.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function setupBang(this: AcceptanceHost, klass: unknown): void {
   if (typeof klass !== "function") return;
   const ctor = klass as { prototype: object };
@@ -55,10 +34,6 @@ export function setupBang(this: AcceptanceHost, klass: unknown): void {
     const inherited = inspectAccessor(ctor.prototype, attribute);
     if (inherited.hasGetter && inherited.hasSetter) continue;
     const slot = `_${attribute}`;
-    // Rails checks reader and writer separately (attribute_method?(name)
-    // vs attribute_method?("#{name}=")). Install only the missing half.
-    // When one side IS inherited (anywhere in the prototype chain),
-    // reuse it on the new descriptor so overriding doesn't shadow it.
     Object.defineProperty(ctor.prototype, attribute, {
       configurable: true,
       get:
@@ -78,23 +53,11 @@ export function setupBang(this: AcceptanceHost, klass: unknown): void {
 export class AcceptanceValidator extends EachValidator {
   static readonly lazilyDefineAttributes = new LazilyDefineAttributes([]);
 
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare setupBang: typeof setupBang;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isAcceptableOption: typeof isAcceptableOption;
 
-  /**
-   * Mirrors: acceptance.rb:6-9
-   *   def initialize(options)
-   *     super({ allow_nil: true, accept: ["1", true] }.merge!(options))
-   *     setup!(options[:class])
-   *   end
-   *
-   * The `allow_nil` / `accept` defaults are applied lazily in `validateEach`
-   * and `isAcceptableOption` (so they survive an explicit `undefined`), so the
-   * constructor's remaining job is calling `setupBang(options.class)` — the
-   * host class threaded through by `validatesWith`.
-   */
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
     super(options);
     this.setupBang(options.class);
@@ -117,20 +80,7 @@ interface AcceptanceHost {
   attributes: readonly string[];
 }
 
-/**
- * Mirrors: acceptance.rb:24-26
- *   def acceptable_option?(value)
- *     Array(options[:accept]).include?(value)
- *   end
- *
- * Rails `Array(options[:accept])` coerces missing → []; scalar → [s];
- * iterable → flattened. Rails checks `options.key?(:accept)` separately
- * at the constructor (defaults to `["1", true]` when missing). This
- * port keeps both behaviors: when the key isn't set the default
- * applies; when set, explicit `null` collapses to `[]`.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isAcceptableOption(
   this: { options: Record<string, unknown> },
   value: unknown,
@@ -148,15 +98,8 @@ export function isAcceptableOption(
   return accepted.includes(value);
 }
 
-/**
- * Ruby `Array()` coerces any object with `to_a`/`to_ary` (Set, Enumerator,
- * Hash, etc.) into an array, but leaves strings wrapped as `[str]`. Match
- * that: if the value is iterable but not a string, spread it.
- */
 function isNonStringIterable(value: unknown): value is Iterable<unknown> {
   if (typeof value !== "object" || value === null) return false;
-  // Boxed strings (`new String("yes")`) are iterable by char; Ruby's
-  // `Array("yes")` still wraps as `["yes"]`, so treat them as scalars.
   if (value instanceof String) return false;
   return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
@@ -164,15 +107,6 @@ function isNonStringIterable(value: unknown): value is Iterable<unknown> {
 AcceptanceValidator.prototype.setupBang = setupBang;
 AcceptanceValidator.prototype.isAcceptableOption = isAcceptableOption;
 
-/**
- * Mirrors: ActiveModel::Validations::HelperMethods (acceptance.rb:99-101) — Ruby reopens the
- * one `HelperMethods` module here, so the TS half of it lives here too and
- * `validations.ts` reassembles them.
- *
- * `validatesWith` injects the host class and invokes the validator's `setupBang`
- * (Rails' `setup!(options[:class])`), which materializes the virtual acceptance
- * accessors on the prototype.
- */
 export const HelperMethods = {
   validatesAcceptanceOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
     return this.validatesWith(AcceptanceValidator, this._mergeAttributes(attrNames));

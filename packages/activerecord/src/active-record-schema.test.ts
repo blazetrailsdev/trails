@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
 import { Migrator } from "./migration.js";
@@ -108,8 +104,6 @@ describe("ActiveRecordSchemaTest", () => {
         ).currentVersion(),
       ).toBe(7);
     } finally {
-      // Rails ensure: drop_table :nep_schema_migrations (dropTable resolves the
-      // still-prefixed table name).
       await new SchemaMigration(adapter.pool).dropTable();
       Base.tableNamePrefix = saved;
     }
@@ -223,10 +217,6 @@ describe("ActiveRecordSchemaTest", () => {
       const m = new BulkTsMig();
       m.connection = adapter;
       await m.up();
-      // Rails asserts column_exists?(:has_timestamps, :created_at, precision: 6, null: false).
-      // The TS adapter mirror: timestamps columns should both be present and the
-      // insert below must succeed only because addTimestamps applied null: false
-      // alongside the supportsDatetimeWithPrecision precision default.
       await adapter.executeMutation(
         `INSERT INTO "has_timestamps" ("name", "created_at", "updated_at") VALUES ('x', '2023-01-01', '2023-01-01')`,
       );

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/json_test.rb
- */
 import { it, expect, beforeEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -16,11 +13,8 @@ describeIfSqlite("SQLite3JSONTest", () => {
 
   let connection: SQLite3Adapter;
 
-  // Registered before the shared module's setup so the table exists by the time
-  // that hook reflects its columns; Ruby reflects lazily, per test.
   beforeEach(async () => {
     connection = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
-    // Teardown lives in the shared module's afterEach (Rails: JSONSharedTestCases#teardown).
     // eslint-disable-next-line blazetrails/require-table-teardown
     await connection.createTable("json_data_type", {}, (t: any) => {
       t.json("payload", { default: {} });

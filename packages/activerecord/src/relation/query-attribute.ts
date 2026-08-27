@@ -1,21 +1,8 @@
-/**
- * QueryAttribute — a value object for use when constructing query conditions.
- *
- * Extends ActiveModel::Attribute so instanceof checks work throughout
- * the system (BindMap, visitors, Attribute#quotedNode, extractNodeValue).
- *
- * Mirrors: ActiveRecord::Relation::QueryAttribute < ActiveModel::Attribute
- */
-
 import { Attribute, Type } from "@blazetrails/activemodel";
 import { Substitute } from "../statement-cache.js";
 
 type CastType = Pick<Type, "cast" | "serialize">;
 
-/**
- * Wraps a duck-typed {cast, serialize} as a full Type for the
- * Attribute constructor.
- */
 class DelegatingType extends Type<unknown> {
   readonly name = "query";
   private _delegate: CastType;
@@ -40,19 +27,13 @@ function ensureType(type: CastType): Type {
 }
 
 export class QueryAttribute extends Attribute {
-  /** Rails' `@_unboundable`; `undefined` stands in for `defined?` being false. @internal */
+  /** @internal */
   private _unboundable?: 1 | -1 | false;
 
   constructor(name: string, value: unknown, type: CastType) {
     super(name, value, ensureType(type));
   }
 
-  /**
-   * Mirrors: ActiveRecord::Relation::QueryAttribute#type_cast
-   * (query_attribute.rb:22-24) — `def type_cast(value) = value`. A
-   * QueryAttribute never puts its raw value through the type; `value` stays the
-   * raw one and `_value_for_database` is what routes it through `serialize`.
-   */
   typeCast(value: unknown): unknown {
     return value;
   }
@@ -75,11 +56,6 @@ export class QueryAttribute extends Attribute {
     return this.type.serialize(this.value);
   }
 
-  // Mirrors Rails QueryAttribute#nil? (query_attribute.rb:35-41): a bind is nil
-  // not only when its raw value is nil, but also when the type carries a
-  // `subtype` (enum) or `normalizer` and the value *serializes* to nil — so
-  // `where(last_read: :forgotten)` (a label mapped to null) or an unknown enum
-  // label routes through `IS NULL`. A StatementCache substitute is never nil.
   isNil(): boolean {
     if (this.valueBeforeTypeCast instanceof Substitute) return false;
     if (this.valueBeforeTypeCast === null || this.valueBeforeTypeCast === undefined) return true;
@@ -90,13 +66,6 @@ export class QueryAttribute extends Attribute {
     return forDatabase === null || forDatabase === undefined;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Relation::QueryAttribute#infinite?
-   * (query_attribute.rb:42-44) — `infinity?(value_before_type_cast) ||
-   * serializable? && infinity?(value_for_database)`. Yields the *sign*, not a
-   * boolean, because Ruby's `Float#infinite?` returns `1 | -1 | nil`; Arel's
-   * `Predications#between` reads it to pick which side of a range collapses.
-   */
   isInfinite(): 1 | -1 | false {
     return (
       isInfinity(this.valueBeforeTypeCast) ||
@@ -104,27 +73,8 @@ export class QueryAttribute extends Attribute {
     );
   }
 
-  /**
-   * Mirrors: ActiveRecord::Relation::QueryAttribute#unboundable?
-   * (query_attribute.rb:45-51) —
-   * `serializable? { |value| @_unboundable = value <=> 0 } && @_unboundable = nil`,
-   * memoized behind `unless defined?(@_unboundable)`. `_unboundable === undefined`
-   * is that `defined?` guard, so the `false` result caches too: Rails assigns on
-   * both paths, and both `between` and the visitor read this.
-   *
-   * No exception handling, because Rails has none here: `serializable?`
-   * (attribute.rb:62-64) delegates to `Type#serializable?`, which is a
-   * predicate — `Integer#serializable?` (integer.rb:74-80) tests `in_range?`
-   * and yields the *cast* value to the block rather than raising. A serializer
-   * error is therefore never swallowed; it propagates as in Rails.
-   */
   isUnboundable(): 1 | -1 | false {
     if (this._unboundable === undefined) {
-      // `serializable? { |value| @_unboundable = value <=> 0 } && @_unboundable = nil`
-      // — the yielded value is `cast_value` (integer.rb:75-79), not the attribute's
-      // own `value`, which for a QueryAttribute is the raw one
-      // (query_attribute.rb:22-24). Taking it from the block is what casts exactly
-      // once, as Ruby's single `cast_value` local does.
       let unboundable: 1 | -1 | false = false;
       const serializable = this.isSerializable((castValue) => {
         unboundable = compareToZero(castValue);
@@ -135,20 +85,7 @@ export class QueryAttribute extends Attribute {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Relation::QueryAttribute#infinity? (query_attribute.rb:53-55)
- * — `value.respond_to?(:infinite?) && value.infinite?`. Returns the sign rather
- * than a boolean; see `isInfinite` above.
- *
- * `infinite?` ports to `isInfinite()`, the one spelling the protocol has across
- * the port — `Quoted` (casted.ts), `BindParam` (bind-param.ts) and arel's
- * `Predications.isInfinity` all read it.
- * Rails has a single `respond_to?(:infinite?)` protocol, so this must not fork
- * into a second name: reading `infinite()` here made
- * `QueryAttribute(Quoted(INFINITY)).infinite?` false while `isInfinity` said 1.
- *
- * @internal
- */
+/** @internal */
 function isInfinity(value: unknown): 1 | -1 | false {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
@@ -160,13 +97,7 @@ function isInfinity(value: unknown): 1 | -1 | false {
   return false;
 }
 
-/**
- * Ruby's `value <=> 0` for the numeric shapes a bound can take. Only the sign is
- * used; a non-numeric value that failed serialization is treated as past the
- * upper bound.
- *
- * @internal
- */
+/** @internal */
 function compareToZero(value: unknown): 1 | -1 {
   if (typeof value === "bigint") return value >= 0n ? 1 : -1;
   if (typeof value === "number") return value >= 0 ? 1 : -1;

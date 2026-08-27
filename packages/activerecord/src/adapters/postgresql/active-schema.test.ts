@@ -1,21 +1,9 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/active_schema_test.rb
- *
- * Rails' setup monkey-patches `PostgreSQLAdapter#execute` to a no-op that
- * returns the SQL, so the suite asserts on the *generated DDL string* rather
- * than running it. We reproduce that with `captureSql(..., { stub: adapter })`,
- * which intercepts the adapter's `exec`/`execute` and instruments the SQL via
- * `sql.active_record` without touching the database. Introspection the
- * SQL-builders still perform (e.g. `add_index_options`' bare-column `:where`
- * check) runs against the canonical `people` table.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, pgServerVersion } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { fixtures } from "../../test-fixtures.js";
 
-// Rails PostgreSQLAdapter#supports_nulls_not_distinct? — PG 15+ (150000).
 const supportsNullsNotDistinct = pgServerVersion >= 150000;
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -56,9 +44,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("add index", async () => {
-      // includeSchema: false drops the `add_index_options` bare-column `:where`
-      // introspection queries (name "SCHEMA"), leaving only the CREATE INDEX —
-      // mirrors Rails, where column_exists? select-queries bypass the execute stub.
       const sql = async (fn: () => void | Promise<void>) =>
         (await captureSql(fn, { stub: adapter, includeSchema: false }))[0];
 

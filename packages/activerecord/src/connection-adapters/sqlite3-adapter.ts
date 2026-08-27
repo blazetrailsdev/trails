@@ -105,27 +105,7 @@ import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
 
-/**
- * SQLite-specific DateTime type.
- *
- * better-sqlite3 returns datetime columns as TEXT. The base
- * DateTimeType#cast returns Temporal.PlainDateTime for offset-less datetime
- * strings. This subclass converts any PlainDateTime result to
- * Temporal.Instant so callers get a timezone-aware value.
- *
- * Stored datetime strings are interpreted according to
- * ActiveRecord.default_timezone (defaulting to UTC), matching the timezone
- * selection used when formatting instants for SQLite.
- *
- * @noRailsEquivalent PERMANENT — Rails' `initialize_type_map`
- * (sqlite3_adapter.rb:499-502) registers exactly one SQLite-specific type,
- * `SQLite3Integer`; datetime columns fall through to `Type::DateTime`, because
- * Ruby's `Time`/`DateTime` carry a zone and the sqlite3 gem's TEXT values parse
- * straight into one. The JS analogue splits: `Temporal.PlainDateTime` (no zone)
- * vs `Temporal.Instant`, so an offset-less TEXT datetime needs a zone applied
- * before it is a usable value. That is a Temporal-language gap with no upstream
- * class to converge onto.
- */
+/** @noRailsEquivalent PERMANENT */
 export class SQLite3DateTime extends ARDateTimeType {
   override cast(value: unknown): DateTimeCastResult | null {
     const result = super.cast(value);
@@ -136,25 +116,7 @@ export class SQLite3DateTime extends ARDateTimeType {
   }
 }
 
-/**
- * SQLite adapter — connects ActiveRecord to a real SQLite database.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
- */
-
-// Unwrap an ActiveModel::Attribute bind (e.g. Relation::QueryAttribute) to its
-// database value before driver type-casting, then apply the SQLite type cast.
-// Mirrors Rails' `type_casted_binds`, which sends `value_for_database` to the
-// driver rather than the Attribute wrapper. Plain pre-cast values (the common
-// case) pass straight through.
 function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
-  // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading it
-  // yields the unwrapped DB value directly. The attribute also carries its cast
-  // `type`; thread whether it is a Float so typeCast can mirror MRI's
-  // class-based INTEGER/FLOAT dispatch (Ruby Float → SQLITE_FLOAT) rather than
-  // keying purely off the JS value — a whole-valued float like `2.0` must still
-  // bind as `real`, not INTEGER. (Decimal binds reach typeCast as BigDecimal
-  // and take its dedicated float branch, so they need no flag here.)
   let bindsAsFloat = false;
   if (value && typeof value === "object" && "valueForDatabase" in value) {
     const attr = value as { valueForDatabase: unknown; type?: unknown };
@@ -188,7 +150,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return "sqlite";
   }
 
-  /** Mirrors: SQLite3::SchemaStatements#schema_creation */
   get schemaCreation(): SQLite3SchemaCreation {
     return new SQLite3SchemaCreation(this);
   }
@@ -201,16 +162,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new SQLite3TableDefinition(this, name, options);
   }
 
-  /**
-   * When true, new connections inherit `strict: true` unless the caller
-   * explicitly passes `strict: false`. Mirrors Rails' class_attribute.
-   */
   static strictStringsByDefault: boolean = false;
 
   static columnNameMatcher(): RegExp {
-    // Mirrors Rails SQLite3 column_name_matcher. Uses "..." quoted identifiers
-    // (SQLite double-quote escaping: "" inside quotes). Strict 0-or-1 function
-    // arg matching Rails \w+\((?:|\g<2>)\) — multi-arg functions are rejected.
     const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
     const col = String.raw`(?:${id}\.)?${id}`;
     const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
@@ -221,8 +175,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   static columnNameWithOrderMatcher(): RegExp {
-    // Mirrors Rails SQLite3 column_name_with_order_matcher. Adds COLLATE and
-    // ASC/DESC; includes NULLS FIRST/LAST for reverseOrder() compatibility.
     const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
     const col = String.raw`(?:${id}\.)?${id}`;
     const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
@@ -232,19 +184,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
   }
 
-  /**
-   * Mirrors: SQLite3::Quoting::ClassMethods#quote_column_name
-   * (sqlite3/quoting.rb:44-46). Lives on the class, as in Rails — the instance
-   * quoter is the inherited `self.class` delegator (abstract/quoting.rb:135-138).
-   */
   static override quoteColumnName(name: string): string {
     return quoteColumnName(name);
   }
 
-  /**
-   * Mirrors: SQLite3::Quoting::ClassMethods#quote_table_name
-   * (sqlite3/quoting.rb:48-50) — dot-split, so `foo.bar` → `"foo"."bar"`.
-   */
   static override quoteTableName(name: string): string {
     return quoteTableName(name);
   }
@@ -254,62 +197,24 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new Visitors.SQLite(this);
   }
 
-  /**
-   * Mirrors: SQLite3Adapter#bind_params_length (sqlite3_adapter.rb:509-512).
-   * SQLite's default SQLITE_LIMIT_VARIABLE_NUMBER is 999; overrides the abstract
-   * DatabaseLimits default (65535), which exceeds the driver's compiled cap.
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   bindParamsLength(): number {
     return 999;
   }
 
   /**
-   * @internal Rails' `raw_connection`. Non-private so the extracted
-   * `performQuery` can read `changes` / `last_insert_row_id` off it through
-   * `PerformQueryHost`.
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#raw_connection (abstract_adapter.rb:798) under a non-Rails name; the extracted performQuery reads it off the host.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   driver!: SqliteConnection;
-  /**
-   * True after construction when the bound driver is async-only and the
-   * connection has not yet been established. Cleared by `completeAsyncConnect`.
-   */
   private _asyncConnectPending = false;
-  /** In-flight async-open promise, deduping concurrent completeAsyncConnect() calls. */
   private _connectingPromise: Promise<void> | null = null;
-  /**
-   * In-flight async driver.close() fired by disconnectBang(). Async-only drivers
-   * (expo-sqlite / WASM) return a Promise from close() that disconnectBang()
-   * cannot await (its contract is sync void), so we retain it here and chain
-   * repeated disconnect cycles onto it; close() awaits it so callers can be sure
-   * the handle is fully torn down. Sync drivers (better-sqlite3) leave this null.
-   */
   private _closingDriver: Promise<void> | null = null;
-  /**
-   * Mirrors: SQLite3Adapter#active? (sqlite3_adapter.rb:216-218).
-   *
-   * Ruby's `disconnect!` takes `@lock.synchronize`
-   * (`abstract_adapter.rb:696-701`), which BLOCKS, so `active?` never observes
-   * an open handle once `disconnect!` has returned. `disconnectBang` below
-   * cannot block on `_statementLock` and defers the close instead, so this —
-   * the async surface — drains that deferred close before it answers, and no
-   * caller awaiting it sees a handle Rails would already have closed.
-   */
   override async active(): Promise<boolean> {
     await this.whenClosed();
     return this.driver?.isOpen() ?? false;
   }
-  /**
-   * @internal The underlying driver connection handle. Exposed for
-   * client-specific extensions (e.g. the libsql embedded-replica adapter's
-   * `syncReplica()`, which reaches the connection's `sync()` escape hatch).
-   * Core code uses `this.driver` directly; subclasses must go through here.
-   *
-   * Awaits `ensureConnected()` first so async-only drivers (whose `driver` is
-   * unset until `completeAsyncConnect()` runs) don't hand back `undefined` when
-   * called before the deferred open completes.
-   */
+  /** @internal */
   protected async sqliteConnection(): Promise<SqliteConnection> {
     await this.ensureConnected();
     return this.driver;
@@ -318,71 +223,31 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _inTransaction = false;
   private _readonly: boolean;
   private _strict: boolean;
-  /**
-   * @internal Tail of the FIFO queue `performQuery` joins to hold the
-   * connection across a statement and its `sqlite3_changes()` readback —
-   * Rails' `@lock` around `perform_query`. `null` while the queue is empty.
-   */
+  /** @internal */
   _statementLock: Promise<void> | null = null;
-  /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
+  /** @internal */
   _lastAffectedRows = 0;
   _lastInsertRowid: number | bigint = 0;
   private _memoryDatabase: boolean;
   private _filename: string;
-  /**
-   * `database.yml`'s `statement_limit`, which Rails reads as
-   * `@config[:statement_limit]` inline at StatementPool construction
-   * (sqlite3_adapter.rb:803) and never exposes. trails' constructor
-   * destructures the adapter-level keys out of the config hash, so the value is
-   * held here — read by `buildStatementPool`, and declared before
-   * `_statements` so that field's initializer sees it.
-   *
-   * @internal
-   */
+  /** @internal */
   private _statementLimit = 1000;
   override _statements = this.buildStatementPool();
 
-  /**
-   * Whether this connection was opened with strict-strings mode (DQS disabled).
-   * Reflects the resolved value of the `strict` constructor option, which
-   * defaults to `SQLite3Adapter.strictStringsByDefault`. Rails keeps the
-   * resolved value in `@config[:strict]` (sqlite3_adapter.rb:127) and exposes
-   * no reader, so this one stays Rails-private.
-   * @internal
-   */
+  /** @internal */
   get _strictStrings(): boolean {
     return this._strict;
   }
 
-  /**
-   * Rails-shaped hash-only constructor: a single config hash whose `database`
-   * key names the file (or `:memory:`), merged with the adapter options.
-   * Mirrors `SQLite3Adapter#initialize(config)`.
-   *
-   * @missingRailsCall merge — CONVERGEABLE: sqlite3_adapter.rb:128-132 builds
-   *   `@connection_parameters = @config.merge(database:, results_as_hash:,
-   *   default_transaction_mode:)` because the sqlite3 gem takes the whole config hash
-   *   as driver options. trails' constructor still carries the `(filename, options)`
-   *   form and holds no `@connection_parameters`, so there is nothing to merge into.
-   *   Retired by RFC 0094's construction convergence
-   *   (`retire-sqlite3-positional-constructor-overload`).
-   */
+  /** @missingRailsCall merge — CONVERGEABLE */
   constructor(config: SQLite3Config);
-  /**
-   * @deprecated Positional `(filename, options)` form. Bridged to the
-   * Rails-shaped hash constructor; prefer passing a single config hash with a
-   * `database` key.
-   */
+  /** @deprecated */
   constructor(filename?: string | ":memory:", options?: SQLite3AdapterOptions);
   constructor(
     filenameOrConfig: string | ":memory:" | SQLite3Config = ":memory:",
     options: SQLite3AdapterOptions = {},
   ) {
     super();
-    // Rails-shaped hash form: a single config object whose `database` key is
-    // the file. An empty/missing `database` raises, mirroring Rails'
-    // "No database file specified" guard. The positional form keeps the
-    // legacy `:memory:` default for callers that pass no filename.
     let filename: string;
     if (typeof filenameOrConfig === "object") {
       const { database, ...rest } = filenameOrConfig;
@@ -395,9 +260,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       filename = filenameOrConfig;
     }
     this._memoryDatabase = isInMemoryDatabase(filename);
-    // Mirrors the non-`:memory:`/non-`file:` branch of Rails'
-    // `SQLite3Adapter#initialize`: expand the path and create its parent
-    // directory before the driver opens the handle below.
     if (!this._memoryDatabase && !filename.startsWith("file:")) {
       filename = this.prepareDatabasePath(filename);
     }
@@ -406,10 +268,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._readonly = options.readonly ?? false;
     this._strict = options.strict ?? SQLite3Adapter.strictStringsByDefault;
     (this._config as SQLite3AdapterOptions).strict = this._strict;
-    // abstract_adapter.rb:159 — `@prepared_statements = !ActiveRecord
-    // .disable_prepared_statements && type_cast_config_to_boolean(
-    // @config.fetch(:prepared_statements) { default_prepared_statements })`.
-    // `SQLite3Adapter` inherits the abstract `default_prepared_statements`.
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
       SQLite3Adapter.typeCastConfigToBoolean(
@@ -419,43 +277,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       );
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
-      // `@statements = build_statement_pool` runs after `@config` is assigned
-      // (abstract_adapter.rb:156); the TS field initializer above runs before
-      // this constructor body, so the pool is rebuilt once the limit is known.
       this._statements = this.buildStatementPool();
     }
     this.connect();
     if (!this._asyncConnectPending) void this.configureConnection();
   }
 
-  /**
-   * Expand the database path and ensure its parent directory exists, mirroring
-   * the non-`:memory:`/non-`file:` branch of Rails' `SQLite3Adapter#initialize`
-   * (`File.expand_path(db, Rails.root)` + `FileUtils.mkdir_p(File.dirname(db))`).
-   *
-   * Mirrors Rails' optional `Rails.root` seam: when `Trails.root` is set (by
-   * trailties' boot), relative paths expand against it; otherwise we fall back
-   * to the working directory (`getFs().cwd()`). An absolute path passes through
-   * `resolve` unchanged, matching Rails.
-   *
-   * The directory is created through the fs adapter rather than `node:fs`, and
-   * synchronously: like Rails' `initialize`, this constructor is synchronous
-   * and pre-warms the driver handle (version/encoding caches) before returning,
-   * so the directory must already exist by the time the driver opens — deferring
-   * the mkdir to the async connect path would race that open. A failed mkdir
-   * raises `NoDatabaseError`, mirroring Rails' `rescue SystemCallError`.
-   * @internal
-   */
+  /** @internal */
   private prepareDatabasePath(filename: string): string {
     const fs = getFs();
     const path = getPath();
     const expanded = path.resolve(trailsRoot() ?? fs.cwd(), filename);
     const dirname = path.dirname(expanded);
-    // Mirrors Rails' `unless File.directory?(dirname)`: a missing parent — or
-    // one that exists as a regular file — falls into the mkdir branch, where
-    // `FileUtils.mkdir_p` raises (caught as NoDatabaseError). An `existsSync`
-    // guard would skip the file case and leak the driver's open failure as a
-    // DatabaseConnectionError instead.
     let dirExists = false;
     try {
       dirExists = fs.statSync(dirname).isDirectory();
@@ -472,13 +305,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return expanded;
   }
 
-  /**
-   * Execute a statement and return its rows (empty for a statement that
-   * returns none, e.g. DDL). Wrapped in a `sql.active_record`
-   * instrumentation event — mirrors Rails' `AbstractAdapter#log`, so
-   * LogSubscriber / ExplainSubscriber / QueryCache / custom subscribers all
-   * observe the same query stream.
-   */
   async execute(
     sql: string,
     binds: unknown[] = [],
@@ -489,9 +315,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.materializeTransactions();
 
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
-    // gated only on materialize_transactions — which this path always does —
-    // and it runs even when the query raises.
     try {
       return await this.log(
         sql,
@@ -518,48 +341,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * The single SQL primitive `raw_execute` — and, in trails, `execute` /
-   * `executeMutation` — delegate to. The live implementation lives in the
-   * Rails-layout file `sqlite3/database-statements.ts` (`performQuery`) so
-   * parity:api's `perform_query` coverage points at reachable code; it is
-   * assigned to the prototype below with `this` as the adapter, whose
-   * `_cachedStatement` / `_freshStatement` / `verifiedBang` /
-   * `dirtyCurrentTransaction` and `_statementLock` / `_last*` fields satisfy
-   * the `PerformQueryHost` interface.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
-   * @internal
-   */
+  /** @internal */
   declare performQuery: typeof sqlitePerformQuery;
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#high_precision_current_timestamp
-   * (sqlite3/database_statements.rb:49-51).
-   */
   declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
 
-  /**
-   * Rows affected by the most recent write. Rails takes the statement result
-   * and ignores it, reading `@last_affected_rows` instead.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows
-   */
-  // The arg is optional because this is only trails' public accessor for the
-  // tracked count now — Rails' framework-internal `affected_rows(result)` call
-  // site (exec_delete/exec_update) has no analogue here: executeMutation returns
-  // the count as a local from performQuery rather than re-reading the shared
-  // field through this port, which would re-open the concurrent-write race. The
-  // port ignores the arg either way (reads @last_affected_rows).
   /** @internal */
   affectedRows(result?: unknown): number {
     return sqliteAffectedRows.call(this, result);
   }
 
-  // A statement prepared outside the pool — Rails' non-`prepare` branch, which
-  // prepares a fresh statement per call rather than caching it.
-  // Non-private (underscore-public) so the extracted `performQuery` in
-  // sqlite3/database-statements.ts can reach it through PerformQueryHost.
   async _freshStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
     const stmt = await this.driver.prepare(sql);
@@ -569,10 +360,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async _cachedStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
-    // When preparedStatements is off, skip the pool and prepare per call —
-    // matches Rails' `statement_pool` behavior gated on
-    // `prepared_statements`. better-sqlite3 still uses its own statement
-    // handle internally, but we no longer cache across executes.
     if (!this.preparedStatements) {
       const stmt = await this.driver.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
@@ -595,18 +382,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  // readBigInts is statement-wide, so enabling it for one BIGINT column also
-  // turns every INTEGER column of the same row into a bigint. Ruby has a single
-  // Integer, and Rails' raw values carry no width: `Book#status_before_type_cast`
-  // over `t.integer :status` is `2`, and `Membership`'s integer `type` reaches
-  // `EnumType#cast` as `2` — a spilled `2n` misses both. Narrow the spill back
-  // at the row boundary so only bigint-declared columns keep the wide value, and
-  // only where the value still fits a JS number (above that, a bigint is the
-  // faithful reading and the alternative is silent precision loss).
-  // Non-private (underscore-public) so the extracted `performQuery` in
-  // sqlite3/database-statements.ts can reach it through PerformQueryHost —
-  // it is the one reader arm, so every path (`execQuery`, `execute`,
-  // `rawExecute`, `loadAsync`) narrows identically.
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void {
     const wide = new Set(
       stmt
@@ -630,32 +405,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
-   * Wrapped in a `sql.active_record` notification — see `execute`.
-   *
-   * Rails has no `execute_mutation`; the `execute`/`executeMutation` split is a
-   * deliberate trails deviation justified once at the `AbstractAdapter`
-   * declaration (abstract-adapter.ts, `executeMutation` on the
-   * DatabaseStatements signature block) — read it there before changing this.
-   * In particular, this cannot be rerouted through `execute`: the two share
-   * one `performQuery` and differ only in what they answer — rows here, the
-   * affected-row count or insert rowid there.
-   */
   async executeMutation(
     sql: string,
     binds: unknown[] = [],
     name: string | null = "SQL",
   ): Promise<number> {
-    // preprocessQuery runs Rails' check_if_write_query, which raises
-    // ReadOnlyError while writes are prevented — see isPreventingWrites below.
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
     await this.materializeTransactions();
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
-    // gated only on materialize_transactions — which this path always does —
-    // and it runs even when the query raises.
     try {
       return await this.log(
         sql,
@@ -690,22 +448,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Begin a transaction.
-   */
   private _previousReadUncommitted: unknown = null;
 
-  // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
     return this.internalBeginTransaction("deferred", isolation ?? null);
   }
 
-  // Mirrors: SQLite3::DatabaseStatements#begin_isolated_db_transaction
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
     return this.internalBeginTransaction("deferred", isolation);
   }
 
-  // Mirrors: SQLite3::DatabaseStatements#internal_begin_transaction
   private async internalBeginTransaction(mode: string, isolation: string | null): Promise<void> {
     if (isolation) {
       if (isolation !== "read_uncommitted") {
@@ -714,8 +466,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         );
       }
       if (!this.isSharedCache()) {
-        // Rails raises a bare StandardError here, distinct from the
-        // TransactionIsolationError above (database_statements.rb:67-68).
         throw new Error(
           "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
         );
@@ -735,7 +485,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
   async resetIsolationLevel(): Promise<void> {
     if (this._previousReadUncommitted !== null) {
       await this.internalExecute(
@@ -748,13 +497,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
-  // materializeTransactions defaults to true; transaction-control SQL passes false
-  // to keep its byte-identical no-materialize path. Rails' with_raw_connection
-  // `ensure dirty_current_transaction if materialize_transactions`
-  // (abstract_adapter.rb:1046) is relocated to this method's finally so a savepoint
-  // statement (materialize:true, savepoints.rb:11-20) dirties the current — parent,
-  // for a popped RELEASE/ROLLBACK TO SAVEPOINT frame — transaction on every exit.
   override async internalExecute(
     sql: string,
     name: string = "SQL",
@@ -774,17 +516,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Mirrors: DatabaseStatements#raw_execute (abstract/database_statements.rb:552)
-   * — `log` around `perform_query`, and the only entry point that takes
-   * `batch:`, which is how `execute_batch` reaches the batch arm
-   * (sqlite3/database_statements.rb:126-129). `with_raw_connection` is not
-   * routed through: this adapter materializes and dirties around the whole
-   * call itself (Rails' `ensure dirty_current_transaction if
-   * materialize_transactions`, abstract_adapter.rb:1046), keeping
-   * transaction-control SQL on its byte-identical no-materialize path.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE DatabaseStatements#raw_execute (abstract/database_statements.rb:552) overridden so the batch arm and dirtying stay adapter-local.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override async rawExecute(
     sql: string,
@@ -800,9 +533,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     try {
       if (materializeTransactions) await this.materializeTransactions();
       const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-      // Rails: `log(sql, name, binds, type_casted_binds, async: async)`
-      // (abstract/database_statements.rb:554) — a scheduled FutureResult's
-      // event must carry `async: true` in its payload.
       return await this.log(
         sql,
         name,
@@ -827,20 +557,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  // Rails' SQLite3Adapter has no `exec_query` override: `exec_query` lives on
-  // the abstract DatabaseStatements and funnels into `internal_exec_query`, so
-  // we inherit it.
-
-  // Rails' SQLite3Adapter has no `internal_exec_query` override: the abstract
-  // `cast_result(internal_execute(...))`
-  // (abstract/database_statements.rb:546-548) funnels the whole read path
-  // through the one `perform_query` (sqlite3/database_statements.rb:78-113),
-  // so we inherit it too.
-
-  // Mirrors: SQLite3::DatabaseStatements#begin_db_transaction
   async beginDbTransaction(): Promise<void> {
-    // DEVIATION: Rails has no re-entrancy guard; the pool proxy can replay a
-    // begin against an already-open connection and SQLite rejects nested BEGIN.
     if (this._inTransaction) return;
     return this.internalBeginTransaction("immediate", null);
   }
@@ -849,9 +566,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
-  /**
-   * Commit the current transaction.
-   */
   async commitDbTransaction(): Promise<void> {
     await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], {
       allowRetry: true,
@@ -874,8 +588,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         materializeTransactions: false,
       });
     } catch (e) {
-      // Mirrors Rails: rescue ConnectionNotEstablished, ConnectionFailed.
-      // A closed/dropped connection is an implicit rollback; re-throw anything else.
       const translated = this._translateException(e, "ROLLBACK TRANSACTION", []);
       if (!(translated instanceof ConnectionNotEstablished)) throw translated;
     }
@@ -889,49 +601,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.rollbackDbTransaction();
   }
 
-  /**
-   * Create a savepoint (nested transaction).
-   */
   async createSavepoint(name: string): Promise<void> {
-    // materializeTransactions defaults to true, matching Rails savepoints.rb:11-20.
-    // internalExecute's finally then dirties the current transaction (Rails'
-    // with_raw_connection ensure) — see internalExecute above.
     await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
-  /**
-   * Release a savepoint.
-   */
   async releaseSavepoint(name: string): Promise<void> {
     await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
-  /**
-   * Rollback to a savepoint.
-   */
   async rollbackToSavepoint(name: string): Promise<void> {
     await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
-  /**
-   * Return the query execution plan.
-   *
-   * Runs through `internalExecQuery` (as Rails does) so the EXPLAIN
-   * itself is instrumented as a `sql.active_record` query.
-   *
-   * Deviation: Rails hardcodes empty binds
-   * (`internal_exec_query(sql, "EXPLAIN", [])`,
-   * sqlite3/database_statements.rb:20) because `to_sql(arel, binds)` on an
-   * already-rendered String returns it with the `?` placeholders intact and
-   * the Ruby sqlite3 gem binds the missing parameters as NULL. better-sqlite3
-   * and node:sqlite instead raise `Too few parameter values were provided`, so
-   * the collected binds are forwarded rather than discarded. EXPLAIN QUERY PLAN
-   * does not evaluate the query, so the bound values never affect the plan.
-   *
-   * Options are accepted for signature parity with `Relation#explain` but
-   * ignored — SQLite has no equivalent to PG's `:analyze` / `:verbose`
-   * toggles.
-   */
   async explain(
     sql: string,
     binds: unknown[] = [],
@@ -942,22 +623,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return printer.pp(result);
   }
 
-  /**
-   * Quote a value for inclusion in a SQL literal. SQLite uses plain
-   * `'' ` string escaping (no backslash escapes), `1/0` for booleans,
-   * and `x'hex'` for binary.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting#quote
-   */
   override quote(value: unknown): string {
-    // Thread `this` so date/time literals dispatch through quotedDate /
-    // quotedTime (mirrors Rails' `super` call in SQLite3::Quoting#quote).
     return sqliteQuote.call(this, value);
   }
 
-  // Exposed so the inherited abstract `quote` dispatch reaches SQLite's
-  // overrides. `quotedTime` keeps the 2000-01-01 date prefix; `quotedDate`
-  // matches the abstract. Mirrors: SQLite3::Quoting#quoted_date / #quoted_time.
   quotedDate(value: Parameters<typeof sqliteQuotedDate>[0]): string {
     return sqliteQuotedDate(value);
   }
@@ -970,14 +639,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteTypeCast.call(this, value);
   }
 
-  /**
-   * SQLite-specific quoting overrides — route every Quoting interface
-   * method to the per-adapter module so call sites can dispatch via
-   * `connection.quoteX(...)` and get the dialect-correct form
-   * (double-quote identifiers, `"1"`/`"0"` bools, hex binary literals).
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting overrides.
-   */
   override quoteString(s: string): string {
     return sqliteQuoteString(s);
   }
@@ -986,20 +647,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteQuoteTableNameForAssignment(table, attr);
   }
 
-  // Mirrors SQLite3::Quoting#quote_default_expression (sqlite3/quoting.rb:99):
-  // a Proc default that reads as a function call (`\A\w+\(.*\)\z`) is wrapped in
-  // parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`); any other Proc result
-  // (bare keyword expressions like CURRENT_TIMESTAMP, or an already-parenthesized
-  // expression) is emitted verbatim. Non-Proc values fall through to `super`,
-  // which serializes through the column's cast type (abstract/quoting.rb:161) —
-  // so a structured `json` default (`default: {}`) is JSON-encoded to `{}` there,
-  // not pre-serialized here (which would double-encode via `super`'s serialize).
-  // The Proc is invoked exactly once (Rails calls `value.call` once), so a proc
-  // with side effects is not double-evaluated. In Rails `SqlLiteral < String`, so
-  // a SqlLiteral result runs through the same `match?` regex — unwrap to its
-  // string and apply the same paren-wrap branch rather than special-casing it.
-  // Return type carries the widened base union for the super call; this
-  // implementation itself never returns a Promise.
   override quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
     if (typeof value === "function") {
       const result = (value as () => unknown)();
@@ -1014,12 +661,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return super.quoteDefaultExpression(value, column);
   }
 
-  // Rails' abstract quote_default_expression serializes the value through the
-  // column's cast type before quoting (abstract/quoting.rb:157). A structured
-  // default for a `json` column (`default: {}`) must serialize to the JSON text
-  // `{}` rather than being coerced with `String({})` → "[object Object]". Route
-  // only plain-object/array defaults through the column type; scalars, dates,
-  // SqlLiteral, and other class instances keep their existing quoting paths.
   private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
     if (!sqlType || !isStructuredDefault(value)) return value;
     const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
@@ -1043,14 +684,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override quotedBinary(value: unknown): string {
-    // Mirrors: SQLite3::Quoting#quoted_binary (`sqlite3/quoting.rb:79`)
-    // — Rails calls `value.hex` and would NoMethodError on non-Binary
-    // values. The TS standalone iterates the value as a byte source,
-    // so non-binary inputs (strings, plain arrays) silently produce
-    // garbage hex. Validate at the interface boundary.
-    //
-    // Rails passes the `Type::Binary::Data` itself; our `quote` unwraps to bytes
-    // before dispatching, so accept both and this stays callable Rails-shaped.
     if (value instanceof BinaryData || value instanceof Uint8Array) {
       return sqliteQuotedBinary(value);
     }
@@ -1064,9 +697,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     );
   }
 
-  /**
-   * Close the database connection.
-   */
   async close(): Promise<void> {
     if (this._closingDriver) {
       const closing = this._closingDriver;
@@ -1077,79 +707,28 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Pool-teardown drain hook. After `disconnectBang()` fires an async-only
-   * `driver.close()`, the underlying handle is still closing even though the
-   * synchronous teardown returned. The pool awaits this so no async close is
-   * left in flight before it reports teardown complete (e.g. before a test
-   * re-opens the same in-memory/file DB and races the prior handle).
-   *
-   * Sync drivers (better-sqlite3) close synchronously inside `disconnectBang()`
-   * and leave `_closingDriver` null, so this resolves immediately — a no-op.
-   *
-   * Rails' `disconnect!` is synchronous; this drain is a TypeScript-async
-   * necessity for promise-returning drivers, not a divergence in observable
-   * teardown behavior.
-   *
-   * @noRailsEquivalent PERMANENT — Rails' `disconnect!`
-   * (sqlite3_adapter.rb:221) closes the handle synchronously and has nothing to
-   * drain, so no Rails method can map onto this hook.
-   */
+  /** @noRailsEquivalent PERMANENT */
   whenClosed(): Promise<void> {
     return this._closingDriver ?? Promise.resolve();
   }
 
-  /**
-   * Check if the database is open.
-   */
   get isOpen(): boolean {
     return this.driver?.isOpen() ?? false;
   }
 
-  /**
-   * Check if we're in a transaction.
-   */
   get inTransaction(): boolean {
     return this._inTransaction;
   }
 
-  /**
-   * Execute raw SQL (for DDL and other non-query statements).
-   */
   async exec(sql: string): Promise<void> {
     await this.ensureConnected();
     await this.driver.exec(sql);
   }
 
-  /**
-   * Driver-specific escape hatch — returns whatever the registered SqliteDriver
-   * exposes as `connection.raw`. With better-sqlite3, that's the `Database`
-   * instance; with node:sqlite, sqlite-wasm, expo-sqlite, etc., it's whichever
-   * handle that driver documents. Consumers cast at the use site.
-   */
   get raw(): unknown {
     return this.driver?.raw;
   }
 
-  /**
-   * Build a SqlTypeMetadata from a raw SQLite column type string. Used by
-   * `newColumnFromField` (the Rails `new_column_from_field` flow) so `columns()`
-   * and the schema-statements column path share one type-reflection routine.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata
-   * (schema_statements.rb:1717) — resolve the cast type from the whole `sql_type`
-   * and carry `type`/`limit`/`precision`/`scale` straight off it, holding the full
-   * `sql_type` verbatim. trails' SQLite type map recovers the scalar hints off the
-   * cast type at lookup time: limits via `register_class_with_limit`, temporal/
-   * decimal precision via `register_class_with_precision`, and the 8-byte INTEGER
-   * default on `SQLite3Integer#_limit` (private) so the public `limit` stays
-   * nil for bare integers — dumps stay bare and `c_int_1..8` keep their 1..8.
-   *
-   * `type` comes straight from `cast_type.type` (no base-name fallback). For an
-   * unmapped `sql_type` the map returns a `ValueType`, whose `type()` — like
-   * Rails' `Value#type` — is nil (`undefined`), so `type` reflects nil while the
-   * verbatim `sqlType` is retained for the raw declaration.
-   */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
     const castType = this.lookupCastType(raw) as import("@blazetrails/activemodel").Type;
@@ -1161,8 +740,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       scale: castType.scale,
     });
   }
-
-  // --- Capability overrides (Rails: SQLite3Adapter returns true for these) ---
 
   override supportsDdlTransactions(): boolean {
     return true;
@@ -1212,18 +789,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return (await this.databaseVersion).compare("3.35.0") >= 0;
   }
 
-  /** Mirrors: SQLite3::DatabaseStatements#returning_column_values — the full
-   *  first row of the RETURNING result (supports multi-column RETURNING). *
-   * @internal
-   */
+  /** @internal */
   override returningColumnValues(result: Result): unknown[] | undefined {
     return sqliteReturningColumnValues(result);
   }
 
-  /** Mirrors: SQLite3::DatabaseStatements#execute_batch
-   *  (sqlite3/database_statements.rb:126-129).
-   * @internal
-   */
+  /** @internal */
   override async executeBatch(
     statements: string[],
     name?: string | null,
@@ -1232,18 +803,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteExecuteBatch.call(this, statements, name, kwargs);
   }
 
-  /** SQLite has no TRUNCATE; emit `DELETE FROM`.
-   *  Mirrors: SQLite3::DatabaseStatements#build_truncate_statement
-   * @internal
-   */
+  /** @internal */
   override buildTruncateStatement(tableName: string): string {
     return sqliteBuildTruncateStatement.call(this, tableName);
   }
 
-  /** SQLite3's `perform_query` already returns an ActiveRecord::Result, so
-   *  `cast_result` is the identity. Mirrors SQLite3::DatabaseStatements#cast_result.
-   * @internal
-   */
+  /** @internal */
   castResult(result: Result): Result {
     return sqliteCastResult(result);
   }
@@ -1301,20 +866,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override disconnectBang(): void {
-    // Rails' `disconnect!` (sqlite3_adapter.rb:221) runs under the same `@lock`
-    // that `with_raw_connection` holds around `perform_query`
-    // (abstract/database_statements.rb:552-559), so a close can never land
-    // between a statement's preparation and its execution. `_statementLock` is
-    // that lock here, and it cannot be awaited from a sync body — so when it is
-    // held, chain the close onto its tail rather than closing the handle out
-    // from under a queued statement. `close()` / `whenClosed()` drain it, and
-    // `active()` drains it before it answers — so the deferral is invisible on
-    // every surface a caller can await, which is the whole of what Ruby's
-    // blocking `@lock.synchronize` buys. The two helpers below exist only to
-    // express that deferral: Rails needs neither, because `disconnect!`
-    // (sqlite3_adapter.rb:221) is one straight-line body under a lock that
-    // blocks. They go away with `_statementLock` itself once `perform_query`
-    // runs under `with_raw_connection`'s adapter-level lock (RFC 0076).
     const ahead = this._statementLock;
     if (ahead) {
       this._chainClose(ahead.then(() => this._disconnect()));
@@ -1323,13 +874,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * @internal The body of `disconnect!`, split out so `disconnectBang` can run
-   * it either inline or on the tail of `_statementLock`.
-   * Ruby's `@lock.synchronize` blocks the thread, so Rails' `disconnect!` has
-   * one straight-line body; a JS runtime has no blocking wait and can only
-   * defer.
-   */
+  /** @internal */
   private _disconnect(): void {
     super.disconnectBang();
     if (this.driver?.isOpen()) {
@@ -1339,30 +884,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._inTransaction = false;
   }
 
-  /**
-   * @internal Appends a teardown promise to `_closingDriver` so repeated
-   * disconnect cycles are drained in order and no earlier teardown is lost.
-   * Same blocking-wait shortcoming as `_disconnect`: Rails' `disconnect!`
-   * closes the handle synchronously (sqlite3_adapter.rb:221) and has nothing
-   * to chain.
-   */
+  /** @internal */
   private _chainClose(closing: Promise<void>): void {
     const settled = closing.catch(() => {});
     this._closingDriver = this._closingDriver ? this._closingDriver.then(() => settled) : settled;
   }
 
-  /**
-   * Mirrors Rails' private `reconnect` (sqlite3_adapter.rb): if the handle is
-   * still live, roll back any in-flight raw transaction in place (preserving an
-   * in-memory database); otherwise open a fresh connection. The abstract
-   * `reconnectBang` lifecycle then re-runs `configure_connection`.
-   *
-   * @internal
-   */
+  /** @internal */
   override async reconnect(): Promise<void> {
     if (await this.active()) {
-      // Mirrors `@raw_connection.rollback rescue nil` — a ROLLBACK with no
-      // active transaction raises, which we swallow like Rails does.
       try {
         await this.driver.exec("ROLLBACK");
       } catch {}
@@ -1376,22 +906,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._inTransaction = false;
   }
 
-  // SQLite has no adapter-specific `ColumnMethods` module (sqlite3/schema_definitions.rb
-  // defines none), so it inherits the abstract `_columnMethodNames()` list unchanged —
-  // no override here is intentional.
-
   nativeDatabaseTypes(): NativeDatabaseTypes {
     return SQLITE3_NATIVE_DATABASE_TYPES;
   }
 
-  /**
-   * Database text encoding. Rails reads `@raw_connection.encoding`
-   * synchronously; an async-only driver (no `openSync()`) returns a Promise
-   * from `pragma()`, so we memoize the value during `connect()`/`connectAsync()`
-   * and the getter serves the cached string. Before the connection is open (deferred async-only checkout),
-   * there is nothing to read, so we fall back to SQLite's "UTF-8" default rather
-   * than leaking a Promise cast as an array.
-   */
   get encoding(): string {
     if (this._encoding !== null) return this._encoding;
     return SQLite3Adapter.parseEncoding(this.driver?.pragma("encoding"));
@@ -1399,46 +917,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private _encoding: string | null = null;
 
-  /** Extract the encoding string from a sync `PRAGMA encoding` result. @internal */
+  /** @internal */
   private static parseEncoding(result: unknown): string {
     const rows = result as Array<{ encoding: string }> | undefined;
     return rows?.[0]?.encoding ?? "UTF-8";
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT: sqlite3_adapter.rb:473 reads
-   *   `@config.fetch(:flags, 0).anybits?(::SQLite3::Constants::Open::SHAREDCACHE)`.
-   *   No JS SQLite driver exposes the `SQLITE_OPEN_*` open-flag bitmask, so there is
-   *   no `flags` config entry to fetch; the `cache=shared` URI query parameter is the
-   *   only way shared cache can be requested here.
-   */
+  /** @missingRailsCall fetch — PERMANENT */
   isSharedCache(): boolean {
     const qIdx = this._filename.indexOf("?");
     if (qIdx === -1) return false;
     return this._filename.slice(qIdx).includes("cache=shared");
   }
 
-  /**
-   * Mirrors: SQLite3Adapter#get_database_version (`sqlite3_adapter.rb:476-478`)
-   * — a pure fetch, run at most once through the pool memo
-   * (`pool_config.rb:39-41`), which `database_version` fills on demand.
-   *
-   * Deviation, language-forced: Rails reads the value through
-   * `query_value(..., "SCHEMA")`, whose trails counterpart is `async`. The
-   * query is issued on the driver so an in-process driver can answer
-   * synchronously; an async-only driver (no `openSync()`) answers a Promise,
-   * which the pool memo resolves. Nothing is open on the deferred
-   * async-checkout path, where Rails has no connection to ask at all.
-   *
-   * @missingRailsCall query_value — PERMANENT: Per-entry verified (RFC 0106 sqlite3
-   *   introspection cluster), sqlite3_adapter.rb:477: Rails reads the version
-   *   through `query_value(..., "SCHEMA")`, whose trails counterpart is `async`,
-   *   while `getDatabaseVersion` must be able to answer synchronously for an
-   *   in-process driver (the pool memo at pool_config.rb:39-41 fills
-   *   `databaseVersion` on demand and callers read it synchronously). The query
-   *   is therefore issued straight on the driver; the deviation is documented on
-   *   the method's JSDoc.
-   */
+  /** @missingRailsCall query_value — PERMANENT */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
@@ -1461,14 +953,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Rails has no SQLite3-level `self.database_exists?` — the base's
-   * `new(config).database_exists?` suffices there because
-   * `SQLite3Adapter#initialize` does not open the file. trails' constructor
-   * connects eagerly (`this.connect()` above), which would CREATE the database
-   * it was asked about, so the class-level probe has to answer from the config
-   * instead of instantiating. The instance method below is the faithful port.
-   */
   static override async databaseExists(config: { database?: string }): Promise<boolean> {
     if (!config.database || config.database === ":memory:") return true;
     try {
@@ -1478,26 +962,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Mirrors Rails' `SQLite3Adapter#database_exists?` (sqlite3_adapter.rb:135):
-   * `@config[:database] == ":memory:" || File.exist?(@config[:database].to_s)`.
-   * SQLite needs no connection to answer — the file either is there or isn't —
-   * so this overrides the base's `connect!` probe. `_filename` is the path the
-   * driver actually opens (the constructor expands it), which is what the
-   * existence check has to ask about.
-   */
   override async databaseExists(): Promise<boolean> {
     return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
-  /**
-   * @missingRailsCall include? — CONVERGEABLE: sqlite3_adapter.rb:36-41 rescues
-   *   `Errno::ENOENT` and re-raises `NoDatabaseError` only when
-   *   `error.message.include?("No such file or directory")`. trails' `newClient`
-   *   constructs an adapter rather than opening a file, so there is no open-time errno
-   *   to classify here and the missing-database mapping happens in `translateException`.
-   *   Moves back to open time with RFC 0094's construction convergence.
-   */
+  /** @missingRailsCall include? — CONVERGEABLE */
   static newClient(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     config: { database?: string; readonly?: boolean },
@@ -1505,12 +974,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new this(config.database ?? ":memory:", { readonly: config.readonly });
   }
 
-  /**
-   * Mirrors: SQLite3Adapter.dbconsole (sqlite3_adapter.rb:44-52) — the
-   * `-#{mode}` / `-header` flags precede the database path, then the whole argv
-   * goes to `find_cmd_and_exec` with the configured sqlite client. Only the
-   * `exec` inside that helper is unported; see AbstractAdapter.findCmdAndExec.
-   */
   static override dbconsole(
     config?: { database?: string },
     options: { mode?: string; header?: boolean } = {},
@@ -1527,10 +990,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
-   * (`sqlite3_adapter.rb:286-292`).
-   */
   async removeIndex(
     tableName: string,
     columnOrOptions?:
@@ -1539,8 +998,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       | { name?: string; column?: string | string[]; ifExists?: boolean },
     options: { name?: string; column?: string | string[]; ifExists?: boolean } = {},
   ): Promise<void> {
-    // Rails: `remove_index(table_name, column_name = nil, **options)` — column
-    // may be positional or in the options hash.
     let columnName: string | string[] | undefined;
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
@@ -1549,8 +1006,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       options = { ...columnOrOptions, ...options };
     }
 
-    // Rails: `return if options[:if_exists] && !index_exists?(table_name,
-    // column_name, **options)` (sqlite3_adapter.rb:287).
     if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
@@ -1562,26 +1017,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return Sqlite3SchemaDumper.create(this, options);
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
   async virtualTableExists(tableName: string): Promise<boolean> {
     return sqliteVirtualTableExists(this, tableName);
   }
 
-  /** Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::VIRTUAL_TABLE_REGEX */
   static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
 
-  /**
-   * Returns a list of defined virtual tables, as the
-   * `[tableName, [moduleName, arguments]]` pairs Rails' trailing `.to_a`
-   * produces (sqlite3_adapter.rb:296-307). Built through a `Map` because Rails
-   * builds a Hash first (`each_with_object({})`), so a repeated `tableName`
-   * collapses last-write-wins at its first-insertion position.
-   *
-   * Rails' `arguments` local is `args` here — `arguments` is not a legal
-   * binding name in a strict-mode module.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
-   */
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
@@ -1679,15 +1120,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    // Rails' extract_new_default_value only unwraps a Hash when it carries BOTH
-    // :from and :to (schema_statements.rb:1820); a bare structured default like
-    // `{}` is the literal default, not a changes hash.
     const newDefault = this.extractNewDefaultValue(defaultOrChanges);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      // The raw value, not a literal: schemaCreation re-emits it through
-      // quoteDefaultExpression, which serializes it through the column's cast
-      // type, so `default: {}` on a json column quotes to `{}`. Unguarded, as
-      // in Rails — an unknown column raises rather than rebuilding unchanged.
       definition.get(columnName)!.options.default = newDefault;
     });
   }
@@ -1700,8 +1134,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): Promise<void> {
     this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ !== undefined) {
-      // Rails backfills NULLs via quote_default_expression, which serializes the
-      // value through the column's cast type (abstract/schema_statements.rb).
       const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
       const serialized = this.serializeDefaultForColumn(default_, existing?.sqlType ?? null);
       const quotedDefault = this.quoteDefault(serialized);
@@ -1752,14 +1184,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const rows = (
       await this.internalExecQuery(`PRAGMA foreign_key_list(${this.quote(tableName)})`, "SCHEMA")
     ).toArray();
-    // Deferred or immediate foreign keys can only be seen in the CREATE TABLE sql
-    // Rails: `table_structure_sql(table_name).select { |column_string|
-    // column_string.start_with?("CONSTRAINT") && column_string.include?("FOREIGN
-    // KEY") }.to_h { ... }` (sqlite3_adapter.rb:421-431). Like Rails' FK_REGEX,
-    // which matches a single quoted column on each side, this resolves only
-    // single-column constraints: the split lookahead cuts a composite
-    // `FOREIGN KEY ("a", "b")` at its inner comma, so a composite reflects as
-    // deferrable-absent in trails exactly as it does in Rails.
     const fkStrings = (await this.tableStructureSql(tableName)).filter(
       (columnString) =>
         columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
@@ -1773,12 +1197,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       fkDefs[`${table},${from},${to}`] =
         mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate";
     }
-    // Ruby's `group_by` returns a Hash in first-encounter order of the key
-    // (sqlite3_adapter.rb:432), and `.values` inherits it. A `Record` keyed by
-    // the numeric `id` would not: JS iterates integer-like keys in ascending
-    // numeric order regardless of insertion order, which silently substitutes
-    // SQLite's id numbering for the pragma's row order. Hold the groups in an
-    // array — that IS the encounter order — and index into it separately.
     const groupedFk: Array<Array<Record<string, unknown>>> = [];
     const groupsById: Record<string, Array<Record<string, unknown>>> = {};
     for (const row of rows) {
@@ -1800,9 +1218,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const toTable = first.table as string;
       const onDelete = this.extractForeignKeyAction(first.on_delete as string);
       const onUpdate = this.extractForeignKeyAction(first.on_update as string);
-      // Rails returns composite column/primary_key as arrays and a bare string
-      // for single-column FKs (sqlite3_adapter.rb#foreign_keys). The name and
-      // deferrable maps are still keyed on the comma-joined column list.
       const fromCols = group.map((r) => r.from as string);
       const toCols = group.map((r) => r.to as string);
       const column = fromCols.length === 1 ? fromCols[0] : fromCols;
@@ -1813,11 +1228,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const name = namesByColumn.get(columnKey) ?? `fk_${tableName}_${nameKey}`;
       const deferrable = fkDefs[`${toTable},${columnKey},${primaryKeyKey}`];
       results.push(
-        // Rails' SQLite foreign_keys options hash carries on_delete/on_update/
-        // deferrable/column/primary_key but no :name (we synthesize one for the
-        // dump), so a name lookup is sliced out (matches) rather than compared.
-        // It also has no :validate, so validate is left unstored (value still
-        // defaults to true).
         new ForeignKeyDefinition(
           tableName,
           toTable,
@@ -1835,7 +1245,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return results;
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_insert_sql.
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     let sql = `INSERT ${insert.into()}`;
 
@@ -1888,18 +1297,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Parse FK constraint names from CREATE TABLE SQL. PRAGMA
-   * foreign_key_list doesn't expose names, but the DDL does when
-   * CONSTRAINT <name> was used. Returns a map keyed by the
-   * comma-joined column list (e.g. "a,b" for composites).
-   */
   private async _parseForeignKeyNames(tableName: string): Promise<Map<string, string>> {
-    // `table_structure_sql(table_name, column_names)` with an explicit empty
-    // column list (sqlite3_adapter.rb:757) is Rails' own second parameter: the
-    // `Regexp.union([])` it produces is `(?!)`, so the split fires only before
-    // CONSTRAINT and never at the inner comma of a composite
-    // `FOREIGN KEY ("a", "b")` — which the column-union split does cut.
     const fkStrings = (await this.tableStructureSql(tableName, [])).filter(
       (columnString) =>
         columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
@@ -1931,10 +1329,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return `'${sqliteQuoteString(String(value))}'`;
   }
 
-  /**
-   * List user tables. Excludes SQLite's internal `sqlite_*` tables and
-   * matches Rails' SQLite3::SchemaStatements#tables filter.
-   */
   async tables(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(
@@ -1955,23 +1349,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows.map((r) => r.name);
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#data_source_sql
-   *
-   * Wired onto the adapter so SchemaStatements#viewExists dispatches here
-   * (via this.adapter.dataSourceSql) instead of hitting the abstract
-   * NotImplementedError stub.
-   *
-   * @internal
-   */
+  /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /**
-   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
-   * callable with the kwargs alone, and TypeScript cannot skip a leading
-   * positional, so the options object may arrive in its place.
-   *
-   * @internal
-   */
+  /** @internal */
   dataSourceSql(options: { type?: string }): string;
   /** @internal */
   dataSourceSql(
@@ -1985,9 +1365,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async tableExists(name: string): Promise<boolean> {
-    // Rails guards with `if table_name.present?` and returns nil for nil/blank
-    // names (schema_statements.rb:61); we return false for the same observable
-    // `table_exists?(nil)` result rather than dereferencing a null name.
     if (name == null) return false;
     const rows = (
       await this.internalExecQuery(
@@ -1998,12 +1375,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows.length > 0;
   }
 
-  /**
-   * Return the primary key for the named table: a single string for
-   * scalar PKs, an array for composite PKs, or null for rowid-only
-   * tables (no explicit PK column). Matches Rails' SchemaCache which
-   * stores `string | string[] | null` for primary_keys entries.
-   */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const rows = (
       await this.internalExecQuery(`PRAGMA table_info(${quoteTableName(tableName)})`, "SCHEMA")
@@ -2014,24 +1385,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return pks.map((r) => r.name);
   }
 
-  /**
-   * Return Column objects for the named table.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#columns —
-   * `table_structure → table_structure_with_collation → new_column_from_field`.
-   * Routing every field through `newColumnFromField` (rather than a parallel
-   * hand-rolled reflection) means STORED/VIRTUAL generated columns report their
-   * generation expression as `default_function`, since
-   * `tableStructureWithCollation` overrides the GENERATED `dflt_value`.
-   */
-  /**
-   * Mirrors: SQLite3::SchemaStatements#new_column_from_field
-   * (sqlite3/schema_statements.rb:143) — the per-adapter callee the abstract
-   * `columns` (schema_statements.rb:107-113) maps `column_definitions` through.
-   * Rails' SQLite3Adapter defines no `columns` of its own.
-   *
-   * @internal
-   */
+  /** @internal */
   private newColumnFromField(
     tableName: string,
     field: Record<string, unknown>,
@@ -2044,32 +1398,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteIndexes(this, tableName);
   }
 
-  /**
-   * Mirrors: SQLite3::SchemaStatements#valid_table_definition_options
-   *
-   * @internal
-   */
+  /** @internal */
   validTableDefinitionOptions(): string[] {
     return sqliteValidTableDefinitionOptions.call(this);
   }
 
-  /**
-   * Mirrors: SQLite3::SchemaStatements#validate_index_length!
-   * (sqlite3/schema_statements.rb:139-141) — `super unless internal`. The
-   * temporary table `alter_table` copies through is `a#{from}` and its indexes
-   * are renamed `t#{name}`, so an index already at the 64-character limit goes
-   * one over; `internal: true` from `copy_table_indexes` is what exempts it.
-   *
-   * @internal
-   */
+  /** @internal */
   override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
     sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
   }
 
-  /**
-   * Parse CHECK constraints from the CREATE TABLE SQL.
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#check_constraints
-   */
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const tableSql = (await this.queryValue(
       `SELECT sql FROM sqlite_master WHERE name = ${this.quote(tableName)} AND type = 'table' ` +
@@ -2078,9 +1416,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       "SCHEMA",
     )) as string | null;
 
-    // Rails' scan regex names the constraint with a bare `\w+`; SQLite also
-    // accepts a double-quoted identifier there, so the quoted form is a second
-    // alternative rather than a replacement.
     const regex =
       /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+CHECK\s*\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/gi;
     return [...String(tableSql ?? "").matchAll(regex)].map((match) => {
@@ -2090,9 +1425,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#add_foreign_key
-   */
   async addForeignKey(
     fromTable: string,
     toTable: string,
@@ -2105,9 +1437,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#remove_foreign_key
-   */
   async removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | RemoveForeignKeyOptions,
@@ -2130,13 +1459,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     delete matchOptions.validate;
 
     const foreignKeys = await this.foreignKeys(fromTable);
-    // Rails' SQLite override hand-rolls `options.slice(*fk.options.keys)` +
-    // `fk.options[k].to_s == v.to_s` (sqlite3/schema_statements.rb:79-80) rather
-    // than calling defined_for?. isDefinedFor is that same slice-and-compare,
-    // differing only for array-valued options, where Ruby's Array#to_s compares
-    // the `["a", "b"]` inspect form. Reproducing that would mean porting Ruby
-    // inspect formatting, and it is unreachable here: SQLite add_foreign_key is
-    // single-column.
     const fkey = foreignKeys.find((fk) => {
       const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
       const table = this.stripTableNamePrefixAndSuffix(
@@ -2157,9 +1479,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.alterTable(fromTable, foreignKeys);
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#add_check_constraint
-   */
   async addCheckConstraint(
     tableName: string,
     expression: string,
@@ -2170,9 +1489,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#remove_check_constraint
-   */
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?:
@@ -2185,17 +1501,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    // Rails' `remove_check_constraint(table_name, expression = nil, **options)`
-    // splits into a positional expression plus keywords; TS callers spell the
-    // keyword-only form as arg 2 and the expression form as arg 2 + arg 3.
     const expression = typeof expressionOrOptions === "string" ? expressionOrOptions : undefined;
     const options =
       typeof expressionOrOptions === "object"
         ? { ...(expressionOrOptions ?? {}), ...trailingOptions }
         : { ...trailingOptions };
 
-    // `if_exists:` is a kwarg in Rails (sqlite3/schema_statements.rb:113), so
-    // it is part of neither `**options` the probe gets nor the lookup's.
     const { ifExists, ...lookupOptions } = options;
 
     if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
@@ -2208,8 +1519,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
   }
 
-  // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---
-
   private async alterTable(
     tableName: string,
     overrideForeignKeys?: ForeignKeyDefinition[],
@@ -2220,17 +1529,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.ensureConnected();
     const rename = options.rename ?? {};
 
-    // Rails: altered_table_name = "a#{table_name}" (sqlite3_adapter.rb:566).
     const alteredTableName = `a${tableName}`;
 
-    // No explicit missing-table guard: the first move's `columns` reaches
-    // table_structure, which already raises StatementInvalid naming the table
-    // (foreign_key_test.rb:322).
     const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
     const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
 
-    // Rails' alter_table caller lambda (sqlite3_adapter.rb:568-583). The block
-    // running last is what lets remove_column delete the FKs it orphans.
     const caller = (definition: SQLite3TableDefinition): void => {
       for (const fk of fks) {
         const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
@@ -2250,10 +1553,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     await this.transaction(async () => {
       await this.disableReferentialIntegrity(async () => {
-        // Rails' alter_table is two move_table calls, each copy_table + drop_table
-        // (sqlite3_adapter.rb:585-596). `options` — and with it `:rename` — goes to
-        // the first move only; the second re-reflects the "a"-prefixed buffer and
-        // layers the caller's FKs / checks / `modify` on top of it.
         await this.moveTable(tableName, alteredTableName, { ...options, temporary: true });
         await this.moveTable(alteredTableName, tableName, {}, caller);
       });
@@ -2262,14 +1561,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this.schemaCache.clearBang();
   }
 
-  // --- Rails: table-rebuild helpers (move_table / copy_table family) ---
-
   /** @internal */
   private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
     const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
-    // Rails: `internal_exec_query("PRAGMA table_xinfo(#{quote_table_name(table_name)})",
-    // "SCHEMA")` (sqlite3_adapter.rb:792-794); `toArray` hands back the plain
-    // rows every reader of `tableInfo` here consumes.
     return (
       await this.internalExecQuery(`PRAGMA ${pragma}(${quoteTableName(tableName)})`, "SCHEMA")
     ).toArray();
@@ -2280,21 +1574,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * @internal
-   *
-   * @missingRailsCall last — PERMANENT: Per-entry verified (RFC 0106 sqlite3 introspection
-   *   cluster), sqlite3_adapter.rb:781-782: `result.partition(REGEX).last` —
-   *   `String#partition` returns a 3-tuple and `Array#last` takes its tail. JS
-   *   `String` has no `partition`, so the port slices from the match index
-   *   directly, which is that whole expression, not an omitted call.
-   * @missingRailsCall union — PERMANENT: Per-entry verified (RFC 0106 sqlite3 introspection
-   *   cluster), sqlite3_adapter.rb:786: `Regexp.union(column_names).source`
-   *   builds an alternation from the column names. JS `RegExp` has no `union`,
-   *   so the port escapes and joins the names with `|` inline — the same
-   *   alternation source, spelled out.
+   * @missingRailsCall last — PERMANENT
+   * @missingRailsCall union — PERMANENT
    */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
-    // Rails: `unless column_names ... column_names = column_info.map { ... }`
-    // (sqlite3_adapter.rb:758-761).
     if (!columnNames) {
       const columnInfo = await this.tableInfo(tableName);
       columnNames = columnInfo.map((column) => String(column["name"]));
@@ -2304,7 +1587,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    SELECT * FROM sqlite_temp_master)
 WHERE type = 'table' AND name = ${this.quote(tableName)}
 `;
-    // Rails: `result = query_value(sql, "SCHEMA")` (sqlite3_adapter.rb:775).
     const result = (await this.queryValue(sql, "SCHEMA")) as string | null;
 
     if (!result) return [];
@@ -2364,7 +1646,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return await this.tableStructureWithCollation(tableName, structure);
   }
 
-  /** Alias of tableStructure (Rails: `alias column_definitions table_structure`). @internal */
+  /** @internal */
   private async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
     return this.tableStructure(tableName);
   }
@@ -2380,7 +1662,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     await this.dropTable(from);
   }
 
-  /** Mirrors: SQLite3Adapter#copy_table (sqlite3_adapter.rb:599-649) @internal */
+  /** @internal */
   private async copyTable(
     from: string,
     to: string,
@@ -2444,12 +1726,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     await this.copyTableContents(from, to, columnsToCopy, rename);
   }
 
-  /**
-   * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
-   *
-   * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`).
-   * @internal
-   */
+  /** @internal */
   private async copyTableIndexes(
     from: string,
     to: string,
@@ -2460,9 +1737,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       let name = idx.name;
       if (to === `a${from}`) name = `t${name}`;
       else if (from === `a${to}`) name = name.slice(1);
-      // Rails gates the rename/filter on `columns.is_a?(Array)` — and with it
-      // the `columns(to)` reflection: an expression index carries its
-      // parenthesized expression as a bare string, copied across verbatim.
       let cols: string[] | string;
       if (Array.isArray(idx.columns)) {
         const toCols = (await this.columns(to)).map((c) => c.name);
@@ -2521,12 +1795,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (code !== undefined) (exc as any).code = code;
     }
     const translated = translateException(exc, msg, sql, binds, this.pool);
-    // `translate_exception`'s result is raised from inside the `rescue`, so
-    // Ruby sets `Exception#cause` from `$!` and never names the driver error in
-    // the argument list (sqlite3_adapter.rb:698-702). JS chains nothing at a
-    // `throw`; this is the raise-site stand-in for the direct
-    // `throw this._translateException(...)` sites, as `translateExceptionClass`
-    // is for everything routed through the public translator.
     if (translated !== exc && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = exc;
     }
@@ -2540,18 +1808,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     );
   }
 
-  /**
-   * The SQLite client library this adapter is bound to. Concrete subclasses
-   * (BetterSQLite3Adapter, etc.) override this to return their bundled driver,
-   * mirroring how Rails ties Mysql2Adapter/TrilogyAdapter to a client lib. The
-   * abstract base is driver-agnostic and returns undefined.
-   * @internal
-   */
+  /** @internal */
   protected defaultSqliteDriver(): SqliteDriver | undefined {
     return undefined;
   }
 
-  /** Resolve the bound SqliteDriver. Shared by `connect`/`connectAsync`. @internal */
+  /** @internal */
   private resolveDriverFactory(): SqliteDriver {
     const driverOpt = (this._config as SQLite3AdapterOptions).driver;
     if (driverOpt != null) {
@@ -2574,12 +1836,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /**
-   * @missingRailsCall new_client — CONVERGEABLE: sqlite3_adapter.rb:807 is
-   *   `@raw_connection = self.class.new_client(@connection_parameters)`, handing the
-   *   sqlite3 gem the whole config hash. trails has no `@connection_parameters` hash
-   *   and `newClient` returns an adapter rather than a raw driver handle, so `connect()`
-   *   opens the driver directly from the expanded filename. Retired by RFC 0094's
-   *   construction convergence (`sqlite3-connection-parameters-never-built`).
+   * @missingRailsCall new_client — CONVERGEABLE
    * @internal
    */
   private connect(): void {
@@ -2606,12 +1863,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /**
-   * Build the driver open-config from adapter config. Mirrors Rails'
-   * `@connection_parameters = @config.merge(...)`: preserves driver-specific
-   * keys (timeout, noMutex, driverOptions) so e.g. expo's `openDatabaseAsync`
-   * options reach the driver. Shared by `connect`/`connectAsync`. @internal
-   */
   private openConfig(): SqliteOpenConfig {
     const cfg = this._config as SQLite3AdapterOptions & Partial<SqliteOpenConfig>;
     return {
@@ -2624,7 +1875,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     };
   }
 
-  /** Async counterpart to `connect()` for async-only drivers. @internal */
+  /** @internal */
   private async connectAsync(): Promise<void> {
     const openConfig = this.openConfig();
     try {
@@ -2646,11 +1897,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /**
-   * Complete a deferred async connection. No-op when already connected
-   * synchronously. Invoked by `openAsync()` and `verifyBang()`.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby's SQLite3::Database.new connects synchronously (sqlite3_adapter.rb:34); an async driver needs a second phase.
+   * @noRailsEquivalent PERMANENT
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
@@ -2662,16 +1910,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return this._connectingPromise;
   }
 
-  /**
-   * Ensure a deferred async-only connection is open before the driver is
-   * touched. The synchronous pool checkout path (`ConnectionPool#checkout`)
-   * hands out a freshly-constructed adapter without awaiting
-   * `completeAsyncConnect()` — it can't, checkout is sync. For async-only
-   * drivers (no `openSync()`) the constructor leaves the handle unset and flags
-   * the open as pending, so the first query that reaches the driver must
-   * complete it. No-op once connected and for sync drivers (never pending).
-   * @internal
-   */
+  /** @internal */
   private async ensureConnected(): Promise<void> {
     if (this._asyncConnectPending) await this.completeAsyncConnect();
     else if (!this.isActive() && this.isReconnectCanRestoreState()) await this.verifyBang();
@@ -2684,16 +1923,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     this._asyncConnectPending = false;
   }
 
-  /**
-   * Async construction entry point — works for both sync drivers (returns an
-   * already-connected adapter) and async-only drivers (awaits the deferred
-   * connection).
-   *
-   * @noRailsEquivalent PERMANENT — the async twin of `new`, for the same reason
-   * as `completeAsyncConnect`: Ruby's sqlite3 gem opens synchronously, so
-   * `SQLite3Adapter.new` (sqlite3_adapter.rb:102) is the only entry point Rails
-   * has or can have.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static async openAsync(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     filename: string | ":memory:" = ":memory:",
@@ -2706,28 +1936,21 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:759) re-implemented per adapter because our `active` getter is sync and cannot ping.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override async verifyBang(): Promise<void> {
     await this.completeAsyncConnect();
     await super.verifyBang();
   }
 
-  /** True when the bound driver has no `openSync()` (e.g. expo-sqlite). @internal */
+  /** @internal */
   private driverIsAsync(): boolean {
     return !this.resolveDriverFactory().openSync;
   }
 
-  /**
-   * Build the ordered `[sql, label]` PRAGMA list applied on every connection.
-   * Shared by the sync and async `configureConnection()` paths so they can't
-   * drift. @internal
-   */
   private configurePragmas(): [string, string][] {
     const stmts: [string, string][] = [];
     if (!this._readonly) {
-      // Rails DEFAULT_PRAGMAS, best-effort: an unsupported PRAGMA on a
-      // non-standard SQLite build should warn, not abort.
       const defaults: [string, string][] = [
         ["foreign_keys", "ON"],
         ["journal_mode", "WAL"],
@@ -2786,41 +2009,17 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /**
-   * Mirrors Rails: AbstractAdapter#configure_connection → check_version. Sync
-   * for in-process drivers; for async-only drivers (no `openSync()`) returns a
-   * Promise that awaits each PRAGMA — the base `attemptConfigureConnection()`
-   * awaits it, so both the initial-open and reconnect paths apply pragmas.
-   *
-   * @missingRailsCall fetch — PERMANENT: sqlite3_adapter.rb:837 is
-   *   `@config.fetch(:pragmas, {}).stringify_keys`. A plain TS object has no `fetch`,
-   *   and Hash#fetch's stored-value-wins-over-default semantics have no JS call
-   *   analogue, so the pragmas option is read directly at Rails' site.
+   * @missingRailsCall fetch — PERMANENT
    * @internal
    */
   override configureConnection(): void | Promise<void> {
     this.castTimeout();
     const cfg = this._config as SQLite3AdapterOptions;
     if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
-      // Deviation: Rails' retries branch also installs
-      // `raw_connection.busy_handler { |count| count <= retries }`
-      // (sqlite3_adapter.rb:827-832), which is the sqlite3 gem's binding for
-      // `sqlite3_busy_handler`. None of our drivers (better-sqlite3, node:sqlite,
-      // libsql) expose that callback — they only accept a busy *timeout* at open
-      // — so there is nothing to install and adding a driver hook would be a
-      // stub no driver can implement. Rails itself deprecates the option for
-      // removal in 8.1, so we warn and let `timeout` be the supported path.
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
-    // Rails runs `super` — i.e. `check_version` — before the pragmas
-    // (`sqlite3_adapter.rb:835-838`) and lets it raise. `checkVersion` is async
-    // here, so its result has to be threaded into what this returns rather than
-    // voided, or a too-old-SQLite error becomes an unhandled rejection instead
-    // of one `attemptConfigureConnection` can see. On the sync-driver path the
-    // pragmas still run synchronously — callers get a configured adapter as
-    // soon as the constructor returns — so only the check's *settlement*, not
-    // its start, trails them.
     const checked = super.configureConnection();
     const stmts = this.configurePragmas();
     const warn = (label: string, e: unknown) =>
@@ -2847,14 +2046,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return checked;
   }
 
-  /**
-   * @internal Mirrors: SQLite3Adapter.initialize_type_map (sqlite3_adapter.rb:499-502)
-   *
-   * Rails registers exactly one SQLite-specific type on top of `super`. The
-   * {@link SQLite3DateTime} pair is the trails addition that class documents —
-   * registered after `super` and followed by the `/timestamp/i` alias so both
-   * spellings reach it, since a later registration wins the lookup.
-   */
+  /** @internal */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
     this.registerClassWithLimit(m, /int/i, SQLite3Integer);
@@ -2862,13 +2054,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     m.aliasType(/timestamp/i, "datetime");
   }
 
-  /**
-   * Mirrors: SQLite3Adapter::TYPE_MAP (sqlite3_adapter.rb:505)
-   *
-   * Declared here, as in Rails, so `self::TYPE_MAP` inside `extended_type_map`
-   * resolves to the SQLite map rather than the abstract one. Built on first
-   * read for the same temporal-dead-zone reason `AbstractAdapter::TYPE_MAP` is.
-   */
   static override get TYPE_MAP(): TypeMap {
     return (sqlite3TypeMap ??= (() => {
       const m = new TypeMap();
@@ -2877,21 +2062,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     })());
   }
 
-  /** Mirrors: SQLite3Adapter::EXTENDED_TYPE_MAPS (sqlite3_adapter.rb:506) */
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /**
-   * A divergent override, NOT a port: `sqlite3_adapter.rb` defines no
-   * `extended_type_map`, so Rails runs `AbstractAdapter`'s
-   * (abstract_adapter.rb:877-883) here unchanged.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT — a consequence of {@link SQLite3DateTime},
-   * which is itself `@noRailsEquivalent PERMANENT` for the Temporal-language
-   * reason that class documents. The inherited body re-registers
-   * `%r(\A[^\(]*datetime)i` on `Type::DateTime` to carry the timezone, which
-   * would clobber the `SQLite3DateTime` registration `initialize_type_map`
-   * makes; this restores it. It disappears when that class does.
+   * @noRailsEquivalent PERMANENT
    */
   static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
     const m = super.extendedTypeMap(options);
@@ -2903,25 +2078,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
- * (sqlite3_adapter.rb:486). The INTEGER storage class holds up to an 8-byte
- * value, so range checks default to an 8-byte limit when the column's sql_type
- * supplies none. Rails overrides only the private `_limit` (leaving the public
- * `limit` reader nil), so `fetch_type_metadata` reflects a nil `limit` and
- * schema dumps stay bare for unlimited integers — mirror that split here.
- */
 export class SQLite3Integer extends IntegerType {
   protected override _limit(): number {
     return this.limit ?? 8;
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::StatementPool
- *
- * SQLite3-specific statement pool backed by the generic StatementPool.
- */
 export class StatementPool extends GenericStatementPool<SqliteStatement> {}
 
 /** @internal */
@@ -2942,19 +2104,13 @@ function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
   );
 }
 
-/**
- * Mirrors the `definition.foreign_keys.delete_if { |fk| ... }` line shared by
- * SQLite3Adapter#remove_column / #remove_columns (sqlite3_adapter.rb:352, 362).
- * @internal
- */
+/** @internal */
 function deleteForeignKeysForColumns(
   definition: SQLite3TableDefinition,
   columnNames: string[],
 ): void {
   for (let i = definition.foreignKeys.length - 1; i >= 0; i--) {
     const fkColumn = definition.foreignKeys[i].column;
-    // Whole-value match, so a composite (array-valued) column never matches —
-    // Rails compares `fk.column` itself, never its members.
     if (!Array.isArray(fkColumn) && columnNames.includes(fkColumn)) {
       definition.foreignKeys.splice(i, 1);
     }
@@ -3005,40 +2161,17 @@ function translateException(
   return new StatementInvalid(message, { sql, binds, connectionPool: pool });
 }
 
-// `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails
-// query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
-// not on AbstractAdapter, or the override would run unwrapped. The write methods
-// this adapter does NOT override (`execInsert`/`execUpdate`/`execDelete`/`execInsertAll`/
-// `truncate`/`truncateTables`/`restartDbTransaction`) are wired once on
-// AbstractAdapter.
-// Each logical write clears the cache exactly once; the still-lower
-// `executeMutation` these funnel through is deliberately NOT wrapped (DDL runs
-// through the wired `execute`, as in Rails), and reads route through
-// `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(SQLite3Adapter, "rollbackDbTransaction", "rollbackToSavepoint");
 dirtiesQueryCache(SQLite3Adapter, "execute");
 
-// Mirrors `include SQLite3::DatabaseStatements` — `perform_query` is an
-// instance method of the adapter, so `raw_execute`'s `this.performQuery(...)`
-// dispatch resolves here (sqlite3/database_statements.rb:78).
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
 SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurrentTimestamp;
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
-/**
- * Rails has no SQLite `database_version` — `abstract_adapter.rb:854-856` answers
- * whatever `get_database_version` returned, and this adapter's
- * (`sqlite3_adapter.rb:476-478`) returns a `Version`. TS needs that told to it,
- * so the inherited getter's `Version | number` is narrowed here by declaration
- * merging rather than by an override method Rails does not have.
- * @internal
- */
+/** @internal */
 export interface SQLite3Adapter {
   get databaseVersion(): Version | Promise<Version>;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-// Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
-// at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers
-// gate behavior on the sqlite3 adapter being loaded.
 runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);

@@ -270,27 +270,16 @@ describe("ErrorTest", () => {
     expect(e.messagesFor("name")).toEqual(["is really not great"]);
   });
 
-  // P10: generateMessage promotes a Symbol-valued options.message to type.
-  // A Ruby Symbol keeps its leading colon as a string value (error.rb:65).
   it("generateMessage with identifier options.message routes through i18n as new type", () => {
     const e = new Errors(null);
     e.add("name", ":blank", { message: ":tooShort" });
     expect(e.messagesFor("name")[0]).toContain("errors.messages.tooShort");
   });
 
-  // Rails error.rb:51-55: strip array notation, then pass full dotted attribute
-  // to human_attribute_name with `attribute.tr(".", "_").humanize` as the default —
-  // so the prefix segment is preserved when no translation matches.
   it("fullMessage strips array notation from attribute", () => {
-    // Rails strips `[\d+]` only inside the `i18n_customize_full_message` branch
-    // (error.rb:22), which it enters only for a base whose class exposes
-    // `i18n_scope` — hence the Model base here.
     ModelError.i18nCustomizeFullMessage = true;
     class Person extends Model {}
     const e = new Errors(new Person({}));
-    // A literal message: `generate_message` — and with it
-    // `read_attribute_for_validation`, which `send`s the attribute name — only
-    // runs for a Symbol type (error.rb:137), and `items[0].name` is no reader.
     e.add("items[0].name", "can't be blank");
     const msg = e.fullMessages[0];
     expect(msg).toBe("Items name can't be blank");

@@ -1,27 +1,3 @@
-/**
- * The test harness' connection bootstrap, mirroring
- * `vendor/rails/activerecord/test/support/connection.rb`:
- *   - `connection_name = ENV["ARCONN"] || config["default_connection"]`
- *     (`connection.rb:10`),
- *   - `test_configuration_hashes` — `config.fetch("connections").fetch(
- *     connection_name) { ... exit 1 }` (`connection.rb:13-20`), a hard failure
- *     when `ARCONN` names an unconfigured connection,
- *   - `connect` (`connection.rb:22-38`) — assigns the configurations and
- *     establishes `Base`'s connection, including the
- *     `unless connection_name.include?(arunit_adapter) raise ArgumentError`
- *     guard (`connection.rb:35-37`) when `ARCONN` and the resolved adapter
- *     diverge.
- *
- * On top of Rails' three methods it wires the resolved configurations into
- * `DatabaseTasks`, so the per-worker boot can purge this database through the
- * real Rails-mirrored path (`DatabaseTasks.purge`) before the schema load. Rails has no equivalent because its suite loads `schema.rb`
- * directly from `cases/helper.rb` against a database it never re-loads.
- *
- * As in `config.example.yml`, `ENV` only feeds connection *sub-settings*
- * (host/port/socket/credentials, via `config.ts`); it never
- * selects the backend.
- */
-
 import { getEnv } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -52,100 +28,34 @@ import {
 
 export type { TestAdapterName };
 
-/**
- * The connection name selected by `ARCONN`, falling back to
- * `config["default_connection"]`. Mirrors `connection.rb:9-11`.
- *
- * `??`, not an empty-string check: Ruby's `ENV["ARCONN"] || ...` falls back on
- * nil alone, so `ARCONN=""` selects the connection named `""` and fails in
- * {@link testConfigurationHashes} with `Connection "" not found` rather than
- * quietly running sqlite. Sub-settings do treat `""` as absent (`config.ts`);
- * the selector must not.
- *
- * Returns a bare `string`, not a `ConnectionName`: `ARCONN` is arbitrary user
- * input, and asserting it into the union here would be a type lie that makes
- * the unknown-name branch look unreachable to every caller.
- * {@link testConfigurationHashes} owns Rails' "Connection not found" failure,
- * so the error surfaces once, at config-build time.
- */
 export function connectionName(read: EnvReader = getEnv): string {
   return read("ARCONN") ?? DEFAULT_CONNECTION;
 }
 
-/**
- * The backend lane the current `ARCONN` drives. Unknown names resolve to the
- * default connection's lane; the loud failure for those belongs to
- * {@link testConfigurationHashes}, not to every lane predicate in the harness.
- *
- * `activeLane` keeps its trails name: Rails has no counterpart, because Ruby
- * dispatches on the live adapter object and never needs a coarse
- * sqlite/postgres/mysql bucket to gate helpers on.
- */
 export function activeLane(read: EnvReader = getEnv): TestAdapterName {
   const lanes: Partial<Record<string, TestAdapterName>> = CONNECTION_LANES;
   return lanes[connectionName(read)] ?? CONNECTION_LANES[DEFAULT_CONNECTION];
 }
 
 export interface TestDatabaseConfig {
-  /** The `DatabaseConfigurations` instance wired into `DatabaseTasks`. */
   configs: DatabaseConfigurations;
-  /** Which adapter was resolved from the environment. */
   adapter: TestAdapterName;
-  /** The primary config entry for the "test" environment. */
   envConfig: HashConfig | UrlConfig;
 }
 
-/**
- * A named connection in the `connections:` hash of
- * `vendor/rails/activerecord/test/config.example.yml`: its `arunit` adapter
- * name plus a builder for the primary "test" env config.
- *
- * `build()` returns `null` when the backend's connection details are absent
- * (the live-backend analogue of a `config.yml` entry with no reachable server);
- * `testConfigurationHashes()` turns that into Rails' loud adapter-mismatch failure rather than
- * silently falling back to SQLite.
- */
 interface NamedConnection {
-  /** The `arunit` adapter name Rails checks against (`connection.rb:35`). */
   adapter: string;
-  /** The public {@link TestAdapterName} lane this connection drives. */
   lane: TestAdapterName;
-  /**
-   * The connection's own named entries, as `config.example.yml` spells them.
-   * Sparse on purpose: `expandConfig` fills in a missing `database` / `adapter`
-   * and creates any entry the yml omits, exactly as `expand_config` does.
-   */
   build(): Promise<Partial<Record<ArunitEntryName, Record<string, unknown>>>>;
 }
 
-/**
- * The three entry names `expand_config` iterates (`config.rb:27-28`). Rails
- * creates every one of them for every connection, defaulting the database and
- * adapter when the yml leaves the key out.
- */
 const ARUNIT_ENTRY_NAMES = ["arunit", "arunit2", "arunit_without_prepared_statements"] as const;
 type ArunitEntryName = (typeof ARUNIT_ENTRY_NAMES)[number];
 
-/**
- * Turn {@link ServerSettings} into the `configuration_hash` a `HashConfig`
- * carries. Rails' `config.example.yml` entries are exactly this: an adapter
- * plus discrete host/port/socket/credential keys — never a URL. The key
- * translation (and why it emits two spellings of the credential and socket)
- * lives in `driverConfig`.
- */
 function serverHash(adapter: string, settings: ServerSettings): Record<string, unknown> {
   return { adapter, ...driverConfig(settings) };
 }
 
-/**
- * The named connections available to the test harness, mirroring the
- * `connections:` hash of `config.example.yml`. `ARCONN` selects one of these
- * keys; `DEFAULT_CONNECTION` is Rails' `config["default_connection"]` fallback.
- *
- * Every entry builds a `HashConfig` from discrete sub-settings, matching how
- * Rails' yml interpolates `MYSQL_HOST`/`MYSQL_PORT`/`MYSQL_SOCK` and defers to
- * libpq's `PG*` vars. No entry reads a connection URL.
- */
 const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
@@ -179,24 +89,6 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   mysql2: {
     adapter: "mysql2",
     lane: "mysql",
-    // `config.example.yml:3-40`: `arunit` and `arunit2` differ — unicode vs
-    // general collation, and only `arunit` carries the `time_zone` variable.
-    // Rails leaves `arunit_without_prepared_statements` out for mysql2, so
-    // `expandConfig` synthesizes it from the defaults alone. Its
-    // `preparedStatements: false` therefore does NOT come from the yml or from
-    // `expand_config` (which fills in `database` / `adapter` only,
-    // `support/config.rb:26-41`): with no key on the entry, Rails falls back to
-    // `Mysql2Adapter#default_prepared_statements` (`mysql2_adapter.rb:186-188`),
-    // which is `false`. So the entry stays off whatever
-    // `MYSQL_PREPARED_STATEMENTS` says, matching Rails.
-    //
-    // `buildAdapterArg` forwards the whole hash to mysql2, which logs
-    // "Ignoring invalid configuration option" for the keys it does not know
-    // (`collation`, `variables`, `encoding`, and `preparedStatements` before
-    // this) and warns that a future version will throw. The config is the Rails
-    // port surface, so the keys stay; whitelisting them at the adapter boundary
-    // the way the sqlite branch already does is story
-    // `mysql-adapter-arg-whitelist`.
     build: async () => {
       const shared = serverHash("mysql2", mysqlSettings());
       const preparedStatements = mysqlPreparedStatements();
@@ -220,27 +112,6 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   },
 };
 
-/**
- * Expand a connection's entries into the three named configs, mirroring
- * `expand_config` (`support/config.rb:26-41`): iterate `arunit`, `arunit2` and
- * `arunit_without_prepared_statements`, creating any the connection omits, then
- * fill in only a missing `database` or `adapter`. Options a connection does
- * declare are preserved per entry — mysql2's two collations, postgresql's
- * `min_messages` — rather than being cloned from one entry onto the others.
- *
- * The names are the `envName` because `Base.configurations` treats top-level
- * keys as environments, which is what lets `connect` say
- * `establish_connection :arunit` (`connection.rb:32`), with Rails' `primary`
- * spec name.
- *
- * Rails defaults the databases to `activerecord_unittest` /
- * `activerecord_unittest2` / `activerecord_unittest` (`config.rb:27-28`);
- * trails takes them from the sub-settings instead, so `arunit` is the worker
- * database the canonical schema is loaded into and `arunit2` its derived
- * sibling — which at slot 1 is Rails' literal `activerecord_unittest2`
- * ({@link arunitDatabaseNames}) — and `arunit_without_prepared_statements` shares `arunit`'s database as it
- * shares `activerecord_unittest` in Rails.
- */
 function expandConfig(
   connection: NamedConnection,
   entries: Partial<Record<ArunitEntryName, Record<string, unknown>>>,
@@ -256,42 +127,20 @@ function expandConfig(
     const entry = { ...(entries[name] ?? {}) };
     entry.database ??= defaultDatabase[name];
     entry.adapter ??= connection.adapter;
-    // Rails' third entry exists to turn prepared statements off. Spelling the
-    // flag out here is what the postgresql yml does
-    // (`config.example.yml:77-79`); on mysql2, where no entry is spelled out at
-    // all, it stands in for `Mysql2Adapter#default_prepared_statements`
-    // (`mysql2_adapter.rb:186-188`) — same `false`, reached a different way.
     if (name === "arunit_without_prepared_statements") entry.preparedStatements ??= false;
     return new HashConfig(name, "primary", entry);
   });
 }
 
-/**
- * The configuration hashes for the connection `ARCONN` selects, mirroring
- * `ARTest.test_configuration_hashes` (`connection.rb:13-20`) plus the
- * adapter-name guard `connect` applies (`connection.rb:35-37`).
- *
- * Rails returns the raw hash and lets `connect` derive the adapter from the
- * established pool; trails builds the config object here, so the resolved lane
- * comes back alongside it rather than being re-read from a live connection.
- *
- */
 export async function testConfigurationHashes(): Promise<{
   adapter: TestAdapterName;
-  /** The `arunit` entry — the one `connect` establishes as the primary pool. */
   envConfig: HashConfig;
-  /** All three named entries, as `ARTest.test_configuration_hashes` returns them. */
   configurationHashes: HashConfig[];
 }> {
   const name = connectionName();
-  // `name` is arbitrary user input from ARCONN, so the lookup is a partial one;
-  // the miss below is Rails' "Connection not found" exit (connection.rb:14-19).
   const connections: Partial<Record<string, NamedConnection>> = CONNECTIONS;
   const connection = connections[name];
   if (!connection) {
-    // Rails prints "Connection ... not found" and `exit 1`; we have no
-    // `process.exit`, so the loud failure is a throw with the same message.
-    // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(
       `Connection "${name}" not found. Available connections: ` +
@@ -301,14 +150,6 @@ export async function testConfigurationHashes(): Promise<{
 
   const configurationHashes = expandConfig(connection, await connection.build());
   const envConfig = configurationHashes[0];
-  // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
-  // (connection.rb:35-37). Previously this fired on a missing `*_TEST_URL` — an
-  // env-presence proxy, since absent connection details silently resolved to
-  // SQLite. Sub-settings always carry defaults, so there is no "absent" state
-  // left to proxy for; the check is now Rails' literal one, comparing the
-  // connection name against the adapter its entry actually built. That makes it
-  // a structural invariant over the CONNECTIONS table (a mislabelled entry
-  // raises) rather than a report on the environment.
   const builtAdapter = String(envConfig.configurationHash.adapter);
   if (!name.includes(builtAdapter)) {
     throw new ArgumentError(
@@ -320,23 +161,6 @@ export async function testConfigurationHashes(): Promise<{
   return { adapter: connection.lane, envConfig, configurationHashes };
 }
 
-/**
- * The `sqlite3` connection's two entries, mirroring `config.example.yml:83-91`:
- * `arunit` and `arunit2` each name their own file, with `timeout` and `strict`.
- *
- * `AR_TEST_WORKER_DB` is the per-worker template clone the setupFile publishes
- * (`support/sqlite-template.ts`) — trails' stand-in for Rails' one
- * already-prepared database, since vitest forks workers where Rails does not.
- * Its `arunit2` is the clone path's `_2` sibling ({@link sqliteSiblingDatabase})
- * rather than a checked-in constant, because the clone name carries the run
- * token and worker slot. Either way both entries name their own file here, as
- * the yml does, since `expand_config` fills a `database` in only when the entry
- * carries none (`support/config.rb:30-36`).
- *
- * The directory is created because Rails' `test/fixtures` is checked in and
- * ours is a gitignored build output; sqlite will not create a missing parent
- * for a file DB.
- */
 async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<string, unknown>>> {
   const options = { adapter: "sqlite3", timeout: 5000, strict: true };
   const workerDb = getEnv("AR_TEST_WORKER_DB");
@@ -355,26 +179,6 @@ async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<stri
   };
 }
 
-/**
- * Assign the test `DatabaseConfigurations` and establish `Base`'s connection,
- * mirroring `ARTest.connect` (`connection.rb:22-38`).
- *
- * `Base.configurations` is assigned as Rails does (`connection.rb:31`) — all
- * three named entries — and the primary pool is established by name
- * (`establish_connection :arunit`, `connection.rb:32`), so ARTest-style lookups
- * such as `Base.establishConnection("arunit")` resolve against the same test
- * configuration the pool was opened from.
- *
- * Beyond Rails it registers the adapter's `DatabaseTasks` handler, because
- * trails loads the schema through `DatabaseTasks` rather than by evaluating
- * `schema.rb` in-process. The registration runs on every call so callers that
- * clear `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
- *
- * `ARUnit2Model.establish_connection :arunit2` (`connection.rb:33`) follows it.
- * The pool is lazy; `provisionSecondDatabase` (`support/setup-second-pool.ts`,
- * run from `test-setup-dy.ts`) creates the arunit2 database and its tables
- * before any suite runs.
- */
 export async function connect(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
   const configs = new DatabaseConfigurations(configurationHashes);
@@ -399,8 +203,6 @@ export async function connect(): Promise<TestDatabaseConfig> {
     }
   }
 
-  // `connection.rb:32` — established by name, not from a raw hash, so the pool
-  // comes from the entry `Base.configurations` publishes.
   await Base.establishConnection("arunit");
   await ARUnit2Model.establishConnection("arunit2");
 
@@ -411,34 +213,6 @@ const CANONICAL_PROBE_TABLE = "posts";
 
 const ADAPTER_SPECIFIC_PROBE_TABLE = "defaults";
 
-/**
- * Give the worker back its `arunit` pool after a test displaced `Base`'s,
- * re-running `connect`'s `establish_connection :arunit` (`connection.rb:32`).
- *
- * Rails has no counterpart: its suite is one process against one file-backed
- * database, so re-establishing always lands on a database that still holds the
- * schema. Under `ARCONN=sqlite3_mem` the displaced connection *was* the
- * database — re-establishing opens a brand-new, EMPTY `:memory:` one — so the
- * schema has to be laid again. The probe, not the lane, decides: a pool that
- * was merely disconnected and reopened on a file lane still has its tables, and
- * `loadSchema` issues no drops, so it must only run against an empty database.
- *
- * Both halves of `load_schema` are probed separately, as the per-worker boot
- * treats them (`test-setup-dy.ts`): canonical tables being present does not
- * imply the adapter-specific ones are, so a database that kept `posts` but lost
- * `defaults` re-runs the adapter-specific arm alone. Running the canonical arm
- * there instead would fail on the surviving tables, since it issues no drops.
- *
- * The reload stamps as the boot's full-load arm does, so a database laid here
- * is indistinguishable from one laid at boot: `canonicalSchemaUpToDate` is read
- * by a *starting* worker, and an unstamped in-memory database would be a state
- * boot never produces.
- *
- * Both of `connect`'s pools are restored, not just `arunit` — `connection.rb:33`
- * opens `ARUnit2Model` on `arunit2` in the same breath, so a file that displaced
- * the worker's pools gets both back and no caller has to know which halves this
- * covers.
- */
 export async function restoreWorkerConnection(): Promise<void> {
   await Base.establishConnection("arunit");
   const connection = (await Base.leaseConnection()) as unknown as {
@@ -454,21 +228,6 @@ export async function restoreWorkerConnection(): Promise<void> {
   await restoreSecondWorkerConnection();
 }
 
-/**
- * The `arunit2` half of {@link restoreWorkerConnection} — `connection.rb:33`'s
- * `ARUnit2Model.establish_connection :arunit2`, plus the same probe-and-reload
- * the `arunit` half carries, for the same reason: under `ARCONN=sqlite3_mem` the
- * displaced pool *was* the database, so re-establishing opens a brand-new empty
- * `:memory:` one and the tables have to be laid again.
- *
- * The reload is gated on the probe rather than run unconditionally because
- * `provisionSecondDatabase()` truncates on its already-provisioned path, and
- * several callers invoke `restoreWorkerConnection()` per test — a caller that
- * never displaced this pool must not lose its rows.
- *
- * Imported at call time: `setup-second-pool.ts` reads `activeLane` from this
- * module, so a static import would close a cycle.
- */
 async function restoreSecondWorkerConnection(): Promise<void> {
   await ARUnit2Model.establishConnection("arunit2");
   const { ARUNIT2_TABLES, provisionSecondDatabase } = await import("./setup-second-pool.js");

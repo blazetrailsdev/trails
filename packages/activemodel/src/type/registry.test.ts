@@ -6,13 +6,6 @@ import { TypeRegistry } from "./registry.js";
 describe("RegistryTest", () => {
   it("a class can be registered for a symbol", () => {
     const registry = new TypeRegistry();
-    // Rails registers a bare class — `registry.register(:foo, ::String)` — and
-    // `register` wraps it in `proc { |_, *args| klass.new(*args) }`
-    // (registry.rb:16). That default block is what a trails registration spells
-    // out, since our `register` takes only the block form. Rails' remaining two
-    // assertions (`lookup(:bar, 2, :a) == [:a, :a]`) are `Array.new(2, :a)` —
-    // splatting positional args into a Ruby core class' constructor, which has
-    // no counterpart here: a trails factory takes one options object.
     registry.register("foo", (_name, options) => new Types.StringType(options));
     registry.register("bar", (_name, options) => new Types.IntegerType(options));
 
@@ -33,9 +26,6 @@ describe("RegistryTest", () => {
       calls.push([type, args, "block for bar"]);
       return barType;
     });
-    // Rails' third registration takes `|type, **kwargs|`; a trails factory
-    // receives its options as a single object either way, so the kwargs arm is
-    // the same shape as the args one and is not a separate case.
 
     expect(registry.lookup("foo", { limit: 1 })).toBe(fooType);
     expect(registry.lookup("foo", { limit: 2 })).toBe(fooType);

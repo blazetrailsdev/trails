@@ -1,12 +1,3 @@
-/**
- * PostgreSQL static type_map initialization + column-metadata helpers.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter's class-level
- * `initialize_type_map(m)` (postgresql_adapter.rb lines ~676–739) and the
- * `extract_limit` / `extract_precision` / `extract_scale` / `register_class_with_limit`
- * / `register_class_with_precision` helpers.
- */
-
 import {
   BigIntegerType,
   BooleanType,
@@ -70,43 +61,26 @@ ArType.register("uuid", Uuid, { adapter: "postgres" });
 ArType.register("vector", Vector, { adapter: "postgres" });
 ArType.register("xml", Xml, { adapter: "postgres" });
 
-/**
- * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.
- * Rails captures everything between parens and lets `to_i` parse leading digits;
- * that tolerates whitespace, trailing text, and comma-separated precision/scale.
- */
 export function extractLimit(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;
-  // Rails uses a greedy `/\((.*)\)/` — captures to the LAST `)`. JS
-  // regexes are greedy by default; mirror that here rather than
-  // stopping at the first close paren.
   const match = /\((.*)\)/.exec(sqlType);
   if (!match) return undefined;
-  // Ruby's String#to_i returns 0 for empty / non-numeric leading chars.
-  // Preserve that: parens present → always returns a number (0 on garbage);
-  // no parens → returns undefined (distinct from "0").
   const n = Number.parseInt(match[1].trim(), 10);
   return Number.isNaN(n) ? 0 : n;
 }
 
-/** Mirrors: PostgreSQLAdapter.extract_precision — first number in `(p,s)` or `(p)`. */
 export function extractPrecision(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;
   const match = /\(\s*(\d+)\s*(?:,\s*\d+\s*)?\)/.exec(sqlType);
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
-/** Mirrors: PostgreSQLAdapter.extract_scale — second number in `(p,s)`. */
 export function extractScale(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;
   const match = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
-/**
- * Mirrors: PostgreSQLAdapter.register_class_with_limit(mapping, key, klass).
- * Registers a block that extracts `limit` from the column's `sql_type`.
- */
 export function registerClassWithLimit(
   mapping: HashLookupTypeMap,
   key: string,
@@ -118,10 +92,6 @@ export function registerClassWithLimit(
   });
 }
 
-/**
- * Mirrors: PostgreSQLAdapter.register_class_with_precision(mapping, key, klass, **opts).
- * Registers a block that extracts `precision` from the column's `sql_type`.
- */
 export function registerClassWithPrecision(
   mapping: HashLookupTypeMap,
   key: string,
@@ -134,21 +104,6 @@ export function registerClassWithPrecision(
   });
 }
 
-/**
- * Adapter-specific column type for PG int8 (OID 20 / typname "int8").
- *
- * Rails registers int8 as `Type::Integer.new(limit: 8)` (postgresql_adapter.rb:676-680).
- * In Ruby, Integer arithmetic is arbitrary-precision so the limit-8 range check is exact.
- * In JS, float64 loses precision at 2^63: Number(2^63n) === Number((2^63-1)n), so the
- * inherited number-path isInRange gives the wrong answer for BigInt application values.
- *
- * We extend BigIntegerType (not IntegerType) because:
- * - PG driver returns int8 values as strings; BigIntegerType.castValue parses them to BigInt,
- *   preserving precision for IDs > Number.MAX_SAFE_INTEGER.
- * - BigIntegerType is unconditionally unlimited (maxValue = Infinity, Rails-faithful).
- *   This subclass re-establishes the 8-byte bound that belongs on the column type,
- *   mirroring Rails' IntegerType(limit: 8) but with BigInt-precision arithmetic.
- */
 class PgInteger8 extends BigIntegerType {
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
@@ -163,14 +118,6 @@ class PgInteger8 extends BigIntegerType {
   }
 }
 
-/**
- * Mirrors: PostgreSQLAdapter.initialize_type_map(m) — the class method that
- * seeds the type_map with ~30 known PG types by typname. User-defined types
- * (arrays, ranges, enums, domains, composites) are layered on top at runtime
- * via OID::TypeMapInitializer.
- *
- * Registrations are 1:1 with Rails postgresql_adapter.rb lines 676–739.
- */
 export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.registerType("int2", new IntegerType({ limit: 2 }));
   m.registerType("int4", new IntegerType({ limit: 4 }));
@@ -210,16 +157,6 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.registerType("polygon", new SpecializedString("polygon"));
   m.registerType("circle", new SpecializedString("circle"));
 
-  // Numeric: Rails picks Decimal vs DecimalWithoutScale based on fmod.
-  //   if fmod && (fmod - 4 & 0xffff).zero?
-  //     Type::DecimalWithoutScale.new(precision: precision)
-  //   else
-  //     OID::Decimal.new(precision: precision, scale: scale)
-  //   end
-  // The scale bits of a numeric column's atttypmod live in the lower 16
-  // bits of (fmod - 4); when those are zero the column was declared
-  // with no scale (NUMERIC(p) / NUMERIC) and should use the integer-
-  // flavored DecimalWithoutScale.
   m.registerType("numeric", undefined, (_key, ...args) => {
     const fmod = fmodFromArgs(args);
     const sqlType = sqlTypeFromArgs(args);
@@ -236,15 +173,6 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   });
 }
 
-/**
- * Instance-level registrations that mirror Rails' instance
- * `initialize_type_map(m = type_map)` at lines 744–749. Rails passes
- * `timezone: @default_timezone` into `time` / `timestamp`; in TS the
- * ActiveModel Type constructors don't yet thread a timezone option
- * through, so the value is recorded on the registration but not acted
- * on until the Type classes are extended. Signature kept for Rails
- * parity and future plumbing.
- */
 export function initializeInstanceTypeMap(
   m: HashLookupTypeMap,
   defaultTimezone: "utc" | "local" = "utc",
@@ -255,11 +183,6 @@ export function initializeInstanceTypeMap(
   registerClassWithPrecision(m, "timestamptz", TimestampWithTimeZone);
 }
 
-/**
- * TypeMapInitializer registrations pass `(oid, fmod, sql_type)` to the
- * block; our fetch signature is `(lookupKey, ...args)`. Grab the last
- * string arg as sql_type to match Rails' `|*args, sql_type|` pattern.
- */
 function sqlTypeFromArgs(args: unknown[]): string | undefined {
   for (let i = args.length - 1; i >= 0; i--) {
     if (typeof args[i] === "string") return args[i] as string;
@@ -267,11 +190,6 @@ function sqlTypeFromArgs(args: unknown[]): string | undefined {
   return undefined;
 }
 
-/**
- * Extract the fmod arg from `(fmod, sql_type)` — HashLookupTypeMap
- * forwards `(oid, fmod, sql_type)` to the registered block. The first
- * numeric positional is fmod.
- */
 function fmodFromArgs(args: unknown[]): number | undefined {
   for (const a of args) {
     if (typeof a === "number") return a;

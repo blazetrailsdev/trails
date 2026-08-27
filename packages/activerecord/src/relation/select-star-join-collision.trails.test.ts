@@ -1,21 +1,3 @@
-/**
- * Regression for task #25: `SELECT *` projects all joined tables'
- * columns, and most drivers (better-sqlite3, pg's default mapper)
- * collapse same-named columns into a single key per row — last
- * write wins. For a `has_many :through` like canonical
- * `Person.followers through: friendships`, the join's target is the
- * same `people` table, but `friendships` also has its own `id`
- * column. Without an explicit projection, `friendships.id` silently
- * overwrites `people.id` in the row hash, and the hydrated record
- * carries the friendship's id with the follower's other columns.
- *
- * Fix: default projection is always `<target>.*` — matches Rails'
- * `Relation#build_select` at query_methods.rb:1909, which projects
- * `table[Arel.star]` unconditionally. Relations with a custom
- * `from()` source still emit the qualified projection (Rails
- * behavior); callers who want bare `*` there override with
- * `.select("*")`.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -37,10 +19,6 @@ describe("SELECT * column collision in joined relations", () => {
   });
 
   it("default projection is `<target>.*` always (matches Rails — never bare `*`)", () => {
-    // Always-qualified projection matches Rails'
-    // `klass.arel_table[Arel.star]`. Holds with or without joins
-    // so the no-joins case isn't a special case the user has to
-    // know about.
     const qPeople = escapeRegExp(quoteTableName("people"));
     const noJoins = Person.all().toSql();
     expect(noJoins).toMatch(new RegExp(`SELECT\\s+${qPeople}\\.\\*`, "i"));
@@ -51,13 +29,6 @@ describe("SELECT * column collision in joined relations", () => {
   });
 
   it("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", () => {
-    // Rails' `Relation#build_select` (query_methods.rb:1909)
-    // projects `table[Arel.star]` unconditionally — it doesn't
-    // special-case `from()`. The resulting SQL is the caller's
-    // responsibility: if the custom FROM source doesn't expose
-    // the target table name, the caller overrides with
-    // `.select("*")`. We match Rails here rather than silently
-    // downgrading to bare `*`.
     const sql = Person.all().from("(SELECT * FROM people) AS sub").toSql();
     expect(sql).toMatch(
       new RegExp(`SELECT\\s+${escapeRegExp(quoteTableName("people"))}\\.\\*`, "i"),

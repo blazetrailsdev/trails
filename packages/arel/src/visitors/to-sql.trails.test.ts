@@ -1,7 +1,3 @@
-/**
- * Trails-specific ToSql tests: no like-named Rails test exists in
- * arel/test/visitors/test_to_sql.rb.
- */
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import {
@@ -31,10 +27,6 @@ describe("ToSql Array-named identifiers", () => {
   const make = (): ToSqlInternals =>
     new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
 
-  // Rails' adapters stringify with `name.to_s`, and Ruby's `Array#to_s` is
-  // inspect-style rather than JS's comma-join. An Array-named Attribute shows
-  // up on the composite-primary-key default order path; the reference is
-  // invalid SQL in Rails too, so the point is byte-identical output.
   it("quoteColumnName stringifies an Array name like Ruby's Array#to_s", () => {
     const v = make();
     const name = ["shop_id", "id"] as unknown as string;
@@ -49,12 +41,6 @@ describe("ToSql Array-named identifiers", () => {
     );
   });
 
-  // Ruby's Array#to_s inspects each element, so String#inspect escaping applies:
-  // named escapes for the usual control characters, \uXXXX (uppercase, four
-  // digits) for other non-printables, `\#` only where a `#` would begin an
-  // interpolation, and printable non-ASCII passed through. The expectation is
-  // the verbatim output of running these same inputs through
-  // `ruby -e 'puts cases.to_s'`.
   it("quoteColumnName applies Ruby String#inspect escaping to Array elements", () => {
     const names = [
       "a\n",
@@ -86,9 +72,6 @@ describe("ToSql Array-named identifiers", () => {
     );
   });
 
-  // Rails' MySQL visitor renders a CTE name with the visitor's own
-  // `quote_table_name` (arel/visitors/mysql.rb:73 → to_sql.rb:872), not the
-  // connection's, so the name goes through the same Array#to_s stand-in.
   it("the MySQL CTE visitor routes its name through the ToSql quoteTableName helper", () => {
     const cte = new Nodes.Cte(
       ["a", "b"] as unknown as string,
@@ -101,13 +84,6 @@ describe("ToSql Array-named identifiers", () => {
 describe("ToSql raw scalars in quoting slots", () => {
   const users = new Table("users");
 
-  // Regression guard for the `NodeOrValue` union. Rails' Assignment visitor
-  // `case`s on the value and sends anything that is not a Node/Attribute to
-  // `quote(o.right)` rather than `visit` (to_sql.rb:637-639). That is why a
-  // bare boolean renders here even though `visit_TrueClass`/`visit_FalseClass`
-  // are aliased to `unsupported` (to_sql.rb:845, :838) — the alias governs
-  // direct dispatch, which this slot never reaches. Dropping `boolean` from the
-  // union on the strength of that alias alone would contradict this behaviour.
   it("quotes a bare boolean in an Assignment right instead of raising", () => {
     const node = new Nodes.Assignment(users.get("admin"), true);
     expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."admin" = TRUE');
@@ -123,10 +99,6 @@ describe("ToSql grouping-set nodes are PostgreSQL-only", () => {
   const users = new Table("users");
   const compile = (n: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(n);
 
-  // `visit_Arel_Nodes_Cube` / `RollUp` / `GroupingElement` / `GroupingSet` are
-  // defined only on the PostgreSQL visitor (postgresql.rb:44-62); the base
-  // ToSql has no handler, so each falls out of `Visitor#visit`'s TypeError
-  // terminal (visitor.rb:36-39).
   it("raises rather than emitting SQL for Cube/RollUp/GroupingElement/GroupingSet", () => {
     expect(() => compile(new Nodes.Cube([users.get("a")]))).toThrow(TypeError);
     expect(() => compile(new Nodes.RollUp([users.get("a")]))).toThrow(TypeError);
@@ -139,8 +111,6 @@ describe("ToSql build_quoted Table arm", () => {
   const users = new Table("users");
   const posts = new Table("posts");
 
-  // casted.rb:47-51 passes an `Arel::Table` through unchanged, so
-  // `visit_Arel_Table` renders it rather than `Quoted` quoting it as a value.
   it("renders a Table reached through quotedNode as a table reference", () => {
     const node = users.get("id").eq(posts);
     expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."id" = "posts"');
@@ -185,7 +155,6 @@ describe("Quoted/Casted collapse", () => {
     expect(binds).toHaveLength(0);
   });
 
-  // Trails-only: asserts the adapter's `quoted_date` rendering (fake_record.rb:73-76).
   it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
     const value = Temporal.Instant.from("2026-04-30T00:00:00.000Z");
     const [sql, binds] = compileWithBinds(
@@ -265,10 +234,6 @@ describe("DeleteManager subselect", () => {
 });
 
 describe("ArelQuoter / defaultQuoter wiring", () => {
-  // Trails-only: this block exercises `defaultQuoter` — the adapter quoting —
-  // rather than the FakeRecord double of fake_record.rb:55-90, so every visitor
-  // here, the `RecordingToSql` subclasses at the end included, keeps
-  // `testConnection`.
   const users = new Table("users");
 
   it("default quoter emits double-quoted identifiers", () => {
@@ -302,10 +267,6 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
   });
 
   it("Uint8Array in value position is routed through quoter.quote(), not String()", () => {
-    // Guards against the String(Uint8Array) → comma-joined decimals ('31,139')
-    // corruption path. The visitor hands the raw value to `connection.quote`
-    // (to_sql.rb:867-870); the connection dispatches binary to quotedBinary and
-    // emits the correct dialect binary literal.
     const received: unknown[] = [];
     const stubQuoter: Visitors.ArelConnection = {
       quoteTableName: (name) => `"${name}"`,
@@ -330,11 +291,6 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
   });
 
   it("integers in raw value position bypass quote(), matching Rails visit_Integer", () => {
-    // Rails' raw-value dispatch sends an Integer to `visit_Integer`, which is
-    // `collector << o.to_s` (to_sql.rb:824-826) — the connection is never
-    // consulted. `quote` governs the Casted-node path (to_sql.rb:87-90), not
-    // this one. A quoter that mangles everything must therefore not be able to
-    // reach an integer here.
     const quoted: unknown[] = [];
     class RecordingToSql extends Visitors.ToSql {
       protected override quote(value: unknown): string {
@@ -342,10 +298,6 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
         return `<<${String(value)}>>`;
       }
     }
-    // A raw JS number reaches the visitor only when placed directly into a
-    // node; `.in([1, 2])` instead wraps each value in a Casted node via
-    // `quotedNode`, which is the to_sql.rb:87-90 path and does route through
-    // quote(). InfixOperation carries the raw value through unwrapped.
     const sql = new RecordingToSql(testConnection).compile(
       new Nodes.InfixOperation(
         "+",
@@ -359,8 +311,6 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
   });
 
   it("Casted values do route through quote(), unlike raw integers", () => {
-    // The companion to the guard above: to_sql.rb:87-90 sends a Casted /
-    // Quoted node's value through quote(), so the two paths must differ.
     const quoted: unknown[] = [];
     class RecordingToSql extends Visitors.ToSql {
       protected override quote(value: unknown): string {
@@ -375,16 +325,7 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
-  // A value exposing `isUnboundable()` (out of range for its column) is dropped
-  // from an IN / NOT IN list, mirroring Rails' `visit_Arel_Nodes_In`
-  // `values.delete_if { |v| unboundable?(v) }`.
   describe("unboundable values in IN / NOT IN lists", () => {
-    // Rails' PredicateBuilder wraps out-of-range bounds in a QueryAttribute,
-    // which `Nodes.build_quoted` passes through unwrapped (casted.rb:50-51 —
-    // the `when ..., ActiveModel::Attribute` arm returning `other`) so it
-    // answers `unboundable?` to the visitor directly (to_sql.rb:905-907).
-    // Trails' equivalent is a BindParam, whose `isUnboundable` delegates to its
-    // value (bind_param.rb:39-40). Only that shape short-circuits.
     const unboundable = new Nodes.BindParam({ isUnboundable: () => 1 as const });
 
     it("drops an unboundable value from an IN list", () => {
@@ -445,9 +386,6 @@ describe("the to_sql visitor", () => {
   });
 
   it("renders non-finite numbers bare in a ValuesList, matching the abstract adapter", () => {
-    // Rails' abstract `quote` emits `when Numeric then value.to_s`
-    // (abstract/quoting.rb:82), so the connection-less default visitor renders
-    // non-finite numbers bare. Only PostgreSQL's adapter string-quotes them.
     const mgr = new InsertManager(users);
     mgr.insert([[users.get("name"), Number.POSITIVE_INFINITY]]);
     expect(mgr.toSql()).toContain("VALUES (Infinity)");
@@ -502,9 +440,6 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::HomogeneousIn", () => {
     it("is not preparable", () => {
-      // HomogeneousIn#casted_values reaches Table#type_for_attribute, which
-      // delegates bare to the caster — so Rails builds this table with a caster
-      // too (`fake_pg_caster`, homogeneous_in_test.rb:44-50).
       const castedUsers = new Table("users", {
         typeCaster: { typeForAttribute: () => new StringType() },
       });
@@ -516,9 +451,6 @@ describe("the to_sql visitor", () => {
   });
 
   describe("value-class visitors aliased to unsupported", () => {
-    // Rails aliases visit_Class/Date/DateTime/Float/Hash/NilClass/String/
-    // Time/TrueClass/FalseClass and the ActiveSupport string types to
-    // `unsupported` (to_sql.rb:832-845): each raises UnsupportedVisitError.
     const aliasNames = [
       "visitActiveSupportMultibyteChars",
       "visitActiveSupportStringInquirer",
@@ -546,10 +478,6 @@ describe("the to_sql visitor", () => {
       });
     }
     describe("raw values reaching visit dispatch on their class", () => {
-      // Rails' raw-value dispatch: only `visit_Integer` renders
-      // (`collector << o.to_s`, to_sql.rb:824-826); every other scalar aliases
-      // to `unsupported` and raises (to_sql.rb:828-845). Equality visits its
-      // right (to_sql.rb:643), so a raw value placed there hits that dispatch.
       const compileRight = (right: unknown): string =>
         new Visitors.ToSql(fakeRecordConnection).compile(
           new Nodes.Equality(new Table("users").get("id"), right as Nodes.NodeOrValue),
@@ -569,24 +497,16 @@ describe("the to_sql visitor", () => {
       }
       it("renders an Integer bare", () => {
         expect(compileRight(1)).toBe('"users"."id" = 1');
-        // Ruby has no fixnum/bignum split at this layer — both are Integer.
         expect(compileRight(9007199254740993n)).toBe('"users"."id" = 9007199254740993');
       });
 
       it("renders IS NULL for Casted(nil) as well as Quoted(nil)", () => {
-        // Rails defines `nil?` as `value.nil?` on both wrappers — Casted
-        // (casted.rb:15) and Quoted (casted.rb:41) — so `right.nil?`
-        // (to_sql.rb:649) is true for either and both emit IS NULL.
         const attr = new Table("users").get("id");
         expect(compileRight(new Nodes.Quoted(null))).toBe('"users"."id" IS NULL');
         expect(compileRight(new Nodes.Casted(null, attr))).toBe('"users"."id" IS NULL');
       });
 
       it("renders IS NULL for a bare NilClass rather than dispatching", () => {
-        // Rails tests `right.nil?` (to_sql.rb:649) before visiting, and that is
-        // true for a bare nil as well as Quoted(nil) (`Quoted#nil?` delegates
-        // to `value.nil?`, casted.rb:41) — so nil never reaches raw dispatch
-        // here, even though visit_NilClass is aliased to `unsupported`.
         expect(compileRight(null)).toBe('"users"."id" IS NULL');
         const attr = new Table("users").get("id");
         expect(
@@ -595,8 +515,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("raises UnsupportedVisitError for NilClass on a path that reaches dispatch", () => {
-        // visit_NilClass is aliased to `unsupported` (to_sql.rb:840); visitArray
-        // reaches it because there is no `nil?` guard on that path.
         const v = new Visitors.ToSql(fakeRecordConnection);
         const visitArray = (
           v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
@@ -607,20 +525,10 @@ describe("the to_sql visitor", () => {
       });
 
       it("raises UnsupportedVisitError for a non-finite Float", () => {
-        // Infinity is not integral, so it lands on the Float branch — there is
-        // no separate non-finite rule. `unboundable?` is purely duck-typed
-        // (`value.respond_to?(:unboundable?) && value.unboundable?`,
-        // to_sql.rb:905-907) and a Float answers it false, so Equality visits
-        // its right (to_sql.rb:643) and reaches visit_Float, aliased to
-        // `unsupported` (to_sql.rb:839).
         expect(() => compileRight(Infinity)).toThrow(Visitors.UnsupportedVisitError);
       });
 
       it("dispatches a bare Temporal on its Rails analogue", () => {
-        // Temporal is the Time analogue, so an Instant must reach visit_Time
-        // (`alias :visit_Time :unsupported`, to_sql.rb:844) and a PlainDate
-        // visit_Date (to_sql.rb:836) — not the generic no-handler tail.
-        // Temporal exposes no toISOString, so the tag is what routes them.
         const v = new Visitors.ToSql(fakeRecordConnection);
         const seen: string[] = [];
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
@@ -643,11 +551,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("does not dispatch a Temporal without a Rails analogue on visit_Time", () => {
-        // Duration/PlainYearMonth/PlainMonthDay have no visitable Rails
-        // ancestor: to_sql.rb defines no visit_ActiveSupport_Duration and
-        // ActiveSupport::Duration is a plain Object subclass, not a Numeric
-        // (duration.rb:14), so Rails finds no handler (visitor.rb:39). They
-        // must reach that same tail, not be mislabelled as a Ruby Time.
         const v = new Visitors.ToSql(fakeRecordConnection);
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
         spy.visitTime = () => {
@@ -669,8 +572,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("dispatches a bare Temporal.PlainDateTime on visit_DateTime", () => {
-        // PlainDateTime is the DateTime analogue (`alias :visit_DateTime
-        // :unsupported`, to_sql.rb:837), not the Time one.
         const v = new Visitors.ToSql(fakeRecordConnection);
         const seen: string[] = [];
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
@@ -690,17 +591,12 @@ describe("the to_sql visitor", () => {
       });
 
       it("raises for a bare Temporal but still renders it wrapped", () => {
-        // A bare Temporal raises; wrapped in Quoted it routes through quote()
-        // (to_sql.rb:87-90) and still inlines, which is the only shape any AR
-        // caller produces.
         const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
         expect(() => compileRight(instant)).toThrow(Visitors.UnsupportedVisitError);
         expect(compileRight(new Nodes.Quoted(instant))).toContain("2026-04-30");
       });
 
       it("renders once wrapped via quotedNode, as predications do", () => {
-        // The AR-facing path: `eq` wraps the raw value in a Casted node, which
-        // routes through quote() (to_sql.rb:87-90) rather than raw dispatch.
         expect(
           new Visitors.ToSql(fakeRecordConnection).compile(new Table("users").get("id").eq("x")),
         ).toBe('"users"."id" = \'x\'');
@@ -708,7 +604,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("visit_Set is aliased to visit_Array (joins with ', ')", () => {
-      // Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861).
       const v = new Visitors.ToSql(fakeRecordConnection);
       const collector = new Collectors.SQLString();
       const set = new Set<Nodes.NodeOrValue>([new Nodes.Quoted(1), new Nodes.Quoted(2)]);
@@ -754,9 +649,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("treats a JoinSource with no joins as no-join-source (Rails has_join_sources?)", () => {
-      // Mirrors Rails: `has_join_sources?` requires non-empty `right`.
-      // A bare JoinSource(table) renders via the plain `DELETE FROM` path,
-      // identical to passing the table directly.
       const stmt = new Nodes.DeleteStatement(new Nodes.JoinSource(users));
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(stmt);
       expect(sql).toBe('DELETE FROM "users"');
@@ -805,9 +697,6 @@ describe("the to_sql visitor", () => {
 
   describe("TableAlias", () => {
     it("emits a subquery alias bare (Rails AliasPredication via SqlLiteral name)", () => {
-      // SelectManager#as wraps the relation in a Grouping, which Rails'
-      // visit_Arel_Nodes_TableAlias renders bare via quote_table_name's
-      // SqlLiteral pass-through. Trails matches on the relation shape.
       const sub = users.project(users.get("id")).as("sub");
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(sub);
       expect(sql).toContain(") sub");
@@ -821,11 +710,7 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  // Rails: to_sql.rb:632's `when ..., ActiveModel::Attribute` arm visits the
-  // right, reaching visit_ActiveModel_Attribute (rb:756) and its add_bind.
   it("visits an ActiveModel::Attribute assignment right instead of quoting it", () => {
-    // `NodeOrValue` doesn't name ActiveModel::Attribute — Rails' `case` accepts
-    // it at runtime, which is what this asserts.
     const node = new Nodes.Assignment(
       users.get("name"),
       AMAttribute.fromUser("name", "x", new ValueType()),
@@ -833,8 +718,6 @@ describe("the to_sql visitor", () => {
     expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe('"users"."name" = ?');
   });
 
-  // Trails-only: the date cases below assert the adapter's `quoted_date` shape,
-  // microseconds and all, which fake_record.rb:73-76 does not produce.
   it("should visit_Date with fractional seconds retains microseconds", () => {
     const d = Temporal.Instant.from("2026-04-18T13:00:41.729Z");
     const sql = new Visitors.ToSql(testConnection).compile(new Nodes.Quoted(d));
@@ -865,16 +748,12 @@ describe("the to_sql visitor", () => {
     const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
     const node = users.get("created_at").eq(new Nodes.Quoted(d));
     const [sql, binds] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), node);
-    // Quoted(Date) inlines per Rails to_sql.rb — _extractBinds was removed by
-    // collector threading; only BindParam/ActiveModel::Attribute go to addBind.
     expect(sql).toContain("2020-01-02");
     expect(sql).not.toContain("?");
     expect(binds).toHaveLength(0);
   });
 
   describe("Nodes::Union with ORDER/LIMIT/OFFSET operands", () => {
-    // Mirrors Rails `grouping_parentheses(..., false)` + `require_parentheses?`:
-    // SELECTs that carry orders/limit/offset are wrapped to disambiguate.
     it("wraps a SELECT operand with ORDER BY", () => {
       const a = users.project(star());
       const b = users.project(star()).order(users.get("id"));
@@ -985,19 +864,12 @@ describe("the to_sql visitor", () => {
     };
 
     v.accept(mgr.ast, collector);
-    // Casted values inline their quoted literal directly (mirrors Rails
-    // visit_Arel_Nodes_Casted, to_sql.rb:87-88) — no addBind, no placeholder.
     expect(binds).toHaveLength(0);
     expect(parts.some((p) => typeof p === "string" && p.includes("'alice'"))).toBe(true);
     expect(parts.some((p) => typeof p === "string" && p.includes("users"))).toBe(true);
   });
 
   describe("Nodes::ValuesList row dispatch", () => {
-    // Rails' `case` (to_sql.rb:106-114) visits only SqlLiteral/BindParam/
-    // ActiveModel::Attribute; everything else — including a Casted/Quoted —
-    // falls to `quote()`. Routing is asserted through a connection whose
-    // `quote` is distinguishable, so this pins which branch each row takes
-    // rather than just the rendered text.
     const probe = {
       quoteTableName: (n: string) => `"${n}"`,
       quoteColumnName: (n: string) => `"${n}"`,
@@ -1024,10 +896,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("sends a Quoted row to quote(), which is where Rails raises TypeError", () => {
-      // Rails: quote(Quoted) → to_sql.rb:867-870 → quoting.rb:86
-      // `else raise TypeError, "can't quote Arel::Nodes::Quoted"`. Trails'
-      // adapter quote does the same (abstract/quoting.ts:151), so a connection
-      // that raises proves the row reaches quote() rather than visit.
       const raising = {
         ...probe,
         quote: (v: unknown) => {
@@ -1045,8 +913,6 @@ describe("the to_sql visitor", () => {
       expect(sql).toBe("VALUES (?)");
     });
 
-    // Rails' `when` at to_sql.rb:110 dispatches on the class, so an object that
-    // merely looks like an ActiveModel::Attribute is not one and reaches quote().
     it("quotes an ActiveModel::Attribute duck-type instead of visiting it", () => {
       const sql = new Visitors.ToSql(probe).compile(
         new Nodes.ValuesList([[{ name: "id", valueForDatabase: 1 }]]),
@@ -1124,20 +990,12 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  // `BindParam#unboundable?` (bind_param.rb:39-40) delegates to its value's
-  // `unboundable?`; the visitor never consults `infinite?` (bind_param.rb:35-37),
-  // which exists for `Predications#open_ended?` (predications.rb:248).
-
-  // Mirrors Rails' to_sql.rb private helpers (sanitize_as_sql_comment,
-  // quote_table_name, quote_column_name).
   describe("Rails-mirrored private helpers", () => {
     type ToSqlInternals = {
       sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string;
       quoteTableName(name: string | Nodes.SqlLiteral): string;
       quoteColumnName(name: string | Nodes.SqlLiteral): string;
     };
-    // Trails-only: asserts adapter quoting — comment stripping and `"` doubling —
-    // that fake_record.rb:55-65 does not do (verbatim name, unchanged comment).
     const make = (): ToSqlInternals =>
       new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
 
@@ -1169,7 +1027,6 @@ describe("the to_sql visitor", () => {
 
     it("collectNodesFor prefixes the spacer and joins with the connector", () => {
       const tbl = new Table("users");
-      // Verify via SelectCore: Rails' WHERE collapses on " AND ".
       const sql = tbl
         .where(tbl.get("a").eq(1))
         .where(tbl.get("b").eq(2))
@@ -1193,11 +1050,7 @@ describe("the to_sql visitor", () => {
       expect(sql).toBe("/*+ IDX(t1) MAX_EXEC_TIME(1000) */");
     });
 
-    // Trails-only: `sanitize_as_sql_comment` is a no-op on fake_record.rb:63-65.
     it("strips embedded comment delimiters from each hint (Rails parity)", () => {
-      // Mirrors Rails: sanitize_as_sql_comment removes /* and */ so a hint
-      // can't escape the surrounding comment block. The literal SQL inside
-      // is preserved as comment text — it's still inside /*+ ... */.
       const node = new Nodes.OptimizerHints(["A */ DROP /*"]);
       const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe("/*+ A DROP */");
@@ -1219,8 +1072,6 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  // Trails-only: adapter identifier quoting (schema splitting, `"` doubling),
-  // which fake_record.rb:55-61 does not do.
   describe("schema-qualified table identifier", () => {
     it("quotes each segment of a schema.table name in SELECT and column refs", () => {
       const tbl = new Table("schema.table");
@@ -1229,8 +1080,6 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  // Trails-only, same reason as the block above: `"` doubling is adapter
-  // quoting, which fake_record.rb:55-61 does not do.
   describe("identifier-escape consistency (helper-routed quoting)", () => {
     it("UPDATE SET column quotes embedded double-quotes", () => {
       const tbl = new Table('tab"le');
@@ -1285,8 +1134,6 @@ describe("the to_sql visitor", () => {
       }
       const tbl = new Table("users");
       const v = new NumberedVisitor(fakeRecordConnection);
-      // Only BindParam routes through addBind (and therefore bindBlock); Casted
-      // and Quoted values inline their quoted literal (Rails to_sql.rb:87-88).
       const [sql] = compileWithBinds(
         v,
         tbl
@@ -1300,9 +1147,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("visitActiveModelAttribute routes through bindBlock (Rails parity)", () => {
-      // ActiveModel::Attribute isn't a Node ctor so it's not reachable
-      // through standard dispatch — exercise the visitor method directly
-      // to confirm Rails' add_bind(o, &bind_block) shape is preserved.
       class NumberedVisitor extends Visitors.ToSql {
         idx = 0;
         protected override bindBlock(): (i: number) => string {
@@ -1321,9 +1165,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("visitArelSelectManager wraps the manager's AST in parens", () => {
-      // Called directly — SelectManager isn't in the dispatch table because
-      // it's a TreeManager, not a Node. Mirrors Rails' `visit_Arel_SelectManager`
-      // which is invoked when the visitor encounters a SelectManager value.
       const tbl = new Table("users");
       const mgr = new SelectManager(tbl).project(tbl.get("id"));
       const v = new Visitors.ToSql(fakeRecordConnection);
@@ -1355,17 +1196,10 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql(fakeRecordConnection).compile(elseNode)).toBe("ELSE 0");
     });
 
-    // Mirrors Rails to_sql.rb#visit_Arel_Nodes_{Equality,NotEqual,GreaterThan,
-    // GreaterThanOrEqual,LessThan,LessThanOrEqual,In,NotIn} short-circuits
-    // when the right operand reports `unboundable?` (±Float::INFINITY).
     describe("unboundable short-circuits", () => {
       const tbl = new Table("users");
       const compile = (n: Nodes.Node) => new Visitors.ToSql(fakeRecordConnection).compile(n);
       const id = tbl.get("id");
-      // Rails' `unboundable?` is duck-typed (to_sql.rb:905-907) and only
-      // BindParam / QueryAttribute answer it. A raw `Float::INFINITY` — or a
-      // Quoted/Casted wrapping one — is *bounded* to the visitor, so it renders
-      // as a value instead of collapsing.
       const unbounded = (sign: 1 | -1) => new Nodes.BindParam({ isUnboundable: () => sign });
 
       it("Equality with an unboundable bind collapses to 1=0", () => {
@@ -1406,12 +1240,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("a raw Float::INFINITY is bounded and renders as a value", () => {
-        // Rails: Float has no `unboundable?`, so `attr.eq(Float::INFINITY)`
-        // builds Casted(INFINITY) and renders `= Infinity` via `quote` →
-        // `when Numeric then value.to_s` (abstract/quoting.rb:82), which is what
-        // the abstract AR adapter path emits. The connection-less default quoter
-        // mirrors that and renders non-finite numbers bare; only PostgreSQL's
-        // adapter string-quotes them (postgresql/quoting.rb:111-115).
         expect(compile(id.eq(Infinity))).toBe('"users"."id" = Infinity');
         expect(compile(id.gt(-Infinity))).toBe('"users"."id" > -Infinity');
         expect(compile(id.in([1, Infinity, 2]))).toBe('"users"."id" IN (1, Infinity, 2)');
@@ -1442,7 +1270,6 @@ describe("the to_sql visitor", () => {
       const v = () => new Visitors.ToSql(fakeRecordConnection) as unknown as Internals;
 
       it("returns 0 for values that do not respond to isUnboundable", () => {
-        // to_sql.rb:905 — `value.respond_to?(:unboundable?) && value.unboundable?`.
         expect(v().unboundableSign(Infinity)).toBe(0);
         expect(v().unboundableSign(-Infinity)).toBe(0);
         expect(v().unboundableSign(0)).toBe(0);
@@ -1452,11 +1279,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("does not consult isInfinite(), which is a different predicate", () => {
-        // `infinite?` serves `Predications#open_ended?` (predications.rb:256-258);
-        // the visitor never calls it, and neither Quoted nor Casted defines
-        // `unboundable?`. It is defined on Quoted (casted.rb:43-45 — the Quoted
-        // class lives in casted.rb) and NOT on Casted (casted.rb:5-35), which is
-        // why Casted answers 0 below on both predicates.
         expect(v().unboundableSign(new Nodes.Quoted(Infinity))).toBe(0);
         expect(v().unboundableSign(new Nodes.Quoted(-Infinity))).toBe(0);
         expect(v().unboundableSign({ isInfinite: () => 1 })).toBe(0);
@@ -1470,10 +1292,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("honours an isUnboundable() protocol returning a sign or boolean", () => {
-        // Rails `case`s on the sign (`when 1` / `when -1`, to_sql.rb:438-475),
-        // so only those two values collapse. Every producer returns
-        // `1 | -1 | false`: QueryAttribute yields `value <=> 0`
-        // (query_attribute.rb:46-51) and BindParam delegates.
         expect(v().unboundableSign({ isUnboundable: () => 1 })).toBe(1);
         expect(v().unboundableSign({ isUnboundable: () => -1 })).toBe(-1);
         expect(v().unboundableSign({ isUnboundable: () => false })).toBe(0);
@@ -1495,9 +1313,6 @@ describe("the to_sql visitor", () => {
       const visitArray = (
         v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
       ).visitArray;
-      // Rails' `visit_Array` is `inject_join` (to_sql.rb:858-860): each entry
-      // goes through `visit`, so a Node and an Integer render while a raw
-      // String hits `visit_String` and raises.
       visitArray.call(v, [tbl.get("a"), 1], collector);
       expect(collector.value).toBe('"users"."a", 1');
       expect(() => visitArray.call(v, ["text"], new Collectors.SQLString())).toThrow(

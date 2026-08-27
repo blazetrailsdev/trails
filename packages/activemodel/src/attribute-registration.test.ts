@@ -3,7 +3,6 @@ import { Model, Types, ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
 import type { Type } from "./type.js";
 
-/** Mirrors: attribute_registration_test.rb:7 — `MyType = Class.new(Type::Value)`. */
 class MyType extends ValueType<unknown> {
   readonly name: string = "MyType";
 }
@@ -11,12 +10,6 @@ class MyType extends ValueType<unknown> {
 const TYPE_1 = new MyType({ precision: 1 });
 const TYPE_2 = new MyType({ precision: 2 });
 
-/**
- * Mirrors: attribute_registration_test.rb:11-19 —
- * `MyDecorator = DelegateClass(Type::Value)` with a `name` reader and
- * `cast_type` aliased to the wrapped type. TypeScript has no `DelegateClass`,
- * so the delegation is the explicit `cast` forward.
- */
 class MyDecorator extends ValueType<unknown> {
   readonly name: string;
   readonly castType: Type;
@@ -33,14 +26,12 @@ class MyDecorator extends ValueType<unknown> {
 }
 
 describe("AttributeRegistrationTest", () => {
-  // Mirrors: attribute_registration_test.rb:247-250 — `class_with(base_class = nil, &block)`.
   function classWith(baseClass: typeof Model | null, block: (klass: any) => void): any {
     const klass = class extends (baseClass ?? Model) {};
     block(klass);
     return klass;
   }
 
-  // Mirrors: attribute_registration_test.rb:252-254 — `default_attributes_for(&block)`.
   function defaultAttributesFor(block: (klass: any) => void): AttributeSet {
     return classWith(null, block)._defaultAttributes();
   }

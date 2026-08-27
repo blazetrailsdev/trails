@@ -14,12 +14,6 @@ import {
   TableDefinition,
 } from "../abstract/schema-definitions.js";
 
-// Stub host satisfies `PgSchemaCreationHost`: the inherited Quoting
-// fallback covers quote*, plus a minimal `typeToSql` since PG's override
-// delegates to the adapter (Rails parity: SchemaCreation delegates
-// type_to_sql to @conn), plus the capability probes `SchemaCreation`
-// delegates to `@conn` (abstract/schema_creation.rb:16-21), answered as
-// `PostgreSQLAdapter` answers them.
 const s = () =>
   new SchemaCreation({
     nativeDatabaseTypes: () => ({}),
@@ -134,8 +128,6 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition: uuid function default stays bare", async () => {
-    // postgresql/quoting.rb:159-160 — a `()`-bearing string default on a
-    // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
     const col = new Column("id", null, new TypeMetadata({ sqlType: "uuid", type: "uuid" }));
     const host = s();
     host.conn.quoteDefaultExpression = (v: unknown, c: unknown) =>
@@ -222,10 +214,6 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(await sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
   });
 
-  // Rails' PostgreSQLAdapter#native_database_types replaces the constant's raw
-  // `datetime: {}` placeholder with `types[datetime_type]` before type_to_sql
-  // reads it (postgresql_adapter.rb:404-408), so `datetime` is never resolved
-  // against the empty placeholder — not even without an adapter threaded.
   it("resolves datetime through datetimeType with no adapter threaded", () => {
     const hostless = new SchemaCreation({
       quoteColumnName: (n: string) => `"${n}"`,
@@ -233,12 +221,8 @@ describe("PostgreSQL SchemaCreation", () => {
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
     } as any);
     expect(hostless.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
-    // `primary_key` is a bare String in Rails' hash, not a `{ name: }` entry.
     expect(hostless.typeToSql("primary_key")).toBe("bigserial primary key");
 
-    // Rails assigns `types[:datetime] = types[datetime_type]` with no default,
-    // so a datetime_type naming no entry leaves it nil and type_to_sql falls
-    // through to "datetime" rather than silently meaning timestamp.
     const original = pgDatetimeConfig.datetimeType;
     try {
       pgDatetimeConfig.datetimeType = "nonesuch";

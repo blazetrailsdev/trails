@@ -1,12 +1,3 @@
-/**
- * WhereClause's String predicate arms (where_clause.rb:160, 167, 190, 203).
- *
- * Rails stores a bare String predicate — `build_where_clause`'s sanitize_sql
- * arm is `parts = [model.sanitize_sql(...)]` (query_methods.rb:1627) — and
- * WhereClause handles the String downstream. Ruby gets these arms for free
- * because SqlLiteral subclasses String; TypeScript needs them spelled out, so
- * they are covered here rather than in the Rails-mirrored file.
- */
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
 import { WhereClause } from "./where-clause.js";

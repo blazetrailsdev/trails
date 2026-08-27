@@ -33,14 +33,6 @@ const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("PostgreSQL quoting", () => {
   it("inherits abstract boolean SQL literals", () => {
-    // Rails PG overrides none of quoted_true/quoted_false/unquoted_true/
-    // unquoted_false — it inherits "TRUE"/"FALSE" and bare true/false from
-    // abstract/quoting.rb:166-180. Inheriting that pair (not MySQL/SQLite's
-    // 1/0) is why encode_array emits '{true}'.
-    //
-    // The inherited quote/typeCast now reach the pair through the receiver
-    // (quoting.rb:77-78, 98-99), so a host that DID override them would change
-    // these results — abstract/quoting.test.ts pins that dispatch.
     expect(quote(true)).toBe("TRUE");
     expect(quote(false)).toBe("FALSE");
     expect(typeCast(true)).toBe(true);
@@ -78,10 +70,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("type_casts datetime array elements through quoted_date (fixed-6, BC)", () => {
-    // encode_array → type_cast_array → type_cast → quoted_date: a datetime
-    // element gets the same db literal a scalar does (fixed-6 μs, " BC" for
-    // proleptic years), not ISO-8601. This is the Rails-shaped path an inline
-    // datetime[] INSERT must route through.
     const dtArray = new ArrayData(new PgTextEncoderArray({ name: "datetime[]", delimiter: "," }), [
       Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
       Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
@@ -92,9 +80,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("encodes unbounded range bounds as empty, matching Ruby nil interpolation", () => {
-    // Rails builds the literal with string interpolation, where a nil bound
-    // (unbounded end) renders as "". `${null}` would emit "null" and PG rejects
-    // e.g. `[2020-01-01,null)` for a tsrange.
     expect(typeCast(new Range("2020-01-01", null, true))).toBe("[2020-01-01,)");
     expect(typeCast(new Range(null, "2020-12-31", false))).toBe("[,2020-12-31]");
     expect(quote(new Range("2020-01-01", null, true))).toBe("'[2020-01-01,)'");
@@ -113,10 +98,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotes a binary default through PG's quotedBinary", async () => {
-    // Binary self-dispatches through the host, so it must reach the bytea escape
-    // form, not the abstract byte-string fallback. Cover both shapes here —
-    // the raw Uint8Array trails' BinaryType#serialize actually returns, and the
-    // BinaryData Rails' Binary#serialize returns (activemodel/.../binary.rb:31).
     expect(await quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]), {})).toBe(
       "'\\x1f8b'",
     );
@@ -126,9 +107,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotes a BC date default through PG's quotedDate", async () => {
-    // Dates self-dispatch through the host, so they must reach PG's BC-suffixing
-    // quotedDate (postgresql/quoting.rb:143), not the abstract formatter which
-    // drops " BC".
     expect(
       await quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"), {}),
     ).toBe("'0044-03-15 BC'");
@@ -154,8 +132,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("does not quote function default values for UUID columns", async () => {
-    // Rails postgresql/quoting.rb:159-160. Both pgcrypto and uuid-ossp spellings
-    // are exercised (uuid_test.rb:16 picks between them by extension support).
     const column = { type: "uuid", sqlType: "uuid" };
     expect(await quoteDefaultExpression.call(HOST, "gen_random_uuid()", column)).toBe(
       "gen_random_uuid()",
@@ -197,11 +173,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("serializes array defaults via an element subtype (per-element coercion)", async () => {
-    // Mirrors Rails postgresql/quoting.rb:161-163 where
-    // lookup_cast_type_from_column returns OID::Array(IntegerType) and
-    // serialize walks each element through Integer#serialize. Trails'
-    // CastTypeLookup returns the element subtype here; quoteDefaultExpression
-    // must wrap it in OidArray so per-element casting fires.
     const column = { sqlType: "integer", array: true };
     const typeMap = {
       lookupCastTypeFromColumn() {
@@ -214,11 +185,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("passes raw array-literal string defaults through without scalar coercion", async () => {
-    // Regression: when the value is a PG array literal string (e.g.
-    // `"{}"`) on an array column, the element-subtype lookup must NOT
-    // run — IntegerType#serialize("{}") would coerce to NaN. Rails
-    // would route through OID::Array#serialize whose string path is a
-    // pass-through; mirror that here.
     const column = { sqlType: "integer", array: true };
     const typeMap = {
       lookupCastTypeFromColumn() {
@@ -251,7 +217,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
-    // postgresql/quoting.rb:152 is `quoted_binary(value)` → `escape_bytea(value.to_s)`.
     expect(quotedBinary(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
   });
 
@@ -319,7 +284,6 @@ describe("PostgreSQL quoting", () => {
     });
 
     it("rejects unquoted collations, matching Rails", () => {
-      // Rails: (?:\s+COLLATE\s+"\w+")? — quoted identifier only.
       expect(matcher.test("name COLLATE C")).toBe(false);
     });
 
@@ -338,7 +302,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quoted_date emits fixed 6-digit microseconds when usec > 0", () => {
-    // Rails abstract/quoting.rb:194-195 — sprintf("%06d", usec), never a trimmed group.
     expect(quotedDate(Temporal.Instant.from("2026-04-26T14:23:55.5Z"))).toBe(
       "2026-04-26 14:23:55.500000",
     );
@@ -370,23 +333,11 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quote dispatches Date/Time through this.quoted_date (BC suffix)", () => {
-    // Rails' PG#quote calls super, whose Date branch is `'#{quoted_date(value)}'`
-    // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.
     const v = Temporal.PlainDate.from("-000043-03-15");
     expect(quoteFn.call(quotingHost({ quotedDate }), v)).toBe("'0044-03-15 BC'");
   });
 
   it("typeCast maps the infinity sentinels to the PG wire strings", () => {
-    // Trails-only: no Rails counterpart — Ruby has no equivalent of these
-    // sentinels, and Rails' `type_cast` never sees one.
-    //
-    // `type_casted_binds` (abstract/quoting.rb:224) is the only bind
-    // normalizer, so the mapping lives here. `DateInfinity` IS
-    // `Number.POSITIVE_INFINITY` (activemodel type/internal/sentinels.ts:25),
-    // so the arm must sit ahead of the numeric arm or the sentinel binds as a
-    // bare float pg cannot send to a date column.
-    // (On the typed path `OID::Date#serialize` has already mapped them to the
-    // "infinity" wire string, so this is belt-and-braces.)
     expect(typeCast(DateInfinity)).toBe("infinity");
     expect(typeCast(DateNegativeInfinity)).toBe("-infinity");
   });

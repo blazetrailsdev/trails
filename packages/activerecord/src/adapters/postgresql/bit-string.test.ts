@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/bit_string_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
@@ -28,7 +25,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("bit string", async () => {
       const { SchemaDumper } = await import("../../schema-dumper.js");
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_bit_strings");
-      // prepareColumnOptions emits limit before default (Rails order)
       expect(output).toMatch(/t\.bit\("a_bit",\s*\{[^}]*limit:\s*8[^}]*default:\s*"00000011"/);
       expect(output).toMatch(
         /t\.bitVarying\("a_bit_varying",\s*\{[^}]*limit:\s*4[^}]*default:\s*"0011"/,

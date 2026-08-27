@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/adapter_prevent_writes_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
@@ -10,7 +7,6 @@ import { fixtures } from "../../test-fixtures.js";
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures([]);
 
-  // Rails: @conn = ActiveRecord::Base.lease_connection
   let conn: Mysql2Adapter;
   beforeAll(async () => {
     conn = Base.connection as Mysql2Adapter;

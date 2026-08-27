@@ -1,14 +1,3 @@
-/**
- * trails-only cases with no counterpart in Rails'
- * activerecord/test/cases/adapters/mysql2/mysql2_adapter_test.rb.
- *
- * The Rails-faithful mirror lives in mysql2-adapter.test.ts; anything here is
- * a trails-specific extension (fabricated translate_exception coverage that
- * needs no live server, DDL-driven error-translation probes drawn from the
- * abstract-adapter suite, the empty-result-set column-reporting guard, and the
- * extended database-timezone re-sync assertions) — kept out of the mirror so
- * parity:test maps cleanly.
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
@@ -45,10 +34,6 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   });
 
   it("active is false for a never-connected / fake adapter", async () => {
-    // Rails' Mysql2Adapter#active? is gated on connected? (raw_connection
-    // non-nil). A fake or never-connected adapter has no _client, so the sync
-    // getter — and isConnected() (Rails' connected?) — report inactive without
-    // touching a real DB, preserving the `active ⟹ isConnected` invariant.
     expect(await adapter.active()).toBe(false);
     expect(adapter.isConnected()).toBe(false);
     const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
@@ -57,9 +42,6 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   });
 
   it("translates connection-loss errnos to ConnectionFailed", () => {
-    // Mirrors AbstractMysqlAdapter#translate_exception cases for
-    // ER_CONNECTION_KILLED / ER_SERVER_SHUTDOWN / CR_SERVER_GONE_ERROR /
-    // CR_SERVER_LOST / ER_CLIENT_INTERACTION_TIMEOUT.
     for (const errno of [
       AbstractMysqlAdapter.ER_CONNECTION_KILLED,
       AbstractMysqlAdapter.ER_SERVER_SHUTDOWN,
@@ -102,8 +84,6 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   });
 
   it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", () => {
-    // Mirrors Mysql2Adapter#translate_exception's ConnectionError branch
-    // AND AbstractMysqlAdapter#translate_exception's `when nil` branch.
     const codedErr = Object.assign(new Error("MySQL client is not connected"), {
       code: "PROTOCOL_CONNECTION_LOST",
     });
@@ -146,11 +126,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     vi.restoreAllMocks();
   });
 
-  // trails-only: the sync `active` getter converges to Rails' Mysql2Adapter#active?
-  // `connected?` guard (`!(@raw_connection.nil? || ...)`) — a never-connected
-  // adapter (`_client === null`) reports inactive until a query establishes the
-  // connection, then false again after disconnectBang(). Rails eager-connects so
-  // it has no never-connected window to cover; this guards trails' lazy-connect.
   describe("#active sync getter reflects connection state", () => {
     it("is false before any connection and true after the first query", async () => {
       const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
@@ -169,10 +144,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     });
   });
 
-  // Rails has no mysql translate_exception test file, so these names are trails
-  // prose covering `AbstractMysqlAdapter#translate_exception`
-  // (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb).
-  // Matches the PG adapter's equivalent suite.
   describe("translate_exception", () => {
     beforeEach(async () => {
       await adapter.executeMutation(`DROP TABLE IF EXISTS ex_child`);
@@ -234,11 +205,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   });
 
   it("#exec_query queries with an empty result set still return the columns", async () => {
-    // Mirrors adapter_test.rb: a zero-row SELECT must still report its
-    // columns from the field descriptors, not collapse to an empty Result.
-    // Rails runs this against the canonical `subscribers` fixture table, which
-    // its schema load lays; trails' per-worker boot (`test-setup-dy.ts`) lays
-    // the same canonical schema, so the table is already there.
     const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
     expect(result).toBeInstanceOf(Result);
     expect(result.rows).toEqual([]);
@@ -246,9 +212,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   });
 
   it("database timezone changes synced to connection (extended re-sync paths)", async () => {
-    // Extends Rails' test_database_timezone_changes_synced_to_connection: the
-    // mirror only checks execute(); here we guard that every perform-query path
-    // (execQuery / executeMutation / exec / explain) re-syncs the timezone too.
     await adapter.execute("SELECT 1");
     expect(adapter._databaseTimezone).toBe("utc");
     await withTimezoneConfig({ default: "local" }, async () => {
@@ -270,10 +233,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   });
 
   it("configure connection seeds database timezone from default", async () => {
-    // Mirrors Rails' `Mysql2Adapter#configure_connection` which assigns
-    // `@raw_connection.query_options[:database_timezone] = default_timezone`
-    // up front. Asserts the seed lands immediately — the per-query re-sync
-    // is covered by the mirror's timezone test.
     adapter._databaseTimezone = "utc";
     await withTimezoneConfig({ default: "local" }, async () => {
       await adapter.configureConnection();
@@ -286,11 +245,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   });
 
   it("warnings handler actually fires on exec update", async () => {
-    // Guards that the warning handler is wired into executeMutation — the
-    // Rails mirror only asserts the returned row count is unaffected; this
-    // extension asserts the warning was actually surfaced (regression catch).
-    // Capture/restore sql_mode (mirrors Rails' ensure) — session variables are
-    // not transactional, so rollback() does not revert SET SESSION.
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);

@@ -3,11 +3,6 @@ import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
-/**
- * SQLite visitor — dialect tweaks on top of generic ToSql.
- *
- * Mirrors: Arel::Visitors::SQLite
- */
 export class SQLite extends ToSql {
   protected override visitArelNodesLock(_node: Nodes.Lock, collector: SQLString): SQLString {
     return collector;
@@ -41,12 +36,6 @@ export class SQLite extends ToSql {
     return collector;
   }
 
-  /**
-   * SQLite has no `IS DISTINCT FROM`; it overloads `IS` / `IS NOT` to be
-   * NULL-aware equality/inequality. Rails routes `IsDistinctFrom` /
-   * `IsNotDistinctFrom` through the SQLite adapter and emits `IS NOT` /
-   * `IS` accordingly.
-   */
   protected override visitArelNodesIsDistinctFrom(
     o: Nodes.IsDistinctFrom,
     collector: SQLString,
@@ -57,11 +46,6 @@ export class SQLite extends ToSql {
     return collector;
   }
 
-  /**
-   * Mirrors `sqlite.rb#infix_value_with_paren`. SQLite rejects parens around
-   * SELECT operands of UNION/INTERSECT/EXCEPT — strip a `Grouping` wrapper
-   * from each operand before recursing/visiting.
-   */
   protected override infixValueWithParen(
     o: Node & { left: Node; right: Node },
     collector: SQLString,

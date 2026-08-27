@@ -3,7 +3,6 @@ import { assertPredicate, assertNothingRaised, Range } from "@blazetrails/active
 import { ArgumentError } from "../attribute-assignment.js";
 import { Model } from "../index.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
   static {
     this.attribute("title", "string");
@@ -17,7 +16,6 @@ class Topic extends Model {
   }
 }
 
-// Mirrors: activemodel/test/models/person.rb — the subset this file exercises.
 class Person extends Model {
   static {
     this.attribute("karma", "string");
@@ -497,8 +495,6 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of using proc as maximum with model method", async () => {
-    // Rails writes `Topic.define_method(:max_title_length) { 5 }`; JS has no
-    // define_method, so the method goes onto the prototype directly.
     (Topic.prototype as unknown as Record<string, unknown>)["maxTitleLength"] = () => 5;
     Topic.validatesLengthOf("title", {
       maximum: (model: Topic) =>

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/network_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -8,7 +5,6 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
-// Rails: class PostgresqlNetworkAddress < ActiveRecord::Base; end
 class PostgresqlNetworkAddress extends Base {
   static {
     this.tableName = "postgresql_network_addresses";
@@ -138,7 +134,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const model = (await PostgresqlNetworkAddress.create({
         mac_address: "Ab:Cd:Ef:01:02:03",
       })) as any;
-      // Rails: model.mac_address = model.mac_address.swapcase
       model.mac_address = (model.mac_address as string).replace(/[a-zA-Z]/g, (c: string) =>
         c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase(),
       );

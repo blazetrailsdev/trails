@@ -1,19 +1,3 @@
-/**
- * The sqlite/MySQL companion to `pg-template.test.ts`: the canonical-schema
- * stamp is what puts a booting worker on `test-setup-dy.ts`'s TRUNCATE fast
- * path instead of a purge + full canonical reload, so both ends of it are
- * pinned here — globalSetup laying it, and the fast path leaving it behind.
- *
- * The first probe is lane-specific because only sqlite has a stamped artifact a
- * test can read back: its template file is cloned per worker and never booted
- * onto, so it keeps its stamp for the whole run. PG's equivalent (the template
- * DB) is covered by `pg-template.test.ts`. MySQL has no `CREATE DATABASE ...
- * TEMPLATE` primitive, so globalSetup stamps the slot DBs workers boot onto
- * directly, and the first boot consumes the stamp — nothing survives to assert.
- *
- * The second probe covers every lane, MySQL included, by replaying the fast
- * path's arm against the worker's own database.
- */
 import { describe, it, expect } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
@@ -81,13 +65,6 @@ describe.skipIf(!runToken)("adapter-specific tables snapshot", () => {
 
 describe.skipIf(!runToken)("snapshot value width", () => {
   it("round-trips a snapshot far wider than the value column", async () => {
-    // `ar_internal_metadata.value` is `t.string` (internal_metadata.rb:85-93),
-    // which MySQL alone renders `varchar(255)` (abstract_mysql_adapter.rb:33);
-    // PG and SQLite impose no limit (postgresql_adapter.rb:136,
-    // sqlite3_adapter.rb:71). Widening the column would diverge from Rails, so
-    // the snapshot is split across as many rows as it needs instead — and the
-    // set must come back whole on every lane, MySQL included, rather than
-    // degrading to a re-lay once the adapter-specific half outgrows 255 chars.
     const connection = await Base.leaseConnection();
     const before = await adapterSpecificTables(connection);
     const oversized = Array.from({ length: 200 }, (_, i) => `padding_table_${i}`);

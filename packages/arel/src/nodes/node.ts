@@ -2,28 +2,12 @@ import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ArelError } from "../errors.js";
 
-/**
- * The `engine` `Node#toSql()` / `TreeManager#toSql()` compile through — Rails'
- * `ActiveRecord::Base`, duck-typed here so arel does not import activerecord.
- */
 export interface ArelEngine {
   connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
 }
 
-/** Backing store for `Arel::Table.engine`. It lives here, not in table.ts,
- *  because `Node#toSql` defaults its engine from it, and a static
- *  `import { Table }` from this module would close a cycle back through
- *  table.ts's own node imports. `Table` exposes it as the Rails-named
- *  `Table.engine` accessor. */
 export const _engine: { current: ArelEngine | null } = { current: null };
 
-/**
- * Base class for all AST nodes in Arel.
- *
- * Mirrors: Arel::Nodes::Node — which `include`s Arel::FactoryMethods.
- * Runtime mixin wiring lives in ../index.ts to avoid a module-load cycle
- * (factory-methods.ts imports concrete node subclasses).
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node {
   not(): Node {
@@ -44,17 +28,6 @@ export class Node {
     return new (assertRegistered(_Not, "Not"))(this);
   }
 
-  /**
-   * Mirrors: Arel::Nodes::Node#to_sql (arel/nodes/node.rb:148-153).
-   *
-   * Deviation: `engine.connection` in place of Rails'
-   * `engine.with_connection { |c| ... }`. trails' `withConnection` is async
-   * (per-checkout `verifyBang` is awaited — see ConnectionPool#checkout) and
-   * `to_sql` is synchronous at all 600+ call sites, so this takes the sync
-   * `engine.connection` lease. Same visitor and connection; it skips only the
-   * async per-checkout verify, the residual tracked by
-   * `converge-sync-connection-lease-per-checkout-verify`.
-   */
   toSql(engine: ArelEngine | null = _engine.current): string {
     if (!engine) {
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.

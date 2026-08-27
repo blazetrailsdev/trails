@@ -9,8 +9,6 @@ import {
 import { fixtures } from "../test-fixtures.js";
 
 describe("rubyInspect", () => {
-  // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
-  // so these Arel assertions need a connection, as Rails' do via helper.rb.
   fixtures({});
   it("renders nil / undefined as 'nil'", () => {
     expect(rubyInspect(null)).toBe("nil");

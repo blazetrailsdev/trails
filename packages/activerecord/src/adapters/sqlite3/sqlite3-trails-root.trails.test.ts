@@ -1,9 +1,3 @@
-/**
- * Trails-specific: a relative SQLite database path expands against
- * `Trails.root` when set (mirroring Rails' optional `Rails.root` seam in
- * SQLite3Adapter#initialize), and falls back to the working directory when
- * unset (bare ActiveRecord usage).
- */
 import { afterEach, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";

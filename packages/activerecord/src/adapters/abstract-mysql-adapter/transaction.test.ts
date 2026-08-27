@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/transaction_test.rb
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertDifference, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
 import {
@@ -29,16 +26,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.execute("DROP TABLE IF EXISTS `samples`").catch(() => {});
     });
 
-    // Rails skips unless `show_variable("max_execution_time")` — that variable
-    // exists only on MySQL, not MariaDB, so gate on the server flavor.
     it.skipIf(isMariaDb)("raises StatementTimeout when statement timeout exceeded", async () => {
       await adapter.execute("INSERT INTO `samples` (value) VALUES (1)");
       const rows = await adapter.execute("SELECT id FROM `samples` LIMIT 1");
       const id = Number(rows[0]["id"]);
 
-      // Stays self-built: the lock contention IS the test. Rails runs the
-      // competing FOR UPDATE on a second thread's pool connection; a second
-      // in-test adapter is the closest faithful shape.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       let error: unknown;
       try {

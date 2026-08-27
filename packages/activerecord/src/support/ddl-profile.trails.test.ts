@@ -1,7 +1,3 @@
-/**
- * Opt-in DDL profiler test — guards classifyDdl's SQL classification.
- * Pure string logic, no DB. See ddl-profile.ts.
- */
 import { describe, it, expect } from "vitest";
 import { classifyDdl, classifyStatements } from "./ddl-profile.js";
 

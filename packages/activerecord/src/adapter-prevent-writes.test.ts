@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapter_prevent_writes_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
 import { Base } from "./index.js";

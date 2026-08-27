@@ -58,7 +58,6 @@ describe("PostgreSQL::OID::DateTime", () => {
 
   it("quoted_date leaves AD dates unchanged", () => {
     const instant = Temporal.Instant.from("2023-06-15T12:00:00Z");
-    // Rails' quoted_date appends fractional seconds only when usec > 0.
     expect(quotedDate(instant)).toBe("2023-06-15 12:00:00");
   });
 

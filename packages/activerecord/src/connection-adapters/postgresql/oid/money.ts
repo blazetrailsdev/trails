@@ -1,23 +1,9 @@
-/**
- * PostgreSQL money type — currency amount.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Money.
- * Rails: `class Money < Type::Decimal`. Hard-codes scale to 2 and parses
- * locale-formatted money strings before delegating to Decimal#cast_value.
- */
-
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 
 export class Money extends DecimalType {
   override readonly name: string = "money";
 
-  /**
-   * Narrow the constructor options: PG money has a hard-coded scale
-   * of 2 (see the getter below), so accepting a caller-supplied scale
-   * would be misleading. Precision and limit pass through to the
-   * DecimalType base.
-   */
   constructor(options?: { precision?: number; limit?: number }) {
     super(options);
   }
@@ -26,41 +12,16 @@ export class Money extends DecimalType {
     return "money";
   }
 
-  /**
-   * Rails: `def scale; 2; end`. Getter override of Type's scale —
-   * PG money always has 2 decimal places.
-   */
   override get scale(): number {
     return 2;
   }
 
-  /**
-   * Rails' OID::Money#cast_value handles four locale-formatted shapes:
-   *   (1) $12,345,678.12    (US-style)
-   *   (2) $12.345.678,12    (EU-style with period grouping, comma decimal)
-   *   (3) -$2.55            (negative with leading minus)
-   *   (4) ($2.55)           (accounting-style parentheses)
-   * This method performs the locale-specific stripping and normalization
-   * itself, then delegates to DecimalType via super.cast(...) for
-   * numeric casting.
-   */
-  /**
-   * Rails' cast_value — exposed publicly so parity:api matches the
-   * Rails method name and callers can invoke the hook directly. Base
-   * `cast()` now handles the nil short-circuit and dispatches here, so
-   * we only fall through to the parent's `castValue` (NOT `cast`) to
-   * avoid the virtual-dispatch loop that would re-enter this method.
-   */
   override castValue(value: unknown): BigDecimal | string | null {
     if (value === null || value === undefined) return null;
     if (typeof value !== "string") return super.castValue(value);
 
     let str = value.replace(/^\((.+)\)$/, "-$1");
 
-    // Use [^0-9,.] for the currency-symbol prefix instead of \D* to prevent
-    // catastrophic backtracking (ReDoS) — \D* overlaps with [\d,]+ and [\d.]+
-    // causing O(n²) backtracking on long repeated-separator inputs. Ruby avoids
-    // this with possessive quantifiers (\D*+); JS has no possessive quantifiers.
     if (/^-?[^0-9,.]*[\d,]+\.\d{2}$/.test(str)) {
       str = str.replace(/[^\-0-9.]/g, "");
     } else if (/^-?[^0-9,.]*[\d.]+,\d{2}$/.test(str)) {

@@ -1,12 +1,3 @@
-/**
- * JoinPart — base class for nodes in the join dependency tree.
- *
- * Each JoinPart represents a table that participates in a JOIN query,
- * tracking its model class, table alias, and child associations.
- *
- * Mirrors: ActiveRecord::Associations::JoinDependency::JoinPart
- */
-
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
 
@@ -17,11 +8,8 @@ export abstract class JoinPart {
   tableIndex = -1;
   tableAlias = "";
   /**
-   * The Arel table this part selects from. Set at tree-construction time so the
-   * `Aliases` value object can build column aliases (`node.table[col].as(...)`)
-   * the way Rails' JoinPart#table does — no separate index-keyed table map.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE stored form of JoinPart#table (join_dependency/join_part.rb:44), which Ruby recomputes off the base_klass each read.
+   * @noRailsEquivalent CONVERGEABLE
    */
   arelTable: Table | Nodes.TableAlias | null = null;
   columns: string[] = [];
@@ -29,7 +17,7 @@ export abstract class JoinPart {
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE stored form of JoinAssociation#reflection (join_dependency/join_association.rb:10), kept on the part so Aliases can read it.
+   * @noRailsEquivalent CONVERGEABLE
    */
   nodeReflection: any | null = null;
   immediateAssocName = "";
@@ -43,14 +31,6 @@ export abstract class JoinPart {
 
   abstract get table(): Table | Nodes.TableAlias | string;
 
-  /**
-   * Mirrors Rails' `delegate :table_name, :column_names, :primary_key,
-   * :attribute_types, to: :base_klass` (join_part.rb:20) — forward each to the
-   * node's base model class so callers can read the joined table's schema off a
-   * JoinPart. `table_name` always returns the base model's real (un-aliased)
-   * table name; the resolved/aliased SQL name lives separately on
-   * `effectiveSqlName` / `tableAlias` / the Arel table.
-   */
   get tableName(): string {
     return this.baseKlass.tableName;
   }
@@ -71,18 +51,10 @@ export abstract class JoinPart {
     return this.constructor === other.constructor;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#readonly?
-   * Base nodes (JoinBase / no-reflection leaves) are never readonly.
-   */
   isReadonly(): boolean {
     return false;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#strict_loading?
-   * Base nodes (JoinBase / no-reflection leaves) never force strict loading.
-   */
   isStrictLoading(): boolean {
     return false;
   }
@@ -94,17 +66,7 @@ export abstract class JoinPart {
     }
   }
 
-  /**
-   * Mirrors `include Enumerable` (join_part.rb:13) over `each`
-   * (join_part.rb:31-34): Ruby derives every Enumerable method — `drop`, `map!`,
-   * … — from `each`, and JS derives them from `Symbol.iterator` the same way, so
-   * `[...node]` is the depth-first, self-first node list `join_root.drop(1)`
-   * reads.
-   *
-   * @noRailsEquivalent PERMANENT — JS has no module to `include`, so the
-   * Enumerable contract Ruby gets from `each` (join_part.rb:13, 31-34) is
-   * spelled `Symbol.iterator`. No port can remove the spelling difference.
-   */
+  /** @noRailsEquivalent PERMANENT */
   *[Symbol.iterator](): IterableIterator<JoinPart> {
     yield this;
     for (const child of this.children) {
@@ -112,12 +74,6 @@ export abstract class JoinPart {
     }
   }
 
-  /**
-   * `Enumerable#drop` (join_part.rb:13 `include Enumerable`), the walk
-   * `JoinDependency#reflections` reads. JS has no Enumerable module to mix in,
-   * so the one method Rails actually calls on a JoinPart-as-Enumerable is
-   * spelled out over the same `each`/iterator.
-   */
   drop(n: number): JoinPart[] {
     return [...this].slice(n);
   }

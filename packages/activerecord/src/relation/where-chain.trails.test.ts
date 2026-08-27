@@ -1,10 +1,3 @@
-/**
- * trails-only extras for WhereChain that assert SQL shape rather than result
- * membership. Rails' `where.associated` guards against re-joining an
- * association already present in `joins_values` / `left_outer_joins_values`
- * (query_methods.rb:91); the Rails-named coverage in where-chain.test.ts only
- * asserts membership, so these SQL-shape tests pin the no-duplicate-join guard.
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../associations.js";
@@ -17,9 +10,6 @@ import { Company } from "../test-helpers/models/company.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 
-// `Post` declares `has_many :categories, through: :categorizations`, whose
-// through reflection resolves Categorization during automatic-inverse /
-// class-name derivation. Rails autoloads it there; trails needs it registered.
 registerModel(Post);
 registerModel(Categorization);
 registerModel(Author);
@@ -60,10 +50,6 @@ describe("WhereChain associated join guard (trails)", () => {
   });
 });
 
-// `where.not` is a single WhereClause#invert over the positively-built clause
-// (query_methods.rb:49, where_clause.rb:85-92) — never per-branch negation
-// threaded through the predicate builder. These pin the inversion shapes the
-// old threading got structurally different (Rails-shape SQL + row semantics).
 describe("WhereChain not inversion shapes (trails)", () => {
   fixtures(["posts", "authors", "authorAddresses", "customers"]);
 
@@ -100,10 +86,6 @@ describe("WhereChain not inversion shapes (trails)", () => {
   });
 
   it("resolves attribute aliases before inversion like build_where_clause", () => {
-    // Rails WhereChain#not routes through build_where_clause (query_methods.rb:49),
-    // which resolves alias_attribute keys before expand_from_hash — so
-    // `where.not(new_name: ...)` lands on the real `name` column, inverted.
-    // `company.rb:22` is `alias_attribute :new_name, :name`.
     const sql = Company.where().not({ new_name: "37signals" }).toSql();
     expect(sql).toMatch(/["`]name["`]\s*!=/);
     expect(sql).not.toMatch(/new_name/);

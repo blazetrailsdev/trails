@@ -1,19 +1,3 @@
-/**
- * Grouped calculation over a composite-key `belongsTo` must apply the
- * relation's order before LIMIT/OFFSET.
- *
- * `groupedCompositeAssoc` (`relation/calculations.ts`) — the composite-FK
- * belongs_to arm of grouped calculations — applied LIMIT/OFFSET but never the
- * relation's `order_values`, so
- * `group(<composite belongs_to>).order(...).limit(n)` picked arbitrary groups
- * on PG/MySQL instead of the ordered first n. The sibling scalar/expression
- * arm `executeGroupedCalculation` already applied it.
- *
- * Rails does not special-case key arity here: `execute_grouped_calculation`
- * builds ONE query from the relation's own arel, so `order_values` ride along
- * for composite and scalar foreign keys alike
- * (`activerecord/lib/active_record/relation/calculations.rb:553-556`).
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
@@ -22,8 +6,6 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
 
 describe("CpkBook grouped calculation over a composite-key belongs_to applies order", () => {
-  // Rails creates CPK rows inline; no cpk fixtures exist. Ride the canonical,
-  // empty cpk tables and let transactional rollback clean up each insert.
   fixtures([]);
 
   beforeAll(() => {

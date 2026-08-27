@@ -1,10 +1,3 @@
-/**
- * Mirrors Rails ActiveRecord::ConnectionAdapters::PostgreSQL::Utils
- * and ActiveRecord::ConnectionAdapters::PostgreSQL::Name
- *
- * Re-exports from the canonical connection-adapters location.
- */
-
 export {
   Name as PgName,
   splitQuotedIdentifier,

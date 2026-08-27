@@ -1,15 +1,3 @@
-/**
- * Connection pool queue — manages waiting for available connections.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue
- *
- * Rails uses Monitor-based synchronization with condition variables. In
- * single-threaded Node the monitor is implicit, but the condition variables
- * are modelled faithfully: `wait` returns a promise that settles when the
- * queue is signalled or the wait times out, and the waiter — not the
- * signaller — takes the element off `@queue`, exactly as `wait_poll` does.
- */
-
 import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
@@ -20,10 +8,6 @@ interface Waiter {
   timer: ReturnType<typeof setTimeout> | null;
 }
 
-/**
- * The condition-variable surface `@cond` is duck-typed against in Rails:
- * `@lock.new_cond` returns one, and BiasedConditionVariable stands in for one.
- */
 interface Cond {
   wait(timeout: number): Promise<void>;
   signal(): void;
@@ -82,9 +66,6 @@ class ConditionVariable implements Cond {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue::BiasedConditionVariable
- */
 export class BiasedConditionVariable implements Cond {
   private _realCond = new ConditionVariable();
   private _otherCond: Cond;
@@ -134,22 +115,11 @@ export class BiasedConditionVariable implements Cond {
   }
 }
 
-/**
- * Host interface for BiasableQueue mixin — the including class must
- * expose a mutable `_cond` field.
- */
 interface BiasableQueueHost {
   _lock?: unknown;
   _cond: Cond;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue
- *
- * In Rails this is a module included into ConnectionLeasingQueue that adds
- * `with_a_bias_for(thread)` to temporarily bias the queue's condition variable
- * toward a specific thread.
- */
 export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: () => T): T {
   let previousCond: Cond | null = null;
   let newCond: BiasedConditionVariable | null = null;
@@ -172,13 +142,6 @@ export const BiasableQueue = {
   withABiasFor,
 };
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue
- *
- * Threadsafe, fair, LIFO queue. In Rails, fairness is enforced by tracking
- * `@num_waiting` — a no-timeout poll only succeeds when queue size exceeds
- * the number of threads blocked in wait_poll. We mirror this with _numWaiting.
- */
 export class Queue {
   private _queue: DatabaseAdapter[] = [];
   protected _lock?: unknown;
@@ -220,8 +183,6 @@ export class Queue {
 
   delete(element: DatabaseAdapter): DatabaseAdapter | undefined {
     return synchronize(this, () => {
-      // Ruby's Array#delete removes EVERY element equal to +element+, and
-      // returns the element (or nil when none matched).
       let deleted: DatabaseAdapter | undefined;
       for (let i = this._queue.length - 1; i >= 0; i--) {
         if (this._queue[i] === element) {
@@ -256,12 +217,7 @@ export class Queue {
     return undefined;
   }
 
-  /**
-   * @missingRailsCall size — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   connection_pool/queue.rb `@queue.size > @num_waiting`; trails' queue holds
-   *   its entries in a JS array whose `.length` is the same quantity —
-   *   `Array#size` is not a ported method name.
-   */
+  /** @missingRailsCall size — PERMANENT */
   private canRemoveNoWait(): boolean {
     return this._queue.length > this._numWaiting;
   }
@@ -277,16 +233,6 @@ export class Queue {
     return undefined;
   }
 
-  /**
-   * `queue.rb:117` wraps the
-   * `@cond.wait` in `ActiveSupport::Dependencies.interlock
-   * .permit_concurrent_loads`, which releases the autoload interlock so
-   * another thread can autoload while this one blocks. Neither the interlock
-   * nor Zeitwerk-style autoloading is ported (see the BLOCKED note in
-   * actionpack's `action-dispatch/dispatch/debug-locks.test.ts`), so there is
-   * nothing to permit; tracked by RFC 0023 story
-   * `port-dependencies-interlock-permit-concurrent-loads`.
-   */
   private async waitPoll(timeout: number): Promise<DatabaseAdapter> {
     this._numWaiting += 1;
 
@@ -312,13 +258,6 @@ export class Queue {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::ConnectionLeasingQueue
- *
- * Connections returned by poll are automatically leased while still inside
- * the queue's critical section, matching Rails where internal_poll calls
- * conn.lease before returning.
- */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface ConnectionLeasingQueue extends Included<typeof BiasableQueue> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -360,28 +299,14 @@ export class ConnectionLeasingQueue extends Queue {
   }
 }
 
-// Rails: `include BiasableQueue` in ConnectionLeasingQueue
 include(ConnectionLeasingQueue, BiasableQueue);
 
-/**
- * Runs `block` under the queue's monitor. JS is single-threaded so the
- * critical section is implicit — invoking the block synchronously preserves
- * Rails' `@lock.synchronize(&block)` semantics for callers that need an
- * `enqueue`-or-`signal` window.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#synchronize
- *
- * @internal
- */
+/** @internal */
 function synchronize<R>(_queue: unknown, block: () => R): R {
   return block();
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#any?
- *
- * @internal
- */
+/** @internal */
 function isAny(queue: Queue): boolean {
   return queue.any;
 }

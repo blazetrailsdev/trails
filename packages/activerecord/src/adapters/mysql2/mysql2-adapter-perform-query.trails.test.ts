@@ -1,15 +1,3 @@
-/**
- * trails-only coverage for the unified `perform_query` primitive.
- *
- * Rails' Mysql2 adapter has one SQL primitive, perform_query
- * (mysql2/database_statements.rb:41), which both `execute` and
- * `executeMutation` now delegate to; affected rows come from a separate
- * `affected_rows` read (backed by `_affectedRowsBeforeWarnings`) rather than
- * the statement result. These assert the shared branch, the affected-rows
- * source, the insert-id path (MySQL 8 has no INSERT ... RETURNING, so the id
- * comes from the driver's `insertId`), and that the readonly guard survives the
- * fold on both entry points.
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
@@ -83,10 +71,6 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
       await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
     });
   });
-  // Rails' internal_execute forwards `prepare:` to raw_execute → perform_query
-  // (abstract/database_statements.rb:552-558, 589-591). MySQL reaches prepared
-  // statements through `_trackPrepared` + `conn.execute`, so an explicit
-  // `prepare: true` must land the SQL in the statement pool.
   it("internalExecute prepares when prepare is true", async () => {
     await adapter.internalExecute("SELECT 1", "SQL", [], { prepare: true });
     const pool = adapter._statements;

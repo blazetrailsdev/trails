@@ -1,11 +1,3 @@
-/**
- * Mirrors the PostgreSQL-gated probes of Rails
- * activerecord/test/cases/adapter_test.rb: the shared `current_database` case
- * (gated by `@connection.respond_to?(:current_database)`, which PG satisfies)
- * and `AdvisoryLocksEnabledTest` (gated by `supports_advisory_locks?`). SQLite
- * is excluded by those gates; here the suite is behind `describeIfPg`, which is
- * `describe.skip` when PG_TEST_URL is absent.
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 

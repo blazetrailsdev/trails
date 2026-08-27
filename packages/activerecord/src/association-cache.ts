@@ -1,26 +1,8 @@
-/**
- * RFC-0022 association-cache fold. Rails keeps one per-record map,
- * `@association_cache` (name → `Association`, carrying target/proxy/loaded-nil
- * inside that one object). Trails historically split that into separate maps;
- * this module folds them into one backing slot — a single
- * `Map<string, AssociationCacheSlot>` per record, with each former map exposed
- * as a `Map`-compatible {@link AssociationCacheFacet} view onto one field of
- * the shared slot. The named accessors keep their exact read/write surface (so
- * the call sites are untouched) but now reach through one memoization slot,
- * converging toward Rails' single `@association_cache`.
- *
- * @internal
- */
+/** @internal */
 
-/** One field of the unified per-record association cache. */
 export type AssociationFacetKey = "instance" | "proxy";
 
-/**
- * A single name → cache entry. Each facet (`instance`/`proxy`) carries its
- * value plus a presence flag.
- *
- * @internal
- */
+/** @internal */
 export interface AssociationCacheSlot {
   instance?: unknown;
   proxy?: unknown;
@@ -44,14 +26,7 @@ function slotIsEmpty(slot: AssociationCacheSlot): boolean {
   return !slot.hasInstance && !slot.hasProxy;
 }
 
-/**
- * A `Map<string, V>`-compatible view onto one field of the shared
- * {@link AssociationCacheSlot} store. `get`/`set`/`has`/`delete`/`clear`/
- * iteration all scope to this facet, while every facet over the same store
- * shares one backing slot per name.
- *
- * @internal
- */
+/** @internal */
 export class AssociationCacheFacet<V> implements Map<string, V> {
   private readonly presence: keyof AssociationCacheSlot;
 
@@ -140,17 +115,7 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
   }
 }
 
-/**
- * The folded association-cache facets for one record, backed by one shared
- * {@link AssociationCacheSlot} store; `clear()` resets every facet.
- *
- * Implemented as a class (not an object literal) so its methods live on the
- * prototype: two empty caches on distinct records deep-equal under `toEqual`,
- * which matters because records are compared field-by-field in tests and an
- * own-property closure here would make otherwise-equal records compare unequal.
- *
- * @internal
- */
+/** @internal */
 export class AssociationCache {
   readonly store = new Map<string, AssociationCacheSlot>();
   readonly instances = new AssociationCacheFacet<unknown>(this.store, "instance");
@@ -163,7 +128,7 @@ export class AssociationCache {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE constructor for the association cache Ruby builds inline as `@association_cache = {}` (associations.rb:70).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function createAssociationCache(): AssociationCache {
   return new AssociationCache();

@@ -1,7 +1,3 @@
-/**
- * Trails-only coverage for `composed_of` arms Rails' aggregations_test.rb does
- * not exercise directly.
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
 import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
@@ -22,12 +18,6 @@ afterAll(() => {
 describe("AggregationsTest (trails)", () => {
   const { customers } = fixtures(["customers"]);
 
-  // `reader_method`'s guard is `@aggregation_cache[name].nil? && (!allow_nil ||
-  // mapping.any? { |key, _| !read_attribute(key).nil? })`
-  // (aggregations.rb:249) — with the default `allow_nil: false` the second
-  // conjunct is skipped entirely, so the value object is built even when every
-  // mapped attribute is nil. `balance` is Customer's `allow_nil: false`
-  // aggregation (test/models/customer.rb:8).
   it("builds the value object when allow nil is false and every mapped attribute is nil", () => {
     const david = customers("david") as CustomerModel & {
       balance: InstanceType<typeof MoneyClass> | null;
@@ -38,10 +28,6 @@ describe("AggregationsTest (trails)", () => {
     expect(david.balance?.amount).toBeNull();
   });
 
-  // `class_name = options[:class_name] || name.camelize`, resolved by
-  // `class_name.constantize` inside the generated reader
-  // (aggregations.rb:232, 249-253) — so a value object registered as a
-  // constant needs no `className` option at all.
   it("infers the value-object class name from the aggregation name", () => {
     class GpsLocation {
       constructor(public gpsLocation: string | null) {}

@@ -3,9 +3,6 @@ import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
 
-// Mirrors Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50): a map that
-// converts any attribute name to a caster. Rails always builds this table with
-// a caster because `Table#type_for_attribute` delegates bare (table.rb:106-108).
 const STRING_TYPE = new StringType();
 const fakePgCaster = { typeForAttribute: () => STRING_TYPE };
 
@@ -15,8 +12,6 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     it("compiles IN with values", () => {
       const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
-      // HomogeneousIn keeps add_binds + bind_block (to_sql.rb:352), so a bare
-      // SQLString collector emits `?` placeholders — mirrors Rails test_in.
       expect(sql).toBe('"users"."id" IN (?, ?, ?)');
     });
 
@@ -27,8 +22,6 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     });
 
     it("compiles empty IN as IN (NULL)", () => {
-      // Mirrors Rails to_sql.rb:347-349 — empty casted_values emits
-      // `quote(nil)` inside the parens, not a `1=0` short-circuit.
       const node = new Nodes.HomogeneousIn([], users.get("id"), "in");
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe('"users"."id" IN (NULL)');
@@ -91,10 +84,6 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
   });
 
   describe("castedValues", () => {
-    // A fake attribute exposing a type_caster with isSerializable + serialize,
-    // mirroring Arel::Attribute#type_caster (an ActiveModel type). castedValues
-    // must consult isSerializable (Rails' `type.serializable?`), NOT a
-    // non-existent `serializable`.
     const fakeAttr = (typeCaster: unknown): Nodes.Node =>
       ({ name: "id", typeCaster }) as unknown as Nodes.Node;
 
@@ -128,8 +117,6 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       const bound = node.procForBinds(42);
       expect(bound).toBeInstanceOf(AMAttribute);
       expect((bound as AMAttribute).name).toBe("id");
-      // Rails' ActiveModel::Type.default_value is a no-op Value type, so
-      // valueForDatabase should round-trip the raw value unchanged.
       expect((bound as AMAttribute).valueForDatabase).toBe(42);
     });
 

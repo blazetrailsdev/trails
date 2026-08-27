@@ -1,13 +1,3 @@
-/**
- * Abstract MySQL adapter — base class for MySQL-compatible adapters.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter
- *
- * Provides shared behavior for Mysql2Adapter.
- * Includes MySQL-specific feature detection, DDL operations,
- * transaction handling, and advisory lock support.
- */
-
 import {
   isWriteQuery as mysqlIsWriteQuery,
   maxAllowedPacket as mysqlMaxAllowedPacket,
@@ -113,18 +103,6 @@ import {
   ArgumentError,
 } from "@blazetrails/activemodel";
 
-/**
- * Adapter-specific column type for MySQL signed bigint.
- *
- * MySQL returns bigint column values as strings from the mysql2 driver.
- * BigIntegerType.castValue parses strings to BigInt (preserving precision
- * for values > Number.MAX_SAFE_INTEGER). BigIntegerType itself is unconditionally
- * unlimited (big_integer.rb:33 — max_value = Float::INFINITY regardless of limit).
- * This subclass re-establishes the 8-byte signed bound on the column type,
- * mirroring Rails' IntegerType(limit: 8) but with BigInt-precision arithmetic
- * so that 9223372036854775808n (= 2^63) is correctly detected as out-of-range
- * (float64 cannot distinguish 2^63 from 2^63-1: Number(2^63n) === Number((2^63-1)n)).
- */
 class MysqlBigInteger extends BigIntegerType {
   override readonly name: string = "integer";
 
@@ -147,11 +125,6 @@ import {
   type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 
-/**
- * Ruby's `Hash#fetch(key, default)` returns the STORED value whenever the key
- * exists — including a stored `nil` or `false` — where `??` would substitute
- * the default.
- */
 function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
   return key in hash ? (hash[key] as T) : defaultValue;
 }
@@ -185,18 +158,8 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
-  /**
-   * Return Column objects for a table. Mirrors Rails'
-   * `AbstractMysqlAdapter#columns` (via `SchemaStatements#columns`):
-   * `column_definitions` rows mapped through `new_column_from_field`, which
-   * centralizes function-default and on_update detection. Concrete adapters
-   * (Mysql2Adapter) may still override for performance.
-   */
   async columns(tableName: string): Promise<Column[]> {
     const fields = await this.columnDefinitions(tableName);
-    // Rails' `.map`, run sequentially: `new_column_from_field` may issue its own
-    // SHOW CREATE TABLE (the `default_type` branch), and Rails emits those one
-    // after the other on the single connection.
     const columns: Column[] = [];
     for (const field of fields) {
       columns.push(
@@ -211,13 +174,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return columns;
   }
 
-  /**
-   * RESTRICT is MySQL's default referential action, so `extractForeignKeyAction`
-   * reflects it back as `undefined` and a lookup keyed on `onDelete: "restrict"`
-   * could never match the live constraint. Drop those keys before resolving.
-   *
-   * Mirrors: `ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#remove_foreign_key`
-   */
   override async removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | RemoveForeignKeyOptions,
@@ -232,65 +188,25 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       : super.removeForeignKey(fromTable, toTableOrOptions, opts);
   }
 
-  /**
-   * `database.yml`'s `statement_limit`, which Rails reads as
-   * `@config[:statement_limit]` inline at StatementPool construction
-   * (abstract_mysql_adapter.rb:975) and never exposes. trails' constructors
-   * destructure the adapter-level keys out of the config hash, so the value is
-   * held here — read by `buildStatementPool` and, in Mysql2Adapter, by
-   * `_getStmtPool`.
-   *
-   * @internal
-   */
+  /** @internal */
   protected _statementLimit = 1000;
 
   get adapterName(): AdapterName {
     return "mysql2";
   }
 
-  // Rails maps MySQL::SchemaStatements#table_alias_length (256, not the
-  // DatabaseLimits default of 64). Thin wrapper delegating to the
-  // Rails-layout implementation in mysql/schema-statements.
   tableAliasLength(): number {
     return mysqlTableAliasLength();
   }
 
-  /**
-   * Trails-specific microsecond cap on date/time literals. Rails' MySQL adapter
-   * has no `quoted_date` override (Ruby's `usec` is already µs-bounded), but
-   * trails' Temporal-backed abstract helper can emit nanoseconds. The inherited
-   * abstract `quote` / `quotedTime` date dispatch resolves through here so MySQL
-   * never emits the 7–9th fractional digits its column types reject in strict mode.
-   */
   quotedDate(value: Parameters<typeof mysqlQuotedDate>[0]): string {
     return mysqlQuotedDate(value);
   }
 
-  /**
-   * Cast a value to the primitive form MySQL drivers expect for
-   * binds. Same motivation as `quote()` above.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
-   */
   override typeCast(value: unknown): unknown {
-    // `.call(this)` so the date/time dispatch resolves to this adapter's
-    // `quotedDate` override (abstract/quoting.rb:93-101).
     return mysqlTypeCast.call(this, value);
   }
 
-  /**
-   * MySQL dialect overrides — integer bool coercion. Matches Rails:
-   *
-   * - `unquoted_true` / `unquoted_false` → `1` / `0`
-   *   (`mysql/quoting.rb:72-77`).
-   *
-   * `quotedTrue`/`quotedFalse` are NOT overridden — Rails MySQL inherits the
-   * abstract `"TRUE"`/`"FALSE"`. Binds serialize to 1/0 via `cast_bound_value`.
-   */
-  // Defined as methods, not class fields: Rails declares these with `def`
-  // (`mysql/quoting.rb:72-77`), and the inherited `type_cast` reaches them
-  // through `self`. A field lives on the instance rather than the prototype,
-  // which silently breaks any receiver built from the prototype alone.
   override unquotedTrue(): number {
     return mysqlUnquotedTrue();
   }
@@ -304,40 +220,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return new Visitors.MySQL(this);
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name_for_assignment
-   * (`abstract/quoting.rb:153-155`) — Rails MySQL inherits from
-   * abstract. Dispatching `quote_table_name("#{table}.#{attr}")`
-   * resolves polymorphically to `MySQL::Quoting#quote_table_name` which
-   * splits on `.` and backticks each part. The TS port doesn't get
-   * polymorphic dispatch from the abstract standalone (it would call
-   * the abstract module's `quoteTableName` and emit double quotes), so
-   * we override on the MySQL adapter to route through `this.quoteTableName`.
-   */
   override quoteTableNameForAssignment(table: string, attr: string): string {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
   /**
-   * Rails reaches `full_version` from here (abstract_mysql_adapter.rb:93) by
-   * duck typing — it is defined only on the concrete adapters
-   * (mysql2_adapter.rb:164-166). TS needs a declared member for that call, so
-   * the declaration stays and concrete adapters override it with the real
-   * body, the same split `getFullVersion` uses.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby reaches full_version by duck typing from abstract_mysql_adapter.rb:93; TS needs the declaration on the abstract class.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async fullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement fullVersion()`);
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#mariadb? (abstract_mysql_adapter.rb:92-94) —
-   * `/mariadb/i.match?(full_version)`. Ruby's `Regexp#match?` accepts nil and
-   * answers false; `RegExp#test` stringifies `null` to `"null"`, so the nil
-   * arm — a Version built without a full version string
-   * (`abstract_adapter.rb:248`) — is spelled out.
-   */
   async isMariadb(): Promise<boolean> {
     const fullVersion = await this.fullVersion();
     return fullVersion != null && /mariadb/i.test(fullVersion);
@@ -347,21 +241,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  // Rails: `index.using == :btree || super` (abstract_mysql_adapter.rb#default_index_type?).
   override defaultIndexType(index: IndexDefinition): boolean {
     return index.using === "btree" || super.defaultIndexType(index);
   }
 
   async supportsIndexSortOrder(): Promise<boolean> {
-    // Rails: `mariadb? ? database_version >= "10.8.1" : database_version >= "8.0.1"`
-    // (abstract_mysql_adapter.rb#supports_index_sort_order?).
     if (await this.isMariadb()) return (await this.databaseVersion).compare("10.8.1") >= 0;
     return (await this.databaseVersion).compare("8.0.1") >= 0;
   }
 
   async supportsExpressionIndex(): Promise<boolean> {
-    // Mirror Rails `!mariadb? && database_version >= "8.0.13"`
-    // (abstract_mysql_adapter.rb:104) — MariaDB is excluded.
     if (await this.isMariadb()) return false;
     return (await this.databaseVersion).compare("8.0.13") >= 0;
   }
@@ -388,9 +277,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async supportsCheckConstraints(): Promise<boolean> {
     if (await this.isMariadb()) {
-      // Rails' two-branch MariaDB floor (abstract_mysql_adapter.rb:128-132):
-      // 10.3.10+, or a pre-10.3 series from 10.2.22 — 10.3.0..10.3.9 is
-      // excluded, which a single `>= 10.2.22` would wrongly admit.
       return (
         (await this.databaseVersion).compare("10.3.10") >= 0 ||
         ((await this.databaseVersion).compare("10.3") < 0 &&
@@ -445,11 +331,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       : column.isAutoIncrementedByDb();
   }
 
-  /** Mirrors: AbstractMysqlAdapter#returning_column_values — the full first row
-   *  when RETURNING is supported (MariaDB ≥ 10.5); otherwise `undefined`, which
-   *  routes the caller to the `last_inserted_id` path. *
-   * @internal
-   */
+  /** @internal */
   override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
     return mysqlReturningColumnValues.call(this, result);
   }
@@ -463,9 +345,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsJson(): Promise<boolean> {
-    // Mirror Rails `!mariadb? && database_version >= "5.7.8"`
-    // (mysql2_adapter.rb:70 / trilogy_adapter.rb:95) — MariaDB JSON is a
-    // LONGTEXT alias, so Rails reports it unsupported.
     if (await this.isMariadb()) return false;
     return (await this.databaseVersion).compare("5.7.8") >= 0;
   }
@@ -486,16 +365,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return MYSQL_NATIVE_DATABASE_TYPES;
   }
 
-  // Mirrors MySQL's explicit `ColumnMethods` list (`mysql/schema_definitions.rb:46`
-  // `define_column_methods`): blob variants, text variants, and the `unsigned_*`
-  // shorthands — absent from NATIVE_DATABASE_TYPES — on top of the abstract names.
-  // `:blob` is in the Rails MySQL list too, but it's already surfaced via the
-  // abstract `blob`/`binary` alias, so we don't repeat it here.
-  /**
-   * @internal Reification of Rails' MySQL `ColumnMethods` module, which extends the abstract
-   * `define_column_methods` list (abstract/schema_definitions.rb:324) rather than exposing public
-   * API.
-   */
+  /** @internal */
   override _columnMethodNames(): string[] {
     return [
       ...super._columnMethodNames(),
@@ -526,8 +396,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    // Mirrors Rails' query_value/update — now backed on the mysql2 adapter by a
-    // real internal_exec_query + cast_result, so the Rails-faithful path works.
     const old = await this.queryValue("SELECT @@FOREIGN_KEY_CHECKS");
     try {
       await this.update("SET FOREIGN_KEY_CHECKS = 0");
@@ -539,22 +407,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async beginDbTransaction(): Promise<void> {}
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#begin_isolated_db_transaction
-   * (abstract_mysql_adapter.rb:230-239)
-   *
-   * @missingRailsCall fetch — PERMANENT: `Hash#fetch`'s raise-on-miss arm has no
-   *   JS equivalent — a plain index returns `undefined` — so the two arms are
-   *   ported explicitly below: the lookup, then Ruby's `KeyError` with Ruby's
-   *   own message. Same shape as the Mysql2Adapter and PostgreSQLAdapter
-   *   overrides of this method.
-   */
+  /** @missingRailsCall fetch — PERMANENT */
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    // From MySQL manual: The [SET TRANSACTION] statement applies only to the next single transaction performed within the session.
-    // So we don't need to implement #reset_isolation_level
-    //
-    // Rails: `transaction_isolation_levels.fetch(isolation)`
-    // (abstract_mysql_adapter.rb:235) — unknown levels raise Ruby's `KeyError`.
     const level = transactionIsolationLevels()[isolation];
     if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
     await this.executeBatch([`SET TRANSACTION ISOLATION LEVEL ${level}`, "BEGIN"], "TRANSACTION", {
@@ -603,11 +457,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
-  /**
-   * Mirrors AbstractMysqlAdapter#current_database (abstract_mysql_adapter.rb:296-298).
-   * A null DATABASE() (no schema selected) is coerced to "" — trails callers type
-   * the result as a plain string.
-   */
   async currentDatabase(): Promise<string> {
     const value = await this.queryValue("SELECT database()", "SCHEMA");
     return value == null ? "" : String(value);
@@ -621,23 +470,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return (await this.showVariable("collation_database")) ?? "";
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#data_source_sql
-   *
-   * Wired here so SchemaStatements#viewExists can dispatch
-   * this.adapter.dataSourceSql and reach the MySQL implementation instead of
-   * the abstract NotImplementedError stub.
-   *
-   * @internal
-   */
+  /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /**
-   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
-   * callable with the kwargs alone, and TypeScript cannot skip a leading
-   * positional, so the options object may arrive in its place.
-   *
-   * @internal
-   */
+  /** @internal */
   dataSourceSql(options: { type?: string }): string;
   /** @internal */
   dataSourceSql(
@@ -650,7 +485,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlDataSourceSql.call(this, name, opts);
   }
 
-  /** Mirrors: AbstractMysqlAdapter#table_comment (abstract_mysql_adapter.rb:310-319) */
   async tableComment(tableName: string): Promise<string | null> {
     const scope = quotedScope.call(this, tableName);
 
@@ -666,7 +500,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     let comment = this.extractNewCommentValue(commentOrChanges);
-    // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
     comment = comment == null ? "" : String(comment);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(comment)}`,
@@ -696,11 +529,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#change_column_default
-   *   execute "ALTER TABLE #{quote_table_name(table_name)}
-   *            #{change_column_default_for_alter(table_name, column_name, default_or_changes)}"
-   */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
@@ -716,17 +544,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * MySQL routes the abstract base's `change_column_default_for_alter` through
-   * `build_change_column_default_definition` + schema_creation, so the
-   * dumper-friendly visitor handles `DROP DEFAULT` vs `SET DEFAULT <expr>`.
-   *
-   *   def change_column_default_for_alter(table_name, column_name, default_or_changes)
-   *     cd = build_change_column_default_definition(table_name, column_name, default_or_changes)
-   *     schema_creation.accept(cd)
-   *   end
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Rails leaves `change_column_default_for_alter` on SchemaStatements (abstract/schema_statements.rb:1843) and gives MySQL only `build_change_column_default_definition` (abstract_mysql_adapter.rb:373); the port overrides the whole method on the adapter instead.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async changeColumnDefaultForAlter(
     tableName: string,
@@ -741,19 +560,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this.schemaCreation.accept(cd);
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#build_change_column_default_definition.
-   *
-   *   column = column_for(table_name, column_name)
-   *   return unless column
-   *   default = extract_new_default_value(default_or_changes)
-   *   ChangeColumnDefaultDefinition.new(column, default)
-   *
-   * Rails' `column_for` itself raises ActiveRecordError when the column is
-   * missing (the `return unless column` guard is defensive against an
-   * unreachable nil branch), so we let columnFor's throw propagate the
-   * same way rather than silently returning null.
-   */
   async buildChangeColumnDefaultDefinition(
     tableName: string,
     columnName: string,
@@ -761,19 +567,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<ChangeColumnDefaultDefinition> {
     const column = await this.columnFor(tableName, columnName);
     let default_ = this.extractNewDefaultValue(defaultOrChanges);
-    // Normalize JS-only `undefined` → `null` so the schema-creation
-    // visitor's SET branch produces `SET DEFAULT NULL` rather than the
-    // bare `SET` that quoteDefaultExpression(undefined) → "" would emit.
-    // Rails has no nil/undefined split, so this is TS-specific defense.
     if (default_ === undefined) default_ = null;
     return new ChangeColumnDefaultDefinition(column, default_);
   }
 
-  /**
-   * Mirrors AbstractMysqlAdapter#change_column_null.
-   * Validates `null_`, backfills NULLs from `default_` when flipping to
-   * NOT NULL, then routes through change_column with `null:` set.
-   */
   async changeColumnNull(
     tableName: string,
     columnName: string,
@@ -789,11 +586,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this.changeColumn(tableName, columnName, null, { null: null_ });
   }
 
-  /**
-   * Mirrors AbstractMysqlAdapter#change_column_comment.
-   * MySQL has no dedicated ALTER COMMENT syntax; mirrors Rails by routing
-   * through change_column with the resolved comment.
-   */
   async changeColumnComment(
     tableName: string,
     columnName: string,
@@ -866,17 +658,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(await this.schemaCreation.accept(createIndex));
   }
 
-  /**
-   * Returns a {@link CreateIndexDefinition} or `undefined` when
-   * `ifNotExists: true` and the index already exists. Mirrors Rails'
-   * MySQL `build_create_index_definition`, which is the seam used by
-   * `add_index` so callers can build-without-executing or short-circuit
-   * uniformly. The `IF NOT EXISTS` keyword is intentionally not carried
-   * onto the definition — MySQL doesn't support it; the pre-flight here
-   * is the portable substitute.
-   *
-   * Mirrors: AbstractMysqlAdapter#build_create_index_definition
-   */
   async buildCreateIndexDefinition(
     tableName: string,
     columnName: string | string[],
@@ -899,10 +680,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * @internal Mirrors: Mysql2Adapter#text_type? (mysql2_adapter.rb:140-142) —
-   * `TYPE_MAP.lookup(type)`, resolved off the concrete adapter class so the
-   * mysql2 map (mysql2_adapter.rb:53) is the one consulted.
-   * @noRailsEquivalent CONVERGEABLE Mysql2Adapter#text_type? (mysql2_adapter.rb:140-142) hoisted to the abstract class so the shared caller can reach it.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   isTextType(type: string): boolean {
     const TYPE_MAP = (this.constructor as typeof AbstractMysqlAdapter).TYPE_MAP;
@@ -913,7 +692,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return arelSql("CURRENT_TIMESTAMP(6)");
   }
 
-  /** Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#write_query? */
   override isWriteQuery(sql: string): boolean {
     return mysqlIsWriteQuery(sql);
   }
@@ -923,11 +701,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   quotedBinary(value: unknown): string {
-    // The standalone shares the `toBytes` byte union (Uint8Array/ArrayBuffer/
-    // Buffer/BinaryData) with the PG and SQLite overrides, so the Rails-shaped
-    // call (`quoted_binary(Type::Binary::Data)`, mysql/quoting.rb:80) works here
-    // and raises on a non-byte source rather than hexing garbage. The latin1
-    // `string` form on top is MySQL's own (PG accepts one too; SQLite rejects it).
     return mysqlQuotedBinary(value as Buffer | Uint8Array | ArrayBuffer | string | BinaryData);
   }
 
@@ -971,8 +744,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       WHERE tc.table_schema = ${scope.schema}
         AND tc.table_name = ${scope.name}
         AND cc.constraint_schema = ${scope.schema}`;
-    // MariaDB lacks the schema+name uniqueness MySQL's JOIN relies on, so it
-    // additionally filters cc.table_name (mirrors Rails).
     if (await this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
 
     const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
@@ -1001,21 +772,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return parseTableOptions(createInfo, comment);
   }
 
-  /**
-   * Query a MySQL session variable by name.
-   * Mirrors: AbstractMysqlAdapter#show_variable — `SELECT @@name` with logging name
-   * "SCHEMA". Returns null for unknown variables (Rails rescues StatementInvalid).
-   * The identifier is validated against MySQL variable-name characters before interpolation.
-   */
   async showVariable(name: string): Promise<string | null> {
     if (!/^\w+$/.test(name)) return null;
     try {
       const val = await this.queryValue(`SELECT @@${name}`, "SCHEMA");
       return val == null ? null : String(val);
     } catch (e) {
-      // Mirrors Rails: rescue ActiveRecord::StatementInvalid — unknown variables
-      // throw a SQL error which we translate to StatementInvalid. Re-raise
-      // anything else (connection failures, protocol errors) so callers see outages.
       if (e instanceof StatementInvalid) return null;
       throw e;
     }
@@ -1024,16 +786,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   declare _maxAllowedPacket?: number;
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#max_allowed_packet
-   * — `@max_allowed_packet ||= show_variable("max_allowed_packet")`.
-   * @internal
-   */
+  /** @internal */
   async maxAllowedPacket(): Promise<number> {
     return mysqlMaxAllowedPacket.call(this);
   }
 
-  /** Mirrors: AbstractMysqlAdapter#primary_keys (abstract_mysql_adapter.rb:585-598) */
   async primaryKeys(tableName: string): Promise<string[]> {
     if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
 
@@ -1050,11 +807,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     )) as string[];
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#case_sensitive_comparison.
-   * A non-binary column with a case-insensitive collation needs an explicit
-   * `BINARY` cast (Arel::Nodes::Bin) to force a case-sensitive comparison.
-   */
   override async caseSensitiveComparison(
     attribute: Nodes.Attribute,
     value: unknown,
@@ -1067,11 +819,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Mirrors: AbstractAdapter#case_insensitive_comparison, with MySQL's
-   * `can_perform_case_insensitive_comparison_for?` override. A column whose
-   * collation is already case-insensitive needs no `LOWER()` wrapper.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:814) overridden async because the collation lookup queries.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1084,19 +833,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return attribute.eq(value);
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#can_perform_case_insensitive_comparison_for? */
+  /** @internal */
   canPerformCaseInsensitiveComparisonFor(column: MysqlColumn): boolean {
     return column.isCaseSensitive();
   }
 
-  // Mirrors: AbstractMysqlAdapter#columns_for_distinct. MySQL rejects
-  // `SELECT DISTINCT ... ORDER BY <col>` when <col> is not in the select list,
-  // so project each ORDER BY column into the SELECT as `<col> AS alias_<i>`.
   columnsForDistinct(columns: string, orders?: (string | Nodes.Node)[]): string {
     const visitor = this.arelVisitor();
-    // Two-pass compact_blank (mirroring Rails): filter blanks before AND after
-    // stripping so an order that becomes empty after stripping doesn't consume
-    // an alias index slot.
     const orderColumns = compactBlank(
       compactBlank(orders ?? []).map((s) =>
         (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, "").trim(),
@@ -1106,10 +849,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return [...orderColumns, columns].join(", ");
   }
 
-  // Mirrors: AbstractMysqlAdapter#strict_mode? (abstract_mysql_adapter.rb:630-632).
-  // `@config.fetch(:strict, true)` — an absent key means strict, and a stored
-  // `false` (or `":default"`, which `type_cast_config_to_boolean` passes
-  // through for `configure_connection`'s defaults check) is honoured.
   isStrictMode(): boolean | unknown {
     return (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToBoolean(
       fetch(this._config, "strict", true),
@@ -1120,17 +859,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return index.using == null || index.using.toUpperCase() === "BTREE";
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_insert_sql
-  // (abstract_mysql_adapter.rb:638-682). Async where Rails is sync: the arm is
-  // selected by `supports_insert_raw_alias_syntax?` (rb:892-894), which reads
-  // `database_version` — a server round-trip trails can only await.
-  /**
-   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby Set#first on `insert.keys`
-   *   (abstract_mysql_adapter.rb:640). JS Set has no `first`; the port
-   *   destructures the iterator (`const [first] = insert.keys`), which emits
-   *   no callee. The sibling `quote_column_name` call converged in the same
-   *   pass.
-   */
+  /** @missingRailsCall first — PERMANENT */
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     const [first] = insert.keys;
     const noOpColumn = first !== undefined ? this.quoteColumnName(first) : undefined;
@@ -1188,8 +917,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return sql;
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#check_version
-  // (abstract_mysql_adapter.rb:684-688).
   override async checkVersion(): Promise<void> {
     if ((await this.databaseVersion).compare("5.6.4") < 0) {
       throw new DatabaseVersionError(
@@ -1198,34 +925,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  /**
-   * Escape-only string quoting per the Quoting interface contract
-   * (`abstract/quoting.ts`). Mirrors Rails MySQL
-   * `quote_string` (`abstract_mysql_adapter.rb`): backslash-escapes
-   * `'` and the control chars MySQL's wire protocol requires (`\0 \n
-   * \r \Z \\`). Distinct from `quote()`, which wraps with surrounding
-   * `'...'` for SQL-literal contexts.
-   *
-   * @missingRailsCall with_raw_connection — PERMANENT: Verified per-site (RFC 0106):
-   *   `with_raw_connection { |c| c.escape(string) }`
-   *   (abstract_mysql_adapter.rb:695-699) is an async checkout in trails, while
-   *   `quoteString` is the synchronous `Quoting` contract every `quote()` call
-   *   site depends on. The body delegates to `mysql/quoting.ts#quoteString`,
-   *   which applies the same escape rules without a connection.
-   */
+  /** @missingRailsCall with_raw_connection — PERMANENT */
   override quoteString(s: string): string {
     return mysqlQuoteString(s);
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
-   *   `mysql_config[:password].to_s.empty?` (abstract_mysql_adapter.rb:76) —
-   *   `empty?` on a Ruby String, whose faithful JS spelling is `s === ""`. That
-   *   emits no callee, so no TS call can ever credit the Ruby one. The gate
-   *   flags it only because `empty?` maps onto the unrelated
-   *   `ActiveRecord::Result.empty`, which takes arguments since it gained Rails'
-   *   `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   static dbconsole(
     config: Record<string, unknown>,
     options: Record<string, unknown> = {},
@@ -1238,7 +943,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (isRubyTruthy(config.sslCa)) args.push(`--ssl-ca=${config.sslCa}`);
     if (isRubyTruthy(config.sslCert)) args.push(`--ssl-cert=${config.sslCert}`);
     if (isRubyTruthy(config.sslKey)) args.push(`--ssl-key=${config.sslKey}`);
-    // Rails: --password=… only with include_password; otherwise -p prompts.
     if (isRubyTruthy(config.password) && options.includePassword) {
       args.push(`--password=${config.password}`);
     } else if (isRubyTruthy(config.password) && String(config.password) !== "") {
@@ -1258,10 +962,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this._emulateBooleans = value;
   }
 
-  /** Mirrors: AbstractMysqlAdapter::EXTENDED_TYPE_MAPS (abstract_mysql_adapter.rb:754) */
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
-  /** Mirrors: AbstractMysqlAdapter.extended_type_map */
   static override extendedTypeMap(
     this: typeof AbstractMysqlAdapter,
     options: { defaultTimezone?: string; emulateBooleans: boolean },
@@ -1273,9 +975,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return m;
   }
 
-  /**
-   * Error codes for MySQL-specific exception translation.
-   */
   static readonly ER_DUP_ENTRY = ER_DUP_ENTRY;
   static readonly ER_NOT_NULL_VIOLATION = ER_NOT_NULL_VIOLATION;
   static readonly ER_DO_NOT_HAVE_DEFAULT = ER_DO_NOT_HAVE_DEFAULT;
@@ -1294,24 +993,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly CR_SERVER_LOST = CR_SERVER_LOST;
   static readonly ER_CLIENT_INTERACTION_TIMEOUT = ER_CLIENT_INTERACTION_TIMEOUT;
 
-  /**
-   * Mirrors: MySQL::DatabaseStatements#build_explain_clause
-   * (`mysql/database_statements.rb:36-46`), included into the adapter — the
-   * body lives in `mysql/database-statements.ts` like `write_query?` and
-   * `returning_column_values`.
-   */
   buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     return mysqlBuildExplainClause.call(this, options);
   }
 
-  /**
-   * @internal
-   * Build a MismatchedForeignKey from a MySQL FK constraint error.
-   * Parses the FK SQL to identify the mismatched columns, then looks up
-   * the referenced column's type to produce a helpful suggestion.
-   *
-   * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key (abstract_mysql_adapter.rb:1001)
-   */
+  /** @internal */
   protected mismatchedForeignKey(
     message: string,
     sql: string | null,
@@ -1332,19 +1018,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * Parse a CREATE TABLE / ALTER TABLE SQL statement to extract the FK
-   * details needed for a helpful MismatchedForeignKey error message.
-   *
-   * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key_details (abstract_mysql_adapter.rb:978)
-   *
-   * @missingRailsCall column_for — CONVERGEABLE (story
-   *   mysql-mismatched-fk-details-omits-primary-key-column, RFC 0112): Verified per-site (RFC 0106):
-   *   `options[:primary_key_column] = column_for(...)`
-   *   (abstract_mysql_adapter.rb:995) is an async schema read in trails, while
-   *   this method is reached synchronously from `_translateException`. The
-   *   lookup is performed instead in `_enrichMismatchedForeignKey`, which
-   *   rebuilds the error with the referenced column's sql_type once it can
-   *   await.
+   * @missingRailsCall column_for — CONVERGEABLE
    */
   protected mismatchedForeignKeyDetails({
     message,
@@ -1378,14 +1052,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return { table, foreignKey, targetTable, primaryKey };
   }
 
-  /**
-   * Async enrichment for MismatchedForeignKey errors — looks up the
-   * referenced column's SQL type and rebuilds the error with a full
-   * human-readable message including the column type suggestion.
-   *
-   * Called after `_translateException` when a MismatchedForeignKey without
-   * type info is returned. Returns the original error if enrichment fails.
-   */
   protected async _enrichMismatchedForeignKey(
     err: MismatchedForeignKey,
   ): Promise<MismatchedForeignKey> {
@@ -1417,11 +1083,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  /**
-   * Map MySQL/MariaDB driver errors to ActiveRecord exception classes by
-   * errno. Matches Rails'
-   * `ConnectionAdapters::AbstractMysqlAdapter#translate_exception`.
-   */
   protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     if (e instanceof ActiveRecordError) return e;
     const build = (): Error => {
@@ -1430,10 +1091,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       const errno = this.errorNumber(e) ?? undefined;
       const msg = e.message;
       if (typeof errno !== "number") {
-        // Mirrors Rails' `when nil` branch — driver errors without a MySQL
-        // errno (e.g. node-mysql2 surfacing a closed-socket failure as a
-        // generic Error) get promoted to ConnectionNotEstablished when the
-        // message indicates the client lost the server handshake.
         if (/MySQL client is not connected/i.test(msg)) {
           return new ConnectionNotEstablished(e, { connectionPool: this.pool });
         }
@@ -1485,11 +1142,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       }
     };
     const translated = build();
-    // Ruby sets `Exception#cause` at the `raise` site, so `translate_exception`
-    // never names the driver error in its argument list
-    // (abstract_mysql_adapter.rb:815-856). JS chains nothing at a `throw`; this
-    // is the raise-site stand-in for the direct `_translateException` callers,
-    // as `translateExceptionClass` is for the public translator.
     if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = e;
     }
@@ -1508,9 +1160,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
-    // Mirrors Rails AbstractMysqlAdapter#extended_type_map_key (lines 762–768):
-    // pair defaultTimezone with emulateBooleans when set; otherwise fall
-    // back to the booleans-only key.
     const tz = this._config.defaultTimezone;
     if (typeof tz === "string") {
       return { defaultTimezone: tz, emulateBooleans: this._emulateBooleans };
@@ -1519,12 +1168,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return null;
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#drop_table
-   * (abstract_mysql_adapter.rb:354-357) — one `DROP` statement for every table
-   * name, with MySQL's `TEMPORARY` and `CASCADE` keywords the base adapter has
-   * no arm for.
-   */
   override async dropTable(
     ...args:
       | [string, ...string[]]
@@ -1541,11 +1184,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
           ((t: MysqlTableDefinition) => void) | undefined,
         ]
   ): Promise<void> {
-    // Ruby's `*table_names, **options` swallows neither an omitted argument nor
-    // a block into `table_names` (abstract/schema_statements.rb:540); TS spells
-    // both as trailing arguments, so they come off first — the block is only
-    // ever read by CommandRecorder, which keeps it so `drop_table` can invert
-    // to `create_table`.
     const rest = [...args] as unknown[];
     while (
       rest.length > 0 &&
@@ -1572,27 +1210,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#handle_warnings
-   * (abstract_mysql_adapter.rb:770-784).
-   *
-   * Rails reads `@raw_connection` directly; `_connection` is trails' spelling
-   * of that same ivar, so the SHOW WARNINGS round-trip is sourced the same way
-   * rather than passed in. Rails' `handle_warnings` has no null guard on it
-   * because `perform_query` only runs with a checked-out connection
-   * (mysql2/database_statements.rb:103); trails types `_connection` as
-   * nullable for the disconnected adapter, so the guard joins the `.nil?`
-   * early return rather than becoming a second branch Rails does not have.
-   *
-   * Rails' closing `ActiveRecord.db_warnings_action.call(warning)`
-   * (abstract_mysql_adapter.rb:782) is spelled `Function#call`, which takes the
-   * receiver first and so fills the slot Ruby's `Proc#call` has no argument for.
-   *
-   * Public rather than Ruby-private for the same reason PostgreSQL's is:
-   * `perform_query` reaches it through a structurally-typed mixin host.
-   *
-   * @internal
-   */
+  /** @internal */
   async handleWarnings(sql: string): Promise<void> {
     const rawConnection = this._connection as unknown as {
       warningCount?: unknown;
@@ -1626,16 +1244,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  /**
-   * The `@raw_connection.warning_count` read of `handle_warnings`
-   * (abstract_mysql_adapter.rb:771). Ruby's mysql2 gem exposes it as an
-   * attribute on the connection, so Rails needs no seam; the npm driver only
-   * populates it when the last protocol packet carried it, and falls back to
-   * `SHOW COUNT(*) WARNINGS` — a SHOW, so it does not itself reset the warning
-   * list the following `SHOW WARNINGS` reads.
-   *
-   * @internal
-   */
+  /** @internal */
   protected async warningCount(rawConnection: {
     warningCount?: unknown;
     query(sql: string): Promise<[unknown, unknown]>;
@@ -1648,7 +1257,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return typeof value === "number" ? value : Number(value) || 0;
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#warning_ignored? */
+  /** @internal */
   override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
     if (warning.level === "Note") return true;
     return super.isWarningIgnored(warning);
@@ -1673,23 +1282,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Fetch the raw version string from the MySQL server (e.g. "8.0.28-ubuntu").
-   * Concrete adapters (Mysql2Adapter) override this to query
-   * the live connection. Base implementation throws — callers must call
-   * `getDatabaseVersion()` only after a subclass has wired this.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the abstract seat for Mysql2Adapter#full_version (mysql2_adapter.rb:164-166), which Ruby needs no base declaration for.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async getFullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement getFullVersion()`);
   }
 
-  /**
-   * Mirrors: AbstractMysqlAdapter#get_database_version
-   * (abstract_mysql_adapter.rb:86-90) — a pure derivation. The memo lives on
-   * the pool (`pool_config.rb:39-41`), reached through
-   * `AbstractAdapter#databaseVersion`.
-   */
   override async getDatabaseVersion(): Promise<Version> {
     const fullVersionString = await this.getFullVersion();
     const versionString = this.versionString(fullVersionString);
@@ -1793,7 +1392,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this.schemaCreation.accept(new ChangeColumnDefinition(cd, column.name));
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#add_index_for_alter (abstract_mysql_adapter.rb:880-885) */
+  /** @internal */
   async addIndexForAlter(
     tableName: string,
     columnName: string | string[],
@@ -1804,7 +1403,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return `ADD ${await this.schemaCreation.accept(index)}${algorithm ? `, ${algorithm}` : ""}`;
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#remove_index_for_alter (abstract_mysql_adapter.rb:887-890) */
+  /** @internal */
   async removeIndexForAlter(
     tableName: string,
     columnName?: string | string[] | null,
@@ -1814,7 +1413,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return `DROP INDEX ${this.quoteColumnName(indexName)}`;
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#column_definitions (abstract_mysql_adapter.rb:962-964) */
+  /** @internal */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
     const result = await this.internalExecQuery(
       `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
@@ -1823,7 +1422,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return result.toArray();
   }
 
-  /** @internal Mirrors: AbstractMysqlAdapter#create_table_info (abstract_mysql_adapter.rb:966-968) */
+  /** @internal */
   async createTableInfo(tableName: string): Promise<string | null> {
     const result = await this.internalExecQuery(
       `SHOW CREATE TABLE ${this.quoteTableName(tableName)}`,
@@ -1863,10 +1462,6 @@ export function parseTableOptions(
   createInfo: string,
   tableComment: string | null,
 ): Record<string, string> {
-  // Strip column definitions — everything up to and including the closing `)`.
-  // Strip partition hints only when followed by a trailing newline (mirrors Rails:
-  // .sub(/\n\/\*!.*\*\/\n\z/m, "")). Without trailing \n the hint stays in raw
-  // and ends up in opts["options"], which is what the schema-dump test expects.
   let raw = createInfo
     .replace(/[\s\S]*\n\) ?/, "")
     .replace(/\n\/\*![\s\S]*\*\/\n$/, "")
@@ -1882,7 +1477,6 @@ export function parseTableOptions(
     if (charsetMatch.groups!["collation"]) opts["collation"] = charsetMatch.groups!["collation"]!;
   }
 
-  // Strip AUTO_INCREMENT — mirrors Rails: sub!(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, '\1')
   raw = raw.replace(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, "$1");
 
   if (/ COMMENT='/.test(raw)) {
@@ -1894,68 +1488,26 @@ export function parseTableOptions(
   return opts;
 }
 
-/**
- * Shape of a cached MySQL prepared statement. `sql` is the key the
- * mysql2 driver uses for its own internal client-side cache — passing
- * it back to `connection.unprepare(sql)` closes the server-side
- * statement (COM_STMT_CLOSE). `key` is the Rails-style `a<n>` identifier
- * we use only for logging / diagnostics.
- *
- * Mirrors: the Statement struct in Rails'
- * `ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements`.
- */
 export interface MysqlPreparedStatement {
   sql: string;
   key: string;
 }
 
-/**
- * MySQL-family StatementPool. Adds Rails-parity `nextKey()` on top of
- * the base LRU cache. Driver-specific subclasses (Mysql2Adapter's
- * inline subclass) override `dealloc` to send COM_STMT_CLOSE via
- * `connection.unprepare`.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::StatementPool
- */
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
   private _counter = 0;
 
-  /**
-   * Allocate a fresh prepared-statement key. Mirrors Rails' per-pool
-   * `@counter += 1` on `AbstractMysqlAdapter::StatementPool`.
-   */
   nextKey(): string {
     return `a${++this._counter}`;
   }
 }
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
-/**
- * Rails has no MySQL `database_version` — `abstract_adapter.rb:854-856` answers
- * whatever `get_database_version` returned, and this adapter's
- * (abstract_mysql_adapter.rb:86-90) returns a `Version`. TS needs that told to
- * it, so the inherited getter's `Version | number` is narrowed here by
- * declaration merging rather than by an override method Rails does not have.
- * @internal
- */
+/** @internal */
 export interface AbstractMysqlAdapter {
   get databaseVersion(): Version | Promise<Version>;
 }
 
-/**
- * The `MySQL::SchemaStatements` surface `include()` installs below
- * (abstract_mysql_adapter.rb:19). Declaration-merged so callers see the mixin's
- * signatures instead of falling through to `AbstractAdapter`'s; kept in step
- * with the mixin by `scripts/mixin-declaration-drift.ts`. @internal
- */
 export interface AbstractMysqlAdapter {
-  /**
-   * MySQL-specific SchemaCreation so that DDL methods mixed in from
-   * SchemaStatements (e.g. `addColumn`) emit `CHARACTER SET` / `COLLATE`
-   * clauses. Rails declares it on `MySQL::SchemaStatements`
-   * (mysql/schema_statements.rb:139), not on the adapter, so it arrives here
-   * through `include(AbstractMysqlAdapter, MysqlSchemaStatements)`.
-   */
   readonly schemaCreation: MysqlSchemaCreation;
 
   updateTableDefinition(tableName: string, base?: unknown): MysqlTable;
@@ -1987,7 +1539,6 @@ export interface AbstractMysqlAdapter {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-// Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
 AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
 AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;

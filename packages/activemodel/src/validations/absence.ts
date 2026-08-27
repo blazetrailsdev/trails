@@ -11,11 +11,6 @@ export class AbsenceValidator extends EachValidator {
   }
 }
 
-/**
- * Mirrors: ActiveModel::Validations::HelperMethods (absence.rb:33-35) — Ruby reopens the
- * one `HelperMethods` module here, so the TS half of it lives here too and
- * `validations.ts` reassembles them.
- */
 export const HelperMethods = {
   validatesAbsenceOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
     return this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));

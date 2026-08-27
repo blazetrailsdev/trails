@@ -13,7 +13,6 @@ export class Equality extends Binary {
   }
 }
 
-// Mirrors `include FetchAttribute` (equality.rb:6).
 include(
   Equality as unknown as new (...args: unknown[]) => object,
   FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,

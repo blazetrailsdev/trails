@@ -1,10 +1,3 @@
-/**
- * Tests for the per-connection Temporal type parsers.
- *
- * These tests exercise `getTypeParser` in isolation (no live DB needed)
- * and verify that the global pg type registry is unaffected.
- */
-
 import { describe, expect, it } from "vitest";
 import pg from "pg";
 import { Temporal } from "@blazetrails/date";

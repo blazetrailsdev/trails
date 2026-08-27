@@ -21,15 +21,6 @@ import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { rbEqual } from "@blazetrails/activesupport";
 
-/**
- * Stands in for Rails' `when Arel::SelectManager` arm (predications.rb:65-74
- * for `in`, 112-121 for `not_in`), duck-typed on the `ast` reader as
- * `buildQuoted` matches managers (casted.ts:41-44) — a structural check keeps
- * the runtime import out. The `instanceof Node` half matters: a bare
- * `"ast" in value` also admits `{ ast: undefined }`, which would build
- * `In(this, undefined)`. A `Node` is excluded: it is the `else`-arm value
- * itself, not a manager wrapping one.
- */
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
     typeof value === "object" &&
@@ -39,38 +30,10 @@ function isSelectManagerLike(value: unknown): value is { ast: Node } {
   );
 }
 
-/**
- * Stands in for Rails' `when Enumerable` arm. Ruby's `Enumerable` covers Set,
- * Hash and Range as well as Array, so matching only `Array.isArray` would drop
- * a Set/Map/generator into the scalar arm and silently cast the container
- * itself.
- *
- * Two deliberate edges:
- * - JS strings are iterable, but Ruby's String is NOT Enumerable, so they must
- *   reach `quoted_node`. `typeof value === "object"` excludes them.
- * - **A plain JS object casts whole rather than expanding.** Ruby's Hash IS
- *   Enumerable, so Rails' `in({a: 1})` takes the `quoted_array` arm and
- *   expands to `[Casted([:a, 1], self)]`. There is no single JS value that is
- *   both the Hash analogue and the `Object.new` analogue, so the two Ruby arms
- *   are split across two JS types: a `Map` is the Hash analogue and is
- *   iterable, so it expands through this guard exactly as Ruby's Hash does; an
- *   object literal is the `Object.new` analogue and correctly reaches
- *   `quoted_node` (attribute_test.rb:747-757). Passing an object literal to
- *   `in` / `notIn` therefore casts the container — use a `Map` to get Ruby
- *   Hash pair-expansion. This is a decided split, not an accident; both arms
- *   are pinned by tests.
- */
 function isEnumerable(value: unknown): value is Iterable<unknown> {
   return typeof value === "object" && value !== null && Symbol.iterator in value;
 }
 
-/**
- * Host contract for the Predications mixin.
- *
- * Implementors provide `quotedNode(other)` which either type-casts (for
- * Attribute) or plain-wraps (for NodeExpression / InfixOperation) — same
- * role Rails' private `quoted_node` method plays inside Predications.
- */
 export interface PredicationHost {
   /** @internal */
   quotedNode(other: unknown): Node;
@@ -78,16 +41,6 @@ export interface PredicationHost {
   quotedArray(others: unknown[]): Node[];
 }
 
-/**
- * The two private folders from Arel::Predications (grouping_any /
- * grouping_all). Declared structurally so the *_any/*_all variants can
- * name them in their `this` types without referring to `Predications`
- * while it is still being defined.
- *
- * Mirrors the real signatures below, closure arm included -- a host typed
- * through this interface keeps the closure form. The assertion after the
- * mixin pins the two declarations together so they cannot drift.
- */
 export interface GroupingFolders {
   /** @internal */
   groupingAny<T extends PredicationHost>(
@@ -105,13 +58,6 @@ export interface GroupingFolders {
   ): Grouping;
 }
 
-/**
- * The `self` half of Rails' `between` contract. `between` / `not_between`
- * (predications.rb:36-61, 84-110) and `open_ended?` (:255-257) dispatch these
- * on implicit self, so an including class overriding one is honored — declared
- * structurally for the same reason {@link GroupingFolders} is: the bodies below
- * cannot name `Predications` while it is still being defined.
- */
 interface RangePredicates {
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | 0;
@@ -143,24 +89,14 @@ interface UnboundableLike {
   isUnboundable?: () => 1 | -1 | false;
 }
 
-/** The receiver `between` / `notBetween` dispatch their whole tree through. */
 type BetweenHost = Node & PredicationHost & RangePredicates;
 
-/**
- * The JS analogue of the Ruby Range `between` / `not_between` take
- * (predications.rb:36, :84): the `begin` / `end` / `exclude_end?` trio, and
- * nothing else — those bodies read no other member off `other`.
- */
 export interface RangeLike {
   begin: unknown;
   end: unknown;
   excludeEnd?: boolean;
 }
 
-// Build the `expr → Node` callback used by groupingAny / groupingAll.
-// Resolves a method-id string against the host (with a clear error if
-// the name doesn't refer to a callable method) or invokes a closure
-// directly. Mirrors Ruby's `send(method_id, expr, *extras)` shape.
 function predicationDispatch<T extends PredicationHost>(
   host: T,
   methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
@@ -180,15 +116,7 @@ function predicationDispatch<T extends PredicationHost>(
   return (expr) => fn.call(host, expr, ...extras);
 }
 
-/**
- * The method-syntax module interface for {@link Predications}, mirroring
- * `WindowPredicationsModule` / `OrderPredicationsModule`. Hosts extend this
- * interface directly rather than `Included<typeof Predications>`: a mapped
- * type produces property-typed members, and a subclass overriding one with a
- * method declaration (`Case#when`, case.rb:13) is then a TS2425 error.
- *
- * @noRailsEquivalent PERMANENT TypeScript-only mixin typing; Ruby `include` needs no type surface.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface PredicationsModule extends GroupingFolders {
   eq(other: unknown): Equality;
   notEq(other: unknown): NotEqual;
@@ -240,11 +168,6 @@ export interface PredicationsModule extends GroupingFolders {
   isOpenEnded(value: unknown): boolean;
 }
 
-/**
- * Predications — predicate-builder mixin.
- *
- * Mirrors: Arel::Predications (activerecord/lib/arel/predications.rb)
- */
 export const Predications: PredicationsModule = {
   eq(this: Node & PredicationHost, other: unknown): Equality {
     return new Equality(this, this.quotedNode(other));
@@ -278,10 +201,6 @@ export const Predications: PredicationsModule = {
     escape: string | Node | null = null,
     caseSensitive = false,
   ): Matches {
-    // Rails: `Nodes::Matches.new self, quoted_node(other), ...`.
-    // `quotedNode` (→ buildQuoted) already unwraps SelectManager/TreeManager
-    // `.ast` and passes Nodes through untouched, so we don't need a
-    // separate branch for AST-bearing inputs here.
     return new Matches(this, this.quotedNode(other), escape, caseSensitive);
   },
   doesNotMatch(
@@ -300,10 +219,6 @@ export const Predications: PredicationsModule = {
   },
 
   in(this: Node & PredicationHost, other: unknown): In {
-    // Mirrors Arel::Predications#in:
-    //   SelectManager → In(self, other.ast)
-    //   Enumerable    → In(self, quoted_array(other))
-    //   else          → In(self, quoted_node(other))
     if (isSelectManagerLike(other)) return new In(this, other.ast);
     if (isEnumerable(other)) return new In(this, this.quotedArray([...other]));
     return new In(this, this.quotedNode(other));
@@ -314,7 +229,6 @@ export const Predications: PredicationsModule = {
     return new NotIn(this, this.quotedNode(other));
   },
 
-  // Mirrors Arel::Predications#between (predications.rb:36-61).
   between(this: BetweenHost, other: RangeLike): Node {
     if (this.isUnboundable(other.begin) === 1 || this.isUnboundable(other.end) === -1) {
       return this.in([]);
@@ -335,8 +249,6 @@ export const Predications: PredicationsModule = {
     } else if (other.excludeEnd) {
       return this.gteq(other.begin).and(this.lt(other.end));
     } else if (rbEqual(other.begin, other.end)) {
-      // predications.rb:56's `==` is a value comparison; `===` covers only its
-      // identity arm, so two equal Dates would not collapse.
       return this.eq(other.begin);
     } else {
       const left = this.quotedNode(other.begin);
@@ -345,7 +257,6 @@ export const Predications: PredicationsModule = {
     }
   },
 
-  // Mirrors Arel::Predications#not_between (predications.rb:84-110).
   notBetween(this: BetweenHost, other: RangeLike): Node {
     if (this.isUnboundable(other.begin) === 1 || this.isUnboundable(other.end) === -1) {
       return this.notIn([]);
@@ -380,11 +291,6 @@ export const Predications: PredicationsModule = {
     this: PredicationHost & GroupingFolders & { eq(o: unknown): Node },
     others: unknown[],
   ): Grouping {
-    // predications.rb:34 folds `quoted_array(others)`, not the bare array --
-    // uniquely among the *_all variants. `eq` re-quotes via quoted_node, which
-    // passes Nodes through untouched, so the pre-quoting is idempotent for
-    // plain values; keep it anyway so a host with a custom quotedNode sees the
-    // same input Rails gives it.
     return this.groupingAll("eq", this.quotedArray(others));
   },
   notEqAny(
@@ -468,8 +374,6 @@ export const Predications: PredicationsModule = {
     others: string[],
     escape: string | Node | null = null,
   ): Grouping {
-    // predications.rb:155-161 forwards only `escape` -- unlike matches_*_any,
-    // it does not thread case_sensitive, so does_not_match's own default wins.
     return this.groupingAny("doesNotMatch", others, escape);
   },
   doesNotMatchAll(
@@ -477,8 +381,6 @@ export const Predications: PredicationsModule = {
     others: string[],
     escape: string | Node | null = null,
   ): Grouping {
-    // predications.rb:155-161 forwards only `escape` -- unlike matches_*_any,
-    // it does not thread case_sensitive, so does_not_match's own default wins.
     return this.groupingAll("doesNotMatch", others, escape);
   },
   inAny(
@@ -521,16 +423,6 @@ export const Predications: PredicationsModule = {
     return others.map((v) => this.quotedNode(v));
   },
 
-  // -- Rails-private helpers (mixed in alongside the public API for
-  //    surface fidelity; the *_any/*_all variants above delegate here,
-  //    mirroring predications.rb:231-241). --
-
-  // Mirrors Arel::Predications#grouping_any(method_id, others, *extras)
-  // — calls `this[methodId](expr, ...extras)` on each value and folds
-  // the resulting nodes with OR inside a Grouping. The closure variant
-  // lets TS callers skip stringly-typed dispatch. Generic over the
-  // host type so a class like Attribute (with a richer surface than
-  // bare PredicationHost) can pass typed closures without `as` casts.
   groupingAny<T extends PredicationHost>(
     this: T,
     methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
@@ -538,15 +430,10 @@ export const Predications: PredicationsModule = {
     ...extras: unknown[]
   ): Grouping {
     const nodes = others.map(predicationDispatch(this, methodId, extras));
-    // Rails' `Or.inject` on [] returns nil; the visitor renders that as
-    // `NULL`. Preserve three-valued semantics (NULL is *not* the same as
-    // FALSE under SQL: `NULL OR FALSE` is NULL, `FALSE OR FALSE` is FALSE)
-    // while still guarding against the `Array#reduce` TypeError on empty.
     if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
     return new Grouping(nodes.reduce((memo, node) => new Or([memo, node])));
   },
 
-  // Mirrors Arel::Predications#grouping_all — fold with AND.
   groupingAll<T extends PredicationHost>(
     this: T,
     methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
@@ -557,20 +444,6 @@ export const Predications: PredicationsModule = {
     return new Grouping(new And(nodes));
   },
 
-  // Mirrors Arel::Predications#infinity? (predications.rb:248-250) —
-  // `value.respond_to?(:infinite?) && value.infinite?`, which yields the SIGN
-  // because Ruby's `Float#infinite?` returns `1 | -1 | nil`. The duck-type
-  // dispatch is Rails': bare ±Infinity (Ruby's `Float` responds to `infinite?`)
-  // or anything exposing `isInfinite()` — which is how a `Quoted` answers
-  // (casted.rb:43-45). `Casted` defines no `infinite?` (casted.rb:5-35), so it
-  // never answers and `open_ended?(Casted(INFINITY))` stays false.
-  //
-  // `0` stands in for Ruby's `nil` miss: Ruby's `0` is truthy and so could not
-  // double as "absent", and a `0` sign is unreachable anyway. The producers
-  // (`Quoted#isInfinite`, `BindParam#isInfinite`, `QueryAttribute#isInfinite`)
-  // return `1 | -1 | false`, mirroring `respond_to?(:x) && value.x` — `false`
-  // is the `&&` short-circuit. Do not add a `true` arm back: a boolean producer
-  // would report `+1` for a -Infinity bound.
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;
     if (value === Infinity) return 1;
@@ -586,17 +459,6 @@ export const Predications: PredicationsModule = {
     return 0;
   },
 
-  // Mirrors Arel::Predications#unboundable? (predications.rb:252-253) —
-  // `value.respond_to?(:unboundable?) && value.unboundable?`, the same
-  // duck-typed predicate the visitor uses (to_sql.rb:905-907). A bound is
-  // unboundable when it serializes out of range for its column type; trails
-  // threads that through a bound exposing `isUnboundable()` (a QueryAttribute
-  // bind, or the RangeHandler's out-of-range sentinel).
-  //
-  // A bare ±Infinity is NOT unboundable — Float has no `unboundable?`, so Rails
-  // answers false and the bound falls through to the `open_ended?` / `infinity?`
-  // arms of the between tree. `Float::INFINITY..` still collapses to `in([])`,
-  // but via the nested `infinity?` check at predications.rb:42.
   isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;
     if (
@@ -611,16 +473,6 @@ export const Predications: PredicationsModule = {
     return 0;
   },
 
-  // Mirrors Arel::Predications#open_ended? (predications.rb:255-257) —
-  // `value.nil? || infinity?(value) || unboundable?(value)`. `infinity?` and
-  // `unboundable?` dispatch through implicit self in Ruby, so a host overriding
-  // either is honored here too.
-  //
-  // The leading `value.nil?` is a real dispatch, not a null check: the node
-  // classes override `nil?` to report on the *wrapped* value (`BindParam#nil?`
-  // bind_param.rb:23-25, `Casted#nil?` / `Quoted#nil?` casted.rb:16,41). So
-  // `between(BindParam(nil), 3)` is `lteq(3)` in Rails, not a Between over a nil
-  // bind — reading only `=== null` skips that.
   isOpenEnded(
     this: PredicationHost & {
       isInfinity(value: unknown): 1 | -1 | 0;

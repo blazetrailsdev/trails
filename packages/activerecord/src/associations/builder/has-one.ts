@@ -2,9 +2,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
-/**
- * Mirrors: ActiveRecord::Associations::Builder::HasOne
- */
 export class HasOne extends SingularAssociation {
   static override macro(): string {
     return "hasOne";
@@ -43,33 +40,10 @@ export class HasOne extends SingularAssociation {
     super.defineConstructors(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    // Redefine the `build#{name}` accessor to mirror Rails' synchronous
-    // `set_new_record` → `replace` → `load_target`: materialize the current
-    // target before the built record displaces it. The accessor returns a
-    // Promise (the sync `build` / nested-attributes paths can't await), so a
-    // second build sees the loaded target and issues no query — one
-    // `load_target` SELECT across repeated builds. `association.build` itself
-    // stays synchronous for the in-memory internal paths.
     Object.defineProperty(mixin, `build${cap}`, {
       value: function (this: { association(n: string): any }, ...args: unknown[]) {
         const assoc = this.association(name);
-        // Only take the async load path when a query would actually run: a
-        // persisted / FK-present owner whose target isn't loaded. New-record
-        // owners build synchronously (no query), so their `build#{name}` returns
-        // the record directly and a synchronous build error (e.g. an invalid STI
-        // type from `build_record`) still throws synchronously — the shape the
-        // building-with-invalid-type tests assert. On the load path the same
-        // error surfaces as a rejected Promise instead, an unavoidable
-        // consequence of awaiting `load_target` in JS (Rails' `replace` is
-        // fully synchronous, so it raises inline regardless of persistence).
         if (typeof assoc.findTargetNeeded === "function" && assoc.findTargetNeeded()) {
-          // `loadTargetForBuild` caches the direct-FK target for a plain
-          // has_one, but a has_one_through overrides it to load the *through*
-          // proxy — Rails' has_one_through `replace` runs no
-          // `load_target`/`remove_target!` on the target; its
-          // `create_through_record` loads the through instead, and the through's
-          // `detachDisplacedOnBuild` is a no-op. With the target cached, `build`
-          // owns the removal and returns the promise to `await`.
           return assoc.loadTargetForBuild().then(() => assoc.build(...args));
         }
         return assoc.build(...args);
@@ -82,21 +56,6 @@ export class HasOne extends SingularAssociation {
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    // `set${cap}` IS the port of Rails' `#{name}=` writer: that writer removes
-    // and persists the displaced target inline (has_one_association.rb:59-84),
-    // blocking I/O a synchronous JS property setter cannot express but a
-    // promise-returning method can. parity:api scores it as such —
-    // `rubyMethodToTs` offers `set#{Name}` as a candidate for `name=`
-    // (scripts/api-compare/conventions.ts).
-    //
-    // Generated unconditionally (including polymorphic has_one) rather than in
-    // `defineConstructors`, which Rails skips for polymorphic; the writer must
-    // exist for every has_one. It is the ONLY writer: RFC 0087 §1 removed the
-    // generated `#{name}=` property setter, so assigning the property now fails
-    // as a plain JS write to a getter-only accessor. A thin
-    // delegation to the association-level `writer`, whose has_one /
-    // has_one_through overrides run the Rails-faithful immediate replace/persist
-    // and whose returned promise rejects (`RecordNotSaved`) at the call site.
     const setter = Object.getOwnPropertyDescriptor(mixin, `set${cap}`);
     if (!setter || setter.configurable) {
       Object.defineProperty(mixin, `set${cap}`, {
@@ -111,9 +70,6 @@ export class HasOne extends SingularAssociation {
       });
     }
 
-    // Rails' `#{name}=` (has_one_association.rb:59-84) — a string key, not a
-    // property setter, so `public_send(setter, v)`
-    // (attribute_assignment.rb:68) reaches it and its promise survives.
     const rubyWriter = Object.getOwnPropertyDescriptor(mixin, `${name}=`);
     if (!rubyWriter || rubyWriter.configurable) {
       Object.defineProperty(mixin, `${name}=`, {
@@ -143,14 +99,6 @@ export class HasOne extends SingularAssociation {
   static override defineCallbacks(model: any, reflection: any): void {
     super.defineCallbacks(model, reflection);
     const options = reflection.options ?? {};
-    // Mirrors Rails AutosaveAssociation::AssociationBuilderExtension.build —
-    // registered for every has_one regardless of the `autosave:` option.
-    // The save callbacks gate on `options.autosave` internally; the validate
-    // callback gates on `reflection.validate?` (true for `validate: true`).
-    // Registered BEFORE the touch callbacks so the child is autosaved (and thus
-    // persisted) before the after_create/after_update touch fires — mirrors
-    // Rails, where has_one.rb's `define_callbacks` runs `super` (which wires
-    // autosave) before `add_touch_callbacks`.
     addAutosaveAssociationCallbacks.call(model, reflection);
     if (options.touch) {
       this.addTouchCallbacks(model, reflection);
@@ -181,9 +129,6 @@ export class HasOne extends SingularAssociation {
       instance = typeof record[name] === "function" ? record[name]() : record[name];
     }
 
-    // Mirrors Rails `HasOne.touch_record`: `touch != true ? instance.touch(touch)
-    // : instance.touch`. The owner is touched immediately via `instance.touch`
-    // (unlike `BelongsTo.touch_record`, which defers with `touch_later`).
     if (instance && typeof instance.isPersisted === "function" && instance.isPersisted()) {
       if (typeof instance.touch !== "function") return;
       if (touch === true) {
@@ -202,17 +147,10 @@ export class HasOne extends SingularAssociation {
       await HasOne.touchRecord(record, name, touch);
     };
 
-    // Mirrors Rails `HasOne.add_touch_callbacks`: the create/update touch fires
-    // only when the owner actually saved changes (`if: :saved_changes?`). Reuse
-    // the existing `isSavedChanges` predicate (matches belongs-to.ts's touch
-    // callback) so a no-op `save` on an unchanged owner does not re-touch.
     const savedChangesQ = (record: any) =>
       typeof record.isSavedChanges === "function" && record.isSavedChanges();
 
     model.afterCreate(callback, { if: savedChangesQ });
-    // Mirrors Rails `after_create_commit { association(name).reset_negative_cache }`:
-    // once the create transaction commits, drop the negative (nil) target cache
-    // so a subsequent read re-queries and sees the freshly persisted child.
     model.afterCreateCommit(async (record: any) => {
       record.association(name).resetNegativeCache();
     });

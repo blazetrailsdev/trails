@@ -16,14 +16,6 @@ import { PresenceValidator } from "./presence.js";
 
 type ValidatorClass = new (options: Record<string, unknown>) => Validator;
 
-/**
- * Ruby resolves `const_get("#{key.to_s.camelize}Validator")`
- * (validates.rb:121-126) against the model class, whose ancestry reaches
- * `ActiveModel::Validations` and so its bundled validator constants. JS has no
- * constant lookup that walks a class's namespace, so the bundled half of that
- * ancestry is this table; the class's own statics are consulted first, which is
- * where a model-local `TitleValidator` lives.
- */
 const BUNDLED_VALIDATORS: Record<string, ValidatorClass> = {
   AbsenceValidator,
   AcceptanceValidator,
@@ -37,7 +29,6 @@ const BUNDLED_VALIDATORS: Record<string, ValidatorClass> = {
   PresenceValidator,
 };
 
-/** The `Model` surface `validates` self-sends. */
 export interface ValidatesHost {
   _validatesDefaultKeys(): string[];
   _parseValidatesOptions(options: unknown): Record<string, unknown>;
@@ -45,10 +36,6 @@ export interface ValidatesHost {
   validatesWith(...args: unknown[]): void;
 }
 
-/**
- * Mirrors: ActiveModel::Validations::ClassMethods#validates
- * (validations/validates.rb:111-133).
- */
 export function validates(
   this: ValidatesHost,
   ...args: [...attributes: string[], rules: Record<string, unknown>]
@@ -80,10 +67,6 @@ export function validates(
   }
 }
 
-/**
- * Mirrors: ActiveModel::Validations::ClassMethods#validates!
- * (validations/validates.rb:153-157).
- */
 export function validatesBang(
   this: ValidatesHost,
   ...args: [...attributes: string[], rules: Record<string, unknown>]
@@ -93,22 +76,12 @@ export function validatesBang(
   this.validates(...(attributes as string[]), options);
 }
 
-/**
- * Mirrors: ActiveModel::Validations::ClassMethods#_validates_default_keys
- * (validations/validates.rb:162-164).
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function _validatesDefaultKeys(): string[] {
   return ["if", "unless", "on", "allowBlank", "allowNil", "strict", "exceptOn"];
 }
 
-/**
- * Mirrors: ActiveModel::Validations::ClassMethods#_parse_validates_options
- * (validations/validates.rb:166-178).
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function _parseValidatesOptions(options: unknown): Record<string, unknown> {
   if (options === true) return {};
   if (options !== null && typeof options === "object" && options.constructor === Object) {

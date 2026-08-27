@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/connection_test.rb
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
@@ -83,23 +80,16 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("indexes logs name", async () => {
-    // "pg_class" substituted for Rails' "items" — no fixture tables at adapter test level
     await adapter.indexes("pg_class");
     expect(subscriber.logged[0][1]).toBe("SCHEMA");
   });
 
   it("table exists logs name", async () => {
-    // "pg_class" substituted for Rails' "items" — no fixture tables at adapter test level
     await adapter.tableExists("pg_class");
     expect(subscriber.logged[0][1]).toBe("SCHEMA");
   });
 
   it("table alias length logs name", async () => {
-    // Rails nils @max_identifier_length then calls table_alias_length to force
-    // the logged "SHOW max_identifier_length" (SCHEMA) query. maxIdentifierLength
-    // is synchronous in trails, so the query lives in the async warm path that
-    // renameTable (and here, the test) drives lazily — it goes through the same
-    // logged internalExecQuery, so it is logged with the SCHEMA name.
     (adapter as unknown as { _maxIdentifierLength: number | null })._maxIdentifierLength = null;
     await adapter.warmMaxIdentifierLength();
     expect(subscriber.logged[0][1]).toBe("SCHEMA");
@@ -286,9 +276,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
       a.discardBang();
       expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
-      // Rails' discard! abandons the fd WITHOUT closing it (socket_io.reopen
-      // (IO::NULL)); it must never communicate with the server. end() would
-      // actively close the socket, violating that fork-safety contract.
       expect(endSpy).not.toHaveBeenCalled();
     } finally {
       socket?.destroy?.();

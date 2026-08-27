@@ -1,12 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Ports vendor/rails/activerecord/test/cases/attributes_test.rb. The Rails file
- * declares OverloadedType / UnoverloadedType on the `overloaded_types` table
- * (canonical TEST_SCHEMA) and exercises `attribute` overrides over it; we mirror
- * that layout rather than inventing a bespoke table.
- */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 import {
@@ -27,8 +18,6 @@ import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
-// attributes_test.rb:5-21 — three classes layered over the canonical
-// `overloaded_types` table.
 class OverloadedType extends Base {
   static {
     this.tableName = "overloaded_types";
@@ -58,17 +47,10 @@ class UnoverloadedType extends Base {
 describe("CustomPropertiesTest", () => {
   fixtures([]);
   beforeAll(async () => {
-    // Reflect the canonical `overloaded_types` columns onto each class that
-    // rides the table (Rails does this implicitly on first access). AR_NO_AUTO_SCHEMA
-    // suppresses the lazy load so the bespoke virtual-attribute tests below stay
-    // connection-free.
     await loadSchemaFromAdapter.call(OverloadedType);
     await loadSchemaFromAdapter.call(UnoverloadedType);
   });
 
-  // attributes_test.rb#with_immutable_strings — toggle the flag, reset column
-  // information so schema-inferred types are recomputed under the active flag,
-  // then restore.
   const withImmutableStrings = async (fn: () => void): Promise<void> => {
     const old = Base.immutableStringsByDefault;
     Base.immutableStringsByDefault = true;
@@ -101,9 +83,6 @@ describe("CustomPropertiesTest", () => {
     await data.reload();
 
     expect(data.overloaded_float).toBe(2);
-    // Rails distinguishes Integer vs Float kind; JS numbers do not, so assert
-    // the overloaded column stays integer-valued and the unoverloaded one keeps
-    // its fractional float value.
     const lastOverloaded = await OverloadedType.last();
     expect(Number.isInteger(lastOverloaded!.overloaded_float)).toBe(true);
     expect(((await UnoverloadedType.last()) as any).overloaded_float).toBe(2.0);
@@ -173,9 +152,6 @@ describe("CustomPropertiesTest", () => {
     }
 
     const startsAtType = WithStartsAt.typeForAttribute("starts_at");
-    // Rails asserts precision/limit/scale forwarded to the Type::DateTime
-    // constructor; trails' `attribute()` doesn't accept precision/scale, so assert
-    // the datetime type plus a materialized time value.
     expect(startsAtType.constructor.name).toMatch(/DateTime/);
     expect((new WithStartsAt() as any).starts_at).toBeDefined();
   });
@@ -203,8 +179,6 @@ describe("CustomPropertiesTest", () => {
     const data = new OverloadedType({ non_existent_decimal: 1 });
 
     expect(data.non_existent_decimal).toEqual(new BigDecimal(1));
-    // UnoverloadedType has no `non_existent_decimal` attribute, so constructing
-    // with the key raises UnknownAttributeError, like Rails.
     expect(() => new UnoverloadedType({ non_existent_decimal: 1 } as any)).toThrow(
       "unknown attribute 'non_existent_decimal'",
     );
@@ -443,8 +417,6 @@ describe("CustomPropertiesTest", () => {
 
     expect((model as any).foo).toBe("lol");
 
-    // Ruby's `<<` mutates the String in place; JS strings are immutable, so
-    // reassign to exercise the same dirty-tracking behavior.
     (model as any).foo = (model as any).foo + "asdf";
     expect((model as any).foo).toBe("lolasdf");
     expect((model as any).fooChanged()).toBe(true);
@@ -473,8 +445,6 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes do not require a connection is established", () => {
-    // Rails: assert_not_called(ActiveRecord::Base, :lease_connection). Declaring
-    // an attribute must not touch the connection.
     class Klass extends OverloadedType {
       static {
         this.attribute("foo", "string");
@@ -520,9 +490,6 @@ describe("CustomPropertiesTest", () => {
 });
 
 describe("DefineAttributeTest", () => {
-  // `define_attribute` writes the type and the default attribute only
-  // (attributes.rb:231-239); it generates no reader, so these read through
-  // `read_attribute` the way Rails does before `define_attribute_methods` runs.
   it("define_attribute registers a type object directly", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
@@ -577,7 +544,6 @@ describe("DefineAttributeTest", () => {
       }
     }
     expect(Post._defaultAttributes().getAttribute("score")).toBeInstanceOf(UserProvidedDefault);
-    // Ruby `_default_attributes.fetch(name.to_s) { nil }` — no prior attribute.
     expect(Post._defaultAttributes().getAttribute("score").getOriginalAttribute()).toBeNull();
   });
 
@@ -591,8 +557,6 @@ describe("DefineAttributeTest", () => {
     }
     const before = Post._defaultAttributes();
     Post.defineAttribute("score", intType);
-    // attributes.rb:290 assigns into `_default_attributes` itself, so the set
-    // is mutated in place rather than invalidated.
     expect(Post._defaultAttributes()).toBe(before);
     expect(before.getAttribute("score").type.name).toBe("integer");
     expect(Post.typeForAttribute("score").name).toBe("integer");

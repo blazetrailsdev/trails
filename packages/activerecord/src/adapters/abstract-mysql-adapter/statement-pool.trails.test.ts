@@ -1,17 +1,3 @@
-/**
- * Trails-only. Rails ships a statement_pool_test.rb for postgresql/ and
- * sqlite3/ but none for mysql, so every test name below is trails prose, not a
- * Rails name. Subject under test is `Mysql2StatementPool`, our subclass of the
- * port of `AbstractMysqlAdapter::StatementPool`
- * (activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb).
- *
- * The pool is driven through `internal_exec_query` with an explicit `prepare:`
- * because that is the only path Rails prepares on: `prepare:` is decided once in
- * `to_sql_and_binds` (`prepared_statements && preparable`,
- * abstract/database_statements.rb:74) and threaded down, while `execute` takes
- * no binds at all in Ruby (abstract/database_statements.rb:196) and defaults
- * `prepare: false` through `raw_execute` (`:552`).
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
   describeIfMysqlAdapter,
@@ -52,10 +38,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("statement pool max evicts LRU via unprepare", async () => {
-      // Rails' matching test sets statement_limit = 1 and asserts LRU
-      // eviction. The limit is constructor-only (statement_pool.rb:10-13), so
-      // the adapter is built at the limit under test; eviction happens on the
-      // second insert via Mysql2StatementPool#dealloc (conn.unprepare).
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 1 });
       adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
@@ -74,10 +56,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
-        // Rails does not branch on the limit at the call site, and its pool has
-        // no zero-limit case either: `while 0 <= cache.size` runs on the empty
-        // cache and `nil.last` raises (statement_pool.rb:31-33). So a
-        // `statement_limit` of 0 is unsupported rather than a caching switch.
         await expect(
           adapter.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true }),
         ).rejects.toThrow();
@@ -146,9 +124,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("passes a non-boolean preparedStatements config through as Rails does", async () => {
-      // abstract_adapter.rb:159 pipes the config through
-      // `type_cast_config_to_boolean`, which maps the string `"false"` to
-      // `false` and returns everything else UNCHANGED (abstract_adapter.rb:65-71).
       const cast = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         preparedStatements: "false" as unknown as boolean,
@@ -158,8 +133,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       } finally {
         await cast.close();
       }
-      // `0` survives the cast and is truthy in Ruby, so
-      // `prepared_statements?` (abstract_adapter.rb:234-235) answers true.
       const zero = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         preparedStatements: 0 as unknown as boolean,

@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/order_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -86,9 +81,6 @@ describe("OrderTest", () => {
     expect(await incOrder(Author.arelTable.get("name").desc(), { books: { name: "asc" } })).toEqual(
       authorDescThenBookName,
     );
-    // Rails' final arg is the symbol `:name`, which qualifies to `books.name`.
-    // A bare string `"name"` would stay an unqualified SqlLiteral (matching
-    // Rails string semantics) and be ambiguous across the joined tables.
     expect(await incOrder({ authors: { name: "desc" } }, ":name")).toEqual(authorDescThenBookName);
   });
 
@@ -105,9 +97,6 @@ describe("OrderTest", () => {
       authorThenBookName,
     );
     expect(await incOrder("author.name", { books: { name: "asc" } })).toEqual(authorThenBookName);
-    // Trailing `":name"` mirrors Rails' `:name` symbol (qualifies to
-    // `books.name`); a bare `"name"` string stays an unqualified SqlLiteral and
-    // would be ambiguous across the joined tables.
     expect(await incOrder({ author: { name: "asc" } }, ":name")).toEqual(authorThenBookName);
     expect(await incOrder(authorName, ":name")).toEqual(authorThenBookName);
 

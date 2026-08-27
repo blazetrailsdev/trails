@@ -4,17 +4,9 @@ import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
 
-// Rails: Arel::Nodes::Function includes WindowPredications and
-// FilterPredications. Runtime mixin wiring lives in ../index.ts.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
-  // Rails seats whatever the caller passed: `NamedFunction.new("generate_series",
-  // [4, 2])` (test/cases/arel/visitors/to_sql_test.rb:865) puts bare Integers
-  // here, and `visit_Integer` (to_sql.rb:824-826) renders them. The slot is
-  // `NodeOrValue`, not `Node`, for the same reason Math's operands are.
   expressions: NodeOrValue[];
-  // Rails' `count(nil)` stores nil (expressions.rb:5-7), which `must_be_nil`
-  // asserts on (attribute_test.rb:377-381), so nil is part of the domain.
   distinct: boolean | null;
   private _alias: Node | null;
 
@@ -38,7 +30,6 @@ export class Function extends NodeExpression {
     return this;
   }
 
-  // Mirrors Arel::Nodes::Function#hash / #eql? / #== (function.rb:21-32).
   hash(): number {
     return rbHash([this.expressions, this.alias, this.distinct]);
   }
@@ -54,11 +45,6 @@ export class Function extends NodeExpression {
   }
 }
 
-/**
- * Exists — EXISTS(subquery) node.
- *
- * Mirrors: Arel::Nodes::Exists (extends Function in Rails)
- */
 export class Exists extends Function {
   constructor(expression: Node, aliasNode: Node | null = null) {
     super([expression], aliasNode);

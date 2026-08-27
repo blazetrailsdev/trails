@@ -1,29 +1,3 @@
-/**
- * Opt-in DDL timing profiler — DORMANT unless `DDL_PROFILE=1`.
- *
- * Measures how often the test suite issues DDL (CREATE/DROP TABLE, indexes,
- * ALTER, TRUNCATE) and how much wall-clock time it costs, broken down by op
- * type, table, and test file. Entirely gated behind `DDL_PROFILE=1` — when the
- * flag is off, `install()` is a no-op and there is zero cost on any code path.
- * Not wired into CI; opt in for an ad-hoc measurement run, e.g.:
- *
- *   DDL_PROFILE=1 DDL_PROFILE_OUT_DIR=/tmp/ddlprof ARCONN=postgresql \
- *     ARCONN=postgresql pnpm vitest run packages/activerecord/src/<file>
- *   node scripts/ddl-profile-aggregate.mjs /tmp/ddlprof
- *
- * See PR #3904 / the `ddl-timing-profile` audit for the methodology + findings.
- *
- * How it works: on install we monkey-patch the two leaf write/DDL primitives
- * (`execute`, `executeMutation`) on each adapter prototype, classify the SQL by
- * leading keyword, time the call with `performance.now()`, and append a record.
- * (`executeBatch` is intentionally NOT patched — it re-dispatches through these
- * two, so wrapping it would double-count.) The setup file flushes a JSON
- * summary per worker from an `afterAll` hook, since vitest kills forked workers
- * before `process.on("exit")` handlers run (those remain as a backstop).
- *
- * This is deliberately isolated in one file with no production imports so it
- * can be deleted wholesale. See the audit report for findings.
- */
 import { getFs } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 
@@ -43,7 +17,6 @@ export interface DdlRecord {
   adapter: string;
   file: string;
   ms: number;
-  /** First 120 chars of the statement, for spot-checking classification. */
   sql?: string;
 }
 
@@ -92,10 +65,6 @@ function currentFile(): string {
   return normalize(fromExpect) ?? activeFile ?? process.env.DDL_PROFILE_FILE ?? "(unknown)";
 }
 
-/**
- * Classify a SQL string as a DDL op, or return null for non-DDL (reads, normal
- * INSERT/UPDATE/DELETE). Table-name extraction is best-effort.
- */
 export function classifyDdl(sqlRaw: string): { op: DdlOp; table: string | null } | null {
   const sql = sqlRaw.trimStart();
   const head = sql.slice(0, 16).toUpperCase();
@@ -148,15 +117,6 @@ export function recordDdl(rec: DdlRecord): void {
   }
 }
 
-/**
- * Classify every DDL statement in a SQL string. A single call can carry several
- * statements: MariaDB's `executeBatch` runs `combineMultiStatements`, joining a
- * batch into ONE `;`-separated string passed to `execute`, and PG's
- * referential-integrity wrapper sends a combined `ALTER TABLE … DISABLE/ENABLE
- * TRIGGER ALL` over every table. Splitting here counts each statement
- * individually so MariaDB's batched DDL is comparable to PG's per-statement
- * dispatch (best-effort split on `;` — batch DDL has no `;` inside literals).
- */
 export function classifyStatements(sql: string): { op: DdlOp; table: string | null }[] {
   if (!sql.includes(";")) {
     const c = classifyDdl(sql);
@@ -171,7 +131,6 @@ export function classifyStatements(sql: string): { op: DdlOp; table: string | nu
   return out;
 }
 
-/** Wrap one adapter primitive so DDL calls are timed and recorded. */
 function wrap(proto: Record<string, unknown>, method: string, sqlArgIndex: number): void {
   const orig = proto[method] as ((...args: unknown[]) => Promise<unknown>) | undefined;
   if (typeof orig !== "function") return;
@@ -207,10 +166,6 @@ function wrap(proto: Record<string, unknown>, method: string, sqlArgIndex: numbe
 
 let installed = false;
 
-/**
- * Patch the DDL/write primitives on every adapter prototype. Idempotent and a
- * no-op unless DDL_PROFILE=1. Safe to call from a vitest setup file.
- */
 export async function install(): Promise<void> {
   if (!ddlProfileEnabled() || installed) return;
   installed = true;
@@ -234,7 +189,6 @@ export async function install(): Promise<void> {
   process.on("beforeExit", dumpSummary);
 }
 
-/** Flush the accumulated summary to disk. Safe to call multiple times. */
 export function flush(): void {
   dumpSummary();
 }

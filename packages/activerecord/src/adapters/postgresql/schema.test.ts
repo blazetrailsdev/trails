@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
@@ -19,10 +16,6 @@ beforeAll(() => {
 afterAll(() => {
   vi.unstubAllEnvs();
 });
-
-// Tables here are PG-schema-qualified (test_schema.things, music.songs, …),
-// which createTable's typed builder can't express — they're provisioned via
-// raw DDL in setupSchemas (mirroring Rails' `@connection.create_table`).
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -122,21 +115,6 @@ fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  // Several describes here mutate the connection's search_path (SchemaTest,
-  // DefaultsUsingMultipleSchemasAndDomainTest, SchemaWithDotsTest) and point it
-  // at schemas they later drop in teardown. Because the PG connection is shared
-  // per worker, a leaked search_path pointing at a dropped schema makes any
-  // later unqualified `CREATE TABLE` fail with "no schema has been selected to
-  // create in" — both for sibling describes in this file and for sibling
-  // adapter-test files in the same worker; a stale schema_cache would likewise
-  // leak across tests.
-  //
-  // Rails wraps every search_path change in `PGSchemaHelper#with_schema_search_path`
-  // (schema_test.rb), whose `ensure` restores `"'$user', public"` AND clears the
-  // schema_cache. The port flattens that block helper into inline
-  // `setSchemaSearchPath` calls, so we recover the same two `ensure` operations
-  // here as a suite-level teardown: capture the default once, then after every
-  // test restore it and clear the schema cache.
   let defaultSearchPath: string;
   beforeAll(async () => {
     defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
@@ -276,9 +254,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raise wrapped exception on bad prepare", async () => {
-      // Rails: PG adapter rejects `?` (MySQL placeholder) → StatementInvalid.
-      // Our adapter rewrites `?` → `$1`, so we ensure the error by querying a table
-      // that can never exist in the test schema.
       await expect(
         adapter.execQuery(
           "select * from _schema_test_nonexistent_table_xyz where id = ?",
@@ -288,14 +263,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toBeInstanceOf(StatementInvalid);
     });
     it("schema change with prepared stmt", async () => {
-      // Rails gates this test on `if connection.prepared_statements`. Our adapter
-      // defaults preparedStatements to true with no test-helper path to disable
-      // it, but assert it explicitly so the cached-plan retry path is actually
-      // exercised rather than trivially passing if it were ever turned off.
       expect(adapter.preparedStatements).toBe(true);
-      // Rails uses the fixture-isolated `developers` table; our PG adapter files
-      // share one database per worker, so we use a uniquely-named table to avoid
-      // racing the canonical `developers` table other files create.
       const tbl = "schema_prepared_stmt_devs";
       await adapter.exec(`DROP TABLE IF EXISTS ${tbl}`);
       await adapter.exec(`CREATE TABLE ${tbl} (id serial primary key, name varchar(255))`);
@@ -416,9 +384,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await (Thing4 as any).count()).toBe(1);
     });
     it("raise on unquoted schema name", async () => {
-      // $user without surrounding single quotes is invalid in SET search_path TO (PG
-      // treats $user as a dollar-quoted string start with no closing tag → syntax error).
-      // Rails schema_search_path= uses direct interpolation, so this raises StatementInvalid.
       await expect(adapter.setSchemaSearchPath("$user,public")).rejects.toBeInstanceOf(
         StatementInvalid,
       );
@@ -476,9 +441,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("indexes report their validity", async () => {
-      // Rails selects d.indisvalid and threads it into IndexDefinition#valid.
-      // Normally-built indexes are valid; SchemaCache uses this flag to skip
-      // invalid ones for uniqueness validation.
       await adapter.setSchemaSearchPath(SCHEMA_NAME);
       const indexes = await adapter.indexes(TABLE_NAME);
       expect(indexes.length).toBeGreaterThan(0);
@@ -662,20 +624,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("dumping schemas", async () => {
-      // Rails passes `/./` as the ignore filter (dump_all_table_schema(/./)),
-      // which matches every table name, so the dump emits only the createSchema
-      // lines and skips all per-table introspection. dumpAllTableSchema routes
-      // through SchemaDumper.dump(adapter), which dispatches to the PG dumper so
-      // the schemas() override still runs.
       const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/./]);
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);
-      // Timeout raised above vitest's 5s default: even with the /./ filter above
-      // skipping per-table introspection, this case has repeatedly crossed 5s under
-      // parallel-fork contention and passed on rerun. Rails' test_dumping_schemas
-      // (schema_test.rb:530) is plain minitest with no per-test budget, so the 5s
-      // ceiling is a harness artifact, not behavior we are meant to hold to.
     }, 30_000);
   });
 
@@ -700,9 +652,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         const lines: string[] = [];
         await adapter.createSchemaDumper().foreignKeys("wagons", lines);
         const output = lines.join("\n");
-        // Default FK name is the Rails fk_rails_<10-hex> hash, which matches the
-        // schema-dumper ignore pattern, so the name is omitted from the dump;
-        // match just the table arguments, allowing optional trailing options.
         expect(output).toMatch(/addForeignKey\("wagons", "my_schema\.trains"/);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS wagons`);
@@ -822,12 +771,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     const DOMAIN_SCHEMA = "schema_1";
     let oldSearchPath: string;
 
-    // Rails sets the search path to `schema_1, pg_catalog` BEFORE creating
-    // `defaults` and restores it in teardown, so the domain-typed table only
-    // ever lives in `schema_1` and is dropped with the schema (drop_schema is
-    // CASCADE). `public` must stay off the path and the table must never be
-    // dropped by name: `public.defaults` is the boot-laid
-    // postgresql_specific_schema.rb table on the shared per-worker DB.
     beforeEach(async () => {
       await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
       await adapter.createSchema(DOMAIN_SCHEMA);
@@ -837,9 +780,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE DOMAIN ${DOMAIN_SCHEMA}.bpchar AS bpchar`);
       oldSearchPath = await adapter.schemaSearchPath();
       await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA}, pg_catalog`);
-      // Torn down by the afterEach `dropSchema` (DROP SCHEMA … CASCADE), which
-      // is how Rails disposes of it — dropping it by name would hit the
-      // boot-laid `public.defaults` instead.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await adapter.exec(`
         CREATE TABLE defaults (
@@ -873,8 +813,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("defaults");
       const decimalCol = cols.find((c) => c.name === "decimal_col");
       expect(decimalCol).toBeDefined();
-      // column.default holds the raw default literal (Rails' extract_value_from_default);
-      // deserialization is deferred to Attribute.from_database.
       expect(decimalCol!.default).toMatch(/3\.14159265358979323846/);
     });
 
@@ -895,10 +833,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("defaults");
       const textCol = cols.find((c) => c.name === "text_col");
       expect(textCol).toBeDefined();
-      // Domain-typed defaults come back from PG as a double-cast expression
-      // (`('some text'::text)::schema.type`). Rails' extract_value_from_default
-      // strips simple casts but leaves compound domain casts in default_function.
-      // Either slot is acceptable as long as the literal is preserved.
       const slot = textCol!.default ?? textCol!.defaultFunction ?? "";
       expect(String(slot)).toMatch(/some text/);
     });
@@ -947,9 +881,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         const welcome = await (Article as any).last();
         expect(welcome.title).toBe("zOMG, welcome to my blorgh!");
       } finally {
-        // Not the canonical `articles`: the search path set at the top of this
-        // test puts both the createTable above and this drop in "my.schema", so
-        // public.articles is never touched and needs no canonical rebuild.
         // eslint-disable-next-line blazetrails/require-canonical-rebuild
         await adapter.dropTable("articles", { ifExists: true });
       }
@@ -1033,9 +964,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaCreateTableOptionsTest", () => {
-    // Mirrors Rails schema_test.rb SchemaCreateTableOptionsTest:
-    // exercises the createTable → DDL → dump round-trip via the
-    // `options:` table-option string.
     afterEach(async () => {
       await adapter.dropTable("trains", "transportation_modes", "vehicles", { ifExists: true });
     });

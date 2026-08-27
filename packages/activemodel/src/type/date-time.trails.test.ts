@@ -3,10 +3,6 @@ import { Temporal } from "@blazetrails/date";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types, ValueType } from "../index.js";
 
-// Fallback-parser coverage for shapes `Date._parse` accepts that no Rails test
-// exercises directly. Rails reaches them through `Date._parse` in
-// `fallback_string_to_time` (date_time.rb:67-76); trails reaches them through
-// the `parseTimeHash` stand-in.
 describe("DateTimeType fallback string parsing", () => {
   const type = new Types.DateTimeType();
   const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
@@ -65,9 +61,6 @@ describe("DateTimeType fallback zone and ordering coverage", () => {
   });
 });
 
-// Date._parse reports a zone only alongside a time; a date-only string keeps
-// its trailing token out of the hash and is read in the default zone. Each
-// expectation below was checked against Ruby's Date._parse.
 describe("DateTimeType date-only strings with a zone token", () => {
   const type = new Types.DateTimeType();
   const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
@@ -109,8 +102,6 @@ describe("DateTimeType offsets sourced from Date._parse", () => {
 
 describe("DateTimeType#serializeCastValue", () => {
   it("applies the column precision to the cast Instant", () => {
-    // The concrete value date_time_test.rb:40-45 only compares against
-    // `serialize`, pinned here so a change of precision handling is visible.
     const type = new Types.DateTimeType({ precision: 1 });
     const value = type.cast("1999-12-31 12:34:56.789 -1000");
     expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
@@ -119,11 +110,6 @@ describe("DateTimeType#serializeCastValue", () => {
   });
 });
 
-// AcceptsMultiparameterTime::InstanceMethods#assert_valid_value
-// (activemodel/lib/active_model/type/helpers/accepts_multiparameter_time.rb:24-30)
-// sends a non-Hash value on to `super`. `ActiveModel::Type::Value#assert_valid_value`
-// is a no-op, so the arm is only observable once an ancestor supplies a real one —
-// which ActiveRecord's Type::Serialized and the enum/PG OID types do.
 describe("DateTimeType assert_valid_value", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -148,10 +134,6 @@ describe("DateTimeType assert_valid_value", () => {
   });
 });
 
-// `serialize_cast_value` comes from Helpers::TimeValue, included AFTER
-// AcceptsMultiparameterTime (date_time.rb:44-47), so it sits nearer the class
-// than the mixin's `serialize` and the predicate
-// (serialize_cast_value.rb:9-12) is true.
 describe("DateTimeType serialize_cast_value_compatible?", () => {
   it("is compatible", () => {
     const type = new Types.DateTimeType();
@@ -159,11 +141,6 @@ describe("DateTimeType serialize_cast_value_compatible?", () => {
   });
 });
 
-// `type_cast_for_schema` comes from Helpers::TimeValue (time_value.rb:36-38) —
-// `value.to_fs(:db).inspect` — where without the mixin the class would inherit
-// `Type::Value`'s `value.inspect` (value.rb:71-73). Verified against MRI:
-// `ActiveModel::Type::DateTime.new.type_cast_for_schema(cast)` answers
-// `"2000-01-01 00:00:00"` (quoted).
 describe("DateTimeType type_cast_for_schema", () => {
   it("answers the to_fs(:db) form, quoted", () => {
     const type = new Types.DateTimeType();
@@ -195,8 +172,6 @@ describe("DateTimeType type_cast_for_schema", () => {
   });
 });
 
-// TS-only coverage moved out of the mirrored `type/date-time.test.ts` so every
-// `it(...)` there is a Rails test name `parity:test` matches on.
 describe("DateTimeType cast and serialize coverage", () => {
   const type = new Types.DateTimeType();
 

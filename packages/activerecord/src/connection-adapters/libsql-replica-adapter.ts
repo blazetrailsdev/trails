@@ -1,53 +1,14 @@
-/**
- * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver
- * (`gem "sqlite3"`, sqlite3_adapter.rb:14), so Rails declares a single
- * `SQLite3Adapter` (sqlite3_adapter.rb:30) and has no class to map a
- * per-driver subclass onto. The JS ecosystem has several interchangeable
- * clients, so trails keeps the sqlite3_adapter.rb port on the shared base and
- * binds each client in its own thin subclass — every name this file declares
- * belongs to that one binding, and none has anything to converge onto.
- */
+/** @noRailsEquivalent PERMANENT */
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { ConfigurationError } from "../errors.js";
 import { libsqlReplicaDriver, type SyncableSqliteConnection } from "../sqlite/libsql.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
-/**
- * SQLite adapter backed by the `libsql` client in **embedded-replica** mode:
- * a local file kept in sync with a remote Turso primary. Reads are served from
- * the local replica; writes are forwarded to the primary and reflected back on
- * the next {@link syncReplica}.
- *
- * The replica is opened with `new Database(localPath, { syncUrl, authToken })`
- * — pass `syncUrl` (and `authToken`) as a top-level key in a database.yml
- * config (lifted into `driverOptions` by `buildAdapterArg`) or directly as
- * `driverOptions: { syncUrl, authToken }`. The local replica path is the
- * adapter's `database`/filename argument.
- *
- * Construction is network-backed (initial sync), so it goes through the
- * async-open path (`SQLite3Adapter.openAsync()`). All SQLite dialect,
- * quoting, and schema logic lives in the abstract base; this subclass binds the
- * replica driver and adds the caller-driven {@link syncReplica} trigger.
- *
- * Periodic auto-sync is opt-in: pass a positive `syncPeriod` (seconds) in
- * `driverOptions` to enable libsql's native background sync loop, which keeps
- * the replica fresh with no explicit {@link syncReplica} call. It is off by
- * default — without it the replica is caller-driven only — and the loop lives
- * in the libsql handle, so it stops on `disconnect`/`close`; there is no
- * adapter-owned JS timer to clear.
- */
 export class LibSQLReplicaAdapter extends SQLite3Adapter {
   protected override defaultSqliteDriver(): SqliteDriver {
     return libsqlReplicaDriver;
   }
 
-  /**
-   * Pull the latest changes from the remote primary into the local replica.
-   * Caller-driven — there is no background sync. Reaches the libsql connection's
-   * `sync()` escape hatch (not part of the core `SqliteConnection` interface).
-   * Covered by the file-level `@noRailsEquivalent` above: Rails' only SQLite
-   * class is bound to the sqlite3 gem, which has no embedded-replica mode.
-   */
   async syncReplica(): Promise<void> {
     const conn = (await this.sqliteConnection()) as Partial<SyncableSqliteConnection>;
     if (typeof conn.sync !== "function") {

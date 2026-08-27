@@ -159,10 +159,6 @@ describe("AttributeMutationTracker", () => {
   });
 });
 
-/**
- * The shape Rails hands `ForcedMutationTracker` — a `_read_attribute`
- * answerer (dirty.rb:385), not an `AttributeSet`.
- */
 function buildHost(set: AttributeSet) {
   return { _readAttribute: (name: string) => set.fetchValue(name) };
 }

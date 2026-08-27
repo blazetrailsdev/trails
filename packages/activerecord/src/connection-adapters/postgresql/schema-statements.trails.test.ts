@@ -1,16 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
- * (schema-statements subset: recreateDatabase, dropTable, indexNameExists,
- * currentDatabase, encoding, collation, ctype, schemaSearchPath,
- * clientMinMessages, tableOptions, tableComment, tablePartitionDefinition,
- * inheritedTableNames, defaultSequenceName, serialSequence, setPkSequenceBang,
- * resetPkSequenceBang, pkAndSequenceFor, primaryKeys,
- * addColumn, renameColumn, changeColumnDefault, changeColumnNull,
- * changeColumnComment, changeTableComment, typeToSql,
- * sequenceNameFromParts, assertValidDeferrable, extractForeignKeyAction,
- * extractConstraintDeferrable, dataSourceSql, quotedScope,
- * referenceNameForTable, columnNamesFromColumnNumbers)
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
@@ -383,9 +370,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("change column default with a bare object treats it as a literal default", async () => {
-      // Rails' extract_new_default_value only unwraps a Hash carrying BOTH
-      // :from and :to; a bare `{ to: ... }` without :from is the literal
-      // default, not a changes hash (schema_statements.rb:1820).
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "config", "json");
       await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "config", { to: 1 });
       const rows = await adapter.internalExecQuery(

@@ -3,8 +3,6 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/date";
 import { DecimalType as Decimal } from "./decimal.js";
 
-// DecimalType#cast returns a BigDecimal (Rails: cast_value -> BigDecimal), so
-// decimal binds quote in fixed "F" form rather than as a 'string' literal.
 const bd = (value: string) => new BigDecimal(value);
 
 describe("DecimalTest", () => {
@@ -12,7 +10,6 @@ describe("DecimalTest", () => {
     const type = new Decimal();
     expect(type.cast(bd("0"))).toEqual(bd("0"));
     expect(type.cast(123.0)).toEqual(bd("123"));
-    // Rails casts the Symbol `:"1"`; a Ruby Symbol is a JS string in trails.
     expect(type.cast("1")).toEqual(bd("1"));
   });
 
@@ -25,7 +22,6 @@ describe("DecimalTest", () => {
   });
 
   it("type cast decimal from float with large precision", () => {
-    // Rails: `::Float::DIG + 2` — 17 on IEEE-754 doubles.
     const type = new Decimal({ precision: 17 });
     expect(type.cast(123.0)).toEqual(bd("123.0"));
   });
@@ -72,7 +68,6 @@ describe("DecimalTest", () => {
     expect(type.isChanged(5.0, 5.0, "5.0")).toBeFalsy();
     expect(type.isChanged(-5.0, -5.0, "-5.0")).toBeFalsy();
     expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBeFalsy();
-    // Rails passes `BigDecimal("0.0") / 0`; trails' NaN decimal is the "NaN" sentinel.
     expect(type.isChanged("NaN", "NaN", "NaN")).toBeFalsy();
     expect(type.isChanged("NaN", NaN, NaN)).toBeTruthy();
   });

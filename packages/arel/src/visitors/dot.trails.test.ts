@@ -13,15 +13,6 @@ import {
 } from "../index.js";
 import { Node as DotNode } from "./dot.js";
 
-/**
- * Coverage with no counterpart in `visitors/dot_test.rb`, which builds every
- * statement node bare. These drive the same visitors from manager-built ASTs,
- * where the edges carry real children rather than nils.
- */
-/**
- * Drive Dot#visit on a bare value (rather than an AST root) and render the
- * graph, so dispatch for non-Node values can be asserted directly.
- */
 function visitStandalone(value: unknown): string {
   const v = new Visitors.Dot();
   v.compile(new Nodes.SqlLiteral(""));
@@ -138,9 +129,6 @@ describe("TestDot", () => {
     });
 
     it("null/undefined values render as empty side-fields (Rails nil.to_s parity)", () => {
-      // Rails dot.rb's quote(field) does field.to_s; nil.to_s is "" — NOT
-      // "nil" (which would be inspect). Trails matches that exactly so
-      // dot output round-trips against Rails fixtures.
       const v = new Visitors.Dot();
       type Internals = {
         visit(o: unknown): void;
@@ -155,10 +143,6 @@ describe("TestDot", () => {
     });
 
     it("primitive leaf visitors stash their value as a side-field (visit_String aliases)", () => {
-      // Rails aliases visit_Time/Date/DateTime/Integer/Float/NilClass/
-      // True/False to visit_String (dot.rb:199-208), which pushes the value
-      // onto the current node's fields. Each TS alias delegates to
-      // visitString; drive them under a node and confirm the field lands.
       const v = new Visitors.Dot();
       type Internals = {
         visitInteger(o: unknown): void;
@@ -183,13 +167,10 @@ describe("TestDot", () => {
         iv.visitSymbol("sym");
       });
       const out = iv.toDot();
-      // Fields appended in order; null renders as "" (Rails nil.to_s).
-      // BigDecimal/Symbol also alias visit_String, so they stash too.
       expect(out).toContain("<f0>Integer|<f1>42|<f2>true|<f3>|<f4>9.99|<f5>sym");
     });
 
     it("visit_Set is aliased to visit_Array (each member becomes an indexed child)", () => {
-      // Rails: `alias :visit_Set :visit_Array` (dot.rb:231).
       const v = new Visitors.Dot();
       type Internals = {
         visitSet(o: ReadonlySet<unknown>): void;
@@ -209,9 +190,6 @@ describe("TestDot", () => {
     });
 
     it("raises TypeError on a class with no visitable ancestor (visitor.rb:39)", () => {
-      // Rails' Visitor#visit walks object.class.ancestors and raises
-      // `TypeError, "Cannot visit #{object.class}"` when none answers. Trails
-      // used to render such a value as a visitString leaf instead.
       class Money {
         toString(): string {
           return "$5";
@@ -226,11 +204,6 @@ describe("TestDot", () => {
     });
 
     it("a mis-registered dispatch method falls through to an ancestor's handler", () => {
-      // Mirrors `respond_to?(dispatch[klass], true)` (visitor.rb:36-37): a class
-      // whose own dispatch entry names a missing method does not raise — it
-      // falls through to an ancestor's working handler. Weird extends Unary, so
-      // a typo'd Weird entry resolves upward to `visitArelNodesUnary` and the
-      // node is visited instead of reported as an unvisitable value.
       class Weird extends Nodes.Unary {}
       const v = new Visitors.Dot();
       (v as unknown as { dispatch: Map<unknown, string> }).dispatch.set(Weird, "visitTypoed");
@@ -240,8 +213,6 @@ describe("TestDot", () => {
     });
 
     it("Temporal values reach visit_Date / visit_Time instead of raising", () => {
-      // Temporal is this codebase's Time/Date analogue, so these have a
-      // visitable Rails ancestor and must not hit the TypeError arm.
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void; toDot(): string };
       const iv = v as unknown as Internals;
@@ -256,10 +227,6 @@ describe("TestDot", () => {
     });
 
     it("Temporal types with no Ruby analogue raise rather than becoming Time leaves", () => {
-      // Duration / PlainYearMonth / PlainMonthDay have no visitable Rails
-      // ancestor — dot.rb defines no visitor for ActiveSupport::Duration
-      // (a plain Object subclass, not a Numeric), so Rails raises at
-      // visitor.rb:39. Only the Date/DateTime/Time analogues are whitelisted.
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void };
       const iv = v as unknown as Internals;
@@ -270,10 +237,6 @@ describe("TestDot", () => {
     });
 
     it("visitEdge throws on a typo'd field (Rails NoMethodError parity)", () => {
-      // Regression: Rails' visit_edge uses public_send which raises
-      // NoMethodError on a typo; the TS port silently treated missing
-      // properties as undefined, emitting a NilClass leaf and hiding the
-      // visitor bug. Now mirrors Rails by failing loudly.
       const v = new Visitors.Dot();
       v.compile(new Nodes.SqlLiteral("seed"));
       type Internals = { visitEdge(o: object, method: string): void };
@@ -311,8 +274,6 @@ describe("TestDot", () => {
     });
 
     it("repeated equal scalar primitives dedupe onto one DotNode (Rails singleton parity)", () => {
-      // Rails' true/false/Integers are singletons with stable object_id, so
-      // two visits of `true` reuse one node. Strings still distinct.
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void; toDot(): string };
       v.compile(new Nodes.SqlLiteral("seed"));
@@ -328,10 +289,6 @@ describe("TestDot", () => {
     });
 
     it("two Tables sharing a name don't collapse into one node (primitive seen-map fix)", () => {
-      // Regression: seen.set(object, node) keyed primitives by value, so
-      // two distinct Tables with the same name `"users"` were aliased to
-      // a single shared `<f0>String|<f1>users` node. Rails uses
-      // object_id which preserves per-instance identity for heap objects.
       const a = new Table("users");
       const b = new Table("users");
       const v = new Visitors.Dot();
@@ -380,9 +337,6 @@ describe("TestDot", () => {
     });
 
     it("a non-Attribute object with valueBeforeTypeCast is not visited as an Attribute", () => {
-      // Rails reaches visit_ActiveModel_Attribute (dot.rb:216) by class
-      // dispatch, so a duck-typed value is a plain Hash there and routes to
-      // visit_Hash (dot.rb:220).
       const out = dot.compile(new Nodes.BindParam({ valueBeforeTypeCast: 42 }));
       expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
       expect(out).toContain('[label="pair_0"]');
@@ -390,10 +344,6 @@ describe("TestDot", () => {
     });
 
     it("visitHash preserves both key and value (Rails parity)", () => {
-      // Mirrors Rails dot.rb:227 — visit_Hash emits one edge per entry
-      // labeled "pair_<i>" pointing at an Array node, which itself emits
-      // index-labeled edges for the [key, value] tuple. Both halves of
-      // the entry must end up in the graph.
       const out = visitStandalone({ alpha: "A", beta: "B" });
       expect(out).toContain('[label="pair_0"]');
       expect(out).toContain('[label="pair_1"]');
@@ -404,26 +354,18 @@ describe("TestDot", () => {
     });
 
     it("names a hash node Hash, not the JS ctor name", () => {
-      // Rails' Dot#visit labels the node `o.class.name` (dot.rb:253), which
-      // is "Hash" for a plain hash. JS's ctor name for an object literal is
-      // "Object" — the label follows Rails.
       const out = visitStandalone({ alpha: "A" });
       expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
       expect(out).not.toContain("<f0>Object");
     });
 
     it("a record derived from a plain object routes to visit_Hash", () => {
-      // Rails' Visitor#visit walks object.class.ancestors (visitor.rb:36-41),
-      // so a Hash subclass reaches visit_Hash. Object.create over a plain
-      // prototype is the JS form of deriving a record from another record.
       const derived: Record<string, unknown> = Object.create({ inherited: "nope" });
       derived.alpha = "A";
       const out = visitStandalone(derived);
       expect(out).toContain('[label="pair_0"]');
       expect(out).toContain("alpha");
       expect(out).toContain("A");
-      // Object.entries ignores prototype-chain keys, so the inherited pair
-      // is not an edge — mirroring the own-pairs Rails' each would yield.
       expect(out).not.toContain("inherited");
     });
 
@@ -449,9 +391,6 @@ describe("TestDot", () => {
     });
 
     it("a record inheriting valueBeforeTypeCast is a Hash, not an attribute", () => {
-      // The attribute arm is a class check (`instanceof ModelAttribute`), so
-      // it cannot swallow a record that merely carries the property — in
-      // Ruby such a value is a Hash and routes to visit_Hash (dot.rb:220).
       const derived: Record<string, unknown> = Object.create({ valueBeforeTypeCast: 42 });
       derived.alpha = "A";
       const out = visitStandalone(derived);
@@ -462,10 +401,6 @@ describe("TestDot", () => {
     });
 
     it("a record inheriting a literal constructor key is a Hash", () => {
-      // Dispatch is by ancestry in Ruby (visitor.rb:36-41), so a Hash with a
-      // `:constructor` key still reaches visit_Hash (dot.rb:220) — the key's
-      // *name* is irrelevant. Here the prototype's `constructor` is an
-      // enumerable data key, not the non-enumerable one a `class` installs.
       const derived: Record<string, unknown> = Object.create({ constructor: "x" });
       derived.alpha = "A";
       const out = visitStandalone(derived);
@@ -484,14 +419,10 @@ describe("TestDot", () => {
         writable: true,
         configurable: true,
       });
-      // Not a Hash, so it falls to the unknown-class leaf arm (visitor.rb:39).
       expect(() => visitStandalone(new Config())).toThrow(/Cannot visit Config/);
     });
 
     it("a Set emits index-labeled edges like an Array", () => {
-      // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). A Set is not a
-      // Hash (its prototype's ctor is Set), so without a dedicated arm it
-      // would fall to the leaf and stringify instead of walking members.
       const out = visitStandalone(new Set(["A", "B"]));
       expect(out).toMatch(/\d+ \[label="<f0>Set"\];/);
       expect(out).toContain('[label="0"]');
@@ -501,11 +432,6 @@ describe("TestDot", () => {
     });
 
     it("a class instance is not a Hash and keeps its own class name", () => {
-      // Ruby's `class Config < Object` finds no visit_Object ancestor and so
-      // never reaches visit_Hash; the JS analogue is any class instance,
-      // whose prototype's constructor is the class rather than Object.
-      // Finding no handler is exactly visitor.rb:39, so it raises rather than
-      // rendering — the class name survives in the message.
       class Config {
         alpha = "A";
       }

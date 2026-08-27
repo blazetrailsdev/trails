@@ -1,11 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/postgresql_rake_test.rb.
- *
- * Despite the file name nothing here drives Rake: every test calls
- * `ActiveRecord::Tasks::DatabaseTasks` directly, against
- * `PostgreSQLDatabaseTasks`, so the tests port straight across wherever the
- * Ruby stubbing they lean on has an analogue.
- */
 import { it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 import {
   getFs,
@@ -25,13 +17,6 @@ import { ARUNIT_DATABASE } from "../../support/config.js";
 import { DatabaseAlreadyExists } from "../../errors.js";
 import { Base } from "../../base.js";
 
-/**
- * `with_stubbed_connection` (`postgresql_rake_test.rb:272-274`), which is
- * `ActiveRecord::Base.stub(:lease_connection, @connection, &block)`. trails'
- * task classes reach the connection through
- * `Base.connectionPool().leaseConnection()`
- * (`postgresql-database-tasks.ts:179`), so the pool is where the double goes.
- */
 async function withStubbedConnection(
   connection: unknown,
   block: () => Promise<void>,
@@ -46,11 +31,6 @@ async function withStubbedConnection(
   }
 }
 
-/**
- * `with_stubbed_connection_establish_connection` (`postgresql_rake_test.rb:127-131`),
- * which nests `Base.stub(:establish_connection, nil)` inside the
- * `lease_connection` stub.
- */
 async function withStubbedConnectionEstablishConnection(
   connection: unknown,
   block: () => Promise<void>,
@@ -72,7 +52,6 @@ function configuration(): HashConfig {
   });
 }
 
-/** The hash `public_schema_config` builds (`postgresql_database_tasks.rb:96-98`). */
 function publicSchemaConfig(): Record<string, unknown> {
   return {
     adapter: "postgresql",
@@ -81,11 +60,6 @@ function publicSchemaConfig(): Record<string, unknown> {
   };
 }
 
-/**
- * Ruby swaps `$stdout`/`$stderr` for a `StringIO` in setup and reads `.string`;
- * trails writes the banners through the activesupport `stdout`/`stderr` shims
- * (`database-tasks.ts:235-243`), so the capture goes there.
- */
 function captureStdio(): { out: string[]; err: string[] } {
   const out: string[] = [];
   const err: string[] = [];
@@ -122,8 +96,6 @@ describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
       await DatabaseTasks.create(dbConfig);
     });
 
-    // The two `mock.expect` argument pins plus `assert_mock`
-    // (`postgresql_rake_test.rb:26-34`).
     expect(establishConnection).toHaveBeenNthCalledWith(1, publicSchemaConfig());
     expect(establishConnection).toHaveBeenNthCalledWith(2, dbConfig);
     expect(establishConnection).toHaveBeenCalledTimes(2);
@@ -188,8 +160,6 @@ describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
       await DatabaseTasks.create(dbConfig);
     });
 
-    // The two `mock.expect` argument pins plus `assert_mock`
-    // (`postgresql_rake_test.rb:26-34`).
     expect(establishConnection).toHaveBeenNthCalledWith(1, publicSchemaConfig());
     expect(establishConnection).toHaveBeenNthCalledWith(2, dbConfig);
     expect(establishConnection).toHaveBeenCalledTimes(2);
@@ -279,8 +249,6 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
       createDatabase: vi.fn(async () => {}),
       dropDatabase: vi.fn(async () => {}),
     };
-    // `ActiveRecord::Base.stub(:establish_connection, nil)`
-    // (`postgresql_rake_test.rb:236`).
     vi.spyOn(Base, "establishConnection").mockResolvedValue(
       undefined as unknown as Awaited<ReturnType<typeof Base.establishConnection>>,
     );
@@ -312,8 +280,6 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
       await DatabaseTasks.purge(dbConfig);
     });
 
-    // The two `mock.expect` argument pins plus `assert_mock`
-    // (`postgresql_rake_test.rb:26-34`).
     expect(establishConnection).toHaveBeenNthCalledWith(1, publicSchemaConfig());
     expect(establishConnection).toHaveBeenNthCalledWith(2, dbConfig);
     expect(establishConnection).toHaveBeenCalledTimes(2);
@@ -347,8 +313,6 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
       await DatabaseTasks.purge(dbConfig);
     });
 
-    // The two `mock.expect` argument pins plus `assert_mock`
-    // (`postgresql_rake_test.rb:26-34`).
     expect(establishConnection).toHaveBeenNthCalledWith(1, publicSchemaConfig());
     expect(establishConnection).toHaveBeenNthCalledWith(2, dbConfig);
     expect(establishConnection).toHaveBeenCalledTimes(2);
@@ -388,14 +352,6 @@ describeIfPostgresqlAdapter("PostgreSQLDBCollationTest", () => {
 });
 
 describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
-  /**
-   * Rails pins the argv through `assert_called_with(Kernel, :system, ...)`;
-   * `runCmd` builds the same argv and hands it to the child-process adapter,
-   * which is where the spy sits. `Kernel.system(env, cmd, *args)` *merges* env
-   * into the inherited environment, while `spawnSync`'s `env` option replaces
-   * it wholesale — so `psqlEnv` seeds it from the ambient environment and the
-   * expected pairs are asserted with `objectContaining` rather than equality.
-   */
   let spawnSync: MockInstance<ChildProcessAdapter["spawnSync"]>;
   let filename: string;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
@@ -418,8 +374,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    // `with_structure_dump_flags` / `with_dump_schemas` ensure blocks
-    // (`postgresql_rake_test.rb:485-497`).
     DatabaseTasks.structureDumpFlags = previousFlags;
     DatabaseTasks.dumpSchemas = previousDumpSchemas;
     SchemaDumper.ignoreTables = [];
@@ -430,8 +384,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     spawnSync.mockRestore();
     expect(getFs().readFileSync(filename, "utf8")).toEqual("");
 
-    // `ARTest.config["connections"]["postgresql"]["arunit"]["database"]`
-    // (`postgresql_rake_test.rb:331`).
     const config = new HashConfig("default_env", "primary", {
       adapter: "postgresql",
       database: ARUNIT_DATABASE,
@@ -627,9 +579,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
         message = e.message;
         throw e;
       }),
-      // `assert_raise(RuntimeError)` (`postgresql_rake_test.rb:479`): Ruby's
-      // `fail "<msg>"` in `run_cmd` raises RuntimeError, which `runCmd`'s
-      // `throw new Error(...)` is the analogue of.
     ).rejects.toThrow(Error);
 
     expect(spawnSync).toHaveBeenCalledWith(
@@ -648,7 +597,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
   beforeEach(async () => {
     const os = await getOsAsync();
-    // Ruby's `File::NULL` (`postgresql_database_tasks.rb:77`).
     const nullDevice = os.platform() === "win32" ? "NUL" : "/dev/null";
     expectedArgs = ["--set", "ON_ERROR_STOP=1", "--quiet", "--no-psqlrc", "--output", nullDevice];
     previousFlags = DatabaseTasks.structureLoadFlags;
@@ -661,7 +609,6 @@ describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    // `with_structure_load_flags`' ensure (`postgresql_rake_test.rb:594-600`).
     DatabaseTasks.structureLoadFlags = previousFlags;
   });
 

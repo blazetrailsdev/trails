@@ -1,15 +1,3 @@
-/**
- * PostgreSQL range parsing and serialization.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range
- *
- * This is a thin adapter-level helper. The canonical implementation lives
- * in `connection-adapters/postgresql/oid/range.ts` as `RangeType` — this
- * function predates that class and is kept for callers that need a plain
- * parser without constructing a full Type::Value. Both share the
- * findRangeSeparator / unquoteRangeBound helpers so parsing stays in sync.
- */
-
 import {
   findRangeSeparator,
   unquoteRangeBound,
@@ -18,12 +6,6 @@ import { Range } from "../../relation.js";
 
 export type SubtypeCast = (value: string) => unknown;
 
-/**
- * Parse a PG range string like "[1,10)" into a Range object.
- *
- * Returns null for empty ranges (matching Rails, which returns nil).
- * Throws if the range excludes its beginning (Ruby Range doesn't support this).
- */
 export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
   if (!input || input === "empty") return null;
 
@@ -57,12 +39,6 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
 
 export type SubtypeSerialize = (value: unknown) => string;
 
-/**
- * Serialize a Range into a PG range literal like "[3,50)".
- *
- * Null bounds represent infinity (stored as empty string in the literal).
- * Bounds containing special characters are double-quoted per the PG format.
- */
 export function serializeRange(range: Range, subtype?: SubtypeSerialize): string {
   const serializeBound = (v: unknown): string => {
     if (v === null || v === undefined) return "";

@@ -5,12 +5,6 @@ describe("crud (trails)", () => {
   const users = new Table("users");
 
   describe("compileUpdate / compileDelete key assignment", () => {
-    // Mirrors Rails Arel::Crud (activerecord/lib/arel/crud.rb): `um.key = key`
-    // and `dm.key = key` are unconditional for Rails parity, so `null` is
-    // assigned explicitly rather than being skipped. We spy on the setter
-    // because the underlying statement initializes `key` to `null`, so a
-    // post-hoc `manager.key === null` check would pass even with the prior
-    // `if (key !== null)` guard in place.
     afterEach(() => {
       vi.restoreAllMocks();
     });

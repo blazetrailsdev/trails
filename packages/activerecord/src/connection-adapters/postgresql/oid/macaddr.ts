@@ -1,12 +1,3 @@
-/**
- * PostgreSQL macaddr type — MAC address.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Macaddr.
- * Rails: `class Macaddr < Type::String`. Overrides `type`, `changed?`,
- * and `changed_in_place?` to do case-insensitive comparison so casing
- * differences don't mark the column dirty.
- */
-
 import { StringType } from "@blazetrails/activemodel";
 
 export class Macaddr extends StringType {

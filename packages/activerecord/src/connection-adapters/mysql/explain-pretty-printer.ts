@@ -1,9 +1,3 @@
-/**
- * MySQL explain pretty printer — formats EXPLAIN output as a table.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter
- */
-
 export interface ExplainResult {
   columns: string[];
   rows: Array<Array<unknown>>;

@@ -3,12 +3,6 @@ import { Extract } from "./nodes/extract.js";
 import { Sum, Max, Min, Avg } from "./nodes/function.js";
 import type { Node } from "./nodes/node.js";
 
-/**
- * Expressions — aggregate-function mixin.
- *
- * Mirrors: Arel::Expressions (activerecord/lib/arel/expressions.rb).
- * Mixed into NodeExpression and SqlLiteral via include() in ./index.ts.
- */
 export interface ExpressionsModule {
   count(distinct?: boolean | null): Count;
   sum(): Sum;
@@ -35,7 +29,6 @@ export const Expressions: ExpressionsModule = {
     return new Avg([this]);
   },
   extract(this: Node, field: string): Extract {
-    // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).
     return new Extract([this], field);
   },
 };

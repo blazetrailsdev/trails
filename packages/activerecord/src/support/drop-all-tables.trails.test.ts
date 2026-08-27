@@ -184,13 +184,6 @@ describe("dropAllTables (shared worker database)", () => {
   });
 });
 
-/**
- * The pre-snapshot path is purge-only by construction: it protects the canonical
- * `schema.rb` half and nothing else, so the adapter-specific tables it drops are
- * the caller's to re-lay. These cover the two ways that contract can be broken
- * silently — a `reset` reaching the pre-snapshot path without meaning to, and
- * the `test-setup-dy.ts` boot order flipping so the arm runs before the purge.
- */
 describe("purge-only pre-snapshot path", () => {
   async function freshModules(): Promise<{
     dropAllTablesModule: typeof import("./drop-all-tables.js");

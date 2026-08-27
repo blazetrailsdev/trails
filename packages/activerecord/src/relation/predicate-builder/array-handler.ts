@@ -3,25 +3,8 @@ import type { PredicateBuilder } from "../predicate-builder.js";
 import { Range } from "../../connection-adapters/postgresql/oid/range.js";
 import { isBaseInstance } from "./is-base-instance.js";
 
-/**
- * Sentinel used when no scalar values exist in an array condition.
- * Acts as an identity element for the OR-folding chain.
- *
- * Mirrors: ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate
- */
 export class NullPredicate {}
 
-/**
- * Handles array values in where conditions by splitting them into
- * scalar values, nils, and ranges, then combining with OR predicates.
- *
- * Mirrors: ActiveRecord::PredicateBuilder::ArrayHandler
- *
- * Examples:
- *   where({ id: [1, 2, 3] })          → id IN (1, 2, 3)
- *   where({ id: [1, null, 3] })       → id IN (1, 3) OR id IS NULL
- *   where({ age: [18, new Range(25, 30)] }) → age IN (18) OR age BETWEEN 25 AND 30
- */
 export class ArrayHandler {
   private predicateBuilder: PredicateBuilder;
 
@@ -30,24 +13,10 @@ export class ArrayHandler {
   }
 
   call(attribute: Nodes.Attribute, value: unknown[] | Set<unknown>): Nodes.Node {
-    // Rails' `value.empty?` — ArrayHandler is registered for BOTH Array and Set
-    // (predicate_builder.rb:19-20); every other read below is iteration.
     if ((Array.isArray(value) ? value.length : value.size) === 0) {
       return attribute.in([]);
     }
 
-    // Mirrors Rails' ArrayHandler#call:
-    //   values = value.map { |x| x.is_a?(Base) ? x.id : x }
-    //   nils = values.compact!
-    //   ranges = values.extract! { |v| v.is_a?(Range) }
-    // Everything that isn't a Base record, nil, or Range stays in `values`,
-    // including arbitrary objects like AdditionalValue (for encrypted
-    // deterministic queries). A single remaining value is routed through
-    // `predicateBuilder.build(...)` (typically producing an Equality);
-    // multiple values use the In/HomogeneousIn branch. Passing Relations
-    // inside the array is unsupported here — Rails would likewise fail
-    // to serialize them inside HomogeneousIn; use `where(col: relation)`
-    // for subqueries instead.
     const values: unknown[] = [];
     let hasNull = false;
     const ranges: Range[] = [];
@@ -58,10 +27,6 @@ export class ArrayHandler {
       } else if (item instanceof Range) {
         ranges.push(item);
       } else if (isBaseInstance(item)) {
-        // Rails: `x.is_a?(Base) ? x.id : x` — flatten AR records to their PK.
-        // Only genuine Base instances deref; an arbitrary non-Base object that
-        // happens to carry an `id` (or a bare Ruby-Hash object literal) is left
-        // intact, matching `is_a?(Base)` being false for both.
         values.push(item.id);
       } else {
         values.push(item);
@@ -74,11 +39,6 @@ export class ArrayHandler {
     } else if (values.length === 1) {
       valuesPredicate = this.predicateBuilder.build(attribute, values[0]);
     } else {
-      // Rails builds the multi-value case with
-      // `Arel::Nodes::HomogeneousIn.new(values, attribute, :in)`. Its
-      // `castedValues` natively drops out-of-range / non-serializable values and
-      // casts per column type, so `[1, 2^63]` → `IN (1)` without any sentinel
-      // pre-substitution.
       valuesPredicate = new Nodes.HomogeneousIn(values, attribute, "in");
     }
 

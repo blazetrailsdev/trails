@@ -1,22 +1,3 @@
-/**
- * A blank-but-present eager spec (`eagerLoad([])`, `eagerLoad({})`) makes
- * `eager_loading?` true — `eager_load_values.any?` is true for `[[]]`
- * (relation.rb:414, query_methods.rb:295) — while
- * `JoinDependency.walk_tree` folds it to an empty tree, so the JoinDependency
- * has zero nodes.
- *
- * Rails does not special-case that: `apply_join_dependency`
- * (finder_methods.rb:457) builds the JoinDependency, joins it (contributing no
- * JOINs), and runs the ordinary query. trails carried three
- * `jd.nodes.length === 0` degrade branches — in `exec_main_query`, the
- * `pluck` eager path and the `cacheVersion` eager path — which were load-bearing
- * only while the preload-fallback lane existed (deleted in #5968). This file
- * covers the shape that reaches those sites, so the ordinary Rails-shaped flow
- * stays correct without them.
- *
- * trails-only (hence `.trails.test.ts`): Rails has no test for a blank eager
- * spec that is actually executed.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { Post } from "../test-helpers/models/post.js";

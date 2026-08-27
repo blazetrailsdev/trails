@@ -177,7 +177,7 @@ jobs:
           else
             echo "Changed files:"
             echo "$files"
-            if echo "$files" | grep -qE '^(\.prettierrc\.json|\.prettierignore|package\.json)$'; then
+            if grep -qE '^(\.prettierrc\.json|\.prettierignore|package\.json)$' <<<"$files"; then
               echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
             elif pfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null); then
               {
@@ -200,7 +200,7 @@ jobs:
             # avoid.
             if [ "${{ github.event_name }}" != "pull_request" ]; then
               echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
-            elif echo "$files" | grep -qE "$LINT_ALL_RE"; then
+            elif grep -qE "$LINT_ALL_RE" <<<"$files"; then
               echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
             elif lfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null); then
               {
@@ -213,9 +213,9 @@ jobs:
             fi
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            elif echo "$files" | grep -qvE '^docs/|^examples/|^README\.md$|^CLAUDE\.md$'; then
+            elif grep -qvE '^docs/|^examples/|^README\.md$|^CLAUDE\.md$' <<<"$files"; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            elif echo "$files" | grep -qxF 'docs/ruby-ts-conventions.md'; then
+            elif grep -qxF 'docs/ruby-ts-conventions.md' <<<"$files"; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
@@ -240,10 +240,16 @@ jobs:
                   echo "comparison_affected=false"   >> "$GITHUB_OUTPUT"
                 else
                   infra_files=$(echo "$files" | grep -vE "$INFRA_CARVEOUT_RE" || true)
+                  # Herestrings, not `echo … | grep -q`: `grep -q` exits on its
+                  # first match, so on a large diff `echo` is still writing when
+                  # the reader vanishes and takes EPIPE. Under `pipefail` that
+                  # makes the pipeline report failure BECAUSE the regex matched,
+                  # and the gate silently inverts to false — a 756-file PR
+                  # skipped Unit Tests and every AR lane that way (#7132).
                   set_gate() {
                     local name="$1" re="$2" excl="${3:-}" gate_files="$files"
                     if [ -n "$excl" ]; then gate_files=$(echo "$files" | grep -vE "$excl" || true); fi
-                    if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$gate_files" | grep -qE "$re"; then
+                    if grep -qE "$INFRA_RE" <<<"$infra_files" || grep -qE "$re" <<<"$gate_files"; then
                       echo "${name}=true"  >> "$GITHUB_OUTPUT"
                     else
                       echo "${name}=false" >> "$GITHUB_OUTPUT"
@@ -511,7 +517,7 @@ jobs:
           # fix. Reading the payload would replay the stale original body and
           # leave the check permanently red.
           body=$(scripts/ci/gh-api-retry.sh "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
-          if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
+          if grep -qiE "$ATTRIBUTION_RE" <<<"$body"; then
             echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
             exit 1
           fi
@@ -544,7 +550,7 @@ jobs:
             exit 1
           fi
           messages=$(scripts/ci/gh-api-retry.sh --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
-          if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
+          if grep -qiE "$ATTRIBUTION_RE" <<<"$messages"; then
             echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
             exit 1
           fi

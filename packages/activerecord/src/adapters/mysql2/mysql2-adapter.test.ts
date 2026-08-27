@@ -1,23 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/mysql2/mysql2_adapter_test.rb
- *
- * Faithful, word-for-word port: describe/it names match the Rails test method
- * names verbatim and the bodies reproduce the Rails assertions. trails-only
- * extensions (fabricated translate_exception coverage, DDL error-translation
- * probes, the empty-result-set guard, extended timezone re-sync) live in the
- * sibling mysql2-adapter.trails.test.ts.
- *
- * connection_error drives `connectBang()` — trails' eager connect, the
- * `PostgreSQLAdapter#connectBang`-style analog of Rails' public `connect!` —
- * and reconnection_error drives `reconnectBang()` directly (Rails' `reconnect!`).
- * A standalone adapter carries a NullPool by default (matching Rails
- * `@pool = NullPool.new`), so `error.connection_pool` is asserted faithfully.
- *
- * The FK type-mismatch tests ride the canonical `engines` / `old_cars` (int PK)
- * / `cars` (bigint PK) / `subscribers` (varchar `nick`) tables, adding the
- * reference column via `add_reference` (which now defaults to `:bigint`, as
- * Rails does) and the constraint via `add_foreign_key`.
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
@@ -52,13 +32,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("connection error", async () => {
-    // Rails: `Mysql2Adapter.new(socket: File::NULL, ...).connect!` raises
-    // ConnectionNotEstablished whose `connection_pool` is a NullPool. trails'
-    // `connectBang()` is the eager connect (Rails' `connect!` establishing
-    // `@raw_connection`), so the dead-socket failure surfaces here via the same
-    // rescued `connect` → `set_pool(@pool)` path, carrying the standalone
-    // adapter's NullPool.
-    // Stays self-built: Rails builds this dead-socket adapter in-test too.
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
       const error = await badAdapter
@@ -73,12 +46,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("reconnection error", async () => {
-    // Rails reconnects a standalone adapter whose config points at a dead
-    // socket and asserts the raised ConnectionNotEstablished's `connection_pool`
-    // equals the adapter's own pool (a NullPool). trails' `reconnectBang()`
-    // (Rails' `reconnect!`) now re-establishes the connection eagerly and
-    // re-raises the translated ConnectionNotEstablished, so assert it directly.
-    // Stays self-built: Rails builds this dead-socket adapter in-test too.
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
       const error = await badAdapter
@@ -93,8 +60,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("mysql2 default prepared statements", () => {
-    // Instantiate with _fakeConnection:true to skip pool creation — mirrors
-    // Rails' fake_connection constructor path.
     const fakeAdapter = new Mysql2Adapter({ _fakeConnection: true });
     expect(fakeAdapter.preparedStatements).toBe(false);
   });
@@ -165,7 +130,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
 
   it("columns for distinct with arel order", () => {
     const prevEngine = Arel.Table.engine;
-    Arel.Table.engine = null; // should not rely on the global Arel::Table.engine
+    Arel.Table.engine = null;
     try {
       const order = new Arel.Nodes.Descending(Arel.sql("posts.created_at"));
       expect(adapter.columnsForDistinct("posts.id", [order])).toBe(
@@ -195,12 +160,10 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
     } finally {
-      // Rails: `ensure @conn.execute("ALTER TABLE engines DROP COLUMN old_car_id") rescue nil`
       await adapter.executeMutation("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
     }
   });
 
-  // Rails: `skip "MariaDB does not return mismatched foreign key in error message" if @conn.mariadb?`
   it.skipIf(isMariaDb)(
     "errors for multiple fks on mismatched types for pk table in alter table",
     async () => {
@@ -219,8 +182,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         expect(error.cause).toBeInstanceOf(Error);
         expect(error.connectionPool).toBe(adapter.pool);
       } finally {
-        // Rails' `ensure` block: `@conn.remove_reference(:engines, :person)` /
-        // `@conn.remove_reference(:engines, :old_car)`.
         await adapter.removeReference("engines", "person");
         await adapter.removeReference("engines", "old_car");
       }
@@ -254,7 +215,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
     } finally {
-      // Rails: `ensure @conn.drop_table :foos, if_exists: true`
       await adapter.dropTable("foos", { ifExists: true });
     }
   });
@@ -286,7 +246,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
     } finally {
-      // Rails: `ensure @conn.drop_table :foos, if_exists: true`
       await adapter.dropTable("foos", { ifExists: true });
     }
   });
@@ -318,16 +277,11 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.cause).toBeInstanceOf(Error);
       expect(error.connectionPool).toBe(adapter.pool);
     } finally {
-      // Rails: `ensure @conn.drop_table :foos, if_exists: true`
       await adapter.dropTable("foos", { ifExists: true });
     }
   });
 
   it("read timeout exception", () => {
-    // The node-mysql2 driver surfaces a read_timeout-tripped query as an Error
-    // with code 'PROTOCOL_SEQUENCE_TIMEOUT' and no MySQL errno. Fabricate the
-    // same shape and feed it through translateException to assert the mapping
-    // onto AdapterTimeout (a QueryAborted), mirroring Rails' assert_kind_of.
     const driverErr = Object.assign(new Error("read ETIMEDOUT"), {
       code: "PROTOCOL_SEQUENCE_TIMEOUT",
     });
@@ -355,9 +309,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("database timezone changes synced to connection", async () => {
-    // Mirrors test_database_timezone_changes_synced_to_connection: with the
-    // default timezone flipped to :local, executing a statement re-syncs the
-    // connection's database_timezone from :utc to :local.
     await adapter.execute("SELECT 1");
     expect(adapter._databaseTimezone).toBe("utc");
     await withTimezoneConfig({ default: "local" }, async () => {
@@ -369,12 +320,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("warnings do not change returned value of exec update", async () => {
-    // Pin a single pool connection via beginTransaction so SET SESSION
-    // sql_mode='' carries over to the warning-producing UPDATE (DDL on MySQL
-    // auto-commits, so the table persists even on rollback). Capture sql_mode
-    // up front and restore it in `finally` (mirrors Rails' ensure): session
-    // variables are NOT transactional, so rollback() would otherwise leak the
-    // weakened sql_mode onto the pooled connection.
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
@@ -401,8 +346,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("warnings do not change returned value of exec delete", async () => {
-    // Capture/restore sql_mode (mirrors Rails' ensure) — session variables are
-    // not transactional, so rollback() does not revert SET SESSION.
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);

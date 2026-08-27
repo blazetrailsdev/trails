@@ -1,8 +1,3 @@
-// Trails-only cases with no Rails counterpart: Ruby gets `Object#clone`'s
-// copy-every-ivar semantics from core, so no Rails test asserts them. In TS
-// each `clone()` has to build the copy itself, and these pin the two ways that
-// can silently diverge — a field the body forgot to copy, and a bound instance
-// property carried over still closed over the original (RFC 0124).
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, SelectManager } from "./index.js";
 import { objectClone } from "./clone-support.js";
@@ -41,8 +36,6 @@ describe("Arel clone", () => {
     expect(copy.conditions.length).toBe(2);
   });
 
-  // NamedFunction has no `initialize_copy`, so Ruby clones it with bare
-  // `Object#clone` — `objectClone` is what that spells here.
   it("gives NamedFunction#over on the clone the clone as its operand", () => {
     const node = new Nodes.NamedFunction("row_number", []);
     const copy = objectClone(node);

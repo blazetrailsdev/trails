@@ -7,11 +7,6 @@ import type { DeleteManager } from "./delete-manager.js";
 
 export type UpdateValues = [Node, unknown][] | string | SqlLiteral | BoundSqlLiteral;
 
-/**
- * Crud — mixed into query-like managers to build CRUD statements.
- *
- * Mirrors: Arel::Crud
- */
 export interface Crud {
   compileInsert(values: [Node, unknown][]): InsertManager;
   createInsert(): InsertManager;

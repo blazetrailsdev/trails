@@ -5,20 +5,11 @@ import type { Branch } from "./branch.js";
 import { groupBy } from "@blazetrails/activesupport";
 import { ThroughAssociation } from "./through-association.js";
 
-/**
- * Orchestrates loading multiple preloader branches together.
- * Walks the Branch tree, finding runnable loaders and executing
- * them in groups until all branches are complete.
- *
- * Mirrors: ActiveRecord::Associations::Preloader::Batch
- */
 export class Batch {
   private _preloaders: Preloader[];
   private _availableRecords: Map<typeof Base, Base[]>;
 
   constructor(preloaders: Preloader[], availableRecords: (Base | Base[])[] = []) {
-    // Empty preloaders are rejected in `call()` — `isEmpty()` is async because
-    // it may materialize a Relation, mirroring Rails' `records.length`.
     this._preloaders = preloaders;
     this._availableRecords = groupBy(
       availableRecords.flat(),
@@ -103,11 +94,6 @@ export class Batch {
 
   private async groupAndLoadSimilar(loaders: Association[]): Promise<void> {
     const nonThroughLoaders = loaders.filter((l) => !(l instanceof ThroughAssociation));
-    // Rails groups on the LoaderQuery objects themselves
-    // (`group_by(&:loader_query)`, batch.rb:41) and relies on
-    // `LoaderQuery#hash`/`#eql?` for value equality. A JS Map keys by
-    // identity, so group on the digest those two are ported as —
-    // `LoaderQuery#hashKey` — and recover the query from the group.
     const groups = groupBy(nonThroughLoaders, (loader) => loader.loaderQuery().hashKey());
     for (const similarLoaders of groups.values()) {
       const query = similarLoaders[0].loaderQuery();

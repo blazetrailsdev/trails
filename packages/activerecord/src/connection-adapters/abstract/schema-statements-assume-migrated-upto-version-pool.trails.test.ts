@@ -1,12 +1,3 @@
-/**
- * `assume_migrated_upto_version` end to end against a REAL pool.
- *
- * The sibling `...-upto-version.trails.test.ts` pins the emitted SQL through a
- * stubbed `pool.migrationContext`; nothing there proves the object a live pool
- * hands back actually owns `getAllVersions` / `migrations`, nor that the paths
- * it discovers migrations from are its own rather than `Migrator`'s global
- * static. These cases go through `Base.connectionPool()` unstubbed.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../base.js";
 import { Migrator } from "../../migration.js";
@@ -19,7 +10,6 @@ const migrationsDir = (name: string) =>
 const VALID = migrationsDir("valid");
 const OLD_AND_NEW_VERSIONS = migrationsDir("old_and_new_versions");
 
-/** `assumeMigratedUptoVersion` is mixed onto the adapter by `SchemaStatements`. */
 const assumeMigratedUptoVersion = (version: number) =>
   (
     Base.connection as unknown as {
@@ -27,11 +17,6 @@ const assumeMigratedUptoVersion = (version: number) =>
     }
   ).assumeMigratedUptoVersion(version);
 
-/**
- * `DatabaseConfig#migrationsPaths` is a reader over a frozen configuration
- * hash, so shadow the reader and drop the pool's memoized context — which,
- * like Rails, captures its paths at construction.
- */
 function pointPoolAt(paths: string[]): () => void {
   const pool = Base.connectionPool();
   const dbConfig = pool.dbConfig as unknown as object;

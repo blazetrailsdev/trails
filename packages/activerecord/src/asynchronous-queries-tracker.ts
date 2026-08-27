@@ -2,7 +2,7 @@ import { Executor } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 
-/** @internal Set by `base.ts` at the bottom of its own module body — see the note there. */
+/** @internal */
 let _base: typeof Base | undefined;
 
 /** @internal */
@@ -15,21 +15,8 @@ function baseClass(): typeof Base {
   return _base;
 }
 
-/**
- * Tracks the async-query sessions opened around a unit of work.
- *
- * Rails guards each session with `Concurrent::AtomicBoolean` and a
- * `Concurrent::ReadWriteLock` so a worker thread can be barred from starting a
- * query once the request that opened the session has finished. On a
- * single-threaded event loop the boolean needs no atomicity and the read/write
- * lock collapses to running the block inline: nothing can interleave between
- * the `active()` check and the block.
- *
- * Mirrors: ActiveRecord::AsynchronousQueriesTracker (asynchronous_queries_tracker.rb)
- * @internal
- */
+/** @internal */
 export class AsynchronousQueriesTracker {
-  /** Mirrors Ruby's nested `AsynchronousQueriesTracker::Session`. */
   static Session: typeof Session;
 
   #stack: Session[];
@@ -52,16 +39,7 @@ export class AsynchronousQueriesTracker {
     asynchronousQueriesTracker.finalizeSession();
   }
 
-  /**
-   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@stack.last or raise
-   *   ActiveRecordError` (`asynchronous_queries_tracker.rb:50`) — the TS body
-   *   reads `this.#stack[this.#stack.length - 1]` and raises the same error with
-   *   the same message. `first`/`last`/`size` are positional/property idioms
-   *   with no JS call form, deliberately left uncredited by RFC 0092
-   *   (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment)
-   *   so the reason-text route is the sanctioned one; nothing was dropped from
-   *   the TS body.
-   */
+  /** @missingRailsCall last — PERMANENT */
   get currentSession(): Session {
     const session = this.#stack[this.#stack.length - 1];
     if (!session)
@@ -81,11 +59,7 @@ export class AsynchronousQueriesTracker {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::AsynchronousQueriesTracker::Session
- * (asynchronous_queries_tracker.rb:8-29)
- * @internal
- */
+/** @internal */
 export class Session {
   #active = true;
 

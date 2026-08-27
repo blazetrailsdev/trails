@@ -1,16 +1,3 @@
-/**
- * AttributeAssignment — bulk and multiparameter attribute assignment.
- *
- * Mirrors: ActiveRecord::AttributeAssignment
- *
- * Runtime note: as in Rails, `assign_attributes` itself is ActiveModel's
- * (activemodel/attribute_assignment.rb:28-34) and is not redefined here; the
- * functions exported here are the Rails-private layer
- * (`_assign_attributes`, `assign_multiparameter_attributes`, etc.) that it
- * calls internally. They are mixed onto `Base`, so ActiveModel's
- * `assign_attributes` reaches this `_assign_attributes` exactly as Ruby's
- * `self` send does. All are @internal.
- */
 import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
@@ -28,38 +15,13 @@ interface AttributeAssignmentHost {
   assignMultiparameterAttributes(pairs: Record<string, unknown>): void;
 }
 
-/**
- * Ruby `v.is_a?(Hash)` (attribute_assignment.rb:13). A Date/Temporal/model
- * value is `typeof "object"` in JS but is not a Hash in Ruby, so only plain
- * objects may be deferred.
- */
 function isNestedParameterHash(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
- * (attribute_assignment.rb:6-23).
- *
- * Rails buckets multiparameter keys AND Hash values out of the main loop and
- * assigns the nested hashes only after the scalar pass (:21), so a nested
- * writer's `reject_if` / the built record's callbacks observe an owner whose
- * own attributes are already set. Nested runs before multiparameter (:21-22).
- *
- * `pending` is the one accommodation Rails does not need: its `_assign_attribute`
- * has finished writing by the time the loop reaches the next key, so where a send
- * here answers a promise the rest of the loop is chained behind it to keep that
- * order. Every send that stays in memory keeps running inline.
- *
- * `_assign_attribute` is sent to `this` (:17), as in Rails: there is exactly one
- * of them, ActiveModel's (activemodel/attribute_assignment.rb:67-75), inherited
- * through `Base`. The association and nested-attribute writers it reaches are
- * the `#{name}=` methods themselves, installed under those Ruby names by the
- * association builders and `generate_association_writer`.
- */
+/** @internal */
 export function _assignAttributes(
   this: AttributeAssignmentHost,
   attributes: Record<string, unknown>,
@@ -96,12 +58,7 @@ export function _assignAttributes(
   return pending ? pending.then(assignDeferred) : assignDeferred();
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#assign_nested_parameter_attributes
- * (attribute_assignment.rb:26-28) — assign any deferred nested attributes after
- * the base attributes have been set.
- */
+/** @internal */
 export function assignNestedParameterAttributes(
   this: AttributeAssignmentHost,
   pairs: Record<string, unknown>,
@@ -115,10 +72,7 @@ export function assignNestedParameterAttributes(
   return pending;
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#assign_multiparameter_attributes
- */
+/** @internal */
 export function assignMultiparameterAttributes(
   this: AttributeAssignmentHost,
   pairs: Record<string, unknown>,
@@ -127,10 +81,7 @@ export function assignMultiparameterAttributes(
   executeCallstackForMultiparameterAttributes.call(this, callstack);
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#execute_callstack_for_multiparameter_attributes
- */
+/** @internal */
 export function executeCallstackForMultiparameterAttributes(
   this: AttributeAssignmentHost,
   callstack: Record<string, Record<number, unknown>>,
@@ -141,10 +92,7 @@ export function executeCallstackForMultiparameterAttributes(
   );
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#extract_callstack_for_multiparameter_attributes
- */
+/** @internal */
 export function extractCallstackForMultiparameterAttributes(
   this: AttributeAssignmentHost,
   pairs: Record<string, unknown>,
@@ -152,15 +100,11 @@ export function extractCallstackForMultiparameterAttributes(
   return extractMultiparameterCallstack(pairs).multiparams;
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#type_cast_attribute_value
- */
+/** @internal */
 export function typeCastAttributeValue(multiparameterName: string, value: string): unknown {
   const match = multiparameterName.match(/\(\d*([if])\)/);
   if (!match) return value;
   const flag = match[1];
-  // Ruby's String#to_i / #to_f return 0 / 0.0 for blank/invalid input.
   if (flag === "i") {
     const n = parseInt(value, 10);
     return isNaN(n) ? 0 : n;
@@ -172,10 +116,7 @@ export function typeCastAttributeValue(multiparameterName: string, value: string
   return value;
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeAssignment#find_parameter_position
- */
+/** @internal */
 export function findParameterPosition(multiparameterName: string): number {
   const match = multiparameterName.match(/\((\d+)/);
   return match ? parseInt(match[1], 10) : 0;

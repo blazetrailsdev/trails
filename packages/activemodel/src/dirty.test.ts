@@ -12,32 +12,8 @@ import * as AttributeMethods from "./attribute-methods.js";
 import { Dirty, asJson as dirtyAsJson, initializeDup as dirtyInitializeDup } from "./dirty.js";
 import { API } from "./api.js";
 
-/**
- * The ivar table Ruby's `@name` / `@color` / `@size` / `@status` live in. A JS
- * `Symbol` key, the sanctioned spelling for a private slot: `Object.keys`
- * skips it, so `instance_values` (core_ext/object/json.rb:58-66) sees only the
- * four readers, while `Reflect.ownKeys` carries it through `dup`.
- */
 const ivars = Symbol("ivars");
 
-/**
- * Rails' `DirtyTest::DirtyModel` (dirty_test.rb:6-43) includes
- * `ActiveModel::API` + `ActiveModel::Dirty` and nothing else — no
- * `ActiveModel::Attributes`. Having no `@attributes`, it takes the second arm
- * of `mutations_from_database` (dirty.rb:382-388) and tracks through
- * `ActiveModel::ForcedMutationTracker`, which is what this file exercises.
- *
- * Also wired is `AttributeMethods`, which Ruby gets from `Dirty`'s own
- * `include ActiveModel::AttributeMethods` (dirty.rb:125);
- * trails' `include()` copies a module's own members, not its nested includes.
- *
- * Ruby's `@name` + `attr_reader :name` + a hand-written `name=` port to one
- * own, enumerable accessor property per ivar: `Object#as_json` serializes an
- * object through `instance_values` (core_ext/object/json.rb:58-66), i.e. its
- * own properties, so the ivar has to be spelled with the reader's name — and a
- * data property of that name would shadow the writer the Ruby model defines.
- * The values live in the `ivars` table below, which no `instance_values` sees.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (dirty_test.rb:7-8); the class/interface merge is how `include()` surfaces on the type side.
 class DirtyModel {
   constructor() {
@@ -98,12 +74,6 @@ class DirtyModel {
     this.changesApplied();
   }
 
-  /**
-   * `Object#dup`, which Ruby's DirtyModel inherits and TypeScript cannot:
-   * allocate, copy the ivars, dispatch `initialize_dup`, without re-entering
-   * the constructor. Same body as `Model#dup` (model.ts), plus the copy of the
-   * ivar table `Reflect.ownKeys` carries but Ruby splits across ivar slots.
-   */
   dup(): this {
     const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
     const descriptors = Object.getOwnPropertyDescriptors(this);
@@ -118,17 +88,8 @@ class DirtyModel {
     return duped;
   }
 
-  /**
-   * The root of the `initialize_dup` chain: Ruby's `Object#initialize_dup`,
-   * where `Dirty#initialize_dup`'s `super` (dirty.rb:248-251) lands.
-   */
   initializeDup(_other: this): void {}
 
-  /**
-   * `Object#as_json` (core_ext/object/json.rb:58-66), which Ruby's DirtyModel
-   * inherits from `Object` and TypeScript cannot: `Object` is not reopenable,
-   * so the body is spelled at the class Ruby gets it from.
-   */
   asJson(options?: Record<string, unknown>): unknown {
     return objectAsJson(InstanceVariablesObject.instanceValues(this), options);
   }
@@ -157,16 +118,11 @@ interface DirtyModel extends API, Dirty {
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 
-// `include ActiveModel::API` (dirty_test.rb:7).
 include(DirtyModel, API);
 
-// `include ActiveModel::AttributeMethods`, which `define_attribute_methods`
-// and every `*_will_change!` come from (attribute_methods.rb:73).
 extend(DirtyModel, AttributeMethods.ClassMethods);
 include(DirtyModel, AttributeMethods.InstanceMethods);
 
-// `include ActiveModel::Dirty` (dirty_test.rb:8) and its `included do` block
-// (dirty.rb:241-245).
 include(DirtyModel, Dirty);
 const DirtyModelClass = DirtyModel as unknown as {
   attributeMethodSuffix(...args: unknown[]): void;
@@ -178,18 +134,13 @@ DirtyModelClass.attributeMethodSuffix("Change", "WillChange!", "Was", { paramete
 DirtyModelClass.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
 DirtyModelClass.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
 DirtyModelClass.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
-// `ActiveSupport::ToJsonWithActiveSupportEncoder` is included into `Object`
-// (core_ext/object/json.rb:47-49), which TypeScript cannot reopen either.
 include(DirtyModel, ToJsonWithActiveSupportEncoder);
 
-// `Dirty#as_json` (dirty.rb:264-268) sits above the `Object#as_json` in the
-// class body, as Ruby's `include ActiveModel::Dirty` puts it above `Object`.
 prepend(DirtyModel.prototype, {
   asJson: dirtyAsJson,
   initializeDup: dirtyInitializeDup,
 });
 
-// dirty_test.rb:9
 DirtyModelClass.defineAttributeMethods("name", "color", "size", "status");
 
 describe("DirtyTest", () => {
@@ -243,13 +194,6 @@ describe("DirtyTest", () => {
   });
 
   it("attribute mutation", () => {
-    // Rails writes `@name` past the writer and then mutates that String in
-    // place (`name.replace(...)`), asserting neither shows as a change —
-    // `ForcedMutationTracker#changed_in_place?` is a flat `false`
-    // (attribute_mutation_tracker.rb:95-97). JS strings are immutable, so each
-    // `replace` is spelled as the value the ivar would then hold; both
-    // `instance_variable_set` and `replace` write past the writer, which is a
-    // property redefinition here.
     Object.defineProperty(model, "name", { value: "Yam", enumerable: true, configurable: true });
     expect(model.nameChanged()).toBe(false);
     Object.defineProperty(model, "name", { value: "Hadad", enumerable: true, configurable: true });

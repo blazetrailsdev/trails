@@ -3,7 +3,6 @@ import { Temporal } from "@blazetrails/date";
 import { Types } from "../index.js";
 import { TimeWithZone, useZone, zone } from "@blazetrails/activesupport";
 
-/** `::Time.utc(...)`, the value Rails' own assertions are written against. */
 function timeUtc(
   year: number,
   mon: number,

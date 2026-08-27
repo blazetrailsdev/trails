@@ -1,11 +1,3 @@
-/**
- * Rails-mirrored private helpers on Relation: assert_modifiable!,
- * check_if_method_has_arguments!, table_name_matches?, arel_column,
- * arel_columns, arel_columns_from_hash, arel_column_with_table.
- *
- * Test names mirror Rails' relation_test.rb / query_methods_test.rb
- * conventions where applicable.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
@@ -68,8 +60,6 @@ describe("Relation private build-arel helpers", () => {
     });
 
     it("flattens arrays only, leaving plain-object args intact (Rails flatten! parity)", () => {
-      // Ruby `args.flatten!` recurses into nested arrays only; hashes pass
-      // through untouched, so a CTE definition hash like {a: rel} survives.
       const args: unknown[] = [[{ a: "x" }]];
       relation().checkIfMethodHasArgumentsBang(":select", args);
       expect(args).toEqual([{ a: "x" }]);
@@ -91,18 +81,10 @@ describe("Relation private build-arel helpers", () => {
     });
 
     it("does not match when the only occurrence is immediately after FROM", () => {
-      // Mirrors Rails' (?<!FROM)\s lookbehind. If the from-target *is*
-      // our model table (e.g. via a subquery rendering SELECT * FROM
-      // \"posts\"), we don't want arelColumn to double-qualify bare
-      // refs — return false.
       expect(relation().isTableNameMatches('SELECT * FROM "posts"')).toBe(false);
     });
 
     it("matches when the table also appears outside the FROM clause", () => {
-      // The hit Rails actually wants: a subquery that joins/filters on
-      // our table, so bare attribute refs must qualify back to it.
-      // Note `posts` must appear bare (no trailing dot) — the (?!\\.)
-      // negative lookahead deliberately excludes qualified usages.
       expect(relation().isTableNameMatches('SELECT * FROM "subquery" JOIN posts ON ...')).toBe(
         true,
       );
@@ -189,9 +171,6 @@ describe("Relation private build-arel helpers", () => {
   });
 });
 
-// `offset!` stores the raw value (query_methods.rb:1231-1234); `build_arel`
-// applies `offset_value.to_i` (:1758), so the truncation shows up in the SQL
-// and not in `offset_value`.
 describe("Relation#offset float truncation", () => {
   it("truncates float offset to integer via Math.trunc", () => {
     const r = relation().offset(1.7);
@@ -210,13 +189,6 @@ describe("Relation#offset float truncation", () => {
   });
 });
 
-// Regression guard for RFC 0030 where-hash-keys-resolve-to-join-alias: a
-// first-occurrence join referenced by a where-hash key is re-aliased to the
-// reference name (Rails make_constraints → aliased_table_for) AND the where-hash
-// key resolves to that same alias, so JOIN and WHERE stay in sync. Pins the SQL
-// shape so a future change that touches one side (associatedTable aliasing) but
-// not the other (_applyReferencedAlias) can't silently desync while behavioral
-// counts still match.
 describe("where-hash key resolves to the referenced join alias", () => {
   class HaPet extends Base {
     static _tableName = "da_pets";

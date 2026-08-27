@@ -1,16 +1,3 @@
-// Rails' `SpawnMethods#spawn` is
-// `already_in_scope?(model.scope_registry) ? model.all : clone`
-// (spawn_methods.rb:9-11), and `already_in_scope?` is
-// `@delegate_to_model && registry.current_scope(model, true)`
-// (relation.rb:1337-1339). `@delegate_to_model` is set only for the duration of
-// `_exec_scope` (relation.rb:552-558), i.e. while a named-scope body runs.
-//
-// No Rails test names this branch, and it is not reachable through ordinary
-// named-scope use: `_exec_scope` nils the current scope for the duration of the
-// body, so `@delegate_to_model` and a non-nil current scope do not normally
-// coincide. These trails tests therefore establish the precondition explicitly
-// (via the real scope registry) and drive `spawn()` itself, so the `model.all`
-// arm is actually executed rather than merely present.
 import { describe, test, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -18,7 +5,6 @@ import { Post } from "../test-helpers/models/post.js";
 
 registerModel([Post]);
 
-/** The relation internals these tests reach into. */
 interface ScopeInternals {
   isAlreadyInScope(registry: ScopeRegistryLike): boolean;
   clone(): ScopeInternals;
@@ -40,13 +26,11 @@ const model = Post as unknown as {
   scopeRegistry(): ScopeRegistryLike;
 };
 
-/** Define a named scope and immediately invoke it. */
 function defineAndCallScope(name: string, body: ScopeBody): unknown {
   model.scope(name, body);
   return (Post as unknown as Record<string, () => unknown>)[name]();
 }
 
-/** Run `fn` with `scope` installed as the model's current scope. */
 function withCurrentScope<R>(scope: unknown, fn: (registry: ScopeRegistryLike) => R): R {
   const registry = model.scopeRegistry();
   const previous = registry.currentScope(Post, true);
@@ -124,9 +108,6 @@ describe("SpawnAlreadyInScopeTest", () => {
       return this;
     });
 
-    // Rails' `initialize_copy` ends in `reset`, which clears the flag. If it
-    // leaked, a derived relation would report "already in scope" whenever a
-    // current scope is installed, and spawn would discard its own values.
     expect(clonedFlag).toBe(false);
   });
 

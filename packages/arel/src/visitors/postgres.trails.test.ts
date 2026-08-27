@@ -3,12 +3,6 @@ import { postgresqlTestConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors, Collectors } from "../index.js";
 import { Temporal } from "@blazetrails/date";
 
-/**
- * trails-only PostgreSQL visitor coverage with no counterpart in
- * `vendor/rails/activerecord/test/cases/arel/visitors/postgres_test.rb`.
- * Kept out of `postgres.test.ts` so the mirrored file stays test-for-test with
- * the Rails one.
- */
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
   const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
   return visitor.compile(node as never, collector) as [string, unknown[]];
@@ -34,7 +28,6 @@ describe("PostgreSQL bind collection", () => {
     const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
     const node = users.get("created_at").eq(new Nodes.Quoted(d));
     const [sql, binds] = compileWithBinds(visitor, node);
-    // Quoted(Date) inlines as a literal — only BindParam/ActiveModel::Attribute produce $N.
     expect(sql).toContain("2020-01-02");
     expect(sql).not.toContain("$1");
     expect(binds).toHaveLength(0);
@@ -65,11 +58,6 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
     const g = new Nodes.GroupingSet([users.get("a"), users.get("b")]);
     expect(compile(g)).toBe('GROUPING SETS( "users"."a", "users"."b" )');
   });
-
-  // The Lateral visitor lives on the base ToSql visitor (matching Rails'
-  // `grouping_parentheses` semantics: parens only for SelectStatement).
-  // PostgreSQL no longer overrides; its tests live in
-  // `select-manager.test.ts` (`describe("lateral")`).
 
   it("IsNotDistinctFrom uses standard SQL keyword on Postgres", () => {
     const node = users.get("a").isNotDistinctFrom(users.get("b"));
@@ -116,8 +104,6 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
 describe("Temporal scalar quoting", () => {
   const users = new Table("users");
 
-  // `when Type::Time::Value then quoted_time` (abstract/quoting.rb:102) —
-  // trails' analogue is Temporal.PlainTime, which carries no date to emit.
   it("quotes a time value as a db time", () => {
     const t = Temporal.PlainTime.from("14:23:55");
     expect(
@@ -136,8 +122,6 @@ describe("Temporal scalar quoting", () => {
 describe("quotedDate normalisation", () => {
   const users = new Table("users");
 
-  // `value.getutc` (abstract/quoting.rb:186-188): a zoned value converts to the
-  // serialization zone rather than emitting its own wall clock.
   it("converts a zoned value instead of emitting its wall clock", () => {
     const z = Temporal.Instant.from("2026-04-26T14:23:55Z").toZonedDateTimeISO("America/New_York");
     expect(
@@ -145,7 +129,6 @@ describe("quotedDate normalisation", () => {
     ).toContain("'2026-04-26 14:23:55'");
   });
 
-  // Rails' `to_fs(:db)` never emits a zero-padded negative year like "00-1".
   it("keeps the sign on a negative year", () => {
     const d = new Temporal.PlainDate(-1, 4, 26);
     expect(

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/date_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
@@ -18,7 +15,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlDateTest", () => {
     it("load infinity and beyond", async () => {
-      // Rails: Topic.find_by_sql("SELECT 'infinity'::date AS last_read").first
       const pos = await adapter.execute("SELECT 'infinity'::date AS val");
       expect(pos[0].val).toBe(DateInfinity);
       const neg = await adapter.execute("SELECT '-infinity'::date AS val");
@@ -26,9 +22,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("save infinity and beyond", async () => {
-      // Rails: Topic.create!(last_read: Float::INFINITY) → reloads DateInfinity.
-      // TS: use OidDate.serialize to produce the wire string, INSERT via raw SQL,
-      // read back through the type parser.
       const oidDate = new OidDate();
       await adapter.exec("DROP TABLE IF EXISTS pg_dates_inf");
       await adapter.exec("CREATE TABLE pg_dates_inf (id serial primary key, last_read date)");
@@ -46,7 +39,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("bc date", async () => {
-      // Rails: Date.new(0) - 1.week = Dec 25, ISO year -1 (2 BC in Postgres).
       const oidDate = new OidDate();
       const date = oidDate.castValue("0002-12-25 BC") as Temporal.PlainDate;
       expect(date.year).toBe(-1);
@@ -61,7 +53,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("bc date leap year", async () => {
-      // Rails: Date.new(-4, 2, 29) = Feb 29, ISO year -4 (5 BC in Postgres).
       const oidDate = new OidDate();
       const date = oidDate.castValue("0005-02-29 BC") as Temporal.PlainDate;
       expect(date.year).toBe(-4);
@@ -76,7 +67,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("bc date year zero", async () => {
-      // Rails: Date.new(0, 4, 7) = Apr 7, ISO year 0 (1 BC in Postgres).
       const oidDate = new OidDate();
       const date = oidDate.castValue("0001-04-07 BC") as Temporal.PlainDate;
       expect(date.year).toBe(0);

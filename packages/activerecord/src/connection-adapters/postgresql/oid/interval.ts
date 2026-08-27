@@ -1,12 +1,3 @@
-/**
- * PostgreSQL interval type — represents a time duration.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Interval.
- * Rails: `class Interval < Type::Value`. cast_value accepts Duration
- * or ISO8601 string; serialize emits ISO8601; type_cast_for_schema
- * inspects the serialized form.
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
 
@@ -25,10 +16,6 @@ export class Interval extends ValueType<Duration> {
     return this.castValue(value);
   }
 
-  /**
-   * Rails' cast_value — exposed publicly so parity:api matches the
-   * Rails method name and callers can invoke the hook directly.
-   */
   castValue(value: unknown): Duration | null {
     if (value == null) return null;
     if (value instanceof Duration) return value;
@@ -36,21 +23,10 @@ export class Interval extends ValueType<Duration> {
       try {
         return Duration.parse(value);
       } catch {
-        // Mirrors Rails: rescue ISO8601Parser::ParsingError → nil. Our
-        // PG adapter sets `intervalstyle = iso_8601` per session so AVG
-        // and SELECT interval results arrive in ISO 8601 form that
-        // Duration.parse accepts directly. For schema reflection,
-        // pg_get_expr returns a casted form like `'P3Y'::interval`; the
-        // adapter's extractValueFromDefault strips the cast before this method
-        // sees `"P3Y"`.
         return null;
       }
     }
     if (typeof value === "number") {
-      // Rails' cast_value lets numeric inputs fall through to super (identity),
-      // then serialize converts. TS is typed `Duration | null`, so we upgrade
-      // numeric seconds into a Duration here — same observable behaviour
-      // through the cast → serialize pipeline.
       return Duration.build(value);
     }
     return null;
@@ -62,9 +38,6 @@ export class Interval extends ValueType<Duration> {
       return value.iso8601({ precision: this.precision ?? null });
     }
     if (typeof value === "number") {
-      // Rails: `Time - Time` yields a Float seconds count that reaches
-      // serialize directly (without going through cast). Keep a numeric
-      // branch so that path still round-trips.
       return Duration.build(value).iso8601({ precision: this.precision ?? null });
     }
     if (typeof value === "string") return value;
@@ -74,7 +47,6 @@ export class Interval extends ValueType<Duration> {
   override typeCastForSchema(value: unknown): string {
     const serialized = this.serialize(value);
     if (serialized == null) return "nil";
-    // Rails: `serialize(value).inspect` — quote the string for schema dump.
     return `"${serialized.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
 }

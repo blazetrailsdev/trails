@@ -11,8 +11,6 @@ const bd = (value: string) => new BigDecimal(value);
 
 describe("DecimalTypeTrails", () => {
   it("convertFloatToBigDecimal: precision rounds significant digits before scale", () => {
-    // Mirrors Rails BigDecimal(value, float_precision) — Type::Decimal.new(precision: 3).cast(1.2346)
-    // rounds the input to 3 significant digits ("1.23") before any scale: pass.
     const type = new Types.DecimalType({ precision: 3 });
     expect(type.cast(1.2346)).toEqual(bd("1.23"));
     expect(type.cast(1234.5)).toEqual(bd("1230"));
@@ -32,15 +30,12 @@ describe("DecimalTypeTrails", () => {
   });
 
   it("apply_scale rounds to a multiple of ten for a negative scale", () => {
-    // Ruby `BigDecimal#round(-1)` rounds to a multiple of 10 ** 1, so
-    // apply_scale passes a negative `scale:` straight through to it.
     expect(new Types.DecimalType({ scale: -1 }).cast("14")).toEqual(bd("10"));
     expect(new Types.DecimalType({ scale: -1 }).cast("15")).toEqual(bd("20"));
     expect(new Types.DecimalType({ scale: -1 }).cast("-15")).toEqual(bd("-20"));
   });
 
   it("apply_scale rounds half away from zero", () => {
-    // Ruby BigDecimal#round default is ROUND_HALF_UP (away from zero).
     const type = new Types.DecimalType({ scale: 2 });
     expect(type.cast("1.005")).toEqual(bd("1.01"));
     expect(type.cast("-1.005")).toEqual(bd("-1.01"));
@@ -87,8 +82,6 @@ describe("DecimalType cast and serialize coverage", () => {
   });
 
   it("type cast decimal from invalid string", () => {
-    // Mirrors Rails decimal_test.rb — "" nils out; leading-numeric
-    // prefix is kept; no-numeric-prefix returns BigDecimal(0).
     expect(type.cast("")).toBe(null);
     expect(type.cast("1ignore")).toEqual(bd("1"));
     expect(type.cast("bad1")).toEqual(bd("0"));
@@ -129,10 +122,6 @@ describe("DecimalType cast and serialize coverage", () => {
   });
 
   it("casts ±Infinity (BigDecimal Infinity sentinel) — number and string forms", () => {
-    // Rails routes Float through `value.to_d`, and `Float::INFINITY.to_d`
-    // yields BigDecimal::INFINITY ("Infinity") rather than nil. With decimals
-    // modelled as strings the value round-trips as the "Infinity"/"-Infinity"
-    // sentinel (the JS ±Infinity on assignment, the string from PG on load).
     const type = new Types.DecimalType();
     expect(type.cast(Infinity)).toBe("Infinity");
     expect(type.cast(-Infinity)).toBe("-Infinity");

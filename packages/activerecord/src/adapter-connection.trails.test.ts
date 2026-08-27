@@ -1,18 +1,3 @@
-/**
- * Trails-only adapter connection/lifecycle unit coverage (RFC 0048).
- *
- * These guard trails-internal behavior with no counterpart in Rails'
- * `AdapterConnectionTest` (adapter_test.rb): the retryable-classification
- * threading through the Arel collector, `findBySql`'s null-opts tolerance,
- * the `execQuery` options type, `withRawConnection` reentrancy, and the
- * `AbstractAdapter#reconnectBang` / `#verifyBang` lifecycle driven directly
- * against a base-controlled fake adapter (independent of a concrete adapter's
- * raw-connection wiring).
- *
- * They live in a `*.trails.test.ts` file so `parity:test` does not map them
- * to a Rails test name — the faithful, integration-level `AdapterConnectionTest`
- * port lives in `adapter.test.ts`.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -24,11 +9,6 @@ import { Result } from "./result.js";
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
 
-  // The abstract quote_column_name raises NotImplementedError (quoting.rb:60-63)
-  // and every real adapter defines its own in `ClassMethods`
-  // (sqlite3/quoting.rb:44, postgresql/quoting.rb:46), which is where the
-  // inherited instance methods send it (quoting.rb:135-143). These test adapters
-  // compile real SQL through Arel, so define the quoter there too.
   static override quoteColumnName(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
   }
@@ -47,8 +27,6 @@ class LifecycleTestAdapter extends AbstractAdapter {
     return this._connected;
   }
 
-  // `load_schema!` reaches this via `schema_cache.data_source_exists?`; without
-  // it the abstract `data_source_sql` raises (schema_statements.rb).
   override async dataSources(): Promise<string[]> {
     return [];
   }
@@ -70,9 +48,6 @@ class QueryTestAdapter extends LifecycleTestAdapter {
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
-    // `select_all` derives allow_retry from `to_sql_and_binds`' collector
-    // (database_statements.rb:29-45, :69-71), which is what the relation now
-    // hands it an Arel manager for.
     const [, , , allowRetry] = (
       this as unknown as {
         toSqlAndBinds(
@@ -114,9 +89,6 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
     await PostForRetryTest.where({ id: 1 }).from(fromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(true);
 
-    // A non-retryable FROM node lowers the classification even when the rest
-    // of the SELECT is retryable — Rails compiles the whole arel through one
-    // collector, so the raw FROM fragment makes allow_retry false.
     const rawFromNode = new Nodes.SqlLiteral("posts");
     await PostForRetryTest.where({ id: 1 }).from(rawFromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
@@ -135,11 +107,6 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   });
 
   it("withRawConnection is reentrant", async () => {
-    // Rails' with_raw_connection runs under a reentrant Monitor and is
-    // documented to re-enter (abstract_adapter.rb:972-981): materialize_
-    // transactions re-enters, and the yielded block can too (e.g. a write
-    // path's exec_restart_db_transaction → execute). A nested call on the same
-    // chain must run directly, not queue behind the held lock and deadlock.
     const a = new AbstractAdapter();
     let innerRan = false;
     const result = await a.withRawConnection(async () => {
@@ -153,10 +120,6 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   });
 });
 
-// Drives AbstractAdapter#reconnectBang / #verifyBang lifecycle directly,
-// independent of a concrete adapter's raw-connection wiring. Mirrors the
-// observable effects of Rails' `reconnect!` / `verify!` / `configure_connection`
-// chain (abstract_adapter.rb).
 class ReconnectLifecycleAdapter extends AbstractAdapter {
   configureCalls = 0;
   clearCacheCalls = 0;

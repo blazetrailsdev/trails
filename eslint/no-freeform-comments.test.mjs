@@ -9,232 +9,312 @@ const tester = new RuleTester({
   },
 });
 
+const prose = [{ messageId: "prose" }];
+const freeform = [{ messageId: "freeform" }];
+
 tester.run("no-freeform-comments", rule, {
   valid: [
-    // JSDoc is where every port convention lives.
-    { code: `/** Mirrors: ActiveRecord::Relation#where. */\nexport function where() {}\n` },
-    { code: `/**\n * @internal\n */\nconst x = 1;\n` },
-    // A tagless JSDoc documenting a declaration is still JSDoc. Ordinary API
-    // documentation looks exactly like this and is untouched; what closes the
-    // reformat-to-`/** */` bypass is position, not content — see the
-    // "JSDoc must document something" block below.
-    { code: `/** The engine every manager compiles against. */\nexport const engine = 1;\n` },
-    // Rails citations, in every spelling the packages actually use.
-    { code: `// query_methods.rb:1604\nconst x = 1;\n` },
-    {
-      code: `// Mirrors Rails: \`Nodes::Extract.new [self], field\` (expressions.rb).\nconst x = 1;\n`,
-    },
-    { code: `// ActiveRecord::Base does this in two passes.\nconst x = 1;\n` },
-    { code: `// Ruby's \`nil\` is falsy; JS \`0\` is not.\nconst x = 1;\n` },
+    { code: `/** @internal */\nconst x = 1;\n` },
+    { code: `/** @noRailsEquivalent PERMANENT */\nexport const x = 1;\n` },
+    { code: `/** @noRailsEquivalent CONVERGEABLE */\nexport const x = 1;\n` },
+    { code: `/** @missingRailsCall PERMANENT */\nconst x = 1;\n` },
+    { code: `/** @missingRailsArgs CONVERGEABLE */\nconst x = 1;\n` },
+    { code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT\n */\nconst x = 1;\n` },
     // Tool directives change behaviour when deleted.
     { code: `// eslint-disable-next-line no-unused-vars\nconst x = 1;\n` },
     { code: `// @ts-expect-error deliberate\nconst x = 1;\n` },
     { code: `// prettier-ignore\nconst x = 1;\n` },
-    // One line of a wrapped block carrying the citation keeps the whole block.
+    { code: `// v8 ignore next\nconst x = 1;\n` },
+    { code: `// boundary: legacy Date value\nconst x = 1;\n` },
     {
-      code: `// The visitor dispatches on node class, not on arity, because\n// visitors.rb:41 does the same.\nconst x = 1;\n`,
+      code: `// @nie disposition=keep-as-strategy-hook rails=arel/visitors/to_sql.rb:194 cluster=arel-visitor-strategy\nconst x = 1;\n`,
     },
+    // A file with no statements is all comment and is left alone.
+    { code: `// a licence header, and nothing else\n` },
   ],
   invalid: [
-    // There is no opt-out marker. `keep:` was the rule's escape hatch and was
-    // removed unused — a comment now earns JSDoc or a citation, or it goes.
+    // Narration goes, with no opt-out marker.
     {
-      code: `// keep: the ordering here is load-bearing for the pool.\nconst x = 1;\n`,
+      code: `// keep: still narration\nconst x = 1;\n`,
+      errors: freeform,
       output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
     },
-    // A standalone comment takes its whole line with it.
     {
-      code: `// this adds two numbers\nconst x = 1 + 1;\n`,
-      output: `const x = 1 + 1;\n`,
-      errors: [{ messageId: "freeform" }],
-    },
-    // A trailing comment keeps the code and loses the preceding space.
-    {
-      code: `const x = 1; // obvious\n`,
+      code: `// The visitor dispatches on node class, not on arity.\nconst x = 1;\n`,
+      errors: freeform,
       output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
     },
-    // A non-JSDoc block comment is free-form.
+    // A contiguous run of `//` lines is one comment and goes whole.
     {
-      code: `/* just a note */\nconst x = 1;\n`,
+      code: `// The visitor dispatches on node class,\n// not on arity.\nconst x = 1;\n`,
+      errors: freeform,
       output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
     },
-    // A wrapped run with no citation anywhere is one report, deleted whole.
-    {
-      code: `// first line of narration\n// second line of narration\nconst x = 1;\n`,
-      output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
-    },
-    // Indentation is consumed too, so no blank-ish line is left behind.
-    {
-      code: `function f() {\n  // narration\n  return 1;\n}\n`,
-      output: `function f() {\n  return 1;\n}\n`,
-      errors: [{ messageId: "freeform" }],
-    },
-    // Two separated comments are two reports, not one.
-    {
-      code: `// one\nconst x = 1;\n// two\nconst y = 2;\n`,
-      output: `const x = 1;\nconst y = 2;\n`,
-      errors: [{ messageId: "freeform" }, { messageId: "freeform" }],
-    },
-    // Section banners carry no information the code does not.
-    {
-      code: `// ---------------------------------------------------------------\n// Statements\n// ---------------------------------------------------------------\nconst x = 1;\n`,
-      output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
-    },
+    // A trailing comment keeps its line of code.
+    { code: `const x = 1; // the engine\n`, errors: freeform, output: `const x = 1;\n` },
   ],
 });
 
-// Audit mode reports without fixing, so a survey run cannot mutate the tree.
-tester.run("no-freeform-comments (report mode)", rule, {
+// Rails citations were kept until 2026-08-27 on the theory that a pointer is
+// not a sentence. They are now deleted like any other comment: the Ruby is
+// vendored, and a line number rots the moment Rails edits the file above it.
+tester.run("no-freeform-comments (Rails citations are not kept)", rule, {
   valid: [],
   invalid: [
     {
-      code: `// narration\nconst x = 1;\n`,
-      options: [{ report: true }],
-      output: null,
-      errors: [{ messageId: "freeform" }],
+      code: `// query_methods.rb:1604\nconst x = 1;\n`,
+      errors: freeform,
+      output: `const x = 1;\n`,
+    },
+    {
+      code: `/** Mirrors: ActiveRecord::Relation#where. */\nexport function where() {}\n`,
+      errors: prose,
+      output: `export function where() {}\n`,
+    },
+    {
+      code: `// Mirrors Rails: \`Nodes::Extract.new [self], field\` (expressions.rb).\nconst x = 1;\n`,
+      errors: freeform,
+      output: `const x = 1;\n`,
+    },
+    {
+      code: `// ActiveRecord::Base does this in two passes.\nconst x = 1;\n`,
+      errors: freeform,
+      output: `const x = 1;\n`,
+    },
+    {
+      code: `// Ruby's \`nil\` is falsy; JS \`0\` is not.\nconst x = 1;\n`,
+      errors: freeform,
+      output: `const x = 1;\n`,
+    },
+    // A citation no longer rescues the sentence it was anchoring.
+    {
+      code: `// The visitor dispatches on node class, not on arity, because\n// visitors.rb:41 does the same.\nconst x = 1;\n`,
+      errors: freeform,
+      output: `const x = 1;\n`,
     },
   ],
 });
 
-// `boundary:` / `@boundary-file:` are directives this repo's own
-// `no-native-date` rule reads, so deleting one reds that rule rather than
-// merely losing a note. They are accepted anywhere in the comment because
-// `no-native-date` accepts them mid-line.
-tester.run("no-freeform-comments (boundary directives)", rule, {
+// Position no longer confers a keep: a descriptive summary on a declaration is
+// exactly the form the policy names, so JSDoc earns its place by carrying a
+// flag or it goes.
+tester.run("no-freeform-comments (descriptive JSDoc goes)", rule, {
+  valid: [],
+  invalid: [
+    {
+      code: `/** The engine every manager compiles against. */\nexport const engine = 1;\n`,
+      errors: prose,
+      output: `export const engine = 1;\n`,
+    },
+    { code: `/** Add GROUP BY. */\nfunction f() {}\n`, errors: prose, output: `function f() {}\n` },
+    { code: `/** The engine. */\nclass C {}\n`, errors: prose, output: `class C {}\n` },
+    {
+      code: `class C {\n  /** The name. */\n  name = 1;\n}\n`,
+      errors: prose,
+      output: `class C {\n  name = 1;\n}\n`,
+    },
+  ],
+});
+
+// A tag document carries simple data or nothing. The English reason that used
+// to follow a tag is prose in a tag's clothing, so the fix rewrites the block
+// down to the tag and the permanence token the extractors switch on.
+tester.run("no-freeform-comments (tag documents keep data, not prose)", rule, {
+  valid: [],
+  invalid: [
+    {
+      code: `/** Mirrors: X. @internal */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @internal */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * Sets the FROM table.\n *\n * @internal\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @internal */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * @noRailsEquivalent PERMANENT — Ruby's \`@connection\` is duck-typed, so\n * no Ruby file declares the shape.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * @param a the first one\n * @returns the sum\n * @internal\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @internal */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * Prose.\n * @internal\n * @noRailsEquivalent CONVERGEABLE — a reason.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/**\n * @internal\n * @noRailsEquivalent CONVERGEABLE\n */\nconst x = 1;\n`,
+    },
+    // `@param` / `@returns` / `@example` carry English by construction and
+    // nothing reads them, so a block of them alone goes entirely.
+    {
+      code: `/**\n * @param a the first one\n * @returns the sum\n */\nfunction f(a) {}\n`,
+      errors: prose,
+      output: `function f(a) {}\n`,
+    },
+  ],
+});
+
+// A directive comment is machine input and is left byte-identical, prose and
+// all. Rewriting it is what turned `/* eslint-disable X -- why */` into
+// `/** eslint-disable X */` on the first fix pass; the second pass no longer
+// recognised that as a directive and deleted it, silently un-suppressing the
+// rule it was holding off.
+tester.run("no-freeform-comments (directive comments are untouched)", rule, {
   valid: [
-    { code: `// boundary: the JS Date is matched only to refuse it, per #939\nconst x = 1;\n` },
-    { code: `// @boundary-file: adapter marshalling\nconst x = 1;\n` },
-    { code: `const x = 1; /* boundary: */\n` },
+    {
+      code: `/* eslint-disable no-console --\n   Each model spells the include in its class body.\n   The empty merge beside it is how include() surfaces the members. */\nconst x = 1;\n`,
+    },
+    { code: `/* eslint-disable no-console */\nconst x = 1;\n` },
+    { code: `/* eslint-enable no-console */\nconst x = 1;\n` },
+    // Recognised even wearing a JSDoc `*` continuation, so a directive that
+    // ever lands inside a block comment is never mistaken for prose.
+    { code: `/**\n * eslint-disable no-console\n */\nconst x = 1;\n` },
+    // A trailing directive keeps the prose that documents which rule it lifts.
+    { code: `const x = 1; // eslint-disable-line no-console -- the CLI prints here\n` },
   ],
   invalid: [],
 });
 
-// `@nie disposition=` is required on every `throw new NotImplementedError(...)`
-// by `nie-requires-annotation`, so deleting one reds that rule.
-tester.run("no-freeform-comments (nie disposition directives)", rule, {
+// `@empty` marks an intentionally-empty block. ESLint's `no-empty` ignores a
+// block containing a comment, so an empty Rails arm stayed legal only because
+// the sentence explaining it was there. `@empty` is that comment with the
+// English removed, and any prose written beside it is stripped like any other.
+tester.run("no-freeform-comments (@empty marks an intentionally-empty block)", rule, {
   valid: [
-    { code: `// @nie disposition=TODO\nconst x = 1;\n` },
-    { code: `// @nie disposition=port-real rails=relation.rb:12 cluster=foo\nconst x = 1;\n` },
+    { code: `if (a) {\n  /** @empty */\n}\n` },
+    { code: `try {\n  f();\n} catch {\n  /** @empty */\n}\n` },
+  ],
+  invalid: [
+    {
+      code: `if (a) {\n  /** @empty — Rails takes no action on this arm. */\n}\n`,
+      errors: prose,
+      output: `if (a) {\n  /** @empty */\n}\n`,
+    },
+    // Without the marker an explanatory comment is prose and goes, which is
+    // what empties the block.
+    {
+      code: `if (a) {\n  // Rails takes no action on this arm.\n}\n`,
+      errors: freeform,
+      output: `if (a) {\n}\n`,
+    },
+  ],
+});
+
+// A directive does not rescue the prose that happens to sit next to it. A
+// contiguous run of `//` lines is grouped so a wrapped sentence is judged
+// whole, but a directive line is its own comment: skipping the whole group on
+// its account would keep every sentence written above an `eslint-disable`.
+tester.run("no-freeform-comments (a directive does not rescue its neighbours)", rule, {
+  valid: [],
+  invalid: [
+    {
+      code: `// Rails' second failure terminal: no handler on the class.\n// eslint-disable-next-line no-console\nconsole.log(1);\n`,
+      errors: freeform,
+      output: `// eslint-disable-next-line no-console\nconsole.log(1);\n`,
+    },
+    {
+      code: `// eslint-disable-next-line no-console\nconsole.log(1);\n// Trailing narration.\nconst x = 1;\n`,
+      errors: freeform,
+      output: `// eslint-disable-next-line no-console\nconsole.log(1);\nconst x = 1;\n`,
+    },
+  ],
+});
+
+// `@deprecated` is required by `blazetrails/rails-deprecated-jsdoc` wherever
+// Rails deprecates the member. Stripping it set the two rules fighting — one
+// deleting the tag, the other re-adding it — which ESLint reports as a
+// circular fix and which leaves the file in whichever state the last pass won.
+tester.run("no-freeform-comments (@deprecated survives)", rule, {
+  valid: [{ code: `/** @deprecated */\nexport function unsignedFloat() {}\n` }],
+  invalid: [
+    {
+      code: `/** Deprecated in Rails 5.1. @deprecated use float instead. */\nexport function unsignedFloat() {}\n`,
+      errors: prose,
+      output: `/** @deprecated */\nexport function unsignedFloat() {}\n`,
+    },
+  ],
+});
+
+// A tag's arguments are data and stay; only the English reason after the
+// permanence claim goes. `@missingRailsCall`'s ruby_call NAMES which Rails
+// call is unmade — dropping it left the tag saying nothing, and
+// `scripts/api-compare/build.ts` fails the run on a tag with no subject.
+tester.run("no-freeform-comments (tag arguments are data)", rule, {
+  valid: [
+    { code: `/** @missingRailsCall with_connection — PERMANENT */\nconst x = 1;\n` },
+    { code: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n` },
+  ],
+  invalid: [
+    {
+      code: `/** @missingRailsCall with_connection — PERMANENT: Rails is \`@arel ||= ...\`. */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @missingRailsCall with_connection — PERMANENT */\nconst x = 1;\n`,
+    },
+    // The reason wraps across lines; the data is still read from the whole tag.
+    {
+      code: `/**\n * @missingRailsArgs change — PERMANENT: time/calculations.rb:256-263 passes\n *   a different hash here.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @missingRailsArgs change — PERMANENT */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * @noRailsEquivalent PERMANENT — Ruby's \`@connection\` is duck-typed, so no\n * Ruby file declares the shape.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n`,
+    },
+    // Several tags in one block each keep their own data.
+    {
+      code: `/**\n * Prose.\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE: not yet ported.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/**\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE\n */\nconst x = 1;\n`,
+    },
+  ],
+});
+
+// A tag whose required argument is missing cannot be reduced to data. A bare
+// `@noRailsEquivalent` / `@missingRailsCall` fails the empty-reason contract
+// that `scripts/api-compare/missing-rails-call-tags.ts` and `extract-ts-api.ts`
+// enforce, and inventing the permanence claim would fabricate a reviewed
+// judgement — so the comment is left exactly as written.
+tester.run("no-freeform-comments (an unclassifiable tag is left alone)", rule, {
+  valid: [
+    { code: `/** @noRailsEquivalent Ruby needs no name for a duck type. */\nconst x = 1;\n` },
+    {
+      code: `/**\n * @noRailsEquivalent Serves trails' awaitable \`serializable_hash\`.\n */\nconst x = 1;\n`,
+    },
+    { code: `/** @missingRailsCall merge! — it is inlined here. */\nconst x = 1;\n` },
   ],
   invalid: [],
 });
 
-// Rails' OWN comments go too. The Ruby is vendored at `vendor/rails/` and the
-// ported file cites it, so copying its annotations across duplicates them into
-// a second place that rots the moment Rails edits them. A comment that names
-// the Ruby is a pointer and survives (rule 2); a comment that restates it does
-// not.
-tester.run("no-freeform-comments (Rails' own comments are not privileged)", rule, {
-  valid: [
-    // A pointer to the Ruby, which is what replaces copying the comment.
-    { code: `// Mirrors arel/nodes/window.rb:15\nconst x = 1;\n` },
-  ],
+// A kept tag must LEAD its line, the rule the extractors apply. Matching one
+// mid-sentence read a quoted mention inside a reason as a second tag —
+// `which is itself \`@noRailsEquivalent PERMANENT\` for ...` minted a duplicate,
+// and TypeScript then truncates the real reason at it, dropping the
+// declaration out of the compared surface
+// (sqlite3-adapter.ts:2889, caught by `pnpm parity:api`).
+tester.run("no-freeform-comments (a quoted tag in prose is not a tag)", rule, {
+  valid: [],
   invalid: [
-    // arel/nodes/window.rb:15, carried across verbatim by the port.
     {
-      code: `// FIXME: We SHOULD NOT be converting these to SqlLiteral automatically\nconst x = 1;\n`,
-      output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
-    },
-    // activemodel/lib/active_model/locale/en.yml:3
-    {
-      code: `// The default format to use in full error messages.\nconst x = 1;\n`,
-      output: `const x = 1;\n`,
-      errors: [{ messageId: "freeform" }],
+      code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT — a consequence of SQLite3DateTime,\n * which is itself \`@noRailsEquivalent PERMANENT\` for the Temporal reason\n * that class documents.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/**\n * @internal\n * @noRailsEquivalent PERMANENT\n */\nconst x = 1;\n`,
     },
   ],
 });
 
-// Keep-rule 1 is positional: a JSDoc block is kept where it DOCUMENTS
-// something, and deleted where it documents nothing. That is what stops a
-// doomed `//` comment from buying a pass by being reformatted to `/** */`,
-// without touching the 94 pre-existing tagless API-doc blocks in arel and
-// activemodel — every one of which sits on a declaration.
-tester.run("no-freeform-comments (JSDoc must document something)", rule, {
+// `drift-ok:` is read by `scripts/mixin-declaration-drift.ts` (its `WAIVER`),
+// which waives a declared-vs-mixin signature difference. Deleting the one on
+// `buildCreateIndexDefinition` red every AR lane, and the failure named a type
+// mismatch rather than a missing comment.
+tester.run("no-freeform-comments (drift-ok: is a directive)", rule, {
   valid: [
-    // Declarations, in the spellings the packages actually use.
-    { code: `/** The engine. */\nfunction f() {}\n` },
-    { code: `/** The engine. */\nclass C {}\n` },
-    { code: `/** A row. */\ntype Row = { id: number };\n` },
-    { code: `/** A row. */\ninterface Row {\n  /** Its key. */\n  id: number;\n}\n` },
-    { code: `/** Set the FROM table. */\nexport function from() {}\n` },
-    // Class and object members.
     {
-      code: `class C {\n  /** Add GROUP BY. */\n  group() {}\n  /** The engine. */\n  engine = 1;\n}\n`,
-    },
-    { code: `const o = {\n  /** Wrap as EXISTS(subquery). */\n  exists: 1,\n};\n` },
-    // A parameter, which JSDoc documents in place as often as by `@param`.
-    { code: `function f(\n  /** The engine. */\n  engine: number,\n) {\n  return engine;\n}\n` },
-    // A definition-shaped statement, at top level or nested: the
-    // `describe(...)` file headers the packages already carry, the `it(...)`
-    // headers inside them, and an assignment that names what it assigns (the
-    // repo's `Model.aliasAttribute = aliasAttribute` mixin idiom). Being
-    // top-level is NOT what earns the keep — see the bare-statement case in
-    // `invalid`.
-    { code: `/** What this file covers. */\ndescribe("Relation", () => {});\n` },
-    { code: `/** Convenience factory. */\ntaggedLogging.logger = function () {};\n` },
-    {
-      code: `/** Mixed in from attribute-methods.ts. */\nModel.aliasAttribute = aliasAttribute;\n`,
-    },
-    {
-      code: `describe("Relation", () => {\n  /** Why this asserts the property and not the boot baseline. */\n  it("fingerprints deterministically", () => {});\n});\n`,
-    },
-    // A tag or a Rails reference keeps a block wherever it sits — the tags are
-    // the port's own conventions and tooling reads several of them.
-    { code: `function f() {\n  /**\n   * @internal\n   */\n  return 1;\n}\n` },
-    { code: `function f() {\n  /** Mirrors: query_methods.rb:1604. */\n  return 1;\n}\n` },
-    // Every `include(...)` mixin-wiring note in the packages is of this shape:
-    // it cites the Ruby include it mirrors, so rule 2 keeps it. `include(C, M)`
-    // takes no function, so position alone would not — and should not, since
-    // nothing distinguishes an uncited one from `registerFoo()` below.
-    {
-      code: `/** Mirrors attribute.rb:6-10, in Rails' include order. */\ninclude(Attribute, Expressions);\n`,
-    },
-    // A file with no statements has no documenting position to attach to, so
-    // its comments are the whole file and are kept rather than erased.
-    { code: `/** This file is intentionally empty. */\n` },
-  ],
-  invalid: [
-    // The bypass itself: narration reformatted from `//` to `/** */`.
-    {
-      code: `function f() {\n  /** now we add the two numbers */\n  return 1 + 1;\n}\n`,
-      output: `function f() {\n  return 1 + 1;\n}\n`,
-      errors: [{ messageId: "floatingJsDoc" }],
-    },
-    // Module scope is not a documenting position either. A bare top-level
-    // statement documents no more than one inside a body does, so exempting it
-    // would reopen this bypass one scope up.
-    {
-      code: `/** now register the thing */\nregisterFoo();\n`,
-      output: `registerFoo();\n`,
-      errors: [{ messageId: "floatingJsDoc" }],
-    },
-    // Floating before a branch, before a bare call, and at the end of a block.
-    {
-      code: `function f(x) {\n  /** the guard below is load-bearing */\n  if (x) return 1;\n  return 2;\n}\n`,
-      output: `function f(x) {\n  if (x) return 1;\n  return 2;\n}\n`,
-      errors: [{ messageId: "floatingJsDoc" }],
-    },
-    {
-      code: `function f(o) {\n  /** flush first */\n  o.flush();\n}\n`,
-      output: `function f(o) {\n  o.flush();\n}\n`,
-      errors: [{ messageId: "floatingJsDoc" }],
-    },
-    {
-      code: `function f() {\n  return 1;\n  /** trailing narration */\n}\n`,
-      output: `function f() {\n  return 1;\n}\n`,
-      errors: [{ messageId: "floatingJsDoc" }],
-    },
-    // A non-JSDoc block in the same position is the plain free-form report.
-    {
-      code: `function f() {\n  /* now we add the two numbers */\n  return 1 + 1;\n}\n`,
-      output: `function f() {\n  return 1 + 1;\n}\n`,
-      errors: [{ messageId: "freeform" }],
+      code: `interface I {\n  /**\n   * drift-ok: concrete adapters may return \`undefined\`, so the declared\n   * return type widens the base.\n   */\n  f(): void;\n}\n`,
     },
   ],
+  invalid: [],
 });

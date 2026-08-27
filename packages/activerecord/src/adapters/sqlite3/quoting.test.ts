@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/quoting_test.rb
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -11,7 +8,6 @@ import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.j
 
 let adapter: SQLite3Adapter;
 
-// -- Rails test class: quoting_test.rb --
 describeIfSqlite("SQLite3QuotingTest", () => {
   fixtures([]);
 
@@ -128,8 +124,6 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
   it("quote numeric infinity", async () => {
     await adapter.exec(`CREATE TABLE "inf_test" ("id" INTEGER PRIMARY KEY, "val" REAL)`);
-    // Mirrors Rails SQLite3::Quoting#type_cast: Float::INFINITY → nil.
-    // Binds pass through sqliteTypeCast before driver hand-off, so Infinity → null.
     await adapter.executeMutation(`INSERT INTO "inf_test" ("val") VALUES (?)`, [Infinity]);
     const rows = await adapter.execute(`SELECT "val" FROM "inf_test"`);
     expect(rows[0].val).toBeNull();

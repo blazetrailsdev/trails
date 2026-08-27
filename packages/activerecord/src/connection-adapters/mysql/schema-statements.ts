@@ -1,9 +1,3 @@
-/**
- * MySQL schema statements — MySQL-specific DDL operations.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (module)
- */
-
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
@@ -25,34 +19,8 @@ import type { Result } from "../../result.js";
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
-/**
- * MySQL-specific SchemaStatements subclass.
- *
- * Mixed into AbstractMysqlAdapter at the bottom of `abstract-mysql-adapter.ts`,
- * mirroring `include MySQL::SchemaStatements`.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
- */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
-  /**
-   * Return user-defined indexes for the given table. Mirrors Rails'
-   * MySQL `indexes`: reads `SHOW KEYS FROM <table>`, skips the primary
-   * key, groups multi-column indexes by `Key_name`, maps `Index_type`
-   * (btree/hash → `using`; fulltext/spatial → `type`), and wraps
-   * functional-index `Expression` values in parens (unescaping `\'`).
-   * Returns `[]` when the table doesn't exist, matching Rails' rescue.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
-   *
-   * @missingRailsCall order:constructor,quoteColumnName — PERMANENT: Verified per-site (RFC
-   *   0106): mysql/schema_statements.rb:66-70 builds the expression-index column
-   *   map with `index[-1].to_h { |name| [name.to_sym, expressions[name] ||
-   *   quote_column_name(name)] }`. Ruby `Array#to_h` takes a block and emits no
-   *   constructor; its faithful JS spelling is `new Map(indexColumns.map(...))`,
-   *   so the `Map` constructor is the `to_h` itself and necessarily precedes the
-   *   `quoteColumnName` calls the block makes. Nothing in the TS body was
-   *   dropped or resequenced relative to Rails.
-   */
+  /** @missingRailsCall order:constructor,quoteColumnName — PERMANENT */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     let rows: Array<Record<string, unknown>>;
     try {
@@ -60,8 +28,6 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
         await this.internalExecQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`, "SCHEMA")
       ).toArray();
     } catch (e) {
-      // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
-      // rather than propagating ER_NO_SUCH_TABLE.
       const message = `${(e as { message?: string })?.message ?? ""} ${
         (e as { cause?: { message?: string } })?.cause?.message ?? ""
       }`;
@@ -99,13 +65,10 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
           using = idxType;
         }
         const nonUnique = Number(r.Non_unique ?? r.NON_UNIQUE ?? 0);
-        // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
         const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
         const comment =
           rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
         byIndex.set(keyName, {
-          // Rails stores `row["Table"]` in the tuple (mysql/schema_statements.rb:24)
-          // and builds the IndexDefinition from it (`:67`), not from the argument.
           table: String((r.Table ?? r.TABLE) as string),
           columns: [],
           unique: nonUnique === 0,
@@ -119,13 +82,9 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       }
 
       const entry = byIndex.get(currentIndex)!;
-      // Mirrors Rails' `row[:Collation] == "D"` — descending column/expression.
       const desc = String((r.Collation ?? r.COLLATION) as string) === "D";
       const rawExpr = r.Expression ?? r.EXPRESSION;
       if (rawExpr != null) {
-        // MySQL 8+ functional indexes carry the raw SQL in `Expression` (and
-        // NULL in `Column_name`). Unescape `\'` then wrap in parens unless the
-        // expression already is, matching Rails' IndexDefinition shape.
         let expr = String(rawExpr).replace(/\\'/g, "'");
         if (!expr.startsWith("(")) expr = `(${expr})`;
         entry.columns.push(expr);
@@ -134,7 +93,6 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       } else {
         const column = String((r.Column_name ?? r.COLUMN_NAME) as string);
         entry.columns.push(column);
-        // Mirrors Rails' `lengths.merge!(col => Sub_part.to_i) if row[:Sub_part]`.
         const subPart = r.Sub_part ?? r.SUB_PART;
         if (subPart != null) entry.lengths[column] = Number(subPart);
         if (desc) entry.orders[column] = "desc";
@@ -156,11 +114,6 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
             expressions,
           },
         ]) => {
-          // Mirrors Rails' final `.map`: a functional (expression) index collapses
-          // its columns array into a single SQL string via addOptionsForIndexColumns,
-          // baking prefix length and DESC/ASC order inline. Non-expression columns
-          // are quoted; expression columns pass through their parenthesized form.
-          // The separate lengths/orders Records are consumed here and dropped.
           if (Object.keys(expressions).length > 0) {
             const columns = new Map<string, string>(
               indexColumns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
@@ -190,23 +143,14 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     );
   }
 
-  /** Mirrors: MySQL::SchemaStatements#schema_creation */
   override get schemaCreation(): MysqlSchemaCreation {
     return new MysqlSchemaCreation(this as unknown as VisitorHostAdapter);
   }
 
-  /** Mirrors: MySQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): MysqlTable {
     return new MysqlTable(tableName, (base ?? this) as SchemaStatementsLike);
   }
 
-  /**
-   * Rails writes this as a defaulted keyword —
-   * `def create_table(table_name, options: default_row_format, **)` — so an
-   * explicit `options:` wins and an absent one triggers the (memoized) lookup.
-   *
-   * Mirrors: MySQL::SchemaStatements#create_table
-   */
   override async createTable(
     name: string,
     optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
@@ -224,7 +168,6 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return super.createTable(name, options, definer);
   }
 
-  /** Mirrors: MySQL::SchemaStatements#remove_column */
   override async removeColumn(
     tableName: string,
     columnName: string,
@@ -237,20 +180,12 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return super.removeColumn(tableName, columnName, type, options);
   }
 
-  /**
-   * Mirrors: MySQL::SchemaStatements#valid_primary_key_options
-   *
-   * @internal
-   */
+  /** @internal */
   override validPrimaryKeyOptions(): string[] {
     return [...super.validPrimaryKeyOptions(), "unsigned", "autoIncrement"];
   }
 
-  /**
-   * Mirrors: MySQL::SchemaStatements#create_table_definition
-   * (mysql/schema_statements.rb:172-174)
-   * @internal
-   */
+  /** @internal */
   override createTableDefinition(
     name: string,
     options: Record<string, unknown> = {},
@@ -258,11 +193,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return new MysqlTableDefinition(this as unknown as VisitorHostAdapter, name, options);
   }
 
-  /**
-   * Mirrors: MySQL::SchemaStatements#add_index_length
-   *
-   * @internal
-   */
+  /** @internal */
   addIndexLength(
     quotedColumns: Map<string, string>,
     options: { length?: number | Record<string, number> } = {},
@@ -274,11 +205,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return quotedColumns;
   }
 
-  /**
-   * Mirrors: MySQL::SchemaStatements#add_options_for_index_columns
-   *
-   * @internal
-   */
+  /** @internal */
   override async addOptionsForIndexColumns(
     quotedColumns: Map<string, string>,
     options: {
@@ -291,20 +218,12 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   }
 }
 
-/** @internal Host surface for the introspection-scope helpers: quoting dispatches
- * through the adapter instance (`this.quote`) so a sub-adapter can override it,
- * mirroring Rails' `quoted_scope`, which quotes via `quote(...)`. */
+/** @internal */
 interface QuotedScopeHost {
   quote(value: unknown): string;
 }
 
-/**
- * @internal Host surface for the row-format helpers. Rails reads `mariadb?` and
- * `database_version` off the adapter and memoizes the InnoDB probe in the
- * `@default_row_format` ivar, so the memo slot lives on the host instance too.
- * `defined?(@default_row_format)` memoizes a nil answer too, which the `in` check
- * on the slot reproduces.
- */
+/** @internal */
 export interface RowFormatHost {
   isMariadb(): Promise<boolean>;
   readonly databaseVersion: Version | number | Promise<Version | number>;
@@ -312,8 +231,7 @@ export interface RowFormatHost {
   _defaultRowFormat?: string | null;
 }
 
-/** @internal Mirrors: MySQL::SchemaStatements#row_format_dynamic_by_default?
- * (mysql/schema_statements.rb:146-152) */
+/** @internal */
 export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
   return (await this.isMariadb())
     ? ((await this.databaseVersion) as Version).compare("10.2.2") >= 0
@@ -334,26 +252,13 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
   return this._defaultRowFormat ?? null;
 }
 
-/**
- * Host for the column-reflection pair below, which Rails defines as private
- * methods on `MySQL::SchemaStatements` and so reaches `create_table_info` /
- * `lookup_cast_type` through `self`.
- * @internal
- */
+/** @internal */
 export interface MysqlColumnReflectionHost {
   createTableInfo(tableName: string): Promise<string | null>;
-  // `AbstractAdapter#lookup_cast_type` (abstract/quoting.rb:234) returns a
-  // `Type`; the widened return here carries `PostgreSQLAdapter`'s awaitable
-  // one, which never reaches this MySQL-only host.
   lookupCastType?(sqlType: string | null): unknown;
 }
 
-/**
- * Mirrors: MySQL::SchemaStatements#default_type (mysql/schema_statements.rb:176).
- * async unlike Rails because `create_table_info` is a query, which blocks in
- * Ruby but not here.
- * @internal
- */
+/** @internal */
 export async function defaultType(
   this: MysqlColumnReflectionHost,
   tableName: string,
@@ -371,11 +276,7 @@ export async function defaultType(
   return undefined;
 }
 
-/**
- * Mirrors: MySQL::SchemaStatements#new_column_from_field (mysql/schema_statements.rb:189).
- * async unlike Rails because the `default_type` branch queries the server.
- * @internal
- */
+/** @internal */
 export async function newColumnFromField(
   this: MysqlColumnReflectionHost,
   tableName: string,
@@ -412,14 +313,6 @@ export async function newColumnFromField(
     [def, defFn] = [null, def];
   }
 
-  // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) wraps
-  // `Column.new` itself, so every constructed column goes through the registry
-  // (`deduplicable.rb:18`). TS cannot mirror that on the class: a base
-  // constructor returning the deduplicated instance freezes it before the
-  // subclass assigns its own fields, so `new SQLite3::Column(...)` would throw
-  // `Cannot add property _generatedType, object is not extensible`. Ruby has no
-  // such split — `new` wraps allocate+initialize for the most-derived class —
-  // so the hook fires here instead, on the fully-built object.
   return new Column(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
@@ -476,12 +369,6 @@ export function extractForeignKeyAction(specifier: string): "cascade" | "nullify
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#table_alias_length
- *
- * MySQL caps table aliases at 256 (https://dev.mysql.com/doc/refman/en/identifiers.html),
- * not max_identifier_length (64). Overrides the DatabaseLimits default.
- */
 export function tableAliasLength(): number {
   return 256;
 }
@@ -581,20 +468,6 @@ export function integerToSql(limit: number | null | undefined): string {
   }
 }
 
-/**
- * Split a `schema.table` or `` `schema`.`table` `` into `{schema, table}`.
- *
- * Whole-string parser (not regex-tokenize): walks the input once and
- * requires exactly one part or two parts joined by a single dot,
- * respecting `` ` `` quoting and doubled-backtick escapes. Rejects
- * empty segments (`.widgets`, `a..b`, `db.widgets.`), extra parts
- * (`a.b.c`), and unterminated quoted tokens. This is intentionally
- * stricter than the PG helper in
- * `packages/activerecord/src/connection-adapters/postgresql/utils.ts`
- * (which tolerates empty segments and trailing parts) so a typo in
- * a MySQL introspection call surfaces instead of silently pointing
- * at the wrong table.
- */
 export function parseMysqlName(name: string): { schema?: string; table: string } {
   const input = name.trim();
   const invalid = (): never => {
@@ -649,8 +522,7 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
   return { schema: checkNonEmpty(first.part), table: checkNonEmpty(second.part) };
 }
 
-/** @internal Host surface for {@link foreignKeys}: scopes the catalog query to the
- * current database and maps RESTRICT/CASCADE/SET NULL referential actions. */
+/** @internal */
 interface ForeignKeysHost {
   internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   quote(value: unknown): string;
@@ -658,14 +530,9 @@ interface ForeignKeysHost {
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined;
 }
 
-/** @internal
- * Return the foreign keys defined on the given table, reading from
- * `information_schema.referential_constraints` joined to
- * `key_column_usage`. Composite keys are grouped by constraint name and
- * their columns joined in ordinal order.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#foreign_keys
- * @noRailsEquivalent CONVERGEABLE AbstractMysqlAdapter#foreign_keys (abstract_mysql_adapter.rb:465), which the port keeps in the MySQL schema-statements mixin instead.
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE
  */
 export async function foreignKeys(
   this: ForeignKeysHost,
@@ -717,10 +584,6 @@ export async function foreignKeys(
         ? (first.primary_key as string)
         : group.map((r) => r.primary_key as string);
     results.push(
-      // Rails' MySQL foreign_keys options hash carries name/on_update/on_delete/
-      // column/primary_key but no :deferrable, so a deferrable lookup is sliced
-      // out (matches) rather than compared against the unset field. It also has
-      // no :validate, so validate is left unstored (value still defaults true).
       new ForeignKeyDefinition(
         tableName,
         toTable,

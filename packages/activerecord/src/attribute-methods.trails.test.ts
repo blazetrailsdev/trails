@@ -1,12 +1,3 @@
-/**
- * Trails-specific invariants relocated out of attribute-methods.test.ts
- * (RFC 0043 extra-test burndown). These guard trails-internal mechanisms with
- * no Rails counterpart in attribute_methods_test.rb: the `formatForInspect`
- * helper, attribute-method generation (`defineAttributeMethods` cascade and
- * accessor-override preservation), `arelTable.get` alias passthrough,
- * `hasAttribute` alias resolution, and the readonly-attribute raise. Test names
- * are kept verbatim per CLAUDE.md.
- */
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -27,7 +18,6 @@ registerModel(Minivan);
 registerModel(CpkBook);
 registerModel(CpkOrder);
 
-/** Internal attribute-method generation surface exercised by these tests. */
 interface Generatable {
   defineAttributeMethods(): boolean;
   _attributeMethodsGenerated?: boolean;
@@ -103,8 +93,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("returns true for alias_attribute names on instances", () => {
-    // Rails `has_attribute?` resolves attribute_aliases
-    // (active_record/attribute_methods.rb).
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -118,9 +106,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("returns true for alias_attribute names on the class", () => {
-    // The class-level twin of the test above — Rails resolves
-    // `attribute_aliases` against `attribute_types`
-    // (active_record/attribute_methods.rb:254-258).
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -133,8 +118,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("attribute_present? is empty?, not blank?", () => {
-    // attribute_methods.rb:387-392 asks `empty?`, not `blank?`: Ruby's
-    // `" ".empty?` is FALSE, so a whitespace-only string is present.
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -149,11 +132,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("readonly attributes are not updated after create", async () => {
-    // Rails raises ReadonlyAttributeError on a persisted-record write to an
-    // attr_readonly column (readonly_attributes.rb line 49). The test name's
-    // "are not updated" wording pre-dates Rails adding the raise; the
-    // attribute isn't updated because the write itself is rejected. Minivan
-    // (models/minivan.rb) declares `attr_readonly :color`.
     const minivan = await Minivan.create({ minivan_id: "mv1", color: "blue", name: "Rebel" });
     expect(() => {
       minivan.color = "red";
@@ -176,8 +154,6 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(attr.name).toBe("username");
   });
 
-  // Rails: a model that overrides only the writer still gets the generated reader
-  // (activerecord/test/models/bulb.rb:27-29 — color= override, no explicit reader).
   it("setter-only override does not suppress generated reader", () => {
     class Widget extends Base {
       static {
@@ -310,25 +286,12 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    // Cold cache fails open (documented inherent deviation — Rails' sync DB
-    // hit would return []); loadSchema seeds dataSourceExists=false, and the
-    // cold answer must not have been memoized, so the guard then closes.
     expect(NonExistentTable.attributeNames()).toEqual(["name"]);
     await NonExistentTable.loadSchema();
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
 
   it("aliasing an attribute onto an Active Record method raises DangerousAttributeError", () => {
-    // define_attribute_method_pattern dispatches instance_method_already_implemented?
-    // through the class, and ActiveRecord's override raises before the
-    // `override: true` arm alias_attribute relies on is consulted
-    // (activerecord/attribute_methods.rb:165-168, 324-331).
-    //
-    // The raise lands when the alias is GENERATED, not when it is declared:
-    // ActiveRecord's `eagerly_generate_alias_attribute_methods` is a no-op
-    // because "alias attributes in Active Record are lazily generated"
-    // (attribute_methods.rb:76-78), so `define_attribute_methods` ->
-    // `generate_alias_attributes` is what reaches the guard.
     class Employee extends Base {
       static {
         this.attribute("name", "string");
@@ -341,10 +304,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("an ordinary class-body method is not overridden by a generated attribute method", () => {
-    // attribute_methods.rb:326 — `instance_method_already_implemented?` is the
-    // ONLY guard, and ActiveRecord's override answers it from the class's own
-    // methods (activerecord/attribute_methods.rb:170-178), so a method written
-    // in the class body survives attribute-method generation.
     class Employee extends Base {
       static {
         this.attribute("name", "string");
@@ -359,11 +318,6 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(employee.nameChanged()).toBe(true);
   });
   it("an inherited generated attribute method does not suppress the subclass's own generation", () => {
-    // attribute_methods.rb:174-177 — the `superclass != Base` arm counts an
-    // inherited method as already-implemented ONLY when its owner is not the
-    // generated-attribute-methods module. `alias_attribute` generates into that
-    // module (attribute_methods.rb:94), so the alias inherited from Middle is
-    // regenerated on the subclass rather than treated as hand-written.
     class Middle extends Base {
       static {
         this.attribute("name", "string");
@@ -372,9 +326,6 @@ describe("AttributeMethodsTest (trails)", () => {
     }
     class Leaf extends Middle {}
 
-    // Aliases are generated lazily in Active Record (attribute_methods.rb:76-78),
-    // so the sweep `define_attribute_methods` runs is what puts `nickname` on
-    // the prototype.
     Middle.generateAliasAttributes();
 
     const host = Leaf as unknown as { isInstanceMethodAlreadyImplemented(n: string): boolean };
@@ -383,9 +334,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("aliasAttribute generates the alias when mass generation already ran", () => {
-    // attribute_methods.rb:66-74 — aliases are lazily generated (:76-78), so
-    // once `@alias_attributes_mass_generated` is set the override's own batch
-    // is the only thing that generates an alias declared afterwards.
     class Late extends Base {
       static {
         this.attribute("title", "string");
@@ -423,8 +371,6 @@ describe("AttributeMethodsTest (trails)", () => {
 
     (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
 
-    // Read through the existing record: constructing again would regenerate,
-    // since `init_internals` calls `define_attribute_methods` (core.rb:849).
     expect(employee.nameChanged).toBeUndefined();
   });
 
@@ -434,9 +380,6 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    // Construction generates (core.rb:849) over the bare module ActiveModel
-    // seated for the class-body `attribute` call; two carriers would leave
-    // `undefineAttributeMethods` clearing only one of them.
     new Employee({});
 
     let carriers = 0;
@@ -459,8 +402,6 @@ describe("AttributeMethodsTest (trails)", () => {
       "defineMethodAttribute",
     );
 
-    // Rails answers true from the first generating pass (attribute_methods.rb:104-125);
-    // the nested post-load pass is still this call generating them.
     expect(generatable(Widget).defineAttributeMethods()).toBe(true);
 
     const names = spy.mock.calls.map(([name]) => name);
@@ -523,13 +464,6 @@ describe("methodDefinedWithin (trails)", () => {
   });
 });
 
-// `define_attribute_methods` gates its whole generation body behind
-// `unless abstract_class?` (attribute_methods.rb:104-125), so an abstract class
-// gets no per-attribute accessors — reader, writer, `*_before_type_cast` or
-// `*_for_database` — while its concrete subclass gets all of them. The
-// generated methods live on the class's own GeneratedAttributeMethods carrier
-// spliced into its prototype chain, so `in` is what observes them; an
-// own-property check sees neither.
 describe("define_attribute_methods abstract gate (trails)", () => {
   fixtures({});
 
@@ -583,11 +517,6 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     }
   });
 
-  // Rails marks a read on the Attribute itself, inside `fetch_value`
-  // (activemodel/attribute.rb:41-44), so every public read path feeds
-  // `accessed_fields` (attribute_methods.rb:460). trails keeps the marker on the
-  // record, so each of these paths has to set it; `slice` and `valuesAt` are
-  // Base's own (persistence.ts), which read through `readAttribute`.
   it.each([
     ["readAttribute", (t: TrackingTopic) => t.readAttribute("title")],
     ["the generated reader", (t: TrackingTopic) => t.title],
@@ -601,12 +530,6 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
   });
 });
 
-// attribute_methods.rb:519-525 rejects a column when `pk_attribute?(name) &&
-// id.nil?`. For a composite key `id` returns an Array (composite_primary_key.rb
-// :8-14), which is never nil even when a member is, and `pk_attribute?` compares
-// against the Array `@primary_key` (attribute_methods.rb:543-545) — so on a
-// composite PK no column is ever dropped. trails used to test the per-column
-// attribute value instead and silently dropped each unset member.
 describe("attributesForCreate (trails)", () => {
   fixtures([]);
 
@@ -616,9 +539,6 @@ describe("attributesForCreate (trails)", () => {
     expect(attributesForCreate.call(book as never, book.attributeNames())).toContain("id");
   });
 
-  // With `partial_inserts` off, `attribute_names_for_partial_inserts`
-  // (dirty.rb:249-258) hands every non-auto-populated column to
-  // `attributes_for_create`, so the nil `shop_id` reaches the filter.
   it("inserts a nil composite primary key member on create", async () => {
     const oldPartialInserts = CpkOrder.partialInserts;
     CpkOrder.partialInserts = false;

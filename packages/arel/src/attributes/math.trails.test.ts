@@ -2,12 +2,6 @@ import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Visitors } from "../index.js";
 
-// TS-only exhaustive coverage. Rails' math_test.rb
-// (activerecord/test/cases/arel/attributes/math_test.rb:8-42, 44-78) loops
-// `%i[* /]` and `%i[+ - & | ^ << >>]` and interpolates the operator into the
-// test name, so its ten test bodies already cover every operator; the mirrored
-// names in math.test.ts are the interpolation-stripped ones. These cases pin
-// one operator each against its exact SQL and have no Rails counterpart.
 describe("MathTest (trails)", () => {
   const visitor = new Visitors.ToSql(fakeRecordConnection);
   const table = new Table("users");

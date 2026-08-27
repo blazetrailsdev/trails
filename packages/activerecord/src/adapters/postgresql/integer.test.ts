@@ -1,11 +1,7 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/integer_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
-// Rails: 2.gigabytes = 2 * 1024 * 1024 * 1024
 const TWO_GB = 2 * 1024 * 1024 * 1024;
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -18,7 +14,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlIntegerTest", () => {
-    // Mirrors Rails setup: create_table "pg_integers" { t.integer :quota, limit: 8, default: 2.gigabytes }
     beforeEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS "pg_integers"`);
       await adapter.exec(`
@@ -58,8 +53,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema properly respects bigint ranges", async () => {
-      // Rails: assert_equal 2.gigabytes, PgInteger.new.quota
-      // At the adapter level: insert default row, cast through BigIntegerType, assert value.
       await adapter.executeMutation(`INSERT INTO "pg_integers" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT "quota" FROM "pg_integers"`);
       const type = new BigIntegerType({ limit: 8 });

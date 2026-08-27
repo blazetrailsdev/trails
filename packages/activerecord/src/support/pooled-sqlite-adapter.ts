@@ -5,17 +5,6 @@ import { ConnectionDescriptor } from "../connection-adapters/abstract/connection
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { resolve as resolveConnectionAdapter } from "../connection-adapters.js";
 
-/**
- * A standalone SQLite pool for tests that need an adapter of their own rather
- * than the ambient connection.
- *
- * A bare `new BetterSQLite3Adapter(...)` holds a `NullPool`, and Rails'
- * `QueryCache#clear_query_cache` (`abstract/query_cache.rb:232-234`) is the
- * unchecked send `pool.clear_query_cache` — which a `NullPool` cannot answer,
- * exactly as in Ruby. Every DDL path that rebuilds a SQLite table
- * (`alter_table`, and so `add_foreign_key` / `remove_column`) ends there, so
- * those tests check their adapter out of a real pool.
- */
 await resolveConnectionAdapter("sqlite3");
 
 export function newSqlitePool(

@@ -5,9 +5,6 @@ import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { ActiveRecord } from "../../ar-config.js";
 
-/**
- * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
- */
 export class BelongsTo extends SingularAssociation {
   static override macro(): string {
     return "belongsTo";
@@ -53,29 +50,18 @@ export class BelongsTo extends SingularAssociation {
     if (options.default != null) {
       this.addDefaultCallbacks(model, reflection);
     }
-    // Rails registers autosave callbacks for every belongs_to via
-    // AssociationBuilderExtension (autosave_association.rb:143-150) — not
-    // gated on the `autosave` option. The option only steers behavior inside
-    // save_belongs_to_association (validate flag, destroy of marked-for-
-    // destruction targets, save of changed-but-persisted records).
     addAutosaveAssociationCallbacks.call(model, reflection);
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {
     const name = reflection.name;
 
-    // belongs_to.rb:39-40 — `klass = reflection.class_name.safe_constantize` then
-    // `klass._counter_cache_columns |= [cache_column] if klass && klass.respond_to?(...)`.
     const cacheColumn = (): string =>
       (typeof reflection.counterCacheColumn === "function"
         ? reflection.counterCacheColumn()
         : null) ?? `${pluralize(underscore(model.name))}_count`;
     const klass = safeConstantize(reflection.className) as any;
     if (!klass) {
-      // The only arm Ruby's autoload reaches and ESM cannot — an unresolved
-      // constant: see counter-cache-state.ts. A resolved class that does not
-      // answer `_counterCacheColumns` falls through recording nothing, as
-      // Rails' `respond_to?` guard does.
       const pending =
         pendingCounterCacheColumns.get(reflection.className) ?? new Set<() => string>();
       pending.add(cacheColumn);
@@ -87,14 +73,10 @@ export class BelongsTo extends SingularAssociation {
       }
     }
 
-    // belongs_to.rb:41 — `model.counter_cached_association_names |= [reflection.name]`
     if (!model.counterCachedAssociationNames.includes(name)) {
       model.counterCachedAssociationNames = [...model.counterCachedAssociationNames, name];
     }
 
-    // Rails only registers after_update in add_counter_cache_callbacks.
-    // Create/destroy counter handling is done by updateCounterCaches()
-    // in associations.ts (called from Base#_createOrUpdate and _destroyRow).
     model.afterUpdate(async (record: any) => {
       const assoc = record.association(name);
       if (assoc.isSavedChangeToTarget()) {
@@ -131,11 +113,7 @@ export class BelongsTo extends SingularAssociation {
     return { [pk]: fkValue };
   }
 
-  /**
-   * @missingRailsCall first — PERMANENT: Ruby Array#first on the [old, new]
-   *   change pair: `changes[foreign_key].first` (builder/belongs_to.rb:45) ports
-   *   to `change[0]`.
-   */
+  /** @missingRailsCall first — PERMANENT */
   static async touchRecord(
     record: any,
     changes: Record<string, unknown>,
@@ -174,9 +152,6 @@ export class BelongsTo extends SingularAssociation {
               ? record._readAttribute(foreignType)
               : record[foreignType]);
           try {
-            // Rails: `o.class.polymorphic_class_for(klass)` — a model may
-            // override the hook to map a custom polymorphic_name back to its
-            // class (builder/belongs_to.rb:53).
             klass = klass
               ? (
                   record.constructor as { polymorphicClassFor(name: string): any }
@@ -200,11 +175,6 @@ export class BelongsTo extends SingularAssociation {
       }
     }
 
-    // Touch the current parent. Mirrors Rails `record = o.public_send name`:
-    // read through the association so a cached (in-memory) target is touched in
-    // place rather than a freshly-loaded copy — the touch_later defer must land
-    // on the same object the caller holds. Falls back to loading from the DB
-    // when the target isn't already cached.
     const association = typeof record.association === "function" ? record.association(name) : null;
     if (association && typeof association.loadTarget === "function") {
       const parent = await association.loadTarget();
@@ -228,23 +198,10 @@ export class BelongsTo extends SingularAssociation {
       await BelongsTo.touchRecord(record, changes, foreignKey, name, touch);
     };
 
-    // Mirrors Rails Associations::Builder::BelongsTo.add_touch_callbacks: when
-    // the association also maintains a counter cache, the counter-cache update
-    // already carries the `touch:` option (folding the timestamp + lock-version
-    // bump into one statement), so the standalone touch must NOT fire on create
-    // or destroy. On update it fires only when the target object itself was not
-    // swapped — otherwise the counter-cache path on the new target owns the
-    // touch. Without this guard the separate touch would re-touch a record whose
-    // lock_version the counter update already advanced, raising StaleObjectError.
     const hasCounterCache =
       typeof reflection.counterCacheColumn === "function" &&
       reflection.counterCacheColumn() != null;
     if (hasCounterCache) {
-      // Rails: `model.after_update update_callback, if: :saved_changes?` —
-      // `instance_exec(record, &touch_callback) unless association(name)
-      // .saved_change_to_target?`. The `if: :saved_changes?` skips no-op saves;
-      // the inner guard skips the case where the target was swapped (the
-      // counter-cache update on the *new* target already carries the touch).
       model.afterUpdate(async (record: any) => {
         if (typeof record.isSavedChanges === "function" && !record.isSavedChanges()) return;
         const assoc =
@@ -278,19 +235,6 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static addDefaultCallbacks(model: any, reflection: any): void {
-    // Mirrors Rails Associations::Builder::BelongsTo.add_default_callbacks:
-    //   model.before_validation { |o| o.association(name).default(&default) }
-    // so the defaulted target satisfies a presence validation on a required
-    // association. The default block may run an async finder (e.g.
-    // `() => Developer.first()`); on the save path the awaited resolution runs
-    // in Base#_runBelongsToDefaults — a pre-validation pass invoked from `save`
-    // before the chain. This before_validation callback fires `default` for the
-    // standalone `valid?` path; it's fire-and-forget (the pre-pass owns awaited
-    // resolution on the save path). On the save path the pre-pass already ran
-    // the block once and sets
-    // `_belongsToDefaultsApplied`, so we skip here to keep the block at Rails'
-    // exactly-once (belongs_to_association.rb:46-48) — re-running would invoke a
-    // block that returned nil a second time.
     model.beforeValidation((record: any) => {
       if (record._belongsToDefaultsApplied) return;
       if (typeof record.association !== "function") return;
@@ -308,12 +252,7 @@ export class BelongsTo extends SingularAssociation {
     });
   }
 
-  /**
-   * @missingRailsCall delete — PERMANENT: Ruby Hash#delete returns the DELETED
-   *   value: `!reflection.options.delete(:required)` (builder/belongs_to.rb:115)
-   *   ports to reading `options.required` and then `delete options.required` —
-   *   JS `delete` returns a boolean, so the two steps cannot fold.
-   */
+  /** @missingRailsCall delete — PERMANENT */
   static override defineValidations(model: any, reflection: any): void {
     const options = reflection.options ?? {};
 
@@ -332,12 +271,6 @@ export class BelongsTo extends SingularAssociation {
     super.defineValidations(model, reflection);
 
     if (required && typeof model.validatesPresenceOf === "function") {
-      // Mirrors Rails BelongsToBuilder.define_validations: presence is
-      // validated on the association NAME (reflection.name), not the foreign
-      // key column, so `read_attribute_for_validation` reads the loaded
-      // in-memory target. Assigning an unsaved `record.parent = Parent.new`
-      // satisfies presence, and autosave persists the new parent before the
-      // owner (see autosave-association saveBelongsTo).
       const name = reflection.name;
       const polymorphic = !!reflection.options?.polymorphic;
       const rawFk =
@@ -349,11 +282,6 @@ export class BelongsTo extends SingularAssociation {
           : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
         : [];
 
-      // The presence check reads the in-memory target and does not itself load
-      // an unloaded record, so we suppress it when the FK is already populated —
-      // keeping `create({ parentId: id })` valid and
-      // matching Rails' observable behavior (where reading the association
-      // loads the record from the FK).
       const foreignKeyPresent = (record: any): boolean => {
         if (foreignKeys.length === 0) return false;
         if (!foreignKeys.every((key) => !isBlank(record._readAttribute(key)))) return false;
@@ -361,11 +289,6 @@ export class BelongsTo extends SingularAssociation {
         return foreignTypes.every((type) => !isBlank(record._readAttribute(type)));
       };
 
-      // Rails' false-config branch only runs the presence check (which reads —
-      // and thus existence-checks — the association) when the FK or polymorphic
-      // type is nil or changed; the true-config branch runs it unconditionally
-      // (builder/belongs_to.rb:127-139). `railsRuns` captures that gate so both
-      // the sync presence check and the async existence check honor it.
       const needsValidation = (record: any, attrs: string[]) =>
         attrs.some(
           (attr) =>
@@ -383,15 +306,6 @@ export class BelongsTo extends SingularAssociation {
 
       model.validatesPresenceOf(name, { message: ":required", if: condition });
 
-      // The presence check above only fires when the FK is blank (Rails'
-      // observable "must exist" for an unset association). When the FK IS
-      // populated, Rails still reads the association — loading the target — and
-      // fails "must exist" if the row no longer exists. Now that the validation
-      // chain is async (RFC 0063), that case runs as a normal validator that
-      // loads the target inline in `valid?`. It is gated by the same `railsRuns`
-      // condition so the false-config branch doesn't reload an already-persisted,
-      // unchanged FK (belongs_to_associations_test.rb "skips parent presence
-      // check if parent has not changed").
       model.validate(
         async (record: any) => {
           let target: unknown = null;

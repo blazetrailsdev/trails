@@ -1,21 +1,3 @@
-/**
- * Regression coverage for threading the single shared `build_joins`
- * AliasTracker through the eager-SELECT preview paths
- * (RFC 0027 thread-shared-tracker-through-eager-select-paths).
- *
- * Rails `build_joins` shares ONE `alias_tracker` across the eager-load
- * JoinDependency and the explicit `joins` it folds in (query_methods.rb
- * `build_joins`; join_dependency.rb), so an eager `includes(:x).references(:x)`
- * that lands on a table an explicit `.joins` already claimed collides and is
- * re-aliased to its `alias_candidate` at emit-time (`make_constraints`). Before
- * this change `_buildEagerJoinManager` / `_buildEagerIdSubquery` passed a FRESH
- * per-emit tracker (seeded only with the base table) to `jd.joinConstraints`,
- * so the eager JD and the manual join's tracker never saw each other and the
- * eager OUTER JOIN emitted unaliased — silently duplicating the table name.
- *
- * Not a Rails-mirrored test name — this is a TS-internal threading invariant
- * with no single Ruby counterpart.
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";

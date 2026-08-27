@@ -22,12 +22,6 @@ function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unkn
   return visitor.compile(node as never, collector) as [string, unknown[]];
 }
 
-// trails-specific regression guard (no Rails counterpart): Base.predicateBuilder
-// is now TableMetadata-backed, and that metadata is bound to the class. The memo
-// must be an OWN property so an STI subclass (same table_name) does not inherit
-// the parent's builder via the prototype chain — that would resolve
-// associations/aggregates against the parent klass. Rails avoids this
-// structurally by resetting @predicate_builder in `inherited` (core.rb:422-425).
 describe("Base.predicateBuilder STI memoization", () => {
   it("does not leak the parent's builder to an STI subclass", () => {
     const companyPb = Company.predicateBuilder;
@@ -38,13 +32,6 @@ describe("Base.predicateBuilder STI memoization", () => {
   });
 });
 
-// trails-specific regression guard (no Rails counterpart): pins the
-// out-of-range collapse through the single-source type lookup. Rails re-roots
-// the builder's `table` per association (`associated_table(key).predicate_builder`,
-// predicate_builder.rb:96-98), so by the time `build` runs, a joined column's
-// builder is rooted on the joined table and `table.type(attribute.name)`
-// (predicate_builder.rb:57-69) is the one and only type source — mirror that
-// shape here by rooting the builder on the joined table itself.
 describe("PredicateBuilder positive-equality bind typing", () => {
   const int8 = new IntegerType({ limit: 8 });
   const OUT_OF_RANGE = 2n ** 63n;
@@ -142,7 +129,6 @@ describe("association hash expansion grouping shape", () => {
     expect(() => CpkOrderWithSingularBookChapters.where({ chapters: [1, 2] })).toThrow(
       'Expected corresponding value for ["author_id", "id"] to be an Array',
     );
-    // Ruby `Array(nil)` is [] — a nil value yields zero query groups, not a raise.
     expect(() => CpkOrderWithSingularBookChapters.where({ chapters: null })).not.toThrow();
   });
 

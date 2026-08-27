@@ -18,12 +18,6 @@ describe("Attributes#attribute_names", () => {
   });
 });
 
-/**
- * trails-only tests that were interleaved with the `attributes_test.rb` mirror
- * in `attributes.test.ts`: type-casting of declared attributes, defaults,
- * inheritance of declarations, and the `attributes_before_type_cast` /
- * `type_for_attribute` readers Rails' file does not exercise.
- */
 describe("Attributes type casting and defaults", () => {
   class User extends Model {
     static {
@@ -63,8 +57,6 @@ describe("Attributes type casting and defaults", () => {
   });
 
   it("casts string to boolean", () => {
-    // Rails BooleanType: only FALSE_VALUES coerce to false; "yes"/"no"
-    // are both truthy (not in FALSE_VALUES).
     expect(new User({ active: "false" })._readAttribute("active")).toBe(false);
     expect(new User({ active: "true" })._readAttribute("active")).toBe(true);
     expect(new User({ active: "yes" })._readAttribute("active")).toBe(true);
@@ -194,7 +186,6 @@ describe("Attributes", () => {
   });
 
   it("casts string to boolean", () => {
-    // Rails BooleanType: "yes"/"no" both truthy (neither in FALSE_VALUES).
     expect(new User({ active: "false" })._readAttribute("active")).toBe(false);
     expect(new User({ active: "true" })._readAttribute("active")).toBe(true);
     expect(new User({ active: "yes" })._readAttribute("active")).toBe(true);

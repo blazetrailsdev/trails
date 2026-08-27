@@ -47,14 +47,8 @@ import type { Quoting } from "./quoting.js";
 import { fixtures } from "../../test-fixtures.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 
-// Rails' DatabaseStatements host is an AbstractAdapter, whose @pool is a real
-// ConnectionPool (abstract_adapter.rb:153), so the mock hosts below hold one
-// rather than a two-member literal standing in for it.
 const pool = newSqlitePool();
 
-// Every AbstractAdapter mixes in `log`, the single `sql.active_record` payload
-// producer (abstract_adapter.rb:1134). The bare host literals below stand in
-// for an adapter, so they carry one too.
 const log: NonNullable<DatabaseStatementsHost["log"]> = async (
   _sql,
   _name,
@@ -74,8 +68,6 @@ const log: NonNullable<DatabaseStatementsHost["log"]> = async (
 const typeCastedBinds: DatabaseStatementsHost["typeCastedBinds"] = (binds) => binds ?? [];
 
 describe("DatabaseStatements", () => {
-  // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
-  // so these Arel assertions need a connection, as Rails' do via helper.rb.
   fixtures({});
   describe("toSql", () => {
     it("returns string SQL unchanged", () => {
@@ -174,10 +166,6 @@ describe("DatabaseStatements", () => {
       expect(levels.serializable).toBe("SERIALIZABLE");
     });
 
-    // Rails' begin_deferred_transaction hands the level name straight to
-    // begin_isolated_db_transaction (database_statements.rb:412-418) — it does
-    // not map it through transaction_isolation_levels, and it does not let an
-    // unknown level pass silently.
     it("begin deferred transaction forwards the isolation level name verbatim", async () => {
       const seen: string[] = [];
       const host = {
@@ -346,10 +334,6 @@ describe("DatabaseStatements", () => {
     });
 
     it("forwards prepare and async on to raw_execute", async () => {
-      // Ruby's `raw_exec_query(...)` forwards EVERY argument, so `raw_execute`'s
-      // `prepare:`/`async:` kwargs reach it (database_statements.rb:541-542,552)
-      // — a FutureResult scheduled with `prepare: true` must not silently run
-      // unprepared, nor lose the async flag off the instrumentation payload.
       const { rawExecute, rawExecQuery } = await import("./database-statements.js");
       let loggedAsync: boolean | undefined;
       let preparedWith: boolean | undefined;
@@ -392,9 +376,6 @@ describe("DatabaseStatements", () => {
 
     it("attaches sql and binds to a translated StatementInvalid via set_query", async () => {
       const { internalExecQuery } = await import("./database-statements.js");
-      // Mirror internal_execute → raw_execute: with_raw_connection rejects with
-      // an already translated StatementInvalid carrying no statement context,
-      // and `log`'s rescue is what attaches the query (abstract_adapter.rb:1145).
       const host = {
         log,
         typeCastedBinds,
@@ -568,8 +549,6 @@ describe("DatabaseStatements", () => {
 
     it("sanitize limit with integer", () => {
       expect(sanitizeLimit(10)).toBe(10);
-      // A non-Integer Float falls to `Integer(limit)` (database_statements.rb:512),
-      // which truncates toward zero rather than flooring.
       expect(sanitizeLimit(3.9)).toBe(3);
       expect(sanitizeLimit(-3.9)).toBe(-3);
     });
@@ -588,11 +567,6 @@ describe("DatabaseStatements", () => {
     });
 
     it("sanitize limit with invalid value", () => {
-      // `Integer("abc")` (database_statements.rb:512) raises ArgumentError, not
-      // TypeError — TypeError is Ruby's arm for a value with no integer
-      // conversion at all, and it names the value's class (nil/true/false render
-      // as themselves). `Integer(Float::NAN)` / `Integer(Float::INFINITY)` raise
-      // FloatDomainError.
       for (const bad of ["abc", "1__0", "1e3", "12.5", "08", "0b2", "0xg", "_1", "1_", "--5"]) {
         expect(() => sanitizeLimit(bad)).toThrow(ArgumentError);
       }
@@ -777,11 +751,6 @@ describe("execInsert", () => {
 });
 
 describe("internal_exec_query is a virtual call", () => {
-  // Ruby's exec_query / exec_insert / select call `internal_exec_query(...)` on
-  // self, so an adapter subclass's override (SQLite3Adapter's bind-aware,
-  // statement-pooling one) wins — abstract/database_statements.rb. The
-  // module-level ports must dispatch through the instance, not call the
-  // module-level function directly, or the override is silently dropped.
   function makeOverrideHost() {
     const seen: string[] = [];
     const host: DatabaseStatementsHost = {
@@ -865,9 +834,6 @@ describe("sqlForInsert", () => {
   });
 
   it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", async () => {
-    // Mirrors Rails sql_for_insert: pk=false signals the caller does not
-    // want any pk-derived RETURNING column. extractTableRefFromInsertSql /
-    // primaryKey lookup must be skipped too.
     const host: DatabaseStatementsHost = {
       log,
       pool,

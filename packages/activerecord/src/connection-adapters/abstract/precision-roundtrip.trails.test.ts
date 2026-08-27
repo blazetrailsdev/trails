@@ -1,9 +1,3 @@
-/**
- * Precision round-trip tests for the Temporal SQL formatters.
- * Verifies that sub-millisecond precision is preserved end-to-end through the
- * format functions that feed both the text-protocol (quote) and bind paths.
- */
-
 import { quotingHost } from "../../support/quoting-host.js";
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
@@ -107,9 +101,6 @@ describe("formatPlainTimeForSql", () => {
   });
 });
 
-// The bind path renders date/time values with `type_cast`, which dispatches
-// `quoted_date` / `quoted_time` on the connection (abstract/quoting.rb:103-104).
-// A bare `{}` receiver exercises the abstract formats.
 describe("typeCast of Temporal bind values", () => {
   const bind = (v: unknown) => typeCast(v);
 
@@ -165,8 +156,6 @@ describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
   });
 });
 
-// Rails `quoted_date` fixed-6 microsecond field (abstract/quoting.rb:194-195):
-// `.5` → `.500000`, and usec == 0 omits the fractional part entirely.
 describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
   it("emits a fixed 6-digit field for a half-second (.5 → .500000)", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.5Z");
@@ -187,8 +176,6 @@ describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
   });
 });
 
-// The 2000-01-01 prefix is SQLite's `quoted_time` override, reached by
-// receiver — the same dispatch Rails uses (abstract/quoting.rb:103).
 describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for PlainTime", () => {
   it("wraps PlainTime in 2000-01-01 for sqlite", () => {
     const v = Temporal.PlainTime.from("14:23:55.123456");

@@ -1,13 +1,3 @@
-/**
- * Pool manager — manages pool configs per role and shard.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PoolManager
- *
- * `@role_to_shard_mapping` is `Hash.new { |h, k| h[k] = {} }`
- * (pool_manager.rb:7); JS has no Hash default block, so the auto-vivification
- * is a Proxy `get` trap.
- */
-
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PoolConfig } from "./pool-config.js";
 
@@ -74,11 +64,7 @@ export class PoolManager {
     }
   }
 
-  /**
-   * @missingRailsCall delete — PERMANENT: `@role_to_shard_mapping.delete(role)`
-   * (pool_manager.rb:37) is Ruby `Hash#delete`; over a plain object the JS
-   * spelling is the `delete` operator, which is not a call.
-   */
+  /** @missingRailsCall delete — PERMANENT */
   removeRole(role: string): Record<string, PoolConfig> | undefined {
     if (!Object.hasOwn(this._roleToShardMapping, role)) return undefined;
     const shardMap = this._roleToShardMapping[role];
@@ -86,11 +72,7 @@ export class PoolManager {
     return shardMap;
   }
 
-  /**
-   * @missingRailsCall delete — PERMANENT: `@role_to_shard_mapping[role].delete(shard)`
-   * (pool_manager.rb:41) is Ruby `Hash#delete`; over a plain object the JS
-   * spelling is the `delete` operator, which is not a call.
-   */
+  /** @missingRailsCall delete — PERMANENT */
   removePoolConfig(role: string, shard: string): PoolConfig | undefined {
     const shardMap = this._roleToShardMapping[role];
     const poolConfig = shardMap[shard];

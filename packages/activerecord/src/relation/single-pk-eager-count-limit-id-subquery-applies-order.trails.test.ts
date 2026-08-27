@@ -1,24 +1,3 @@
-/**
- * Single-PK eager-count limit/offset id subquery must apply the relation's
- * order.
- *
- * The single-PK eager-count limit/offset branch in `calculations.ts` builds a
- * `SELECT DISTINCT pk ... LIMIT/OFFSET` id-materialization subquery to bound
- * which ROWS participate before the re-count. It previously applied only
- * joins, wheres, from, take, and skip — never the relation's `order_values`.
- * Rails `distinct_relation_for_primary_key`
- * (schema_statements.rb:1429-1452) builds the limited relation via
- * `columns_for_distinct(primary_key_columns, relation.order_values)`, i.e. it
- * RETAINS the order so the LIMIT/OFFSET selects a deterministic, Rails-ordered
- * top-n set of primary keys.
- *
- * Without the order,
- * `Model.eager_load(:assoc).order(:col).limit(n).count(:other)` materializes an
- * arbitrary limited id set, so the subsequent `COUNT(DISTINCT other)` over
- * `pk IN (<ids>)` can diverge from Rails whenever the ordered vs unordered
- * top-n rows differ. This mirrors the composite-PK sibling (PR #4549), which
- * already applies `buildOrder(idSubquery)`.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
@@ -53,10 +32,6 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
         .limit(2)
         .count("posts.tags_count")) as number;
     });
-    // Rails materializes the ordered, limited DISTINCT pk set (posts 2 & 3),
-    // then re-counts COUNT(DISTINCT tags_count) over `pk IN (...)` — both rows
-    // have tags_count 7, so the answer is 1. An unordered top-2 (posts 1 & 2)
-    // would wrongly return 2.
     expect(count).toBe(1);
     const idSql = sqls.find((s) => /DISTINCT/i.test(s) && /ORDER BY/i.test(s) && /LIMIT/i.test(s));
     expect(idSql).toBeTruthy();

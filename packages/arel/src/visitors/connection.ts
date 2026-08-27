@@ -1,29 +1,6 @@
-/**
- * Connection-quoting surface exposed to the Arel visitor.
- *
- * Mirrors Rails' `@connection` object passed to `Arel::Visitors::ToSql`.
- * Rails dispatches every quoting decision through the connection so adapters
- * can specialise (PG hex-escapes binary, MySQL backtick-quotes identifiers,
- * etc.).  We accept this subset so `arel` stays dependency-free from
- * `activerecord`; `AbstractAdapter` is a structural superset and always
- * satisfies this interface.
- *
- * @noRailsEquivalent PERMANENT — Ruby's `@connection` is duck-typed: the visitor
- * just calls `quote` / `quote_table_name` / … on whatever it was handed, and no
- * Ruby file declares the shape. TypeScript has no such option, and `arel` cannot
- * name the class that supplies it (`ConnectionAdapters::Quoting` lives in
- * `activerecord`, which depends on `arel`, not the reverse), so a structural
- * interface is the only way to type the collaborator. Every member is the Rails
- * `Quoting` method of that name (`activerecord/lib/active_record/connection_adapters/abstract/quoting.rb`),
- * which is why this declares no surface of its own.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface ArelConnection {
-  /**
-   * Ruby's adapters take the raw name and apply `to_s` themselves
-   * (sqlite3/quoting.rb:48, mysql/quoting.rb:51, postgresql/quoting.rb:47,59),
-   * so the visitor hands over whatever `Attribute#name` / `Table#name` holds.
-   * @internal
-   */
+  /** @internal */
   quoteTableName(name: unknown): string;
   /** @internal */
   quoteColumnName(name: unknown): string;
@@ -37,32 +14,12 @@ export interface ArelConnection {
   quotedTrue(): string;
   /** @internal */
   quotedFalse(): string;
-  /**
-   * The bare (un-quoted) boolean literals. Rails' `type_cast` uses this pair —
-   * not `quoted_true`/`quoted_false` — for booleans (`abstract/quoting.rb:94-107`),
-   * and PostgreSQL's `encode_array` routes every array element through
-   * `type_cast_array` -> `type_cast`. MySQL and SQLite both override the pair to
-   * `1`/`0` (`mysql/quoting.rb:72-79`, `sqlite3/quoting.rb:87-97`), so array
-   * elements must dispatch through the connection to reach the right literal.
-   * @internal
-   */
+  /** @internal */
   unquotedTrue(): boolean | number;
   /** @internal */
   unquotedFalse(): boolean | number;
-  /**
-   * Sanitize a string for inclusion inside a SQL comment (optimizer hints,
-   * query annotations). Mirrors Rails' `@connection.sanitize_as_sql_comment`,
-   * which the Arel visitor delegates to so each adapter applies its own
-   * comment-escaping rules.
-   * @internal
-   */
+  /** @internal */
   sanitizeAsSqlComment(value: string): string;
-  /**
-   * Cast a value to be used as a bound parameter of unknown type. Mirrors
-   * Rails' `@connection.cast_bound_value`, which `visit_Arel_Nodes_BoundSqlLiteral`
-   * applies to every non-Arel scalar before `collector.add_bind`. The abstract
-   * adapter returns the value unchanged; MySQL stringifies numerics/booleans.
-   * @internal
-   */
+  /** @internal */
   castBoundValue(value: unknown): unknown;
 }

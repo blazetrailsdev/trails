@@ -1,10 +1,3 @@
-/**
- * Schema cache — caches database schema information to avoid repeated
- * introspection queries.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache
- */
-
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
@@ -34,10 +27,6 @@ function serializeColumn(col: Column): ColumnCoder {
   return coder;
 }
 
-/**
- * The Column subclasses a dump can name, keyed by the `class` tag
- * `Column#encodeWith` writes — JSON's stand-in for YAML's `!ruby/object:` tag.
- */
 const COLUMN_CLASSES: Record<string, { prototype: Column }> = {
   Column,
   "MySQL::Column": MysqlColumn,
@@ -45,12 +34,6 @@ const COLUMN_CLASSES: Record<string, { prototype: Column }> = {
   "SQLite3::Column": Sqlite3Column,
 };
 
-/**
- * Psych's restore step: allocate the tagged class, then `init_with` the coder
- * (`psych/visitors/to_ruby.rb`; `column.rb:46-53`). `Object.create` is the JS
- * `allocate` — it must not run a constructor, because the coder is the only
- * source of state.
- */
 function rehydrateColumn(data: unknown): Column {
   if (data instanceof Column) return data;
   const coder = data as ColumnCoder;
@@ -60,15 +43,6 @@ function rehydrateColumn(data: unknown): Column {
   return column;
 }
 
-/**
- * `IndexDefinition#conciseOptions` collapses a per-column option map to a bare
- * scalar when every key column shares the value, so a serialized row can carry
- * either shape. Re-expand the scalar over the key columns before handing it
- * back to the constructor, which collapses it again. An expression index has no
- * key columns to expand over — `columns` is the raw expression string — so its
- * scalar passes straight through to `conciseOptions`, which leaves a non-map
- * value alone.
- */
 function expandIndexOption<T>(
   columns: string | string[],
   value: unknown,
@@ -79,12 +53,6 @@ function expandIndexOption<T>(
   return Object.fromEntries(columns.map((c) => [c, value as T]));
 }
 
-/**
- * Rails' schema cache round-trips real `IndexDefinition` structs (the
- * YAML/Marshal payload carries the class), so derived behavior like
- * `columnOptions` / `isDefinedFor` survives a `schema_cache.yml` load. JSON has
- * no class tag, so rebuild the instance from the serialized fields.
- */
 function rehydrateIndex(data: unknown): IndexDefinition {
   if (data instanceof IndexDefinition) return data;
   const row = data as Record<string, unknown>;
@@ -122,13 +90,7 @@ export class SchemaCache {
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
-  /**
-   * @missingRailsCall load — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_cache.rb:228-242 dispatches to `Marshal.load` or `YAML.unsafe_load`
-   *   by extension; trails dumps and loads the cache as JSON
-   *   (schema-cache.ts:134-146), so neither Ruby deserializer has a counterpart
-   *   to call.
-   */
+  /** @missingRailsCall load — PERMANENT */
   static _loadFrom(filename: string): SchemaCache | null {
     try {
       const fs = getFs();
@@ -143,14 +105,7 @@ export class SchemaCache {
     }
   }
 
-  /**
-   * Mirrors SchemaCache.read in Rails: transparently gunzips .gz files.
-   *
-   * @missingRailsCall open — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_cache.rb:246 is `Zlib::GzipReader.open(filename) { |gz| ... }`;
-   *   trails reads the bytes and calls the pure `Gzip.decompress`
-   *   (schema-cache.ts:149-156) — there is no reader object to open.
-   */
+  /** @missingRailsCall open — PERMANENT */
   static read<T>(filename: string, callback: (data: string) => T): T {
     const fs = getFs();
     if (filename.endsWith(".gz")) {
@@ -160,9 +115,6 @@ export class SchemaCache {
     return callback(fs.readFileSync(filename, "utf-8"));
   }
 
-  // SchemaCache is not an ActiveRecord model: Rails' SchemaCache#initialize_dup
-  // supers into Object (schema_cache.rb:264) and fires no model callbacks, so
-  // this override must not run any either.
   initializeDup(): SchemaCache {
     const dup = new SchemaCache();
     dup._columns = new Map(this._columns);
@@ -226,7 +178,6 @@ export class SchemaCache {
 
     this._version = (coder["version"] as string | number) ?? null;
 
-    // `unless coder["deduplicated"]` (`schema_cache.rb:289-291`).
     if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
       this.deriveColumnsHashAndDeduplicateValues();
     }
@@ -261,7 +212,6 @@ export class SchemaCache {
 
   async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
     if (this.isIgnoredTable(name)) return undefined;
-    // Rails: eager-load all data sources on first cache miss
     if (this._dataSourceExists.size === 0) {
       const tables = await this.tablesToCache(pool);
       for (const source of tables) {
@@ -318,7 +268,6 @@ export class SchemaCache {
       return this._columnsHash.get(tableName);
     }
 
-    // Rails: @columns_hash[table_name] = columns(pool, table_name).index_by(&:name).freeze
     const cols = await this.columns(pool, tableName);
     if (cols) {
       const hash: Record<string, Column> = {};
@@ -331,93 +280,29 @@ export class SchemaCache {
     return undefined;
   }
 
-  // Rails: columns_hash?(_pool, table_name) — "checks whether the columns hash
-  // is already cached for a table" (schema_cache.rb:359).
   isColumnsHash(_pool: unknown, tableName: string): boolean {
     return this._columnsHash.has(tableName);
   }
 
   /**
-   * Synchronous, query-free read of an already-warmed columns hash. Rails has
-   * no counterpart: `columns_hash(pool, table)` is its only accessor, and in
-   * Ruby it can block on a connection checkout when the entry is cold.
-   *
-   * Both trails callers are Rails-sync accessors that cannot await: the sync
-   * `Model.columnsHash()` (`model-schema.ts` `columnsHash`, which user code and
-   * `columnNames()` call without awaiting) and `cachedColumnsHash`, which
-   * `attributes.ts` `_defaultAttributes` reads while *constructing* a record.
-   * Both gate on `_columnsHash` — the same map this reads, not `isCached`'s
-   * `_columns` — so a cold table falls through to the async `columnsHash` path
-   * rather than silently reporting an empty schema.
-   *
-   * @internal Reflection plumbing behind the sync `columnsHash` accessors, not a
-   * Rails surface. It disappears once those accessors can block on a checkout
-   * the way `columns_hash(pool, table)` does — blocked on RFC 0073 (the
-   * permanent connection-checkout flip), not on anything TypeScript forbids.
-   * @noRailsEquivalent CONVERGEABLE query-free read of SchemaCache#columns_hash (schema_cache.rb:352), which may block on a checkout; retires with RFC 0073.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
   }
 
   /**
-   * Synchronous, query-free read of an already-resolved data-source existence
-   * check. `undefined` when this table has never been checked (a warm cache
-   * only seeds `true` for tables it saw — an unchecked absent table is not
-   * `false` here until `dataSourceExists` misses on it).
-   *
-   * @internal Reflection plumbing behind the sync `cachedTableExists`, not a
-   * Rails surface. It disappears once that caller can block the way
-   * `data_source_exists?(pool, name)` does — blocked on RFC 0073 (the permanent
-   * connection-checkout flip).
-   * @noRailsEquivalent CONVERGEABLE query-free read of SchemaCache#data_source_exists? (schema_cache.rb:309), which may block on a checkout; retires with RFC 0073.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   getCachedDataSourceExists(name: string): boolean | undefined {
     return this._dataSourceExists.get(name);
   }
 
   /**
-   * Synchronous, query-free read of an already-cached primary key. Returns
-   * `undefined` when the table's primary key has not been reflected yet (the
-   * caller should fall back to the convention default), or the cached value
-   * — which may be `null` for a primary-key-less data source such as a view.
-   *
-   * When the dedicated `_primaryKeys` map has no entry but the columns are
-   * already warm, derive the key from the columns' `primaryKey` flags. This is
-   * what lets `id: false` tables with a custom string PK (e.g. `countries`'
-   * `country_id`) surface the right key after `loadSchema` warms only the
-   * columns hash — without it the caller falls back to the "id" convention and
-   * the model needs an explicit `primary_key=`. Mirrors Rails, where the schema
-   * cache resolves `primary_key` from the reflected table rather than the
-   * convention.
-   *
-   * This column-flag derivation is adapter-scoped: it fires only for adapters
-   * whose `columns()` flag the PK (sqlite/postgres). MySQL/MariaDB's `columns()`
-   * carries no per-column primary flag — matching Rails' `MySQL::Column`
-   * (`abstract_mysql_adapter.rb`), which resolves the key solely via
-   * `@connection.primary_key` — so this branch never resolves a MySQL key and
-   * falls through to `undefined`. That is not a gap: MySQL PK resolution is
-   * authoritative-only, and `loadSchema` → `loadSchemaFromAdapter`
-   * (`model-schema.ts`) always warms `_primaryKeys` (via `adapter.primaryKey()`)
-   * alongside the columns hash, so the `_primaryKeys` hit above answers first.
-   * A MySQL custom-PK table therefore still resolves through the model path
-   * (regression-tested in `primary-keys.test.ts`); only a low-level caller that
-   * warms `_columns` without `_primaryKeys` — which the model path never does —
-   * would see the fall-through, exactly as Rails would require a `primary_keys`
-   * query there.
-   *
-   * Deliberately returns `undefined` (not `null`) when the warm columns flag no
-   * primary key: the authoritative keyless→`null` answer comes from the async
-   * `primaryKeys` query, and resolving it here would change a warm-but-unqueried
-   * keyless table's `primary_key` from the "id" convention to `null` — a
-   * behavior change beyond surfacing custom keys. Falling through keeps this a
-   * strictly additive read: a table that resolved "id" before still does.
-   *
-   * @internal Reflection plumbing behind the sync `Model.primaryKey`, not a
-   * Rails surface. It disappears once that accessor can block the way
-   * `primary_keys(pool, table)` does — blocked on RFC 0073 (the permanent
-   * connection-checkout flip).
-   * @noRailsEquivalent CONVERGEABLE query-free read of SchemaCache#primary_keys (schema_cache.rb:298), which may block on a checkout; retires with RFC 0073.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
     return this._primaryKeys.get(tableName);
@@ -457,7 +342,6 @@ export class SchemaCache {
     return this._version;
   }
 
-  // Rails: [@columns, @columns_hash, @primary_keys, @data_sources].sum(&:size)
   get size(): number {
     return (
       this._columns.size +
@@ -467,7 +351,6 @@ export class SchemaCache {
     );
   }
 
-  // Rails: clear_data_source_cache!(_connection, name)
   clearDataSourceCacheBang(_connection: unknown, name: string): void {
     this._columns.delete(name);
     this._columnsHash.delete(name);
@@ -477,25 +360,8 @@ export class SchemaCache {
   }
 
   /**
-   * Populate the columns / columns-hash / data-source entries for a table from
-   * columns the caller has *already* reflected. Rails has no sync writer — its
-   * only population path is `add(pool, table_name)`, which issues the
-   * introspection queries itself behind `pool.with_connection`.
-   *
-   * It survives as the write half of the sync readers below: `columns()` seeds
-   * every reflection through it, so `getCachedColumnsHash` and friends can
-   * answer query-free. Rails needs no such writer because its readers may block
-   * on a checkout.
-   *
-   * Also warms `_dataSourceExists` — a table whose columns just came back
-   * demonstrably exists — which is what lets the sync readers above answer
-   * without a query.
-   *
-   * @internal The write half of the sync readers above — same lifetime as they
-   * have: once they can block on a checkout, every population path is
-   * `add(pool, tableName)` again. Blocked on RFC 0073 (the permanent
-   * connection-checkout flip).
-   * @noRailsEquivalent CONVERGEABLE the write half of the sync readers above; Ruby populates only through SchemaCache#add (schema_cache.rb:326). Retires with RFC 0073.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   setColumns(tableName: string, cols: Column[]): void {
     this._columns.set(tableName, cols);
@@ -525,10 +391,6 @@ export class SchemaCache {
     this.encodeWith(coder);
     const payload = JSON.stringify(coder, null, 2);
     if (filename.endsWith(".gz")) {
-      // Mirrors Rails: .gz files are gzipped on disk. Gzip.compress (via
-      // node:zlib gzipSync) writes a header with mtime=0 and OS=0xff, so
-      // two dumps of the same cache produce byte-identical output (Rails
-      // relies on this in `test_gzip_dumps_identical`).
       fs.writeFileSync(filename, Gzip.compress(payload), "latin1");
     } else {
       fs.writeFileSync(filename, payload, "utf-8");
@@ -573,11 +435,6 @@ export class SchemaCache {
     this.deriveColumnsHashAndDeduplicateValues();
   }
 
-  /**
-   * Mirrors `SchemaCache#derive_columns_hash_and_deduplicate_values`
-   * (`schema_cache.rb:440-446`), the tail of both load paths (`initWith` and
-   * `marshalLoad`).
-   */
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columns = deepDeduplicate(this._columns);
     this._columnsHash.clear();
@@ -602,14 +459,6 @@ export class SchemaCache {
     this._version = null;
   }
 
-  // Rails: tables_to_cache(pool) — gets data_sources from connection,
-  // filtering out anything matched by ActiveRecord.schema_cache_ignored_tables.
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table?
-   * (`schema_cache.rb:436`, private) — `ActiveRecord.schema_cache_ignored_table?`
-   * behind a private method on the cache, which is what every ignore check in
-   * this class calls.
-   */
   private isIgnoredTable(tableName: string): boolean {
     return isSchemaCacheIgnoredTable(tableName);
   }
@@ -625,53 +474,12 @@ export class SchemaCache {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection
- */
 export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
-  /**
-   * Mirrors Rails' `ActiveRecord.lazily_load_schema_cache` (default
-   * false). When true, ConnectionPool.newConnection will kick off a
-   * fire-and-forget `schemaCache.loadBang()` on first connection —
-   * apps that commit `db/schema_cache.json` get it populated at boot
-   * without paying the introspection cost on every model load.
-   *
-   * Off by default because the load involves file I/O + optional
-   * schema-version validation; apps opt in by setting this to true
-   * (typically in production boot) the same way Rails exposes it.
-   */
   static lazilyLoadSchemaCache = false;
 
-  /**
-   * Eagerly warm the schema cache by DB introspection at connection/boot,
-   * even when no `schema_cache.json` exists on disk. When true,
-   * ConnectionPool.newConnection kicks off a fire-and-forget
-   * `loadAllBang(pool)` on the first connection: it introspects every table's
-   * columns/primary-keys/indexes (Rails' `schema_cache.addAll(pool)`) so a
-   * synchronous `Model.columnNames()` / `columnsHash()` on a connected model
-   * takes the warm, DB-sourced branch — and therefore excludes virtual
-   * `attribute()` declarations — without a prior `await ensureSchemaLoaded()`.
-   *
-   * Distinct from {@link lazilyLoadSchemaCache}, which only loads a committed
-   * dump file. Eager warming subsumes it: `loadAllBang` first consults the
-   * on-disk cache (if any) as a base, then tops it up by introspection.
-   *
-   * Off by default — the boot-time introspection cost is opt-in, mirroring how
-   * Rails apps choose between a committed dump and live reflection.
-   *
-   * Boot-time only: `resetColumnInformation` always clears the table's entry
-   * (Rails' `clear_data_source_cache!`) regardless of this flag — the next
-   * load re-reflects it.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story:
-   * retire-schema-cache-sync-readers-after-checkout-flip) — blocked on RFC 0073,
-   * the permanent connection-checkout flip. Rails has only
-   * `lazily_load_schema_cache` (a committed dump) because its sync accessors
-   * fall back on blocking reflection; trails' cannot until the flip lands, at
-   * which point this flag has nothing left to buy and goes away with it.
-   */
+  /** @noRailsEquivalent CONVERGEABLE */
   static eagerLoadSchemaCache = false;
 
   private _cache: SchemaCache | null;
@@ -683,13 +491,6 @@ export class SchemaReflection {
     this._cachePath = cachePath ?? null;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache
-   * (`schema_cache.rb:100`, private). Rails uses `allocate` + `send(:initialize)`
-   * to bypass a custom `new`; TS has no such distinction, so a plain
-   * construction is the faithful equivalent. Every empty-cache fallback in this
-   * class routes through it, as Rails' do.
-   */
   private emptyCache(): SchemaCache {
     return new SchemaCache();
   }
@@ -705,18 +506,8 @@ export class SchemaReflection {
   }
 
   /**
-   * Eagerly warm the cache by full DB introspection. First resolves the base
-   * cache via {@link cache} — which consults the on-disk dump when present —
-   * then introspects every data source via {@link SchemaCache#addAll} to top
-   * it up, so a synchronous read sees real DB columns even with no dump file.
-   *
-   * @internal trails-only composite — NOT a Rails method. Rails'
-   * `SchemaReflection#load!(pool)` is just `cache(pool)`; the introspection
-   * top-up is `SchemaCache#add_all(pool)`. There is no `load_all!` in Rails;
-   * this pairs the two so the eager-warm pool path has a single entry point
-   * that also routes through the lone-connection `FakePool`. Don't grep Rails
-   * for it.
-   * @noRailsEquivalent CONVERGEABLE pairs SchemaReflection#load! (schema_cache.rb:27) with SchemaCache#add_all (schema_cache.rb:220) behind one entry point.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   async loadAllBang(pool: unknown): Promise<this> {
     const cache = await this.cache(pool);
@@ -725,25 +516,16 @@ export class SchemaReflection {
   }
 
   /**
-   * @internal Return the internal SchemaCache if already loaded, or
-   * null if no cache has been populated yet. Used by ConnectionPool to
-   * propagate the reflection's loaded cache into poolConfig.schemaCache
-   * so adapter-side consumers (AbstractAdapter.schemaCache) see the
-   * preloaded data from a schema_cache.json without hitting the DB.
-   * External callers should not mutate the returned cache.
-   * @noRailsEquivalent CONVERGEABLE reads the ivar slot SchemaReflection keeps (schema_cache.rb:16) so the pool can share the one raw cache.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   get loadedCache(): SchemaCache | null {
     return this._cache;
   }
 
   /**
-   * @internal Companion setter for {@link loadedCache}: `PoolConfig#schemaCache`
-   * is backed by this slot so the pool's one raw SchemaCache is shared by every
-   * reader — the BoundSchemaReflection and the adapters' `internalSchemaCache`
-   * alike. Assigning drops any in-flight disk load so it can't overwrite the
-   * cache the caller just installed.
-   * @noRailsEquivalent CONVERGEABLE the companion writer for that same ivar slot (schema_cache.rb:16); Ruby assigns it directly.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   set loadedCache(cache: SchemaCache | null) {
     this._cache = cache;
@@ -795,20 +577,12 @@ export class SchemaReflection {
     return this._cache?.size ?? 0;
   }
 
-  // Rails: return if @cache.nil? && !possible_cache_available?
-  //        cache(pool).clear_data_source_cache!(pool, name)
   async clearDataSourceCacheBang(pool: unknown, name: string): Promise<void> {
     if (!this._cache && !this.possibleCacheAvailable()) return;
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
 
-  /**
-   * @missingRailsCall load_cache — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_cache.rb:79-89 may `load_cache(nil)` inline; trails' `isCached` is
-   *   synchronous while `loadCache` is promise-returning, so the load is
-   *   performed by `ensureSyncCache()` from the already-resolved dump
-   *   (schema-cache.ts:839-842).
-   */
+  /** @missingRailsCall load_cache — PERMANENT */
   isCached(tableName: string): boolean {
     this.ensureSyncCache();
     return this._cache?.isCached(tableName) ?? false;
@@ -838,11 +612,6 @@ export class SchemaReflection {
     return this._cachePromise;
   }
 
-  /**
-   * Attempt to populate _cache synchronously from disk when version
-   * checking is disabled. Used by sync-only paths (isCached, size,
-   * isColumnsHash) that can't await.
-   */
   private ensureSyncCache(): void {
     if (this._cache) return;
     if (!SchemaReflection.checkSchemaCacheDumpVersion) {
@@ -900,9 +669,6 @@ export class SchemaReflection {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::BoundSchemaReflection
- */
 export class BoundSchemaReflection {
   private _schemaReflection: SchemaReflection;
   private _pool: unknown;
@@ -929,10 +695,8 @@ export class BoundSchemaReflection {
   }
 
   /**
-   * @internal trails-only composite — NOT a Rails method. Bound counterpart of
-   * {@link SchemaReflection#loadAllBang}; see that note. Rails has `load!` and
-   * `add(name)` on BoundSchemaReflection but no `load_all!`.
-   * @noRailsEquivalent CONVERGEABLE bound counterpart pairing BoundSchemaReflection#load! (schema_cache.rb:169) with add_all; Ruby has no load_all!.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   async loadAllBang(): Promise<this> {
     await this._schemaReflection.loadAllBang(this._pool);
@@ -992,9 +756,6 @@ export class BoundSchemaReflection {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::BoundSchemaReflection::FakePool
- */
 export class FakePool {
   private _connection: unknown;
 
@@ -1007,18 +768,7 @@ export class FakePool {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#deep_deduplicate
- * (`schema_cache.rb:448-459`, private). Ruby's Hash arm is a `Map` here — the
- * shape every cache in this file uses. Ruby's `-value` on a String is
- * interning, which JS strings already have, so only the `Deduplicable` arm has
- * work to do: it routes through the registry so structurally identical values
- * become one shared, frozen object. A value that is neither (an
- * `IndexDefinition`, say — not `Deduplicable` in Rails either) falls through
- * `else` and is returned untouched, class and all.
- *
- * @internal
- */
+/** @internal */
 export function deepDeduplicate<T>(value: T): T {
   if (value instanceof Map) {
     return new Map(
@@ -1037,17 +787,8 @@ export function deepDeduplicate<T>(value: T): T {
 }
 
 /**
- * Write content to a file, creating parent directories as needed.
- * Rails uses File.atomic_write; TS writes synchronously (not atomically —
- * FsAdapter lacks renameSync).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#open (private)
- *
  * @internal
- *
- * @missingRailsCall new — PERMANENT: Per-site verified (RFC 0106 wave 4b):
- *   schema_cache.rb:466 is `Zlib::GzipWriter.new file`; trails compresses with
- *   the pure `Gzip.compress` and writes the result, so no writer is allocated.
+ * @missingRailsCall new — PERMANENT
  */
 export function open(
   filename: string,
@@ -1062,8 +803,5 @@ export function open(
       content += data;
     },
   });
-  // FsAdapter does not expose renameSync, so a true atomic write is not possible.
-  // Write directly to the target file (mirrors Rails' File.atomic_write intent;
-  // full atomicity would require renameSync support in FsAdapter).
   fs.writeFileSync(filename, content, "utf-8");
 }

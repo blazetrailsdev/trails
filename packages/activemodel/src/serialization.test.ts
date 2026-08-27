@@ -8,11 +8,6 @@ import { Serialization } from "./serialization.js";
 import { Model } from "./index.js";
 import { NoMethodError } from "./attribute-assignment.js";
 
-// Plain ActiveModel serializes `include:` entries via `send(association)` —
-// the value behind a Ruby `attr_accessor :address` / `:friends` (see Rails'
-// serialization_test.rb). The trails analog is a plain property on the
-// instance; serialization reads it through the same `send` baseline. (For
-// activerecord, `send` reaches the generated association reader instead.)
 function setAssociationAccessors(record: unknown, entries: Record<string, unknown>): void {
   for (const [name, value] of Object.entries(entries)) {
     (record as Record<string, unknown>)[name] = value;
@@ -21,8 +16,6 @@ function setAssociationAccessors(record: unknown, entries: Record<string, unknow
 
 describe("SerializationTest", () => {
   it("should use read attribute for serialization", () => {
-    // Mirrors Rails: a per-instance `read_attribute_for_serialization` override
-    // is consulted by `serializable_hash` (serialization_test.rb).
     class Person extends Model {
       static {
         include(this, Serialization);
@@ -39,8 +32,6 @@ describe("SerializationTest", () => {
   });
 
   it("include option with empty association", () => {
-    // Rails: `@user.friends = []` then `serializable_hash(include: :friends)`
-    // yields `friends: []` — the accessor exists and returns an empty array.
     class Person extends Model {
       static {
         include(this, Serialization);
@@ -57,8 +48,6 @@ describe("SerializationTest", () => {
   });
 
   it("include option with ary", () => {
-    // Rails wraps the association in a `FriendList` that responds to `to_ary`
-    // (a non-array Enumerable). serialization maps over it element-wise.
     class Person extends Model {
       static {
         include(this, Serialization);
@@ -141,10 +130,6 @@ describe("SerializationTest", () => {
   });
 
   it("nested include", () => {
-    // Rails test_nested_include: `@user.friends.first.friends = [@user]` then
-    // `serializable_hash(include: { friends: { include: :friends } })` recurses
-    // one level — David's friends [Joe, Sue] each serialize their own friends
-    // (Joe's is [David], Sue's is []).
     class User extends Model {
       static {
         include(this, Serialization);
@@ -319,8 +304,6 @@ describe("SerializationTest", () => {
 
     const p = new Person({ name: "Alice", age: 25, email: "a@b.com" });
     const result = p.serializableHash({ only: ["email", "name"] });
-    // Rails `Array(only) & attribute_names` orders by the `only:` list, not the
-    // model's declared `name, age, email` order.
     expect(Object.keys(result)).toEqual(["email", "name"]);
     expect(result.age).toBeUndefined();
   });

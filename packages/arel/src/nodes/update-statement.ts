@@ -3,11 +3,6 @@ import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 
-/**
- * UpdateStatement — UPDATE ... SET ... WHERE ...
- *
- * Mirrors: Arel::Nodes::UpdateStatement
- */
 export class UpdateStatement extends Node {
   relation: Node | Table | null;
   values: Node[];
@@ -32,7 +27,6 @@ export class UpdateStatement extends Node {
     this.key = null;
   }
 
-  // Mirrors Arel::Nodes::UpdateStatement#hash / #eql? / #== (update_statement.rb:26-43).
   hash(): number {
     return rbHash([
       this.relation,
@@ -61,8 +55,6 @@ export class UpdateStatement extends Node {
     );
   }
 
-  // Mirrors Arel::Nodes::UpdateStatement#initialize_copy
-  // (update_statement.rb:21-25), which Ruby runs for `#clone`.
   clone(): this {
     const copy = objectClone(this);
     copy.wheres = [...this.wheres];

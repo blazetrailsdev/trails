@@ -1,12 +1,3 @@
-/**
- * FromClause — tracks the FROM source override on a Relation.
- *
- * When `relation.from("subquery")` is called, the FromClause replaces
- * the default table in the generated SQL.
- *
- * Mirrors: ActiveRecord::Relation::FromClause
- */
-
 export class FromClause {
   readonly value: any;
   readonly name: string | null;

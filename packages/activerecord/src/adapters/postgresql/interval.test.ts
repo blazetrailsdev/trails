@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/interval_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
@@ -9,8 +6,6 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { Column as PostgreSQLColumn } from "../../connection-adapters/postgresql/column.js";
 
-// Rails: class IntervalDataType < ActiveRecord::Base
-//   attribute :legacy_term, :string
 class IntervalDataType extends Base {
   static {
     this.tableName = "interval_data_types";
@@ -44,7 +39,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     const hash = IntervalDataType.columnsHash() as unknown as Record<string, PostgreSQLColumn>;
     columnMax = hash["maximum_term"];
     columnMin = hash["minimum_term"];
-    // Rails setup assertions
     expect(columnMax).toBeInstanceOf(PostgreSQLColumn);
     expect(columnMin).toBeInstanceOf(PostgreSQLColumn);
     expect(columnMax.precision).toBeNull();
@@ -115,10 +109,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema dump with default value", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "interval_data_types");
-      // Rails asserts: t.interval "default_term", default: "P3Y"
-      // Our schema dumper emits TS DSL (parentheses, object options), and may emit
-      // t.column(...) instead of t.interval(...) for interval columns. Accept either
-      // spelling so long as the default round-trips as "P3Y".
       expect(output).toMatch(
         /t\.interval\("default_term",\s*\{[^}]*default:\s*"P3Y"|t\.column\("default_term",\s*"interval"(?:\([^)]*\))?,\s*\{[^}]*default:\s*"P3Y"/,
       );

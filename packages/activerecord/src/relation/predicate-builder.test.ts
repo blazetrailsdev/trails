@@ -19,18 +19,6 @@ function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unkn
   return visitor.compile(node as never, collector) as [string, unknown[]];
 }
 
-// Same shape as Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50) — a map
-// converting any attribute name to a caster — because `Table#type_for_attribute`
-// delegates bare (table.rb:106-108) and these tables are not canonical models
-// (`users` is in neither Rails' schema.rb nor TEST_SCHEMA). It yields `ValueType`
-// where Rails' yields `String`: Rails' Arel tests assert SQL shape only, whereas
-// these assert bound *values*, so they need the no-op type Rails reaches for as
-// `ActiveModel::Type.default_value`. A real column type would cast `{ id: 5 }` to
-// `"[object Object]"` and defeat the dereference assertions below.
-// Both members: #4888 converged `Table#typeCastForDatabase` to bare delegation
-// too, and a range bound reaches it through `Casted`. Mirrors TypeCaster::Map /
-// ::Connection, whose `type_cast_for_database` is `type_for_attribute(n).serialize(v)`
-// (type_caster/map.rb:10-13).
 const VALUE_TYPE = new ValueType();
 const fakePgCaster = {
   typeForAttribute: () => VALUE_TYPE,
@@ -39,10 +27,6 @@ const fakePgCaster = {
 const castedTable = (name: string): Table => new Table(name, { typeCaster: fakePgCaster });
 
 describe("PredicateBuilderTest", () => {
-  // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
-  // Teardown: Topic.class_eval { @predicate_builder = nil }
-  // We use a local RegexFilter class instead of Regexp to keep the test
-  // self-contained — trails has no Regexp predicate-builder coercion.
   class RegexFilter {
     constructor(public source: string) {}
   }
@@ -51,13 +35,9 @@ describe("PredicateBuilderTest", () => {
       new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
   };
 
-  // Rails declares no fixtures here; we still ride the canonical tables so the
-  // models' schema is warmed for the synchronous `toSql()` assertions below.
   fixtures(["topics", "posts", "authors", "products"]);
 
   beforeAll(() => {
-    // Reply.belongs_to(:topic) and the nested {topics: …} key both resolve
-    // "Topic" through the registry — Rails has these globally available.
     registerModel("Topic", Topic);
     registerModel("Reply", Reply);
   });
@@ -94,12 +74,6 @@ describe("PredicateBuilderTest", () => {
   });
 
   it("registering new handlers for joins", () => {
-    // Rails: Reply.belongs_to :regexp_topic, -> { where(title: /rails/) },
-    //   class_name: "Topic", foreign_key: "parent_id"
-    // then Reply.joins(:regexp_topic).references(Arel.sql("regexp_topic")).to_sql
-    // aliases the joined `topics` table to the association name `regexp_topic`.
-    // We add the association on a throwaway Reply subclass rather than mutating
-    // the canonical Reply (Rails leaks the association; we keep it scoped).
     class RegexpReply extends Reply {
       static {
         this.belongsTo(
@@ -128,27 +102,15 @@ describe("PredicateBuilderTest", () => {
   });
 
   it("references with schema", () => {
-    // Rails: PredicateBuilder.references(%w{schema.table.column}) => ["schema.table"]
     const refs = PredicateBuilder.references(["schema.table.column"]);
     expect(refs.map((r) => r.value)).toEqual(["schema.table"]);
   });
 
   it("build from hash with schema", () => {
-    // Rails: Topic.predicate_builder.build_from_hash("schema.table.column" => "value").first.to_sql
-    // convert_dot_notation_to_hash splits on rindex("."):
-    //   "schema.table.column" → { "schema.table" => { "column" => "value" } }
-    // TableMetadata.associated_table("schema.table") falls back to a bare
-    // Arel::Table("schema.table"), so expand_from_hash produces:
-    //   "schema.table"."column" = 'value'
-    // Topic.predicateBuilder is TableMetadata-backed (like Rails), so the
-    // associated_table fallback expansion happens without a hand-built PB.
     const [node] = Topic.predicateBuilder.buildFromHash({
       "schema.table.column": "value",
     });
     const sql = new Visitors.ToSql(testConnection).compile(node);
-    // Arel resolves "schema.table" as schema.table identifier, producing:
-    // "schema"."table"."column" = ?  (the value is a BindParam, not inlined —
-    // Rails parity, see Arel BindParam#toSql).
     expect(sql).toMatch(/schema.+table.+column/i);
   });
 
@@ -170,7 +132,6 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ title: "hello" });
       expect(compile(node)).toContain('"posts"."title"');
-      // Value is a BindParam → rendered as `?`, not inlined (Rails parity).
       expect(compile(node)).toContain("= ?");
     });
 
@@ -209,11 +170,6 @@ describe("PredicateBuilderTest", () => {
       expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
     });
 
-    // No verbatim Rails test exists for the plain-object-not-a-record case (it is
-    // an unusual call shape not exercised by Rails' ported predicate_builder tests).
-    // These regressions pin the convergence: in Ruby a bare Hash does not
-    // `respond_to?(:id)` (Object#id was removed in 1.9), so `where(col: { id: 5 })`
-    // routes the Hash to a handler rather than dereferencing it to `5`.
     it("does not dereference a plain object literal to its id", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), { id: 5 });
@@ -229,10 +185,6 @@ describe("PredicateBuilderTest", () => {
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
     });
 
-    // No verbatim Rails test exists for this shape either: Ruby's ArrayHandler
-    // derefs only `x.is_a?(Base)`, so a non-Base class instance carrying an
-    // `id` is left intact. This pins that convergence — a class instance that
-    // is not an AR record must NOT be flattened to its `id` inside an array.
     it("does not dereference a non-Base object carrying an id inside an array", () => {
       class NotARecord {
         constructor(public id: number) {}
@@ -252,21 +204,12 @@ describe("PredicateBuilderTest", () => {
       expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
     });
 
-    // No verbatim Rails test for this in isolation: it pins the trails
-    // convergence for Rails' uniform `force_equality?` dispatch at the top of
-    // `PredicateBuilder#build` (predicate_builder.rb:57-69). When the column
-    // type reports `force_equality?(value)` — as OID::Array does for an Array —
-    // the value is bound as a single equality (`col = ?`) BEFORE any handler
-    // dispatch, so an array never reaches ArrayHandler → `IN (...)`. This is the
-    // PG-array case (`where(arrayCol: [1, 2])` → `arr = '{1,2}'`) at unit level.
     it("forces equality for a force-equality type instead of dispatching to a handler", () => {
       const forceEqType = {
         isForceEquality: (v: unknown) => Array.isArray(v),
         cast: (v: unknown) => v,
         serialize: (v: unknown) => v,
       };
-      // The metadata's table caster answers the force-equality type — the
-      // `table.type(attribute.name)` lookup Rails' build performs.
       const feTable = new Table("posts", { typeCaster: { typeForAttribute: () => forceEqType } });
       const builder = new PredicateBuilder(new TableMetadata(null, feTable));
       const node = builder.build(feTable.get("tags"), [1, 2]);
@@ -278,8 +221,6 @@ describe("PredicateBuilderTest", () => {
     });
   });
 
-  // Negation is Rails-shaped: the builder is always positive; `where.not`
-  // inverts the assembled clause (WhereClause#invert → node.invert()).
   describe("buildNegatedFromHash", () => {
     const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
@@ -305,8 +246,6 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("builds correct negation for exclusive ranges", () => {
-      // Rails: positive `gteq(begin).and(lt(end))`, inverted via Node#invert →
-      // `NOT (age >= 18 AND age < 65)` (And has no invert override).
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = buildInverted(builder, { age: new Range(18, 65, true) });
       const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
@@ -320,8 +259,6 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), { id: 5 }).invert();
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      // Rails inverts a positively-built, bound predicate, so the value rides a
-      // QueryAttribute bind rather than being inlined.
       expect(sql).toContain('"posts"."title" !=');
       const bound = (node as unknown as { right: { value: unknown } }).right.value;
       expect(bound).toEqual({ id: 5 });
@@ -375,8 +312,6 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql(testConnection);
-      // The value is wrapped in a BindParam, so raw Arel compile emits `?`
-      // (mirrors Rails); the value is carried as a bind, not inlined.
       expect(visitor.compile(node)).toBe('"users"."name" = ?');
       const [, binds] = compileWithBinds(visitor, node);
       expect(binds).toHaveLength(1);
@@ -413,9 +348,6 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("aliases a nested hash keyed by an association name that differs from the table to the association key", () => {
-      // Rails table_metadata.rb associated_table aliases the resolved table to
-      // the hash key whenever the names differ, so an association key that
-      // differs from its table (writer -> authors) emits "writer"."name".
       const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
@@ -431,7 +363,6 @@ describe("PredicateBuilderTest", () => {
         .predicates as Nodes.Node[];
       const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
-      // Negation binds the RHS, so 'Rails' rides a QueryAttribute bind.
       const bound = (nodes[0] as unknown as { right: { value: unknown } }).right.value;
       expect(bound).toBe("Rails");
       expect(sql).not.toContain('"posts"."authors"');

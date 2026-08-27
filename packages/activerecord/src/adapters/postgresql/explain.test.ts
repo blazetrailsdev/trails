@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/explain_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -45,8 +42,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(typeof plan).toBe("string");
       expect(plan.toLowerCase()).toContain("select");
       expect(plan).toContain("ex_relations");
-      // The per-query header from PG buildExplainClause (no " for:" — that is
-      // Explain#build_explain_clause's fallback only, explain.rb:56-61):
       expect(plan).toMatch(/^EXPLAIN SELECT/m);
     });
 
@@ -107,7 +102,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("explain executes with FORMAT JSON and returns JSON plan", async () => {
       const result = await adapter.explain("SELECT 1", [], ["FORMAT JSON"]);
       expect(result).not.toContain("[object Object]");
-      // Rails wraps JSON output in the "QUERY PLAN" header block; JSON.parse(result) would fail.
       expect(result).toContain("QUERY PLAN");
       const jsonMatch = result.match(/\[[\s\S]*\]/);
       expect(jsonMatch).not.toBeNull();
@@ -117,7 +111,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("explain options with eager loading", async () => {
-      // Rails: Author.where(id: 1).includes(:posts).explain(:analyze).inspect
       const { registerModel } = await import("../../index.js");
       class OpAuthor extends Base {
         static {
@@ -143,11 +136,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await OpPost.create({ title: "B", op_author_id: author.id });
 
       const plan = await OpAuthor.where({ id: author.id }).includes(":opPosts").explain("analyze");
-      // Rails: assert_match %(QUERY PLAN), explain
       expect(plan).toContain("QUERY PLAN");
-      // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "authors".*), explain
       expect(plan).toMatch(/EXPLAIN \(ANALYZE\)/);
-      // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "posts".*), explain
       const analyzeBlocks = plan.split("\n\n").filter((b) => /EXPLAIN \(ANALYZE\)/.test(b));
       expect(analyzeBlocks.length).toBeGreaterThanOrEqual(2);
       expect(plan).toContain("op_authors");

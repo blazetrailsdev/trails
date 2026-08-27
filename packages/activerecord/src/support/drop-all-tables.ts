@@ -3,80 +3,25 @@ import { ActiveRecordError } from "../errors.js";
 import { canonicalForeignKeyDependents } from "./canonical-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
-/**
- * Tables that exist after the schema load but are *not* part of the loaded
- * schema: Rails' own migration bookkeeping, which migrator tests manage per-test
- * and rely on the reset clearing. Dropped like any non-boot-laid table.
- */
 export const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
   "schema_migrations",
   "ar_internal_metadata",
 ]);
 
-/**
- * The canonical `schema.rb` mirror — the registry `loadCanonicalSchema` lays
- * from. The `<adapter>_specific_schema.rb` half is deliberately absent: this is
- * the *protected* set of {@link purgeToCanonicalTables}, whose whole job is to
- * drop the adapter-specific tables so the arm can re-lay them.
- */
 const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
 
 let _bootLaidTableNames: ReadonlySet<string> | null = null;
 let _adapterSpecificSchemaLoaded = false;
 
-/**
- * Records that the `<adapter>_specific_schema.rb` arm has run in this process,
- * so {@link purgeToCanonicalTables} can refuse to run after it — a purge on that
- * side of the arm drops `defaults`, `postgresql_times`, `binary_fields`, … and
- * nothing re-lays them, which surfaces far away as `table "defaults" does not
- * exist`.
- *
- * Called by `loadAdapterSpecificSchema`; not for test files.
- */
 export function noteAdapterSpecificSchemaLoaded(): void {
   _adapterSpecificSchemaLoaded = true;
 }
 
-/**
- * Snapshot the tables the schema load just laid — both halves of Rails'
- * `load_schema` (`schema.rb`'s mirror and `<adapter>_specific_schema.rb`) — as
- * the set {@link resetTestTables} truncates rather than drops.
- *
- * Taken from the database rather than declared: whatever the loaders create is
- * what is protected, on whichever lane is running, with nothing to keep in step.
- *
- * Every table then present must therefore *be* boot-laid. `test-setup-dy.ts`
- * guarantees that by running {@link purgeToCanonicalTables} between the canonical load
- * and the adapter-specific arm: `DatabaseTasks.loadSchema` only drop+recreates
- * the tables the schema file declares, so on the shared PG/MySQL database a
- * bespoke table from a previous run would otherwise be snapshotted as boot-laid
- * and never dropped again.
- *
- * Boot/template setup paths only.
- */
 export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<void> {
   const laid = (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
   _bootLaidTableNames = new Set(laid);
 }
 
-/**
- * Reset for a caller that runs *before* {@link recordBootLaidTables}, protecting
- * only the canonical half — i.e. **purge-only by construction**: every
- * adapter-specific table is dropped, and the caller owns re-laying them.
- *
- * The one caller is `test-setup-dy.ts`'s fast path, which purges between the
- * canonical load and the adapter-specific arm and re-lays that arm immediately
- * after (PR #5659) — unless the stamped database carries a snapshot of the
- * adapter-specific tables, in which case it passes those names as `alsoProtect`
- * and they are truncated in place instead of dropped and re-laid per test file.
- *
- * It is a separate entry point rather than a fallback inside
- * {@link resetTestTables} so that intent is stated at the call site: a
- * pre-snapshot reset that did *not* mean to lose the adapter-specific tables now
- * throws instead of silently losing them.
- *
- * Boot/template setup paths only.
- */
 export async function purgeToCanonicalTables(
   adapter: DatabaseAdapter,
   alsoProtect: readonly string[] = [],
@@ -113,49 +58,16 @@ function bootLaidTableNames(): ReadonlySet<string> {
   return _bootLaidTableNames;
 }
 
-/**
- * Drops every user table/view/matview in the database. Idempotent; per-DROP
- * errors are swallowed so teardown noise never aborts the sequence.
- * PG covers all schemas in `current_schemas(false)` (not just `public`).
- * MySQL and sqlite both go through `disableReferentialIntegrity`.
- */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "drop-all", new Set());
 }
 
-/**
- * Row reset that keeps the boot-laid canonical schema intact.
- *
- * Instead of `dropAllTables`' ~330-table `DROP TABLE` fan-out per test (the
- * dominant DDL-churn source measured in PR #4499), this **truncates** the
- * canonical tables (schema/indexes preserved — RFC 0059 lays them once at boot
- * and keeps them shape-stable). **Every non-canonical table is dropped**, exactly
- * as the previous unconditional `dropAllTables` did: bespoke tables a test
- * created (so their shape can't leak into the next file) *and* the
- * `schema_migrations` / `ar_internal_metadata` bookkeeping tables.
- * Views/matviews are never canonical, so they are always dropped.
- *
- * Requires the boot-laid snapshot: the protected set is what
- * {@link recordBootLaidTables} saw, never a declared stand-in. The pre-snapshot
- * boot purge is {@link purgeToCanonicalTables}. There is no between-test reset: Rails'
- * `teardown_fixtures` rolls the per-test transaction back and never truncates
- * or drops (`test_fixtures.rb:146-158`), so a file that creates bespoke tables
- * owns dropping them itself.
- */
 export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "reset", bootLaidTableNames());
 }
 
 type ResetMode = "drop-all" | "reset";
 
-/**
- * Drops or truncates per `mode`, then clears the pool's data-source cache: the
- * drops are raw `DROP TABLE` statements rather than `SchemaStatements#drop_table`
- * (`abstract/schema_statements.rb:485`), so nothing else invalidates the cache
- * `InternalMetadata#table_exists?` reads (`internal_metadata.rb:108-110`) — a
- * stale entry reports a dropped `ar_internal_metadata` as present and the next
- * read raises on the missing table.
- */
 async function resetTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
@@ -175,23 +87,6 @@ async function resetTables(
   adapter.schemaCache.clearBang();
 }
 
-/**
- * Truncate only the candidate canonical tables that actually hold rows.
- *
- * Truncating is the between-test row-clear, but on PostgreSQL every
- * `truncateTables` call pays `disableReferentialIntegrity` (an `ALTER TABLE …
- * TRIGGER` pass over *every* table) and on MySQL/MariaDB `TRUNCATE` is
- * DDL-grade (drop+recreate tablespace) per table — so truncating all ~330
- * canonical tables per test, even the empty ones, dominates CI time. Most
- * non-transactional tests write to zero canonical tables, so a single
- * `EXISTS` probe collapses the work to the handful (often none) that changed;
- * when none changed we skip `truncateTables` entirely (no referential-integrity
- * pass at all).
- *
- * Exactness matters — missing a non-empty table would leak rows into the next
- * test — so on any probe failure we fall back to truncating the full candidate
- * set (the previous, correct-but-slower behavior).
- */
 async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]): Promise<void> {
   if (candidates.length === 0) return;
   let toTruncate = candidates;

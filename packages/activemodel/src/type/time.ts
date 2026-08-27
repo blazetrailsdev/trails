@@ -14,27 +14,11 @@ import { isUtc } from "./helpers/timezone.js";
 import { TimeValue } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
-/**
- * Mirrors: ActiveModel::Type::Time (time.rb).
- *
- * A time of day, which Rails answers as a `::Time` normalized to 2000-01-01 in
- * the UTC zone — `event.start = "00:01:02+03:00"` is `1999-12-31 21:01:02 UTC`
- * (time.rb:16-27), the date having rolled because the offset shifted the
- * instant. `Temporal.Instant` is the port's `::Time` (see `newTime`), so the
- * cast result carries that instant rather than a bare time of day.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
 export interface TimeType
   extends
     Omit<InstanceMethods<Temporal.Instant>, "valueFromMultiparameterAssignment">,
     Omit<Included<typeof TimeValue>, "userInputInTimeZone" | "serializeCastValue"> {
-  /**
-   * Mixed in from Helpers::TimeValue (time_value.rb:10-21). Declared here
-   * because a merged interface cannot inherit a signature that differs from
-   * `ValueType`'s. The return type is `unknown` so a subclass can widen it, as
-   * ActiveRecord's `Type::Time` does
-   * (activerecord/lib/active_record/type/time.rb:20-22).
-   */
   serializeCastValue(value: Temporal.Instant | null): unknown;
 }
 
@@ -46,43 +30,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
     return this.name;
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Time#user_input_in_time_zone (time.rb:47-63).
-   *
-   *   def user_input_in_time_zone(value)
-   *     return unless value.present?
-   *
-   *     case value
-   *     when ::String
-   *       value = "2000-01-01 #{value}"
-   *       time_hash = begin
-   *         ::Date._parse(value)
-   *       rescue ArgumentError
-   *       end
-   *
-   *       return if time_hash.nil? || time_hash[:hour].nil?
-   *     when ::Time
-   *       value = value.change(year: 2000, day: 1, month: 1)
-   *     end
-   *
-   *     super(value)
-   *   end
-   *
-   * `super` is `Helpers::TimeValue#user_input_in_time_zone`, `value.in_time_zone`
-   * (time_value.rb:42-44) — `Time.zone.parse` of the dummy-dated string, which
-   * is what preserves an offset the string carries. TypeScript has no `super`
-   * for a mixed-in module, so the tail calls the mixin member on `this`; the
-   * mixin also answers Ruby's fall-through arms, so a value that is neither a
-   * `::String` nor a `::Time` reaches it untouched, as in Rails. The zone is
-   * the thread-local `Time.zone`; with no zone set at all Ruby answers a bare
-   * `to_time` (`date_and_time/zones.rb:20-27`), which the mixin reads in the
-   * system zone.
-   *
-   * The `present?` guard is spelled out rather than routed through
-   * `isBlank`: Ruby's `blank?` is `respond_to?(:empty?) ? !!empty? : !self`, so
-   * a `::Time` is present, while `isBlank` reads any object with no own
-   * enumerable keys as blank — which every Temporal value is.
-   */
   userInputInTimeZone(
     value: unknown,
   ): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | null {
@@ -108,41 +55,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
     return TimeValue.userInputInTimeZone.call(this, value);
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Time#cast_value (time.rb:68-83).
-   *
-   *   def cast_value(value)
-   *     return apply_seconds_precision(value) unless value.is_a?(::String)
-   *     return if value.blank?
-   *
-   *     dummy_time_value = value.sub(/\A\d{4}-\d\d-\d\d(?:T|\s)|/, "2000-01-01 ")
-   *
-   *     fast_string_to_time(dummy_time_value) || begin
-   *       time_hash = begin
-   *         ::Date._parse(dummy_time_value)
-   *       rescue ArgumentError
-   *       end
-   *
-   *       return if time_hash.nil? || time_hash[:hour].nil?
-   *       new_time(*time_hash.values_at(:year, :mon, :mday, :hour, :min, :sec, :sec_fraction, :offset))
-   *     end
-   *   end
-   *
-   * The `dummy_time_value` substitution's empty alternation makes the pattern
-   * match at position 0 whatever the string, so a leading `YYYY-MM-DD`
-   * separator is replaced and a time-only string is prefixed. `::Date._parse`
-   * is the gem's own entry point, ported at `packages/date/src/date.ts`.
-   *
-   * Unlike `Type::DateTime#fallback_string_to_time` (date_time.rb:73), this
-   * hands `new_time` the raw `:sec_fraction` — a Rational of a *second* — as
-   * `Time.utc`'s *microsecond* argument, so a string's sub-second digits land
-   * three orders of magnitude down: on ruby 3.3.11
-   * `Type::Time.new.cast("14:23:55.123456").nsec` is `123`. `newTime` reads its
-   * `microsec` the same way `Time.utc` does, so passing the fraction through
-   * unchanged is what reproduces it.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   protected castValue(value: unknown): Temporal.Instant | null {
     if (typeof value !== "string") {
       if (value instanceof Temporal.PlainDateTime) {
@@ -177,36 +90,16 @@ export class TimeType extends ValueType<Temporal.Instant> {
     );
   }
 
-  /** Mixed in from Helpers::Timezone — `is_utc?` (timezone.rb:9-11). */
   get isUtc(): boolean {
     return isUtc();
   }
 
-  /**
-   * @internal The zone `is_utc?` picks between, which Rails spells inline at
-   * each site as the choice of receiver — `Time.utc` vs `Time.local`
-   * (time_value.rb:56-63), `Time.public_send(default_timezone, *values)`
-   * (accepts_multiparameter_time.rb:23). Temporal names a zone by argument
-   * rather than by constructor, so the branch needs a value;
-   * `Temporal.Now.timeZoneId()` is the host zone `::Time.local` builds in.
-   */
+  /** @internal */
   #zoneId(): string {
     return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
   }
 
-  /**
-   * `super` is the mixin's `::Time` assembly (see the `include` at the bottom
-   * of this file), whose Rails base date 2000-01-01 lets hour-only form inputs
-   * (e.g. { "4": 15 }) produce a valid Time. Rails' Type::Time has no override
-   * of its own; this one only re-spells that `::Time` as the
-   * `Temporal.Instant` this port casts to.
-   *
-   * `super` is reached as Ruby's own `instance_method(...).bind_call(self, ...)`
-   * does: TS types `super` against a declared base class only, never against a
-   * mixed-in module.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   protected valueFromMultiparameterAssignment(
     values: Record<string, unknown>,
   ): Temporal.Instant | null {
@@ -220,19 +113,9 @@ export class TimeType extends ValueType<Temporal.Instant> {
   }
 }
 
-/**
- * Mirrors: `include Helpers::AcceptsMultiparameterTime.new(defaults: { 1 => 2000, 2 => 1, 3 => 1, 4 => 0, 5 => 0 })`
- * (time.rb:40-42).
- */
 const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
   defaults: { "1": 2000, "2": 1, "3": 1, "4": 0, "5": 0 },
 });
 include(TimeType, acceptsMultiparameterTime);
 
-/**
- * Mirrors: `include Helpers::TimeValue` (time.rb:43). Every member lands on the
- * prototype rather than on each instance: `type_cast_for_schema` is public and
- * `PostgreSQL::OID::DateTime` overrides it with a `super` call
- * (postgresql/oid/date_time.rb:21-27), which only an ancestry can answer.
- */
 include(TimeType, TimeValue);

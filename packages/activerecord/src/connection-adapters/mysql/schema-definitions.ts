@@ -1,11 +1,3 @@
-/**
- * MySQL schema definitions — MySQL-specific table/column definitions.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::TableDefinition,
- *          ActiveRecord::ConnectionAdapters::MySQL::Table,
- *          ActiveRecord::ConnectionAdapters::MySQL::ColumnMethods (module)
- */
-
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -22,21 +14,11 @@ import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
-// Mirrors Rails' `deprecate :unsigned_float, :unsigned_decimal` on MySQL::ColumnMethods,
-// which passes no `:message`, so ActiveSupport builds the default
-// "<method> is deprecated and will be removed from <gem_name> <deprecation_horizon>"
-// (deprecation/reporting.rb) with no usage hint. The trailing horizon is omitted here
-// because this deprecator carries no horizon infrastructure.
 const UNSIGNED_FLOAT_DEPRECATION =
   "unsigned_float is deprecated and will be removed from Active Record";
 const UNSIGNED_DECIMAL_DEPRECATION =
   "unsigned_decimal is deprecated and will be removed from Active Record";
 
-/**
- * MySQL-specific column type methods mixed into TableDefinition.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::ColumnMethods
- */
 export interface ColumnMethods {
   blob(...names: string[]): unknown;
   blob(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): unknown;
@@ -233,9 +215,6 @@ export class TableDefinition extends AbstractTableDefinition {
       (options as any).limit = (options as any).limit ?? 8;
       (options as any).primaryKey = true;
     } else if (resolvedType === "virtual") {
-      // Rails: `type = options[:type]` with no fallback (mysql/schema_definitions.rb).
-      // A `t.virtual` without `type:` drops the type (nil), so the generated
-      // column renders with no SQL type before its `AS (...)` clause.
       resolvedType = options.type as string;
     } else {
       const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
@@ -282,7 +261,7 @@ export class TableDefinition extends AbstractTableDefinition {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE MySQL::Table/TableDefinition's define_column_methods macro (mysql/schema_definitions.rb:46); Ruby generates the methods, TS declares them.
+   * @noRailsEquivalent CONVERGEABLE
    */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
@@ -316,10 +295,6 @@ export class Table extends AbstractTable {
     super(tableName, schema);
   }
 
-  // Mirrors the column-type methods MySQL::ColumnMethods mixes into both
-  // TableDefinition and Table. The `unsigned_<type>` type is normalized to its
-  // base type + `unsigned: true` by MySQL::TableDefinition#newColumnDefinition
-  // along the addColumn/alter path.
   async blob(...args: unknown[]): Promise<void> {
     await this.definedColumn("blob" as ColumnType, args);
   }

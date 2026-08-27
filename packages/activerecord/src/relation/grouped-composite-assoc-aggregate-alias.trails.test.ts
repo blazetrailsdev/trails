@@ -1,17 +1,3 @@
-/**
- * Grouped calculation over a composite-key `belongsTo` must alias the aggregate
- * through the column-alias tracker, not a hard-coded "val".
- *
- * Rails' `execute_grouped_calculation` does not special-case foreign-key arity:
- * it always aliases the aggregate as
- * `column_alias_tracker.alias_for("#{operation} #{column_name}")` — `count_all`,
- * `sum_status`, … — so `order("count_all desc")` can reference the aggregate
- * (`activerecord/lib/active_record/relation/calculations.rb:536-539`). The
- * composite-FK arm `groupedCompositeAssoc` (`relation/calculations.ts`) instead
- * projected `AS "val"`, which both diverged from Rails' SQL and made an order by
- * the Rails alias unresolvable — reachable only since #5190 taught that arm to
- * apply `order_values` at all.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
@@ -20,8 +6,6 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
 
 describe("CpkBook grouped calculation over a composite-key belongs_to aliases the aggregate", () => {
-  // Rails creates CPK rows inline; no cpk fixtures exist. Ride the canonical,
-  // empty cpk tables and let transactional rollback clean up each insert.
   fixtures([]);
 
   beforeAll(() => {

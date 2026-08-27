@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/json_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Base } from "../../index.js";
@@ -14,9 +11,6 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// The `json_test` table uses the PG-specific `JSON` and `JSONB` types,
-// which aren't expressible via createTable's typed builder; the table is
-// created via raw DDL below (mirroring Rails' `@connection.create_table`).
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {

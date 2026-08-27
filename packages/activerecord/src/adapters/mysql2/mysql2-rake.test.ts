@@ -1,11 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/mysql2/mysql2_rake_test.rb.
- *
- * Despite the file name nothing here drives Rake: every test calls
- * `ActiveRecord::Tasks::DatabaseTasks` directly, against `MySQLDatabaseTasks`,
- * so the tests port straight across wherever the Ruby stubbing they lean on
- * has an analogue.
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as activesupport from "@blazetrails/activesupport";
 import { stdout, stderr } from "@blazetrails/activesupport";
@@ -17,12 +9,6 @@ import { DatabaseAlreadyExists } from "../../errors.js";
 import { Base } from "../../base.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
-/**
- * `ActiveRecord::Base.stub(:lease_connection, @connection, &block)`
- * (`mysql2_rake_test.rb:235`). trails' task classes reach the connection
- * through `Base.connectionPool().leaseConnection()`
- * (`mysql-database-tasks.ts:254`), so the pool is where the double goes.
- */
 async function withStubbedConnection(
   connection: unknown,
   block: () => Promise<void>,
@@ -37,10 +23,6 @@ async function withStubbedConnection(
   }
 }
 
-/**
- * `with_stubbed_connection_establish_connection` (`mysql2_rake_test.rb:88-92`):
- * `Base.stub(:establish_connection, nil)` around `withStubbedConnection`.
- */
 async function withStubbedConnectionEstablishConnection(
   connection: unknown,
   block: () => Promise<void>,
@@ -51,12 +33,6 @@ async function withStubbedConnectionEstablishConnection(
   await withStubbedConnection(connection, block);
 }
 
-/**
- * Rails swaps `$stdout` / `$stderr` for a `StringIO` in `setup` and reads
- * `.string` back (`mysql2_rake_test.rb:17-18, 74`). trails' analogue is the
- * activesupport process adapter's streams, which is what `DatabaseTasks`
- * writes its messages to.
- */
 function captureStreams(): { out: () => string; err: () => string } {
   let outString = "";
   let errString = "";
@@ -170,10 +146,6 @@ describeIfMysqlAdapter("MysqlDBCreateWithInvalidPermissionsTest", () => {
   });
 
   it("raises error", async () => {
-    // Rails raises `Mysql2::Error` from the stubbed `establish_connection`
-    // (`mysql2_rake_test.rb:98-123`). trails has no such class: the node-mysql2
-    // driver surfaces a plain `Error`, which the task layer re-raises untouched,
-    // so the driver error itself is what the assertion pins.
     const error = new Error("Invalid permissions");
     vi.spyOn(Base, "establishConnection").mockRejectedValue(error);
 
@@ -232,8 +204,6 @@ describeIfMysqlAdapter("MySQLDBDropTest", () => {
 });
 
 describeIfMysqlAdapter("MySQLPurgeTest", () => {
-  // `@configuration` here is Rails' own (`mysql2_rake_test.rb:181-184`) —
-  // "test-db", not the `my-app-db` the create/drop cases use.
   let connection: { recreateDatabase: ReturnType<typeof vi.fn> };
   const purgeConfiguration = (overrides: Record<string, unknown> = {}): HashConfig =>
     new HashConfig("default_env", "primary", {
@@ -319,12 +289,6 @@ describeIfMysqlAdapter("MysqlDBCollationTest", () => {
   });
 });
 
-/**
- * Rails pins the exact `mysqldump` argv through
- * `assert_called_with(Kernel, :system, ...)` (`mysql2_rake_test.rb:269-279`).
- * `runCmd` builds the same argv and hands it to the child-process adapter,
- * which is where the spy sits — the same route the sqlite enrollment takes.
- */
 describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
   const filename = "awesome-file.sql";
   const configurationDb = new HashConfig("default_env", "primary", {

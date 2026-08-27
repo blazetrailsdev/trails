@@ -1,8 +1,3 @@
-/**
- * TS-only coverage for `Relation#_substitute_values`
- * (relation.rb:1381-1393): update_all values are cast by the column type and
- * bound, never inline-quoted.
- */
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Nodes } from "@blazetrails/arel";
@@ -13,16 +8,11 @@ import { Topic } from "../test-helpers/models/topic.js";
 
 type Mutator = (sql: string, ...rest: unknown[]) => unknown;
 
-/** Runs `fn`, capturing the SQL + binds of every UPDATE issued on `rel`'s connection. */
 async function captureUpdate(
   rel: unknown,
   fn: () => Promise<unknown>,
 ): Promise<{ sql: string; binds: unknown[] }> {
   const conn = (rel as { _conn(): Record<string, Mutator> })._conn();
-  // `update_all` reaches the adapter through `exec_update`, which is
-  // `affected_rows(internal_execute(sql, name, binds))`
-  // (abstract/database_statements.rb:172-174) — so the binds arrive in
-  // `internalExecute`'s options object, not as a positional argument.
   const key = conn.internalExecute ? "internalExecute" : "execute";
   const original = conn[key];
   const calls: { sql: string; binds: unknown[] }[] = [];
@@ -37,9 +27,6 @@ async function captureUpdate(
   }
   const update = calls.find((c) => c.sql.startsWith("UPDATE"));
   if (!update) throw new Error(`no UPDATE captured; saw: ${calls.map((c) => c.sql).join(" | ")}`);
-  // Rails hands `ActiveModel::Attribute` binds down to the adapter, which reads
-  // `value_for_database` in `type_casted_binds` (abstract/quoting.rb:224); the
-  // assertions below are about that database value.
   return {
     sql: update.sql,
     binds: update.binds.map((b) =>
@@ -54,15 +41,8 @@ describe("update_all value substitution", () => {
   fixtures({ topics: [Topic, {}] });
 
   it("casts a wrong-typed value through the column type", async (ctx) => {
-    // Bind-slot assertions are prepared-statements-only: Rails' non-prepared
-    // `to_sql_and_binds` compiles through `SubstituteBinds`, inlining every
-    // value and returning `binds == []` (database_statements.rb:31-45) — the
-    // MySQL/MariaDB default. Rails gates its own bind assertions the same way
-    // (bind_parameter_test.rb:9).
     ctx.skip(!(await Topic.leaseConnection()).preparedStatements);
     const rel = Topic.where({ id: 1 });
-    // A raw ISO-8601 string is not a datetime — `type_for_attribute("written_on").cast`
-    // must turn it into a Time, which then serializes to Rails' datetime format.
     const { sql, binds } = await captureUpdate(rel, () =>
       rel.updateAll({ written_on: "2004-04-15T10:20:30Z" }),
     );
@@ -73,11 +53,6 @@ describe("update_all value substitution", () => {
   });
 
   it("sends values as bind params rather than inline literals", async (ctx) => {
-    // Bind-slot assertions are prepared-statements-only: Rails' non-prepared
-    // `to_sql_and_binds` compiles through `SubstituteBinds`, inlining every
-    // value and returning `binds == []` (database_statements.rb:31-45) — the
-    // MySQL/MariaDB default. Rails gates its own bind assertions the same way
-    // (bind_parameter_test.rb:9).
     ctx.skip(!(await Topic.leaseConnection()).preparedStatements);
     const rel = Topic.where({ id: 1 });
     const { sql, binds } = await captureUpdate(rel, () => rel.updateAll({ title: "bound value" }));
@@ -87,16 +62,7 @@ describe("update_all value substitution", () => {
   });
 
   it("casts each value exactly once", async (ctx) => {
-    // Bind-slot assertions are prepared-statements-only: Rails' non-prepared
-    // `to_sql_and_binds` compiles through `SubstituteBinds`, inlining every
-    // value and returning `binds == []` (database_statements.rb:31-45) — the
-    // MySQL/MariaDB default. Rails gates its own bind assertions the same way
-    // (bind_parameter_test.rb:9).
     ctx.skip(!(await Topic.leaseConnection()).preparedStatements);
-    // Rails casts once (relation.rb:1389-1390 + identity QueryAttribute#type_cast,
-    // query_attribute.rb:22-24). A non-idempotent type makes a second cast visible.
-    // A stub type whose `serialize` does NOT re-enter `cast` — every real type
-    // self-casts inside serialize, which would mask the bind-level double cast.
     const casts: unknown[] = [];
     const stub = {
       cast: (v: unknown) => {
@@ -131,15 +97,6 @@ describe("update_all value substitution", () => {
   });
 });
 
-/**
- * TS-only coverage for the empty-updates path of `touch_all` / `update_counters`
- * (relation.rb:926-944, 969-971). Neither method guards a blank hash: both hand
- * it to `update_all`, whose first line raises `ArgumentError` (relation.rb:589)
- * — before the `none?` check on the next line, so a `none` relation raises too.
- *
- * `posts` has no `updated_at`/`updated_on`, so `touch_attributes_with_time`
- * returns `{}` for `Post`.
- */
 describe("touch_all / update_counters with empty updates", () => {
   const { topics } = fixtures(["posts", "topics"]);
 
@@ -168,18 +125,12 @@ describe("touch_all / update_counters with empty updates", () => {
   });
 
   it("update_all with a whitespace-only string argument raises", async () => {
-    // Rails' guard is `updates.blank?` (relation.rb:589), and Ruby's
-    // `String#blank?` is `strip.empty?` — a whitespace-only SQL fragment is
-    // blank, so it raises rather than reaching sanitize_sql_for_assignment.
     await expect(Post.all().updateAll("  ")).rejects.toThrow(
       new ArgumentError("Empty list of attributes to change"),
     );
   });
 
   it("update_counters with touch: [] raises when there are no timestamp columns", async () => {
-    // `touch: []` is truthy in Ruby too, so Rails calls
-    // touch_attributes_with_time with no names; on a model without
-    // updated_at/updated_on that yields {} and update_all raises.
     await expect(Post.all().updateCounters({ touch: [] })).rejects.toThrow(
       new ArgumentError("Empty list of attributes to change"),
     );

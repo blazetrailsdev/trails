@@ -28,20 +28,6 @@ function loadAsEntryModule(module: string): Promise<string | null> {
   });
 }
 
-/**
- * Every built module must load when it is the ESM *entry* module — the check
- * CLAUDE.md's "Call-time constant resolution" section mandates, because a
- * vitest run enters the package's funnel module first and masks a cycle. Two
- * modules failed it before this file existed: `nodes/index.js` and
- * `visitors/postgresql.js` both threw `Cannot access 'TableAlias' before
- * initialization`, because a visitor's `static {}` block read `Nodes.*` at
- * module-eval time while `nodes/index.js` was still evaluating.
- *
- * One `node` subprocess per module is load-bearing twice over: vitest's module
- * runner has its own cycle semantics, and within a single process only the
- * first import is an entry module — every later one reuses the graph the first
- * one built, which is exactly what hides the failure.
- */
 describe("arel dist modules", () => {
   it("each load as an ESM entry module", async () => {
     const modules = (await distModules(distDir)).filter((f) => !f.endsWith(".test.js"));

@@ -2,10 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Types } from "./index.js";
 
 describe("Type#itselfIfSerializeCastValueCompatible", () => {
-  // Mirrors serialize_cast_value.rb:9-12 — compatible when
-  // serialize_cast_value is defined at or above serialize in the
-  // ancestor chain. Subclasses that override only `serialize` push it
-  // below the inherited cast-value owner and become incompatible.
   it("base Type is compatible (both methods at the base class)", () => {
     class Base extends Types.Type<string> {
       readonly name = "base";

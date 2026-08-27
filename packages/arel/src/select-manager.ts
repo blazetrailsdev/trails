@@ -31,11 +31,6 @@ const UNION_NODE_CLASSES: Record<
   new (left: SelectStatement, right: SelectStatement) => Union
 > = { UnionAll };
 
-/**
- * SelectManager — the chainable API for building SELECT queries.
- *
- * Mirrors: Arel::SelectManager
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectManager extends TreeManager {
   ast: SelectStatement;
@@ -45,19 +40,10 @@ export class SelectManager extends TreeManager {
     this.ast = new SelectStatement(table ?? null);
   }
 
-  /**
-   * Return the current LIMIT amount (the inner expression of the Limit node),
-   * or null when no limit is set.
-   *
-   * Mirrors: Arel::SelectManager#limit
-   */
   get limit(): Limit["expr"] | null {
     return (this.ast.limit as Limit | null)?.expr ?? null;
   }
 
-  /**
-   * Mirrors: Arel::SelectManager `alias limit= take` (select_manager.rb).
-   */
   set limit(value: number | Node | null) {
     this.take(value);
   }
@@ -67,55 +53,27 @@ export class SelectManager extends TreeManager {
     return this.limit;
   }
 
-  /**
-   * Return the current WHERE conditions.
-   *
-   * Mirrors: Arel::SelectManager#constraints
-   */
   get constraints(): Node[] {
     return [...this.core.wheres];
   }
 
-  /**
-   * Return the current OFFSET amount (the inner expression of the Offset node),
-   * or null when no offset is set.
-   *
-   * Mirrors: Arel::SelectManager#offset
-   */
   get offset(): Offset["expr"] | null {
     return (this.ast.offset as Offset | null)?.expr ?? null;
   }
 
-  /**
-   * Mirrors: Arel::SelectManager `alias offset= skip` (select_manager.rb).
-   */
   set offset(value: number | Node | null) {
     this.skip(value);
   }
 
-  /**
-   * Set OFFSET.
-   *
-   * Mirrors: Arel::SelectManager#skip (select_manager.rb). Pass `null`
-   * to clear; raw amounts flow through `new Offset(amount)` unwrapped.
-   */
   skip(amount: unknown): this {
     this.ast.offset = amount == null ? null : new Offset(amount);
     return this;
   }
 
-  /**
-   * Wrap as EXISTS(subquery).
-   */
   exists(): Exists {
     return new Exists(this.ast);
   }
 
-  /**
-   * Alias the entire subquery with a name, returning a TableAlias.
-   *
-   * Mirrors: Arel::SelectManager#as
-   */
   as(other: string | SqlLiteral): TableAlias {
     return this.createTableAlias(
       this.grouping(this.ast),
@@ -123,20 +81,11 @@ export class SelectManager extends TreeManager {
     );
   }
 
-  /**
-   * Add a lock clause (FOR UPDATE by default).
-   *
-   * Mirrors: Arel::SelectManager#lock (select_manager.rb:52-63). The
-   * `SqlLiteral` arm is Rails' empty `when` — a literal passes through
-   * unwrapped — and it precedes the `String` arm because Ruby's SqlLiteral is
-   * a String subclass. `true` is how ActiveRecord's `lock!` / `with_lock`
-   * express the default lock.
-   */
   lock(locking: string | Node | boolean = sql("FOR UPDATE")): this {
     if (locking === true) {
       locking = sql("FOR UPDATE");
     } else if (locking instanceof SqlLiteral) {
-      // Rails' empty `when Arel::Nodes::SqlLiteral` arm (select_manager.rb:56).
+      /** @empty */
     } else if (typeof locking === "string") {
       locking = sql(locking);
     }
@@ -145,20 +94,10 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Return the current LOCK node.
-   *
-   * Mirrors: Arel::SelectManager#locked
-   */
   get locked(): Node | null {
     return this.ast.lock;
   }
 
-  /**
-   * Set the ON condition on the last join.
-   *
-   * Mirrors: Arel::SelectManager#on
-   */
   on(...exprs: (Node | string | null | undefined)[]): this {
     const joins = this.core.source.right;
     const lastJoin = joins[joins.length - 1] as unknown as { right: Node | null };
@@ -166,9 +105,6 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Add GROUP BY.
-   */
   group(...columns: (Node | string)[]): this {
     for (const column of columns) {
       if (typeof column === "string") {
@@ -180,9 +116,6 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Set the FROM table.
-   */
   from(table: Table | Node | string): this {
     const node = typeof table === "string" ? new SqlLiteral(table) : table;
     if (node instanceof Join) {
@@ -193,29 +126,16 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Return the FROM sources (left side of the source).
-   *
-   * Mirrors: Arel::SelectManager#froms
-   */
   get froms(): Node[] {
     return this.ast.cores.map((c) => c.from).filter((x): x is Node => x !== null);
   }
 
-  /**
-   * INNER JOIN (or the join class passed as `klass`).
-   *
-   * Mirrors: Arel::SelectManager#join (select_manager.rb:102-113).
-   */
   join(
     relation: Node | Table | string | null | undefined,
     klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
   ): this {
     if (relation == null) return this;
 
-    // Rails: `case relation when String, Nodes::SqlLiteral` (select_manager.rb:105-109).
-    // SqlLiteral subclasses String in Ruby, so both arms share the emptiness
-    // check and the StringJoin promotion.
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       const text = typeof relation === "string" ? relation : relation.value;
       if (text.length === 0) throw new EmptyJoinError();
@@ -226,35 +146,21 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * LEFT OUTER JOIN.
-   *
-   * Mirrors: Arel::SelectManager#outer_join (select_manager.rb:115-117).
-   */
   outerJoin(relation: Node | Table | string | null | undefined): this {
     return this.join(relation, OuterJoin);
   }
 
-  /**
-   * Add HAVING.
-   */
   having(expr: Node): this {
     this.core.havings.push(expr);
     return this;
   }
 
-  /**
-   * Define a named window.
-   */
   window(name: string): NamedWindow {
     const window = new NamedWindow(name);
     this.core.windows.push(window);
     return window;
   }
 
-  /**
-   * Add projections (columns to SELECT).
-   */
   project(...projections: (Node | string)[]): this {
     for (const x of projections) {
       if (typeof x === "string") {
@@ -266,32 +172,15 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Return the current list of projections.
-   *
-   * Mirrors: Arel::SelectManager#projections
-   */
   get projections(): Node[] {
     return [...this.core.projections];
   }
 
-  /**
-   * Replace all projections.
-   *
-   * Mirrors: Arel::SelectManager#projections=
-   */
   set projections(value: Node[]) {
     this.core.projections.length = 0;
     this.core.projections.push(...value);
   }
 
-  /**
-   * Add optimizer hints to the query.
-   *
-   * Mirrors: Arel::SelectManager#optimizer_hints (select_manager.rb).
-   * Rails wraps the splat in `Nodes::OptimizerHints.new(hints)` and only
-   * assigns when at least one hint is provided.
-   */
   optimizerHints(...hints: (string | SqlLiteral)[]): this {
     if (hints.length > 0) {
       this.core.optimizerHints = new OptimizerHints(hints);
@@ -299,74 +188,35 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Make the SELECT DISTINCT (or clear DISTINCT when `value` is `false`
-   * or `null`).
-   *
-   * Mirrors: Arel::SelectManager#distinct (select_manager.rb). Ruby's
-   * `if value` treats only `false` and `nil` as falsy, so we test those
-   * exactly — `0`, `""`, etc. enable DISTINCT in Rails.
-   */
   distinct(value: unknown = true): this {
     this.core.setQuantifier = value === false || value == null ? null : new Distinct();
     return this;
   }
 
-  /**
-   * Set DISTINCT ON quantifier.
-   *
-   * Mirrors: Arel::SelectManager#distinct_on
-   */
   distinctOn(value: Node | false | null): this {
     this.core.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
     return this;
   }
 
-  /**
-   * Add ORDER BY clauses.
-   */
   order(...expr: (Node | string)[]): this {
     this.ast.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
-  /**
-   * Return the current ORDER BY expressions.
-   *
-   * Mirrors: Arel::SelectManager#orders
-   */
   get orders(): Node[] {
     return [...this.ast.orders];
   }
 
-  /**
-   * Add a WHERE condition.
-   */
   where(expr: Node | TreeManager): this {
     this.core.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
     return this;
   }
 
-  /**
-   * Compile just the WHERE clause to SQL.
-   *
-   * Mirrors: Arel::SelectManager#where_sql
-   */
   whereSql(engine: ArelEngine | null = _engine.current): SqlLiteral | null {
     if (this.core.wheres.length === 0) return null;
     return new SqlLiteral(`WHERE ${new And(this.core.wheres).toSql(engine)}`);
   }
 
-  /**
-   * UNION with another manager.
-   *
-   * Mirrors: Arel::SelectManager#union (select_manager.rb:187-196). The
-   * one-argument form is `union(other)`; `union(":all", other)` produces a
-   * `Nodes::UnionAll`. A Ruby Symbol is a colon-prefixed string here (see
-   * CLAUDE.md), and `UNION_NODE_CLASSES` stands in for
-   * `Nodes.const_get("Union#{operation.to_s.capitalize}")`, which JS has no
-   * equivalent of.
-   */
   union(
     operation: string | SelectManager | SelectStatement,
     other: SelectManager | SelectStatement | null = null,
@@ -385,90 +235,46 @@ export class SelectManager extends TreeManager {
     return new nodeClass(this.ast, otherAst);
   }
 
-  /**
-   * INTERSECT with another manager.
-   */
   intersect(other: SelectManager): Intersect {
     return new Intersect(this.ast, other.ast);
   }
 
-  /**
-   * EXCEPT with another manager.
-   */
   except(other: SelectManager): Except {
     return new Except(this.ast, other.ast);
   }
 
-  /** Mirrors: `alias :minus :except` (select_manager.rb:215). */
   minus(other: SelectManager): Except {
     return this.except(other);
   }
 
-  /**
-   * Wrap the AST in a LATERAL subquery.
-   *
-   * Mirrors: Arel::SelectManager#lateral
-   */
   lateral(tableName?: string): Lateral {
-    // Mirrors Rails: `lateral(table_name = nil)` builds the base — either the
-    // raw AST or `as(table_name)` (a TableAlias wrapping a Grouping) — and
-    // wraps it in a Lateral. The TableAlias lives inside the Lateral, not
-    // outside (select_manager.rb).
     const base = tableName === undefined ? this.ast : this.as(tableName);
     return new Lateral(base);
   }
 
-  /**
-   * Set WITH (CTE).
-   */
   with(...subqueries: Node[]): this {
     this.ast.with = new With(subqueries);
     return this;
   }
 
-  /**
-   * Set LIMIT.
-   *
-   * Mirrors: Arel::SelectManager#take (select_manager.rb). Pass `null`
-   * to clear; raw amounts flow through `new Limit(amount)` unwrapped.
-   */
   take(limit: unknown): this {
     this.ast.limit = limit == null ? null : new Limit(limit);
     return this;
   }
 
-  /**
-   * Return the current join sources (right side of the source).
-   *
-   * Mirrors: Arel::SelectManager#join_sources
-   */
   joinSources(): Join[] {
     return this.core.source.right as Join[];
   }
 
-  /**
-   * Return the source (FROM clause).
-   *
-   * Mirrors: Arel::SelectManager#source
-   */
   get source(): JoinSource {
     return this.core.source;
   }
 
-  /**
-   * Add SQL comments to the query.
-   *
-   * Mirrors: Arel::SelectManager#comment
-   */
   comment(...values: string[]): this {
-    // Mirrors Rails: `@ctx.comment = Nodes::Comment.new(values)`
-    // (select_manager.rb) — sets on the current SelectCore, not on the
-    // statement. `Nodes::Comment.new(values)` takes a single array arg.
     this.core.comment = new Comment(values);
     return this;
   }
 
-  // Mirrors Arel::SelectManager#collapse (select_manager.rb:256-268).
   protected collapse(exprs: unknown[]): Node {
     exprs = exprs
       .filter((expr) => expr !== null && expr !== undefined)
@@ -477,47 +283,25 @@ export class SelectManager extends TreeManager {
     return this.createAnd(exprs as Node[]);
   }
 
-  // Arel::SelectManager#initialize_copy (select_manager.rb:14-17) re-seats
-  // `@ctx` on the copied AST's last core; this getter derives that on every
-  // read, so the copy TreeManager#clone makes is already correct.
   private get core(): SelectCore {
     return this.ast.cores[this.ast.cores.length - 1];
   }
 
-  /**
-   * Set WITH RECURSIVE.
-   */
   withRecursive(...ctes: Node[]): this {
     this.ast.with = new WithRecursive(ctes);
     return this;
   }
 
-  /**
-   * Create an InsertManager from a SELECT.
-   *
-   * Mirrors: Arel::SelectManager#compile_insert
-   */
   compileInsert(values: [Node, unknown][]): InsertManager {
     const im = new InsertManager();
     im.insert(values);
     return im;
   }
 
-  /**
-   * Create a new InsertManager.
-   *
-   * Mirrors: Arel::SelectManager#create_insert
-   */
   createInsert(): InsertManager {
     return new InsertManager();
   }
 
-  /**
-   * Build an UpdateManager that applies this SELECT's constraints,
-   * ordering, limit, offset, and grouping to an UPDATE.
-   *
-   * Mirrors: Arel::SelectManager#compile_update
-   */
   compileUpdate(
     values: UpdateValues,
     key: Node | Node[] | null = null,
@@ -536,18 +320,6 @@ export class SelectManager extends TreeManager {
     return um;
   }
 
-  // -- FactoryMethods (via TreeManager) --
-  // createTrue/createFalse/createTableAlias/createJoin/createStringJoin/
-  // createAnd/createOn/grouping/lower/coalesce/cast are mixed in from
-  // Arel::FactoryMethods (see ./factory-methods.ts and the include() call
-  // in ./index.ts).
-
-  /**
-   * Build a DeleteManager that applies this SELECT's constraints,
-   * ordering, limit, offset, and grouping to a DELETE.
-   *
-   * Mirrors: Arel::SelectManager#compile_delete
-   */
   compileDelete(
     key: Node | Node[] | null = null,
     havingClause: Node | null = null,
@@ -565,8 +337,6 @@ export class SelectManager extends TreeManager {
   }
 }
 
-// Surface the inherited FactoryMethods on select-manager.ts so parity:api
-// matches them against select_manager.rb.
 type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,

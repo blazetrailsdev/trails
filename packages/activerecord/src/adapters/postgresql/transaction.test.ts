@@ -1,16 +1,7 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/transaction_test.rb
- *
- * Rails drives these through `Sample.transaction`; this port drives the same
- * SQLSTATE -> exception mapping at the adapter level (two `PostgreSQLAdapter`
- * instances coordinating real conflicts), the idiom for `adapters/postgresql/`.
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
 import { SerializationFailure, Deadlocked, LockWaitTimeout, QueryCanceled } from "../../errors.js";
 
-// Rails' inline `samples`, renamed per suite — see suiteTable for why the
-// shared name races across vitest workers on the one CI database.
 const SAMPLES = suiteTable("samples", "transaction");
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -23,8 +14,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTransactionTest", () => {
-    // Mirrors Rails' setup/teardown (samples table, value column). Dropped and
-    // recreated in beforeEach: nothing clears tables between tests.
     beforeEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}`);
       await adapter.exec(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
@@ -59,9 +48,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises Interrupt when canceling statement via interrupt", async () => {
-      // Rails uses `thread.raise Interrupt` and asserts a prompt abort (< 5s).
-      // Node has no thread-interrupt analog, so we cancel from a second
-      // connection (libpq PQcancel, what Ruby's interrupt sends) — same 57014.
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         const rows = await adapter.execute("SELECT pg_backend_pid() AS pid");
@@ -100,8 +86,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});
       }
-      // Mirrors Rails' `assert connections.all?(&:active?)` — both connections
-      // remain usable after the deadlock.
       expect((await adapter.execute("SELECT 1 AS n"))[0].n).toBe(1);
       expect((await other.execute("SELECT 1 AS n"))[0].n).toBe(1);
       await other.close();

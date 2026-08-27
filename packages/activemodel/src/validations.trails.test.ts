@@ -8,9 +8,6 @@ import { humanAttributeName } from "./translation.js";
 import { Validations } from "./validations.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
-// Trails-only extras that have no `validations_test.rb` counterpart. They live
-// here rather than in `validations.test.ts` so the Rails-mirroring file stays a
-// one-to-one port of the Rails case.
 describe("ValidationsTest (trails)", () => {
   describe("presence", () => {
     class Article extends Model {
@@ -363,8 +360,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("rejects invalid types", async () => {
-      // Ruby's `"not a number".to_i` is 0, so an integer attribute never
-      // reaches numericality with a non-numeric value; nil does.
       const m = new TypedModel({ age: null, email: "" } as any);
       expect(await m.isValid()).toBe(false);
       expect(m.errors.messagesFor("age").length).toBeGreaterThan(0);
@@ -373,8 +368,6 @@ describe("ValidationsTest (trails)", () => {
   });
 
   it("validates an undeclared getter via the send default", async () => {
-    // Rails' default `read_attribute_for_validation` is `send`, so a plain
-    // getter with no declared attribute is read by its accessor, not nil.
     class Person extends Model {
       static {
         this.attribute("first", "string");
@@ -395,8 +388,6 @@ describe("ValidationsTest (trails)", () => {
   });
 
   it("read_attribute_for_validation returns undefined for a present reader that returns undefined", () => {
-    // Ruby `send` keys off method existence, not return value: a getter that
-    // exists and returns undefined yields undefined, it does not raise.
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -414,8 +405,6 @@ describe("ValidationsTest (trails)", () => {
   });
 
   it("read_attribute_for_validation raises NoMethodError-style for a missing reader", () => {
-    // Ruby `send(:nope)` raises NoMethodError; a typo'd / undeclared validation
-    // attribute with no reader fails loud rather than validating a nil-ish value.
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -482,7 +471,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("validate! forwards context to valid?", async () => {
-      // Rails validations.rb:417-419 — `valid?(context) || raise_validation_error`.
       class Scoped extends Model {
         static {
           this.attribute("name", "string");
@@ -494,9 +482,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("valid? accepts an array context that matches :on-registered validators", async () => {
-      // Rails `predicate_for_validation_context` (validations.rb:294-306)
-      // intersects the registered `on:` set with the model's current
-      // context — either side may be a single symbol or an array.
       class Scoped extends Model {
         static {
           this.attribute("name", "string");
@@ -509,7 +494,6 @@ describe("ValidationsTest (trails)", () => {
       expect(await a.isValid("create")).toBe(false);
       expect(a.errors.attributeNames).toEqual(["name"]);
 
-      // Array context → both validators fire (Rails: intersection).
       const b = new Scoped({});
       expect(await b.isValid(["create", "publish"])).toBe(false);
       expect(b.errors.attributeNames.sort()).toEqual(["name", "title"]);
@@ -532,9 +516,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("validationContext round-trips array contexts while a validation is in flight", async () => {
-      // Rails `validation_context` surfaces whatever context is currently
-      // set — when called inside a validator with an array context, it
-      // returns the array.
       const captured: Array<string | string[] | null> = [];
       class Scoped extends Model {
         static {
@@ -549,8 +530,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("valid?(null) clears the context (Rails sets it to nil on entry)", async () => {
-      // Rails `valid?(context = nil)` always assigns
-      // `context_for_validation.context = context` — passing nil clears.
       const captured: Array<string | string[] | null> = [];
       class Scoped extends Model {
         static {
@@ -567,7 +546,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("valid? restores previous context in ensure/finally even on failure", async () => {
-      // Rails validations.rb:361-368 uses `ensure` to restore context.
       class Scoped extends Model {
         static {
           this.attribute("name", "string");
@@ -620,8 +598,6 @@ describe("ValidationsTest (trails)", () => {
     it("freeze preserves errors/validationContext access (Rails pre-touch)", () => {
       const t = new Topic({ title: "ok" });
       t.freeze();
-      // Rails validations.rb:372-377 ensures these lazy ivars are
-      // materialized so frozen models can still answer.
       expect(t.errors).toBeDefined();
       expect(t.validationContext).toBe(null);
     });
@@ -631,7 +607,6 @@ describe("ValidationsTest (trails)", () => {
       const vc = t.contextForValidation();
       vc.context = "create";
       expect(t.validationContext).toBe("create");
-      // Same instance is returned on subsequent calls (Rails ||= memoization).
       expect(t.contextForValidation()).toBe(vc);
     });
 
@@ -643,9 +618,6 @@ describe("ValidationsTest (trails)", () => {
   });
 
   describe("_validators hash-of-arrays (Rails fidelity)", () => {
-    // Rails `_validators = Hash.new { |h, k| h[k] = [] }`
-    // (activemodel/lib/active_model/validations.rb:50) — per-attribute
-    // buckets, O(1) `validators_on`, dup-in-inherited.
     it("validatorsOn is O(1) per-attribute lookup", () => {
       class Person extends Model {
         static {
@@ -665,9 +637,6 @@ describe("ValidationsTest (trails)", () => {
         static {
           this.attribute("name", "string");
           this.attribute("email", "string");
-          // validates_each binds one validator across two attributes —
-          // it lands in both buckets and must still appear once via
-          // `validators()` (Rails: `_validators.values.flatten.uniq`).
           this.validatesEach(["name", "email"], () => {});
         }
       }
@@ -678,12 +647,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("inheritance is copy-on-first-write (subclass sees parent writes made before its own first write)", () => {
-      // Documented divergence from Rails. Rails' `inherited(base)` hook runs
-      // eagerly at `class Child < Base; end` time and snapshots
-      // `_validators`, so subsequent `Base.validates` additions don't reach
-      // `Child`. JS has no `inherited` hook that fires at subclass
-      // definition, so we defer the dup until Child's first write. In this
-      // window, Child still reads Base's Map via the prototype chain.
       class Base extends Model {
         static {
           this.attribute("name", "string");
@@ -735,8 +698,6 @@ describe("ValidationsTest (trails)", () => {
           this.validates("name", { presence: true });
         }
       }
-      // Reading an unseen attribute must NOT create a bucket (unlike Rails'
-      // default-proc hash) — the TS API keeps reads side-effect-free.
       Person.validatorsOn("never_registered");
       expect(Array.from(Person._validators.keys())).not.toContain("never_registered");
 
@@ -1135,8 +1096,6 @@ describe("ValidationsTest (trails)", () => {
       });
 
       it("skips null", async () => {
-        // Rails format validator does NOT auto-skip nil — opt in via
-        // allow_nil: true (matches EachValidator's allow_nil dispatch).
         class NilSkippingEmail extends Model {
           static {
             this.attribute("email", "string");
@@ -1150,10 +1109,6 @@ describe("ValidationsTest (trails)", () => {
     });
 
     describe("acceptance", () => {
-      // Rails' equivalent uses a virtual attribute; boolean here so `"1"` /
-      // `true` round-trip through cast as `true` and match the default accept
-      // list `["1", true]`, whereas a string-typed attr would cast `true` to
-      // "t" (per type/immutable_string.rb) and rightly fail.
       class Terms extends Model {
         static {
           this.attribute("accepted", "boolean");
@@ -1769,8 +1724,6 @@ describe("ValidationsTest (trails)", () => {
   });
 
   describe("initialize_dup", () => {
-    // validations.rb:310-313. `test_dup_validity_is_independent` cannot see the
-    // difference — every `valid?` clears the errors first. MRI-verified.
     class DupTopic extends Model {
       static {
         this.attribute("title", "string");
@@ -1815,10 +1768,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // `include ActiveModel::Validations` is a Concern (validations.rb:37), so a
-  // Ruby includer gets `ClassMethods` (validations.rb:57-307) and the
-  // reopenings at `validations/with.rb:87` and `validations/validates.rb:110`
-  // from the one `include` — no `extend` at the call site.
   describe("include Validations", () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (validations.rb:37); the class/interface merge is how `include()` surfaces on the type side.
     interface Host extends Validations {
@@ -1827,8 +1776,6 @@ describe("ValidationsTest (trails)", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class Host {
-      // `extend ActiveModel::Naming` / `Callbacks` / `Translation`
-      // (validations.rb:41-43); declared only for their types.
       declare static modelName: ModelName;
       declare static i18nScope: string;
       declare static lookupAncestors: () => Array<{
@@ -1861,9 +1808,6 @@ describe("ValidationsTest (trails)", () => {
       expect(await host.isValid()).toBe(true);
     });
 
-    // `extend ActiveModel::Naming` (validations.rb:41) is what gives the host a
-    // `model_name`, which every `Translation` reader resolves through
-    // (translation.rb:20, :27, :44).
     it("gives the includer model_name and the Translation readers that resolve through it", () => {
       expect(Host.modelName.name).toBe("Host");
       expect(Host.i18nScope).toBe("activemodel");
