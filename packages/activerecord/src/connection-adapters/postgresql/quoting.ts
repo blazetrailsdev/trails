@@ -16,7 +16,7 @@ import { Data as BitData } from "./oid/bit.js";
 import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { toS, TimeWithZone } from "@blazetrails/activesupport";
+import { toS } from "@blazetrails/activesupport";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(value: bigint | number) {
@@ -271,7 +271,6 @@ export function checkIntegerRange(value: bigint | number): void {
   }
 }
 
-/** Mirrors: PostgreSQL::Quoting#quoted_date (postgresql/quoting.rb:143-150) */
 export function quotedDate(value: TemporalDateLike): string {
   if (yearOf(value) <= 0) {
     const bceYear = String(-yearOf(value) + 1).padStart(4, "0");
@@ -280,7 +279,6 @@ export function quotedDate(value: TemporalDateLike): string {
   return abstractQuotedDate(value);
 }
 
-/** `value.year` (postgresql/quoting.rb:144), read pre-`super`. */
 function yearOf(value: TemporalDateLike): number {
   if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(defaultSqlTimezone()).year;
   if (value instanceof Temporal.PlainTime) return 2000;

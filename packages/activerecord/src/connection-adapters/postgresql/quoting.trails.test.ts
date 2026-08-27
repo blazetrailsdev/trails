@@ -327,13 +327,6 @@ describe("PostgreSQL quoting", () => {
     expect(quotedDate(instant)).toBe("0044-03-15 12:34:56 BC");
   });
 
-  // `postgresql/quoting.rb:144` reads `value.year` off the value AS IT ARRIVES,
-  // before `super` normalises the timezone, so a `TimeWithZone` decides the BC
-  // branch from its OWN zone. This instant is 0000-12-31T23:30Z — year 0 in
-  // UTC, but year 1 in Asia/Tokyo (UTC+9), which is the zone the value carries
-  // and therefore the one `TimeWithZone#year` reports. Rails takes the `else`
-  // arm and emits a bare `super`; deciding the branch from `default_timezone`
-  // instead would wrongly suffix BC.
   it("quoted_date reads the BC year off a TimeWithZone's own zone", () => {
     const twz = new TimeWithZone(
       Temporal.Instant.from("0000-12-31T23:30:00Z"),

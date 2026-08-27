@@ -121,11 +121,6 @@ export interface ArraySubtype {
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
   typeCastForSchema?(value: unknown): string;
-  /**
-   * Optional only because trails' tests hand `Array` a duck-typed subtype
-   * double; every real `Type::Value` answers it (value.rb:117-119), which is
-   * why array.rb:68 calls it unguarded.
-   */
   map?(value: unknown, block: (value: unknown) => unknown): unknown;
   userInputInTimeZone?(value: unknown): unknown;
 }
