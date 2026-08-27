@@ -6,7 +6,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
-import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 
 describe("RequiredAssociationsTest", () => {
   fixtures([]);
@@ -18,7 +17,6 @@ describe("RequiredAssociationsTest", () => {
   });
   afterAll(async () => {
     await Base.connection.dropTable("children", "parents", { ifExists: true });
-    await rebuildCanonicalTables(Base.connection, ["children"]);
   });
 
   it("belongs_to associations can be optional by default", async () => {

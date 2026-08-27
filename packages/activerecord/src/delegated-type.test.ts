@@ -6,7 +6,6 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";
@@ -43,24 +42,6 @@ describe("DelegatedTypeTest", () => {
   registerModel("Account", Account);
   registerModel("Post", Post);
   registerModel("Recipient", Recipient);
-
-  beforeAll(async () => {
-    // Force-recreate every canonical table this suite touches. The tables
-    // already exist from the template clone, so nothing else drops them —
-    // meaning a sibling file that physically replaced `posts` with a
-    // reduced shape (e.g. `posts: { title }`, no `body`) would survive into this
-    // suite and break fixture seeding. Drop + recreate them verbatim. Covers the
-    // fixture tables (`comments`/`accounts`/`posts`) plus the setup-built
-    // `entries`/`messages`/`recipients`.
-    await rebuildCanonicalTables(Base.connection, [
-      "comments",
-      "accounts",
-      "posts",
-      "entries",
-      "messages",
-      "recipients",
-    ]);
-  });
 
   let entryWithMessage: Base;
   let entryWithComment: Base;

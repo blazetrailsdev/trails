@@ -6,20 +6,16 @@
     "cat_categories",
     "catalog_categories",
     "catalog_products",
-    "children",
     "clients",
     "company2s",
     "content_pages",
     "contract2s",
     "crews",
-    "distinct",
-    "distinct_select",
     "doctors",
     "essay_authors",
     "essay_cats",
     "essay_models",
     "firms",
-    "group",
     "habtm_posts",
     "host_as",
     "hot_accounts",
@@ -66,7 +62,6 @@
     "sc_depts",
     "sc_drinks",
     "sc_hotels",
-    "select",
     "special_books",
     "standalones",
     "sub_books",
@@ -77,8 +72,7 @@
     "to_be_linked_accounts",
     "to_be_linked_users",
     "top_users",
-    "topic2s",
-    "values"
+    "topic2s"
   ],
   "columns": ["admin_users.region_id"]
 }

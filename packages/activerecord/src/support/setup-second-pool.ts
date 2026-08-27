@@ -2,7 +2,7 @@ import { beforeAll } from "vitest";
 import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { registerModel } from "../associations.js";
-import { rebuildCanonicalTables } from "./canonical-table-rebuild.js";
+import { loadCanonicalArunit2Schema } from "./canonical-schema.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
 import { College } from "../test-helpers/models/college.js";
@@ -76,15 +76,16 @@ export async function provisionSecondDatabase(): Promise<void> {
     await arunit2.truncateTables(...wanted);
     return;
   }
-  await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);
+  await loadCanonicalArunit2Schema(arunit2);
   await createOtherDogsTable(arunit2);
   await stampCanonicalSchema(arunit2);
 }
 
 /**
  * Prepares the two-database split `MultipleDbTest` asserts over. Both pools are
- * already open, so this readies only the tables: the arunit2 ones are rebuilt so
- * rows a sibling suite left behind cannot reach `College.count`.
+ * already open, and `provisionSecondDatabase` has already laid the arunit2
+ * tables in their canonical shape, so this readies only the rows: they are
+ * truncated so a sibling suite's leftovers cannot reach `College.count`.
  *
  * The primary database never carries the arunit2 tables — the canonical schema
  * skips them (`schema.rb:1444-1460` creates them through the second connection)
@@ -100,7 +101,7 @@ async function setupSecondPool(): Promise<void> {
   registerModel(Professor);
   const arunit2 = await ARUnit2Model.leaseConnection();
 
-  await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);
+  await arunit2.truncateTables(...ARUNIT2_TABLES);
 }
 
 export function withSecondPool(): void {

@@ -11,7 +11,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 
 interface TableNameLimits {
   tableNameLength(): number;
@@ -39,10 +38,6 @@ describe("Migration", () => {
       await connection.renameTable("octopi", "test_models");
     }
     await connection.dropTable("test_models", { ifExists: true });
-    if (await connection.tableExists("old_references")) {
-      await connection.dropTable("old_references", { ifExists: true });
-      await rebuildCanonicalTables(connection, ["references"]);
-    }
   });
 
   describe("RenameTableTest", () => {

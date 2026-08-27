@@ -15,7 +15,6 @@ import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineFixtures, defineJoinTableFixtures } from "./fixtures.js";
@@ -63,9 +62,6 @@ function schema(): SchemaStatements {
 }
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
-// `order` is the one name here TEST_SCHEMA does not declare; the rest are
-// canonical, so teardown must hand them back in their canonical shape.
-const CANONICAL_RESERVED_TABLES = RESERVED_TABLES.filter((t) => t !== "order");
 
 // Mirrors Rails `setup`: rebuild the five reserved-word tables before each
 // test via `create_table`. `references` adds the `*_id` column and the
@@ -95,14 +91,14 @@ beforeEach(async () => {
 });
 
 // Mirrors Rails teardown: drop the tables so the bespoke per-test shapes don't
-// leak into sibling files sharing the worker DB. Rails can stop there; we then
-// hand the canonical names back in their TEST_SCHEMA shape.
+// leak into sibling files sharing the worker DB. Like Rails, these six names are
+// this file's own — none of them is in schema.rb or TEST_SCHEMA — so dropping
+// them hands nothing back short.
 afterAll(async () => {
   const conn = schema();
   await conn.dropTable("values", "group", "distinct_select", "distinct", "select", "order", {
     ifExists: true,
   });
-  await rebuildCanonicalTables(Base.connection, CANONICAL_RESERVED_TABLES);
 });
 
 // Mirrors the Rails private `create_test_fixtures` loader: seed only the named
