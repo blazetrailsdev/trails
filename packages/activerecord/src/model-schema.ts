@@ -145,7 +145,7 @@ function containedTableNamePrefix(this: typeof Base): string {
  * Build a WHERE clause string for the primary key of a given record.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the primary-key predicate Ruby builds through predicate_builder in _update_record (persistence.rb:1006).
+ * @noRailsEquivalent CONVERGEABLE the primary-key predicate Ruby builds through predicate_builder in _update_record (persistence.rb:263).
  */
 export function buildPkWhere(this: typeof Base, idValue: unknown): string {
   const pk = this.primaryKey;
@@ -168,7 +168,7 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
  * Build an Arel node for a primary key WHERE condition.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the Arel form of that same predicate_builder call (persistence.rb:1006).
+ * @noRailsEquivalent CONVERGEABLE the Arel form of that same predicate_builder call (persistence.rb:263).
  */
 export function buildPkWhereNode(
   this: typeof Base,
@@ -212,7 +212,7 @@ export function buildPkWhereNode(
  * turn `_query_constraints_hash` into the predicate WHERE.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE turns _query_constraints_hash into the predicate WHERE Ruby builds inline (persistence.rb:1006).
+ * @noRailsEquivalent CONVERGEABLE turns _query_constraints_hash into the predicate WHERE Ruby builds inline (persistence.rb:263).
  */
 export function buildWhereNodeFromConstraints(
   this: typeof Base,
