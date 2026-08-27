@@ -105,7 +105,9 @@ export class DatabaseConfigurations {
    *
    * `NODE_ENV` sits last, ahead of only the literal default: it is a
    * one-release bridge with no Rails counterpart, and test runners set it
-   * unconditionally, so it must not mask a deliberate assignment.
+   * unconditionally, so it must not mask a deliberate assignment. The terminal
+   * literal is Rails' `"default_env"` (`connection_handling.rb:7`), for the
+   * unset case as much as the blank one — it is `DEFAULT_ENV`'s only fallback.
    *
    * @internal
    */
@@ -119,7 +121,7 @@ export class DatabaseConfigurations {
     // env vars are blank" and falls straight to `"default_env"` — never on to
     // `NODE_ENV`, which is the `RACK_ENV` bridge the lambda already consumed.
     if (this._defaultEnv !== null) return this._defaultEnv || "default_env";
-    return getEnv("NODE_ENV") || "development";
+    return getEnv("NODE_ENV") || "default_env";
   }
 
   /** @internal Assign null to clear the override and fall back to the process env. */

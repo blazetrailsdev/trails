@@ -1503,15 +1503,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new this(config.database ?? ":memory:", { readonly: config.readonly });
   }
 
-  // Mirrors Rails' SQLite3Adapter.dbconsole: `-#{mode}` / `-header` flags
-  // precede the database path. The PTY exec itself is unported (Ruby-only).
   /**
-   * @missingRailsCall find_cmd_and_exec — PERMANENT: Per-entry verified (RFC 0106 sqlite3
-   *   cluster), sqlite3_adapter.rb:51:
-   *   `find_cmd_and_exec(ActiveRecord.database_cli[:sqlite], *args)` execs the
-   *   sqlite CLI over a PTY. Process spawning is Ruby-only in trails (no
-   *   `node:*` imports, no `process.*`), so `dbconsole` returns the assembled
-   *   argv and the exec itself is unported — noted on the method.
+   * Mirrors: SQLite3Adapter.dbconsole (sqlite3_adapter.rb:44-52) — the
+   * `-#{mode}` / `-header` flags precede the database path, then the whole argv
+   * goes to `find_cmd_and_exec` with the configured sqlite client. Only the
+   * `exec` inside that helper is unported; see AbstractAdapter.findCmdAndExec.
    */
   static override dbconsole(
     config?: { database?: string },
@@ -1521,7 +1517,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (isRubyTruthy(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
     args.push(config?.database ?? ":memory:");
-    return args;
+    return this.findCmdAndExec(ActiveRecord.databaseCli["sqlite"], ...args);
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {

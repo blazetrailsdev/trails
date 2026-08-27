@@ -1,4 +1,4 @@
-import { ArgumentError, isBlank, rbHash, type Included } from "@blazetrails/activesupport";
+import { ArgumentError, isBlank, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
@@ -107,13 +107,10 @@ export class SqlLiteral extends Node {
   }
 }
 
+type _Predications = import("../predications.js").PredicationsModule;
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
 type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SqlLiteral
-  extends
-    Included<typeof import("../predications.js").Predications>,
-    _Expressions,
-    _AliasPredication,
-    _OrderPredications {}
+  extends _Predications, _Expressions, _AliasPredication, _OrderPredications {}

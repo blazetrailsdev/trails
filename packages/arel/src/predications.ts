@@ -180,11 +180,71 @@ function predicationDispatch<T extends PredicationHost>(
 }
 
 /**
+ * The method-syntax module interface for {@link Predications}, mirroring
+ * `WindowPredicationsModule` / `OrderPredicationsModule`. Hosts extend this
+ * interface directly rather than `Included<typeof Predications>`: a mapped
+ * type produces property-typed members, and a subclass overriding one with a
+ * method declaration (`Case#when`, case.rb:13) is then a TS2425 error.
+ *
+ * @noRailsEquivalent PERMANENT TypeScript-only mixin typing; Ruby `include` needs no type surface.
+ */
+export interface PredicationsModule extends GroupingFolders {
+  eq(other: unknown): Equality;
+  notEq(other: unknown): NotEqual;
+  gt(right: unknown): GreaterThan;
+  gteq(right: unknown): GreaterThanOrEqual;
+  lt(right: unknown): LessThan;
+  lteq(right: unknown): LessThanOrEqual;
+  isDistinctFrom(other: unknown): IsDistinctFrom;
+  isNotDistinctFrom(other: unknown): IsNotDistinctFrom;
+  matches(other: unknown, escape?: string | Node | null, caseSensitive?: boolean): Matches;
+  doesNotMatch(
+    other: unknown,
+    escape?: string | Node | null,
+    caseSensitive?: boolean,
+  ): DoesNotMatch;
+  matchesRegexp(other: string, caseSensitive?: boolean): RegexpNode;
+  doesNotMatchRegexp(other: string, caseSensitive?: boolean): NotRegexp;
+  in(other: unknown): In;
+  notIn(other: unknown): NotIn;
+  between(other: RangeLike): Node;
+  notBetween(other: RangeLike): Node;
+  eqAny(others: unknown[]): Grouping;
+  eqAll(others: unknown[]): Grouping;
+  notEqAny(others: unknown[]): Grouping;
+  notEqAll(others: unknown[]): Grouping;
+  gtAny(others: unknown[]): Grouping;
+  gtAll(others: unknown[]): Grouping;
+  gteqAny(others: unknown[]): Grouping;
+  gteqAll(others: unknown[]): Grouping;
+  ltAny(others: unknown[]): Grouping;
+  ltAll(others: unknown[]): Grouping;
+  lteqAny(others: unknown[]): Grouping;
+  lteqAll(others: unknown[]): Grouping;
+  matchesAny(others: string[], escape?: string | Node | null, caseSensitive?: boolean): Grouping;
+  matchesAll(others: string[], escape?: string | Node | null, caseSensitive?: boolean): Grouping;
+  doesNotMatchAny(others: string[], escape?: string | Node | null): Grouping;
+  doesNotMatchAll(others: string[], escape?: string | Node | null): Grouping;
+  inAny(others: unknown[]): Grouping;
+  inAll(others: unknown[]): Grouping;
+  notInAny(others: unknown[]): Grouping;
+  notInAll(others: unknown[]): Grouping;
+  when(right: unknown): Case;
+  concat(other: Node): Concat;
+  contains(other: unknown): Contains;
+  overlaps(other: unknown): Overlaps;
+  quotedArray(others: unknown[]): Node[];
+  isInfinity(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | 0;
+  isOpenEnded(value: unknown): boolean;
+}
+
+/**
  * Predications — predicate-builder mixin.
  *
  * Mirrors: Arel::Predications (activerecord/lib/arel/predications.rb)
  */
-export const Predications = {
+export const Predications: PredicationsModule = {
   eq(this: Node & PredicationHost, other: unknown): Equality {
     return new Equality(this, this.quotedNode(other));
   },

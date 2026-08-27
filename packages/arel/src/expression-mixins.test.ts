@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fakeRecordConnection } from "./test-helpers/connection.js";
+import { fakeRecordConnection, mysqlTestConnection } from "./test-helpers/connection.js";
 import { Nodes, Visitors } from "./index.js";
 
 const compile = (n: Nodes.Node): string => new Visitors.ToSql(fakeRecordConnection).compile(n);
@@ -82,10 +82,10 @@ describe("WindowPredications.over (mixed into Function)", () => {
     expect(compile(sum.over(new Nodes.SqlLiteral("w")))).toBe("SUM(col) OVER w");
   });
 
-  it("NamedFunction#over with a NamedWindow doubles embedded quotes in the name", () => {
+  it("quotes a string window name through the adapter, not a hard-coded quote", () => {
     const fn = new Nodes.NamedFunction("MY_FN", [new Nodes.SqlLiteral("x")]);
-    const win = new Nodes.NamedWindow('weird"name');
-    expect(compile(fn.over(win))).toBe('MY_FN(x) OVER "weird""name"');
+    const mysql = new Visitors.ToSql(mysqlTestConnection);
+    expect(mysql.compile(fn.over("w"))).toBe("MY_FN(x) OVER `w`");
   });
 });
 

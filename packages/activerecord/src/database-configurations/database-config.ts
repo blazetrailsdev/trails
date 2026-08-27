@@ -143,7 +143,7 @@ export class DatabaseConfig {
    * Mirrors: DatabaseConfig#for_current_env?
    */
   get forCurrentEnv(): boolean {
-    const defaultEnv = _defaultEnvGetter ? _defaultEnvGetter() : "development";
+    const defaultEnv = _defaultEnvGetter ? _defaultEnvGetter() : "default_env";
     return this.envName === defaultEnv;
   }
 

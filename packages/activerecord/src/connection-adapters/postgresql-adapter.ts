@@ -249,20 +249,18 @@ export class PostgreSQLAdapter
     return pgQuoteTableName(name);
   }
 
-  // Mirrors Rails' PostgreSQLAdapter.dbconsole, which exports PG* env vars
-  // before exec'ing psql. We can't mutate the process environment (no
-  // process.* access), so we return the env map the PTY exec would set;
-  // PGPASSWORD is included only when `includePassword` is set, matching Rails.
   /**
-   * @missingRailsCall find_cmd_and_exec — PERMANENT: Rails' dbconsole execs `psql` through
-   *   find_cmd_and_exec; process spawning is forbidden in this package (no
-   *   node:* imports, no process.*), so trails' dbconsole only builds the PG*
-   *   environment the console command needs.
+   * Mirrors: PostgreSQLAdapter.dbconsole (postgresql_adapter.rb:73-90), which
+   * exports PG* env vars and then execs the configured client with the database
+   * name. We can't mutate the process environment (no `process.*` access), so
+   * both effects come back as values: `env` is the map the exec would have set,
+   * `argv` is `find_cmd_and_exec`'s result. PGPASSWORD is included only when
+   * `includePassword` is set, matching Rails.
    */
   static override dbconsole(
     config: Record<string, unknown> = {},
     options: { includePassword?: boolean } = {},
-  ): Record<string, string> {
+  ): { env: Record<string, string>; argv: string[] } {
     const env: Record<string, string> = {};
     if (isRubyTruthy(config.username)) env.PGUSER = String(config.username);
     if (isRubyTruthy(config.host)) env.PGHOST = String(config.host);
@@ -283,7 +281,11 @@ export class PostgreSQLAdapter
         .join(" ");
       if (pgOptions) env.PGOPTIONS = pgOptions;
     }
-    return env;
+    const argv = this.findCmdAndExec(
+      ActiveRecord.databaseCli["postgresql"],
+      config.database as string,
+    );
+    return { env, argv };
   }
 
   // Is this connection alive and ready for queries?
