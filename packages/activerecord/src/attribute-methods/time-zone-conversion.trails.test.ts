@@ -169,21 +169,25 @@ describe("TimeZoneConverter#serialize containers", () => {
   const instant = Temporal.Instant.from("2020-06-15T10:00:00Z");
   const twz = () => new TimeWithZone(instant, zone);
 
-  it("extracts TimeWithZone bounds out of a range", () => {
+  it("forwards TimeWithZone range bounds to the subtype untouched", () => {
     const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range(twz(), twz(), true)) as Range;
-    expect(serialized.begin).toBeInstanceOf(Temporal.Instant);
-    expect((serialized.begin as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
+    expect(serialized.begin).toBeInstanceOf(TimeWithZone);
+    expect((serialized.begin as TimeWithZone).utc().toTime().toInstant().epochNanoseconds).toBe(
+      instant.epochNanoseconds,
+    );
   });
 
-  it("extracts TimeWithZone bounds out of an array of ranges", () => {
+  it("forwards TimeWithZone bounds through an array of ranges", () => {
     const converter = TimeZoneConverter.wrap(
       new ArrayType(new RangeType(new Types.DateTimeType({}))),
     );
     const serialized = converter.serialize([new Range(twz(), twz(), true)]) as { values: Range[] };
     const begin = serialized.values[0].begin;
-    expect(begin).toBeInstanceOf(Temporal.Instant);
-    expect((begin as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
+    expect(begin).toBeInstanceOf(TimeWithZone);
+    expect((begin as TimeWithZone).utc().toTime().toInstant().epochNanoseconds).toBe(
+      instant.epochNanoseconds,
+    );
   });
 
   it("leaves an infinite range bound untouched", () => {

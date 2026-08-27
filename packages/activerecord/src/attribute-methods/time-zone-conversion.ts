@@ -108,23 +108,31 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return this.convertTimeToTimeZone(this._subtype.deserialize(value));
   }
 
+  /**
+   * Rails defines no `serialize` on `TimeZoneConverter`: `DelegateClass(Type::Value)`
+   * forwards it to the subtype untouched (time_zone_conversion.rb:8-52), which
+   * handles a `TimeWithZone` because it `acts_like?(:time)`. TS has no
+   * `method_missing`, so the forward is spelled out — but it stays a forward.
+   */
   override serialize(value: unknown): unknown {
-    // Rails' DelegateClass forwards serialize to the subtype, which calls
-    // cast_value on it. In Ruby, TimeWithZone acts_like?(:time) so AR's
-    // DateTime type can handle it. In TS, DateTime.castValue() can't parse
-    // a TimeWithZone — extract the UTC Temporal.Instant first.
-    return this._subtype.serialize(this._resolveForSerialize(value));
+    return this._subtype.serialize(value);
   }
 
+  /**
+   * Rails' `SerializeCastValue.serialize` deliberately refuses the fast path for
+   * a DelegateClass instance — `type.equal?(type.itself_if_serialize_cast_value_compatible)`
+   * is false because the delegator forwards the message to the subtype
+   * (serialize_cast_value.rb:25-33) — so the subtype decides between its own
+   * `serialize_cast_value` and `serialize`.
+   */
   override serializeCastValue(value: unknown): unknown {
-    const resolved = this._resolveForSerialize(value);
     const sub = this._subtype as ValueTypeInstance;
     if (typeof sub.itselfIfSerializeCastValueCompatible === "function") {
       return sub.itselfIfSerializeCastValueCompatible()
-        ? sub.serializeCastValue(resolved as any)
-        : this._subtype.serialize(resolved);
+        ? sub.serializeCastValue(value as any)
+        : this._subtype.serialize(value);
     }
-    return this._subtype.serialize(resolved);
+    return this._subtype.serialize(value);
   }
 
   // Rails' DelegateClass(Type::Value) auto-forwards these to the subtype; the
@@ -170,18 +178,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
     if (subsec < 0n) subsec += 1_000_000_000n;
     const roundedOff = subsec % mod;
     return ns - roundedOff;
-  }
-
-  // Rails has no such hop: DelegateClass forwards serialize straight to the
-  // subtype, whose cast_value handles a TimeWithZone because it acts_like?(:time).
-  // Containers take the subtype's own `map` hook, the one `cast` and
-  // `convert_time_to_time_zone` end in (value.rb:117-119, oid/range.rb:50-54,
-  // oid/array.rb:67-69).
-  private _resolveForSerialize(value: unknown): unknown {
-    if (value instanceof TimeWithZone) return value.utc().toTime().toInstant();
-    if (value instanceof Temporal.Instant) return value;
-    if (typeof value === "number" && !Number.isFinite(value)) return value;
-    return this.map(value, (v) => this._resolveForSerialize(v));
   }
 
   override equals(other: Type): boolean {

@@ -16,6 +16,7 @@ import { NotImplementedError } from "../../errors.js";
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { BinaryData } from "@blazetrails/activemodel";
+import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import {
   quote,
   quoteTableName,
@@ -44,6 +45,19 @@ describe("quotedDate", () => {
   it("formats a Temporal.PlainTime (normalised to 2000-01-01 date)", () => {
     const v = Temporal.PlainTime.from("14:23:55");
     expect(quotedDate(v)).toBe("2000-01-01 14:23:55");
+  });
+
+  it("formats a TimeWithZone through its UTC instant", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const v = new TimeWithZone(Temporal.Instant.from("2026-04-26T14:23:55Z"), eastern);
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("quote and type_cast route a TimeWithZone through quotedDate", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const v = new TimeWithZone(Temporal.Instant.from("2026-04-26T14:23:55Z"), eastern);
+    expect(quote.call(quotingHost(), v)).toBe("'2026-04-26 14:23:55'");
+    expect(typeCast.call(quotingHost(), v)).toBe("2026-04-26 14:23:55");
   });
 
   it("formats a Temporal.ZonedDateTime via its instant", () => {

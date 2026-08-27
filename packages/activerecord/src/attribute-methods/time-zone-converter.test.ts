@@ -126,28 +126,33 @@ describe("TimeZoneConverterTest", () => {
     expect(twz.hour).toBe(10);
   });
 
-  it("serialize extracts UTC from TimeWithZone before delegating to subtype", () => {
+  it("serialize forwards the TimeWithZone to the subtype untouched", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = new TimeWithZone(instant, eastern);
-    // 14:00 UTC displayed as 10:00 EDT; serialize (value_for_database) returns the
-    // cast UTC Temporal.Instant — the adapter renders the SQL literal downstream.
+    // Rails' DelegateClass forwards `serialize` to the subtype, whose
+    // `ActiveModel::Type::Value#serialize` is the identity — value_for_database
+    // IS the TimeWithZone, and `quoted_date` getutc's it downstream.
     const result = converter.serialize(twz);
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect((result as Temporal.Instant).toString()).toBe("2024-06-15T14:00:00Z");
+    expect(result).toBeInstanceOf(TimeWithZone);
+    expect((result as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
+      "2024-06-15T14:00:00Z",
+    );
   });
 
-  it("serialize round-trips: deserialize then serialize returns the cast UTC value", () => {
+  it("serialize round-trips: deserialize then serialize returns the cast value", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
     const deserialized = converter.deserialize("2024-06-15 14:00:00");
     expect(deserialized).toBeInstanceOf(TimeWithZone);
     const serialized = converter.serialize(deserialized);
-    // value_for_database is the cast UTC Temporal.Instant, not a SQL string.
-    expect(serialized).toBeInstanceOf(Temporal.Instant);
-    expect((serialized as Temporal.Instant).toString()).toBe("2024-06-15T14:00:00Z");
+    // value_for_database is the cast TimeWithZone, not a SQL string.
+    expect(serialized).toBeInstanceOf(TimeWithZone);
+    expect((serialized as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
+      "2024-06-15T14:00:00Z",
+    );
   });
 
   it("falls back to ActiveRecord.default_timezone when the subtype has no is_utc?", () => {

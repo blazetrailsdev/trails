@@ -24,7 +24,7 @@ import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS } from "@blazetrails/activesupport";
+import { toS, TimeWithZone } from "@blazetrails/activesupport";
 
 export function quotedTrue(): string {
   return "1";
@@ -119,6 +119,7 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
  */
 export function quotedDate(
   value:
+    | TimeWithZone
     | Temporal.Instant
     | Temporal.ZonedDateTime
     | Temporal.PlainDateTime

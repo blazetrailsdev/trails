@@ -56,6 +56,7 @@ export function serializeCastValue<T>(this: TimeValueHost, value: T): T {
  * `respond_to?(:nsec)` else arm and passes through.
  */
 type NsecBearing =
+  | TimeWithZone
   | Temporal.Instant
   | Temporal.PlainDateTime
   | Temporal.ZonedDateTime
@@ -306,6 +307,7 @@ export const TimeValue = {
 
 function respondToNsec(value: unknown): value is NsecBearing {
   return (
+    value instanceof TimeWithZone ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.ZonedDateTime ||
@@ -315,6 +317,7 @@ function respondToNsec(value: unknown): value is NsecBearing {
 
 /** `Time#nsec` — the fraction of the second, always in `0...1_000_000_000`. */
 function nsec(value: NsecBearing): bigint {
+  if (value instanceof TimeWithZone) return BigInt(value.nsec);
   if (value instanceof Temporal.Instant) {
     return ((value.epochNanoseconds % NANOS_PER_SECOND) + NANOS_PER_SECOND) % NANOS_PER_SECOND;
   }
@@ -327,6 +330,9 @@ function nsec(value: NsecBearing): bigint {
 
 /** `Time#change(nsec:)` — replaces the sub-second fraction, leaving the second. */
 function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
+  if (value instanceof TimeWithZone) {
+    return value.change({ nsec: Number(newNsec) }) as T;
+  }
   if (value instanceof Temporal.Instant) {
     return Temporal.Instant.fromEpochNanoseconds(
       value.epochNanoseconds - nsec(value) + newNsec,

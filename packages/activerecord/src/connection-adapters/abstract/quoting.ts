@@ -15,7 +15,7 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
@@ -69,6 +69,7 @@ export interface QuotingDispatchHost {
 export type QuotedTimeValue = TimeValue | Temporal.PlainTime | Temporal.PlainDateTime;
 
 type TemporalDateLike =
+  | TimeWithZone
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
@@ -151,6 +152,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
     return `'${this.quotedTime(value)}'`;
   if (
+    value instanceof TimeWithZone ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
@@ -208,6 +210,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
     return this.quotedTime(value);
   if (
+    value instanceof TimeWithZone ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
@@ -469,12 +472,18 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
  */
 export function quotedDate(
   value:
+    | TimeWithZone
     | Temporal.Instant
     | Temporal.ZonedDateTime
     | Temporal.PlainDateTime
     | Temporal.PlainDate
     | Temporal.PlainTime,
 ): string {
+  // Rails: `value.acts_like?(:time)` (abstract/quoting.rb:185-191), which an
+  // `ActiveSupport::TimeWithZone` answers true (time_with_zone.rb:504-506). Both
+  // the `getutc` and the `getlocal` arm name the same instant, and rendering it
+  // in `default_timezone` is what `formatInstantForSql` already does.
+  if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
