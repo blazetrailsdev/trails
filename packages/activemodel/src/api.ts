@@ -10,22 +10,9 @@ import {
   sanitizeForMassAssignment,
   sanitizeForbiddenAttributes,
 } from "./forbidden-attributes-protection.js";
-import {
-  Validations,
-  ClassMethods as ValidationsClassMethods,
-  contextForValidation,
-  runValidationsBang,
-  raiseValidationError,
-  readAttributeForValidation,
-  freeze,
-  type ValidationContext,
-} from "./validations.js";
+import { Validations, type ValidationContext } from "./validations.js";
 import type { AttrNameArg } from "./validations/helper-methods.js";
-import {
-  ClassMethods as WithClassMethods,
-  validatesWith as withValidatesWith,
-} from "./validations/with.js";
-import * as Validates from "./validations/validates.js";
+import type { validatesWith as withValidatesWith } from "./validations/with.js";
 import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Naming } from "./naming.js";
 import { Translation } from "./translation.js";
@@ -89,29 +76,10 @@ export class API {
       sanitizeForbiddenAttributes,
     });
 
-    // api.rb:62 — `include ActiveModel::Validations`. Ruby's Concern brings
-    // `ClassMethods` (validations.rb:57-307) along; `validations/with.rb:87`
-    // and `validations/validates.rb:110` reopen the same module, hence the
-    // further extends.
-    extend(base, ValidationsClassMethods);
-    extend(base, WithClassMethods);
-    extend(base, {
-      validates: Validates.validates,
-      validatesBang: Validates.validatesBang,
-      _validatesDefaultKeys: Validates._validatesDefaultKeys,
-      _parseValidatesOptions: Validates._parseValidatesOptions,
-    });
-    // The module's own `included do` block (validations.rb:40-50) runs from
-    // its `[included]` hook.
+    // api.rb:62 — `include ActiveModel::Validations`. The module's own
+    // `[included]` hook issues its `ClassMethods` half and its `included do`
+    // block, exactly as Ruby's Concern does.
     include(base, Validations);
-    include(base, {
-      contextForValidation,
-      runValidationsBang,
-      raiseValidationError,
-      readAttributeForValidation,
-      freeze,
-      validatesWith: withValidatesWith,
-    });
 
     // api.rb:63 — `include ActiveModel::Conversion` and its `ClassMethods`
     // half (conversion.rb:105-118); the `included do` block (:28-33) rides

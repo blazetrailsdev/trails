@@ -14,8 +14,14 @@ import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
 import { freeze as attributesFreeze, type AttributeInstanceHost } from "./attributes.js";
 
+import { Naming } from "./naming.js";
 import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
 import { HelperMethods } from "./validations/helper-methods.js";
+import {
+  ClassMethods as WithClassMethods,
+  validatesWith as withValidatesWith,
+} from "./validations/with.js";
+import * as Validates from "./validations/validates.js";
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import type { CallbackFn, CallbackConditions } from "./callbacks.js";
 import {
@@ -118,11 +124,44 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 export class Validations {
   /**
    * Rails' `included do` block (validations.rb:40-50). The `extend`s at :41-43
-   * install what their modules already export: `define_model_callbacks`
-   * (callbacks.rb:72) and the whole of Translation — `human_attribute_name`,
-   * `lookup_ancestors` and `i18n_scope` (translation.rb:20, :27, :44).
+   * install what their modules already export: `model_name` (naming.rb:270-277),
+   * `define_model_callbacks` (callbacks.rb:72) and the whole of Translation —
+   * `human_attribute_name`, `lookup_ancestors` and `i18n_scope`
+   * (translation.rb:20, :27, :44), which resolve through `model_name` and so
+   * need the `Naming` extend at :41 even on a host that never includes `API`.
    */
   static [included](base: IncludingClass): void {
+    // `ActiveSupport::Concern#append_features` (concern.rb:135-138) mixes the
+    // module's own instance methods (`super`, :136) before it extends
+    // `ClassMethods` (:137) and class_evals the `included do` block (:138).
+    // `include()` has already copied this class module's prototype; these are
+    // the rest of `super` — the members validations.rb declares on the module
+    // itself (:296-306, :376, :437, :467-471, :589) and `with.rb:144-151`,
+    // which this port spells as free functions rather than prototype methods.
+    include(base, {
+      contextForValidation,
+      runValidationsBang,
+      raiseValidationError,
+      readAttributeForValidation,
+      freeze,
+      validatesWith: withValidatesWith,
+    });
+
+    // concern.rb:137 — `base.extend const_get(:ClassMethods)`. Ruby's
+    // reopenings of the same module (`validations/with.rb:87`,
+    // `validations/validates.rb:110`) ride along on the one `extend`; each
+    // reopening lives in the `.ts` matching its `.rb`, so they are separate
+    // `extend()` calls here.
+    extend(base, ClassMethods);
+    extend(base, WithClassMethods);
+    extend(base, {
+      validates: Validates.validates,
+      validatesBang: Validates.validatesBang,
+      _validatesDefaultKeys: Validates._validatesDefaultKeys,
+      _parseValidatesOptions: Validates._parseValidatesOptions,
+    });
+
+    extend(base, Naming);
     extend(base, Callbacks);
     extend(base, Translation);
     extend(base, HelperMethods);

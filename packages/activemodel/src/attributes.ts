@@ -1,14 +1,16 @@
-import { include, type CodeGenerator, included } from "@blazetrails/activesupport";
+import { extend, include, type CodeGenerator, included } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
   ClassMethods as AttributeMethodsClassMethods,
   InstanceMethods as AttributeMethodsInstanceMethods,
+  defineMethodAttribute,
   type AttributeMethodHost,
   type AttributeMethod,
 } from "./attribute-methods.js";
 import {
+  ClassMethods as AttributeRegistrationClassMethods,
   attribute as registrationAttribute,
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
@@ -203,10 +205,17 @@ export interface Attributes {
  *
  * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
  */
-/** A class with `ActiveModel::AttributeMethods` already extended onto it. */
-type AttributeMethodSuffixHost = AttributeMethodHost & {
-  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
-};
+/**
+ * The class Ruby's `included(base)` hook receives (attributes.rb:35), with the
+ * `attribute_method_suffix` macro AttributeMethods has just put on it.
+ */
+type AttributeMethodSuffixHost = AttributeMethodHost &
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+  (new (...args: any[]) => any) & { prototype: object } & {
+    attributeMethodSuffix(
+      ...suffixes: Array<string | { parameters?: string | null | false }>
+    ): void;
+  };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attributes {
@@ -217,6 +226,36 @@ export class Attributes {
    *   end
    */
   static [included](base: AttributeMethodSuffixHost): void {
+    // concern.rb:135 — `@_dependencies.each { |dep| base.include(dep) }`, this
+    // module's `include`s at attributes.rb:32-33. AttributeRegistration is all
+    // `ClassMethods` (attribute_registration.rb has no instance half and no
+    // `included do` block); AttributeMethods lands second, which is what makes
+    // its alias-resolving `resolve_attribute_name` (attribute_methods.rb:396-398)
+    // win over the registration one (attribute_registration.rb:101-103), and
+    // carries its own `included do` (attribute_methods.rb:70-73) in the plain
+    // module object's `[included]` hook.
+    extend(base, AttributeRegistrationClassMethods);
+    extend(base, AttributeMethodsClassMethods);
+    include(base, AttributeMethodsInstanceMethods);
+
+    // concern.rb:136 — `super`, the module's own instance methods, which land
+    // before the `ClassMethods` extend (:137) and the `included do` block
+    // (:138). `include()` has already copied this class module's prototype;
+    // these are the rest of it — attributes.rb:156-159's `_write_attribute` and
+    // `alias :attribute= :_write_attribute`, which this port spells as free
+    // functions rather than prototype methods.
+    include(base, { _writeAttribute, "attribute=": _writeAttribute });
+
+    // attributes.rb:39 — the module's own `ClassMethods`, whose `attribute`
+    // (:59-61) and `define_method_attribute=` (:92-104) override the
+    // registration halves.
+    extend(base, ClassMethods);
+    // CLAUDE.md § "Generated attribute readers are properties" — ActiveModel has
+    // no `define_method_attribute` hook, and needs one because a zero-arg Ruby
+    // reader ports as a property that `define_proxy_call` cannot emit.
+    extend(base, { defineMethodAttribute });
+
+    // attributes.rb:35 — the `included do` block.
     base.attributeMethodSuffix("=", { parameters: "value" });
   }
 
@@ -277,3 +316,14 @@ export class Attributes {
 // brings `attribute_missing` with it; the interface merge above is its type
 // side.
 include(Attributes, { attributeMissing: AttributeMethodsInstanceMethods.attributeMissing });
+
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-104) — the
+ * class half `include ActiveModel::Attributes` contributes, issued from the
+ * module's own `[included]` hook.
+ */
+export const ClassMethods = {
+  attribute,
+  attributeNames,
+  setDefineMethodAttribute,
+};
