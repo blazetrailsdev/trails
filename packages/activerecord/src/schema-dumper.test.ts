@@ -6,7 +6,6 @@ import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
@@ -439,33 +438,44 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("temp_cache");
   });
 
-  // Deferred: Rails' canonical `string_key_objects` is `id: false` +
+  // Deferred: Rails dumps the canonical `string_key_objects` — `id: false` +
   // `t.string :id, null: false` + `t.index :id, unique: true`
-  // (schema.rb:1162-1166). Converging onto that canonical shape needs a trails
+  // (schema.rb:1162-1166) — via `standard_dump`
+  // (schema_dumper_test.rb:466-469). Riding the canonical table needs a trails
   // MySQL/MariaDB fix first — reflection there promotes the unique NOT NULL `id`
   // index to the primary key, so the dump emits `id: "string"` instead of
-  // `id: false`. Until that's fixed this stays on an ad-hoc table whose unique
-  // column is `key` (not `id`), which keeps the explicit `id: false` in the dump
-  // on every adapter. Tracked as an RFC 0048 follow-up story.
+  // `id: false`. Until that's fixed this stays on a table of its own whose
+  // unique column is `key` (not `id`), which keeps the explicit `id: false` in
+  // the dump on every adapter. The name is deliberately NOT the canonical one:
+  // `force`-recreating `string_key_objects` here drifted the shared worker DB
+  // for every later file. Tracked as an RFC 0048 follow-up story.
   it("schema dump keeps id false when id is false and unique not null column added", async () => {
-    await Base.connection.createTable("string_key_objects", { id: false, force: true }, (t) => {
-      t.string("key", { null: false });
-    });
-    await Base.connection.addIndex("string_key_objects", "key", { unique: true });
-    const output = await SchemaDumper.dumpTableSchema(Base.connection, "string_key_objects");
-    expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
+    await Base.connection.createTable(
+      "dump_string_key_objects",
+      { id: false, force: true },
+      (t) => {
+        t.string("key", { null: false });
+      },
+    );
+    await Base.connection.addIndex("dump_string_key_objects", "key", { unique: true });
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "dump_string_key_objects");
+    expect(output).toMatch(/createTable\("dump_string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
   itIfSupports("check_constraints", "schema dumps check constraints", async () => {
     const testAdapter = Base.connection;
-    await testAdapter.createTable("products", { force: true }, (t) => {
+    // Rails dumps the canonical `products`, whose check constraint schema.rb
+    // adds (schema.rb:1020). trails' canonical loader has no check-constraint
+    // support yet, so the constraint is built here — on a table of its own, so
+    // the shared worker DB keeps its canonical `products`.
+    await testAdapter.createTable("dump_check_constraints", { force: true }, (t) => {
       t.decimal("price");
       t.decimal("discounted_price");
     });
-    await testAdapter.addCheckConstraint("products", "price > discounted_price", {
+    await testAdapter.addCheckConstraint("dump_check_constraints", "price > discounted_price", {
       name: "products_price_check",
     });
-    const output = await SchemaDumper.dumpTableSchema(testAdapter, "products");
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "dump_check_constraints");
     expect(output).toContain("products_price_check");
     expect(output).toContain("t.checkConstraint");
   });
@@ -554,11 +564,10 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema does not include limit for emulated mysql boolean fields",
     async () => {
-      const adapter = Base.connection;
-      await adapter.createTable("booleans", { force: true }, (t) => {
-        t.boolean("has_fun", { default: false });
-      });
-      const output = await SchemaDumper.dumpTableSchema(adapter, "booleans");
+      // Rails dumps the canonical `booleans`, whose `has_fun` is
+      // `null: false, default: false` (schema.rb:171-173);
+      // schema_dumper_test.rb:348-351 creates nothing.
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "booleans");
       expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
     },
   );
@@ -647,11 +656,10 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
-    const adapter = Base.connection;
-    await adapter.createTable("numeric_data", { force: true }, (t) => {
-      t.float("temperature_with_limit", { limit: 24 });
-    });
-    const output = await SchemaDumper.dumpTableSchema(adapter, "numeric_data");
+    // Rails dumps the canonical `numeric_data`, which already carries
+    // `t.float :temperature_with_limit, limit: 24` (schema.rb:855);
+    // schema_dumper_test.rb:424-427 creates nothing.
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "numeric_data");
     expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
@@ -792,11 +800,11 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t column",
     async () => {
-      await Base.connection.createTable("posts", { force: true }, (t) => {
+      await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.string("title");
         t.timestamps();
       });
-      const output = await SchemaDumper.dumpTableSchema(Base.connection, "posts");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
       expect(output).toContain("datetime");
       expect(output).toContain("created_at");
       expect(output).toContain("updated_at");
@@ -876,11 +884,11 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column",
     async () => {
-      await Base.connection.createTable("posts", { force: true }, (t) => {
+      await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.string("title");
       });
-      await Base.connection.addColumn("posts", "created_at", "datetime");
-      const output = await SchemaDumper.dumpTableSchema(Base.connection, "posts");
+      await Base.connection.addColumn("timestamps", "created_at", "datetime");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
       expect(output).toContain("datetime");
       expect(output).toContain("created_at");
     },
@@ -906,11 +914,11 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
     async () => {
-      await Base.connection.createTable("posts", { force: true }, (t) => {
+      await Base.connection.createTable("timestamps", { force: true }, (t) => {
         t.string("title");
       });
-      await Base.connection.addColumn("posts", "posted_at", "datetime");
-      const output = await SchemaDumper.dumpTableSchema(Base.connection, "posts");
+      await Base.connection.addColumn("timestamps", "posted_at", "datetime");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
       expect(output).toContain("datetime");
       expect(output).toContain("posted_at");
     },
@@ -971,44 +979,20 @@ describe("SchemaDumperDefaultsTest", () => {
 // The deferred bespoke cases in the second `SchemaDumperTest` describe build
 // real ad-hoc tables via the adapter DSL on the shared per-worker DB; drop
 // every one they create, by name, so the leaked tables don't collide with
-// sibling files under parallel forks. The canonical tables the first describe
-// *rides* (accounts/authors/binaries/movies/…) are shielded by `fixtures({})`
-// and are NOT dropped here. `companies`/`booleans`/`numeric_data`/`posts`/
-// `products` appear only because deferred cases still `force`-recreate them on
-// some adapters; the rebuildCanonicalTables call below restores their canonical
-// shape.
+// sibling files under parallel forks. Every name below is bespoke to this
+// file — no canonical table is created, dropped, or reshaped here, so the
+// canonical tables the first describe *rides* (accounts/authors/booleans/
+// numeric_data/products/…) stay exactly as `fixtures({})` laid them and no
+// rebuild is needed.
 afterAll(async () => {
   const o = { ifExists: true } as const;
-  await Base.connection.dropTable("booleans", o);
-  await Base.connection.dropTable("companies", o);
+  await Base.connection.dropTable("dump_check_constraints", o);
   await Base.connection.dropTable("dump_defaults", o);
-  await Base.connection.dropTable("indexed", o);
+  await Base.connection.dropTable("dump_string_key_objects", o);
   await Base.connection.dropTable("infinity_defaults", o);
-  await Base.connection.dropTable("limits", o);
-  await Base.connection.dropTable("myapp_posts", o);
-  await Base.connection.dropTable("myapp_users", o);
-  await Base.connection.dropTable("myapp_users_v1", o);
-  await Base.connection.dropTable("numeric_data", o);
-  await Base.connection.dropTable("posts", o);
   await Base.connection.dropTable("schema_dump_probe", o);
-  await Base.connection.dropTable("products", o);
-  await Base.connection.dropTable("string_key_objects", o);
-  await Base.connection.dropTable("temp_cache", o);
   await Base.connection.dropTable("test_schema_exclusion", o);
   await Base.connection.dropTable("test_schema_unique", o);
   await Base.connection.dropTable("test_uc_no_idx", o);
   await Base.connection.dropTable("timestamps", o);
-  await Base.connection.dropTable("users", o);
-  // The drops above include canonical tables the deferred cases `force`-recreate
-  // in a bespoke shape; restore the canonical ones here instead of leaving the
-  // shared worker DB drifted for the next file.
-  await rebuildCanonicalTables(Base.connection, [
-    "booleans",
-    "companies",
-    "numeric_data",
-    "posts",
-    "products",
-    "string_key_objects",
-    "users",
-  ]);
 });
