@@ -1222,17 +1222,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *   flags it only because `empty?` maps onto the unrelated
    *   `ActiveRecord::Result.empty`, which takes arguments since it gained Rails'
    *   `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped.
-   * @missingRailsCall find_cmd_and_exec — PERMANENT: Verified per-site (RFC 0106):
-   *   `find_cmd_and_exec` (abstract_mysql_adapter.rb:82) resolves the mysql
-   *   binary on PATH and `exec`s it. trails forbids `process.*`/`node:*` here,
-   *   so `dbconsole` returns the assembled argv for the CLI layer to spawn — the
-   *   argument construction this method is tested on is fully ported.
    */
   static dbconsole(
     config: Record<string, unknown>,
     options: Record<string, unknown> = {},
   ): string[] {
-    const args: string[] = ["mysql"];
+    const args: string[] = [];
     if (isRubyTruthy(config.host)) args.push(`--host=${config.host}`);
     if (isRubyTruthy(config.port)) args.push(`--port=${config.port}`);
     if (isRubyTruthy(config.socket)) args.push(`--socket=${config.socket}`);
@@ -1247,7 +1242,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       args.push("-p");
     }
     if (config.database) args.push(config.database as string);
-    return args;
+    return this.findCmdAndExec(ActiveRecord.databaseCli["mysql"], ...args);
   }
 
   private _emulateBooleans = true;

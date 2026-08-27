@@ -15,6 +15,26 @@ import { BitwiseNot } from "./nodes/unary-operation.js";
 import type { NodeOrValue } from "./nodes/binary.js";
 
 /**
+ * The method-syntax module interface for {@link Math}; see
+ * {@link PredicationsModule} in `predications.ts` for why hosts extend an
+ * interface rather than `Included<typeof Math>`.
+ *
+ * @noRailsEquivalent PERMANENT TypeScript-only mixin typing; Ruby `include` needs no type surface.
+ */
+export interface MathModule {
+  multiply(other: NodeOrValue): Multiplication;
+  add(other: NodeOrValue): Grouping;
+  subtract(other: NodeOrValue): Grouping;
+  divide(other: NodeOrValue): Division;
+  bitwiseAnd(other: NodeOrValue): Grouping;
+  bitwiseOr(other: NodeOrValue): Grouping;
+  bitwiseXor(other: NodeOrValue): Grouping;
+  bitwiseShiftLeft(other: NodeOrValue): Grouping;
+  bitwiseShiftRight(other: NodeOrValue): Grouping;
+  bitwiseNot(): BitwiseNot;
+}
+
+/**
  * Math — arithmetic mixin.
  *
  * Mirrors: Arel::Math (activerecord/lib/arel/math.rb). `+`/`-` and the
@@ -29,7 +49,7 @@ import type { NodeOrValue } from "./nodes/binary.js";
  * parameter with it (rather than `unknown` + a cast) makes it load-bearing:
  * a caller that cannot produce a `NodeOrValue` is a finding, not a widen.
  */
-export const Math = {
+export const Math: MathModule = {
   multiply(this: Node, other: NodeOrValue): Multiplication {
     return new Multiplication(this, other);
   },

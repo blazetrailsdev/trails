@@ -2238,7 +2238,33 @@ export class AbstractAdapter implements Quoting {
     return /^\s*(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|DESCRIBE|DESC)\b/i;
   }
 
-  static findCmdAndExec(_commands: string[]): void {}
+  /**
+   * Mirrors: AbstractAdapter.find_cmd_and_exec (abstract_adapter.rb:91-117).
+   *
+   * @missingRailsCall exec — PERMANENT: Rails stats every candidate in `commands`
+   *   against `$PATH` and `exec`s the first executable one. Both halves need
+   *   `process.*` (`ENV["PATH"]`, `exec`), which this package forbids, so the
+   *   resolved command name is returned at the head of the argv for the CLI
+   *   layer to spawn instead. The portable half — `Array(commands)` and reading
+   *   whatever `ActiveRecord.databaseCli` names — is ported, so an application
+   *   that configures `databaseCli` is honored exactly as in Rails.
+   * @missingRailsCall split — PERMANENT: `ENV["PATH"].to_s.split(File::PATH_SEPARATOR)`
+   *   (abstract_adapter.rb:93) is the first half of that same PATH scan, and
+   *   reading the process environment is forbidden here.
+   * @missingRailsCall empty? — PERMANENT: `RbConfig::CONFIG["EXEEXT"].empty?`
+   *   (abstract_adapter.rb:94) appends Ruby's platform executable suffix before
+   *   the PATH scan. There is no `RbConfig` analogue, and with the scan itself
+   *   unported the suffix has nothing to apply to.
+   */
+  static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
+    const cmds = Array.isArray(commands) ? commands : [commands];
+    if (cmds.length === 0) {
+      throw new Error(
+        `Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`,
+      );
+    }
+    return [cmds[0], ...args];
+  }
 
   static dbconsole(_config?: unknown): void {}
 

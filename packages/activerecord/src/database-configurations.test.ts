@@ -178,7 +178,8 @@ describe("DatabaseConfigurationsTest", () => {
       expect(DatabaseConfigurations.defaultEnv).toBe("staging");
 
       vi.stubEnv("NODE_ENV", undefined as unknown as string);
-      expect(DatabaseConfigurations.defaultEnv).toBe("development");
+      // connection_handling.rb:7 — `DEFAULT_ENV`'s terminal literal.
+      expect(DatabaseConfigurations.defaultEnv).toBe("default_env");
     });
 
     it("forCurrentEnv follows an explicitly set defaultEnv over the process env", () => {

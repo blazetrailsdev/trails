@@ -1,4 +1,4 @@
-import { include, rbEqual, rbHash, type Included } from "@blazetrails/activesupport";
+import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { _setAttribute } from "../node-slots.js";
 import { Node } from "../nodes/node.js";
 import { As } from "../nodes/binary.js";
@@ -21,7 +21,7 @@ import {
 } from "../nodes/infix-operation.js";
 import { BitwiseNot } from "../nodes/unary-operation.js";
 import type { NodeOrValue } from "../nodes/binary.js";
-import { Predications, type RangeLike } from "../predications.js";
+import { Predications, type PredicationsModule, type RangeLike } from "../predications.js";
 
 /**
  * Attribute — represents a column on a table.
@@ -213,12 +213,11 @@ export class Attribute extends Node {
 // Attribute supplies (the type-casting variant).
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Attribute extends Omit<
-  Included<typeof Predications>,
+  PredicationsModule,
   "between" | "notBetween" | "isInfinity" | "isUnboundable" | "isOpenEnded"
 > {
-  // Declared as methods (not the property signatures `Included<>` produces) so
-  // a subclass can `override` them — the self-dispatch predications.rb:38-51
-  // relies on.
+  // Restated (rather than inherited) so a subclass can `override` them with a
+  // narrowed signature — the self-dispatch predications.rb:38-51 relies on.
 
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | 0;
