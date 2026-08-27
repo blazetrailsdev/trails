@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
+   model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
+   those members on the type side. */
+import { include } from "@blazetrails/activesupport";
+import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model, Types } from "./index.js";
 import "./attribute/user-provided-default.js";
@@ -150,9 +156,11 @@ describe("AttributeTest", () => {
   it("an attribute is not changed if it hasn't been assigned or mutated", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m.changesApplied();
     expect(m.attributeChanged("name")).toBe(false);
@@ -161,9 +169,11 @@ describe("AttributeTest", () => {
   it("an attribute is changed if it's been assigned a new value", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m._writeAttribute("name", "changed");
     expect(m.attributeChanged("name")).toBe(true);
@@ -172,9 +182,11 @@ describe("AttributeTest", () => {
   it("an attribute is not changed if it's assigned the same value", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m.changesApplied();
     m._writeAttribute("name", "test");
@@ -184,9 +196,11 @@ describe("AttributeTest", () => {
   it("an attribute cannot be mutated if it has not been read, and skips expensive calculations", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m.changesApplied();
     expect(m.attributeChanged("name")).toBe(false);
@@ -195,9 +209,11 @@ describe("AttributeTest", () => {
   it("an attribute is changed if it has been mutated", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m._writeAttribute("name", "mutated");
     expect(m.attributeChanged("name")).toBe(true);
@@ -206,9 +222,11 @@ describe("AttributeTest", () => {
   it("an attribute can forget its changes", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m._writeAttribute("name", "changed");
     expect(m.attributeChanged("name")).toBe(true);
@@ -219,9 +237,11 @@ describe("AttributeTest", () => {
   it("#forgetting_assignment on an unchanged .from_database attribute re-deserializes its value", () => {
     class MyModel extends Model {
       static {
+        include(this, Dirty);
         this.attribute("name", "string");
       }
     }
+    interface MyModel extends Dirty {}
     const m = new MyModel({ name: "test" });
     m.clearChangesInformation();
     expect(m._readAttribute("name")).toBe("test");

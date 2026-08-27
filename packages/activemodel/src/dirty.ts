@@ -1,4 +1,4 @@
-import { kernelArray } from "@blazetrails/activesupport";
+import { included, kernelArray, prepend } from "@blazetrails/activesupport";
 
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -14,6 +14,18 @@ export interface DirtyOptions {
 }
 
 /**
+ * The host `include ActiveModel::Dirty` needs — a class that already carries
+ * `ActiveModel::AttributeMethods`, which `dirty.rb:130` includes.
+ */
+interface DirtyIncludeHost {
+  prototype: object;
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+  attributeMethodAffix(
+    ...affixes: Array<{ prefix?: string; suffix?: string; parameters?: string | null | false }>
+  ): void;
+}
+
+/**
  * `ActiveModel::Dirty` — the instance half of the module, mixed onto a model
  * by `include(Model, Dirty)`.
  *
@@ -26,6 +38,28 @@ export interface DirtyOptions {
  * Mirrors: ActiveModel::Dirty (dirty.rb:123-421)
  */
 export class Dirty {
+  /**
+   * Mirrors: dirty.rb:241-245 — the module's `included do` block.
+   *
+   * The Ruby affixes are snake_case fragments of the generated name, trails'
+   * the camelCased halves of it, so a `?` disappears into the spelling; a `!`
+   * is kept and stripped by `AttributeMethodPattern`, which is how the mutator
+   * stays a zero-arg method rather than an accessor property.
+   *
+   * The `prepend()` is Ruby's `super` chain: `init_internals` and
+   * `initialize_dup` (dirty.rb:371-376, :248-251) each open with `super`, so
+   * they are links in the host's chain rather than copied methods, spliced in
+   * at the point the host includes the module.
+   */
+  static [included](base: DirtyIncludeHost): void {
+    base.attributeMethodSuffix("PreviouslyChanged", "Changed", { parameters: "**options" });
+    base.attributeMethodSuffix("Change", "WillChange!", "Was", { parameters: false });
+    base.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
+    base.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
+    base.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
+    prepend(base.prototype, { initInternals, initializeDup });
+  }
+
   declare _attributes: AttributeSet;
   /**
    * Rails' `_read_attribute`, the one member `ForcedMutationTracker` reads its

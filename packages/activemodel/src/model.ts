@@ -21,11 +21,6 @@ import {
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelName } from "./naming.js";
-import {
-  Dirty,
-  initInternals as dirtyInitInternals,
-  initializeDup as dirtyInitializeDup,
-} from "./dirty.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
@@ -93,7 +88,7 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model
-  extends API, Dirty, Access, Naming, Included<typeof AttributeMethods.InstanceMethods> {
+  extends API, Access, Naming, Included<typeof AttributeMethods.InstanceMethods> {
   /**
    * Redeclared as a method, not the property `Included<>` derives, so a
    * subclass may override `attribute_missing` the way Rails' cascade expects.
@@ -138,8 +133,7 @@ export interface Model
   /**
    * The `super`-chained hooks Ruby's included modules define —
    * `Validations#init_internals` / `#initialize_dup` (validations.rb:467-471,
-   * 310-313) and `Dirty#init_internals` / `#initialize_dup` (dirty.rb:371-376,
-   * 248-251) — prepended in include order at the bottom of this file. As in
+   * 310-313) — prepended in include order at the bottom of this file. As in
    * `model.rb`, this class defines no body for either.
    *
    * @internal
@@ -150,8 +144,8 @@ export interface Model
 }
 
 /**
- * Model — the base class that bundles Attributes, Validations, Callbacks,
- * Dirty tracking and Naming.
+ * Model — the base class that bundles Attributes, Validations, Callbacks
+ * and Naming.
  *
  * Mirrors: ActiveModel::Model (with all the included modules)
  */
@@ -521,12 +515,12 @@ export class Model {
    * so an own accessor property (the alias reader ActiveRecord installs for a
    * select alias, where Ruby answers through `method_missing`) arrives as an
    * accessor rather than a flattened snapshot of the source's value. Rails
-   * splits the hook across three modules chained by `super` —
-   * `Attributes#initialize_dup` deep-dups `@attributes` (attributes.rb:111-114),
-   * `Validations#initialize_dup` replaces `@errors` (validations.rb:310-313),
-   * `Dirty#initialize_dup` rebuilds the mutation trackers (dirty.rb:248-251).
-   * All three are links in the {@link initializeDup} chain, so `dup` only
-   * allocates and dispatches.
+   * splits the hook across modules chained by `super` —
+   * `Attributes#initialize_dup` deep-dups `@attributes` (attributes.rb:111-114)
+   * and `Validations#initialize_dup` replaces `@errors` (validations.rb:310-313),
+   * with `Dirty#initialize_dup` (dirty.rb:248-251) joining them on a host that
+   * includes that module. Each is a link in the {@link initializeDup} chain, so
+   * `dup` only allocates and dispatches.
    */
   dup(): this {
     const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
@@ -578,22 +572,6 @@ include(Model, Attributes);
 // attributes.rb:156-159 — `_write_attribute` and `alias :attribute= :_write_attribute`.
 include(Model, { _writeAttribute, "attribute=": _writeAttribute });
 
-// Ruby `include ActiveModel::Dirty` (model.rb:12-14) — a class module, since
-// only `include()`'s class branch carries the accessor descriptors the module's
-// zero-arg readers port to.
-include(Model, Dirty);
-
-// Its `included do` block (dirty.rb:241-245).
-// The Ruby affixes are snake_case fragments of the generated name, trails' the
-// camelCased halves of it, so a `?` disappears into the spelling; a `!` is kept
-// and stripped by `AttributeMethodPattern`, which is how the mutator stays a
-// zero-arg method rather than an accessor property.
-Model.attributeMethodSuffix("PreviouslyChanged", "Changed", { parameters: "**options" });
-Model.attributeMethodSuffix("Change", "WillChange!", "Was", { parameters: false });
-Model.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
-Model.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
-Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
-
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).
 extend(Model, ValidationsCallbacksClassMethods);
@@ -614,15 +592,15 @@ include(Model, ToJsonWithActiveSupportEncoder);
 // beyond `include ActiveModel::API`.
 include(Model, Access);
 
-// The `super`-opening halves of the Validations and Dirty modules: each
-// defines `init_internals` / `initialize_dup` and opens with `super`
-// (validations.rb:467-471 and :310-313, dirty.rb:371-376 and :248-251), so
-// the chain IS the include order — with `Attributes#initialize_dup`
-// (attributes.rb:111-114) at the bottom, since `include ActiveModel::API`
-// (which includes Attributes) precedes both.
+// The `super`-opening halves of the Attributes and Validations modules: each
+// defines `initialize_dup` (and Validations `init_internals` too) opening with
+// `super` (attributes.rb:111-114, validations.rb:467-471 and :310-313), so the
+// chain IS the include order.
 // `prepend()` is that chain — the later include wraps the earlier one and
 // receives it as `super_`, with a no-op root where Ruby's only definition is
 // `ActiveRecord::Core#init_internals` (core.rb:834).
+// `Dirty`'s two links (dirty.rb:371-376, :248-251) are NOT here: `model.rb:42-45`
+// does not include the module, so the host that does prepends them where it does.
 prepend(Model.prototype, {
   initializeDup: attributesInitializeDup,
 });
@@ -630,16 +608,6 @@ prepend(Model.prototype, {
   initInternals: validationsInitInternals,
   initializeDup: validationsInitializeDup,
 });
-prepend(Model.prototype, {
-  initInternals: dirtyInitInternals,
-  initializeDup: dirtyInitializeDup,
-});
-// `Dirty#as_json` (dirty.rb:264-268) is deliberately NOT in that chain:
-// `ActiveModel::Serializers::JSON#as_json` (json.rb:96-108) is included after
-// Dirty and does not call `super`, so Ruby's lookup never reaches the Dirty
-// body on a model that serializes through `serializable_hash`. It applies to a
-// Dirty-including model whose `as_json` is still `Object`'s — Rails'
-// `DirtyTest::DirtyModel` (dirty_test.rb:6-43).
 
 // model.rb:77 — `ActiveSupport.run_load_hooks(:active_model, Model)`.
 runLoadHooks("active_model", Model);

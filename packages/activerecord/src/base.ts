@@ -32,6 +32,7 @@ import type {
 import {
   ArgumentError,
   AttributeMethodPattern,
+  Dirty as AMDirty,
   JSONSerializer,
   Model,
   Type,
@@ -1819,13 +1820,17 @@ export class Base extends Model {
   // changes (attributeChanged) and persisted changes (isSavedChangeToAttribute).
   // All enums are label-stored via the registered EnumType with their mapping
   // in the single `_enums` registry.
-  override attributeChanged(name: string, options?: DirtyOptions): boolean {
+  attributeChanged(name: string, options?: DirtyOptions): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
-    return super.attributeChanged(name, options);
+    // `ActiveModel::Dirty` is included into this class rather than inherited
+    // from `Model` (attribute_methods/dirty.rb:42), so the module body a Ruby
+    // `super` would reach is on this same prototype and shadowed by the class
+    // body. This is Ruby's `instance_method(...).bind(self).call`.
+    return AMDirty.prototype.attributeChanged.call(this, name, options);
   }
 
   /**
@@ -4216,7 +4221,11 @@ export class Base extends Model {
 // through `Model`, and re-declaring it here would put a second copy of the
 // name on base.ts's surface.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof AutosaveAssociation>, Omit<JSONSerializer, "toJSON"> {
+export interface Base
+  extends
+    Included<typeof AutosaveAssociation>,
+    Omit<JSONSerializer, "toJSON">,
+    Omit<AMDirty, "attributeChanged"> {
   /** Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26). */
   normalizeAttribute(name: string): void;
   /**
@@ -4714,6 +4723,15 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
+// `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
+// `ActiveRecord::AttributeMethods::Dirty` builds on, and which
+// `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
+// `include()` copies the module's zero-arg readers as accessor descriptors;
+// its `[included]` hook issues the `included do` affixes (dirty.rb:241-245) and
+// splices the module's `init_internals` / `initialize_dup` links (dirty.rb:
+// 371-376, :248-251) into this prototype's chains, below Core — the position
+// they had while `ActiveModel::Model` carried them on its own prototype.
+include(Base, AMDirty);
 // The accessor-property half of AttributeMethods::Dirty. A class module, so
 // `include()` copies the getter descriptors rather than flattening them.
 include(Base, _Dirty);
