@@ -1161,41 +1161,6 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
 }
 
 /**
- * For one Ruby file's entities, compute the union of all TS candidate names
- * produced by `rubyMethodToTs`. Mirrors `compare.flattenIncludedMethodInfos`
- * mixin routing exactly:
- *
- *   - `include M`: M's instance methods land on the host as instance methods.
- *     A nested `include N` inside M chains through (instance methods only).
- *     M's own `extend` chain does NOT propagate to the host — Ruby `extend`
- *     affects only the receiver's singleton class.
- *   - `extend M` (at host level): M's instance methods land as class methods.
- *   - Module `classMethods` are NOT propagated through include/extend (Ruby
- *     semantics; `flattenIncludedMethodInfos` only pushes `instanceMethods`).
- *     The `ActiveSupport::Concern` "class methods via include" pattern is
- *     handled by `foldClassMethodsModules` above, which moves the nested
- *     `ClassMethods` submodule's instanceMethods into the parent's own
- *     `classMethods` — flattening still only reads `instanceMethods`, so
- *     ASC class methods become entity-level surface, not propagated mixins.
- *   - A mixin whose source file is unported (`UNPORTED_FILES`) is skipped, so
- *     its methods never enter `allowed` — matching the `isSourceUnported`
- *     guard at compare.ts:507. The check uses the module's *owning* package.
- *
- * The matched file's `fileConstants` names join `allowed` too (see
- * `rubyConstantCandidates`): a faithfully-ported `ER_DUP_ENTRY` is not extra
- * surface. Constants have no mixin routing — they belong to the file, not to
- * an entity — so they're added once up front rather than per entity.
- *
- * Since `allowed` is a flat name set (instance vs class collapsed on the TS
- * side anyway), we simply union both `instanceMethods` and `classMethods`
- * for the *host* entity, but ONLY `instanceMethods` for walked-into mixins.
- *
- * `include` names are resolved via compare.ts's `resolveModuleName`, which
- * walks namespace prefixes — `AbstractAdapter` including `"Quoting"` maps
- * only to `ConnectionAdapters::Quoting`, never to PG/MySQL siblings of the
- * same short name. Cross-package / stdlib mixins are silently skipped.
- */
-/**
  * The two symbol-keyed members trails uses to port a Ruby Concern's hooks —
  * `included do ... end` and `def self.extended(base)` — as
  * `static [included](base)` / `static [extended](base)`, keyed by the symbols
@@ -1290,6 +1255,41 @@ export async function loadConcernHooks(
   return hooks;
 }
 
+/**
+ * For one Ruby file's entities, compute the union of all TS candidate names
+ * produced by `rubyMethodToTs`. Mirrors `compare.flattenIncludedMethodInfos`
+ * mixin routing exactly:
+ *
+ *   - `include M`: M's instance methods land on the host as instance methods.
+ *     A nested `include N` inside M chains through (instance methods only).
+ *     M's own `extend` chain does NOT propagate to the host — Ruby `extend`
+ *     affects only the receiver's singleton class.
+ *   - `extend M` (at host level): M's instance methods land as class methods.
+ *   - Module `classMethods` are NOT propagated through include/extend (Ruby
+ *     semantics; `flattenIncludedMethodInfos` only pushes `instanceMethods`).
+ *     The `ActiveSupport::Concern` "class methods via include" pattern is
+ *     handled by `foldClassMethodsModules` above, which moves the nested
+ *     `ClassMethods` submodule's instanceMethods into the parent's own
+ *     `classMethods` — flattening still only reads `instanceMethods`, so
+ *     ASC class methods become entity-level surface, not propagated mixins.
+ *   - A mixin whose source file is unported (`UNPORTED_FILES`) is skipped, so
+ *     its methods never enter `allowed` — matching the `isSourceUnported`
+ *     guard at compare.ts:507. The check uses the module's *owning* package.
+ *
+ * The matched file's `fileConstants` names join `allowed` too (see
+ * `rubyConstantCandidates`): a faithfully-ported `ER_DUP_ENTRY` is not extra
+ * surface. Constants have no mixin routing — they belong to the file, not to
+ * an entity — so they're added once up front rather than per entity.
+ *
+ * Since `allowed` is a flat name set (instance vs class collapsed on the TS
+ * side anyway), we simply union both `instanceMethods` and `classMethods`
+ * for the *host* entity, but ONLY `instanceMethods` for walked-into mixins.
+ *
+ * `include` names are resolved via compare.ts's `resolveModuleName`, which
+ * walks namespace prefixes — `AbstractAdapter` including `"Quoting"` maps
+ * only to `ConnectionAdapters::Quoting`, never to PG/MySQL siblings of the
+ * same short name. Cross-package / stdlib mixins are silently skipped.
+ */
 function collectAllowedNames(
   entities: RubyEntity[],
   pkg: string,
