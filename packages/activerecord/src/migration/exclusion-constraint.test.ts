@@ -9,20 +9,33 @@
  * #remove_exclusion_constraint route through create_alter_table +
  * schema_creation.accept.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { PG_TEST_URL } from "../support/describe-if-pg.js";
 import { describeIfSupports } from "../support/supports.js";
-import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
+import { createTestExclusionConstraintsTable } from "../support/load-schema-helper.js";
+import { openScratchDatabase, type ScratchDatabase } from "../support/pg-scratch-database.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 
 describeIfSupports("exclusion_constraints", "Migration", () => {
+  let scratch: ScratchDatabase;
   let connection: PostgreSQLAdapter;
 
+  // `invoices` is a canonical table (`schema.rb:675`) and this suite clobbers
+  // and drops it exactly as Rails does, so it runs against a database of its
+  // own rather than the shared per-worker one (RFC 0079).
+  beforeAll(async () => {
+    scratch = await openScratchDatabase("exclusion_constraints");
+    connection = scratch.connection;
+    await createTestExclusionConstraintsTable(connection);
+  }, 30000);
+
+  afterAll(async () => {
+    await scratch.drop();
+  }, 30000);
+
   beforeEach(async () => {
-    connection = new PostgreSQLAdapter(PG_TEST_URL);
     await connection.createTable("invoices", { force: true }, (t) => {
       t.date("start_date");
       t.date("end_date");
@@ -31,8 +44,6 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
 
   afterEach(async () => {
     await connection.dropTable("invoices", { ifExists: true });
-    await rebuildCanonicalTables(connection, ["invoices"]);
-    await connection.close();
   });
 
   describe("ExclusionConstraintTest", () => {

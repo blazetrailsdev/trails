@@ -7,6 +7,74 @@ import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 /**
+ * `postgresql_specific_schema.rb:162-173` — the `test_exclusion_constraints`
+ * table, extracted so a suite that needs it in a database of its own
+ * (`migration/exclusion-constraint.test.ts`) lays the canonical shape rather
+ * than a copy of it.
+ */
+export async function createTestExclusionConstraintsTable(
+  adapter: PostgreSQLAdapter,
+): Promise<void> {
+  await adapter.createTable("test_exclusion_constraints", { force: true }, (t) => {
+    t.date("start_date");
+    t.date("end_date");
+    t.date("valid_from");
+    t.date("valid_to");
+    t.date("transaction_from");
+    t.date("transaction_to");
+
+    t.exclusionConstraint("daterange(start_date, end_date) WITH &&", {
+      using: "gist",
+      where: "start_date IS NOT NULL AND end_date IS NOT NULL",
+      name: "test_exclusion_constraints_date_overlap",
+    });
+    t.exclusionConstraint("daterange(valid_from, valid_to) WITH &&", {
+      using: "gist",
+      where: "valid_from IS NOT NULL AND valid_to IS NOT NULL",
+      name: "test_exclusion_constraints_valid_overlap",
+      deferrable: "immediate",
+    });
+    t.exclusionConstraint("daterange(transaction_from, transaction_to) WITH &&", {
+      using: "gist",
+      where: "transaction_from IS NOT NULL AND transaction_to IS NOT NULL",
+      name: "test_exclusion_constraints_transaction_overlap",
+      deferrable: "deferred",
+    });
+  });
+}
+
+/**
+ * `postgresql_specific_schema.rb:175-185` — the `test_unique_constraints`
+ * table, extracted for the same reason as
+ * {@link createTestExclusionConstraintsTable}
+ * (`migration/unique-constraint.test.ts`).
+ */
+export async function createTestUniqueConstraintsTable(adapter: PostgreSQLAdapter): Promise<void> {
+  await adapter.createTable("test_unique_constraints", { force: true }, (t) => {
+    t.integer("position_1");
+    t.integer("position_2");
+    t.integer("position_3");
+    t.integer("position_4");
+
+    t.uniqueConstraint("position_1", {
+      name: "test_unique_constraints_position_deferrable_false",
+    });
+    t.uniqueConstraint("position_2", {
+      name: "test_unique_constraints_position_deferrable_immediate",
+      deferrable: "immediate",
+    });
+    t.uniqueConstraint("position_3", {
+      name: "test_unique_constraints_position_deferrable_deferred",
+      deferrable: "deferred",
+    });
+    t.uniqueConstraint("position_4", {
+      name: "test_unique_constraints_position_nulls_not_distinct",
+      nullsNotDistinct: true,
+    });
+  });
+}
+
+/**
  * The ported slice of
  * `vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb` — the
  * `uuid-ossp` / `pgcrypto` extension header, the four uuid-primary-key tables,
@@ -203,55 +271,9 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     t.string("subject");
   });
 
-  await adapter.createTable("test_exclusion_constraints", { force: true }, (t) => {
-    t.date("start_date");
-    t.date("end_date");
-    t.date("valid_from");
-    t.date("valid_to");
-    t.date("transaction_from");
-    t.date("transaction_to");
+  await createTestExclusionConstraintsTable(adapter);
 
-    t.exclusionConstraint("daterange(start_date, end_date) WITH &&", {
-      using: "gist",
-      where: "start_date IS NOT NULL AND end_date IS NOT NULL",
-      name: "test_exclusion_constraints_date_overlap",
-    });
-    t.exclusionConstraint("daterange(valid_from, valid_to) WITH &&", {
-      using: "gist",
-      where: "valid_from IS NOT NULL AND valid_to IS NOT NULL",
-      name: "test_exclusion_constraints_valid_overlap",
-      deferrable: "immediate",
-    });
-    t.exclusionConstraint("daterange(transaction_from, transaction_to) WITH &&", {
-      using: "gist",
-      where: "transaction_from IS NOT NULL AND transaction_to IS NOT NULL",
-      name: "test_exclusion_constraints_transaction_overlap",
-      deferrable: "deferred",
-    });
-  });
-
-  await adapter.createTable("test_unique_constraints", { force: true }, (t) => {
-    t.integer("position_1");
-    t.integer("position_2");
-    t.integer("position_3");
-    t.integer("position_4");
-
-    t.uniqueConstraint("position_1", {
-      name: "test_unique_constraints_position_deferrable_false",
-    });
-    t.uniqueConstraint("position_2", {
-      name: "test_unique_constraints_position_deferrable_immediate",
-      deferrable: "immediate",
-    });
-    t.uniqueConstraint("position_3", {
-      name: "test_unique_constraints_position_deferrable_deferred",
-      deferrable: "deferred",
-    });
-    t.uniqueConstraint("position_4", {
-      name: "test_unique_constraints_position_nulls_not_distinct",
-      nullsNotDistinct: true,
-    });
-  });
+  await createTestUniqueConstraintsTable(adapter);
 
   if (await adapter.supportsPartitionedIndexes()) {
     await adapter.createTable(
