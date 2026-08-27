@@ -589,23 +589,29 @@ export class Builder implements InsertBuilder {
    * Mirrors: ActiveRecord::InsertAll::Builder#extract_types_from_columns_on
    * (insert_all.rb:306-313).
    *
-   * Rails reads `@model.schema_cache.columns_hash(table_name)`. trails' sync
-   * read of that hash is `Model.columnsHash()` (model-schema.ts), which is
-   * bound to the model's own table — `SchemaCache#columnsHash` is async here and
-   * this builder path cannot await (the RFC 0073 constraint
-   * `getCachedColumnsHash` documents). `tableName` therefore does not steer the
-   * read; it is kept because Rails' signature has it and its sole caller passes
-   * `model.table_name`, so the two reads are the same hash.
+   * Rails reads `@model.schema_cache.columns_hash(table_name)`, which blocks on
+   * a connection checkout when the entry is cold. `SchemaCache#columnsHash` is
+   * async in trails and this builder path cannot await, so the read is the
+   * query-free `getCachedColumnsHash` off `internalSchemaCache` — the sync-peek
+   * slot behind `AbstractAdapter#schema_cache` (the RFC 0073 constraint both
+   * document).
    * @internal
    */
   private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
-    const columns = this.model.columnsHash();
+    const columns = (
+      this._connection as unknown as {
+        internalSchemaCache: {
+          getCachedColumnsHash(t: string): Record<string, unknown> | undefined;
+        };
+      }
+    ).internalSchemaCache.getCachedColumnsHash(tableName);
 
-    // Ruby's `columns_hash` blocks on a checkout, so it is never empty for a
-    // real table; trails' sync read can be cold, and judging keys against an
-    // empty hash would raise on every column of a model whose `table_name=`
-    // reset the schema (`Book.table_name = "db.books"`, insert_all_test.rb).
-    if (Object.keys(columns).length > 0) {
+    // Ruby's blocking read always has the columns to judge against. A cold
+    // entry here means trails cannot yet know them, and judging the keys
+    // against nothing would raise on a column the reflect is about to produce
+    // — `Book.table_name = "\${db}.books"` (insert_all_test.rb:836-845) resets
+    // the schema and inserts before anything has warmed the qualified name.
+    if (columns != null) {
       const unknownColumn = keys.find((key) => !(key in columns));
       if (unknownColumn !== undefined) {
         // UnknownAttributeError only reads record?.constructor?.name; skip the
