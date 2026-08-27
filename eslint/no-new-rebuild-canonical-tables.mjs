@@ -36,6 +36,19 @@
  * There is deliberately NO reseed script. Reseeding is what turns an
  * only-shrink baseline back into a rubber stamp; the entries are few enough
  * that every change to this file is a reviewed one-line edit.
+ *
+ * Three details of the implementation are worth stating, since none is obvious
+ * from the code:
+ *
+ *   - The helper's own module and its two self-coverage tests are skipped
+ *     outright. They are deleted along with the helper by the RFC's final
+ *     story, so a path allowance for them would be debt existing only to be
+ *     deleted.
+ *   - Both the bare call and a member call (`mod.rebuildCanonicalTables(…)`)
+ *     count, so re-exporting the helper under a namespace cannot slip past.
+ *   - When a listed file exceeds its allowance only the EXCESS calls report,
+ *     so a file that legitimately keeps its baselined sites is not lit up
+ *     wholesale by one new one.
  */
 
 import {
@@ -63,9 +76,6 @@ const rule = {
   create(context) {
     const filename = context.filename ?? context.getFilename();
 
-    // The helper's own module and its self-coverage tests are out of scope:
-    // they die with the helper, and measuring them would mean carrying a path
-    // allowance for code whose whole purpose is to exercise the thing.
     if (isRebuildHelperModule(filename)) return {};
 
     const allowed = rebuildCallerAllowance(filename);
@@ -73,8 +83,6 @@ const rule = {
 
     return {
       CallExpression(node) {
-        // Match both the bare call and a member call (`mod.rebuildCanonicalTables(…)`),
-        // so re-exporting the helper under a namespace does not slip past.
         const callee = node.callee;
         const name =
           callee.type === "Identifier"
@@ -93,8 +101,6 @@ const rule = {
           return;
         }
         if (calls.length > allowed) {
-          // Report only the calls beyond the allowance, so a file that legitimately
-          // keeps its baselined sites is not lit up wholesale by one new one.
           for (const node of calls.slice(allowed)) {
             context.report({
               node,

@@ -14,11 +14,8 @@ import {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// A file that IS in the baseline, with an allowance of exactly 1.
 const LISTED_ONE = "packages/activerecord/src/date.test.ts";
-// A file that IS in the baseline, with an allowance of 2.
 const LISTED_TWO = "packages/activerecord/src/locking.test.ts";
-// A file that is NOT in the baseline.
 const UNLISTED = "packages/activerecord/src/relations.test.ts";
 
 const CALL = 'await rebuildCanonicalTables(Base.connection, ["topics"]);';
@@ -33,84 +30,92 @@ const tester = new RuleTester({
 
 tester.run("no-new-rebuild-canonical-tables", rule, {
   valid: [
-    // A listed file calling exactly its allowance.
-    { filename: LISTED_ONE, code: `async function f() { ${CALL} }` },
-    { filename: LISTED_TWO, code: `async function f() { ${CALL} ${CALL} }` },
-    // An unlisted file that does not call the helper at all.
     {
+      name: "a listed file calling exactly its allowance",
+      filename: LISTED_ONE,
+      code: `async function f() { ${CALL} }`,
+    },
+    {
+      name: "a listed file with an allowance of two, calling twice",
+      filename: LISTED_TWO,
+      code: `async function f() { ${CALL} ${CALL} }`,
+    },
+    {
+      name: "an unlisted file that does not call the helper",
       filename: UNLISTED,
       code: 'import { fixtures } from "./test-fixtures.js";\nfixtures(["topics"]);',
     },
-    // Merely IMPORTING the helper is not a call — the ratchet counts call
-    // sites, and require-canonical-rebuild already governs the import side.
     {
+      name: "importing the helper without calling it is not a call site",
       filename: UNLISTED,
       code: 'import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";',
     },
-    // The helper's own module declares it; the declaration is not a call, and
-    // the module is exempt besides.
     {
+      name: "the helper's own module, where the declaration is not a call",
       filename: HELPER_MODULES[0],
       code: "export async function rebuildCanonicalTables() {}",
     },
-    // The helper's self-coverage tests call it freely — exempt.
-    { filename: HELPER_MODULES[1], code: `async function f() { ${CALL} ${CALL} ${CALL} }` },
-    { filename: HELPER_MODULES[2], code: `async function f() { ${CALL} ${CALL} }` },
-    // A same-named method on an unrelated object is not the helper. Guarding
-    // this keeps the rule from firing on a future adapter method that happens
-    // to share the name.
-    { filename: UNLISTED, code: "async function f() { await this.somethingElse(); }" },
+    {
+      name: "the helper's self-coverage tests, which are exempt",
+      filename: HELPER_MODULES[1],
+      code: `async function f() { ${CALL} ${CALL} ${CALL} }`,
+    },
+    {
+      name: "the bulk-inbound-fk self-coverage test, which is exempt",
+      filename: HELPER_MODULES[2],
+      code: `async function f() { ${CALL} ${CALL} }`,
+    },
+    {
+      name: "a same-named method on an unrelated object is not the helper",
+      filename: UNLISTED,
+      code: "async function f() { await this.somethingElse(); }",
+    },
   ],
   invalid: [
-    // An unlisted file may not call the helper at all.
     {
+      name: "an unlisted file may not call the helper at all",
       filename: UNLISTED,
       code: `async function f() { ${CALL} }`,
       errors: [{ messageId: "unlistedCaller" }],
     },
-    // Every call in an unlisted file reports, not just the first.
     {
+      name: "every call in an unlisted file reports, not just the first",
       filename: UNLISTED,
       code: `async function f() { ${CALL} ${CALL} }`,
       errors: [{ messageId: "unlistedCaller" }, { messageId: "unlistedCaller" }],
     },
-    // A listed file exceeding its allowance reports only the excess calls, so
-    // its baselined sites are not lit up wholesale by one new one.
     {
+      name: "a listed file over its allowance reports only the excess call",
       filename: LISTED_ONE,
       code: `async function f() { ${CALL} ${CALL} }`,
       errors: [{ messageId: "tooManyCalls", data: { allowed: "1", actual: "2" } }],
     },
     {
+      name: "two excess calls over an allowance of two report twice",
       filename: LISTED_TWO,
       code: `async function f() { ${CALL} ${CALL} ${CALL} ${CALL} }`,
       errors: [{ messageId: "tooManyCalls" }, { messageId: "tooManyCalls" }],
     },
-    // A listed file BELOW its allowance must tighten the baseline in the same
-    // PR — this is what makes the ratchet actually shrink.
     {
+      name: "a listed file that dropped to zero calls must tighten the baseline",
       filename: LISTED_ONE,
       code: "async function f() { return 1; }",
       errors: [{ messageId: "staleAllowance", data: { allowed: "1", actual: "0" } }],
     },
     {
+      name: "a listed file that dropped one of two calls must tighten the baseline",
       filename: LISTED_TWO,
       code: `async function f() { ${CALL} }`,
       errors: [{ messageId: "staleAllowance", data: { allowed: "2", actual: "1" } }],
     },
-    // A file outside packages/ and scripts/ has no repo-relative baseline key,
-    // so it can never BE listed — which makes it an unlisted caller, not an
-    // exempt one. Today the config globs keep the rule off such trees entirely;
-    // reporting here means widening those globs later actually catches
-    // something instead of silently exempting a whole directory.
     {
+      name: "a file outside packages/ and scripts/ can never be listed, so it reports",
       filename: "tools/scratch.ts",
       code: `async function f() { ${CALL} }`,
       errors: [{ messageId: "unlistedCaller" }],
     },
-    // A namespaced call is still a call — re-exporting the helper under an
-    // alias must not slip past the ratchet.
     {
+      name: "a namespaced call is still a call",
       filename: UNLISTED,
       code: 'import * as m from "./support/canonical-table-rebuild.js";\nasync function f() { await m.rebuildCanonicalTables(c, ["topics"]); }',
       errors: [{ messageId: "unlistedCaller" }],
@@ -144,20 +149,14 @@ describe("rebuild-canonical-tables-callers.json", () => {
     }
   });
 
-  it("matches the RFC 0079 baseline of 26 call sites across 22 files", () => {
+  it("never exceeds the RFC 0079 baseline of 26 call sites across 22 files", () => {
     const files = Object.keys(REBUILD_CALLERS).length;
     const sites = Object.values(REBUILD_CALLERS).reduce((a, b) => a + b, 0);
-    // These numbers ONLY go down. A burndown PR that lands a removal updates
-    // them here in the same commit that tightens the entry; a PR that raises
-    // either one is doing the opposite of what RFC 0079 exists to do.
     expect(files).toBeLessThanOrEqual(22);
     expect(sites).toBeLessThanOrEqual(26);
   });
 
-  it("agrees with what is actually on disk", async () => {
-    // The ratchet is only as good as its baseline: if a listed file has drifted
-    // from its allowance, lint reports it — but only for files ESLint actually
-    // visits. This closes that gap by measuring the tree directly.
+  it("agrees with what is actually on disk, for files ESLint may never visit", async () => {
     for (const [rel, allowed] of Object.entries(REBUILD_CALLERS)) {
       const src = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
       const actual = (src.match(/\brebuildCanonicalTables\s*\(/g) ?? []).length;
