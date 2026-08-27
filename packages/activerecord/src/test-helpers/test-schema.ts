@@ -1858,36 +1858,12 @@ export const TEST_SCHEMA: Schema = {
     settings: "text",
   },
 
-  // Reserved-word tables (ReservedWordTest). Table and column names are SQL
-  // reserved words, so they exercise identifier quoting throughout AR.
-  group: {
-    order: "string",
-    select_id: "integer",
-  },
-  select: {},
-  distinct: {},
-  distinct_select: {
-    columns: {
-      distinct_id: "integer",
-      select_id: "integer",
-    },
-    primaryKey: false,
-  },
-  values: {
-    columns: {
-      as: "integer",
-      group_id: "integer",
-    },
-    primaryKey: ["as"],
-  },
-
   // Tables used by reflection.test.ts (not in Rails schema.rb; reflection-test-specific).
   appointments: { doctor_id: "integer", patient_id: "integer" },
   bookmarks: { author_name: "string" },
   cat_categories: { name: "string" },
   catalog_categories: { name: "string" },
   catalog_products: { name: "string" },
-  children: { parent_id: "integer" },
   clients: { name: "string" },
   company2s: {},
   content_pages: { name: "string" },

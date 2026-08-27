@@ -19,7 +19,6 @@ import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Lion } from "./test-helpers/models/cat.js";
 
@@ -421,10 +420,6 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   // must reflect synchronously from the warm schema cache on its own (the same
   // sync path `Base.typeForAttribute` uses). Awaiting the async loader first
   // would mask a regression where the helper fire-and-forgets reflection.
-  beforeAll(async () => {
-    await rebuildCanonicalTables(Base.connection, ["numeric_data"]);
-  });
-
   it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
     const type = enumTypeOf(NumericEnum, "decimal_number");
     expect(type).toBeInstanceOf(EnumType);

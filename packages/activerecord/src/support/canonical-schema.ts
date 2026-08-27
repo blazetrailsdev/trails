@@ -197,8 +197,8 @@ interface TableMeta {
    * `schema.rb:1444-1460` creates this table through the *second* connection
    * (`Course`/`College`/`Professor.lease_connection`), so it belongs to
    * `arunit2` and never to the primary `arunit` database.
-   * {@link loadCanonicalSchema} skips it; `setup-second-pool.ts` lays it in
-   * arunit2 by name through `rebuildCanonicalTables`.
+   * {@link loadCanonicalSchema} skips it; {@link loadCanonicalArunit2Schema}
+   * lays it in arunit2 for `setup-second-pool.ts`.
    */
   arunit2?: true;
 }
@@ -1894,25 +1894,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.text("settings");
   });
 
-  await define("group", {}, (t) => {
-    t.string("order");
-    t.integer("select_id");
-  });
-
-  await define("select", {}, (t) => {});
-
-  await define("distinct", {}, (t) => {});
-
-  await define("distinct_select", { id: false }, (t) => {
-    t.integer("distinct_id");
-    t.integer("select_id");
-  });
-
-  await define("values", { serialPk: "as" }, (t) => {
-    t.integer("as");
-    t.integer("group_id");
-  });
-
   await define("appointments", {}, (t) => {
     t.integer("doctor_id");
     t.integer("patient_id");
@@ -1932,10 +1913,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("catalog_products", {}, (t) => {
     t.string("name");
-  });
-
-  await define("children", {}, (t) => {
-    t.integer("parent_id");
   });
 
   await define("clients", {}, (t) => {
@@ -2211,6 +2188,27 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
   }
   // create_table/drop_table clear the connection's prepared statements in Rails;
   // mirror that so PostgreSQL doesn't reuse a stale cached plan (0A000).
+  await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
+}
+
+/**
+ * The arunit2 half of `schema.rb`: `schema.rb:1444-1460` creates `colleges`,
+ * `courses`, `professors` and `courses_professors` through the *second*
+ * connection (`Course`/`College`/`Professor.lease_connection`), which is why
+ * {@link loadCanonicalSchema} skips them. Rails writes them `force: true`, so a
+ * reused arunit2 database carrying stale shapes is replaced rather than kept.
+ *
+ * Plumbing for `setup-second-pool.ts`, the trails stand-in for the `db:create`
+ * step Rails runs in front of `schema.rb`. Same rule as
+ * {@link loadCanonicalSchema}: never call it from a `*.test.ts` file.
+ */
+export async function loadCanonicalArunit2Schema(adapter: DatabaseAdapter): Promise<void> {
+  const { ss, typeMap } = await prepareSchema(adapter);
+  for (const def of await buildCanonicalRegistry()) {
+    if (!def.meta.arunit2) continue;
+    await adapter.dropTable(def.name, { ifExists: true });
+    await runTable(adapter, ss, typeMap, def);
+  }
   await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }
 

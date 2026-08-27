@@ -11,9 +11,15 @@ import {
 import { Base } from "../../base.js";
 import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 
-async function restoreCanonicalTables(names: readonly string[]): Promise<void> {
+/**
+ * The four canonical tables this file force-recreates in a bespoke shape, all
+ * restored together from one literal list: `require-canonical-rebuild` reads
+ * the list at the call site, so forwarding it through a parameter would leave
+ * every drop in the file unproven.
+ */
+async function restoreCanonicalTables(): Promise<void> {
   const adapter = await leaseMysqlAdapter();
-  await rebuildCanonicalTables(adapter, names);
+  await rebuildCanonicalTables(adapter, ["posts", "topics", "students", "lessons_students"]);
 }
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -22,7 +28,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     adapter = await leaseMysqlAdapter();
   });
   afterAll(async () => {
-    await restoreCanonicalTables(["posts"]);
+    await restoreCanonicalTables();
   });
 
   describe("SchemaTest", () => {
@@ -193,7 +199,7 @@ describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
     ansi = undefined;
   });
   afterAll(async () => {
-    await restoreCanonicalTables(["students", "lessons_students", "topics"]);
+    await restoreCanonicalTables();
   });
 
   it("primary key method with ansi quotes", async () => {

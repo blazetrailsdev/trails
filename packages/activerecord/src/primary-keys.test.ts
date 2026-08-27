@@ -560,7 +560,6 @@ describe("CompositePrimaryKeyTest", () => {
   const { cpkBooks } = fixtures(["cpkAuthors", "cpkOrders", "cpkBooks"]);
 
   beforeAll(async () => {
-    await rebuildCanonicalTables(Base.connection, ["cpk_books", "cpk_orders", "cpk_authors"]);
     const conn = Base.connection as any;
     await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
     await conn.createTable(

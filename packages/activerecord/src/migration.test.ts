@@ -18,7 +18,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
-import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -1672,10 +1671,6 @@ describe("MigrationTest", () => {
         expect(await connection.indexExists("values", "value")).toBe(false);
       } finally {
         await connection.dropTable("values", { ifExists: true });
-        // `values` is canonical: the bespoke shape above replaced it, so put
-        // the canonical one back rather than leaving the shared worker DB
-        // short a table for whichever file runs next.
-        await rebuildCanonicalTables(connection, ["values"]);
       }
     });
   });
@@ -1697,10 +1692,6 @@ describe("MigrationTest", () => {
         expect(await connection.indexExists("values", "value")).toBe(false);
       } finally {
         await connection.dropTable("values", { ifExists: true });
-        // `values` is canonical: the bespoke shape above replaced it, so put
-        // the canonical one back rather than leaving the shared worker DB
-        // short a table for whichever file runs next.
-        await rebuildCanonicalTables(connection, ["values"]);
       }
     });
   });
