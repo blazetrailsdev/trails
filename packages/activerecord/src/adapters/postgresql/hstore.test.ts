@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import type { Table as PgTable } from "../../connection-adapters/postgresql/schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, serialize, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
@@ -123,7 +122,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("change table supports hstore", async () => {
       await connection.changeTable("hstores", async (t) => {
-        await (t as PgTable).hstore("users", { default: "" });
+        await t.hstore("users", { default: "" });
       });
       void Hstore.resetColumnInformation();
       await Hstore.loadSchema();
@@ -132,10 +131,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("hstore migration", async () => {
-      class HstoreMigration extends Migration {
+      class HstoreMigration extends Migration<PostgreSQLAdapter> {
         async change() {
           await this.changeTable("hstores", async (t) => {
-            await (t as PgTable).hstore("keys");
+            await t.hstore("keys");
           });
         }
       }

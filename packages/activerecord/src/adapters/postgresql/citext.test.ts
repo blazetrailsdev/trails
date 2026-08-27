@@ -3,7 +3,6 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base, Rollback } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
-import type { Table as PgTable } from "../../connection-adapters/postgresql/schema-definitions.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 class Citext extends Base {
@@ -55,7 +54,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await connection.transaction(async () => {
           await connection.changeTable("citexts", async (t) => {
-            await (t as PgTable).citext("username");
+            await t.citext("username");
           });
           await Citext.resetColumnInformation();
           const column = Citext.columnsHash()["username"] as unknown as PgColumn;

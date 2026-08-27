@@ -17,7 +17,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   TableDefinition,
-  Table,
+  type TableDefinitionOf,
+  type TableOf,
   ForeignKeyDefinition,
   type ColumnType,
   type ColumnOptions,
@@ -368,9 +369,15 @@ function isCommandRecorder(connection: unknown): connection is CommandRecorder {
 /**
  * Migration — base class for database migrations.
  *
+ * `A` names the adapter this migration runs against, so a `create_table`
+ * block resolves that adapter's own column methods — `t.enum` on PostgreSQL
+ * — the way Ruby resolves them at call time on the yielded definition
+ * (migration.rb:1024-1036). It defaults to the abstract adapter, so a
+ * migration that needs nothing adapter-specific declares nothing.
+ *
  * Mirrors: ActiveRecord::Migration
  */
-export class Migration {
+export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   /**
    * @internal Per-migration connection override — mirrors Rails' @connection
    * ivar, which holds the adapter OR the `CommandRecorder` that `#revert`
@@ -527,16 +534,8 @@ export class Migration {
    *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
    *   scope for the port, so the wrapper is not ported and the base
    *   `create_table` is what pairs here.
-   *
-   * Ruby resolves `t.enum` / `t.citext` on the yielded definition when the
-   * block runs (migration.rb:1024-1036), so a PG migration block reaches
-   * `PostgreSQL::ColumnMethods` with nothing declared. `Migration` names only
-   * the abstract `DatabaseAdapter`, whose block parameter is the abstract
-   * `TableDefinition`, and under `strictFunctionTypes` a narrower block is
-   * contravariantly rejected at the forward — so the caller's own annotation
-   * (`TD`) types the block and the forward carries the cast.
    */
-  async createTable<TD extends TableDefinition = TableDefinition>(
+  async createTable(
     name: string,
     optionsOrFn?:
       | {
@@ -551,15 +550,11 @@ export class Migration {
           collation?: string;
           as?: string;
         }
-      | ((t: TD) => void),
-    fn?: (t: TD) => void,
+      | ((t: TableDefinitionOf<A>) => void),
+    fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
     const tname = this._pt(name);
-    await this.connection.createTable(
-      tname,
-      optionsOrFn as Parameters<DatabaseAdapter["createTable"]>[1],
-      fn as Parameters<DatabaseAdapter["createTable"]>[2],
-    );
+    await this.connection.createTable(tname, optionsOrFn, fn);
   }
 
   /**
@@ -795,7 +790,7 @@ export class Migration {
     tableName: string,
     nameOrOptions: string | { name: string },
   ): Promise<void> {
-    const connection = this.connection as DatabaseAdapter & ValidateConstraintStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & ValidateConstraintStatements;
     await connection.validateCheckConstraint(this._pt(tableName), nameOrOptions);
   }
 
@@ -806,7 +801,7 @@ export class Migration {
   ): Promise<void> {
     const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
-    const connection = this.connection as DatabaseAdapter & ValidateConstraintStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & ValidateConstraintStatements;
     await connection.validateForeignKey(this._pt(fromTable), toTable, opts);
   }
 
@@ -816,23 +811,23 @@ export class Migration {
     commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     tableName = this._pt(tableName);
-    const connection = this.connection as DatabaseAdapter & CommentStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & CommentStatements;
     await connection.changeColumnComment(tableName, columnName, commentOrChanges);
   }
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     tableName = this._pt(tableName);
-    const connection = this.connection as DatabaseAdapter & CommentStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & CommentStatements;
     await connection.changeTableComment(tableName, commentOrChanges);
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
-    const connection = this.connection as DatabaseAdapter & ExtensionStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & ExtensionStatements;
     await connection.enableExtension(name, options);
   }
 
   async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
-    const connection = this.connection as DatabaseAdapter & ExtensionStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & ExtensionStatements;
     await connection.disableExtension(name, options);
   }
 
@@ -841,7 +836,7 @@ export class Migration {
     values: string[],
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const connection = this.connection as DatabaseAdapter & EnumStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & EnumStatements;
     await connection.createEnum(name, values, options);
   }
 
@@ -858,12 +853,12 @@ export class Migration {
       !Array.isArray(valuesOrOptions);
     const values = isOptsObj ? undefined : valuesOrOptions;
     const opts = isOptsObj ? valuesOrOptions : (options ?? undefined);
-    const connection = this.connection as DatabaseAdapter & EnumStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & EnumStatements;
     await connection.dropEnum(name, values, opts);
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    const connection = this.connection as DatabaseAdapter & EnumStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & EnumStatements;
     await connection.renameEnumValue(name, options);
   }
 
@@ -873,7 +868,7 @@ export class Migration {
     options?: UniqueConstraintOptions,
   ): Promise<void> {
     tableName = this._pt(tableName);
-    const connection = this.connection as DatabaseAdapter & UniqueConstraintStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & UniqueConstraintStatements;
     await connection.addUniqueConstraint(tableName, columnName, options);
   }
 
@@ -891,7 +886,7 @@ export class Migration {
     const columnName = isOptsObj ? undefined : columnNameOrOptions;
     const opts = isOptsObj ? columnNameOrOptions : (options ?? undefined);
     tableName = this._pt(tableName);
-    const connection = this.connection as DatabaseAdapter & UniqueConstraintStatements;
+    const connection = this.connection as unknown as DatabaseAdapter & UniqueConstraintStatements;
     await connection.removeUniqueConstraint(tableName, columnName, opts);
   }
 
@@ -915,22 +910,17 @@ export class Migration {
    *   scope for the port, so the wrapper is not ported and the base
    *   `create_join_table` is what pairs here.
    *
-   * Same call-time block resolution as `createTable` above: the caller's own
-   * annotation (`TD`) types the block and the forward carries the cast.
+   * Same call-time block resolution as `createTable` above: `A` types the
+   * yielded definition.
    */
-  async createJoinTable<TD extends TableDefinition = TableDefinition>(
+  async createJoinTable(
     table1: string,
     table2: string,
-    options?: JoinTableOptions | ((t: TD) => void),
-    fn?: (t: TD) => void,
+    options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
+    fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
     table1 = this._pt(table1);
-    await this.connection.createJoinTable(
-      table1,
-      table2,
-      options as Parameters<DatabaseAdapter["createJoinTable"]>[2],
-      fn as Parameters<DatabaseAdapter["createJoinTable"]>[3],
-    );
+    await this.connection.createJoinTable(table1, table2, options, fn);
   }
 
   async dropJoinTable(
@@ -954,8 +944,8 @@ export class Migration {
    */
   async changeTable(
     tableName: string,
-    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: Table) => void | Promise<void>,
+    fnOrOptions?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
     await this.connection.changeTable(this._pt(tableName), fnOrOptions, fn);
   }
@@ -1254,7 +1244,7 @@ export class Migration {
 
   // --- Connection (Rails: Migration#connection, #connection_pool) ---
 
-  get connection(): DatabaseAdapter {
+  get connection(): A {
     // Rails' @connection is whatever answers the schema statements — the
     // adapter, or the CommandRecorder #revert swaps in. TS has no duck type
     // spanning both, so the reader keeps the adapter type and the recorder
@@ -1265,7 +1255,7 @@ export class Migration {
     // `tasks/database-tasks.js` here would be a load-time edge back into a
     // module that already imports this one.
     return (this._connectionOverride ??
-      migrationArConfig()!.databaseTasks().migrationConnection()) as DatabaseAdapter;
+      migrationArConfig()!.databaseTasks().migrationConnection()) as A;
   }
 
   set connection(conn: DatabaseAdapter | CommandRecorder | undefined) {
@@ -2682,7 +2672,7 @@ export class Migrator {
  *
  * Equivalent to Migration.forVersion(CURRENT_VERSION).
  */
-export class Current extends Migration {
+export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migration<A> {
   static readonly VERSION = CURRENT_VERSION;
 
   /**

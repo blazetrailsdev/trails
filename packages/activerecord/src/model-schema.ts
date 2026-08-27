@@ -21,7 +21,6 @@ import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
-import { FakePool } from "./connection-adapters/schema-cache.js";
 import { NullColumn } from "./connection-adapters/column.js";
 import {
   threadedConnectionFor,
@@ -292,6 +291,12 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   } catch {
     adapter = null;
   }
+  // The raw cache, not the bound handle: Rails reads
+  // `schema_cache.columns_hash(table_name)` synchronously from the synchronous
+  // `columns_hash` reader (model_schema.rb:434-441), and trails'
+  // `BoundSchemaReflection#columnsHash` (schema_cache.rb:186) returns a
+  // Promise — so the query-free `getCachedColumnsHash` peek is the only read
+  // this body can make. Retires with RFC 0073.
   const cache = adapter?.internalSchemaCache as
     | {
         getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
@@ -383,6 +388,10 @@ type DatabaseAdapterLike = { internalSchemaCache?: unknown };
  * @noRailsEquivalent CONVERGEABLE connection-free read of ModelSchema#columns_hash (model_schema.rb:427-441); retires with RFC 0073.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
+  // Same sync constraint as `columnsHash` above: Rails' `columns_hash` read
+  // (model_schema.rb:434-441) is synchronous where our
+  // `BoundSchemaReflection#columnsHash` (schema_cache.rb:186) is not, so this
+  // reads the raw cache's query-free peek. Retires with RFC 0073.
   const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
     const cache = conn?.internalSchemaCache as
       | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
@@ -567,12 +576,7 @@ export async function createTable(this: typeof Base): Promise<void> {
   // eager warm) survives and reports the old table shape to the next
   // `columnsHash()` read. Mirrors SchemaStatements#createTable's
   // `clear_data_source_cache!`.
-  (
-    a as {
-      internalSchemaCache?: { clearDataSourceCacheBang(pool: unknown, name: string): void };
-      pool?: unknown;
-    }
-  ).internalSchemaCache?.clearDataSourceCacheBang((a as { pool?: unknown }).pool ?? null, table);
+  await a.schemaCache.clearDataSourceCacheBang(table);
 }
 
 // ---------------------------------------------------------------------------
@@ -831,10 +835,13 @@ export function symbolColumnToString(this: SchemaHost, name: string): string | u
  */
 function clearAdapterDataSourceCache(host: SchemaHost): void {
   // The raw, sync SchemaCache — `clearDataSourceCacheBang(connection, name)`.
-  // NOT the pool's BoundSchemaReflection (async, single-arg `(name)`); reaching
-  // for that form here would clear a table named `null` and leave a floating
-  // Promise. Both branches below resolve the raw cache, matching what the
-  // adapter's own `internalSchemaCache` getter returns (abstract-adapter.ts).
+  // NOT the pool's BoundSchemaReflection: Rails' `reset_column_information`
+  // clears the entry synchronously (model_schema.rb:507-513, through
+  // `schema_cache.clear_data_source_cache!`), and
+  // `BoundSchemaReflection#clearDataSourceCacheBang` (schema_cache.rb:196)
+  // returns a Promise here — so calling it from this synchronous body would
+  // defer the clear past the caller and leave a floating Promise behind.
+  // Retires with RFC 0073.
   type Cache = {
     clearDataSourceCacheBang?: (connection: unknown, name: string) => void;
   };
@@ -1224,25 +1231,19 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
     }
   }
   const adapterOwner = this;
-  const cache = startingAdapter.internalSchemaCache;
+  // Rails reaches the schema cache as the one-arg, pool-bound handle
+  // (`AbstractAdapter#schema_cache`, abstract_adapter.rb:298); on a
+  // lone-connection pool `for_lone_connection` (schema_cache.rb:155) is what
+  // keeps the read off `pool.with_connection`, and the getter picks that
+  // shape itself.
+  const cache = startingAdapter.schemaCache;
   if (!cache) return;
   const table = this.tableName;
-  // Rails' `for_lone_connection` shape (schema_cache.rb:155): on
-  // lone-connection pools (SQLite :memory: + size 1) the connection is
-  // permanently checked out, so routing through pool.withConnection deadlocks.
-  const pool = new FakePool(startingAdapter);
 
-  if (typeof cache.dataSourceExists === "function") {
-    const exists = await cache.dataSourceExists(pool, table);
-    if (exists === false) return;
-  }
+  const exists = await cache.dataSourceExists(table);
+  if (exists === false) return;
 
-  let hash: Record<string, unknown> | undefined;
-  if (typeof cache.columnsHash === "function") {
-    hash = await cache.columnsHash(pool, table);
-  } else if (typeof cache.getCachedColumnsHash === "function") {
-    hash = cache.getCachedColumnsHash(table);
-  }
+  const hash = await cache.columnsHash(table);
   if (!hash) return;
 
   // Warm the primary-key cache alongside columns so the synchronous
@@ -1250,9 +1251,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // source — e.g. a view, whose introspected primary key is null — instead of
   // assuming the "id" convention. Mirrors Rails' get_primary_key reading
   // connection.schema_cache.primary_keys(table_name).
-  if (typeof cache.primaryKeys === "function") {
-    await cache.primaryKeys(pool, table);
-  }
+  await cache.primaryKeys(table);
 
   // Guard against adapter swaps during the async work above. Verify the
   // *same* host that supplied startingAdapter still has it — checking
@@ -1289,6 +1288,11 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
     adapter = undefined;
   }
   if (!adapter) return false;
+  // The raw cache, not the bound handle: this is the synchronous half of
+  // `load_schema!`, whose `schema_cache.columns_hash(table_name)`
+  // (model_schema.rb:534-546) never awaits in Ruby;
+  // `BoundSchemaReflection#columnsHash` (schema_cache.rb:186) does here.
+  // Retires with RFC 0073.
   const cache = adapter.internalSchemaCache;
   if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
   const table = host.tableName;
@@ -1469,6 +1473,10 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
   } catch {
     return undefined;
   }
+  // The raw cache, not the bound handle: Rails' `table_exists?` reads
+  // `schema_cache.data_source_exists?(table_name)` synchronously
+  // (model_schema.rb:416-418) where `BoundSchemaReflection#dataSourceExists`
+  // (schema_cache.rb:176) returns a Promise. Retires with RFC 0073.
   const cache = conn?.internalSchemaCache;
   if (!cache || typeof cache.getCachedDataSourceExists !== "function") return undefined;
   return cache.getCachedDataSourceExists(this.tableName);
