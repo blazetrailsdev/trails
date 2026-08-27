@@ -31,7 +31,6 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
-  AttributeMethodPattern,
   Dirty as AMDirty,
   JSONSerializer,
   Model,
@@ -175,7 +174,6 @@ import {
   benchmark as benchmarkable,
   type BenchmarkLogger,
   runLoadHooks,
-  isBlank as _isBlankValue,
   type PrependMethod,
   singularize as _singularize,
   type Included,
@@ -247,7 +245,10 @@ import {
   writeAttribute as _writeAttributeMethod,
   _writeAttribute as _writeAttributeLowLevel,
 } from "./attribute-methods/write.js";
-import { attributeCameFromUser as _attributeCameFromUser } from "./attribute-methods/before-type-cast.js";
+import {
+  BeforeTypeCast as _BeforeTypeCast,
+  attributeCameFromUser as _attributeCameFromUser,
+} from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -1567,12 +1568,12 @@ export class Base extends Model {
     this._recordTimestamps = value;
   }
 
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty — class_attribute
-  // :partial_updates/:partial_inserts, default: true (dirty.rb:49-50). Apps flip
+  // `class_attribute :partial_updates, :partial_inserts` (dirty.rb:50-51),
+  // installed by AttributeMethods::Dirty's `[included]` hook. Apps flip
   // partial_inserts to false via `config.load_defaults 7.0`; that belongs in a
   // config layer, not this framework default.
-  static partialUpdates = true;
-  static partialInserts = true;
+  declare static partialUpdates: boolean;
+  declare static partialInserts: boolean;
 
   static async noTouching<R>(fn: () => R | Promise<R>): Promise<R> {
     return _noTouchingBlock(this, fn);
@@ -1594,35 +1595,6 @@ export class Base extends Model {
 
   static set sequenceName(name: string | null) {
     ModelSchema.sequenceName.call(this, name);
-  }
-
-  /**
-   * The `included do` blocks of AttributeMethods::BeforeTypeCast
-   * (before_type_cast.rb:32-33) and AttributeMethods::Dirty (dirty.rb:53-59).
-   * The `class_attribute` writer gives Active Record its own array rather than
-   * mutating ActiveModel's.
-   *
-   * Ruby tells the predicate `saved_change_to_name?` (dirty.rb:53) from the
-   * array-returning `saved_change_to_name` (dirty.rb:54) by the trailing `?`,
-   * which the camel spelling drops; the `is*` prefix
-   * (docs/ruby-ts-conventions.md) is where TypeScript puts the same
-   * distinction, so it goes in the pattern's own prefix and the derived
-   * `${prefix}Attribute${suffix}` proxy target (attribute_methods.rb:481)
-   * lands on `isSavedChangeToAttribute` unchanged.
-   */
-  static {
-    this.attributeMethodPatterns = [
-      ...this.attributeMethodPatterns,
-      new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
-      new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
-      new AttributeMethodPattern({ suffix: "CameFromUser", parameters: false }),
-      new AttributeMethodPattern({ prefix: "isSavedChangeTo", parameters: "**options" }),
-      new AttributeMethodPattern({ prefix: "savedChangeTo", parameters: false }),
-      new AttributeMethodPattern({ suffix: "BeforeLastSave", parameters: false }),
-      new AttributeMethodPattern({ prefix: "isWillSaveChangeTo", parameters: "**options" }),
-      new AttributeMethodPattern({ suffix: "ChangeToBeSaved", parameters: false }),
-      new AttributeMethodPattern({ suffix: "InDatabase", parameters: false }),
-    ];
   }
 
   // -- Ignored columns --
@@ -1815,59 +1787,6 @@ export class Base extends Model {
   declare static assertValidEnumOptions: typeof _EnumModule.assertValidEnumOptions;
   /** @internal */
   declare static detectNegativeEnumConditionsBang: typeof _EnumModule.detectNegativeEnumConditionsBang;
-
-  // Cast `from:`/`to:` options through the enum mapping before comparison.
-  // Rails normalises these via AttributeMutationTracker#type_cast (which calls
-  // type.cast on the attribute's EnumType); we mirror it here for both live
-  // changes (attributeChanged) and persisted changes (isSavedChangeToAttribute).
-  // All enums are label-stored via the registered EnumType with their mapping
-  // in the single `_enums` registry.
-  attributeChanged(name: string, options?: DirtyOptions): boolean {
-    if (options) {
-      const ctor = this.constructor as typeof Base;
-      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
-      options = _castEnumDirtyOpts(ctor, canonical, options);
-    }
-    // `ActiveModel::Dirty` is included into this class rather than inherited
-    // from `Model` (attribute_methods/dirty.rb:42), so the module body a Ruby
-    // `super` would reach is on this same prototype and shadowed by the class
-    // body. This is Ruby's `instance_method(...).bind(self).call`.
-    return AMDirty.prototype.attributeChanged.call(this, name, options);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
-   * (attribute_methods/dirty.rb:86-88), declared alongside its
-   * `attribute_method_affix` in `attributeMethodPatterns` above.
-   *
-   * The body is the port in `attribute-methods/dirty.ts`. What stays here is
-   * what Rails does inside `AttributeMutationTracker#changed?`
-   * (attribute_mutation_tracker.rb:44-48) and trails cannot: alias resolution
-   * and the `type_cast(attr_name, …)` of each option through the attribute's
-   * `EnumType`, both of which need the class, not the record.
-   */
-  isSavedChangeToAttribute(name: string, options?: DirtyOptions): boolean {
-    const ctor = this.constructor as typeof Base;
-    if (options) {
-      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
-      options = _castEnumDirtyOpts(ctor, canonical, options);
-    }
-    return _isSavedChangeToAttribute.call(this as any, ctor.resolveAttributeName(name), options);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
-   * (attribute_methods/dirty.rb:138-140). Same split as
-   * {@link Base.isSavedChangeToAttribute}.
-   */
-  isWillSaveChangeToAttribute(name: string, options?: DirtyOptions): boolean {
-    const ctor = this.constructor as typeof Base;
-    if (options) {
-      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
-      options = _castEnumDirtyOpts(ctor, canonical, options);
-    }
-    return _isWillSaveChangeToAttribute.call(this as any, ctor.resolveAttributeName(name), options);
-  }
 
   // -- Explain --
 
@@ -4220,10 +4139,7 @@ export class Base extends Model {
 // name on base.ts's surface.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base
-  extends
-    Included<typeof AutosaveAssociation>,
-    Omit<JSONSerializer, "toJSON">,
-    Omit<AMDirty, "attributeChanged"> {
+  extends Included<typeof AutosaveAssociation>, Omit<JSONSerializer, "toJSON">, AMDirty {
   /** Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26). */
   normalizeAttribute(name: string): void;
   /**
@@ -4316,6 +4232,12 @@ export interface Base
    */
   readonly attributesInDatabase: Record<string, unknown>;
   /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
+   * (attribute_methods/dirty.rb:86-88). Ported and mixed in as
+   * {@link Base.attributeBeforeLastSave} is.
+   */
+  isSavedChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
+  /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
    * (attribute_methods/dirty.rb:108-110).
    *
@@ -4325,6 +4247,12 @@ export interface Base
    * port.
    */
   attributeBeforeLastSave(attr: string): unknown;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
+   * (attribute_methods/dirty.rb:138-140). Ported and mixed in as
+   * {@link Base.attributeBeforeLastSave} is.
+   */
+  isWillSaveChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
    * (attribute_methods/dirty.rb:152-154). Ported and mixed in as
@@ -4398,36 +4326,6 @@ export interface Base
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
-}
-
-// Normalise a single `from:` or `to:` option value through the enum mapping so
-// that label / symbol / integer forms all compare equal to the stored value.
-// All enums register their mapping in the single `_enums` registry (the former
-// `defineEnum` EnumType registry has been folded in).
-function _castEnumDirtyOpts(
-  ctor: typeof Base,
-  name: string,
-  opts: { from?: unknown; to?: unknown },
-): { from?: unknown; to?: unknown } {
-  const mapping = ctor._enums?.get(name);
-  if (mapping) {
-    // Since I-2, _enum stores label strings in _attributes (via EnumType.cast).
-    // Normalise both label inputs and integer storage-value inputs to the label
-    // string so the comparison matches the in-memory value.
-    const entries = Object.entries(mapping) as [string, number | string][];
-    const cast = (v: unknown): unknown => {
-      if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v)) return v;
-      const found = entries.find(([, sv]) => sv === v);
-      if (found) return found[0];
-      if (_isBlankValue(v)) return null;
-      return v;
-    };
-    const result: { from?: unknown; to?: unknown } = {};
-    if ("from" in opts) result.from = cast(opts.from);
-    if ("to" in opts) result.to = cast(opts.to);
-    return result;
-  }
-  return opts;
 }
 
 // ---------------------------------------------------------------------------
@@ -4721,6 +4619,10 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
+// attribute_methods.rb:14 includes BeforeTypeCast ahead of Dirty, so its
+// `included do` patterns (before_type_cast.rb:32-33) precede both halves of
+// Dirty's in `attributeMethodPatterns`.
+include(Base, _BeforeTypeCast);
 // `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
 // `ActiveRecord::AttributeMethods::Dirty` builds on, and which
 // `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
@@ -4862,9 +4764,8 @@ include(Base, {
   // with `include(Base, _PrimaryKey)` / `include(Base, _CompositePrimaryKey)`
   // above: the readers are accessor properties, and only those calls copy
   // descriptors — this object literal is read by value and would flatten them.
-  // `isSavedChangeToAttribute` / `isWillSaveChangeToAttribute` are absent on
-  // purpose: this literal lands on the prototype after the class body and would
-  // clobber the overrides there that carry the alias + enum type_cast step.
+  isSavedChangeToAttribute: _isSavedChangeToAttribute,
+  isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
   savedChangeToAttribute: _savedChangeToAttribute,
   attributeBeforeLastSave: _attributeBeforeLastSave,
   attributeChangeToBeSaved: _attributeChangeToBeSaved,

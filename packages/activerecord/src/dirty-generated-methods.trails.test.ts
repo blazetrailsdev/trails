@@ -158,3 +158,43 @@ describe("attributeInDatabase / attributeBeforeLastSave", () => {
     expect(u.isSavedChangeToAttribute("name", { from: "Wrong", to: "Bob" })).toBe(false);
   });
 });
+
+describe("enum from/to through the generated predicates", () => {
+  class Card extends Base {
+    static {
+      this.attribute("status", "integer");
+      this.enum("status", { proposed: 0, written: 1 });
+    }
+  }
+
+  interface GeneratedEnum {
+    status: string | null;
+    changesApplied(): void;
+    statusChanged(options?: { from?: unknown; to?: unknown }): boolean;
+    isSavedChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean;
+    isWillSaveChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean;
+  }
+
+  // The generated predicates reach `AttributeMutationTracker#changed?` without
+  // passing through any `Base` body, so they are the path that proves the
+  // `from:`/`to:` cast lives in the tracker (attribute_mutation_tracker.rb:
+  // 41-51) rather than at a call site.
+  it("attributeChanged casts a stored value through the attribute's EnumType", () => {
+    const card = new Card({ status: "proposed" }) as unknown as GeneratedEnum;
+    card.changesApplied();
+    card.status = "written";
+    expect(card.statusChanged({ from: "proposed", to: "written" })).toBe(true);
+    expect(card.statusChanged({ from: 0, to: 1 })).toBe(true);
+    expect(card.statusChanged({ to: "proposed" })).toBe(false);
+  });
+
+  it("willSaveChangeTo and savedChangeTo cast the same way", () => {
+    const card = new Card({ status: "proposed" }) as unknown as GeneratedEnum;
+    card.changesApplied();
+    card.status = "written";
+    expect(card.isWillSaveChangeToStatus({ from: 0, to: 1 })).toBe(true);
+    card.changesApplied();
+    expect(card.isSavedChangeToStatus({ from: 0, to: 1 })).toBe(true);
+    expect(card.isSavedChangeToStatus({ from: 1 })).toBe(false);
+  });
+});

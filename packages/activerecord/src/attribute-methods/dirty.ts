@@ -7,6 +7,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
+import { classAttribute, included } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import type {
   AttributeMutationTracker,
@@ -104,6 +105,18 @@ export function attributeInDatabase(record: DirtyRecord, attr: string): unknown 
 }
 
 /**
+ * The host `include ActiveRecord::AttributeMethods::Dirty` needs — a class that
+ * already carries `ActiveModel::Dirty`, which dirty.rb:42 includes.
+ */
+interface DirtyIncludeHost {
+  attributeMethodPrefix(...prefixes: Array<string | { parameters?: string | null | false }>): void;
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+  attributeMethodAffix(
+    ...affixes: Array<{ prefix?: string; suffix?: string; parameters?: string | null | false }>
+  ): void;
+}
+
+/**
  * The half of ActiveRecord::AttributeMethods::Dirty whose Ruby bodies are
  * zero-arg readers, so they port as accessor properties (CLAUDE.md,
  * "Generated attribute readers are properties"). A class module rather than a
@@ -114,6 +127,29 @@ export function attributeInDatabase(record: DirtyRecord, attr: string): unknown 
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 export class Dirty {
+  /**
+   * Mirrors: dirty.rb:44-59 — the module's `included do` block.
+   *
+   * Ruby tells the predicate `saved_change_to_name?` (dirty.rb:53) from the
+   * array-returning `saved_change_to_name` (dirty.rb:54) by the trailing `?`,
+   * which the camel spelling drops; the `is*` prefix
+   * (docs/ruby-ts-conventions.md) is where TypeScript puts the same
+   * distinction, so it goes in the pattern's own prefix and the derived
+   * `${prefix}Attribute${suffix}` proxy target (attribute_methods.rb:481)
+   * lands on `isSavedChangeToAttribute` unchanged.
+   */
+  static [included](base: DirtyIncludeHost): void {
+    classAttribute.call(base, "partialUpdates", { instanceWriter: false, default: true });
+    classAttribute.call(base, "partialInserts", { instanceWriter: false, default: true });
+
+    base.attributeMethodAffix({ prefix: "isSavedChangeTo", parameters: "**options" });
+    base.attributeMethodPrefix("savedChangeTo", { parameters: false });
+    base.attributeMethodSuffix("BeforeLastSave", { parameters: false });
+
+    base.attributeMethodAffix({ prefix: "isWillSaveChangeTo", parameters: "**options" });
+    base.attributeMethodSuffix("ChangeToBeSaved", "InDatabase", { parameters: false });
+  }
+
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes
    * (dirty.rb:118-120) — `mutations_before_last_save.changes`.

@@ -9,6 +9,29 @@
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
  */
 
+import { included } from "@blazetrails/activesupport";
+
+/** The host `include ActiveRecord::AttributeMethods::BeforeTypeCast` needs. */
+interface BeforeTypeCastIncludeHost {
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+}
+
+/**
+ * `ActiveRecord::AttributeMethods::BeforeTypeCast` — the module whose
+ * `included do` block (before_type_cast.rb:31-34) declares the
+ * `*_before_type_cast` / `*_for_database` / `*_came_from_user?` patterns. Its
+ * instance methods are the `this`-typed functions below (CLAUDE.md, "Module
+ * mixins"), so the module object itself carries only the hook.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
+ */
+export const BeforeTypeCast = {
+  [included](base: BeforeTypeCastIncludeHost): void {
+    base.attributeMethodSuffix("BeforeTypeCast", "ForDatabase", { parameters: false });
+    base.attributeMethodSuffix("CameFromUser", { parameters: false });
+  },
+};
+
 interface BeforeTypeCastRecord extends AttributeOwner {
   _attributes: AttributeOwner["_attributes"] & {
     valuesBeforeTypeCast(): Record<string, unknown>;
