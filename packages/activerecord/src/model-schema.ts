@@ -980,10 +980,6 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  */
 export function loadSchema(this: SchemaHost): void {
   if (ownSchemaMemo(this, "_schemaLoaded")) return;
-  // `return if @columns_hash` (model_schema.rb:534-546): the guard that stops a
-  // `columns_hash` read from inside `load_schema!` re-entering the load it is
-  // already inside of.
-  if (ownSchemaMemo(this, "_columnsHash") != null) return;
   try {
     loadSchemaBang.call(this);
   } catch (error) {
@@ -993,13 +989,18 @@ export function loadSchema(this: SchemaHost): void {
     throw error;
   }
   if (!ownSchemaMemo(this, "_schemaLoaded")) {
-    // Same reset, for the failure mode Rails cannot have: its
-    // `schema_cache.columns_hash` blocks, so `load_schema!` either reflects or
-    // raises. trails' is async, so a cold cache leaves the load incomplete —
-    // the anchor set `@columns_hash` for re-entrancy but never reflected. Reset
-    // it so a later `loadSchema`, once the cache is warm, runs the real read
-    // instead of serving the empty hash forever.
-    reloadSchemaFromCache.call(this);
+    // The failure mode Rails cannot have: its `schema_cache.columns_hash`
+    // blocks, so `load_schema!` either reflects or raises. trails' is async, so
+    // a cold cache leaves the load incomplete — the anchor set `@columns_hash`
+    // only so `columns_hash`'s own `load_schema unless @columns_hash`
+    // (:427-428) could not re-enter the load it was already inside of. Drop
+    // that placeholder so a later `loadSchema` runs the real read once the
+    // cache is warm, instead of serving the empty hash forever. Only the
+    // placeholder: the full `reload_schema_from_cache` belongs to the rescue
+    // arm above, and running it here would also clear `@default_attributes` —
+    // which `_default_attributes` is in the middle of building, since it
+    // reaches this load through `columns_hash` (attributes.rb:241-252).
+    this._columnsHash = undefined;
   }
 }
 

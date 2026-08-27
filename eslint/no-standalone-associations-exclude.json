@@ -66,7 +66,6 @@
   "packages/activerecord/src/associations/join-dependency-quoting.trails.test.ts::Asset::belongsTo::owner",
   "packages/activerecord/src/associations/join-dependency-quoting.trails.test.ts::Asset::hasMany::comments",
   "packages/activerecord/src/associations/join-dependency-quoting.trails.test.ts::Owner::hasMany::assets",
-  "packages/activerecord/src/associations/join-dependency-quoting.trails.test.ts::Owner::hasMany::cars",
   "packages/activerecord/src/associations/join-dependency-quoting.trails.test.ts::StiSubOwner::hasMany::assets",
   "packages/activerecord/src/associations/required.test.ts::Child::belongsTo::parent",
   "packages/activerecord/src/associations/required.test.ts::Parent::hasOne::child",
