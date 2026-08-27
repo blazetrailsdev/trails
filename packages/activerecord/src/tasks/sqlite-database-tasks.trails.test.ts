@@ -307,4 +307,27 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
     expect(contents).toMatch(/UPDATE widgets SET updated_at/);
     expect(contents).toMatch(/index_widgets_on_name/);
   });
+
+  it("dumps an in-memory database byte-for-byte as it dumps a file-backed one", async () => {
+    const schema =
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT);\n" +
+      "CREATE INDEX index_widgets_on_name ON widgets(name);\n";
+
+    const tasks = new SQLiteDatabaseTasks(configuration);
+    await tasks.structureLoad(sqlFile(schema));
+    const fromMemory = sqlFile();
+    await tasks.structureDump(fromMemory);
+
+    const dbFile = tmpDbPath();
+    created.push(dbFile);
+    const fileTasks = new SQLiteDatabaseTasks(
+      new HashConfig("development", "primary", { adapter: "sqlite3", database: dbFile }),
+    );
+    await fileTasks.structureLoad(sqlFile(schema));
+    const fromFile = sqlFile();
+    await fileTasks.structureDump(fromFile);
+
+    expect(fs.readFileSync(fromMemory, "utf8")).toEqual(fs.readFileSync(fromFile, "utf8"));
+    expect(fs.existsSync(`${fromMemory}.dump.sqlite3`)).toBe(false);
+  });
 });

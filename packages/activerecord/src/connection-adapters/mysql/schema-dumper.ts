@@ -224,12 +224,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
-    // `schema_collation` fetches the table collation lazily, inside its own
-    // body, the first time a column asks for it (mysql/schema_dumper.rb:66-71).
-    // That query is async here and `schemaCollation` is sync, so it is issued
-    // once from this async point instead — which is what lets `table()` call
-    // `tableOptions` where Rails calls it (schema_dumper.rb:187), after
-    // `column_spec_for_primary_key`, rather than early to prefill this cache.
+    // `schema_collation` fetches this lazily inside its own body
+    // (mysql/schema_dumper.rb:66-71); that query is async here and
+    // `schemaCollation` is sync, so it is issued from this async point.
     await this.populateTableCollationFromStatus(tableName);
     await super.table(tableName, stream);
   }

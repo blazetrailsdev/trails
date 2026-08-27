@@ -141,7 +141,7 @@ export class SQLiteDatabaseTasks {
 
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
     let ignoreTables = SchemaDumper.ignoreTables;
-    let dumpSpec = ".schema --nosys";
+    let dumpSpec: string;
     if (ignoreTables.length > 0) {
       const connection = await this.connection();
       ignoreTables = (await connection.dataSources()).filter((table) =>
@@ -156,14 +156,13 @@ export class SQLiteDatabaseTasks {
       );
       const condition = ignoreTables.map((table) => connection.quote(table)).join(", ");
       dumpSpec = `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`;
+    } else {
+      dumpSpec = ".schema --nosys";
     }
 
-    // `sqlite_database_tasks.rb:44-58` shells out unconditionally, because
-    // Rails has no in-memory SQLite lane. An in-memory database belongs to the
-    // connection that opened it, so a child `sqlite3` has no file to attach —
-    // it is materialised with `VACUUM INTO` (SQLite 3.27+) and the CLI is
-    // pointed at that copy, so there is still one dump path and one emitted
-    // format.
+    // An in-memory database belongs to the connection that opened it, so the
+    // child `sqlite3` Rails shells out to (sqlite_database_tasks.rb:44-58) has
+    // no file to attach; it is copied out with `VACUUM INTO` (SQLite 3.27+).
     let database = this.dbConfig.database as string;
     let materialized: string | undefined;
     if (isInMemoryDatabase(database)) {
