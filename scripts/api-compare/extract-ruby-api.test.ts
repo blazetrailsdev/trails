@@ -11,7 +11,15 @@ const HERE = __dirname;
 // script guards its env-dependent setup and auto-run behind
 // `__FILE__ == $PROGRAM_NAME`, so it is safe to `require_relative` here and
 // drive ApiExtractor directly.
-describe("Ruby extractor body call capture", () => {
+// Every case here shells out to a real `ruby` process through Ripper, so a case
+// costs a process spawn plus parse (~300-500ms locally) rather than the
+// microseconds vitest's default 5s timeout is tuned for. On a loaded 4-vCPU CI
+// runner that budget is thin enough to lose the race — it has timed out on a
+// case whose assertions were never reached — so the whole subprocess-driven
+// describe gets a wider one.
+const RUBY_SUBPROCESS_TIMEOUT_MS = 30_000;
+
+describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
   // Returns a map of "<fqn>#<method>" -> the named method_info array for the
@@ -188,22 +196,25 @@ describe("Ruby extractor body call capture", () => {
   });
 });
 
-describe("Ruby extractor inert-receiver call suppression", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor inert-receiver call suppression",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Returns a map of "<fqn>#<method>" -> { calls, weakCalls }.
-  function rubyWeakCalls(
-    fixtures: Record<string, string>,
-  ): Record<string, { calls?: string[]; weakCalls?: string[] }> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "weak-rb-"));
-    try {
-      for (const [rel, src] of Object.entries(fixtures)) {
-        const p = path.join(dir, rel);
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(p, src);
-      }
-      const rels = JSON.stringify(Object.keys(fixtures));
-      const driver = `
+    // Returns a map of "<fqn>#<method>" -> { calls, weakCalls }.
+    function rubyWeakCalls(
+      fixtures: Record<string, string>,
+    ): Record<string, { calls?: string[]; weakCalls?: string[] }> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "weak-rb-"));
+      try {
+        for (const [rel, src] of Object.entries(fixtures)) {
+          const p = path.join(dir, rel);
+          fs.mkdirSync(path.dirname(p), { recursive: true });
+          fs.writeFileSync(p, src);
+        }
+        const rels = JSON.stringify(Object.keys(fixtures));
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -218,16 +229,16 @@ describe("Ruby extractor inert-receiver call suppression", () => {
         end
         puts JSON.generate(out)
       `;
-      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
-      return JSON.parse(stdout);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+        const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+        return JSON.parse(stdout);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
-  }
 
-  it("marks local-variable and literal receivers weak", () => {
-    const c = rubyWeakCalls({
-      "foo.rb": `
+    it("marks local-variable and literal receivers weak", () => {
+      const c = rubyWeakCalls({
+        "foo.rb": `
         class Foo
           def a(opts)
             xs = [1]
@@ -240,17 +251,17 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Foo#a"].weakCalls?.sort()).toEqual(
+        ["fetch", "first", "merge", "to_proc", "to_s", "upcase"].sort(),
+      );
     });
-    expect(c["Foo#a"].weakCalls?.sort()).toEqual(
-      ["fetch", "first", "merge", "to_proc", "to_s", "upcase"].sort(),
-    );
-  });
 
-  it("suppresses a paren-less qualified call on a local variable", () => {
-    // `opts.assert_valid_keys :a` parses as :command_call, not :call — the
-    // receiver check has to cover both or half the noise survives.
-    const c = rubyWeakCalls({
-      "cmd.rb": `
+    it("suppresses a paren-less qualified call on a local variable", () => {
+      // `opts.assert_valid_keys :a` parses as :command_call, not :call — the
+      // receiver check has to cover both or half the noise survives.
+      const c = rubyWeakCalls({
+        "cmd.rb": `
         class Cmd
           def d(opts)
             opts.assert_valid_keys :a
@@ -261,15 +272,15 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Cmd#d"].weakCalls).toEqual(["assert_valid_keys"]);
+      expect(c["Cmd#e"].calls).toContain("assert_valid_keys");
+      expect(c["Cmd#e"].weakCalls ?? []).toEqual([]);
     });
-    expect(c["Cmd#d"].weakCalls).toEqual(["assert_valid_keys"]);
-    expect(c["Cmd#e"].calls).toContain("assert_valid_keys");
-    expect(c["Cmd#e"].weakCalls ?? []).toEqual([]);
-  });
 
-  it("still records self, ivar, constant and method-chain receivers", () => {
-    const c = rubyWeakCalls({
-      "bar.rb": `
+    it("still records self, ivar, constant and method-chain receivers", () => {
+      const c = rubyWeakCalls({
+        "bar.rb": `
         class Bar
           def b
             self.save
@@ -279,16 +290,16 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Bar#b"].calls).toEqual(
+        expect.arrayContaining(["save", "reader", "build", "destroy"]),
+      );
+      expect(c["Bar#b"].weakCalls ?? []).toEqual([]);
     });
-    expect(c["Bar#b"].calls).toEqual(
-      expect.arrayContaining(["save", "reader", "build", "destroy"]),
-    );
-    expect(c["Bar#b"].weakCalls ?? []).toEqual([]);
-  });
 
-  it("keeps a name significant when any occurrence has a live receiver", () => {
-    const c = rubyWeakCalls({
-      "baz.rb": `
+    it("keeps a name significant when any occurrence has a live receiver", () => {
+      const c = rubyWeakCalls({
+        "baz.rb": `
         class Baz
           def c(list)
             list.save
@@ -296,14 +307,14 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Baz#c"].calls).toContain("save");
+      expect(c["Baz#c"].weakCalls ?? []).not.toContain("save");
     });
-    expect(c["Baz#c"].calls).toContain("save");
-    expect(c["Baz#c"].weakCalls ?? []).not.toContain("save");
-  });
 
-  it("drops a Ruby core method call in a core_ext body but keeps a ported one", () => {
-    const c = rubyWeakCalls({
-      "lib/active_support/core_ext/array/access.rb": `
+    it("drops a Ruby core method call in a core_ext body but keeps a ported one", () => {
+      const c = rubyWeakCalls({
+        "lib/active_support/core_ext/array/access.rb": `
         class Array
           def sole
             case count
@@ -313,16 +324,16 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      // `count`/`first` are Ruby core on the reopened receiver; `in_groups_of` is
+      // an ActiveSupport extension the port really does have to call.
+      expect(c["Array#sole"].weakCalls?.sort()).toEqual(["count", "first"]);
+      expect(c["Array#sole"].calls).toContain("in_groups_of");
     });
-    // `count`/`first` are Ruby core on the reopened receiver; `in_groups_of` is
-    // an ActiveSupport extension the port really does have to call.
-    expect(c["Array#sole"].weakCalls?.sort()).toEqual(["count", "first"]);
-    expect(c["Array#sole"].calls).toContain("in_groups_of");
-  });
 
-  it("keeps a Ruby core method name significant outside core_ext", () => {
-    const c = rubyWeakCalls({
-      "lib/active_record/relation.rb": `
+    it("keeps a Ruby core method name significant outside core_ext", () => {
+      const c = rubyWeakCalls({
+        "lib/active_record/relation.rb": `
         class Relation
           def sole
             count
@@ -330,13 +341,13 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Relation#sole"].weakCalls ?? []).toEqual([]);
     });
-    expect(c["Relation#sole"].weakCalls ?? []).toEqual([]);
-  });
 
-  it("drops a Ruby core call on an Array-literal constant receiver", () => {
-    const c = rubyWeakCalls({
-      "lib/active_support/inflector/transliterate.rb": `
+    it("drops a Ruby core call on an Array-literal constant receiver", () => {
+      const c = rubyWeakCalls({
+        "lib/active_support/inflector/transliterate.rb": `
         class Inflector
           ALLOWED = [Encoding::UTF_8, Encoding::US_ASCII].freeze
 
@@ -349,17 +360,17 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      // `ALLOWED` is an Array literal, so its `include?` is Array#include?;
+      // `I18N_RULES` is not a literal collection in this file, so its `include?`
+      // is still a call to a ported collaborator.
+      expect(c["Inflector#transliterate"].weakCalls).toEqual(["include?"]);
+      expect(c["Inflector#rules"].weakCalls ?? []).toEqual([]);
     });
-    // `ALLOWED` is an Array literal, so its `include?` is Array#include?;
-    // `I18N_RULES` is not a literal collection in this file, so its `include?`
-    // is still a call to a ported collaborator.
-    expect(c["Inflector#transliterate"].weakCalls).toEqual(["include?"]);
-    expect(c["Inflector#rules"].weakCalls ?? []).toEqual([]);
-  });
 
-  it("drops a Module method called unqualified inside a module_eval block", () => {
-    const c = rubyWeakCalls({
-      "lib/active_support/deprecation/method_wrappers.rb": `
+    it("drops a Module method called unqualified inside a module_eval block", () => {
+      const c = rubyWeakCalls({
+        "lib/active_support/deprecation/method_wrappers.rb": `
         class MethodWrappers
           def deprecate_methods(target_module, method_name)
             target_module.module_eval do
@@ -370,21 +381,21 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      // `self` inside the block is the module, so `define_method` /
+      // `redefine_method` there are Ruby metaprogramming; the same names outside
+      // the block, and the ported `deprecation_warning`, stay significant.
+      expect(c["MethodWrappers#deprecate_methods"].weakCalls?.sort()).toEqual([
+        "module_eval",
+        "redefine_method",
+      ]);
+      expect(c["MethodWrappers#deprecate_methods"].calls).toContain("define_method");
+      expect(c["MethodWrappers#deprecate_methods"].calls).toContain("deprecation_warning");
     });
-    // `self` inside the block is the module, so `define_method` /
-    // `redefine_method` there are Ruby metaprogramming; the same names outside
-    // the block, and the ported `deprecation_warning`, stay significant.
-    expect(c["MethodWrappers#deprecate_methods"].weakCalls?.sort()).toEqual([
-      "module_eval",
-      "redefine_method",
-    ]);
-    expect(c["MethodWrappers#deprecate_methods"].calls).toContain("define_method");
-    expect(c["MethodWrappers#deprecate_methods"].calls).toContain("deprecation_warning");
-  });
 
-  it("drops a call on a Ruby core class constant receiver", () => {
-    const c = rubyWeakCalls({
-      "lib/active_support/file_utils.rb": `
+    it("drops a call on a Ruby core class constant receiver", () => {
+      const c = rubyWeakCalls({
+        "lib/active_support/file_utils.rb": `
         class Writer
           def write(path)
             File.stat(path)
@@ -393,14 +404,14 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Writer#write"].weakCalls?.sort()).toEqual(["new"]);
+      expect(c["Writer#write"].calls).toContain("stat");
     });
-    expect(c["Writer#write"].weakCalls?.sort()).toEqual(["new"]);
-    expect(c["Writer#write"].calls).toContain("stat");
-  });
 
-  it("drops new at a Proc receiver while keeping it at a constant receiver", () => {
-    const c = rubyWeakCalls({
-      "qux.rb": `
+    it("drops new at a Proc receiver while keeping it at a constant receiver", () => {
+      const c = rubyWeakCalls({
+        "qux.rb": `
         class Qux
           def d
             callback = Proc.new { |x| x.run }
@@ -408,18 +419,18 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      // `Proc.new { ... }` ports to an arrow function, which names no callee, so
+      // the site can never be satisfied; `Wrapper.new` is a real construction the
+      // TS side records as `constructor`.
+      expect(c["Qux#d"].calls).toContain("new");
+      expect(c["Qux#d"].calls?.filter((n) => n === "new")).toEqual(["new"]);
+      expect(c["Qux#d"].calls).toContain("run");
     });
-    // `Proc.new { ... }` ports to an arrow function, which names no callee, so
-    // the site can never be satisfied; `Wrapper.new` is a real construction the
-    // TS side records as `constructor`.
-    expect(c["Qux#d"].calls).toContain("new");
-    expect(c["Qux#d"].calls?.filter((n) => n === "new")).toEqual(["new"]);
-    expect(c["Qux#d"].calls).toContain("run");
-  });
 
-  it("drops the new a raise builds its error with, keeping any other new", () => {
-    const c = rubyWeakCalls({
-      "raiser.rb": `
+    it("drops the new a raise builds its error with, keeping any other new", () => {
+      const c = rubyWeakCalls({
+        "raiser.rb": `
         class Raiser
           def f
             raise ArgumentError.new("bad") unless ok?
@@ -427,43 +438,47 @@ describe("Ruby extractor inert-receiver call suppression", () => {
           end
         end
       `,
+      });
+      // `raise Foo.new(msg)` and `raise Foo, msg` are one raise written two ways,
+      // and the port spells both `throw new Foo(msg)` — so the raise's own `new`
+      // carries no position (extract-ts-api.ts#isThrownConstruction drops the TS
+      // half). `Wrapper.new` still does, and lands after `ok?`.
+      expect(c["Raiser#f"].calls).toEqual(["ok?", "raise", "build", "new"]);
     });
-    // `raise Foo.new(msg)` and `raise Foo, msg` are one raise written two ways,
-    // and the port spells both `throw new Foo(msg)` — so the raise's own `new`
-    // carries no position (extract-ts-api.ts#isThrownConstruction drops the TS
-    // half). `Wrapper.new` still does, and lands after `ok?`.
-    expect(c["Raiser#f"].calls).toEqual(["ok?", "raise", "build", "new"]);
-  });
 
-  it("drops new entirely when Proc is the only receiver", () => {
-    const c = rubyWeakCalls({
-      "quux.rb": `
+    it("drops new entirely when Proc is the only receiver", () => {
+      const c = rubyWeakCalls({
+        "quux.rb": `
         class Quux
           def e
             Proc.new { greet }
           end
         end
       `,
+      });
+      expect(c["Quux#e"].calls ?? []).not.toContain("new");
+      expect(c["Quux#e"].calls).toContain("greet");
     });
-    expect(c["Quux#e"].calls ?? []).not.toContain("new");
-    expect(c["Quux#e"].calls).toContain("greet");
-  });
-});
+  },
+);
 
-describe("Ruby extractor call-argument Proc.new suppression", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor call-argument Proc.new suppression",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Returns a map of "<fqn>#<method>" -> the recorded call sites' names.
-  function rubyCallSiteNames(fixtures: Record<string, string>): Record<string, string[]> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "args-rb-"));
-    try {
-      for (const [rel, src] of Object.entries(fixtures)) {
-        const p = path.join(dir, rel);
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(p, src);
-      }
-      const rels = JSON.stringify(Object.keys(fixtures));
-      const driver = `
+    // Returns a map of "<fqn>#<method>" -> the recorded call sites' names.
+    function rubyCallSiteNames(fixtures: Record<string, string>): Record<string, string[]> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "args-rb-"));
+      try {
+        for (const [rel, src] of Object.entries(fixtures)) {
+          const p = path.join(dir, rel);
+          fs.mkdirSync(path.dirname(p), { recursive: true });
+          fs.writeFileSync(p, src);
+        }
+        const rels = JSON.stringify(Object.keys(fixtures));
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -478,16 +493,16 @@ describe("Ruby extractor call-argument Proc.new suppression", () => {
         end
         puts JSON.generate(out)
       `;
-      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
-      return JSON.parse(stdout);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+        const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+        return JSON.parse(stdout);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
-  }
 
-  it("drops the Proc.new site while keeping a constant-receiver new site", () => {
-    const c = rubyCallSiteNames({
-      "qux.rb": `
+    it("drops the Proc.new site while keeping a constant-receiver new site", () => {
+      const c = rubyCallSiteNames({
+        "qux.rb": `
         class Qux
           def d
             callback = Proc.new { |x| x.run }
@@ -495,27 +510,28 @@ describe("Ruby extractor call-argument Proc.new suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Qux#d"].filter((n) => n === "new")).toEqual(["new"]);
+      expect(c["Qux#d"]).toContain("run");
     });
-    expect(c["Qux#d"].filter((n) => n === "new")).toEqual(["new"]);
-    expect(c["Qux#d"]).toContain("run");
-  });
 
-  it("drops the new site entirely when Proc is the only receiver", () => {
-    const c = rubyCallSiteNames({
-      "quux.rb": `
+    it("drops the new site entirely when Proc is the only receiver", () => {
+      const c = rubyCallSiteNames({
+        "quux.rb": `
         class Quux
           def e
             Proc.new { greet }
           end
         end
       `,
+      });
+      expect(c["Quux#e"]).not.toContain("new");
+      expect(c["Quux#e"]).toContain("greet");
     });
-    expect(c["Quux#e"]).not.toContain("new");
-    expect(c["Quux#e"]).toContain("greet");
-  });
-});
+  },
+);
 
-describe("Ruby extractor alias arity resolution", () => {
+describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
   // Returns a map of "<fqn>#<method>" -> param-name array after running
@@ -1023,24 +1039,27 @@ describe("Ruby extractor alias arity resolution", () => {
   });
 });
 
-describe("Ruby extractor umbrella module-config scanning", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor umbrella module-config scanning",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Lay out a package libPath with a `base.rb` and a sibling umbrella file
-  // one level above it, scan the package then the umbrella, and return the
-  // ActiveRecord::Base / ActiveRecord entries.
-  function scanWithUmbrella(
-    baseSrc: string,
-    umbrellaSrc: string,
-    full = false,
-  ): Record<string, ClassEntry> {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "umbrella-rb-"));
-    try {
-      const libPath = path.join(root, "active_record");
-      fs.mkdirSync(libPath, { recursive: true });
-      fs.writeFileSync(path.join(libPath, "base.rb"), baseSrc);
-      fs.writeFileSync(path.join(root, "active_record.rb"), umbrellaSrc);
-      const driver = `
+    // Lay out a package libPath with a `base.rb` and a sibling umbrella file
+    // one level above it, scan the package then the umbrella, and return the
+    // ActiveRecord::Base / ActiveRecord entries.
+    function scanWithUmbrella(
+      baseSrc: string,
+      umbrellaSrc: string,
+      full = false,
+    ): Record<string, ClassEntry> {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "umbrella-rb-"));
+      try {
+        const libPath = path.join(root, "active_record");
+        fs.mkdirSync(libPath, { recursive: true });
+        fs.writeFileSync(path.join(libPath, "base.rb"), baseSrc);
+        fs.writeFileSync(path.join(root, "active_record.rb"), umbrellaSrc);
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -1052,20 +1071,20 @@ describe("Ruby extractor umbrella module-config scanning", () => {
         end
         puts JSON.generate(out)
       `;
-      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
-      return JSON.parse(stdout);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+        const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+        return JSON.parse(stdout);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     }
-  }
 
-  interface ClassEntry {
-    classMethods: { name: string; umbrellaConfig?: boolean }[];
-    instanceMethods: { name: string; visibility: string }[];
-    file: string;
-  }
+    interface ClassEntry {
+      classMethods: { name: string; umbrellaConfig?: boolean }[];
+      instanceMethods: { name: string; visibility: string }[];
+      file: string;
+    }
 
-  const BASE_SRC = `
+    const BASE_SRC = `
     module ActiveRecord
       class Base
         def save; end
@@ -1073,102 +1092,102 @@ describe("Ruby extractor umbrella module-config scanning", () => {
     end
   `;
 
-  it("attributes module-level singleton_class config to <Module>::Base, tagged umbrellaConfig", () => {
-    const out = scanWithUmbrella(
-      BASE_SRC,
-      `
+    it("attributes module-level singleton_class config to <Module>::Base, tagged umbrellaConfig", () => {
+      const out = scanWithUmbrella(
+        BASE_SRC,
+        `
       module ActiveRecord
         singleton_class.attr_accessor :writing_role
         singleton_class.attr_reader :default_timezone
         def self.eager_load!; end
       end
     `,
-    );
-    const base = out["ActiveRecord::Base"];
-    const names = base.classMethods.map((m) => m.name);
-    // accessor → reader + writer; reader-only → reader only.
-    expect(names).toContain("writing_role");
-    expect(names).toContain("writing_role=");
-    expect(names).toContain("default_timezone");
-    expect(names).not.toContain("default_timezone=");
-    // Every redirected entry is tagged so compare can credit the port wherever
-    // it lands in the package.
-    for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
-      expect(m.umbrellaConfig).toBe(true);
-    }
-    // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
-    expect(names).not.toContain("eager_load!");
-  });
+      );
+      const base = out["ActiveRecord::Base"];
+      const names = base.classMethods.map((m) => m.name);
+      // accessor → reader + writer; reader-only → reader only.
+      expect(names).toContain("writing_role");
+      expect(names).toContain("writing_role=");
+      expect(names).toContain("default_timezone");
+      expect(names).not.toContain("default_timezone=");
+      // Every redirected entry is tagged so compare can credit the port wherever
+      // it lands in the package.
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+        expect(m.umbrellaConfig).toBe(true);
+      }
+      // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
+      expect(names).not.toContain("eager_load!");
+    });
 
-  it("redirects the `class << self; attr_accessor` block form to Base too", () => {
-    // active_record.rb uses the `singleton_class.attr_*` command form today, but
-    // the equivalent `class << self` block form is also module-level config and
-    // must redirect to Base rather than being silently dropped.
-    const out = scanWithUmbrella(
-      BASE_SRC,
-      `
+    it("redirects the `class << self; attr_accessor` block form to Base too", () => {
+      // active_record.rb uses the `singleton_class.attr_*` command form today, but
+      // the equivalent `class << self` block form is also module-level config and
+      // must redirect to Base rather than being silently dropped.
+      const out = scanWithUmbrella(
+        BASE_SRC,
+        `
       module ActiveRecord
         class << self
           attr_accessor :writing_role
         end
       end
     `,
-    );
-    const base = out["ActiveRecord::Base"];
-    const names = base.classMethods.map((m) => m.name);
-    expect(names).toContain("writing_role");
-    expect(names).toContain("writing_role=");
-    for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
-      expect(m.umbrellaConfig).toBe(true);
-    }
-  });
+      );
+      const base = out["ActiveRecord::Base"];
+      const names = base.classMethods.map((m) => m.name);
+      expect(names).toContain("writing_role");
+      expect(names).toContain("writing_role=");
+      for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+        expect(m.umbrellaConfig).toBe(true);
+      }
+    });
 
-  it("does not leak umbrella config onto the ActiveRecord module's bucket", () => {
-    const out = scanWithUmbrella(
-      BASE_SRC,
-      `
+    it("does not leak umbrella config onto the ActiveRecord module's bucket", () => {
+      const out = scanWithUmbrella(
+        BASE_SRC,
+        `
       module ActiveRecord
         singleton_class.attr_accessor :writing_role
       end
     `,
-    );
-    const mod = out["ActiveRecord"];
-    const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
-    expect(modNames).not.toContain("writing_role");
-  });
+      );
+      const mod = out["ActiveRecord"];
+      const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
+      expect(modNames).not.toContain("writing_role");
+    });
 
-  it("skips umbrella config when the module has no ::Base to redirect to", () => {
-    // `ActiveSupport.error_reporter` lives on a module with no `::Base`; without
-    // a Base to credit it, recording it would leak onto the module's entity-file
-    // bucket as false-missing, so it must be skipped entirely.
-    const out = scanWithUmbrella(
-      `
+    it("skips umbrella config when the module has no ::Base to redirect to", () => {
+      // `ActiveSupport.error_reporter` lives on a module with no `::Base`; without
+      // a Base to credit it, recording it would leak onto the module's entity-file
+      // bucket as false-missing, so it must be skipped entirely.
+      const out = scanWithUmbrella(
+        `
       module ActiveSupport
         class NotBase
           def call; end
         end
       end
     `,
-      `
+        `
       module ActiveSupport
         singleton_class.attr_accessor :error_reporter
       end
     `,
-    );
-    const mod = out["ActiveSupport"];
-    const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
-    expect(names).not.toContain("error_reporter");
-  });
+      );
+      const mod = out["ActiveSupport"];
+      const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
+      expect(names).not.toContain("error_reporter");
+    });
 
-  // `vendor/i18n/lib/i18n.rb` is not an autoload manifest: it is where
-  // `I18n::Base`, the gem's whole public facade, is defined. The config-only
-  // scan above sees only its three aliases, so the ported facade is measured
-  // against a denominator of 3. UMBRELLA_FULL_SCAN_PACKAGES opts such a package
-  // into a full walk.
-  it("extracts the method definitions of an umbrella file scanned in full", () => {
-    const out = scanWithUmbrella(
-      BASE_SRC,
-      `
+    // `vendor/i18n/lib/i18n.rb` is not an autoload manifest: it is where
+    // `I18n::Base`, the gem's whole public facade, is defined. The config-only
+    // scan above sees only its three aliases, so the ported facade is measured
+    // against a denominator of 3. UMBRELLA_FULL_SCAN_PACKAGES opts such a package
+    // into a full walk.
+    it("extracts the method definitions of an umbrella file scanned in full", () => {
+      const out = scanWithUmbrella(
+        BASE_SRC,
+        `
       module ActiveRecord
         module Facade
           def translate(key, **options); end
@@ -1184,23 +1203,27 @@ describe("Ruby extractor umbrella module-config scanning", () => {
         extend Facade
       end
     `,
-      true,
-    );
-    const facade = out["ActiveRecord::Facade"];
-    expect(facade.instanceMethods.map((m) => m.name)).toEqual(["translate", "t", "translate_key"]);
-    expect(facade.instanceMethods.map((m) => m.visibility)).toEqual([
-      "public",
-      "public",
-      "private",
-    ]);
-    expect(facade.file).toBe("../active_record.rb");
-    expect(out["ActiveRecord"].classMethods.map((m) => m.name)).toContain("reserve_key");
-  });
+        true,
+      );
+      const facade = out["ActiveRecord::Facade"];
+      expect(facade.instanceMethods.map((m) => m.name)).toEqual([
+        "translate",
+        "t",
+        "translate_key",
+      ]);
+      expect(facade.instanceMethods.map((m) => m.visibility)).toEqual([
+        "public",
+        "public",
+        "private",
+      ]);
+      expect(facade.file).toBe("../active_record.rb");
+      expect(out["ActiveRecord"].classMethods.map((m) => m.name)).toContain("reserve_key");
+    });
 
-  it("keeps a config-only umbrella scan free of those definitions", () => {
-    const out = scanWithUmbrella(
-      BASE_SRC,
-      `
+    it("keeps a config-only umbrella scan free of those definitions", () => {
+      const out = scanWithUmbrella(
+        BASE_SRC,
+        `
       module ActiveRecord
         module Facade
           def translate(key, **options); end
@@ -1209,26 +1232,30 @@ describe("Ruby extractor umbrella module-config scanning", () => {
         def self.reserve_key(key); end
       end
     `,
-    );
-    expect(out["ActiveRecord::Facade"].instanceMethods).toEqual([]);
-    expect(out["ActiveRecord"].classMethods).toEqual([]);
-  });
-});
+      );
+      expect(out["ActiveRecord::Facade"].instanceMethods).toEqual([]);
+      expect(out["ActiveRecord"].classMethods).toEqual([]);
+    });
+  },
+);
 
-describe("Ruby extractor body digest (source-hash pinning)", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor body digest (source-hash pinning)",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Returns a map of "<fqn>#<method>" -> bodyDigest for the given fixtures.
-  function rubyDigests(fixtures: Record<string, string>): Record<string, string | undefined> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "digest-rb-"));
-    try {
-      for (const [rel, src] of Object.entries(fixtures)) {
-        const p = path.join(dir, rel);
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(p, src);
-      }
-      const rels = JSON.stringify(Object.keys(fixtures));
-      const driver = `
+    // Returns a map of "<fqn>#<method>" -> bodyDigest for the given fixtures.
+    function rubyDigests(fixtures: Record<string, string>): Record<string, string | undefined> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "digest-rb-"));
+      try {
+        for (const [rel, src] of Object.entries(fixtures)) {
+          const p = path.join(dir, rel);
+          fs.mkdirSync(path.dirname(p), { recursive: true });
+          fs.writeFileSync(p, src);
+        }
+        const rels = JSON.stringify(Object.keys(fixtures));
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -1243,29 +1270,29 @@ describe("Ruby extractor body digest (source-hash pinning)", () => {
         end
         puts JSON.generate(out)
       `;
-      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
-      return JSON.parse(stdout);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+        const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+        return JSON.parse(stdout);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
-  }
 
-  it("emits a body digest for each method", () => {
-    const d = rubyDigests({
-      "foo.rb": `
+    it("emits a body digest for each method", () => {
+      const d = rubyDigests({
+        "foo.rb": `
         class Foo
           def save
             run_callbacks(:save)
           end
         end
       `,
+      });
+      expect(d["Foo#save"]).toMatch(/^[0-9a-f]{16}$/);
     });
-    expect(d["Foo#save"]).toMatch(/^[0-9a-f]{16}$/);
-  });
 
-  it("is unchanged by indentation, blank-line, and comment churn", () => {
-    const base = rubyDigests({
-      "a.rb": `
+    it("is unchanged by indentation, blank-line, and comment churn", () => {
+      const base = rubyDigests({
+        "a.rb": `
         class Foo
           def save
             validate!
@@ -1273,9 +1300,9 @@ describe("Ruby extractor body digest (source-hash pinning)", () => {
           end
         end
       `,
-    });
-    const churned = rubyDigests({
-      "a.rb": `
+      });
+      const churned = rubyDigests({
+        "a.rb": `
         class Foo
           def save
                 # a leading comment
@@ -1286,38 +1313,39 @@ describe("Ruby extractor body digest (source-hash pinning)", () => {
           end
         end
       `,
+      });
+      expect(churned["Foo#save"]).toBe(base["Foo#save"]);
     });
-    expect(churned["Foo#save"]).toBe(base["Foo#save"]);
-  });
 
-  it("changes when the body's code changes (drift)", () => {
-    const base = rubyDigests({
-      "a.rb": `
+    it("changes when the body's code changes (drift)", () => {
+      const base = rubyDigests({
+        "a.rb": `
         class Foo
           def save
             run_callbacks(:save)
           end
         end
       `,
-    });
-    const edited = rubyDigests({
-      "a.rb": `
+      });
+      const edited = rubyDigests({
+        "a.rb": `
         class Foo
           def save
             run_callbacks(:create)
           end
         end
       `,
+      });
+      expect(edited["Foo#save"]).not.toBe(base["Foo#save"]);
     });
-    expect(edited["Foo#save"]).not.toBe(base["Foo#save"]);
-  });
-});
+  },
+);
 
 // Per-method source lines let consumers (the file-structure method-order
 // manifest) interleave classMethods back into Rails source order instead of
 // appending them after instanceMethods — which inverts every Rails file that
 // opens with a `class << self` block (active_model/attribute.rb:7-24).
-describe("Ruby extractor method source lines", () => {
+describe("Ruby extractor method source lines", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
   // Returns "<fqn>#<method>" -> [bucket, line].
@@ -1387,20 +1415,23 @@ describe("Ruby extractor method source lines", () => {
   });
 });
 
-describe("Ruby extractor option-key const expansion", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor option-key const expansion",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Returns a map of "<fqn>#<method>" -> the method's expanded option_keys.
-  function optionKeys(fixtures: Record<string, string>): Record<string, string[] | undefined> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "optkeys-rb-"));
-    try {
-      for (const [rel, src] of Object.entries(fixtures)) {
-        const p = path.join(dir, rel);
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(p, src);
-      }
-      const rels = JSON.stringify(Object.keys(fixtures));
-      const driver = `
+    // Returns a map of "<fqn>#<method>" -> the method's expanded option_keys.
+    function optionKeys(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "optkeys-rb-"));
+      try {
+        for (const [rel, src] of Object.entries(fixtures)) {
+          const p = path.join(dir, rel);
+          fs.mkdirSync(path.dirname(p), { recursive: true });
+          fs.writeFileSync(p, src);
+        }
+        const rels = JSON.stringify(Object.keys(fixtures));
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -1415,16 +1446,16 @@ describe("Ruby extractor option-key const expansion", () => {
         end
         puts JSON.generate(out)
       `;
-      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
-      return JSON.parse(stdout);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+        const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+        return JSON.parse(stdout);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
-  }
 
-  it("binds a leading :: option-key const to the top level, not a nested const", () => {
-    const r = optionKeys({
-      "abs_opt.rb": `
+    it("binds a leading :: option-key const to the top level, not a nested const", () => {
+      const r = optionKeys({
+        "abs_opt.rb": `
         module Foo
           KEYS = [:top_a, :top_b]
         end
@@ -1441,12 +1472,13 @@ describe("Ruby extractor option-key const expansion", () => {
           end
         end
       `,
+      });
+      expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
     });
-    expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
-  });
-});
+  },
+);
 
-describe("Ruby extractor file constants", () => {
+describe("Ruby extractor file constants", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
   function rubyFileConstants(src: string): Record<string, { kind: string }> {
@@ -1481,23 +1513,26 @@ describe("Ruby extractor file constants", () => {
   });
 });
 
-describe("Ruby extractor metaprogrammed method surface", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor metaprogrammed method surface",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  type MetaMethod = {
-    name: string;
-    notes?: string;
-    visibility: string;
-    params: { kind: string }[];
-  };
+    type MetaMethod = {
+      name: string;
+      notes?: string;
+      visibility: string;
+      params: { kind: string }[];
+    };
 
-  // Returns "<fqn>" -> instance methods, so a test can assert both the
-  // generated names and the params lifted off the define_method block.
-  function metaMethods(src: string): Record<string, MetaMethod[]> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "meta-rb-"));
-    try {
-      fs.writeFileSync(path.join(dir, "meta.rb"), src);
-      const driver = `
+    // Returns "<fqn>" -> instance methods, so a test can assert both the
+    // generated names and the params lifted off the define_method block.
+    function metaMethods(src: string): Record<string, MetaMethod[]> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "meta-rb-"));
+      try {
+        fs.writeFileSync(path.join(dir, "meta.rb"), src);
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -1510,14 +1545,14 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
         puts JSON.generate(out)
       `;
-      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+        return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
-  }
 
-  it("records define_method with a literal name", () => {
-    const m = metaMethods(`
+    it("records define_method with a literal name", () => {
+      const m = metaMethods(`
       module Engine
         define_method(:railtie_routes_url_helpers) { |include_path_helpers = true| nil }
         define_method "railtie_helpers_paths" do
@@ -1525,17 +1560,17 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
       end
     `);
-    const names = m["Engine"].map((x) => x.name);
-    expect(names).toContain("railtie_routes_url_helpers");
-    expect(names).toContain("railtie_helpers_paths");
-    const urlHelpers = m["Engine"].find((x) => x.name === "railtie_routes_url_helpers")!;
-    expect(urlHelpers.notes).toBe("define_method");
-    // The block's params are the generated method's params.
-    expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
-  });
+      const names = m["Engine"].map((x) => x.name);
+      expect(names).toContain("railtie_routes_url_helpers");
+      expect(names).toContain("railtie_helpers_paths");
+      const urlHelpers = m["Engine"].find((x) => x.name === "railtie_routes_url_helpers")!;
+      expect(urlHelpers.notes).toBe("define_method");
+      // The block's params are the generated method's params.
+      expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
+    });
 
-  it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
-    const m = metaMethods(`
+    it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
+      const m = metaMethods(`
       module Arel
         class Attribute < Struct.new :relation, :name
           def type_caster
@@ -1544,39 +1579,39 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
       end
     `);
-    expect(m["Arel::Attribute"].map((x) => x.name).sort()).toEqual([
-      "initialize",
-      "name",
-      "name=",
-      "relation",
-      "relation=",
-      "type_caster",
-    ]);
-    const init = m["Arel::Attribute"].find((x) => x.name === "initialize")!;
-    expect(init.params).toEqual([
-      { name: "relation", kind: "optional", default: "..." },
-      { name: "name", kind: "optional", default: "..." },
-    ]);
-    const reader = m["Arel::Attribute"].find((x) => x.name === "relation")!;
-    expect(reader.params).toEqual([]);
-  });
+      expect(m["Arel::Attribute"].map((x) => x.name).sort()).toEqual([
+        "initialize",
+        "name",
+        "name=",
+        "relation",
+        "relation=",
+        "type_caster",
+      ]);
+      const init = m["Arel::Attribute"].find((x) => x.name === "initialize")!;
+      expect(init.params).toEqual([
+        { name: "relation", kind: "optional", default: "..." },
+        { name: "name", kind: "optional", default: "..." },
+      ]);
+      const reader = m["Arel::Attribute"].find((x) => x.name === "relation")!;
+      expect(reader.params).toEqual([]);
+    });
 
-  it("synthesizes keyword params for a keyword_init Struct's initialize", () => {
-    const m = metaMethods(`
+    it("synthesizes keyword params for a keyword_init Struct's initialize", () => {
+      const m = metaMethods(`
       module ActiveSupport
         class Report < Struct.new(:error, :severity, keyword_init: true)
         end
       end
     `);
-    const init = m["ActiveSupport::Report"].find((x) => x.name === "initialize")!;
-    expect(init.params).toEqual([
-      { name: "error", kind: "keyword", default: "..." },
-      { name: "severity", kind: "keyword", default: "..." },
-    ]);
-  });
+      const init = m["ActiveSupport::Report"].find((x) => x.name === "initialize")!;
+      expect(init.params).toEqual([
+        { name: "error", kind: "keyword", default: "..." },
+        { name: "severity", kind: "keyword", default: "..." },
+      ]);
+    });
 
-  it("synthesizes the accessors a `CONST = Struct.new(...) do ... end` generates", () => {
-    const m = metaMethods(`
+    it("synthesizes the accessors a `CONST = Struct.new(...) do ... end` generates", () => {
+      const m = metaMethods(`
       module Arel
         Edge = Struct.new(:name, :from) do
           def to_s
@@ -1585,18 +1620,18 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
       end
     `);
-    expect(m["Arel::Edge"].map((x) => x.name).sort()).toEqual([
-      "from",
-      "from=",
-      "initialize",
-      "name",
-      "name=",
-      "to_s",
-    ]);
-  });
+      expect(m["Arel::Edge"].map((x) => x.name).sort()).toEqual([
+        "from",
+        "from=",
+        "initialize",
+        "name",
+        "name=",
+        "to_s",
+      ]);
+    });
 
-  it("unrolls a literal-array each loop that interpolates the loop variable", () => {
-    const m = metaMethods(`
+    it("unrolls a literal-array each loop that interpolates the loop variable", () => {
+      const m = metaMethods(`
       module ClassMethods
         [:before, :after, :around].each do |callback|
           define_method "#{callback}_action" do |*names, &blk|
@@ -1611,29 +1646,29 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
       end
     `);
-    const names = m["ClassMethods"].map((x) => x.name);
-    expect(names).toEqual([
-      "before_action",
-      "after_action",
-      "around_action",
-      "skip_before_action",
-      "skip_after_action",
-      "skip_around_action",
-      "append_before_action",
-      "append_after_action",
-      "append_around_action",
-    ]);
-    const beforeAction = m["ClassMethods"].find((x) => x.name === "before_action")!;
-    expect(beforeAction.params.map((p) => p.kind)).toEqual(["rest", "block"]);
-    const appendBefore = m["ClassMethods"].find((x) => x.name === "append_before_action")!;
-    expect(appendBefore.notes).toBe("alias");
-  });
+      const names = m["ClassMethods"].map((x) => x.name);
+      expect(names).toEqual([
+        "before_action",
+        "after_action",
+        "around_action",
+        "skip_before_action",
+        "skip_after_action",
+        "skip_around_action",
+        "append_before_action",
+        "append_after_action",
+        "append_around_action",
+      ]);
+      const beforeAction = m["ClassMethods"].find((x) => x.name === "before_action")!;
+      expect(beforeAction.params.map((p) => p.kind)).toEqual(["rest", "block"]);
+      const appendBefore = m["ClassMethods"].find((x) => x.name === "append_before_action")!;
+      expect(appendBefore.notes).toBe("alias");
+    });
 
-  it("records both block-less define_method shapes exactly once", () => {
-    // Bare command (action_view/layouts.rb:311's shape) and parenthesized
-    // (rack/utils.rb:183's). The block forms below must not be recorded twice
-    // by the generic descent re-reaching process_command / method_add_arg.
-    const m = metaMethods(`
+    it("records both block-less define_method shapes exactly once", () => {
+      // Bare command (action_view/layouts.rb:311's shape) and parenthesized
+      // (rack/utils.rb:183's). The block forms below must not be recorded twice
+      // by the generic descent re-reaching process_command / method_add_arg.
+      const m = metaMethods(`
       module Shapes
         define_method :from_proc, &_layout
         define_method(:from_method, Kernel.instance_method(:inspect))
@@ -1643,18 +1678,18 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         define_method(:with_brace_block) { |a| nil }
       end
     `);
-    expect(m["Shapes"].map((x) => x.name)).toEqual([
-      "from_proc",
-      "from_method",
-      "with_do_block",
-      "with_brace_block",
-    ]);
-    // Only the block forms can supply params; the block-less ones stay empty.
-    expect(m["Shapes"].map((x) => x.params.length)).toEqual([0, 0, 1, 1]);
-  });
+      expect(m["Shapes"].map((x) => x.name)).toEqual([
+        "from_proc",
+        "from_method",
+        "with_do_block",
+        "with_brace_block",
+      ]);
+      // Only the block forms can supply params; the block-less ones stay empty.
+      expect(m["Shapes"].map((x) => x.params.length)).toEqual([0, 0, 1, 1]);
+    });
 
-  it("buckets a `class << self` define_method as a class method", () => {
-    const m = metaMethods(`
+    it("buckets a `class << self` define_method as a class method", () => {
+      const m = metaMethods(`
       class Base
         class << self
           define_method(:configure) { nil }
@@ -1665,15 +1700,15 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         define_method(:normalize) { nil }
       end
     `);
-    expect(m["Base.self"].map((x) => x.name)).toEqual(["configure"]);
-    const normalize = m["Base"].find((x) => x.name === "normalize")!;
-    expect(normalize.visibility).toBe("private");
-  });
+      expect(m["Base.self"].map((x) => x.name)).toEqual(["configure"]);
+      const normalize = m["Base"].find((x) => x.name === "normalize")!;
+      expect(normalize.visibility).toBe("private");
+    });
 
-  it("keeps the literal def when a branch defines the same name both ways", () => {
-    // rack utils.rb:183 — `define_method(:escape_html, …)` or `def escape_html`
-    // off an `if defined?(…)`; the extractor walks both branches, only one is live.
-    const m = metaMethods(`
+    it("keeps the literal def when a branch defines the same name both ways", () => {
+      // rack utils.rb:183 — `define_method(:escape_html, …)` or `def escape_html`
+      // off an `if defined?(…)`; the extractor walks both branches, only one is live.
+      const m = metaMethods(`
       module Utils
         if defined?(ERB::Escape)
           define_method(:escape_html, ERB::Escape.instance_method(:html_escape))
@@ -1684,11 +1719,11 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
       end
     `);
-    expect(m["Utils"].map((x) => [x.name, x.notes])).toEqual([["escape_html", undefined]]);
-  });
+      expect(m["Utils"].map((x) => [x.name, x.notes])).toEqual([["escape_html", undefined]]);
+    });
 
-  it("skips a define_method whose name cannot be resolved to literals", () => {
-    const m = metaMethods(`
+    it("skips a define_method whose name cannot be resolved to literals", () => {
+      const m = metaMethods(`
       module Unresolvable
         SUFFIXES.each do |suffix|
           define_method "reader_#{suffix}" do
@@ -1707,12 +1742,13 @@ describe("Ruby extractor metaprogrammed method surface", () => {
         end
       end
     `);
-    expect(m["Unresolvable"] ?? []).toEqual([]);
-    expect(m["Unresolvable.self"] ?? []).toEqual([]);
-  });
-});
+      expect(m["Unresolvable"] ?? []).toEqual([]);
+      expect(m["Unresolvable.self"] ?? []).toEqual([]);
+    });
+  },
+);
 
-describe("Ruby extractor call-argument capture", () => {
+describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
   interface CallSite {
@@ -2036,7 +2072,7 @@ describe("Ruby extractor call-argument capture", () => {
   });
 });
 
-describe("Ruby extractor attr_reader flag", () => {
+describe("Ruby extractor attr_reader flag", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
   type AttrMethod = { name: string; reader?: boolean };
@@ -2084,22 +2120,25 @@ describe("Ruby extractor attr_reader flag", () => {
   });
 });
 
-describe("Ruby extractor attr_reader read suppression", () => {
-  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+describe(
+  "Ruby extractor attr_reader read suppression",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Returns a map of "<fqn>#<method>" -> [callArgs site names, calls].
-  function rubyStreams(
-    fixtures: Record<string, string>,
-  ): Record<string, { sites: string[]; calls: string[] }> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attr-rb-"));
-    try {
-      for (const [rel, src] of Object.entries(fixtures)) {
-        const p = path.join(dir, rel);
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(p, src);
-      }
-      const rels = JSON.stringify(Object.keys(fixtures));
-      const driver = `
+    // Returns a map of "<fqn>#<method>" -> [callArgs site names, calls].
+    function rubyStreams(
+      fixtures: Record<string, string>,
+    ): Record<string, { sites: string[]; calls: string[] }> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attr-rb-"));
+      try {
+        for (const [rel, src] of Object.entries(fixtures)) {
+          const p = path.join(dir, rel);
+          fs.mkdirSync(path.dirname(p), { recursive: true });
+          fs.writeFileSync(p, src);
+        }
+        const rels = JSON.stringify(Object.keys(fixtures));
+        const driver = `
         require_relative ${JSON.stringify(RUBY_SCRIPT)}
         require "json"
         ex = ApiExtractor.new
@@ -2117,16 +2156,16 @@ describe("Ruby extractor attr_reader read suppression", () => {
         end
         puts JSON.generate(out)
       `;
-      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
-      return JSON.parse(stdout);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+        const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+        return JSON.parse(stdout);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     }
-  }
 
-  it("drops a bare read of an attr_reader, which the port spells as a getter", () => {
-    const c = rubyStreams({
-      "scope.rb": `
+    it("drops a bare read of an attr_reader, which the port spells as a getter", () => {
+      const c = rubyStreams({
+        "scope.rb": `
         class Scope
           private
             attr_reader :value_transformation
@@ -2140,18 +2179,18 @@ describe("Ruby extractor attr_reader read suppression", () => {
             end
         end
       `,
+      });
+      // The reader read itself is gone, and the Proc invocation Ruby spells
+      // `.call` on it lands under the reader's name — what `this.valueTransformation(value)`
+      // records on the TS side.
+      expect(c["Scope#transform_value"].sites).toEqual(["value_transformation"]);
+      expect(c["Scope#transform_self"].sites).toEqual(["value_transformation"]);
+      expect(c["Scope#transform_value"].calls).toEqual(["value_transformation"]);
     });
-    // The reader read itself is gone, and the Proc invocation Ruby spells
-    // `.call` on it lands under the reader's name — what `this.valueTransformation(value)`
-    // records on the TS side.
-    expect(c["Scope#transform_value"].sites).toEqual(["value_transformation"]);
-    expect(c["Scope#transform_self"].sites).toEqual(["value_transformation"]);
-    expect(c["Scope#transform_value"].calls).toEqual(["value_transformation"]);
-  });
 
-  it("keeps a site that passes arguments to an attr_reader name", () => {
-    const c = rubyStreams({
-      "branch.rb": `
+    it("keeps a site that passes arguments to an attr_reader name", () => {
+      const c = rubyStreams({
+        "branch.rb": `
         class Branch
           attr_reader :association
 
@@ -2161,13 +2200,13 @@ describe("Ruby extractor attr_reader read suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Branch#preloaders_for_reflection"].sites).toEqual(["class", "association"]);
     });
-    expect(c["Branch#preloaders_for_reflection"].sites).toEqual(["class", "association"]);
-  });
 
-  it("keeps a bare call whose name is an attr_reader on a NESTED class only", () => {
-    const c = rubyStreams({
-      "outer.rb": `
+    it("keeps a bare call whose name is an attr_reader on a NESTED class only", () => {
+      const c = rubyStreams({
+        "outer.rb": `
         class Outer
           def read
             association
@@ -2178,7 +2217,8 @@ describe("Ruby extractor attr_reader read suppression", () => {
           end
         end
       `,
+      });
+      expect(c["Outer#read"].sites).toEqual(["association"]);
     });
-    expect(c["Outer#read"].sites).toEqual(["association"]);
-  });
-});
+  },
+);
