@@ -1,58 +1,38 @@
 /**
  * ESLint rule: no-freeform-comments
  *
- * trails is a line-by-line port of Rails. A comment that restates what the TS
- * says, or that narrates a decision the Rails source already settles, is drift:
- * it competes with the Ruby for authority and it rots independently of both
- * sides. The comments worth having are the ones that point at Rails, the ones
- * the port's own conventions live in (JSDoc), and the ones a tool reads.
+ * Policy, 2026-08-27 (maintainer): trails carries no English-language
+ * comments. trails is a line-by-line port and the Ruby is vendored at
+ * `vendor/rails/`; a sentence here is a second description of something Rails
+ * already documents, in a place that rots independently of both sides.
  *
- * So this rule deletes free-form comments and KEEPS three kinds:
+ * So this rule deletes comments and KEEPS exactly two kinds:
  *
- *   1. JSDoc block comments (`/** ... *\/`). Every port convention lives here —
- *      `Mirrors:`, `@internal`, `@noRailsEquivalent`, `@missingRailsCall` — and
- *      `parity:api` / the ESLint manifests read them.
- *   2. Rails references — a `.rb` path or citation, a `Mirrors:` line, a Rails
- *      constant path. This is the fidelity anchor CLAUDE.md asks for.
- *   3. Tool directives — `eslint-*`, `@ts-*`, `prettier-ignore`, coverage
+ *   1. The repo's own JSDoc flags — `@internal`, `@noRailsEquivalent`,
+ *      `@missingRailsCall`, `@missingRailsArgs` — together with the reason
+ *      argument each requires. `parity:api:extra` and
+ *      `lint-missing-rails-call-reasons` read those reasons and they are
+ *      reviewed, so they are arguments, not prose.
+ *   2. Tool directives — `eslint-*`, `@ts-*`, `prettier-ignore`, coverage
  *      pragmas, and this repo's own `boundary:` / `@boundary-file:` (read by
  *      `no-native-date`) and `@nie disposition=` (read by
- *      `nie-requires-annotation`). Deleting these changes what the toolchain
+ *      `nie-requires-annotation`). Deleting one changes what the toolchain
  *      does.
  *
- * There is no opt-out marker. The rule shipped with a `keep:` escape hatch and
- * the sweep across arel and activemodel used it zero times, so it was removed:
- * a comment earns one of the three forms above or it goes.
+ * Everything else goes, with no opt-out marker: `//` narration, prose
+ * paragraphs, descriptive JSDoc summaries (`/** Add GROUP BY. *\/`), and
+ * `@param` / `@returns` / `@example`, which carry English by construction.
+ * TypeDoc loses those summaries; that is accepted — the signature carries it.
  *
- * Rails' OWN comments are NOT kept, and that is deliberate. The Ruby is
- * vendored at `vendor/rails/` and every ported file carries a `Mirrors:` line
- * pointing at it, so a reader who wants Rails' annotation on a line reads it
- * at the source. Copying it into trails duplicates it into a second place that
- * rots on its own the moment Rails edits it — the same failure this rule
- * exists to prevent. Reference the Ruby; do not restate it.
+ * Rails citations are NOT kept either. A `Mirrors:` line, a `.rb:LINE`
+ * reference and a Ruby constant path were all kept until 2026-08-27, on the
+ * theory that a pointer is not a sentence. The pointer rots the same way — a
+ * line number is wrong the moment Rails edits the file above it — and in
+ * practice the citation was the hook the prose hung off. The Ruby is vendored;
+ * `pnpm rails:find <query>` maps a name to its `file:line` on demand.
  *
- * Keep-rule 1 is NOT unconditional. A JSDoc block is kept when it documents
- * something — when it is the leading comment of a declaration, of a class /
- * interface / object member, of a parameter, or of a definition-shaped
- * statement (a `describe(...)` file header, an `it(...)` header, an assignment
- * that names what it assigns). That is where every port convention lives, and
- * it is where ordinary API documentation lives too; neither is touched.
- *
- * A JSDoc block that is NOT in a documenting position documents no
- * declaration — floating between statements inside a function body, before an
- * `if` or a `return`, at the end of a block. It is narration, and `/** *\/` is
- * exactly the two-character reformatting that used to buy narration a pass, so
- * it is deleted like any other free-form comment, unless it carries a JSDoc
- * tag, a Rails reference, or a tool directive on its own merits.
- *
- * The blanket alternative — "every JSDoc block must carry a tag or a Rails
- * reference" — was measured and rejected: it flags 94 pre-existing blocks in
- * arel and activemodel that are ordinary API documentation ("Set the FROM
- * table.", "Add GROUP BY."), which is JSDoc doing its job. Position
- * discriminates where content cannot: those 94 all sit on a declaration.
- *
- * The fix is destructive by design: the point is to run it, then read the diff
- * and rescue whatever turns out to be load-bearing. Run it with
+ * The fix is destructive by design: run it, then read the diff and rescue
+ * whatever turns out to be load-bearing. Run it with
  * `--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'` to
  * audit without deleting.
  */
@@ -75,19 +55,23 @@ const DIRECTIVE_RE =
   /^\s*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=/iu;
 
 /**
- * A reference to the Rails source. Deliberately generous: a false KEEP costs
- * one line of audit, a false DELETE costs a fidelity anchor.
+ * The repo's own JSDoc flags, the only tags that survive. Each is read by a
+ * tool — `parity:api:extra` scores `@noRailsEquivalent`,
+ * `lint-missing-rails-call-reasons` scores `@missingRailsCall` /
+ * `@missingRailsArgs`, and `@internal` decides whether a member is measured at
+ * all — so the tag AND the reason argument it requires are machine input.
  *
- * - `query_methods.rb`, `relation/query_methods.rb:1604`
- * - `Mirrors:` / `Mirrors Rails:` — the repo's citation convention
- * - `ActiveRecord::Relation`, `Arel::Nodes::Grouping` — Ruby constant paths
- * - a bare `rails/` path
- *
- * This keeps pointers TO the Ruby, which is the whole substitute for copying
- * the Ruby's own comments across.
+ * `@param` / `@returns` / `@example` are deliberately absent: nothing reads
+ * them and they are English by construction.
  */
-const RAILS_REF_RE =
-  /(?:\b[\w/]+\.rb\b|\bMirrors\b|\b(?:Active(?:Record|Model|Support|Storage|Job)|Arel|Abstract\w*)::|(?:^|\s)rails\/|\bRails\b|\bRuby\b|\bMRI\b)/u;
+const KEPT_TAG_RE = /@(internal|noRailsEquivalent|missingRailsCall|missingRailsArgs)\b/u;
+
+/**
+ * The permanence token `parity:api:extra` and `lint-missing-rails-call-reasons`
+ * switch on. It is the only argument a tag keeps; the English reason after it
+ * is prose.
+ */
+const PERMANENCE_RE = /^\s*(PERMANENT|CONVERGEABLE)\b/u;
 
 /**
  * A contiguous run of `//` comments is one human comment that happens to wrap.
@@ -134,98 +118,29 @@ function isJsDoc(comment) {
 }
 
 /**
- * A JSDoc tag (`@internal`, `@param`, `@noRailsEquivalent`, ...). A tagged
- * block is kept wherever it sits: the tags are the port's own conventions and
- * several of them are read by tooling.
- */
-const JSDOC_TAG_RE = /^[\s*]*@\w/mu;
-
-/**
- * Node types that a JSDoc block can document: declarations, class / interface
- * / object members, and enum members. A statement is NOT one of them, at any
- * scope — a bare `registerFoo();` at module scope documents no more than one
- * inside a body does, and exempting it would reopen this rule's bypass one
- * scope up. The statements that DO document something are definition-shaped,
- * and `isDefinitionStatement` recognises those wherever they sit.
- */
-const DOCUMENTABLE_TYPES = new Set([
-  "VariableDeclaration",
-  "FunctionDeclaration",
-  "ClassDeclaration",
-  "ClassExpression",
-  "TSDeclareFunction",
-  "TSTypeAliasDeclaration",
-  "TSInterfaceDeclaration",
-  "TSEnumDeclaration",
-  "TSEnumMember",
-  "TSModuleDeclaration",
-  "ImportDeclaration",
-  "ExportNamedDeclaration",
-  "ExportDefaultDeclaration",
-  "ExportAllDeclaration",
-  "MethodDefinition",
-  "PropertyDefinition",
-  "AccessorProperty",
-  "StaticBlock",
-  "TSAbstractMethodDefinition",
-  "TSAbstractPropertyDefinition",
-  "TSPropertySignature",
-  "TSMethodSignature",
-  "TSIndexSignature",
-  "TSCallSignatureDeclaration",
-  "TSConstructSignatureDeclaration",
-  "Property",
-]);
-
-/**
- * A statement that DEFINES something, which a JSDoc block above it documents
- * the same way one above a `function` documents the function:
+ * The machine-read content of one comment, as the lines that survive.
  *
- *   - a call taking a function, which is Ruby-block-shaped — `describe(...)`,
- *     `it(...)`, `beforeEach(...)`. Recognised at any depth: at module scope
- *     for a `describe(...)` file header, nested for the `it(...)` headers
- *     inside it.
- *   - an assignment, which names the thing it assigns —
- *     `taggedLogging.logger = function (...)`, and the repo's own mixin idiom
- *     `Model.aliasAttribute = aliasAttribute`.
- *
- * Narration sits above an `if`, a `return` or a bare call — none of which
- * define anything, at any scope. The packages' `include(Model, Mixin)`
- * mixin-wiring notes take no function and are kept by rule 2 instead: every
- * one of them cites the Ruby `include` it mirrors, which is what tells it
- * apart from a bare call.
+ * A tag document carries simple data or nothing: `@internal` is the whole tag,
+ * `@noRailsEquivalent` and `@missingRailsCall` / `@missingRailsArgs` keep only
+ * the permanence token the extractors switch on, and a directive line is
+ * key=value input kept verbatim. The English reason that used to follow a tag
+ * is prose in a tag's clothing and goes with the rest.
  */
-function isDefinitionStatement(node) {
-  if (node.type !== "ExpressionStatement") return false;
-  const expression = node.expression;
-  if (expression?.type === "AssignmentExpression") return true;
-  if (expression?.type !== "CallExpression") return false;
-  return expression.arguments.some(
-    (arg) => arg.type === "FunctionExpression" || arg.type === "ArrowFunctionExpression",
-  );
-}
-
-/** A function parameter, which JSDoc documents in place as often as by `@param`. */
-function isParameter(node) {
-  return Array.isArray(node.parent?.params) && node.parent.params.includes(node);
-}
-
-function isDocumentable(node) {
-  if (DOCUMENTABLE_TYPES.has(node.type)) return true;
-  if (isParameter(node)) return true;
-  return isDefinitionStatement(node);
-}
-
-function isKept(group, attachedJsDoc) {
-  return group.some((comment) => {
-    const text = comment.value;
-    if (isJsDoc(comment)) {
-      if (JSDOC_TAG_RE.test(text)) return true;
-      if (attachedJsDoc.has(comment)) return true;
+function keptLines(comment) {
+  const kept = [];
+  for (const line of comment.value.split("\n")) {
+    if (DIRECTIVE_RE.test(line)) {
+      kept.push(line);
+      continue;
     }
-    if (DIRECTIVE_RE.test(text)) return true;
-    return RAILS_REF_RE.test(text);
-  });
+    const tag = KEPT_TAG_RE.exec(line);
+    if (!tag) continue;
+    const indent = /^[\s*]*/u.exec(line)[0];
+    const name = tag[1];
+    const permanence = PERMANENCE_RE.exec(line.slice(tag.index + tag[0].length));
+    kept.push(`${indent}@${name}${permanence ? ` ${permanence[1]}` : ""}`);
+  }
+  return kept;
 }
 
 /**
@@ -249,12 +164,25 @@ function removalRange(group, sourceCode) {
   return [start, end];
 }
 
+/**
+ * The comment rewritten down to `kept`, or `null` when nothing survives. A
+ * single kept line collapses to a one-line block; several keep the block form.
+ */
+function renderComment(comment, kept) {
+  if (kept.length === 0) return null;
+  if (comment.type === "Line") return `//${kept[0].replace(/^[\s*]*/u, " ")}`;
+  const indent = " ".repeat(comment.loc.start.column);
+  const bodies = kept.map((line) => line.replace(/^[\s*]*/u, ""));
+  if (bodies.length === 1) return `/** ${bodies[0]} */`;
+  return [`/**`, ...bodies.map((b) => `${indent} * ${b}`), `${indent} */`].join("\n");
+}
+
 const rule = {
   meta: {
     type: "suggestion",
     docs: {
       description:
-        "Delete free-form comments; keep only JSDoc, references to the Rails source, and tool directives.",
+        "Delete English-language comments; keep only the repo's JSDoc flags and tool directives.",
     },
     fixable: "code",
     schema: [
@@ -268,35 +196,50 @@ const rule = {
       },
     ],
     messages: {
-      floatingJsDoc:
-        "JSDoc block in a non-documenting position. It documents no declaration, so it is narration: attach it to what it documents, cite the Rails file, or delete it.",
+      prose:
+        "English-language comment. trails carries none: only the repo's JSDoc flags with their permanence token, and tool directives.",
       freeform:
-        "Free-form comment. trails is a line-by-line Rails port: cite the Rails file, promote it to JSDoc, or delete it.",
+        "English-language comment. trails carries none: only the repo's JSDoc flags with their permanence token, and tool directives.",
     },
   },
   create(context) {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     const reportOnly = context.options[0]?.report === true;
-    const attachedJsDoc = new Set();
     return {
-      "*"(node) {
-        if (!isDocumentable(node)) return;
-        for (const comment of sourceCode.getCommentsBefore(node)) {
-          if (isJsDoc(comment)) attachedJsDoc.add(comment);
-        }
-      },
       "Program:exit"(program) {
-        // A file with no statements has no documenting position to attach to,
-        // so its comments are the whole file and are kept rather than erased.
         if (program.body.length === 0) return;
         for (const group of groupLineComments(sourceCode.getAllComments(), sourceCode)) {
-          if (isKept(group, attachedJsDoc)) continue;
-          const range = removalRange(group, sourceCode);
-          context.report({
-            loc: { start: group[0].loc.start, end: group[group.length - 1].loc.end },
-            messageId: group.some(isJsDoc) ? "floatingJsDoc" : "freeform",
-            fix: reportOnly ? undefined : (fixer) => fixer.removeRange(range),
-          });
+          const rewrites = group.map((comment) => [comment, keptLines(comment)]);
+          const anyKept = rewrites.some(([, kept]) => kept.length > 0);
+          const changed = rewrites.some(
+            ([comment, kept]) => kept.join("\n") !== comment.value.replace(/^\*/u, ""),
+          );
+          if (anyKept && !changed) continue;
+
+          if (!anyKept) {
+            const range = removalRange(group, sourceCode);
+            context.report({
+              loc: { start: group[0].loc.start, end: group[group.length - 1].loc.end },
+              messageId: group.some(isJsDoc) ? "prose" : "freeform",
+              fix: reportOnly ? undefined : (fixer) => fixer.removeRange(range),
+            });
+            continue;
+          }
+
+          for (const [comment, kept] of rewrites) {
+            const replacement = renderComment(comment, kept);
+            if (replacement === sourceCode.getText(comment)) continue;
+            context.report({
+              loc: comment.loc,
+              messageId: "prose",
+              fix: reportOnly
+                ? undefined
+                : (fixer) =>
+                    replacement === null
+                      ? fixer.removeRange(removalRange([comment], sourceCode))
+                      : fixer.replaceText(comment, replacement),
+            });
+          }
         }
       },
     };
@@ -304,4 +247,4 @@ const rule = {
 };
 
 export default rule;
-export { RAILS_REF_RE, DIRECTIVE_RE };
+export { KEPT_TAG_RE, DIRECTIVE_RE };
