@@ -14,8 +14,6 @@ export class Grouping extends Unary {
     super(expr);
   }
 
-  // Mirrors: Arel::Nodes::Grouping#fetch_attribute (grouping.rb:6-8) —
-  // `expr.fetch_attribute(&block)`, delegated bare.
   fetchAttribute(block: (attr: Node) => unknown): unknown {
     return (
       this.expr as { fetchAttribute(block: (attr: Node) => unknown): unknown }
