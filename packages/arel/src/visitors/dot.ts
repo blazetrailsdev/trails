@@ -512,8 +512,8 @@ export class Dot extends Visitor {
   }
 
   /** Mirrors Rails' Dot#quote — escape `"` for inclusion in a label. */
-  protected quote(value: unknown): string {
-    return String(value).replace(/"/g, '\\"');
+  protected quote(string: unknown): string {
+    return String(string).replace(/"/g, '\\"');
   }
 
   /**
@@ -577,7 +577,6 @@ export class Dot extends Visitor {
     if (typeof o === "number") return Number.isInteger(o) ? "Integer" : "Float";
     if (typeof o === "boolean") return o ? "TrueClass" : "FalseClass";
     if (typeof o === "bigint") return "Integer";
-    if (typeof o === "symbol") return "Symbol";
     // boundary: legacy JS Date values stringify to Rails' `Time` class name.
     if (o instanceof Date) return "Time";
     const temporalClass = temporalClassName(o);

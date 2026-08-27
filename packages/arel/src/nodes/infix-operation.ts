@@ -1,10 +1,6 @@
 import { Node } from "./node.js";
 import { Binary, type NodeOrValue } from "./binary.js";
-import { As } from "./binary.js";
-import { SqlLiteral } from "./sql-literal.js";
 import { buildQuoted } from "./casted.js";
-import { Ascending } from "./ascending.js";
-import { Descending } from "./descending.js";
 
 /**
  * Represents a custom infix operation: left OP right.
@@ -32,18 +28,6 @@ export class InfixOperation extends Binary {
    */
   quotedNode(other: unknown): Node {
     return buildQuoted(other, this);
-  }
-
-  as(other: string | SqlLiteral): As {
-    return new As(this, new SqlLiteral(other, { retryable: true }));
-  }
-
-  asc(): Ascending {
-    return new Ascending(this);
-  }
-
-  desc(): Descending {
-    return new Descending(this);
   }
 }
 

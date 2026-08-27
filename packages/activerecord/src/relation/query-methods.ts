@@ -2589,7 +2589,9 @@ export function buildCaseForValuePosition(
   const filter = options.filter !== false;
   const node = new Nodes.Case();
   values.forEach((value, i) => {
-    node.when((column as any).eq(value), i + 1);
+    // query_methods.rb:2166 — `node.when(column.eq(value)).then(order)`; the
+    // THEN value is quoted by `#then`, not by `#when`.
+    node.when((column as any).eq(value)).then(i + 1);
   });
   if (!filter) (node as any).else(values.length + 1);
   return new Nodes.Ascending(node);

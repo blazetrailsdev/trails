@@ -32,8 +32,8 @@ export class DeleteManager extends TreeManager {
    *
    * Mirrors: Arel::DeleteManager#from
    */
-  from(table: Table): this {
-    this.ast.relation = table;
+  from(relation: Table): this {
+    this.ast.relation = relation;
     return this;
   }
 
@@ -58,8 +58,8 @@ export class DeleteManager extends TreeManager {
    *
    * Mirrors: Arel::DeleteManager#having
    */
-  having(condition: Node): this {
-    this.ast.havings.push(condition);
+  having(expr: Node): this {
+    this.ast.havings.push(expr);
     return this;
   }
 }

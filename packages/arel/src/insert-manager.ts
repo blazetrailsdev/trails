@@ -51,8 +51,8 @@ export class InsertManager extends TreeManager {
    * either shape (raw Node or SelectManager-shaped duck-type) via
    * `visit`.
    */
-  select(selectManager: InsertSelectSource): this {
-    this.ast.select = selectManager;
+  select(select: InsertSelectSource): this {
+    this.ast.select = select;
     return this;
   }
 
@@ -96,8 +96,8 @@ export class InsertManager extends TreeManager {
    *
    * Mirrors: Arel::InsertManager#create_values
    */
-  createValues(row: unknown[]): ValuesList {
-    return new ValuesList([row]);
+  createValues(values: unknown[]): ValuesList {
+    return new ValuesList([values]);
   }
 
   /**

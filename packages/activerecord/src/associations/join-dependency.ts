@@ -135,7 +135,9 @@ export class Aliases {
    * every joined table. Mirrors Rails' Aliases#columns returning Arel nodes.
    */
   selectArel(): Nodes.As[] {
-    return this._tables.flatMap((t) => t.columns.map((c) => t.table.get(c.column).as(c.alias)));
+    return this._tables.flatMap((t) =>
+      t.columns.map((c) => t.table.get(c.column).as(c.alias) as Nodes.As),
+    );
   }
 }
 

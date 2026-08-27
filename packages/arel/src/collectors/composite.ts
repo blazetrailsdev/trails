@@ -1,10 +1,10 @@
 type CollectorLike = {
   append(str: string): unknown;
-  addBind(value: unknown, block?: (index: number) => string): unknown;
-  addBinds?(
+  addBind(value: unknown, block: (index: number) => string): unknown;
+  addBinds(
     binds: unknown[],
-    procForBinds?: ((v: unknown) => unknown) | null,
-    block?: (index: number) => string,
+    procForBinds: ((v: unknown) => unknown) | null | undefined,
+    block: (index: number) => string,
   ): unknown;
   retryable?: boolean;
   value?: unknown;
@@ -16,21 +16,19 @@ type CollectorLike = {
  * Mirrors: Arel::Collectors::Composite
  */
 export class Composite {
-  private left: CollectorLike;
-  private right: CollectorLike;
-  preparable = true;
+  // `attr_accessor :preparable` (composite.rb:7) — no default; nil until written.
+  preparable?: boolean;
+  #retryable?: boolean;
 
-  get retryable(): boolean {
-    if ("retryable" in this.left && this.left.retryable === false) return false;
-    if ("retryable" in this.right && this.right.retryable === false) return false;
-    return true;
+  // `attr_reader :retryable` (composite.rb:8), written only by `retryable=`.
+  get retryable(): boolean | undefined {
+    return this.#retryable;
   }
 
-  set retryable(value: boolean) {
-    if ("retryable" in this.left)
-      (this.left as CollectorLike & { retryable: boolean }).retryable = value;
-    if ("retryable" in this.right)
-      (this.right as CollectorLike & { retryable: boolean }).retryable = value;
+  set retryable(retryable: boolean) {
+    this.left.retryable = retryable;
+    this.right.retryable = retryable;
+    this.#retryable = retryable;
   }
 
   constructor(left: CollectorLike, right: CollectorLike) {
@@ -38,19 +36,19 @@ export class Composite {
     this.right = right;
   }
 
-  addBind(value: unknown, block?: (index: number) => string): this {
-    this.left.addBind(value, block);
-    this.right.addBind(value, block);
+  addBind(bind: unknown, block: (index: number) => string): this {
+    this.left.addBind(bind, block);
+    this.right.addBind(bind, block);
     return this;
   }
 
   addBinds(
     binds: unknown[],
-    procForBinds?: ((v: unknown) => unknown) | null,
-    block?: (index: number) => string,
+    procForBinds: ((v: unknown) => unknown) | null | undefined,
+    block: (index: number) => string,
   ): this {
-    if (this.left.addBinds) this.left.addBinds(binds, procForBinds, block);
-    if (this.right.addBinds) this.right.addBinds(binds, procForBinds, block);
+    this.left.addBinds(binds, procForBinds, block);
+    this.right.addBinds(binds, procForBinds, block);
     return this;
   }
 
@@ -63,4 +61,7 @@ export class Composite {
     this.right.append(str);
     return this;
   }
+
+  private left: CollectorLike;
+  private right: CollectorLike;
 }

@@ -14,31 +14,23 @@ export class SQLString extends PlainString {
     super();
   }
 
-  addBind(bind: unknown, block?: (index: number) => string): this {
-    if (block) {
-      this.append(block(this.bindIndex));
-    } else {
-      this.append("?");
-    }
+  addBind(bind: unknown, block: (index: number) => string): this {
+    this.append(block(this.bindIndex));
     this.bindIndex++;
     return this;
   }
 
   addBinds(
     binds: unknown[],
-    _procForBinds?: ((v: unknown) => unknown) | null,
-    block?: (index: number) => string,
+    _procForBinds: ((v: unknown) => unknown) | null | undefined,
+    block: (index: number) => string,
   ): this {
-    if (block) {
-      const parts: string[] = [];
-      for (let i = this.bindIndex; i < this.bindIndex + binds.length; i++) {
-        parts.push(block(i));
-      }
-      this.append(parts.join(", "));
-    } else {
-      this.append(binds.map(() => "?").join(", "));
+    const parts: string[] = [];
+    for (let i = this.bindIndex; i < this.bindIndex + binds.length; i++) {
+      parts.push(block(i));
     }
     this.bindIndex += binds.length;
+    this.append(parts.join(", "));
     return this;
   }
 }

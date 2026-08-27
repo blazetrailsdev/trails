@@ -238,8 +238,8 @@ export class SelectManager extends TreeManager {
   /**
    * Add HAVING.
    */
-  having(condition: Node): this {
-    this.core.havings.push(condition);
+  having(expr: Node): this {
+    this.core.havings.push(expr);
     return this;
   }
 
@@ -325,16 +325,8 @@ export class SelectManager extends TreeManager {
   /**
    * Add ORDER BY clauses.
    */
-  order(...exprs: (Node | string | symbol)[]): this {
-    this.ast.orders.push(
-      ...exprs.map((x) =>
-        typeof x === "string"
-          ? new SqlLiteral(x)
-          : typeof x === "symbol"
-            ? new SqlLiteral(x.description ?? x.toString())
-            : x,
-      ),
-    );
+  order(...expr: (Node | string)[]): this {
+    this.ast.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
@@ -350,8 +342,8 @@ export class SelectManager extends TreeManager {
   /**
    * Add a WHERE condition.
    */
-  where(condition: Node | TreeManager): this {
-    this.core.wheres.push(condition instanceof TreeManager ? condition.ast : condition);
+  where(expr: Node | TreeManager): this {
+    this.core.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
     return this;
   }
 
@@ -429,8 +421,8 @@ export class SelectManager extends TreeManager {
   /**
    * Set WITH (CTE).
    */
-  with(...ctes: Node[]): this {
-    this.ast.with = new With(ctes);
+  with(...subqueries: Node[]): this {
+    this.ast.with = new With(subqueries);
     return this;
   }
 

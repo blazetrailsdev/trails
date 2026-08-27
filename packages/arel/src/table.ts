@@ -62,7 +62,8 @@ export class Table {
   // Rails stores whatever `name` it was handed (table.rb:16) — a String, an
   // `Arel.sql` SqlLiteral, or a node such as a NamedFunction
   // (test/cases/arel/table_test.rb:118-130).
-  readonly name: string | Node;
+  // `attr_accessor :name` (table.rb:11).
+  name: string | Node;
   readonly tableAlias: string | null;
   readonly klass?: TableKlass;
 
@@ -136,8 +137,8 @@ export class Table {
    *
    * Mirrors: Arel::Table#order
    */
-  order(...exprs: (Node | string)[]): SelectManager {
-    return this.from().order(...exprs);
+  order(...expr: (Node | string)[]): SelectManager {
+    return this.from().order(...expr);
   }
 
   /**
@@ -149,8 +150,8 @@ export class Table {
     return this.from().where(condition);
   }
 
-  project(...projections: (Node | string)[]): SelectManager {
-    return this.from().project(...projections);
+  project(...things: (Node | string)[]): SelectManager {
+    return this.from().project(...things);
   }
 
   /**

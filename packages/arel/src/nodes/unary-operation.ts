@@ -1,9 +1,5 @@
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
-import { As } from "./binary.js";
-import { SqlLiteral } from "./sql-literal.js";
-import { Ascending } from "./ascending.js";
-import { Descending } from "./descending.js";
 
 /**
  * UnaryOperation — a prefix or postfix unary operation.
@@ -20,18 +16,6 @@ export class UnaryOperation extends Unary {
   constructor(operator: string, operand: Node) {
     super(operand);
     this.operator = operator;
-  }
-
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
-  }
-
-  asc(): Ascending {
-    return new Ascending(this);
-  }
-
-  desc(): Descending {
-    return new Descending(this);
   }
 }
 

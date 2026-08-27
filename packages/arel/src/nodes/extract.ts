@@ -1,8 +1,6 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
-import { As } from "./binary.js";
-import { SqlLiteral } from "./sql-literal.js";
 
 /**
  * Represents EXTRACT(field FROM expr).
@@ -24,9 +22,5 @@ export class Extract extends Unary {
 
   override eql(other: unknown): boolean {
     return super.eql(other) && rbEqual(this.field, (other as Extract).field);
-  }
-
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 }
