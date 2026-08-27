@@ -69,10 +69,7 @@ describe("NodesTest", () => {
       expect(out).toMatch(/-> \d+ \[label="right"\]/);
     });
   });
-});
 
-describe("NodesTest", () => {
-  const users = new Table("users");
   describe("Binary", () => {
     it("generates a hash based on its value", () => {
       const a = new Nodes.Equality(users.get("id"), new Nodes.Quoted(1));
