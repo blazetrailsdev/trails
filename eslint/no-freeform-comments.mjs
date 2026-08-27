@@ -33,9 +33,9 @@
  *
  * Keep-rule 1 is NOT unconditional. A JSDoc block is kept when it documents
  * something — when it is the leading comment of a declaration, of a class /
- * interface / object member, or of a top-level statement (a `describe(...)`
- * file header, an `include(...)` mixin-wiring note). That is where every port
- * convention lives and where ordinary API documentation lives, and neither is
+ * interface / object member, of a parameter, or of a definition-shaped
+ * statement (a `describe(...)` file header, an `it(...)` header, an assignment
+ * that names what it assigns). That is where every port convention lives and where ordinary API documentation lives, and neither is
  * touched.
  *
  * A JSDoc block that is NOT in a documenting position — floating between
@@ -143,11 +143,11 @@ const JSDOC_TAG_RE = /^[\s*]*@\w/mu;
 
 /**
  * Node types that a JSDoc block can document: declarations, class / interface
- * / object members, and enum members. Anything whose parent is `Program` also
- * counts — a top-level `describe(...)` file header or an `include(...)`
- * mixin-wiring note documents the file, which is a real documenting position
- * even though it is a statement rather than a declaration. So does a
- * block-taking call at any depth (see `isBlockTakingCall`).
+ * / object members, and enum members. A statement is NOT one of them, at any
+ * scope — a bare `registerFoo();` at module scope documents no more than one
+ * inside a body does, and exempting it would reopen this rule's bypass one
+ * scope up. The statements that DO document something are definition-shaped,
+ * and `isDefinitionStatement` recognises those wherever they sit.
  */
 const DOCUMENTABLE_TYPES = new Set([
   "VariableDeclaration",
@@ -179,17 +179,29 @@ const DOCUMENTABLE_TYPES = new Set([
 ]);
 
 /**
- * A call that takes a function is Ruby-block-shaped: `describe(...)`,
- * `it(...)`, `include(Model, Mixin)` all DEFINE something, so a JSDoc block
- * above one documents that definition the same way one above a `function`
- * documents the function. Narration sits above an `if`, a `return`, an
- * assignment or a bare call — none of which define anything.
+ * A statement that DEFINES something, which a JSDoc block above it documents
+ * the same way one above a `function` documents the function:
+ *
+ *   - a call taking a function, which is Ruby-block-shaped — `describe(...)`,
+ *     `it(...)`, `beforeEach(...)`. Recognised at any depth: at module scope
+ *     for a `describe(...)` file header, nested for the `it(...)` headers
+ *     inside it.
+ *   - an assignment, which names the thing it assigns —
+ *     `taggedLogging.logger = function (...)`, and the repo's own mixin idiom
+ *     `Model.aliasAttribute = aliasAttribute`.
+ *
+ * Narration sits above an `if`, a `return` or a bare call — none of which
+ * define anything, at any scope. The packages' `include(Model, Mixin)`
+ * mixin-wiring notes take no function and are kept by rule 2 instead: every
+ * one of them cites the Ruby `include` it mirrors, which is what tells it
+ * apart from a bare call.
  */
-function isBlockTakingCall(node) {
+function isDefinitionStatement(node) {
   if (node.type !== "ExpressionStatement") return false;
-  const call = node.expression;
-  if (call?.type !== "CallExpression") return false;
-  return call.arguments.some(
+  const expression = node.expression;
+  if (expression?.type === "AssignmentExpression") return true;
+  if (expression?.type !== "CallExpression") return false;
+  return expression.arguments.some(
     (arg) => arg.type === "FunctionExpression" || arg.type === "ArrowFunctionExpression",
   );
 }
@@ -201,9 +213,8 @@ function isParameter(node) {
 
 function isDocumentable(node) {
   if (DOCUMENTABLE_TYPES.has(node.type)) return true;
-  if (node.parent?.type === "Program") return true;
   if (isParameter(node)) return true;
-  return isBlockTakingCall(node);
+  return isDefinitionStatement(node);
 }
 
 function isKept(group, attachedJsDoc) {

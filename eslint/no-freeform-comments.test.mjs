@@ -170,11 +170,17 @@ tester.run("no-freeform-comments (JSDoc must document something)", rule, {
     { code: `const o = {\n  /** Wrap as EXISTS(subquery). */\n  exists: 1,\n};\n` },
     // A parameter, which JSDoc documents in place as often as by `@param`.
     { code: `function f(\n  /** The engine. */\n  engine: number,\n) {\n  return engine;\n}\n` },
-    // A block-taking call defines something, at top level or nested: the
-    // `describe(...)` file headers and `include(...)` mixin-wiring notes the
-    // packages already carry, and the `it(...)` headers inside them.
+    // A definition-shaped statement, at top level or nested: the
+    // `describe(...)` file headers the packages already carry, the `it(...)`
+    // headers inside them, and an assignment that names what it assigns (the
+    // repo's `Model.aliasAttribute = aliasAttribute` mixin idiom). Being
+    // top-level is NOT what earns the keep — see the bare-statement case in
+    // `invalid`.
     { code: `/** What this file covers. */\ndescribe("Relation", () => {});\n` },
-    { code: `/** Wires the query methods in. */\ninclude(Relation, QueryMethods);\n` },
+    { code: `/** Convenience factory. */\ntaggedLogging.logger = function () {};\n` },
+    {
+      code: `/** Mixed in from attribute-methods.ts. */\nModel.aliasAttribute = aliasAttribute;\n`,
+    },
     {
       code: `describe("Relation", () => {\n  /** Why this asserts the property and not the boot baseline. */\n  it("fingerprints deterministically", () => {});\n});\n`,
     },
@@ -182,6 +188,13 @@ tester.run("no-freeform-comments (JSDoc must document something)", rule, {
     // the port's own conventions and tooling reads several of them.
     { code: `function f() {\n  /**\n   * @internal\n   */\n  return 1;\n}\n` },
     { code: `function f() {\n  /** Mirrors: query_methods.rb:1604. */\n  return 1;\n}\n` },
+    // Every `include(...)` mixin-wiring note in the packages is of this shape:
+    // it cites the Ruby include it mirrors, so rule 2 keeps it. `include(C, M)`
+    // takes no function, so position alone would not — and should not, since
+    // nothing distinguishes an uncited one from `registerFoo()` below.
+    {
+      code: `/** Mirrors attribute.rb:6-10, in Rails' include order. */\ninclude(Attribute, Expressions);\n`,
+    },
     // A file with no statements has no documenting position to attach to, so
     // its comments are the whole file and are kept rather than erased.
     { code: `/** This file is intentionally empty. */\n` },
@@ -191,6 +204,14 @@ tester.run("no-freeform-comments (JSDoc must document something)", rule, {
     {
       code: `function f() {\n  /** now we add the two numbers */\n  return 1 + 1;\n}\n`,
       output: `function f() {\n  return 1 + 1;\n}\n`,
+      errors: [{ messageId: "floatingJsDoc" }],
+    },
+    // Module scope is not a documenting position either. A bare top-level
+    // statement documents no more than one inside a body does, so exempting it
+    // would reopen this bypass one scope up.
+    {
+      code: `/** now register the thing */\nregisterFoo();\n`,
+      output: `registerFoo();\n`,
       errors: [{ messageId: "floatingJsDoc" }],
     },
     // Floating before a branch, before a bare call, and at the end of a block.
