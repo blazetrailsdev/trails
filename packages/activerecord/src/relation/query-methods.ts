@@ -30,7 +30,7 @@ import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
-import { any, compactBlank, foreignKey, wrap } from "@blazetrails/activesupport";
+import { any, compactBlank, foreignKey, rbEqual, rbHash, wrap } from "@blazetrails/activesupport";
 
 /**
  * Provides chainable where.not(), where.associated(), where.missing().
@@ -602,13 +602,13 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   const seenStrings = new Set<string>();
   const seenNodeHashes = new Map<number, Nodes.Node[]>();
   const nodeIsDuplicate = (node: Nodes.Node): boolean => {
-    const h = node.hash();
+    const h = rbHash(node);
     const bucket = seenNodeHashes.get(h);
     if (!bucket) return false;
-    return bucket.some((n) => n.eql(node));
+    return bucket.some((n) => rbEqual(n, node));
   };
   const addNodeToSeen = (node: Nodes.Node): void => {
-    const h = node.hash();
+    const h = rbHash(node);
     const bucket = seenNodeHashes.get(h);
     if (bucket) bucket.push(node);
     else seenNodeHashes.set(h, [node]);

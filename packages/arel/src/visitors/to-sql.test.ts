@@ -308,7 +308,7 @@ describe("the to_sql visitor", () => {
   describe("Nodes::Fragments", () => {
     it("can be built by adding SQL fragments one at a time", () => {
       let fragments = sql("SELECT foo, bar").plus(sql("FROM customers"));
-      fragments = fragments.join(sql("GROUP BY foo"));
+      fragments = fragments.plus(sql("GROUP BY foo"));
       expect(mustBeLike(compile(fragments))).toBe(
         mustBeLike("SELECT foo, bar FROM customers GROUP BY foo"),
       );

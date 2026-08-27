@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/activesupport";
+import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -71,6 +71,26 @@ export class BoundSqlLiteral extends NodeExpression {
       this.positionalBinds = null;
       this.namedBinds = namedBinds;
     }
+  }
+
+  // Mirrors Arel::Nodes::BoundSqlLiteral#hash / #eql? / #== (bound_sql_literal.rb:41-52).
+  hash(): number {
+    return rbHash([
+      this.constructor,
+      this.sqlWithPlaceholders,
+      this.positionalBinds,
+      this.namedBinds,
+    ]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof BoundSqlLiteral &&
+      this.constructor === other.constructor &&
+      rbEqual(this.sqlWithPlaceholders, other.sqlWithPlaceholders) &&
+      rbEqual(this.positionalBinds, other.positionalBinds) &&
+      rbEqual(this.namedBinds, other.namedBinds)
+    );
   }
 
   // Mirrors Arel::Nodes::BoundSqlLiteral#+ — concatenates with another

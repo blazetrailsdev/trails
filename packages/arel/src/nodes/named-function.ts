@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import type { NodeOrValue } from "./binary.js";
 import { Function } from "./function.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -16,6 +17,15 @@ export class NamedFunction extends Function {
     super(expressions, aliasName ?? null);
     this.name = name;
     this.distinct = distinct;
+  }
+
+  // Mirrors Arel::Nodes::NamedFunction#hash / #eql? / #== (named_function.rb:12-20).
+  override hash(): number {
+    return (super.hash() ^ rbHash(this.name)) >>> 0;
+  }
+
+  override eql(other: unknown): boolean {
+    return super.eql(other) && rbEqual(this.name, (other as NamedFunction).name);
   }
 
   /**

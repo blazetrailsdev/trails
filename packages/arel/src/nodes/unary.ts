@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { _setNot } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -13,6 +14,19 @@ export class Unary extends NodeExpression {
   constructor(expr: unknown) {
     super();
     this.expr = expr;
+  }
+
+  // Mirrors Arel::Nodes::Unary#hash / #eql? / #== (unary.rb:13-22).
+  hash(): number {
+    return rbHash(this.expr);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Unary &&
+      this.constructor === other.constructor &&
+      rbEqual(this.expr, other.expr)
+    );
   }
 }
 

@@ -1,3 +1,4 @@
+import { rbEqual } from "@blazetrails/activesupport";
 /**
  * WhereClause — manages WHERE predicates on a Relation.
  *
@@ -139,7 +140,7 @@ export class WhereClause {
       // `String#==` in Ruby; a JS primitive has no method to dispatch, so it is
       // seated in the SqlLiteral whose `eql` is that same `String#==`.
       this.predicates.every((predicate, i) =>
-        (typeof predicate === "string" ? sql(predicate) : predicate).eql(other.predicates[i]),
+        rbEqual(typeof predicate === "string" ? sql(predicate) : predicate, other.predicates[i]),
       )
     );
   }
@@ -206,10 +207,10 @@ export class WhereClause {
         // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
         // whose left expression matches one being merged in (last equality wins).
         const left = predicationLeft(node);
-        if (left !== null && exprNodes.some((e) => e.eql(left))) return false;
+        if (left !== null && exprNodes.some((e) => rbEqual(e, left))) return false;
         return true;
       }
-      if (attrNodes.some((a) => a.eql(attr))) return false;
+      if (attrNodes.some((a) => rbEqual(a, attr))) return false;
       if (colStrings.has(String(attr.name))) return false;
       const qualified = `${String(attr.relation.name)}.${attr.name}`;
       if (colStrings.has(qualified)) return false;
@@ -285,7 +286,7 @@ function subtractNodes(
 ): (Nodes.Node | string)[] {
   const result: (Nodes.Node | string)[] = [];
   for (const node of a) {
-    if (!b.some((other) => (typeof node === "string" ? sql(node) : node).eql(other))) {
+    if (!b.some((other) => rbEqual(typeof node === "string" ? sql(node) : node, other))) {
       result.push(node);
     }
   }
@@ -350,7 +351,7 @@ function unionNodes(
   for (const node of b) {
     if (
       !result.some((existing) =>
-        (typeof existing === "string" ? sql(existing) : existing).eql(node),
+        rbEqual(typeof existing === "string" ? sql(existing) : existing, node),
       )
     ) {
       result.push(node);
@@ -377,7 +378,7 @@ function extractAttribute(node: Nodes.Node | string): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
   fetchAttribute(node, (attr: Nodes.Node) => {
     if (!(attr instanceof Nodes.Attribute)) return true;
-    if (attrNode !== null && !attrNode.eql(attr)) {
+    if (attrNode !== null && !rbEqual(attrNode, attr)) {
       attrNode = null;
       return false;
     }

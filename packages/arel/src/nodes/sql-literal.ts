@@ -1,4 +1,4 @@
-import { ArgumentError, isBlank, type Included } from "@blazetrails/activesupport";
+import { ArgumentError, isBlank, rbHash, type Included } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
@@ -44,9 +44,21 @@ export class SqlLiteral extends Node {
    * method declares them, and TypeScript cannot subclass the string primitive.
    * No amount of porting removes this name.
    */
-  override eql(other: unknown): boolean {
+  eql(other: unknown): boolean {
     if (typeof other === "string") return this.value === other;
     return other instanceof SqlLiteral && this.value === other.value;
+  }
+
+  /**
+   * The `hash` half of the pair above, and inherited from String for the same
+   * reason: `String#hash` is over the text alone.
+   *
+   * @noRailsEquivalent PERMANENT: `SqlLiteral < String` (sql_literal.rb:5), so
+   * `hash` arrives by inheritance and no `sql_literal.rb` method declares it;
+   * TypeScript cannot subclass the string primitive.
+   */
+  hash(): number {
+    return rbHash(this.value);
   }
 
   /** Mirrors: `encode_with(coder)` (sql_literal.rb:18-20). */
@@ -81,10 +93,6 @@ export class SqlLiteral extends Node {
   /** @internal */
   quotedNode(other: unknown): Node {
     return other instanceof Node ? other : buildQuoted(other, this);
-  }
-
-  join(other: Node): Fragments {
-    return new Fragments([this, other]);
   }
 
   // Mirrors Arel::Nodes::SqlLiteral#+ (sql_literal.rb:25-29), including the

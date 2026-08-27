@@ -1,6 +1,6 @@
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
-import { include } from "@blazetrails/activesupport";
+import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { _Attribute, _Equality, _In } from "../node-slots.js";
 import { Node } from "./node.js";
@@ -113,6 +113,20 @@ export class Binary extends NodeExpression {
     super();
     this.left = left;
     this.right = right;
+  }
+
+  // Mirrors Arel::Nodes::Binary#hash / #eql? / #== (binary.rb:19-29).
+  hash(): number {
+    return rbHash([this.constructor, this.left, this.right]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Binary &&
+      this.constructor === other.constructor &&
+      rbEqual(this.left, other.left) &&
+      rbEqual(this.right, other.right)
+    );
   }
 
   // Mirrors Arel::Nodes::Binary#initialize_copy (binary.rb:14-18), which Ruby

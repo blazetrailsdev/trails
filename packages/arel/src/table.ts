@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
 import { _engine, ArelEngine, Node } from "./nodes/node.js";
@@ -192,32 +193,20 @@ export class Table extends Node {
     return new Attribute(table ?? this, resolved);
   }
 
-  /**
-   * Mirrors: Arel::Table#hash — only name (Rails excludes aliases to avoid loops).
-   */
-  override hash(): number {
-    // Rails hashes `@name` whatever it is (table.rb:88-93); a node name hashes
-    // by its own `hash`.
-    if (typeof this.name !== "string") return this.name.hash();
-    let h = 0x811c9dc5;
-    for (let i = 0; i < this.name.length; i++) {
-      h ^= this.name.charCodeAt(i);
-      h = Math.imul(h, 0x01000193);
-    }
-    return h >>> 0;
+  // Mirrors Arel::Table#hash / #eql? / #== (table.rb:88-100). The perf note
+  // there is why `aliases` and `table_alias` stay out of the hash: an alias can
+  // loop back to this table.
+  hash(): number {
+    return rbHash(this.name);
   }
 
-  /**
-   * Mirrors: Arel::Table#eql? — compares name and tableAlias (not klass).
-   * Rails excludes aliases array and engine from the hash to avoid loops.
-   */
   eql(other: unknown): boolean {
-    if (!(other instanceof Table)) return false;
-    // Ruby's `self.name == other.name` is value equality, so a SqlLiteral or
-    // node name compares by content, not identity.
-    const sameName =
-      this.name instanceof Node ? this.name.eql(other.name) : this.name === other.name;
-    return sameName && this.tableAlias === other.tableAlias;
+    return (
+      other instanceof Table &&
+      this.constructor === other.constructor &&
+      rbEqual(this.name, other.name) &&
+      rbEqual(this.tableAlias, other.tableAlias)
+    );
   }
 
   typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {

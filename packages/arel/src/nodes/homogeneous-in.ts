@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
 import { Attribute as AMAttribute, defaultValue } from "@blazetrails/activemodel";
@@ -12,6 +13,21 @@ export class HomogeneousIn extends Node {
     this.values = values;
     this.attribute = attribute;
     this.type = type;
+  }
+
+  // Mirrors Arel::Nodes::HomogeneousIn#hash / #eql? / #== (homogeneous_in.rb:13-21).
+  // `super` there is `Object#eql?` — identity — since Node defines none.
+  hash(): number {
+    return rbHash(this.ivars());
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      this === other ||
+      (other instanceof HomogeneousIn &&
+        this.constructor === other.constructor &&
+        rbEqual(this.ivars(), other.ivars()))
+    );
   }
 
   isEquality(): boolean {
@@ -89,9 +105,7 @@ export class HomogeneousIn extends Node {
 
   // Mirrors Arel::Nodes::HomogeneousIn#ivars — protected helper Rails
   // uses to fold this node's identity into hash/eql? comparisons.
-  // Trails' `eql()` / `hash()` from Node already walk every own
-  // property so this isn't called internally; kept for Rails-fidelity
-  // / parity:api privates coverage.
+  // `hash` / `eql?` above both fold through it, as Rails does.
   protected ivars(): [Node, unknown[], HomogeneousIn["type"]] {
     return [this.attribute, this.values, this.type];
   }

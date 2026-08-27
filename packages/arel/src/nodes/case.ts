@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -42,6 +43,21 @@ export class Case extends NodeExpression {
     this.default = new Else(buildQuoted(result === undefined ? null : result));
     return this;
   }
+  // Mirrors Arel::Nodes::Case#hash / #eql? / #== (case.rb:35-46).
+  hash(): number {
+    return rbHash([this.case, this.conditions, this.default]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Case &&
+      this.constructor === other.constructor &&
+      rbEqual(this.case, other.case) &&
+      rbEqual(this.conditions, other.conditions) &&
+      rbEqual(this.default, other.default)
+    );
+  }
+
   // Mirrors Arel::Nodes::Case#then — sets the right side of the most
   // recent When clause. Rails: `@conditions.last.right = build_quoted(expression)`.
   // Rails raises NoMethodError on `nil.right=` if no #when has been called;

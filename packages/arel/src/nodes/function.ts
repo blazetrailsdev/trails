@@ -1,3 +1,4 @@
+import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
@@ -35,6 +36,21 @@ export class Function extends NodeExpression {
   as(aliaz: string): this {
     this.alias = aliaz;
     return this;
+  }
+
+  // Mirrors Arel::Nodes::Function#hash / #eql? / #== (function.rb:21-32).
+  hash(): number {
+    return rbHash([this.expressions, this.alias, this.distinct]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Function &&
+      this.constructor === other.constructor &&
+      rbEqual(this.expressions, other.expressions) &&
+      rbEqual(this.alias, other.alias) &&
+      rbEqual(this.distinct, other.distinct)
+    );
   }
 }
 

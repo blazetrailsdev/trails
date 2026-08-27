@@ -680,6 +680,7 @@ export { currentTimeInstant } from "./time-travel.js";
 
 export { Range } from "./range-ext.js";
 export { rbEqual } from "./rb-equal.js";
+export { rbHash } from "./rb-hash.js";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 export { overlap, overlaps } from "./core-ext/range/overlap.js";
 // Note: core-ext/range's conversions and each are intentionally kept as subpath

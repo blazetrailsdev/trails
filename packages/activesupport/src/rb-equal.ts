@@ -22,5 +22,30 @@ export function rbEqual(a: unknown, b: unknown): boolean {
   if (typeof (a as { eql?: unknown }).eql === "function") {
     return (a as { eql(other: unknown): boolean }).eql(b);
   }
+  // Ruby's `Array#==` compares elementwise with `==`, and `Date#==` /
+  // `Time#==` compare by value — both are `rb_equal` sends of their own, and a
+  // JS `===` on either is reference equality.
+  if (Array.isArray(a)) {
+    return (
+      Array.isArray(b) && a.length === b.length && a.every((element, i) => rbEqual(element, b[i]))
+    );
+  }
+  // boundary: a JS Date is one of the values a ported `==` is handed, and
+  // Ruby's `Date#==` / `Time#==` compare by value where JS `===` does not.
+  if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
+  // A plain object stands in for a Ruby Hash, whose `==` compares keys and
+  // values rather than identity.
+  if (isPlainObject(a)) {
+    if (!isPlainObject(b)) return false;
+    const keys = Object.keys(a);
+    return (
+      keys.length === Object.keys(b).length &&
+      keys.every((key) => key in b && rbEqual(a[key], b[key]))
+    );
+  }
   return false;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && value.constructor === Object;
 }
