@@ -202,7 +202,7 @@ export class Column implements Deduplicable {
    * Ruby's registry is a Hash keyed by the object itself, which works because
    * Rails pairs `==`/`eql?` with `hash`; a JS `Map` keys by identity, so the
    * port needs an explicit string key over exactly those attributes.
-   * @noRailsEquivalent PERMANENT Ruby pairs Column#== with Column#hash so a Hash dedupes it (column.rb:75-88); a JS Map keys by identity and needs an explicit key.
+   * @noRailsEquivalent PERMANENT Ruby pairs Column#== with Column#hash so a Hash dedupes it (connection_adapters/column.rb:75-88); a JS Map keys by identity and needs an explicit key.
    */
   deduplicateKey(): string {
     return JSON.stringify([

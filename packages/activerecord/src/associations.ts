@@ -338,7 +338,7 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
  * the wider, fallback-only namespace — `registerSubclass` and `Base.adapter=`
  * must not promote a throwaway subclass into association resolution).
  * @internal
- * @noRailsEquivalent PERMANENT Ruby binds a model to a constant with const_set and Zeitwerk (inheritance.rb:280); JS has no constant table to write through.
+ * @noRailsEquivalent PERMANENT Ruby resolves a model name through `type_name.constantize` and lets Zeitwerk define the constant (inheritance.rb:196); JS has no constant table to register into.
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
   guardCanonicalNameShadow(name, model);
@@ -443,7 +443,7 @@ export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeo
  * No-op when the name already resolves or the index has no entry, so a genuine
  * miss still leaves `constantize` to raise.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby's const_get runs the autoloader on a miss (inheritance.rb:280); JS module resolution has no such hook.
+ * @noRailsEquivalent PERMANENT `constantize` runs Zeitwerk's autoloader on a miss (inheritance.rb:196); JS module resolution has no such hook.
  */
 export function autoloadModel(name: string): void {
   // `constantize` strips a leading `::` itself; the registry and the index are
@@ -490,7 +490,7 @@ export function resolveAssocClass(
  * Throws InverseOfAssociationNotFoundError if not found.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the InverseOfAssociationNotFoundError raise of Association#initialize (association.rb:37), extracted from the macro path.
+ * @noRailsEquivalent CONVERGEABLE the InverseOfAssociationNotFoundError raise of Association#initialize (association.rb:41), extracted from the macro path.
  */
 export function validateInverseOf(
   owner: typeof Base,
@@ -1216,7 +1216,7 @@ export async function _loadSingularViaStatementCache(
  * Sync loaded result to the association instance if one exists.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE writes the loaded target Ruby sets inline via `association.target =` (association.rb:52).
+ * @noRailsEquivalent CONVERGEABLE writes the loaded target Ruby sets inline via `association.target =` (association.rb:102).
  */
 export function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
   const holder = record._associationInstances.get(assocName) as

@@ -77,7 +77,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby's SchemaCreation delegates type_to_sql to the adapter (abstract/schema_creation.rb:14-20); ours must override to route back.
+   * @noRailsEquivalent CONVERGEABLE Ruby's SchemaCreation delegates type_to_sql to the adapter (abstract/schema_creation.rb:16-20); ours must override to route back.
    */
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     if (options.array && type !== "primary_key") {
@@ -192,7 +192,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby dispatches visit_#{o.class} dynamically (abstract/schema_creation.rb:8); our manual chain must be extended per adapter.
+   * @noRailsEquivalent CONVERGEABLE Ruby dispatches visit_#{o.class} dynamically (abstract/schema_creation.rb:11); our manual chain must be extended per adapter.
    */
   override accept(
     o:
@@ -265,7 +265,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE MySQL::SchemaCreation#add_column_options! (mysql/schema_creation.rb:66) without the Ruby bang suffix.
+   * @noRailsEquivalent CONVERGEABLE MySQL::SchemaCreation#add_column_options! (mysql/schema_creation.rb:62) without the Ruby bang suffix.
    */
   override async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const mo = options as MysqlColumnOptions;

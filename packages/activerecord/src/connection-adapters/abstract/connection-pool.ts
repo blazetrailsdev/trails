@@ -1114,7 +1114,7 @@ export class ConnectionPool implements ReapablePool {
    * discarded. Not a Rails counterpart — Rails' `discard!` is fully synchronous.
    *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE ConnectionPool#discard! (connection_pool.rb:530) with the async close drains Ruby's fully-synchronous discard has nothing to return.
+   * @noRailsEquivalent CONVERGEABLE ConnectionPool#discard! (connection_pool.rb:484) with the async close drains Ruby's fully-synchronous discard has nothing to return.
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();

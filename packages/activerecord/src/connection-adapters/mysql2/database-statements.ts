@@ -87,7 +87,7 @@ const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
  * the PostgreSQL adapter's `cast_result` (which Rails' `column_types` slicing
  * reads by name in `JoinDependency#instantiate`).
  * @internal
- * @noRailsEquivalent CONVERGEABLE builds the column_types map Ruby's cast_result reads (postgresql/database_statements.rb:97) from node-mysql2 field descriptors.
+ * @noRailsEquivalent CONVERGEABLE builds the column_types map Ruby's cast_result reads (postgresql/database_statements.rb:171) from node-mysql2 field descriptors.
  */
 export function buildColumnTypes(
   fields: ReadonlyArray<Mysql2FieldDescriptor>,
@@ -255,7 +255,7 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
  * + first-result semantics), using `rawFields[0]` for the field descriptors
  * (or undefined for DML-only, matching Rails' `fields.empty?` check).
  * @internal
- * @noRailsEquivalent CONVERGEABLE the first-result-set selection Ruby gets from abandon_results! (mysql2/database_statements.rb:70).
+ * @noRailsEquivalent CONVERGEABLE the first-result-set selection Ruby gets from abandon_results! (mysql2/database_statements.rb:100).
  */
 export function unwrapMultiResult(
   rawResult: unknown,

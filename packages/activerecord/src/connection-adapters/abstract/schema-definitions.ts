@@ -12,7 +12,7 @@ import {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE Ruby splats column names with Array() at each use site (schema_statements.rb:1258); named here so the arms share one spelling.
+ * @noRailsEquivalent CONVERGEABLE Ruby splats column names with Array() at each use site (abstract/schema_statements.rb:1173); named here so the arms share one spelling.
  */
 export function splitColumnNames(
   args: unknown[],
@@ -207,7 +207,7 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
  * many `column`s as `primaryKey`s. `Array(nil)` is empty in Ruby, so a lone
  * array with no counterpart also mismatches.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the composite-arity guard Ruby writes inline in add_foreign_key (schema_statements.rb:1258-1266).
+ * @noRailsEquivalent CONVERGEABLE the composite-arity guard Ruby writes inline in add_foreign_key (abstract/schema_statements.rb:1173-1266).
  */
 export function assertCompositeForeignKeyArity(
   toTable: string,
@@ -260,7 +260,7 @@ export type ForeignKeyStoredOptionKey =
  * `addForeignKey`) so `isDefinedFor` slices a defaulted key (e.g. primaryKey
  * "id") out rather than mismatching it.
  * @internal
- * @noRailsEquivalent CONVERGEABLE reproduces the key set Ruby's foreign_key_options hash carries (schema_statements.rb:1290); TS has no options hash to read keys off.
+ * @noRailsEquivalent CONVERGEABLE reproduces the key set Ruby's foreign_key_options hash carries (abstract/schema_statements.rb:1246); TS has no options hash to read keys off.
  */
 export function foreignKeyOptionsStoredKeys(
   options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,
@@ -289,7 +289,7 @@ export class ForeignKeyDefinition {
    * `options.fetch(:validate, validate)` fallback in `defined_for?`: when the
    * definition did not store `validate`, a `validate` lookup is ignored.
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby reads `options.fetch(:validate, validate)` off the raw hash in defined_for? (schema_definitions.rb:126); TS has no such hash.
+   * @noRailsEquivalent PERMANENT Ruby reads `options.fetch(:validate, validate)` off the raw hash in defined_for? (abstract/schema_definitions.rb:161); TS has no such hash.
    */
   readonly storesValidate: boolean;
 
@@ -300,7 +300,7 @@ export class ForeignKeyDefinition {
    * `options.slice(*self.options.keys)`. Rails reads this off the raw options
    * hash; trails has no such hash, so we record the key set explicitly.
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby's `options.slice(*self.options.keys)` in defined_for? reads a raw hash TS does not keep (schema_definitions.rb:126).
+   * @noRailsEquivalent PERMANENT Ruby's `options.slice(*self.options.keys)` in defined_for? reads a raw hash TS does not keep (abstract/schema_definitions.rb:161).
    */
   readonly storedOptionKeys: ReadonlySet<ForeignKeyStoredOptionKey>;
 

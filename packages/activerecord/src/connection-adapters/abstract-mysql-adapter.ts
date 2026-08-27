@@ -726,7 +726,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *   end
    *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractMysqlAdapter#change_column_default_for_alter (abstract_mysql_adapter.rb:857) without the Ruby _for_alter arity split.
+   * @noRailsEquivalent CONVERGEABLE AbstractMysqlAdapter#change_column_default_for_alter (abstract_mysql_adapter.rb:370) without the Ruby _for_alter arity split.
    */
   async changeColumnDefaultForAlter(
     tableName: string,
@@ -1071,7 +1071,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `can_perform_case_insensitive_comparison_for?` override. A column whose
    * collation is already case-insensitive needs no `LOWER()` wrapper.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:702) overridden async because the collation lookup queries.
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:814) overridden async because the collation lookup queries.
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1860,7 +1860,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
  * @param createInfo - Raw output of `SHOW CREATE TABLE`
  * @param tableComment - Pre-fetched table comment (pass null if no COMMENT= in createInfo)
  * @internal
- * @noRailsEquivalent CONVERGEABLE the SHOW CREATE TABLE parsing of AbstractMysqlAdapter#table_options (abstract_mysql_adapter.rb:232), extracted for unit testing.
+ * @noRailsEquivalent CONVERGEABLE the SHOW CREATE TABLE parsing of AbstractMysqlAdapter#table_options (abstract_mysql_adapter.rb:549), extracted for unit testing.
  */
 export function parseTableOptions(
   createInfo: string,

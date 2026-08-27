@@ -212,7 +212,7 @@ export function columnNameWithOrderMatcher(): RegExp {
  * dispatch lands here instead of the nanosecond-precision abstract helper.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE MySQL inherits Quoting#quoted_date (quoting.rb:80); ours must cap Temporal's nanoseconds at microseconds for strict-mode MySQL.
+ * @noRailsEquivalent CONVERGEABLE MySQL inherits Quoting#quoted_date (abstract/quoting.rb:184); ours must cap Temporal's nanoseconds at microseconds for strict-mode MySQL.
  */
 export function quotedDate(
   value:

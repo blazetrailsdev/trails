@@ -334,7 +334,7 @@ export function extractGeneratedType(
 /**
  * Mirrors: SQLite3Adapter#extract_value_from_default
  * @internal
- * @noRailsEquivalent CONVERGEABLE SQLite3Adapter#extract_value_from_default (sqlite3_adapter.rb:709) as a free function rather than a private adapter method.
+ * @noRailsEquivalent CONVERGEABLE SQLite3Adapter#extract_value_from_default (sqlite3_adapter.rb:522) as a free function rather than a private adapter method.
  */
 export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (dfltValue === null) return null;

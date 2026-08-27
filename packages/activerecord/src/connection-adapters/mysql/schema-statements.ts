@@ -665,7 +665,7 @@ interface ForeignKeysHost {
  * their columns joined in ordinal order.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#foreign_keys
- * @noRailsEquivalent CONVERGEABLE MySQL::SchemaStatements#foreign_keys (mysql/schema_statements.rb:74) as a free function rather than a mixin method.
+ * @noRailsEquivalent CONVERGEABLE AbstractMysqlAdapter#foreign_keys (abstract_mysql_adapter.rb:465), which the port keeps in the MySQL schema-statements mixin instead.
  */
 export async function foreignKeys(
   this: ForeignKeysHost,

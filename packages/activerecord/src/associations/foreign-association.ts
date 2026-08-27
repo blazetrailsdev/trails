@@ -13,7 +13,7 @@ import type { Base } from "../base.js";
  * rung here means the receiver is `nil`, which is Ruby's NoMethodError.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE `options[:foreign_key] || reflection.foreign_key` spelled as a helper instead of inline (foreign_association.rb:11).
+ * @noRailsEquivalent CONVERGEABLE `options[:foreign_key] || reflection.foreign_key` spelled as a helper instead of inline (foreign_association.rb:5).
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,

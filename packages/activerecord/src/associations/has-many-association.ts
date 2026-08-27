@@ -531,7 +531,7 @@ function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): s
  * and the `:through` reflection, and so cannot pick a diff by inheritance —
  * can reach the same set semantics the OO association uses.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#difference, extracted so the reflection-agnostic proxy can reach it (has_many_association.rb:120).
+ * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#difference, extracted so the reflection-agnostic proxy can reach it (has_many_association.rb:158).
  */
 export function setDifference(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => !includesRecord(b, record));
@@ -539,7 +539,7 @@ export function setDifference(a: Base[], b: Base[]): Base[] {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#intersection, extracted for the same proxy path (has_many_association.rb:124).
+ * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#intersection, extracted for the same proxy path (has_many_association.rb:162).
  */
 export function setIntersection(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => includesRecord(b, record));

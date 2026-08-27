@@ -124,7 +124,7 @@ function defaultScopeMethod(modelClass: any): ((this: any) => any) | undefined {
  * Mirrors the `respond_to?(:default_scope)` clause of
  * `Scoping::Default::ClassMethods#scope_attributes?`.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby tests `respond_to?(:default_scope)` in scope_attributes? (scoping/default.rb:53); JS has no equivalent method lookup.
+ * @noRailsEquivalent PERMANENT Ruby tests `respond_to?(:default_scope)` in scope_attributes? (scoping/default.rb:55); JS has no equivalent method lookup.
  */
 export function hasDefaultScopeOverride(modelClass: any): boolean {
   return defaultScopeMethod(modelClass) !== undefined;

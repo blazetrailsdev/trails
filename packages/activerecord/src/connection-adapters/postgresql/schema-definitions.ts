@@ -341,7 +341,7 @@ export class TableDefinition extends AbstractTableDefinition {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::Table/TableDefinition's define_column_methods macro (postgresql/schema_definitions.rb:238).
+   * @noRailsEquivalent CONVERGEABLE PostgreSQL::Table/TableDefinition's define_column_methods macro (postgresql/schema_definitions.rb:185).
    */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {

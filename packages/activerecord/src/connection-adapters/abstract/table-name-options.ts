@@ -20,7 +20,7 @@ let _source: TableNameOptionsSource | null = null;
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby reads ActiveRecord::Base.table_name_prefix at call time (model_schema.rb:26); a TS import from here would close a module cycle.
+ * @noRailsEquivalent PERMANENT Ruby reads ActiveRecord::Base.table_name_prefix at call time (model_schema.rb:37); a TS import from here would close a module cycle.
  */
 export function registerTableNameOptions(source: TableNameOptionsSource): void {
   _source = source;
@@ -28,7 +28,7 @@ export function registerTableNameOptions(source: TableNameOptionsSource): void {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.table_name_prefix, which Ruby names directly (model_schema.rb:26).
+ * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.table_name_prefix, which Ruby names directly (model_schema.rb:37).
  */
 export function globalTableNamePrefix(): string {
   return _source?.tableNamePrefix ?? "";
@@ -36,7 +36,7 @@ export function globalTableNamePrefix(): string {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.table_name_suffix, which Ruby names directly (model_schema.rb:34).
+ * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.table_name_suffix, which Ruby names directly (model_schema.rb:56).
  */
 export function globalTableNameSuffix(): string {
   return _source?.tableNameSuffix ?? "";
@@ -44,7 +44,7 @@ export function globalTableNameSuffix(): string {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.pluralize_table_names, which Ruby names directly (model_schema.rb:42).
+ * @noRailsEquivalent PERMANENT lazily-wired read of ActiveRecord::Base.pluralize_table_names, which Ruby names directly (model_schema.rb:97).
  */
 export function globalPluralizeTableNames(): boolean {
   return _source?.pluralizeTableNames ?? true;
@@ -52,7 +52,7 @@ export function globalPluralizeTableNames(): boolean {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT lazily-wired call of ActiveRecord::Base.get_primary_key, which Ruby names directly (attribute_methods/primary_key.rb:98).
+ * @noRailsEquivalent PERMANENT lazily-wired call of ActiveRecord::Base.get_primary_key, which Ruby names directly (attribute_methods/primary_key.rb:103).
  */
 export function globalGetPrimaryKey(baseName: string): string {
   return _source?.getPrimaryKey(baseName) ?? "id";

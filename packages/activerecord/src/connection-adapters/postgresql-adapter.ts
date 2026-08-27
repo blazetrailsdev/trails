@@ -992,7 +992,7 @@ export class PostgreSQLAdapter
    * Mirrors: PostgreSQLAdapter#case_insensitive_comparison (via AbstractAdapter).
    * Async override: looks up the column type and checks pg_proc before emitting LOWER.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:702) overridden async because the pg_proc check queries.
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#case_insensitive_comparison (abstract_adapter.rb:814) overridden async because the pg_proc check queries.
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -2418,7 +2418,7 @@ export class PostgreSQLAdapter
    * async ping the way Rails' `active?` does.
    *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:800) re-implemented per adapter because our `active` getter is sync and cannot ping.
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:759) re-implemented per adapter because our `active` getter is sync and cannot ping.
    */
   override async verifyBang(): Promise<void> {
     // Mirrors Rails' verify! → reconnect! when active? returns false

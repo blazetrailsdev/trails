@@ -110,7 +110,7 @@ export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
  * `lookup` reads it lazily inside the call.
  *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby reads Base.connection_db_config.adapter at call time (type.rb:41); a TS import would close a module cycle.
+ * @noRailsEquivalent PERMANENT Ruby reads Base.connection_db_config.adapter at call time (active_record/type.rb:49); a TS import would close a module cycle.
  */
 export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
   _currentAdapterResolver = resolver;

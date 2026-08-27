@@ -218,7 +218,7 @@ function cachedSchemaCacheFor(
  * `table_exists?` is async here: a read taken before the schema cache is warm
  * would otherwise cache the "id" convention forever.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (primary_key.rb:78-81) as a this-typed function; Ruby's memoizes, ours re-resolves because table_exists? is async.
+ * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; Ruby's memoizes, ours re-resolves because table_exists? is async.
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
@@ -233,7 +233,7 @@ export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | nul
  * (base.ts:1157) that delegates here, so this export is redundant public
  * surface; unexporting it is RFC 0081 shape-1 work, not a seam.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (primary_key.rb:106) as a this-typed function behind the Rails-named Base accessor.
+ * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (attribute_methods/primary_key.rb:130) as a this-typed function behind the Rails-named Base accessor.
  */
 export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]): void {
   this._primaryKey = key;

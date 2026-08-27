@@ -1458,7 +1458,7 @@ function diffHooks(assoc: CollectionAssociation): {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby `target.include?(record)` compares with `==`; JS Array#includes is reference-only (collection_association.rb:333).
+ * @noRailsEquivalent PERMANENT Ruby `target.include?(record)` compares with `==`; JS Array#includes is reference-only (collection_association.rb:265).
  */
 export function includesRecord(records: Base[], record: Base): boolean {
   return records.some((r) => (r as unknown as { equals(o: unknown): boolean }).equals(record));

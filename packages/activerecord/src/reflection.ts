@@ -99,7 +99,7 @@ function arrayLen(value: string | string[]): number {
  * Returns null when no explicit column is configured.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the options[:counter_cache] normalization Ruby does inline in counter_cache_column (reflection.rb:590).
+ * @noRailsEquivalent CONVERGEABLE the options[:counter_cache] normalization Ruby does inline in counter_cache_column (reflection.rb:244).
  */
 export function counterCacheColumnOption(counterCache: unknown): string | null {
   if (typeof counterCache === "string") return counterCache;
@@ -115,7 +115,7 @@ export function counterCacheColumnOption(counterCache: unknown): string | null {
  * the explicit column, else the pluralized owner model name + `_count`.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the belongs_to? arm of Reflection#counter_cache_column (reflection.rb:590) as a free function.
+ * @noRailsEquivalent CONVERGEABLE the belongs_to? arm of Reflection#counter_cache_column (reflection.rb:244) as a free function.
  */
 export function belongsToCounterCacheColumn(
   counterCache: unknown,

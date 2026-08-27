@@ -44,7 +44,7 @@ export function bindParamsLength(): number {
  * real-bind `HomogeneousIn`).
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the bind-count guard Ruby writes inline in to_sql_and_binds (database_statements.rb:36-38), shared by the four compile paths.
+ * @noRailsEquivalent CONVERGEABLE the bind-count guard Ruby writes inline in to_sql_and_binds (abstract/database_statements.rb:36-38), shared by the four compile paths.
  */
 export function exceedsBindParamsLimit(
   conn: { preparedStatements?: boolean; bindParamsLength?(): number } | null | undefined,

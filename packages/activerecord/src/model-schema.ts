@@ -413,7 +413,7 @@ type DatabaseAdapterLike = { internalSchemaCache?: unknown };
  * for columns that carry no client-side default anyway.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE connection-free read of ModelSchema#columns_hash (model_schema.rb:437-441); retires with RFC 0073.
+ * @noRailsEquivalent CONVERGEABLE connection-free read of ModelSchema#columns_hash (model_schema.rb:427-441); retires with RFC 0073.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
   const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
@@ -1252,7 +1252,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * `connection_pool` throws where Ruby's always answers.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:591), which Ruby reaches synchronously through the schema cache.
+ * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
@@ -1505,7 +1505,7 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
  * (class-level `attribute_names`) use this since `tableExists` is async.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:200) for the sync callers; retires with RFC 0073.
+ * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:416) for the sync callers; retires with RFC 0073.
  */
 export function cachedTableExists(this: SchemaHost): boolean | undefined {
   let conn: any;

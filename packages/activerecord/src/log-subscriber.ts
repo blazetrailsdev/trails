@@ -62,7 +62,7 @@ let _baseResolver: (() => any) | null = null;
  * `log-subscriber → base → index → log-subscriber`.
  *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby names the ActiveRecord::Base constant at call time (log_subscriber.rb:22); a TS import would close a module cycle.
+ * @noRailsEquivalent PERMANENT Ruby names the ActiveRecord::Base constant at call time (log_subscriber.rb:110); a TS import would close a module cycle.
  */
 export function setBaseResolver(resolver: () => any): void {
   _baseResolver = resolver;
@@ -87,14 +87,14 @@ export function getBase(): any {
 let _verboseQueryLogs = false;
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE reads ActiveRecord.verbose_query_logs (active_record.rb:120) through the lazily-wired resolver.
+ * @noRailsEquivalent CONVERGEABLE reads ActiveRecord.verbose_query_logs (active_record.rb:329) through the lazily-wired resolver.
  */
 export function getVerboseQueryLogs(): boolean {
   return _verboseQueryLogs;
 }
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE writes ActiveRecord.verbose_query_logs (active_record.rb:120) through the same resolver.
+ * @noRailsEquivalent CONVERGEABLE writes ActiveRecord.verbose_query_logs (active_record.rb:329) through the same resolver.
  */
 export function setVerboseQueryLogs(value: boolean): void {
   _verboseQueryLogs = value;

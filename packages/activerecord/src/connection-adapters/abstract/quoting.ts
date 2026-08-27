@@ -363,7 +363,7 @@ export function unquotedFalse(): boolean {
  * this, so every adapter accepts the same union.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE Ruby's quoted_binary receives a Type::Binary::Data and calls to_s (quoting.rb:114); TS must normalize the byte-source union first.
+ * @noRailsEquivalent CONVERGEABLE Ruby's quoted_binary receives a Type::Binary::Data and calls to_s (abstract/quoting.rb:206); TS must normalize the byte-source union first.
  */
 export function toBytes(value: unknown): Uint8Array | null {
   if (value instanceof BinaryData) return value.bytes;
@@ -455,7 +455,7 @@ export function columnNameWithOrderMatcher(): RegExp {
  * API — sqlite3-adapter.ts imports it for the same branch — hence `@internal`.
  *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby writes `Arel::Nodes::SqlLiteral === value` inline at each branch (quoting.rb:34); TS cannot spell case-equality matching.
+ * @noRailsEquivalent PERMANENT Ruby writes `Arel::Nodes::SqlLiteral === value` inline at each branch (abstract/quoting.rb:206); TS cannot spell case-equality matching.
  */
 export function isSqlLiteral(value: unknown): value is { value: string } {
   return (

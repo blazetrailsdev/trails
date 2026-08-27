@@ -864,7 +864,7 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
  * equality, so two tuples with equal contents created separately
  * wouldn't match. Rails' `|` operator on order_values is structural.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby's `|` on order_values dedupes by eql?/hash; JS Array has only reference equality (association_scope.rb:114).
+ * @noRailsEquivalent PERMANENT Ruby's `|` on order_values dedupes by eql?/hash; JS Array has only reference equality (association_scope.rb:154).
  */
 export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
   const result: unknown[] = [];

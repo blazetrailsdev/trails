@@ -943,7 +943,7 @@ export type ExceptSkip = ExceptKey | (string & {});
  * reads back as its default.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the `r.values = values` assignment of SpawnMethods#relation_with (spawn_methods.rb:71-74); TS cannot await a set accessor.
+ * @noRailsEquivalent CONVERGEABLE the `r.values = values` assignment of SpawnMethods#relation_with (spawn_methods.rb:72-74); TS cannot await a set accessor.
  */
 export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
   host._values = values;
@@ -1323,7 +1323,7 @@ function uniqArray(arr: unknown[]): unknown[] {
  * falls back to per-key structural equality for plain-object specs — so
  * `leftJoins({ ":posts": "x" })` called twice folds to one entry as in Rails.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby's Array#| dedupes by eql?/hash (query_methods.rb:1272); JS Array has only reference equality.
+ * @noRailsEquivalent PERMANENT Ruby's Array#| dedupes by eql?/hash (query_methods.rb:256); JS Array has only reference equality.
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
   if (a instanceof JoinDependency || b instanceof JoinDependency) return a === b;
@@ -2247,7 +2247,7 @@ export function processWithArgs(
 /** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby's Object#to_i coercion (query_methods.rb:1004) has no JS equivalent that matches its string and nil arms.
+ * @noRailsEquivalent PERMANENT Ruby's Object#to_i coercion (query_methods.rb:1758) has no JS equivalent that matches its string and nil arms.
  */
 export function toI(value: unknown): number {
   if (value == null) return 0;

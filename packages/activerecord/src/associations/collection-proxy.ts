@@ -232,7 +232,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * for both `string` and `string[]` primary-key values; records whose key is
    * not yet assigned (new records) are skipped. Used by the migration stories
    * to dedup proxy writes against the canonical store.
-   * @noRailsEquivalent CONVERGEABLE index over the same target array Ruby scans inline in CollectionAssociation#find_by_scan (collection_association.rb:399).
+   * @noRailsEquivalent CONVERGEABLE index over the same target array Ruby scans inline in CollectionAssociation#find_by_scan (collection_association.rb:521).
    */
   targetsByPrimaryKey(): Map<string, T> {
     const byKey = new Map<string, T>();
@@ -245,7 +245,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal Owner record — used by AssociationRelation.
-   * @noRailsEquivalent CONVERGEABLE mirrors Association#owner (association.rb:16); it belongs on the Association object, which our proxy stands in for.
+   * @noRailsEquivalent CONVERGEABLE mirrors Association#owner (association.rb:36); it belongs on the Association object, which our proxy stands in for.
    */
   get owner(): Base {
     return this._record;
@@ -271,7 +271,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * in `Reflection.addReflection`), so there is no reflection-less association
    * to fall back for.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE mirrors Association#reflection (association.rb:16); it belongs on the Association object, which our proxy stands in for.
+   * @noRailsEquivalent CONVERGEABLE mirrors Association#reflection (association.rb:37); it belongs on the Association object, which our proxy stands in for.
    */
   get reflection(): AssociationDefinition {
     const ctor = this._record.constructor as typeof Base;
@@ -294,7 +294,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal Association name — used by AssociationRelation.
-   * @noRailsEquivalent CONVERGEABLE mirrors `reflection.name` as Ruby reads it off the association (association.rb:16).
+   * @noRailsEquivalent CONVERGEABLE mirrors `reflection.name` as Ruby reads it off the association (association.rb:37).
    */
   get associationName(): string {
     return this._assocName;

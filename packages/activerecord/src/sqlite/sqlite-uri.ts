@@ -1,5 +1,5 @@
 /**
- * @noRailsEquivalent PERMANENT Rails leaves file:/:memory: handling to SQLITE_OPEN_URI inside the sqlite3 gem (sqlite3_adapter.rb:82); the JS drivers disagree about it, so trails resolves the URI itself.
+ * @noRailsEquivalent PERMANENT Rails leaves file:/:memory: handling to SQLITE_OPEN_URI inside the sqlite3 gem (sqlite3_adapter.rb:34); the JS drivers disagree about it, so trails resolves the URI itself.
  */
 
 /**
@@ -20,7 +20,7 @@
  * a shared-cache in-memory URI rather than the bare `:memory:` alias.
  *
  * @internal
- * @noRailsEquivalent PERMANENT Rails compares the config database against the literal ":memory:" inline (sqlite3_adapter.rb:82); the sqlite3_mem lane needs a URI-aware predicate.
+ * @noRailsEquivalent PERMANENT Rails compares the config database against the literal ":memory:" inline (sqlite3_adapter.rb:34); the sqlite3_mem lane needs a URI-aware predicate.
  */
 export function isInMemoryDatabase(database: string): boolean {
   if (database === ":memory:") return true;
@@ -44,7 +44,7 @@ export function isInMemoryDatabase(database: string): boolean {
  * `databaseExists()` checks the path `open()` actually uses; only `file:/...`
  * / `file://host/...` is absolute.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the file:/:memory: handling Ruby leaves to SQLITE_OPEN_URI in SQLite3Adapter.new_client (sqlite3_adapter.rb:82).
+ * @noRailsEquivalent CONVERGEABLE the file:/:memory: handling Ruby leaves to SQLITE_OPEN_URI in SQLite3Adapter.new_client (sqlite3_adapter.rb:34).
  */
 export function resolveUriDatabasePath(database: string): string | null {
   if (database === ":memory:") return null;

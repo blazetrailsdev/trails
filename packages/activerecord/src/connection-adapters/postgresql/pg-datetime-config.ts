@@ -1,5 +1,5 @@
 /**
- * @noRailsEquivalent PERMANENT Rails keeps the datetime_type alias on the adapter class itself (postgresql_adapter.rb:87); TS cannot mutate a class-level type registry from the dumper, so the alias lives in its own module.
+ * @noRailsEquivalent PERMANENT Rails keeps the datetime_type alias on the adapter class itself (postgresql_adapter.rb:123); TS cannot mutate a class-level type registry from the dumper, so the alias lives in its own module.
  */
 
 /**
@@ -24,7 +24,7 @@ export const pgDatetimeConfig = {
  * what re-introspecting the column would yield.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE OID::DateTime#real_type_unless_aliased (postgresql/oid/date_time.rb:20) as a free function; the dumper has no type instance to call.
+ * @noRailsEquivalent CONVERGEABLE OID::DateTime#real_type_unless_aliased (postgresql/oid/date_time.rb:29) as a free function; the dumper has no type instance to call.
  */
 export function pgRealTypeUnlessAliased(physicalType: string): string {
   return pgDatetimeConfig.datetimeType === physicalType ? "datetime" : physicalType;

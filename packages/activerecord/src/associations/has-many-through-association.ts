@@ -494,7 +494,7 @@ export interface BuiltThroughInverse {
  * Rails-mirroring file; the proxy's `build` path calls in via this helper.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the inverse half of HasManyThroughAssociation#build_record (has_many_through_association.rb:96-109), extracted for the proxy's build path.
+ * @noRailsEquivalent CONVERGEABLE the inverse half of HasManyThroughAssociation#build_record (has_many_through_association.rb:90-109), extracted for the proxy's build path.
  */
 export function buildThroughInverseFor(
   owner: Base,
@@ -797,7 +797,7 @@ function markOccurrence(distribution: Occurrences, record: Base): boolean {
  * over the same `distribution`/`markOccurrence` pair those methods use, exposed
  * for the `CollectionProxy` replace path (see `setDifference`).
  * @internal
- * @noRailsEquivalent CONVERGEABLE the body of HasManyThroughAssociation#difference, extracted for the proxy replace path (has_many_through_association.rb:129).
+ * @noRailsEquivalent CONVERGEABLE the body of HasManyThroughAssociation#difference, extracted for the proxy replace path (has_many_through_association.rb:177).
  */
 export function multisetDifference(a: Base[], b: Base[]): Base[] {
   const buckets = distribution(b);
@@ -806,7 +806,7 @@ export function multisetDifference(a: Base[], b: Base[]): Base[] {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE the body of HasManyThroughAssociation#intersection, same extraction (has_many_through_association.rb:133).
+ * @noRailsEquivalent CONVERGEABLE the body of HasManyThroughAssociation#intersection, same extraction (has_many_through_association.rb:183).
  */
 export function multisetIntersection(a: Base[], b: Base[]): Base[] {
   const buckets = distribution(b);

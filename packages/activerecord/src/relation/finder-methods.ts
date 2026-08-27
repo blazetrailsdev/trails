@@ -85,7 +85,7 @@ export interface NormalizedFindIds {
  * error — that stays at the call site (SQL vs in-memory each have
  * their own count-comparison logic).
  * @internal Rails inlines this in `find`; no counterpart to match against.
- * @noRailsEquivalent CONVERGEABLE the argument dispatch Ruby writes inline in FinderMethods#find (finder_methods.rb:69).
+ * @noRailsEquivalent CONVERGEABLE the argument dispatch Ruby writes inline in FinderMethods#find (finder_methods.rb:98).
  */
 export function normalizeFindArgs(
   modelName: string,
@@ -193,7 +193,7 @@ export function normalizeFindArgs(
  * `notFoundIds` (Rails' `ids_writer` passes `ids - found_ids`) appends the
  * trailing "Couldn't find <Model> with <key> <ids>." sentence.
  * @internal Relation-free form of `raiseRecordNotFoundExceptionBang` below.
- * @noRailsEquivalent CONVERGEABLE the multi-id arm of raise_record_not_found_exception! (finder_methods.rb:431-432) in relation-free form.
+ * @noRailsEquivalent CONVERGEABLE the multi-id arm of raise_record_not_found_exception! (finder_methods.rb:430-432) in relation-free form.
  */
 export function raiseNotFoundAll(
   modelName: string,
@@ -251,7 +251,7 @@ function formatNotFoundAllMessage(
  * Raise the single-id not-found error for a simple PK.
  * Matches `Relation.performFind`'s `"with 'pk'=<id>"` message.
  * @internal Relation-free form of `raiseRecordNotFoundExceptionBang` below.
- * @noRailsEquivalent CONVERGEABLE the single-id arm of raise_record_not_found_exception! (finder_methods.rb:425) in relation-free form.
+ * @noRailsEquivalent CONVERGEABLE the single-id arm of raise_record_not_found_exception! (finder_methods.rb:426) in relation-free form.
  */
 export function raiseNotFoundSingle(
   modelName: string,

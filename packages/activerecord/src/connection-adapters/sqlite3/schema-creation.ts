@@ -25,7 +25,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE SQLite3::SchemaCreation#add_column_options! (sqlite3/schema_creation.rb:19) without the Ruby bang suffix.
+   * @noRailsEquivalent CONVERGEABLE SQLite3::SchemaCreation#add_column_options! (sqlite3/schema_creation.rb:18) without the Ruby bang suffix.
    */
   override addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;

@@ -48,7 +48,7 @@ export class ShardSelector {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE reads ActiveSupport::Notifications, which Ruby names directly in the middleware body (middleware/shard_selector.rb:36).
+   * @noRailsEquivalent CONVERGEABLE mirrors Resolver#instrumenter (middleware/database_selector/resolver.rb:33), which ShardSelector has no counterpart for.
    */
   instrumenter(): typeof Notifications {
     return Notifications;
@@ -56,7 +56,7 @@ export class ShardSelector {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE reads the the resolver ivar ShardSelector keeps (middleware/shard_selector.rb:26); Ruby has no reader for it.
+   * @noRailsEquivalent CONVERGEABLE ShardSelector#resolver (middleware/shard_selector.rb:38) under a longer name; the Rails spelling is the convergence.
    */
   shardResolver(): ShardResolverFn {
     return this.resolver;
@@ -64,7 +64,7 @@ export class ShardSelector {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE reads the the options-derived lock setting (middleware/shard_selector.rb:28); Ruby reads the ivar inline.
+   * @noRailsEquivalent CONVERGEABLE the `lock` read off ShardSelector#options (middleware/shard_selector.rb:38), which Ruby indexes inline at its use site.
    */
   shardSelectorStrategy(): { lock: boolean } {
     return { lock: this.options.lock ?? true };

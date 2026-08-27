@@ -38,7 +38,7 @@ type DbConfigHandler = (
  * can only mean as a String — is a URL config.
  *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby branches on `config.is_a?(Symbol)` (database_configurations.rb:44); TS collapses Symbol and String onto one type.
+ * @noRailsEquivalent PERMANENT Ruby branches on `config.is_a?(Symbol)` (database_configurations.rb:178); TS collapses Symbol and String onto one type.
  */
 export function symbolConnectionName(config: unknown): string | undefined {
   if (typeof config !== "string" || config === "") return undefined;
@@ -51,7 +51,7 @@ let _configurations: DatabaseConfigurations | undefined;
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE reads the the configurations slot ActiveRecord::Base.configurations names directly (core.rb:34).
+ * @noRailsEquivalent CONVERGEABLE reads the configurations slot ActiveRecord::Base.configurations names directly (core.rb:77).
  */
 export function configurationsStore(): DatabaseConfigurations {
   // Memoized on first read so `Base.configurations` holds one object, as Rails'
@@ -62,7 +62,7 @@ export function configurationsStore(): DatabaseConfigurations {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE writes that same the configurations slot (core.rb:38); Ruby assigns through the Base accessor.
+ * @noRailsEquivalent CONVERGEABLE writes that same configurations slot (core.rb:71); Ruby assigns through the Base accessor.
  */
 export function setConfigurationsStore(configs: DatabaseConfigurations): void {
   _configurations = configs;

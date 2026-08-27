@@ -242,7 +242,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE removes a per-context query-cache store Ruby drops with the thread's IsolatedExecutionState (query_cache.rb:24).
+   * @noRailsEquivalent CONVERGEABLE removes a per-context query-cache store Ruby drops with the thread's IsolatedExecutionState (abstract/query_cache.rb:62).
    */
   deleteStore(contextId: string): void {
     this._threadQueryCaches.deleteStore(contextId);
@@ -351,7 +351,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE explicit form of Ruby's `@pinned_connections_count += 1` inside pin_connection! (connection_pool.rb:180).
+   * @noRailsEquivalent CONVERGEABLE explicit form of Ruby's `@pinned_connections_count += 1` inside pin_connection! (connection_pool.rb:325).
    */
   incrementPinnedCount(): void {
     this._pinnedCount++;
@@ -359,7 +359,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE explicit form of Ruby's `@pinned_connections_count -= 1` inside unpin_connection! (connection_pool.rb:196).
+   * @noRailsEquivalent CONVERGEABLE explicit form of Ruby's `@pinned_connections_count -= 1` inside unpin_connection! (connection_pool.rb:340).
    */
   decrementPinnedCount(): void {
     this._pinnedCount--;

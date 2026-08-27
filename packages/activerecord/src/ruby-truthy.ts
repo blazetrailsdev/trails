@@ -1,5 +1,5 @@
 /**
- * @noRailsEquivalent PERMANENT Ruby truthiness is a language primitive JS disagrees with for "", 0 and NaN, so a ported `if x` guard cannot be a bare JS truthiness test (finder_methods.rb:110).
+ * @noRailsEquivalent PERMANENT Ruby truthiness is a language primitive JS disagrees with for "", 0 and NaN, so a ported `if x` guard cannot be a bare JS truthiness test (finder_methods.rb:129).
  */
 
 /**
@@ -15,7 +15,7 @@
  * empty strings and zeroes.
  *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby truthiness is a language primitive JS disagrees with for "", 0 and NaN (finder_methods.rb:110).
+ * @noRailsEquivalent PERMANENT Ruby truthiness is a language primitive JS disagrees with for "", 0 and NaN (finder_methods.rb:129).
  */
 export function isRubyTruthy(value: unknown): boolean {
   return value !== null && value !== undefined && value !== false;

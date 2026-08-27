@@ -127,7 +127,7 @@ function enumTypeFrom(
  * `decorate_attributes([name]) { |_n, subtype| EnumType.new(...) }` (enum.rb:238-247).
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the attribute(...) + decorate_attributes pair of Enum#_enum (enum.rb:238-247), extracted from the macro body.
+ * @noRailsEquivalent CONVERGEABLE the attribute(...) + decorate_attributes pair of Enum#_enum (enum.rb:222-247), extracted from the macro body.
  */
 export function installEnumAttribute(
   klass: typeof Base,
@@ -403,7 +403,7 @@ export class EnumMethods {
    * prototype). Installing directly on `klass.prototype` instead would clobber
    * (or be clobbered by) class-body methods with no `super` chain between them.
    * Created lazily and once per class; all of a class's enums share it.
-   * @noRailsEquivalent PERMANENT Ruby includes an anonymous _enum_methods_module into the class (enum.rb:251); JS needs an explicit interposed prototype.
+   * @noRailsEquivalent PERMANENT Ruby includes an anonymous _enum_methods_module into the class (enum.rb:326); JS needs an explicit interposed prototype.
    */
   carrier(): object {
     return getOrCreateModuleCarrier(this._klass, _enumCarriers);
@@ -970,7 +970,7 @@ export function raiseConflictError(
  * Returns null when the attribute isn't an enum on this class.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE reads the EnumType off the replayed attribute set the way Ruby reads attribute_types[name] (enum.rb:238-247).
+ * @noRailsEquivalent CONVERGEABLE reads the EnumType off the replayed attribute set the way Ruby reads attribute_types[name] (enum.rb:222-247).
  */
 export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
   const host = klass as unknown as {

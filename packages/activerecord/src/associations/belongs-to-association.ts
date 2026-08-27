@@ -479,7 +479,7 @@ export class BelongsToAssociation extends SingularAssociation {
  * infers the single `"id"`; otherwise the full composite array is kept. A
  * scalar primary key is returned as a one-element array.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the composite-PK branch of BelongsToReflection#association_primary_key, extracted rather than inlined (reflection.rb:935-938).
+ * @noRailsEquivalent CONVERGEABLE the composite-PK branch of BelongsToReflection#association_primary_key, extracted rather than inlined (reflection.rb:926-938).
  */
 export function inferCompositePrimaryKey(pk: string | string[]): string[] {
   if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;

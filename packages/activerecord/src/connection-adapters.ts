@@ -196,7 +196,7 @@ export {
  * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#default_primary_key (private)
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE TableDefinition#default_primary_key (abstract/schema_definitions.rb:511) hoisted to a free function; the port splits that file.
+ * @noRailsEquivalent CONVERGEABLE TableDefinition#default_primary_key (abstract/schema_definitions.rb:170) hoisted to a free function; the port splits that file.
  */
 export function defaultPrimaryKey(): string {
   return "id";

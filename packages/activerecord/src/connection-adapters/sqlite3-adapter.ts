@@ -268,7 +268,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal Rails' `raw_connection`. Non-private so the extracted
    * `performQuery` can read `changes` / `last_insert_row_id` off it through
    * `PerformQueryHost`.
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#raw_connection (abstract_adapter.rb:700) under a non-Rails name; the extracted performQuery reads it off the host.
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#raw_connection (abstract_adapter.rb:798) under a non-Rails name; the extracted performQuery reads it off the host.
    */
   driver!: SqliteConnection;
   /**
@@ -2650,7 +2650,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * synchronously. Invoked by `openAsync()` and `verifyBang()`.
    *
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby's SQLite3::Database.new connects synchronously (sqlite3_adapter.rb:82); an async driver needs a second phase.
+   * @noRailsEquivalent PERMANENT Ruby's SQLite3::Database.new connects synchronously (sqlite3_adapter.rb:34); an async driver needs a second phase.
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
@@ -2706,7 +2706,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:800) re-implemented per adapter because our `active` getter is sync and cannot ping.
+   * @noRailsEquivalent CONVERGEABLE AbstractAdapter#verify! (abstract_adapter.rb:759) re-implemented per adapter because our `active` getter is sync and cannot ping.
    */
   override async verifyBang(): Promise<void> {
     await this.completeAsyncConnect();

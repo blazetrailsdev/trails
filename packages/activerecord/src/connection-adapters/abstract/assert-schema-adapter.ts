@@ -1,5 +1,5 @@
 /**
- * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:100); TS must narrow the union at the boundary instead.
+ * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:35); TS must narrow the union at the boundary instead.
  */
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Quoting } from "./quoting.js";
@@ -21,7 +21,7 @@ export type SchemaQuoter = Pick<
  * concrete adapter is known to mix in `Quoting` at runtime. Throws a
  * descriptive error rather than failing inside a quoting call later.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:100); TS must narrow the union at the boundary instead.
+ * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:35); TS must narrow the union at the boundary instead.
  */
 export function assertSchemaAdapter(
   adapter: DatabaseAdapter,

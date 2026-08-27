@@ -1446,7 +1446,7 @@ export class AbstractAdapter implements Quoting {
    * resolve uniformly across adapters.
    *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE identity default for PostgreSQLAdapter#sql_key (postgresql_adapter.rb:1027); Ruby reaches it by respond_to?, TS needs a declared base.
+   * @noRailsEquivalent CONVERGEABLE identity default for PostgreSQLAdapter#sql_key (postgresql_adapter.rb:914); Ruby reaches it by respond_to?, TS needs a declared base.
    */
   sqlKey(sql: string): string {
     return sql;
@@ -1544,7 +1544,7 @@ export class AbstractAdapter implements Quoting {
    * the bound reflection (see {@link schemaCache}) — so this is the
    * trails-internal name for the sync peeks and pool-arg-taking reads that our
    * async `BoundSchemaReflection` can't serve.
-   * @noRailsEquivalent CONVERGEABLE the raw the schema-cache slot behind AbstractAdapter#schema_cache (abstract_adapter.rb:216); needed while our reflection reads are async.
+   * @noRailsEquivalent CONVERGEABLE the raw schema-cache slot behind AbstractAdapter#schema_cache (abstract_adapter.rb:298); needed while our reflection reads are async.
    */
   get internalSchemaCache(): SchemaCache {
     const reflection = this._poolSchemaReflection();
