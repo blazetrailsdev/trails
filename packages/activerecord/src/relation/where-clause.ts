@@ -210,7 +210,7 @@ export class WhereClause {
         if (left !== null && exprNodes.some((e) => rbEqual(e, left))) return false;
         return true;
       }
-      if (attrNodes.some((a) => a.eql(attr))) return false;
+      if (attrNodes.some((a) => rbEqual(a, attr))) return false;
       if (colStrings.has(String(attr.name))) return false;
       const qualified = `${String(attr.relation.name)}.${attr.name}`;
       if (colStrings.has(qualified)) return false;
@@ -378,7 +378,7 @@ function extractAttribute(node: Nodes.Node | string): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
   fetchAttribute(node, (attr: Nodes.Node) => {
     if (!(attr instanceof Nodes.Attribute)) return true;
-    if (attrNode !== null && !attrNode.eql(attr)) {
+    if (attrNode !== null && !rbEqual(attrNode, attr)) {
       attrNode = null;
       return false;
     }
