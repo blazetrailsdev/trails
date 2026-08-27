@@ -128,6 +128,21 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.tableAliasFor(long)).toBe("x".repeat(64));
   });
 
+  // Ruby's `drop_table(*table_names, **options)` iterates an empty array
+  // (abstract/schema_statements.rb:540-545), and kwargs never land in
+  // `table_names`, so both calls are no-ops. The TS parameter tuple still
+  // requires a first name, so the zero-name call is reachable only through
+  // untyped dispatch (`CommandRecorder#replay`, `methodMissing`) — which is the
+  // path the deleted ArgumentError used to raise on. Rails has no counterpart
+  // test.
+  it("dropTable with no table names is a no-op, with or without options", async () => {
+    const sqlite = new SqliteCapturingAdapter();
+    const dropTable = sqlite.dropTable.bind(sqlite) as (...args: unknown[]) => Promise<void>;
+    await dropTable();
+    await dropTable({ ifExists: true });
+    expect(sqlite.allSql).toEqual([]);
+  });
+
   it("indexes() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
     const sqlite = new SqliteCapturingAdapter();
     await sqlite.indexes("things");
