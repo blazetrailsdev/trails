@@ -304,7 +304,7 @@ describe("SchemaDumperAdapterTest", () => {
     });
     await adapter.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
     const result = await TopLevelDumper.dumpTableSchema(adapter, "testings");
-    expect(result).toContain("addIndex");
+    expect(result).toContain("t.index(");
     expect(result).toContain("index_testings_on_post_id");
   });
 

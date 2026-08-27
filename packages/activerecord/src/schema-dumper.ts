@@ -854,28 +854,19 @@ export abstract class SchemaDumper {
         }
       }
 
-      // Rails emits the in-create index/constraint calls inside the block, on
-      // the `t` builder (schema_dumper.rb:209-212). trails' DSL exposes
-      // `addIndex` / `addExclusionConstraint` / `addUniqueConstraint` on `ctx`
-      // rather than on the `TableDefinition` the callback receives, so those
-      // three land after the block. They are called here, in Rails' order, and
-      // write into their own buffers; only the emission point moves.
-      const indexLines: string[] = [];
       const indexes = await this.filterIndexesForDump(table, await this._source.indexes(table));
-      this.indexesInCreate(table, indexLines, indexes);
+      this.indexesInCreate(table, tbl, indexes);
 
       const remaining = await this.checkConstraintsInCreate(table, tbl);
 
-      const constraintLines: string[] = [];
       if (adapter?.supportsExclusionConstraints?.())
-        await this.exclusionConstraintsInCreate?.(table, constraintLines);
+        await this.exclusionConstraintsInCreate?.(table, tbl);
       if (adapter?.supportsUniqueConstraints?.())
-        await this.uniqueConstraintsInCreate?.(table, constraintLines);
+        await this.uniqueConstraintsInCreate?.(table, tbl);
 
       tbl.push("  });");
-      tbl.push(...indexLines);
+
       if (remaining && remaining.length > 0) tbl.push("", ...remaining);
-      tbl.push(...constraintLines);
 
       stream.push(...tbl);
     } catch (e) {
@@ -1154,12 +1145,13 @@ export abstract class SchemaDumper {
    *   awaits the list and passes it in (schema-dumper.ts:995).
    */
   indexesInCreate(table: string, stream: string[], indexes: IndexInfo[] = []): void {
-    const stripped = this.removePrefixAndSuffix(table);
-    for (const index of indexes) {
+    if (indexes.length === 0) return;
+    const indexStatements = indexes.map((index) => {
       const [cols, ...opts] = this.indexParts(index);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      stream.push(`  await ctx.addIndex(${JSON.stringify(stripped)}, ${cols}${optStr});`);
-    }
+      return `    t.index(${cols}${optStr});`;
+    });
+    stream.push(indexStatements.sort().join("\n"));
   }
 
   /**

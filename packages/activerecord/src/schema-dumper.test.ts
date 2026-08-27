@@ -202,9 +202,7 @@ describe("SchemaDumperTest", () => {
   // Helper: grep the lone dumped `addIndex` line for `companies` matching `re`,
   // mirroring Rails' `dump_table_schema("companies").split(/\n/).grep(...).first`.
   function companyIndexLine(output: string, re: RegExp): string {
-    return (
-      output.split(/\n/).find((l) => /addIndex\("companies"/.test(l) && re.test(l)) ?? ""
-    ).trim();
+    return (output.split(/\n/).find((l) => /t\.index\(/.test(l) && re.test(l)) ?? "").trim();
   }
 
   it("schema dumps index columns in right order", async () => {
@@ -214,8 +212,7 @@ describe("SchemaDumperTest", () => {
     // keeps the sub-part length map, other adapters drop it; the sort order is
     // present only where the backend surfaces it (schema_dumper_test.rb:170-183).
     // `index_parts` emits length before order.
-    const base =
-      'await ctx.addIndex("companies", ["firm_id", "type", "rating"], { name: "company_index"';
+    const base = 't.index(["firm_id", "type", "rating"], { name: "company_index"';
     const lengthPart = adapterType === "mysql" ? ", length: { type: 10 }" : "";
     const orderPart = (await dumpsIndexSortOrder()) ? ', order: { rating: "desc" }' : "";
     expect(line).toBe(`${base}${lengthPart}${orderPart} });`);
@@ -227,8 +224,8 @@ describe("SchemaDumperTest", () => {
     // Rails branches on supports_partial_index?; unsupported backends (MySQL)
     // emit the plain index with no `where:`.
     const expected = adapterSupports("partial_index")
-      ? 'await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
-      : 'await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index" });';
+      ? 't.index(["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
+      : 't.index(["firm_id", "type"], { name: "company_partial_index" });';
     expect(line).toBe(expected);
   });
 
@@ -238,8 +235,8 @@ describe("SchemaDumperTest", () => {
     // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
     // unsupported backends emit a plain index with no `nullsNotDistinct:`.
     const expected = adapterSupports("nulls_not_distinct")
-      ? 'await ctx.addIndex("companies", "firm_id", { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
-      : 'await ctx.addIndex("companies", "firm_id", { name: "company_nulls_not_distinct" });';
+      ? 't.index("firm_id", { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
+      : 't.index("firm_id", { name: "company_nulls_not_distinct" });';
     expect(line).toBe(expected);
   });
 
@@ -250,8 +247,8 @@ describe("SchemaDumperTest", () => {
     // scalar (`order: :desc`); backends that don't surface sort order here emit a
     // plain index (schema_dumper_test.rb:203-211).
     const expected = (await dumpsIndexSortOrder())
-      ? 'await ctx.addIndex("companies", ["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });'
-      : 'await ctx.addIndex("companies", ["name", "rating"], { name: "index_companies_on_name_and_rating" });';
+      ? 't.index(["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });'
+      : 't.index(["name", "rating"], { name: "index_companies_on_name_and_rating" });';
     expect(line).toBe(expected);
   });
 
@@ -261,8 +258,8 @@ describe("SchemaDumperTest", () => {
     // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
     const expected =
       adapterType === "mysql"
-        ? 'await ctx.addIndex("companies", ["name", "description"], { name: "index_companies_on_name_and_description", length: 10 });'
-        : 'await ctx.addIndex("companies", ["name", "description"], { name: "index_companies_on_name_and_description" });';
+        ? 't.index(["name", "description"], { name: "index_companies_on_name_and_description", length: 10 });'
+        : 't.index(["name", "description"], { name: "index_companies_on_name_and_description" });';
     expect(line).toBe(expected);
   });
 
@@ -492,7 +489,7 @@ describe("SchemaDumperTest", () => {
     );
     const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_exclusion");
     expect(output).toContain(
-      'await ctx.addExclusionConstraint("test_schema_exclusion", "daterange(start_date, end_date) WITH &&", { using: "gist", name: "test_schema_exclusion_date_overlap" });',
+      't.exclusionConstraint("daterange(start_date, end_date) WITH &&", { using: "gist", name: "test_schema_exclusion_date_overlap" });',
     );
   });
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
@@ -510,10 +507,10 @@ describe("SchemaDumperTest", () => {
     });
     const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_unique");
     expect(output).toContain(
-      'await ctx.addUniqueConstraint("test_schema_unique", ["position_1"], { name: "test_schema_unique_position_1" });',
+      't.uniqueConstraint(["position_1"], { name: "test_schema_unique_position_1" });',
     );
     expect(output).toContain(
-      'await ctx.addUniqueConstraint("test_schema_unique", ["position_2"], { nullsNotDistinct: true, name: "test_schema_unique_position_2_nnd" });',
+      't.uniqueConstraint(["position_2"], { nullsNotDistinct: true, name: "test_schema_unique_position_2_nnd" });',
     );
   });
   itIfSupports(
