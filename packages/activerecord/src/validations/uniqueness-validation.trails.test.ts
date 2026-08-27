@@ -14,6 +14,7 @@ import { Topic } from "../test-helpers/models/topic.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 describe("UniquenessValidationContextTest", () => {
@@ -96,6 +97,13 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
 
   beforeAll(async () => {
     ({ adapter, pool } = await checkoutRawTestAdapter());
+    // The raw pool builds its own connection, and on the `:memory:` lane that
+    // is a private, empty database — nothing has laid the canonical schema in
+    // it. Guarded on absence so the file-backed lanes, where the table is
+    // already there and shared with every other file, are left untouched.
+    if (!(await adapter.tableExists("subscribers"))) {
+      await rebuildCanonicalTables(adapter, ["subscribers"]);
+    }
     (DirectSubscriber as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
   });
 
