@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { declaredAttributeNames } from "./model-schema.js";
-/** The names a class declared with `attribute()`, read off the
- * pending-modification queue the way `columnsHash`' synthesis does. */
-const declared = (klass: unknown): string[] => declaredAttributeNames.call(klass as never);
+/** The names a class declared with `attribute()` — the `name`s on its own
+ * pending-modification queue (activemodel attribute_registration.rb:33-40),
+ * which holds user declarations only and never schema-sourced columns. */
+const declared = (klass: unknown): string[] => {
+  if (!Object.hasOwn(klass as object, "_pendingAttributeModifications")) return [];
+  return (
+    klass as { _pendingAttributeModifications: { name?: string }[] }
+  )._pendingAttributeModifications
+    .map((modification) => modification.name)
+    .filter((name): name is string => name !== undefined);
+};
 
 describe("STI subclass attribute() registration", () => {
   it("keeps subclass attribute() calls on the subclass, not the STI base", () => {

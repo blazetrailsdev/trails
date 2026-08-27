@@ -365,17 +365,6 @@ function applyDeclarations(cls: SchemaHost, attributeSet: AttributeSet): void {
 }
 
 /**
- * The names this model declared with `attribute()`, its ancestors' included.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE — feeds `ensureSchemaLoaded`'s reflection
- * gate, itself a trails-only bridge for Rails' synchronous `load_schema!`.
- */
-export function declaredAttributeNames(this: SchemaHost): string[] {
-  return declaredAttributes(this).keys();
-}
-
-/**
  * One declared attribute in the shape `columnsHash`' readers expect of a column.
  */
 function synthesizedColumn(name: string, attribute: Attribute): Record<string, unknown> {
