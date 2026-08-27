@@ -264,6 +264,11 @@ export class GID {
    * `gid.rb:28-29` carries — `app` (aliased to `host`), `model_name`,
    * `model_id` and `params` — so the compare is over those.
    *
+   * `normalize` (`uri/generic.rb:1340-1350`) downcases the host before the
+   * component arrays are compared, and `app` IS the host — so `gid://App/...`
+   * and `gid://app/...` are equal. `model_name` gets no such treatment and
+   * stays case-sensitive.
+   *
    * `self.class == oth.class` is spelled as a null guard plus a read through
    * the public component readers rather than an `instanceof`: TS treats the
    * src/ and dist/ resolutions of this module as distinct classes because of
@@ -275,7 +280,7 @@ export class GID {
   equals(oth: GID): boolean {
     if (oth == null) return false;
     return (
-      this.app === oth.app &&
+      this.app.toLowerCase() === oth.app.toLowerCase() &&
       this.modelName === oth.modelName &&
       modelIdEquals(this.modelId, oth.modelId) &&
       paramsEquals(this.params, oth.params)

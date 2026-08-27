@@ -6,6 +6,7 @@ import {
   DateNegativeInfinity,
 } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
+import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, PgTextEncoderArray } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
@@ -324,6 +325,22 @@ describe("PostgreSQL quoting", () => {
     const instant = Temporal.Instant.from("-000043-03-15T12:34:56Z");
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
     expect(quotedDate(instant)).toBe("0044-03-15 12:34:56 BC");
+  });
+
+  // `postgresql/quoting.rb:144` reads `value.year` off the value AS IT ARRIVES,
+  // before `super` normalises the timezone, so a `TimeWithZone` decides the BC
+  // branch from its OWN zone. This instant is 0000-12-31T23:30Z — year 0 in
+  // UTC, but year 1 in Asia/Tokyo (UTC+9), which is the zone the value carries
+  // and therefore the one `TimeWithZone#year` reports. Rails takes the `else`
+  // arm and emits a bare `super`; deciding the branch from `default_timezone`
+  // instead would wrongly suffix BC.
+  it("quoted_date reads the BC year off a TimeWithZone's own zone", () => {
+    const twz = new TimeWithZone(
+      Temporal.Instant.from("0000-12-31T23:30:00Z"),
+      TimeZone.find("Tokyo")!,
+    );
+    expect(twz.year).toBe(1);
+    expect(quotedDate(twz)).toBe("0000-12-31 23:30:00");
   });
 
   it("quoted_date suffixes BC for a PlainDateTime with proleptic year <= 0", () => {
