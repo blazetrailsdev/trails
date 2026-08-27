@@ -374,6 +374,7 @@ export class PostgreSQLAdapter
           ? this._config.preparedStatements
           : this.defaultPreparedStatements(),
       );
+    this._defaultTimezone = PostgreSQLAdapter.validateDefaultTimezone(this._config.defaultTimezone);
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._pgClientOptions = {

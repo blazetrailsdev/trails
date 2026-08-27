@@ -89,11 +89,6 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     const queries: [string, string | null | undefined][] = [];
     adapter.supportsRenameColumn = () => false;
     adapter.pool = new NullPool();
-    // Object.create skips the constructor, which is what assigns `@config`
-    // (abstract_adapter.rb:139); `new_column_from_field` reaches
-    // `lookup_cast_type` → `extended_type_map_key`, which reads a
-    // config-derived `default_timezone` (abstract_mysql_adapter.rb:763).
-    adapter._config = {};
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.quoteTableName = (s: string) => `\`${s}\``;
@@ -427,11 +422,8 @@ async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) 
   const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
   const adapter = Object.create(AbstractMysqlAdapter.prototype);
   // Object.create skips the constructor, which is what plants Rails' NullPool
-  // (abstract_adapter.rb:153) and `@config` (abstract_adapter.rb:139); every
-  // adapter carries both, and `extended_type_map_key` reads a config-derived
-  // `default_timezone` (abstract_mysql_adapter.rb:763).
+  // (abstract_adapter.rb:153); every adapter carries one.
   adapter.pool = new NullPool();
-  adapter._config = {};
   adapter.quoteColumnName = (s: string) => `\`${s}\``;
   adapter.quoteTableName = (s: string) => `\`${s}\``;
   Object.assign(adapter, overrides);

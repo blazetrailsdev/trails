@@ -223,6 +223,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           ? this._config.preparedStatements
           : this.defaultPreparedStatements(),
       );
+    this._defaultTimezone = Mysql2Adapter.validateDefaultTimezone(this._config.defaultTimezone);
     if (typeof config === "string") {
       let waitTimeout: number | undefined;
       let uri = config;

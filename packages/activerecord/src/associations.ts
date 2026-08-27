@@ -821,7 +821,7 @@ export function association<T extends Base = Base>(
   const ctor = record.constructor as typeof Base;
   const assocDef = ctor._reflectOnAssociation(assocName) as unknown as AssociationDefinition | null;
   if (!assocDef) {
-    throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
+    throw _associationNotFound(record, assocName);
   }
   validateThroughReflection(ctor, assocName);
   const instance = record.association(assocName) as unknown as { isCollection(): boolean };

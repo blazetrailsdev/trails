@@ -1,128 +1,71 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { Base } from "../../index.js";
-import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
+import { it, expect, beforeEach } from "vitest";
+import "../../index.js";
+import { sql as arelSql } from "@blazetrails/arel";
+import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-fixtures.js";
+import { jsonSharedTestCases, JsonDataType as klass } from "../../cases/json-shared-test-cases.js";
+import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
+import type { TableDefinition } from "../../connection-adapters/abstract/schema-definitions.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+function insertStatementPerDatabase(values: string): string {
+  return `insert into json_data_type (payload) VALUES ('${values}')`;
+}
+
+function postgresqlJsonSharedTestCases(columnType: string): void {
+  let connection: AbstractAdapter;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await connection.createTable("json_data_type", {}, async (t: TableDefinition) => {
+      const column = t as unknown as Record<
+        string,
+        (name: string, options?: Record<string, unknown>) => void
+      >;
+      column[columnType]("payload", { default: {} });
+      column[columnType]("settings");
+      column[columnType]("objects", { array: true });
+    });
+  });
+
+  jsonSharedTestCases({ columnType, insertStatementPerDatabase });
+
+  it("test_default", async () => {
+    await connection.addColumn("json_data_type", "permissions", columnType, {
+      default: { users: "read", posts: ["read", "write"] },
+    });
+    await klass.resetColumnInformation();
+    await klass.loadSchema();
+
+    expect(klass.columnDefaults["permissions"]).toEqual({
+      users: "read",
+      posts: ["read", "write"],
+    });
+    expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
+  });
+
+  it("test_deserialize_with_array", async () => {
+    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+    await x.saveBang();
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+    await x.reload();
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+  });
+
+  it("test_noname_columns_of_different_types", async () => {
+    await connection.execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
+    expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
+  });
+}
+
+describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
+  fixtures([]);
+  postgresqlJsonSharedTestCases("json");
 });
 
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
-
-describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-  beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec(`DROP TABLE IF EXISTS "json_test"`);
-    await adapter.exec(
-      `CREATE TABLE "json_test" ("id" SERIAL PRIMARY KEY, "settings" JSON, "prefs" JSONB, "name" VARCHAR(255))`,
-    );
-  });
-  afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "json_test"`).catch(() => {});
-    await adapter.close();
-  });
-  withTransactionalFixtures(() => adapter);
-
-  describe("PostgresqlJsonTest", () => {
-    it("json column", async () => {
-      const obj = { foo: "bar", baz: 123 };
-      await adapter.executeMutation(`INSERT INTO "json_test" ("settings", "name") VALUES (?, ?)`, [
-        JSON.stringify(obj),
-        "test",
-      ]);
-      const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
-      expect(rows).toHaveLength(1);
-      expect(JSON.parse(rows[0].settings as string)).toEqual(obj);
-    });
-
-    it("json default", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "json_default_test"`);
-      await adapter.exec(
-        `CREATE TABLE "json_default_test" ("id" SERIAL PRIMARY KEY, "config" JSON DEFAULT '{}')`,
-      );
-      try {
-        await adapter.executeMutation(`INSERT INTO "json_default_test" DEFAULT VALUES`);
-        const rows = await adapter.execute(`SELECT "config" FROM "json_default_test"`);
-        expect(JSON.parse(rows[0].config as string)).toEqual({});
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS "json_default_test"`);
-      }
-    });
-
-    it("json type cast", async () => {
-      const arr = [1, "two", { three: true }];
-      await adapter.executeMutation(`INSERT INTO "json_test" ("settings") VALUES (?)`, [
-        JSON.stringify(arr),
-      ]);
-      const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
-      expect(JSON.parse(rows[0].settings as string)).toEqual(arr);
-    });
-
-    it("deserialize with array", async () => {
-      const arr = [1, 2, 3];
-      await adapter.executeMutation(`INSERT INTO "json_test" ("settings") VALUES (?)`, [
-        JSON.stringify(arr),
-      ]);
-      const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
-      const parsed = JSON.parse(rows[0].settings as string);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed).toEqual(arr);
-    });
-
-    it("json string cast round-trip", async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "json_string_cast"`);
-      await adapter.exec(
-        `CREATE TABLE "json_string_cast" ("id" SERIAL PRIMARY KEY, "data" JSON, "meta" JSONB)`,
-      );
-      try {
-        class JsonStringCast extends Base {
-          static {
-            this.tableName = "json_string_cast";
-            this.attribute("id", "integer");
-          }
-        }
-        JsonStringCast.adapter = adapter;
-        await JsonStringCast.loadSchema();
-        const record = new JsonStringCast();
-        (record as any).data = '{"a":1}';
-        (record as any).meta = '{"b":2}';
-        await record.save();
-        await record.reload();
-        expect((record as any).data).toBe('{"a":1}');
-        expect((record as any).meta).toBe('{"b":2}');
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS "json_string_cast"`);
-      }
-    });
-
-    it("noname columns of different types", async () => {
-      const jsonVal = { key: "value" };
-      const jsonbVal = { nested: { deep: true } };
-      await adapter.executeMutation(
-        `INSERT INTO "json_test" ("settings", "prefs", "name") VALUES (?, ?, ?)`,
-        [JSON.stringify(jsonVal), JSON.stringify(jsonbVal), "test"],
-      );
-      const rows = await adapter.execute(`SELECT "settings", "prefs", "name" FROM "json_test"`);
-      expect(JSON.parse(rows[0].settings as string)).toEqual(jsonVal);
-      expect(JSON.parse(rows[0].prefs as string)).toEqual(jsonbVal);
-      expect(rows[0].name).toBe("test");
-    });
-  });
-
-  it("default", async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "jsonb_default_test"`);
-    await adapter.exec(
-      `CREATE TABLE "jsonb_default_test" ("id" SERIAL PRIMARY KEY, "data" JSONB DEFAULT '[]')`,
-    );
-    try {
-      await adapter.executeMutation(`INSERT INTO "jsonb_default_test" DEFAULT VALUES`);
-      const rows = await adapter.execute(`SELECT "data" FROM "jsonb_default_test"`);
-      expect(JSON.parse(rows[0].data as string)).toEqual([]);
-    } finally {
-      await adapter.exec(`DROP TABLE IF EXISTS "jsonb_default_test"`);
-    }
-  });
+describeIfPostgresqlAdapter("PostgresqlJSONBTest", () => {
+  fixtures([]);
+  postgresqlJsonSharedTestCases("jsonb");
 });

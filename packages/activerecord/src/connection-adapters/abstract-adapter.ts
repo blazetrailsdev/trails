@@ -127,6 +127,7 @@ import {
   BooleanType,
   BinaryType,
   DecimalType,
+  ArgumentError,
   type Type,
 } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
@@ -705,6 +706,7 @@ export class AbstractAdapter implements Quoting {
   protected _unconfiguredConnection: AbstractAdapter | null = null;
   protected _rawConnectionDirty = false;
   protected _config: Record<string, unknown> = {};
+  protected _defaultTimezone?: string;
   protected _advisoryLocksEnabled = true;
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
@@ -991,6 +993,9 @@ export class AbstractAdapter implements Quoting {
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
       (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(configured);
+    this._defaultTimezone = (this.constructor as typeof AbstractAdapter).validateDefaultTimezone(
+      this._config.defaultTimezone,
+    );
   }
 
   disconnectBang(): void {
@@ -1339,8 +1344,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get defaultTimezone(): string {
-    const v = this._config.defaultTimezone;
-    return typeof v === "string" ? v : "utc";
+    return this._defaultTimezone ?? ActiveRecord.defaultTimezone;
   }
 
   get connectionDescriptor(): ConnectionDescriptor | undefined {
@@ -1642,12 +1646,17 @@ export class AbstractAdapter implements Quoting {
     return 0;
   }
 
-  static validateDefaultTimezone(timezone: string): string {
-    const valid = ["utc", "local"];
-    if (!valid.includes(timezone)) {
-      throw new Error(`Invalid timezone: ${timezone}. Must be one of: ${valid.join(", ")}`);
+  static validateDefaultTimezone(config: unknown): string | undefined {
+    switch (config) {
+      case null:
+      case undefined:
+        return undefined;
+      case "utc":
+      case "local":
+        return config as string;
+      default:
+        throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
     }
-    return timezone;
   }
 
   buildReadQueryRegexp(): RegExp {
@@ -1906,8 +1915,10 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   extendedTypeMapKey(): Record<string, unknown> | null {
-    const tz = this._config.defaultTimezone;
-    return typeof tz === "string" ? { defaultTimezone: tz } : null;
+    if (this._defaultTimezone != null) {
+      return { defaultTimezone: this._defaultTimezone };
+    }
+    return null;
   }
 
   /**

@@ -1,5 +1,3 @@
-import { MutableModule } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
 import { Json } from "../../../type/json.js";
 
 export class Jsonb extends Json {
@@ -9,5 +7,3 @@ export class Jsonb extends Json {
     return "jsonb";
   }
 }
-
-include(Jsonb, MutableModule);
