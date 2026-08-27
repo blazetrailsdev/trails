@@ -62,7 +62,7 @@ export const FactoryMethods: FactoryMethodsModule = {
   },
 
   // Rails' create_join/create_and are duck-typed and its own tests exercise
-  // them with bare strings, so the params admit `string` like Table#createJoin.
+  // them with bare strings, so the params admit `string` too.
   createJoin(
     to: Node | Table | string,
     constraint?: Node | string | null,

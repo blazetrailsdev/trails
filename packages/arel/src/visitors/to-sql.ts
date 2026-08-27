@@ -93,7 +93,7 @@ export class ToSql extends Visitor {
   compile(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>): string;
   compile<T>(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
   compile(
-    node: Node | ReadonlyArray<Nodes.NodeOrValue>,
+    node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>,
     collector: { value: unknown } = new SQLString(),
   ): unknown {
     return this.accept(node, collector as unknown as SQLString).value;
