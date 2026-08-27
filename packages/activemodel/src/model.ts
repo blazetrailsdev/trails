@@ -1,21 +1,11 @@
 import { Errors } from "./errors.js";
 import {
   ValidationContext,
-  Validations,
   ClassMethods as ValidationsClassMethods,
   initInternals as validationsInitInternals,
   initializeDup as validationsInitializeDup,
-  contextForValidation as validationsContextForValidation,
-  runValidationsBang as validationsRunValidationsBang,
-  raiseValidationError as validationsRaiseValidationError,
-  readAttributeForValidation as validationsReadAttributeForValidation,
-  freeze as validationsFreeze,
 } from "./validations.js";
 import { HelperMethods } from "./validations/helper-methods.js";
-import {
-  sanitizeForMassAssignment as attrSanitize,
-  sanitizeForbiddenAttributes as forbiddenSanitize,
-} from "./forbidden-attributes-protection.js";
 import {
   Callbacks as ASCallbacks,
   defineCallbacks,
@@ -40,7 +30,6 @@ import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions } from "./validations.js";
-import type { AttrNameArg } from "./validations/helper-methods.js";
 import * as AttributeMethods from "./attribute-methods.js";
 import {
   AttributeMethodPattern,
@@ -48,17 +37,13 @@ import {
   defineMethodAttribute,
   _resurrectAttributeMethods,
 } from "./attribute-methods.js";
-import * as AttributeAssignment from "./attribute-assignment.js";
 import {
   ClassMethods as ValidationsCallbacksClassMethods,
   type ValidationCallbackFilter,
   type ValidationCallbackOptions,
 } from "./validations/callbacks.js";
 import * as Validates from "./validations/validates.js";
-import {
-  ClassMethods as WithClassMethods,
-  validatesWith as withValidatesWith,
-} from "./validations/with.js";
+import { ClassMethods as WithClassMethods } from "./validations/with.js";
 import {
   Attributes,
   attribute,
@@ -77,9 +62,10 @@ import {
   resolveTypeName as _resolveTypeNameHelper,
   hookAttributeType as _hookAttributeTypeHelper,
 } from "./attribute-registration.js";
-import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import type { ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Access } from "./access.js";
 import { Naming } from "./naming.js";
+import { API, initialize as apiInitialize } from "./api.js";
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-101) — the
@@ -107,18 +93,12 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model
-  extends Dirty, Access, Conversion, Naming, Included<typeof AttributeMethods.InstanceMethods> {
+  extends API, Dirty, Access, Naming, Included<typeof AttributeMethods.InstanceMethods> {
   /**
    * Redeclared as a method, not the property `Included<>` derives, so a
    * subclass may override `attribute_missing` the way Rails' cascade expects.
    */
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
-
-  /**
-   * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
-   * mixed on by the `include(Model, …)` at the bottom of this file.
-   */
-  validatesWith: typeof withValidatesWith;
 
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
@@ -144,64 +124,6 @@ export interface Model
   _writeAttribute(name: string, value: unknown): void;
   /** @internal */
   "attribute="(name: string, value: unknown): void;
-
-  /**
-   * The instance half of Ruby `include ActiveModel::AttributeAssignment`
-   * (api.rb:14), installed by the `include(Model, AttributeAssignment)` at the
-   * bottom of this file.
-   */
-  assignAttributes(newAttributes: unknown): Promise<void> | void;
-  setAttributes(newAttributes: unknown): Promise<void> | void;
-  attributeWriterMissing(name: string, value: unknown): void;
-  /** @internal */
-  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
-  /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
-
-  /**
-   * The instance halves of Ruby `include ActiveModel::Validations`
-   * (validations.rb:52) and `include ForbiddenAttributesProtection`
-   * (model.rb:12-14), installed by the `include(Model, …)` calls at the bottom
-   * of this file.
-   *
-   * @internal
-   */
-  contextForValidation(): ValidationContext;
-  /** @internal */
-  runValidationsBang(): Promise<boolean>;
-  raiseValidationError(): never;
-  readAttributeForValidation(attribute: string): unknown;
-  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
-  readonly validationContext: string | string[] | null;
-  /** @internal */
-  _validationContext: string | string[] | null;
-  /** @internal */
-  _runValidateCallbacks(): Promise<void>;
-  /** @internal */
-  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
-  /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
-  freeze(): this;
-
-  /**
-   * The instance halves of `include HelperMethods` (validations.rb:46) that a
-   * `validate do … end` body calls; the instance `validates_with` is async
-   * (RFC 0063), so these settle where Ruby's return straight away.
-   */
-  validatesPresenceOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesAbsenceOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesLengthOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesSizeOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesNumericalityOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesInclusionOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesExclusionOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesFormatOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesAcceptanceOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesConfirmationOf(...attrNames: AttrNameArg[]): Promise<void>;
-  validatesComparisonOf(...attrNames: AttrNameArg[]): Promise<void>;
 
   /**
    * `ActiveModel::Attributes#attribute_names` (attributes.rb:146-148),
@@ -560,9 +482,7 @@ export class Model {
 
     this._initializingAttributes = true;
     try {
-      // AR's override of `_assign_attributes` can owe I/O; Rails' `initialize`
-      // does not await it either — the writes drain on save (RFC 0087).
-      if (attrs != null) void this.assignAttributes(attrs);
+      apiInitialize.call(this, attrs);
     } finally {
       this._initializingAttributes = false;
     }
@@ -622,35 +542,11 @@ export class Model {
   }
 
   /**
-   * Whether this model instance has been persisted.
-   * ActiveModel returns false; ActiveRecord overrides.
-   *
-   * Mirrors: ActiveModel::API#persisted?
-   */
-  isPersisted(): boolean {
-    return false;
-  }
-
-  /**
    * `run_callbacks` (callbacks.rb:96-104), mixed on by the
    * `ActiveModel::Callbacks`' `extended` hook (callbacks.rb:66-70).
    */
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
-
-// Ruby `include ActiveModel::Validations` brings ClassMethods#validates and
-// friends (validations.rb:57-307, validations/validates.rb:111-178) onto the
-// class; `with.rb:87` reopens the same `ClassMethods`, hence the second extend.
-extend(Model, ValidationsClassMethods);
-extend(Model, WithClassMethods);
-include(Model, { validatesWith: withValidatesWith });
-
-extend(Model, {
-  validates: Validates.validates,
-  validatesBang: Validates.validatesBang,
-  _validatesDefaultKeys: Validates._validatesDefaultKeys,
-  _parseValidatesOptions: Validates._parseValidatesOptions,
-});
 
 // Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
 extend(Model, {
@@ -682,26 +578,6 @@ include(Model, Attributes);
 // attributes.rb:156-159 — `_write_attribute` and `alias :attribute= :_write_attribute`.
 include(Model, { _writeAttribute, "attribute=": _writeAttribute });
 
-// api.rb:65-68 — `included do extend ActiveModel::Naming; extend ActiveModel::Translation end`.
-// The Translation half is issued from `Validations.[included]` (validations.rb:43);
-// the `Naming.extended` hook (naming.rb:253-256) installs the instance delegate.
-extend(Model, Naming);
-
-// Ruby `include ActiveModel::Conversion` (api.rb:16) and its ClassMethods half
-// (conversion.rb:105-118); the `included do` block (:28-33) rides along from
-// the module's own `[included]` hook.
-include(Model, Conversion);
-extend(Model, ConversionClassMethods);
-
-// Ruby `include ActiveModel::AttributeAssignment` (api.rb:14).
-include(Model, {
-  assignAttributes: AttributeAssignment.assignAttributes,
-  setAttributes: AttributeAssignment.setAttributes,
-  attributeWriterMissing: AttributeAssignment.attributeWriterMissing,
-  _assignAttributes: AttributeAssignment._assignAttributes,
-  _assignAttribute: AttributeAssignment._assignAttribute,
-});
-
 // Ruby `include ActiveModel::Dirty` (model.rb:12-14) — a class module, since
 // only `include()`'s class branch carries the accessor descriptors the module's
 // zero-arg readers port to.
@@ -721,9 +597,11 @@ Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: fals
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).
 extend(Model, ValidationsCallbacksClassMethods);
-// Ruby `include ActiveModel::Validations` (validations.rb:52); its `included do`
-// block (:40-50) runs from the module's own `[included]` hook.
-include(Model, Validations);
+
+// model.rb:43 — `include ActiveModel::API`, which is itself
+// `AttributeAssignment` + `Validations` + `Conversion` and the `included do`
+// block extending `Naming` and `Translation` (api.rb:60-68).
+include(Model, API);
 
 defineCallbacks(Model.prototype, "validation", {
   skipAfterCallbacksIfTerminated: true,
@@ -731,18 +609,6 @@ defineCallbacks(Model.prototype, "validation", {
 });
 
 include(Model, ToJsonWithActiveSupportEncoder);
-
-// The remaining `include ActiveModel::Validations` members (validations.rb:52)
-// and `include ActiveModel::ForbiddenAttributesProtection` (model.rb:12-14).
-include(Model, {
-  contextForValidation: validationsContextForValidation,
-  runValidationsBang: validationsRunValidationsBang,
-  raiseValidationError: validationsRaiseValidationError,
-  readAttributeForValidation: validationsReadAttributeForValidation,
-  freeze: validationsFreeze,
-  sanitizeForMassAssignment: attrSanitize,
-  sanitizeForbiddenAttributes: forbiddenSanitize,
-});
 
 // model.rb:44 — `include ActiveModel::Access`, the one thing `model.rb` does
 // beyond `include ActiveModel::API`.

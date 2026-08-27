@@ -832,6 +832,24 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`ActiveModel::API#initialize` (api.rb:78-81) is an `initialize` on a " +
+      "Concern, so in Ruby it joins the *host's* constructor chain via `super` " +
+      "when a class does `include ActiveModel::API`. TypeScript has no " +
+      "expression for that: `include()` " +
+      "(packages/activesupport/src/include.ts) copies prototype members and " +
+      "cannot install a constructor, so the port keeps the Rails name as an " +
+      "exported `initialize` function that each including class calls from its " +
+      "own constructor (model.ts). There is no TS `constructor` at the mapped " +
+      "site for the comparison to find — the same shape " +
+      "`ActiveSupport::Messages::Rotator#initialize` above already carries. " +
+      "Scoped to api.rb so a real class's `initialize` is still expected to " +
+      "map to a `constructor`.",
+    names: ["initialize"],
+    rubyFiles: ["api.rb"],
+    tsMirrorName: "initialize",
+  },
+  {
+    reason:
       "ActiveSupport::Dependencies (dependencies.rb), " +
       "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
       "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +

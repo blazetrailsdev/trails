@@ -3,8 +3,9 @@ import { Model, UnknownAttributeError } from "./index.js";
 
 /**
  * Port of `vendor/rails/activemodel/test/cases/api_test.rb`. Rails' host is
- * `include ActiveModel::API`; trails' `API` is an interface (api.ts) whose
- * implementation is `Model`, so the test classes extend `Model`.
+ * `include ActiveModel::API`; `Model` is `include API` + `include Access`
+ * (model.rb:42-45), so the test classes extend `Model` for the constructor
+ * `API#initialize` (api.rb:78-81) ports to.
  *
  * `module DefaultValue` (api_test.rb:7-17) is a mixin whose `initialize`
  * seeds `@attr` and whose `included` hook adds `attr_accessor :hello`. Ruby
