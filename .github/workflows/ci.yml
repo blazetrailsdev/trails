@@ -1621,6 +1621,13 @@ jobs:
         env:
           RAILS_STRUCTURE_REPORT: "1"
         run: pnpm exec tsx scripts/build-rails-file-structure-manifest.ts && pnpm exec eslint packages/arel/src packages/activemodel/src
+      - name: Rails test-name parity ratchet
+        # Only-shrink per-file gate on TS-only tests sitting in Rails-named
+        # test files (RFC 0124). The manifest needs the Ruby test extraction
+        # above, so like the file-structure rule this is the only job that can
+        # enforce it. Tighten after moving tests out with
+        # `pnpm parity:test:names:tighten`.
+        run: pnpm exec tsx scripts/build-rails-test-names-manifest.ts && pnpm exec eslint packages/arel/src --max-warnings 0
       - name: Test comparison
         # --gates prints the adapter/feature gate-mismatch breakdown; --check
         # fails the step if activerecord's gate-mismatch count is non-zero
