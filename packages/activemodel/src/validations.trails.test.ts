@@ -3,6 +3,8 @@ import { Range } from "@blazetrails/activesupport";
 import { include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Errors } from "./errors.js";
+import { ModelName } from "./naming.js";
+import { humanAttributeName } from "./translation.js";
 import { Validations } from "./validations.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
@@ -1825,6 +1827,16 @@ describe("ValidationsTest (trails)", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class Host {
+      // `extend ActiveModel::Naming` / `Callbacks` / `Translation`
+      // (validations.rb:41-43); declared only for their types.
+      declare static modelName: ModelName;
+      declare static i18nScope: string;
+      declare static lookupAncestors: () => Array<{
+        new (...args: never[]): unknown;
+        modelName: ModelName;
+      }>;
+      declare static humanAttributeName: typeof humanAttributeName;
+
       title: string | null = null;
 
       constructor() {
@@ -1847,6 +1859,15 @@ describe("ValidationsTest (trails)", () => {
 
       host.title = "hello";
       expect(await host.isValid()).toBe(true);
+    });
+
+    // `extend ActiveModel::Naming` (validations.rb:41) is what gives the host a
+    // `model_name`, which every `Translation` reader resolves through
+    // (translation.rb:20, :27, :44).
+    it("gives the includer model_name and the Translation readers that resolve through it", () => {
+      expect(Host.modelName.name).toBe("Host");
+      expect(Host.i18nScope).toBe("activemodel");
+      expect(Host.humanAttributeName("title")).toBe("Title");
     });
   });
 });

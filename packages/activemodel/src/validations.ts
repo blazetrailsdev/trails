@@ -14,6 +14,7 @@ import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
 import { freeze as attributesFreeze, type AttributeInstanceHost } from "./attributes.js";
 
+import { Naming } from "./naming.js";
 import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
@@ -123,9 +124,11 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 export class Validations {
   /**
    * Rails' `included do` block (validations.rb:40-50). The `extend`s at :41-43
-   * install what their modules already export: `define_model_callbacks`
-   * (callbacks.rb:72) and the whole of Translation — `human_attribute_name`,
-   * `lookup_ancestors` and `i18n_scope` (translation.rb:20, :27, :44).
+   * install what their modules already export: `model_name` (naming.rb:270-277),
+   * `define_model_callbacks` (callbacks.rb:72) and the whole of Translation —
+   * `human_attribute_name`, `lookup_ancestors` and `i18n_scope`
+   * (translation.rb:20, :27, :44), which resolve through `model_name` and so
+   * need the `Naming` extend at :41 even on a host that never includes `API`.
    */
   static [included](base: IncludingClass): void {
     // `ActiveSupport::Concern#append_features` (concern.rb:135-138) mixes the
@@ -158,6 +161,7 @@ export class Validations {
       _parseValidatesOptions: Validates._parseValidatesOptions,
     });
 
+    extend(base, Naming);
     extend(base, Callbacks);
     extend(base, Translation);
     extend(base, HelperMethods);
