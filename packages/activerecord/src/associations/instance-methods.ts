@@ -1,11 +1,3 @@
-/**
- * Base instance methods mixed in from the Associations module —
- * `record.association(name)`, `record.loadBelongsTo(name)`,
- * `record.loadHasOne(name)`.
- *
- * Mirrors the instance-method portion of ActiveRecord::Associations.
- */
-
 import type { Base } from "../base.js";
 import { Association as AssociationInstance } from "./association.js";
 import { BelongsToAssociation } from "./belongs-to-association.js";
@@ -20,16 +12,7 @@ import {
   type AssociationDefinition as AssocDef,
 } from "../associations.js";
 
-/**
- * Build the macro-specific Association for a definition, *without* caching it
- * on the record. `association(name)` caches what it builds; the loaders that
- * hold an ad-hoc definition (a through step carrying a synthesised `scope`, a
- * through record standing in for the owner) build an uncached holder here
- * instead, so loadedness, `_loaderWritebackSuppressed` and inverse wiring on
- * the owner's real holder for that name are left alone.
- *
- * @internal
- */
+/** @internal */
 export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
   switch (assocDef.macro ?? assocDef.type) {
@@ -104,13 +87,6 @@ async function bypassStrictLoading<T>(this: Base, fn: () => Promise<T>): Promise
   }
 }
 
-/**
- * Return (or lazily build + cache) the Association wrapper for the given
- * name. Pulls any preloaded / cached / collection-proxy target onto the
- * returned instance so sync reader access honors prior hydration.
- *
- * Mirrors: ActiveRecord::Base#association
- */
 export function association(this: Base, name: string): AssociationInstance {
   const existing = this._associationInstances.get(name);
   if (existing) {
@@ -119,8 +95,6 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const ctor = this.constructor as typeof Base;
-  // Rails constructs from the reflection (`associations.rb:290-296`:
-  // `reflection.association_class.new(self, reflection)`).
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as AssocDef | undefined;
   if (!assocDef) {
     throw _associationNotFound(this, name);
@@ -132,17 +106,6 @@ export function association(this: Base, name: string): AssociationInstance {
   return instance;
 }
 
-/**
- * Explicit async load for a belongsTo association. Returns the cached /
- * preloaded value if present; otherwise runs a query. Not a forced
- * reload — use `record.reload()` for that.
- *
- * Rails spells this entry point `record.association(name).load_target`, and
- * that is what it delegates to: the cache read, the staleness guard and the
- * writeback all live in `load_target` (association.rb:190), with
- * `SingularAssociation#find_target` (singular_association.rb:47-55) the pure
- * query underneath.
- */
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "belongsTo");
   const result = await bypassStrictLoading.call(this, () =>
@@ -151,14 +114,6 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
   return result as Base | null;
 }
 
-/**
- * Explicit async load for a hasOne association. Returns the cached /
- * preloaded value if present; otherwise runs a query. Not a forced
- * reload — use `record.reload()` for that.
- *
- * Reaches the target through `association(name).load_target` for the reasons
- * given on `loadBelongsTo`.
- */
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "hasOne");
   const result = await bypassStrictLoading.call(this, () =>
@@ -167,11 +122,6 @@ export async function loadHasOne(this: Base, name: string): Promise<Base | null>
   return result as Base | null;
 }
 
-/**
- * Instance methods mixed onto Base via include(Base, InstanceMethods).
- * Mirrors the layout of ActiveRecord::Associations which mixes these into
- * the model class alongside the ClassMethods macros.
- */
 export const InstanceMethods = {
   association,
   loadBelongsTo,

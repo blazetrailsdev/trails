@@ -5,15 +5,6 @@ import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js
 import { loadCanonicalSchema } from "./canonical-schema.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
-/**
- * Adapter members the canonical lay path is allowed to touch *without* being in
- * `STUBBED_DDL_METHODS`. Every entry is a read, a cache-bust or a renderer input
- * — none of them is a point where intercepting the member would stop the schema
- * being laid, which is the only thing the guarded set is about. Widening this
- * list is a deliberate act: a new entry needs a reason on the same line, and a
- * stale one fails too — an entry the lay path no longer touches has to go, so
- * the list can never drift into a blanket exemption nobody re-derived.
- */
 const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   [
     "adapterName",
@@ -67,52 +58,10 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ],
 ]);
 
-/**
- * A getter whose body reads a private field brand-checks its receiver and
- * throws when the recording view is that receiver. That is the one throw the
- * recorder may answer by re-reading off the real adapter; anything else is a
- * genuine failure in the getter body, and swallowing it would let the trace go
- * quietly shallower for that member instead of failing — the drift the guard's
- * staleness rule exists to prevent. Match the brand-check shape only.
- */
 function isPrivateFieldBrandCheck(error: unknown): boolean {
   return error instanceof TypeError && /private (member|field|method)/i.test(error.message);
 }
 
-/**
- * Lay the canonical schema through a proxy that records every adapter member
- * the loader reaches for.
- *
- * The mixed-in `SchemaStatements` bodies are the adapter's own methods, so a
- * proxy that bound them to the real adapter would see only the loader's first
- * call and nothing those bodies do. The recorder is therefore two levels deep:
- * a member reached off the proxy is recorded and bound to a second recording
- * view, so the `this.<member>` calls the mixed-in body makes are recorded one
- * hop deep, while the calls that view then makes to the real adapter stay
- * unrecorded. `this.adapter` — how a mixed-in body names the adapter, which is
- * itself — is answered with the same view so that hop stays recorded.
- *
- * Getters are the second half of the boundary. A getter read off the view is
- * evaluated with the view as receiver, not the real adapter, so whatever it
- * builds off `this` keeps recording: `schemaCreation` hands back a renderer
- * holding the view, and the renderer's own quoting and type reads
- * (`quoteColumnName`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) come
- * back through the proxy and are pinned again. Getters that read a private
- * field brand-check their receiver and throw on a proxy; those fall back to
- * evaluating on the real adapter, unrecorded.
- *
- * Depth stops there, deliberately. Self-binding the recorded functions so that
- * *every* hop inside an adapter method is recorded drags in the whole adapter
- * internals — 44 further members (`performQuery`, `materializeTransactions`,
- * `verifiedBang`, `ensureConnected`, …), none of which is a surface a cover
- * stubs, and exempting them one by one would turn NON_EMITTING into the blanket
- * exemption its own staleness rule exists to prevent. The boundary this pins is
- * the one a cover can actually intercept: the loader's calls into the adapter,
- * the calls those bodies make back into it, and everything the renderer they
- * build reads. Members reached deeper than that (`createTableDefinition`,
- * `indexNameLength`, …) are not pinned; `schemaCreation` stays in the guarded
- * set because stubbing it still removes the renderer wholesale.
- */
 async function recordLayPath(): Promise<Set<string>> {
   const real = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
   const touched = new Set<string>();
@@ -145,23 +94,6 @@ async function recordLayPath(): Promise<Set<string>> {
   return touched;
 }
 
-/**
- * The guarded set is a point-in-time trace of what `loadCanonicalSchema` really
- * goes through. Nothing else holds it true: if the lay path grows another
- * adapter call, a cover that intercepts the new member lays nothing and the
- * canonical half dies with `relation "…" does not exist` on the PG lane only —
- * the exact shape PR #5676 shipped. So drive the real loader and pin what it
- * touches.
- *
- * SQLite is the lane here because it needs no server, and the lay path it walks
- * is the shared abstract one. The companions do override members (MySQL:
- * `addIndex`, `dropTable`; PostgreSQL: `dropTable`, `schemaCreation` — not an
- * exhaustive list, check the class before relying on it), but none of those
- * overrides changes what this pins: `dropTable` is off the lay path for every
- * adapter (the canonical loader passes no `force:`), MySQL's `addIndex` reaches
- * the database through the same `adapter.execute` this records, and every
- * adapter's `schemaCreation` renderer reads back through the same boundary.
- */
 describe("STUBBED_DDL_METHODS", () => {
   test("covers every adapter member the canonical lay path touches", async () => {
     const touched = await recordLayPath();

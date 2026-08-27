@@ -1,18 +1,3 @@
-/**
- * Converts association-based where conditions into foreign key queries.
- * When you write `where({ author: authorRecord })`, this extracts
- * the foreign key and wraps the id in a single-element array so that
- * `ArrayHandler`'s single-element path emits `author_id = ?` (not IN).
- *
- * Mirrors: ActiveRecord::PredicateBuilder::AssociationQueryValue
- *
- * Intermediate query hash shapes (before predicate building):
- *   where({ author: author })         → { author_id: [author.id] }
- *   where({ author: [a1, a2] })       → { author_id: [a1.id, a2.id] }
- *   where({ author: Author.where(...) }) → { author_id: <subquery> }
- */
-
-/** Metadata about the associated table needed to build the FK predicate. */
 export interface AssocTableMeta {
   joinForeignKey: string | string[];
   joinPrimaryKey(klass?: unknown): string | string[] | null;
@@ -42,19 +27,8 @@ export class AssociationQueryValue {
   queries(): Record<string, unknown>[] {
     const fk = this.associatedTable.joinForeignKey;
     if (Array.isArray(fk)) {
-      // CPK path — Slot B. Rails plucks primary_key from Relations then zips to FK tuples.
-      // Relation subqueries can't be represented as an object key (JS would stringify the array).
-      // Throw a clear error so the caller knows this is not yet supported rather than emitting
-      // a silently malformed hash.
       const ids = this.ids();
       if (this.isRelation(ids)) {
-        // Pragmatic deviation from Rails: Rails calls `id_list.pluck(primary_key)`
-        // here, synchronously materializing the relation into tuples. Our pluck is
-        // async and queries() is sync, so instead we emit one IN subquery per FK
-        // column (`fk[i] IN (SELECT pk[i] FROM ...)`, ANDed via PredicateBuilder).
-        // This is broader than Rails' tuple-IN — it matches rows where each FK
-        // component is in its column independently rather than as a tuple — but
-        // mirrors the subquery approach used for non-CPK Relations (Batch 71).
         const pks = this.primaryKey() as string[];
         const fkCols = fk;
         const baseRelation = ids as any;
@@ -65,10 +39,6 @@ export class AssociationQueryValue {
           }, {}),
         ];
       }
-      // Rails zips each element of id_list with the FK columns (id_list.map { |ids_set| fk.zip(ids_set).to_h }).
-      // Each ids_set must be an array with the same arity as joinForeignKey. Non-tuple values
-      // (single record, scalar) cannot be safely distributed across multiple FK columns — throw
-      // rather than assigning the same value to every column (silently wrong SQL).
       const idList = Array.isArray(ids) ? ids : [ids];
       return idList.map((idsSet: any) => {
         if (!Array.isArray(idsSet)) {
@@ -133,23 +103,12 @@ export class AssociationQueryValue {
     const value = this.value as { whereValuesHash?: () => Record<string, unknown> };
     const type = this.primaryType();
     if (!type) return false;
-    // Rails: polymorphic? && !where_values_hash.key?(primary_type). If the relation
-    // doesn't implement where_values_hash (non-Relation duck), treat as needing the
-    // polymorphic constraint — that's the safer default than skipping the type guard.
     const hash = typeof value.whereValuesHash === "function" ? value.whereValuesHash() : undefined;
     if (!hash) return true;
     return !(type in hash);
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
-   *   `value.select_values.empty?` (association_query_value.rb:52) — `empty?` on
-   *   a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits
-   *   no callee, so no TS call can ever credit the Ruby one. The gate flags it
-   *   only because `empty?` maps onto the unrelated
-   *   `ActiveRecord::Result.empty`, which takes arguments since it gained Rails'
-   *   `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   private isSelectClause(): boolean {
     const sv = (this.value as any).selectValues;
     if (typeof sv === "function") return sv.call(this.value).length === 0;
@@ -160,11 +119,9 @@ export class AssociationQueryValue {
   private convertToId(value: unknown): unknown {
     const pk = this.primaryKey();
     if (Array.isArray(pk)) {
-      // Rails: primary_key.map { |attribute| next nil if value.nil?; attribute == "id" ? value.id_value : value.public_send(attribute) }
       return pk.map((attr) => {
         if (value === null || value === undefined) return null;
         if (attr === "id" && typeof (value as any).readAttribute === "function") {
-          // Rails: id_value reads the scalar `id` column on composite-PK records.
           return (value as any).readAttribute("id");
         }
         return (value as any)[attr];

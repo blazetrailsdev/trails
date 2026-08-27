@@ -30,17 +30,6 @@ describe("templateSchemaCache", () => {
     );
   });
 
-  /**
-   * The warm installs the dump by *replacing* the pool's cache object, as
-   * Rails' `load_cache` does (`schema_cache.rb:116-139`). Every adapter-side
-   * consumer has to see it through that swap — `AbstractAdapter#schemaCache`
-   * and `#internalSchemaCache`, and `TypeCaster::Connection` via
-   * `poolConfig.schemaCache` — which is only true because each reads the
-   * reflection's slot live rather than holding a cache by identity. The
-   * installed cache is not the shared module-scoped dump either: each pool gets
-   * its own dup, as Rails gets for free from `_load_from` running per reflection
-   * (`schema_cache.rb:116-121`).
-   */
   it("is one object, reached by every adapter-side consumer after the swap", () => {
     const conn = Base.connection;
     const installed = conn.pool.schemaReflection.loadedCache;
@@ -50,15 +39,6 @@ describe("templateSchemaCache", () => {
     expect(installed).not.toBe(templateSchemaCache());
   });
 
-  /**
-   * The boot fingerprint is the baseline the replay compares against, but it is
-   * not an invariant of a running worker: a file that alters a canonical table
-   * and leaves it altered is exactly the case the guard exists for, and the
-   * between-file reset restores rows, not shapes (`drop-all-tables.ts`
-   * `resetTestTables`). So these assert the property the guard actually needs —
-   * that the fingerprint moves for a change to a dumped table and does not move
-   * for anything else — against a baseline taken here, not against boot.
-   */
   it("recorded a boot fingerprint, and fingerprints a database deterministically", async () => {
     expect(templateSchemaFingerprint()).toEqual(expect.any(String));
     const cached = dumpedTables(templateSchemaCache()!.marshalDump());
@@ -92,12 +72,6 @@ describe("templateSchemaCache", () => {
     }
   });
 
-  /**
-   * sqlite has no column comments — `supports_comments?` is false there
-   * (`abstract_adapter.rb:502` returns false and `sqlite3_adapter.rb` has no
-   * override) — so the comment arm of the fingerprint is only exercisable on PG
-   * and MySQL.
-   */
   it.skipIf(activeLane() === "sqlite")(
     "stops matching once a canonical column's comment changes",
     async () => {
@@ -130,15 +104,6 @@ describe("templateSchemaCache", () => {
     expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(before);
   });
 
-  /**
-   * A functional index reports no column at all on MySQL —
-   * `information_schema.STATISTICS.COLUMN_NAME` is NULL and the expression sits
-   * in `EXPRESSION`, which is what `SHOW KEYS`' `Expression` feeds
-   * `IndexDefinition#columns` from (`mysql/schema_statements.rb:36-52`). So an
-   * expression that changed with the column set unchanged is the one index
-   * edit that could leave the fingerprint intact. MariaDB has no such column
-   * and no functional indexes at all, hence the capability gate.
-   */
   itIfSupports(
     "expression_index",
     "stops matching once a canonical functional index's expression changes",

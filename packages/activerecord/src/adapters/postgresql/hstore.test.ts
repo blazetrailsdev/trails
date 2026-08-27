@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/hstore_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -9,7 +6,6 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base, serialize, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
-// Rails: class TagCollection
 class TagCollection {
   constructor(private readonly hash: Record<string, string | null>) {}
   toHash(): Record<string, string | null> {
@@ -23,9 +19,6 @@ class TagCollection {
   }
 }
 
-// Rails: class Hstore < ActiveRecord::Base
-//   self.table_name = "hstores"
-//   store_accessor :settings, :language, :timezone
 class Hstore extends Base {
   static {
     this.tableName = "hstores";
@@ -34,8 +27,6 @@ class Hstore extends Base {
   }
 }
 
-// Rails: class HstoreWithSerialize < Hstore
-//   serialize :tags, coder: TagCollection
 class HstoreWithSerialize extends Hstore {}
 serialize(HstoreWithSerialize, "tags", { coder: TagCollection });
 
@@ -49,39 +40,31 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     connection = Base.connection as PostgreSQLAdapter;
 
-    // Rails: enable_extension!("hstore", @connection)
     await connection.enableExtension("hstore");
 
-    // Rails: @connection.transaction { @connection.create_table("hstores") { |t| ... } }
     await connection.createTable("hstores", (t) => {
       t.column("tags", "hstore", { default: "" });
       t.column("payload", "hstore", { array: true });
       t.column("settings", "hstore");
     });
 
-    // Rails: Hstore.reset_column_information
     void Hstore.resetColumnInformation();
     await Hstore.loadSchema();
     void HstoreWithSerialize.resetColumnInformation();
     await HstoreWithSerialize.loadSchema();
 
-    // Rails: @column = Hstore.columns_hash["tags"]
     column = (Hstore as any).columnsHash()["tags"];
-    // Rails: @type = Hstore.type_for_attribute("tags")
     type = Hstore.typeForAttribute("tags");
   });
 
   afterEach(async () => {
-    // Rails: @connection.drop_table "hstores", if_exists: true
     await connection.dropTable("hstores", { ifExists: true });
-    // Rails: disable_extension!("hstore", @connection)
     await connection.disableExtension("hstore", { force: "cascade" }).catch(() => {});
     void Hstore.resetColumnInformation();
     void HstoreWithSerialize.resetColumnInformation();
   });
 
   describe("PostgresqlHstoreTest", () => {
-    // Rails: private def assert_cycle(hash)
     async function assertCycle(hash: Record<string, string | null>): Promise<void> {
       const x = await Hstore.createBang({ tags: hash });
       await (x as any).reload();
@@ -93,7 +76,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((y as any).tags).toEqual(hash);
     }
 
-    // Rails: private def assert_array_cycle(array)
     async function assertArrayCycle(array: Array<Record<string, string | null>>): Promise<void> {
       const x = await Hstore.createBang({ payload: array });
       await (x as any).reload();
@@ -117,17 +99,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await connection.extensionEnabled("hstore")).toBe(false);
       await connection.enableExtension("hstore");
       expect(await connection.extensionEnabled("hstore")).toBe(true);
-      // Rails: ensure { load_schema } restores columns dropped by CASCADE.
-      // Here afterEach dropTable(ifExists)+disableExtension and the next
-      // beforeEach enableExtension+createTable achieve the same effect.
-      // No assertions below this point may assume the hstores table exists.
     });
 
     it("column", async () => {
       expect(column.type).toBe("hstore");
       expect(column.sqlType).toBe("hstore");
       expect(column.array).toBeFalsy();
-      // Rails: assert_not_predicate @type, :binary? — hstore is not a binary type
       expect(type.type()).not.toBe("binary");
     });
 
@@ -135,7 +112,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.addColumn("hstores", "permissions", "hstore", {
         default: '"users"=>"read", "articles"=>"write"',
       });
-      // Rails: Hstore.reset_column_information (ensure block also resets)
       void Hstore.resetColumnInformation();
       await Hstore.loadSchema();
       expect((Hstore as any).columnDefaults["permissions"]).toEqual({
@@ -146,8 +122,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("change table supports hstore", async () => {
-      // Rails wraps in a transaction and raises ActiveRecord::Rollback to undo —
-      // afterEach drops and recreates the table, so no manual rollback is needed.
       await connection.changeTable("hstores", async (t) => {
         await (t as PgTable).hstore("users", { default: "" });
       });
@@ -158,9 +132,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("hstore migration", async () => {
-      // Rails: hstore_migration = Class.new(ActiveRecord::Migration::Current) do
-      //          def change; change_table("hstores") { |t| t.hstore :keys }; end
-      //        end
       class HstoreMigration extends Migration {
         async change() {
           await this.changeTable("hstores", async (t) => {
@@ -230,11 +201,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((x as any).language).toBe("fr");
       expect((x as any).timezone).toBe("GMT");
 
-      // Rails: YAML.dump(x) / YAML.unsafe_load(payload) exercises AR's encode_with /
-      // init_with hooks. TS has no AR object-graph YAML, so we go one level down:
-      // verify that (a) serializableHash() captures store accessor state in the
-      // settings column, (b) Hstore.new() restores it, and (c) the attribute hash
-      // is YAML-safe (no non-serializable values sneak in from the hstore OID type).
       const payload = yamlStringify((x as any).serializableHash());
       const data = yamlParse(payload) as Record<string, unknown>;
       const y = Hstore.new(data);
@@ -419,9 +385,5 @@ describeIfPg("PostgreSQLAdapter", () => {
       const output = await SchemaDumper.dumpTableSchema(connection, "hstores");
       expect(output).toMatch(/t\.hstore\("tags",\s+\{?\s*default:\s*\{\}/);
     });
-
-    // NOTE: `supports to unsafe h values` (ActionController::Parameters#to_unsafe_h)
-    // is a Ruby-only ProtectedParams API; reclassified in
-    // scripts/api-compare/unported-files.ts.
   });
 });

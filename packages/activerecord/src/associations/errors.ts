@@ -1,22 +1,8 @@
-/**
- * Association-specific error classes.
- *
- * Mirrors: ActiveRecord::Associations error classes defined in
- * activerecord/lib/active_record/associations/errors.rb
- */
 import { singularize } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
-/**
- * Mirrors Rails' `DidYouMean::Correctable#detailed_message`: the base message
- * plus a "Did you mean?" suggestion line built from the closest names, each on
- * its own line indented to align under the first correction. Shared by every
- * association error that mixes in `DidYouMean::Correctable` so they all format
- * suggestions identically.
- *
- * @internal
- */
+/** @internal */
 function withCorrections(message: string, corrections: string[]): string {
   if (corrections.length === 0) return message;
   return `${message}\nDid you mean?  ${corrections.join("\n               ")}`;
@@ -37,24 +23,12 @@ export class AssociationNotFoundError extends ConfigurationError {
     this.corrections = corrections;
   }
 
-  /**
-   * Mirrors Rails' `DidYouMean::Correctable#detailed_message`: the base
-   * message plus a "Did you mean?" suggestion line built from the closest
-   * declared association names. The suggestion lives here (not in `message`)
-   * to match Rails, where corrections surface only via `detailed_message`.
-   */
   detailedMessage(): string {
     return withCorrections(this.message, this.corrections);
   }
 }
 
-/**
- * The reflection surface `InverseOfAssociationNotFoundError` reads. Structural
- * so `associations/errors.ts` takes no import on `reflection.ts`, which imports
- * this file.
- *
- * @internal
- */
+/** @internal */
 interface InverseOfReflection {
   readonly name: string;
   readonly options: Record<string, unknown>;
@@ -62,24 +36,13 @@ interface InverseOfReflection {
   readonly klass: InverseOfAssociatedClass;
 }
 
-/**
- * The `associated_class` surface the error reads: its name, and its declared
- * association names for the `Did you mean?` dictionary.
- *
- * @internal
- */
+/** @internal */
 interface InverseOfAssociatedClass {
   readonly name: string;
   reflections(): Readonly<Record<string, unknown>>;
 }
 
-/**
- * `reflection.options[:inverse_of].inspect` — a Ruby Symbol inspects with its
- * leading colon, `nil` as "nil". Shared by the two inverse-of errors, whose
- * Rails messages both interpolate it (associations/errors.rb:39, :66).
- *
- * @internal
- */
+/** @internal */
 function inspectInverseOf(reflection: InverseOfReflection): string {
   const inverseOf = reflection.options["inverseOf"];
   return inverseOf == null ? "nil" : `:${String(inverseOf)}`;
@@ -103,10 +66,6 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
     );
     this.name = "InverseOfAssociationNotFoundError";
     this.reflection = reflection;
-    // `associated_class.nil? ? reflection.klass : associated_class`
-    // (associations/errors.rb:38). `klass` is not always resolvable here, where
-    // Ruby would raise NameError: the resolution failure is swallowed to `null`
-    // so the inverse-of error this is already constructing is what surfaces.
     if (reflection == null) {
       this.associatedClass = null;
     } else if (associatedClass != null) {
@@ -265,47 +224,15 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
   }
 }
 
-/**
- * Reflection-shaped object that `CompositePrimaryKeyMismatchError` derives its
- * message from. Rails (associations/errors.rb:190-200) is passed the real
- * reflection and branches on macro to pick `active_record_primary_key`
- * (has_one / collection) or `association_primary_key` (belongs_to). The
- * canonical `AbstractReflection#checkValidityBang` raise site passes the real
- * reflection, so we replicate that branch here. Trails-only defensive guards
- * (association-scope, collection-proxy, autosave, the inline association
- * loaders) don't hold a reflection — they pass a `primaryKey` they already
- * resolved, which takes precedence when no macro predicates are present.
- *
- * Rails raises this error from exactly one place,
- * `AbstractReflection#check_validity!` (reflection.rb:623,625), reached via
- * `Association#initialize` (association.rb:39) on first use. The trails-only
- * guard sites in `association-scope.ts`, `collection-proxy.ts`,
- * `autosave-association.ts` and `associations.ts` (inline-fallback /
- * scope-building / autosave / `:as` collapse paths) now route through that
- * canonical `checkValidityBang` first — via
- * `routeThroughCheckValidity` (validate-through-reflection.ts) — so a
- * resolvable reflection raises the Rails-faithful error derived from
- * `active_record_primary_key` / `association_primary_key`. The bare-guard
- * throw below each call remains only as a minimal fallback for paths that
- * genuinely cannot resolve a reflection (lower-level test helpers) or where a
- * polymorphic `:as` collapse has no Rails composite-key equivalent; dropping
- * it would surface a silent broken WHERE / `readAttribute(undefined)` instead
- * of a clear error. (RFC 0023 — story
- * `route-composite-pk-guards-through-check-validity`, converging the sites
- * audited in `composite-pk-mismatch-extra-guard-raise-sites`.)
- */
 export interface CompositePrimaryKeyMismatchReflection {
-  /** The owner — a model class (whose `name` builds the message) or its name. */
   activeRecord?: unknown;
   name?: string;
   foreignKey?: string | string[];
-  /** Real-reflection accessors mirrored from Rails' constructor branch. */
   hasOne?: () => boolean;
   isCollection?: () => boolean;
   belongsTo?: () => boolean;
   activeRecordPrimaryKey?: string | string[];
   associationPrimaryKey?: () => string | string[];
-  /** Pre-resolved key for trails-only guard sites that hold no reflection. */
   primaryKey?: string | string[];
 }
 
@@ -313,15 +240,7 @@ function formatKey(key: string | string[]): string {
   return Array.isArray(key) ? `[${key.map((k) => `"${k}"`).join(", ")}]` : key;
 }
 
-/**
- * Resolve the primary key the message reports. Mirrors Rails' macro branch in
- * `CompositePrimaryKeyMismatchError#initialize` (errors.rb:192-196): a real
- * reflection uses `activeRecordPrimaryKey` for has_one/collection and
- * `associationPrimaryKey` for belongs_to; a bare guard object supplies its own
- * already-resolved `primaryKey`.
- *
- * @internal
- */
+/** @internal */
 function reflectionPrimaryKey(
   reflection: CompositePrimaryKeyMismatchReflection,
 ): string | string[] | undefined {
@@ -338,17 +257,6 @@ function reflectionPrimaryKey(
   return reflection.primaryKey;
 }
 
-/**
- * Mirrors Rails' `CompositePrimaryKeyMismatchError` (associations/errors.rb:187):
- * declares a `reflection` reader and derives the message from the passed
- * reflection inside the constructor, branching on the reflection's macro to
- * choose the primary key to report.
- *
- * Fidelity note: Rails 8.0.2 declares `attr_reader :reflection` but
- * `initialize` never assigns `@reflection` (errors.rb:190-200), so
- * `error.reflection` is always `nil`. We mirror that exactly — the reader
- * exists for API parity but is never populated from the constructor argument.
- */
 export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
   readonly reflection: CompositePrimaryKeyMismatchReflection | null = null;
 
@@ -374,7 +282,6 @@ export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
     }
     super(message);
     this.name = "CompositePrimaryKeyMismatchError";
-    // Rails never assigns @reflection (errors.rb:190-200); leave the reader null.
   }
 }
 
@@ -387,11 +294,6 @@ export class AmbiguousSourceReflectionForThroughAssociation extends ActiveRecord
   }
 }
 
-/**
- * Mirrors: `ThroughNestedAssociationsAreReadonly` (associations/errors.rb:224-232)
- * — built from the `(owner, reflection)` pair, deriving the message from
- * `owner.class.name` and `reflection.name`, with the argument-less fallback.
- */
 export class ThroughNestedAssociationsAreReadonly extends ActiveRecordError {
   constructor(owner?: object | null, reflection?: { name: string } | null) {
     if (owner && reflection) {
@@ -440,23 +342,6 @@ export class DeleteRestrictionError extends ActiveRecordError {
   }
 }
 
-/**
- * Thrown when a `has_one` association is assigned by mass assignment —
- * `owner.assignAttributes({ account: x })`, `new Owner({ account: x })` — on a
- * *persisted* owner. (RFC 0087 §1 removed the native `=` setter that also
- * raised this. The mass-assignment arm is the campaign's deliberate residue:
- * Rails' `assign_attributes` returns nil and does its work inline
- * (`activemodel/lib/active_model/attribute_assignment.rb:32-35`), so trails'
- * `assignAttributes` stays synchronous too — which leaves this the only way to
- * report a write it cannot await.) This is a deliberate
- * trails-only deviation with no Rails counterpart: Rails'
- * `HasOneAssociation#replace` persists the displacement + new record inline at
- * assignment, which is synchronous DB I/O JS cannot do from a property setter.
- * Rather than silently deferring the writes to the owner's next `save()` — the
- * order-undefined two-row race RFC 0068 exists to kill — we throw loudly and
- * name the exact awaitable replacement. See RFC 0068-awaitable-has-one-setter
- * ("Why 'loud' beats 'deferred'") for the ergonomic-tradeoff decision.
- */
 export class HasOnePersistedAssignmentError extends ActiveRecordError {
   readonly association: string;
 
@@ -473,25 +358,6 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
   }
 }
 
-/**
- * Thrown when a collection association (`has_many` / HABTM) is assigned by
- * mass assignment — `owner.assignAttributes({ items: [...] })`, `new Owner({
- * items: [...] })` — where Rails' `replace` would do DB I/O: a *persisted*
- * owner, or a new owner whose replace still owes a query (the unconditional
- * `load_target` once its primary key is set, or removing an already-persisted
- * record). (RFC 0087 §1 removed the native
- * `=` setter that also raised this; the mass-assignment arm is retired by that
- * RFC's `retire-sync-association-mass-assignment-arms`.) The collection analogue of
- * {@link HasOnePersistedAssignmentError}, and a deliberate trails-only
- * deviation with no Rails counterpart: Rails'
- * `CollectionAssociation#replace` diffs against the loaded target and runs the
- * deletes + inserts inline in a transaction (`replace_records`,
- * collection_association.rb:242), which is synchronous DB I/O JS cannot do
- * from a property setter. Rather than deferring those writes to the owner's
- * next `save()` — where a deferred delete can race an interim insert — we
- * throw loudly and name the awaitable Rails-named replacements. See RFC
- * 0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'").
- */
 export class CollectionPersistedAssignmentError extends ActiveRecordError {
   readonly association: string;
 
@@ -507,27 +373,6 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
   }
 }
 
-/**
- * Thrown when a collection association's ids are assigned by mass assignment —
- * `owner.assignAttributes({ itemIds: [...] })`, `new Owner({ itemIds: [...] })`
- * — on *either* owner arm.
- *
- * The ids writer is stricter than {@link CollectionPersistedAssignmentError}'s
- * record writer, which only throws for a persisted owner: Rails' `ids_writer`
- * (collection_association.rb:61-83) *resolves the ids to records with a query*
- * before it replaces, so even the new-record arm — where the replace itself is
- * pure in-memory work — needs I/O mass assignment cannot await. Returning that
- * promise for the caller to discard made a bad id
- * (`raise_record_not_found_exception!`) surface as an unhandled rejection
- * rather than a catchable throw, and let an immediate `save()` race the
- * in-flight resolution. See RFC
- * 0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'").
- *
- * RFC 0087 §1 listed this class for deletion; it survives that campaign
- * deliberately, for the same reason {@link HasOnePersistedAssignmentError}
- * does — mass assignment is synchronous by design, so the ids arm keeps a
- * permanent caller.
- */
 export class CollectionIdsAssignmentError extends ActiveRecordError {
   readonly association: string;
 

@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/update_all_test.rb
- */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
@@ -51,9 +46,6 @@ function epochMs(v: unknown): number {
   throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
 }
 
-// ==========================================================================
-// UpdateAllTest — targets relation/update_all_test.rb
-// ==========================================================================
 describe("UpdateAllTest", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -302,8 +294,6 @@ describe("UpdateAllTest", () => {
       title: "activerecord",
       author_name: null,
     });
-    // Rails: `topics = TopicWithCallbacks.none; topics.update([id1, id2], [attrs1, attrs2])`
-    // Trails: use class-level update which also runs callbacks
     await TopicWithCallbacks.update(
       [topic1.id, topic2.id],
       [{ title: "adequaterecord" }, { title: "adequaterecord" }],
@@ -455,9 +445,6 @@ describe("UpdateAllTest", () => {
     expect(await joinScope.updateAll({ status: "shipped" })).toBe(1);
   });
 
-  // TRACKED DEVIATION: updateAll on an association scope that includes("comments", "categories")
-  // generates malformed SQL (`no such column: 0`). Rails strips the ORDER clause and uses a
-  // subselect strategy; the trails path fails when includes + order are combined with updateAll.
   it("update all ignores order without limit from association", async () => {
     const david = await Author.find(authors("david").id);
     const postsWithCats = await (david as any).postsWithCommentsAndCategories.toArray();

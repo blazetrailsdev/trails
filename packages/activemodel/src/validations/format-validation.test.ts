@@ -14,12 +14,6 @@ describe("FormatValidationTest", () => {
   });
 
   it("validates format of without lambda without arguments", async () => {
-    // JS regex has no \A/\z analogues for Ruby's start-of-string /
-    // end-of-string anchors. JS ^/$ default to start/end of input
-    // (line anchors only with the `m` flag), but Rails inspects regex
-    // *source* for ^/$ regardless and forces opt-in via multiline: true
-    // — the security check is about the developer's intent, not the
-    // regex engine's flag state (format.rb:42, regexp_using_multiline_anchors?).
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -42,8 +36,6 @@ describe("FormatValidationTest", () => {
   });
 
   it("validates format of when with isnt a regexp should raise error", () => {
-    // Rails check_validity! runs at validator construction, so the
-    // throw fires when `validates(...)` is called — match that timing.
     expect(() => {
       class Person extends Model {
         static {
@@ -222,9 +214,6 @@ describe("format with 'without' option", () => {
   });
 
   it("validate format does not mutate regex lastIndex across calls (g flag)", async () => {
-    // Rails regexp.match? is stateless. JS RegExp#test mutates lastIndex
-    // for /g and /y regexes — a shared regex would alternate
-    // pass/fail. Pin the stateless behavior here.
     const sharedRe = /\d+/g;
     class P extends Model {
       static {

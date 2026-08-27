@@ -135,9 +135,6 @@ describe("MySQL::SchemaDumper", () => {
         (make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer", autoIncrement: true })),
       ).toBe(false));
     it("true when autoIncrement undefined (not auto_increment)", () =>
-      // Mirrors Rails `!column.auto_increment?`: an introspected non-auto-increment integer
-      // PK (e.g. `id: :integer, default: nil`) carries no autoIncrement flag, so it is an
-      // explicit-default PK and must dump `default: null`.
       expect((make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer" }))).toBe(true));
   });
 

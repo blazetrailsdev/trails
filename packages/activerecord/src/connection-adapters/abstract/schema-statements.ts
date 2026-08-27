@@ -1,13 +1,3 @@
-/**
- * SchemaStatements — DDL operations for database schema manipulation.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements
- *
- * This is the base implementation with generic SQL. Adapter-specific
- * subclasses can override methods for dialect differences (e.g. SQLite
- * doesn't support ALTER TABLE ADD CONSTRAINT).
- */
-
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -72,14 +62,7 @@ export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 type RemoveIndexOptions = { name?: string; column?: string | string[] };
 type IndexInfo = { name: string; columns: string[] };
 
-/**
- * Rails: `can_remove_index_by_name?` (`schema_statements.rb`) —
- * `column_name.nil? && options.key?(:name) && options.except(:name, :algorithm).empty?`.
- * A bare `{ name }` (optionally with `:algorithm`) resolves without
- * introspecting the table's indexes; any other extra key forces the lookup.
- *
- * @internal
- */
+/** @internal */
 export function canRemoveIndexByName(
   columnName: string | string[] | undefined | null,
   options: Record<string, unknown>,
@@ -91,8 +74,6 @@ export function canRemoveIndexByName(
   );
 }
 
-// Rails: `expression_column_name?` — a String column carrying a non-word char
-// (e.g. `"lower(email)"`) is an expression index, not a plain column.
 /** @internal */
 function isExpressionColumnName(columnName: string | string[] | undefined): columnName is string {
   return typeof columnName === "string" && /\W/.test(columnName);
@@ -100,11 +81,6 @@ function isExpressionColumnName(columnName: string | string[] | undefined): colu
 
 type GenerateIndexName = (tableName: string, column: string | string[]) => string;
 
-// Normalize a remove-index spec into the effective name + column list, applying
-// Rails' expression branch: an expression positional column with no `name`
-// matches by name only. Rails sets `options[:name] = index_name(table, column)`,
-// where a String column routes through `index_name_options` (scan \w+, join "_")
-// and `generate_index_name`, so the index-name length/hash fallback applies.
 function removeIndexSpec(
   generateIndexName: GenerateIndexName,
   tableName: string,
@@ -121,13 +97,8 @@ function removeIndexSpec(
 }
 
 /**
- * Rails: `index_name_for_remove` — resolve the concrete index name from the
- * given (already-fetched) indexes plus a name and/or column spec. Raises
- * ArgumentError on a no-match / ambiguous match. Shared by the SQLite and
- * PostgreSQL adapters, whose `removeIndex` overrides are self-contained.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE SchemaStatements#index_name_for_remove (abstract/schema_statements.rb:1647) taking the already-fetched indexes, since ours cannot re-query synchronously.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function indexNameForRemoveFrom(
   generateIndexName: GenerateIndexName,
@@ -136,9 +107,6 @@ export function indexNameForRemoveFrom(
   columnName: string | string[] | undefined,
   options: RemoveIndexOptions,
 ): string {
-  // can_remove_index_by_name?: a bare `{ name }` needs no introspection. Rails
-  // gates purely on key presence (`options.key?(:name)`) and returns the value
-  // as-is, so `{ name: undefined }` returns undefined here (Rails: nil).
   if (canRemoveIndexByName(columnName, options)) {
     return options.name as string;
   }
@@ -148,8 +116,6 @@ export function indexNameForRemoveFrom(
     checks.push((i) => i.name === name);
   }
   if (columnNames.length > 0) {
-    // Rails: `index_name(table, i.columns) == index_name(table, column_names)` —
-    // both sides route through generate_index_name (length/hash fallback).
     const target = generateIndexName(tableName, columnNames);
     checks.push((i) => generateIndexName(tableName, i.columns) === target);
   }
@@ -170,12 +136,8 @@ export function indexNameForRemoveFrom(
 }
 
 /**
- * Rails: `index_exists?` for the remove path — true when an index matches the
- * given name and/or columns. Shared by the SQLite / PostgreSQL `removeIndex`
- * overrides for their `ifExists` short-circuit.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE SchemaStatements#index_exists? (abstract/schema_statements.rb:102) over already-fetched indexes for the same async reason.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function indexExistsForRemoveFrom(
   generateIndexName: GenerateIndexName,
@@ -196,7 +158,6 @@ export function indexExistsForRemoveFrom(
   });
 }
 
-/** Options accepted by `createJoinTable`. Extends the `createTable` option set with join-specific keys. */
 export type JoinTableOptions = {
   tableName?: string;
   columnOptions?: Record<string, unknown>;
@@ -209,13 +170,6 @@ export type JoinTableOptions = {
   as?: string;
 };
 
-/**
- * Constraint-validation statements that only adapters supporting
- * `supportsValidateConstraints` (PostgreSQL) implement. Rails' `Migration`
- * reaches them through `method_missing`, which is untyped in Ruby; declaring
- * them here lets our delegations narrow to a real type instead of `any`, so
- * signature drift on the adapter fails typecheck at the call site.
- */
 export interface ValidateConstraintStatements {
   validateConstraint(tableName: string, constraintName: string): Promise<void>;
   validateCheckConstraint(
@@ -229,18 +183,8 @@ export interface ValidateConstraintStatements {
   ): Promise<void>;
 }
 
-/**
- * A comment argument: either the new value, or Rails' `{ from:, to: }` change hash.
- * Both keys are required: `extract_new_default_value` only unwraps when the hash
- * `has_key?(:from) && has_key?(:to)`
- * (activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1820-1827).
- */
 export type CommentOrChanges = string | null | { from: string | null; to: string | null };
 
-/**
- * Comment DDL that only adapters supporting `supportsComments` implement.
- * Reached from `Migration` the same way as {@link ValidateConstraintStatements}.
- */
 export interface CommentStatements {
   changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
   changeColumnComment(
@@ -250,13 +194,11 @@ export interface CommentStatements {
   ): Promise<void>;
 }
 
-/** Extension DDL — PostgreSQL only. */
 export interface ExtensionStatements {
   enableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
   disableExtension(name: string, options?: { force?: "cascade" }): Promise<void>;
 }
 
-/** Enum type DDL — PostgreSQL only. */
 export interface EnumStatements {
   createEnum(name: string, values: string[], options?: Record<string, unknown>): Promise<void>;
   dropEnum(
@@ -267,7 +209,6 @@ export interface EnumStatements {
   renameEnumValue(name: string, options: { from: string; to: string }): Promise<void>;
 }
 
-/** Unique-constraint DDL — PostgreSQL only. */
 export interface UniqueConstraintStatements {
   addUniqueConstraint(
     tableName: string,
@@ -281,22 +222,11 @@ export interface UniqueConstraintStatements {
   ): Promise<void>;
 }
 
-/** Schema (namespace) DDL — PostgreSQL only. */
 export interface SchemaNamespaceStatements {
   createSchema(name: string, options?: { force?: boolean; ifNotExists?: boolean }): Promise<void>;
 }
 
-/**
- * The pool surface the schema_migrations statements reach for. Rails calls
- * `pool.schema_migration` / `pool.migration_context` unguarded
- * (schema_statements.rb:1356-1370), so a mis-wired pool raises here rather
- * than degrading to a bare `schema_migrations` literal.
- *
- * Versions are strings here where Rails' `MigrationContext#get_all_versions`
- * (`migration.rb:1282`) and `#migrations` (`:1303`) hand back integers, so
- * callers comparing against a numeric target coerce them.
- * @internal
- */
+/** @internal */
 interface SchemaMigrationPool {
   schemaMigration: { tableName: string; versions(): Promise<Array<string | number>> };
   migrationContext: {
@@ -306,34 +236,17 @@ interface SchemaMigrationPool {
 }
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
-/**
- * `SchemaStatements` is only ever mixed into an adapter (`include()` at the
- * bottom of each adapter module), so its bodies call plain `this` methods the
- * way Rails' module does. This merged interface gives those calls the adapter's
- * type. @internal
- */
 export interface SchemaStatements extends DatabaseAdapter, SchemaQuoter {}
 
 export class SchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-  /**
-   * `@config` (`abstract_adapter.rb:132`). Rails' module bodies read the host's
-   * ivar directly; `_config` is protected on `AbstractAdapter`, which the
-   * merged host interface cannot surface, so the field is redeclared here to
-   * reach it typed rather than through an `as any` cast. @internal
-   */
   declare protected _config: Record<string, unknown>;
 
-  /**
-   * `AbstractAdapter#pool` is typed `unknown` (it holds a NullPool until a real
-   * ConnectionPool claims the connection); narrow it once here. @internal
-   */
   private get _pool(): SchemaMigrationPool {
     return this.pool as SchemaMigrationPool;
   }
 
-  /** Mirrors: SchemaStatements#schema_creation — `SchemaCreation.new(self)`. */
   get schemaCreation(): SchemaCreation {
     return new SchemaCreation(this as unknown as SchemaCreationConn);
   }
@@ -385,11 +298,6 @@ export class SchemaStatements {
       definer = fn;
     }
 
-    // Rails takes `id:`, `primary_key:` and `force:` as their own kwargs, so
-    // they never reach `validate_create_table_options!(options)`
-    // (schema_statements.rb:293-294). TS has no `**rest` in a signature, so
-    // every kwarg arrives in one object and is split back out here — `options`
-    // is then Rails' `**options`.
     const { id, primaryKey, force, ...options } = kwargs;
     this.validateCreateTableOptionsBang(options);
 
@@ -419,8 +327,6 @@ export class SchemaStatements {
 
     if (!this.supportsIndexesInCreate?.()) {
       for (const [columnName, indexOptions] of td.indexes) {
-        // Rails overrides any per-index `if_not_exists:` with the table
-        // definition's, since it splats `**index_options` first.
         await this.addIndex(tableName, columnName, {
           ...indexOptions,
           ifNotExists: td.ifNotExists,
@@ -433,15 +339,10 @@ export class SchemaStatements {
       if (tableComment != null && typeof this.changeTableComment === "function") {
         await this.changeTableComment(tableName, tableComment);
       }
-      // Mirrors Rails: adapters that can't inline column comments in CREATE
-      // emit a COMMENT ON COLUMN per column so inline `comment:` options
-      // round-trip through columns().
       const commentAdapter = this as {
         changeColumnComment?(t: string, c: string, comment: string | null): Promise<void>;
       };
       if (typeof commentAdapter.changeColumnComment === "function") {
-        // ColumnDefinition keeps the comment under `.options.comment` (Rails'
-        // `column.comment` reads through to the options hash).
         for (const column of td.columns as Array<{
           name: string;
           options?: { comment?: string | null };
@@ -467,12 +368,6 @@ export class SchemaStatements {
           ((t: TableDefinition) => void) | undefined,
         ]
   ): Promise<void> {
-    // TS has no kwargs, so Rails' `*table_names, **options, &block`
-    // (abstract/schema_statements.rb:540) arrives as a trailing options object
-    // on the rest parameter, and the block as a trailing function. Ruby's
-    // signature swallows both without them reaching `table_names`; here they
-    // are popped off first — the block is only ever read by CommandRecorder,
-    // which keeps it so `drop_table` can invert to `create_table`.
     const rest = [...args] as unknown[];
     while (
       rest.length > 0 &&
@@ -547,27 +442,16 @@ export class SchemaStatements {
       | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
-    // Rails: `remove_index(table_name, column_name = nil, **options)` — the column
-    // can be passed positionally or via the options hash.
     let columnName: string | string[] | undefined;
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
     } else {
       columnName = undefined;
-      // Ruby's `**options` collects the hash whether it arrived as the sole
-      // argument or behind an explicit nil column.
       options = { ...columnOrOptions, ...options };
     }
 
-    // Rails: `return if options[:if_exists] && !index_exists?(table_name,
-    // column_name, **options)` (schema_statements.rb:967) — one probe, because
-    // `Index#defined_for?` (schema_definitions.rb:54) reads `options[:column]`
-    // when no columns are given and then matches on `name` alone.
     if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
 
-    // Rails resolves the concrete index name via `index_name_for_remove`, which
-    // raises ArgumentError when the spec matches no index (or is ambiguous), and
-    // then drops by that real name — never a silent DROP ... IF EXISTS.
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
     if (this.adapterName === "mysql2") {
@@ -579,19 +463,6 @@ export class SchemaStatements {
     }
   }
 
-  /**
-   * Changes the column's definition according to the new options.
-   * See TableDefinition#column for details of the options you can use.
-   *
-   *   changeColumn('suppliers', 'name', 'string', { limit: 80 })
-   *   changeColumn('accounts', 'description', 'text')
-   *
-   * Mirrors: `SchemaStatements#change_column` (`schema_statements.rb:711-713`).
-   * Every adapter overrides it: MySQL and PostgreSQL through
-   * `change_column_for_alter` (abstract_mysql_adapter.rb:396-398,
-   * postgresql/schema_statements.rb:466-471), SQLite through `alter_table`
-   * (sqlite3_adapter.rb:385-389).
-   */
   async changeColumn(
     _tableName: string,
     _columnName: string,
@@ -602,24 +473,11 @@ export class SchemaStatements {
     throw new NotImplementedError("change_column is not implemented");
   }
 
-  /**
-   * Renames a table.
-   *
-   *   renameTable('octopuses', 'octopi')
-   *
-   * Mirrors: `SchemaStatements#rename_table` (`schema_statements.rb:524-526`).
-   */
   async renameTable(_tableName: string, _newName: string): Promise<void> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:524
     throw new NotImplementedError("rename_table is not implemented");
   }
 
-  /**
-   * Rails guards with a trailing `if table_name.present?` modifier
-   * (schema_statements.rb:60), so a blank name falls off the end of the method
-   * and the value is `nil` — not `false`. Same shape at schema_statements.rb:45
-   * (`data_source_exists?`) and :75 (`view_exists?`).
-   */
   async tableExists(tableName: string): Promise<boolean | null> {
     if (!isPresent(tableName)) return null;
     try {
@@ -646,13 +504,6 @@ export class SchemaStatements {
       comment?: unknown;
     } = {},
   ): Promise<boolean> {
-    // Rails' column_exists? loads the table's columns and matches the name in
-    // Ruby (schema_statements.rb:132-141), never interpolating the column name
-    // into SQL — so an arbitrary value (quotes/operators) simply matches
-    // nothing. The schema.table qualification is honored by columns() below.
-    // An optional `type` plus any of the `columnOptionsKeys`
-    // (limit/precision/scale/default/null/collation/comment) narrow the match,
-    // each ANDed like Rails' `checks.all?`.
     const cols = await this.columns(tableName);
     const optionKeys = this.columnOptionsKeys() as Array<keyof typeof options>;
     return cols.some((c) => {
@@ -671,11 +522,7 @@ export class SchemaStatements {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    // Rails unwraps a Hash to its :to only when it carries BOTH :from and :to
-    // (extract_new_default_value, schema_statements.rb:1820); a bare structured
-    // default like `{ to: 1 }` without :from is the literal default.
     const defaultVal = this.extractNewDefaultValue(defaultOrChanges);
-    // Rails resolves the column before quoting (postgresql/schema_statements.rb:490).
     const column = await this.columnFor(tableName, columnName);
     const clause = await this.quoteDefaultExpression(defaultVal, column);
     await this.execute(
@@ -711,7 +558,6 @@ export class SchemaStatements {
     await new ReferenceDefinition(refName, options).add(tableName, this);
   }
 
-  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
   async addBelongsTo(
     tableName: string,
     refName: string,
@@ -747,7 +593,6 @@ export class SchemaStatements {
     }
   }
 
-  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
   async removeBelongsTo(
     tableName: string,
     refName: string,
@@ -761,37 +606,18 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    // Rails: return unless use_foreign_keys?
     if (!this.useForeignKeys()) return;
-    // Mirrors Rails' add_foreign_key short-circuit:
-    //   return if options[:if_not_exists] == true &&
-    //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
-    // foreign_key_exists? matches via foreign_keys(from).detect { defined_for? },
-    // scoping on to_table plus column when one is given.
     if (options.ifNotExists === true) {
       if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
         return;
       }
     }
-    // Rails: options = foreign_key_options(from_table, to_table, options)
-    //        at = create_alter_table from_table
-    //        at.add_foreign_key to_table, options
-    //        execute schema_creation.accept(at)
-    // foreign_key_options supplies the default column and the SHA256
-    // `fk_rails_<hex>` name (via foreign_key_name) when not given. Adapters
-    // override addForeignKey on the class and call super for this body, so
-    // there is no self-delegation here — the override already shadows the
-    // mixed-in method on the prototype.
     options = this.foreignKeyOptions(
       fromTable,
       toTable,
       options as Record<string, unknown>,
     ) as AddForeignKeyOptions;
     const at = this.createAlterTable(fromTable);
-    // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
-    // (now converged) rather than building the FK def inline: it applies
-    // table_name_prefix/suffix to to_table and re-runs foreign_key_options
-    // idempotently (column/name already filled above), mirroring Rails.
     at.addForeignKey(toTable, options as Partial<AddForeignKeyOptions>);
     await this.execute(await this.schemaCreation.accept(at));
   }
@@ -801,12 +627,7 @@ export class SchemaStatements {
     toTableOrOptions?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    // Rails: return unless use_foreign_keys?
     if (!this.useForeignKeys()) return;
-    // Mirrors Rails remove_foreign_key(from_table, to_table = nil, **options):
-    // resolve the actual constraint via foreign_key_for! (matching column /
-    // name / to_table against the live foreign keys) rather than deriving a
-    // name, so a hashed `fk_rails_<hex>` name drops correctly.
     let toTable: string | undefined;
     let opts: RemoveForeignKeyOptions;
     if (typeof toTableOrOptions === "object" && toTableOrOptions !== null) {
@@ -816,19 +637,12 @@ export class SchemaStatements {
       toTable = toTableOrOptions;
       opts = { ...options };
     }
-    // Rails checks existence with only the positional to_table
-    // (`foreign_key_exists?(from_table, to_table)`), then resolves the exact
-    // constraint via foreign_key_for! using column/name too.
     if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, toTable))) {
       return;
     }
     const lookup: ForeignKeyLookupOptions = { ...opts, toTable };
     delete (lookup as RemoveForeignKeyOptions).ifExists;
     const fk = await this.foreignKeyForBang(fromTable, lookup);
-    // Rails: at = create_alter_table from_table; at.drop_foreign_key fk.name;
-    //        execute schema_creation.accept(at)
-    // Route through AlterTable so adapters emit dialect-specific DROP syntax
-    // (MySQL/MariaDB `DROP FOREIGN KEY`) rather than a hardcoded `DROP CONSTRAINT`.
     const at = this.createAlterTable(fromTable);
     at.dropForeignKey(fk.name);
     await this.execute(await this.schemaCreation.accept(at));
@@ -851,8 +665,6 @@ export class SchemaStatements {
     )
       return;
 
-    // schema_statements.rb:1293 takes `if_not_exists:` as its own kwarg, so it
-    // survives the `options = check_constraint_options(...)` rebind below.
     const ifNotExists = options.ifNotExists;
     options = this.checkConstraintOptions(tableName, expression, options) as {
       name?: string;
@@ -872,11 +684,6 @@ export class SchemaStatements {
       | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
     options: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
   ): Promise<void> {
-    // Mirrors Rails remove_check_constraint(table_name, expression = nil,
-    // if_exists: false, **options) (schema_statements.rb:1324-1335): the
-    // if_exists probe runs on the options alone, then check_constraint_for!
-    // resolves the live constraint with the expression *and* the options, and
-    // it is dropped by its real name.
     let expression: string | undefined;
     let opts: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean };
     if (typeof expressionOrOptions === "string") {
@@ -886,17 +693,11 @@ export class SchemaStatements {
       expression = undefined;
       opts = { ...(expressionOrOptions ?? {}), ...options };
     }
-    // `if_exists:` is a kwarg in Rails, so it is not part of the `**options`
-    // either lookup receives.
     const { ifExists, ...lookupOptions } = opts;
 
     if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
 
     const chk = await this.checkConstraintForBang(tableName, { expression, ...lookupOptions });
-    // Rails: at = create_alter_table table_name; at.drop_check_constraint chk.name;
-    //        execute schema_creation.accept(at)
-    // Route through AlterTable so adapters emit dialect-specific DROP syntax
-    // (MySQL `DROP CHECK`) rather than a hardcoded `DROP CONSTRAINT`.
     const at = this.createAlterTable(tableName);
     at.dropCheckConstraint(chk.name);
     await this.execute(await this.schemaCreation.accept(at));
@@ -925,14 +726,10 @@ export class SchemaStatements {
       kwargs = kwargsOrFn;
       definer = fn;
     }
-    // Rails takes `column_options:` as its own kwarg, so `options` is the rest
-    // (schema_statements.rb:389); `find_join_table_name` then deletes
-    // `:table_name` out of it (:390).
     const options: JoinTableOptions = { ...kwargs };
     let columnOptions = options.columnOptions ?? {};
     delete options.columnOptions;
     const joinTableName = this.findJoinTableName(table1, table2, options);
-    // schema_statements.rb:391 — `column_options.reverse_merge!`.
     columnOptions = { null: false, index: false, ...columnOptions };
     const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
@@ -948,20 +745,11 @@ export class SchemaStatements {
     table2: string,
     kwargs: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" } = {},
   ): Promise<void> {
-    // Ruby's `**options` (schema_statements.rb:427) collects a FRESH hash, so
-    // `find_join_table_name`'s `options.delete(:table_name)` cannot reach the
-    // caller's. A TS object is passed by reference, so copy it here.
     const options = { ...kwargs };
     const joinTableName = this.findJoinTableName(table1, table2, options);
     await this.dropTable(joinTableName, options);
   }
 
-  /**
-   * Rails spells the receiver the yielded `Table` is bound to as the second
-   * POSITIONAL parameter — `change_table(table_name, base = self, **options)`
-   * (schema_statements.rb:510-518). TS puts it last because slot 2 is already
-   * the options-or-block union Ruby gets from `**options` plus a real block.
-   */
   async changeTable(
     tableName: string,
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
@@ -1007,9 +795,6 @@ export class SchemaStatements {
       | string
       | string[],
   ): string {
-    // Rails `index_name`: the `column` branch routes through generate_index_name
-    // (length/hash fallback) by default; the bare `_and_` join is only used when
-    // `options[:_uses_legacy_index_name]` is set (Rails migration compatibility).
     if (typeof options !== "string" && !Array.isArray(options)) {
       if (options.column != null) {
         if (options._usesLegacyIndexName) {
@@ -1065,13 +850,6 @@ export class SchemaStatements {
     }
   }
 
-  /**
-   * Mirrors: SchemaStatements#columns (schema_statements.rb:107-113) —
-   * `column_definitions(table_name).map { |field| new_column_from_field(...) }`.
-   * Both callees are per-adapter overrides (PostgreSQL, MySQL, SQLite3), as in
-   * Rails, so they are absent from the abstract host's type and reached through
-   * a cast; `new_column_from_field` is async here, so the map is awaited.
-   */
   async columns(tableName: string): Promise<Column[]> {
     tableName = String(tableName);
     const adapter = this as unknown as {
@@ -1116,11 +894,6 @@ export class SchemaStatements {
           );
           const expressions = defMatch?.[1] ?? "";
           const where = defMatch?.[4]?.trim();
-          // Mirrors Rails (postgresql/schema_statements.rb:117) and the concrete
-          // adapter: an expression index stores `columns` as the raw expression
-          // string parsed from pg_get_indexdef, since the LEFT JOIN on
-          // `pg_attribute` yields NULL for expression keys (attnum 0). Plain
-          // indexes keep the column array and parse orders.
           const hasExpressions = row.has_expressions === true;
           const columns: string | string[] = hasExpressions
             ? expressions
@@ -1160,9 +933,6 @@ export class SchemaStatements {
           if (!indexMap.has(name)) {
             indexMap.set(name, { unique: row.Non_unique === 0, seqs: [] });
           }
-          // `Collation` is 'A' (ascending), 'D' (descending), or null (unsorted);
-          // descending columns surface in `orders`, mirroring Rails' MySQL adapter.
-          // Read both casings (the concrete adapter does `Collation ?? COLLATION`).
           indexMap
             .get(name)!
             .seqs.push([row.Seq_in_index, row.Column_name, row.Collation ?? row.COLLATION ?? null]);
@@ -1172,7 +942,6 @@ export class SchemaStatements {
           .map(([name, info]) => {
             info.seqs.sort((a, b) => a[0] - b[0]);
             const columns = info.seqs.map((s) => s[1]);
-            // Mirrors Rails' MySQL adapter: `orders[col] = :desc if Collation == "D"`.
             const ordersMap: Record<string, string> = {};
             for (const [, column, collation] of info.seqs) {
               if (collation === "D") ordersMap[column] = "desc";
@@ -1185,12 +954,6 @@ export class SchemaStatements {
     }
   }
 
-  /**
-   * Mirrors: SchemaStatements#primary_key (schema_statements.rb:145-149) —
-   * `pk = primary_keys(table_name); pk = pk.first unless pk.size > 1; pk`.
-   * `primary_keys` is a per-adapter override, so it is reached through a cast
-   * for the same reason as `columns`' callees above.
-   */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const primaryKeys = await (
       this as unknown as { primaryKeys(tableName: string): Promise<string[]> }
@@ -1216,14 +979,6 @@ export class SchemaStatements {
   }
 
   async viewExists(viewName: string): Promise<boolean | null> {
-    // Mirrors Rails:
-    //   query_values(data_source_sql(view_name, type: "VIEW"), "SCHEMA").any?
-    //     if view_name.present?
-    //   rescue NotImplementedError
-    //     views.include?(view_name.to_s)
-    //
-    // present? covers blank strings including whitespace-only.
-    // The "SCHEMA" name is what keeps the probe out of assertQueries counts.
     if (!isPresent(viewName)) return null;
     try {
       return any(await this.queryValues(this.dataSourceSql(viewName, { type: "VIEW" }), "SCHEMA"));
@@ -1241,10 +996,6 @@ export class SchemaStatements {
     options?: { unique?: boolean; name?: string; valid?: boolean; column?: string | string[] },
   ): Promise<boolean> {
     const allIndexes = await this.indexes(tableName);
-    // Rails `defined_for?`: `columns = options[:column] if columns.blank?`, then
-    // the column check only applies when columns are present (`columns.blank?` —
-    // nil, "", and [] are all absent), so `index_exists?(:t, nil, name: ...)`
-    // matches on name alone (used to reverse a named expression index).
     const isBlank = (c: string | string[] | null | undefined): boolean =>
       c == null || c === "" || (Array.isArray(c) && c.length === 0);
     const columns = isBlank(columnName) ? options?.column : columnName;
@@ -1257,15 +1008,9 @@ export class SchemaStatements {
     return allIndexes.some((idx) => {
       if (options?.name && idx.name !== options.name) return false;
       if (options?.unique !== undefined && idx.unique !== options.unique) return false;
-      // Mirrors Rails Index#defined_for? — filter on index validity when given
-      // (used to distinguish a failed CONCURRENTLY index, which is left invalid).
       if (options?.valid !== undefined && (idx as { valid?: boolean }).valid !== options.valid)
         return false;
       if (targetCols == null) return true;
-      // Mirrors Rails `Array(self.columns) == Array(columns).map(&:to_s)`:
-      // an expression index carries its columns as a single String, which
-      // `Array()` wraps into a one-element array, so a matching expression
-      // passed as `column_name` compares equal.
       const idxCols = Array.isArray(idx.columns) ? idx.columns : [idx.columns];
       return targetCols.length === idxCols.length && targetCols.every((c, i) => c === idxCols[i]);
     });
@@ -1287,10 +1032,6 @@ export class SchemaStatements {
     return this.schemaCreation.typeToSql(type, options);
   }
 
-  // ---------------------------------------------------------------------------
-  // Methods below match the Rails SchemaStatements API surface.
-  // ---------------------------------------------------------------------------
-
   nativeDatabaseTypes(): Record<string, unknown> {
     return {};
   }
@@ -1303,10 +1044,6 @@ export class SchemaStatements {
     return null;
   }
 
-  // Rails: `table_alias_length` lives only in DatabaseLimits; SchemaStatements
-  // merely uses it (schema_statements.rb:28-29). Resolve it via the mixin host
-  // rather than defining a duplicate that would silently diverge from
-  // DatabaseLimits if an adapter overrode maxIdentifierLength.
   tableAliasFor(
     this: SchemaStatements & { tableAliasLength(): number },
     tableName: string,
@@ -1347,12 +1084,7 @@ export class SchemaStatements {
     } = {},
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
-    // schema_statements.rb:331 — `id:`, `primary_key:` and `force:` are named
-    // kwargs, so `options` is the `**options` rest the two `extract!` calls
-    // below consume.
     const { id = true, primaryKey, force: _force, ...options } = kwargs;
-    // Rails uses `options.extract!`, which *deletes* what it returns — so
-    // `_skipValidateOptions` only ever reaches the first extraction.
     const tdOptions: Record<string, unknown> = {};
     for (const key of [...this.validTableDefinitionOptions(), "_skipValidateOptions"]) {
       if (key in options) {
@@ -1389,7 +1121,6 @@ export class SchemaStatements {
     } = {},
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
-    // schema_statements.rb:408-410, as in `create_join_table` above.
     const options: Record<string, unknown> = { ...kwargs };
     let columnOptions = (options.columnOptions as Record<string, unknown>) ?? {};
     delete options.columnOptions;
@@ -1415,8 +1146,6 @@ export class SchemaStatements {
       return null;
     }
     const { ifNotExists: _, ...colOpts } = options;
-    // Mirrors abstract/schema_statements.rb#build_add_column_definition:
-    // default datetime precision to 6 when the adapter supports it.
     if (
       this.supportsDatetimeWithPrecision?.() &&
       type === "datetime" &&
@@ -1424,16 +1153,11 @@ export class SchemaStatements {
     ) {
       colOpts.precision = 6;
     }
-    // Mirrors Rails' `build_add_column_definition` (abstract/schema_statements.rb:1697):
-    // `alter_table = create_alter_table(name); alter_table.add_column(...)`.
     const at = this.createAlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
   }
 
-  // Mirrors AbstractAdapter::SchemaStatements#build_change_column_default_definition,
-  // which raises NotImplementedError; each adapter that supports it (PostgreSQL,
-  // MySQL) overrides with its own column-aware ChangeColumnDefaultDefinition.
   buildChangeColumnDefaultDefinition(
     _tableName: string,
     _columnName: string,
@@ -1465,11 +1189,6 @@ export class SchemaStatements {
     return new CreateIndexDefinition(index, algorithm, ifNotExists);
   }
 
-  // Rails' `index_name_exists?` is a value-returning predicate: `detect` hands
-  // back the IndexDefinition, not a boolean (schema_statements.rb:1011-1014).
-  // The return type is widened to include `boolean` because the PostgreSQL
-  // override answers with a COUNT(*) comparison (postgresql/schema_statements.rb
-  // :68-79) — Ruby needs no common type across the two bodies, TypeScript does.
   async indexNameExists(
     tableName: string,
     indexName: string,
@@ -1479,18 +1198,11 @@ export class SchemaStatements {
   }
 
   foreignKeyColumnFor(tableName: string, columnName = "id"): string {
-    // Rails' foreign_key_column_for strips table_name_prefix/suffix before
-    // singularizing (schema_statements.rb:1241-1244), so the default column is
-    // derived from the bare table name even when new_foreign_key_definition
-    // threads a prefixed to_table through.
     const name = this.stripTableNamePrefixAndSuffix(tableName);
     return `${singularize(name)}_${columnName}`;
   }
 
-  /**
-   * @missingRailsCall size — PERMANENT: RFC 0106: Ruby Array#size — JS spells it `.length`,
-   *   no call to converge (schema_statements.rb:1259-1260).
-   */
+  /** @missingRailsCall size — PERMANENT */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,
@@ -1505,8 +1217,6 @@ export class SchemaStatements {
         );
       }
     } else {
-      // Rails (schema_statements.rb:1254): the scalar branch always derives the
-      // default column from the literal "id", independent of :primary_key.
       if (!options.column) {
         options.column = this.foreignKeyColumnFor(toTable, "id");
       }
@@ -1526,15 +1236,6 @@ export class SchemaStatements {
     throw new NotImplementedError();
   }
 
-  /**
-   * `schema_statements.rb:1305-1309`:
-   * `options[:name] ||= check_constraint_name(table_name, expression: expression, **options)`.
-   * The double-splat comes LAST, so an `:expression` carried in options wins
-   * over the positional one. The `||=` is truthy where
-   * {@link checkConstraintName}'s `fetch` is key-presence — but it derives only
-   * for an absent key either way, because its own derive call splats the same
-   * options back through that `fetch`, which hands a stored nil straight back.
-   */
   checkConstraintOptions(
     tableName: string,
     expression: string,
@@ -1548,12 +1249,6 @@ export class SchemaStatements {
     return dup;
   }
 
-  /**
-   * `schema_statements.rb:1341-1343`. The argument guard is
-   * `!options.key?(:name) && !options.key?(:expression)` — key presence, not
-   * truthiness — so an explicitly supplied `name: ""` or `name: nil` satisfies
-   * it and falls through to the lookup, which then matches nothing.
-   */
   async checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean } = {},
@@ -1611,17 +1306,6 @@ export class SchemaStatements {
     return columns;
   }
 
-  /**
-   * Mirrors: ConnectionAdapters::SchemaStatements#distinct_relation_for_primary_key
-   * (schema_statements.rb:1429-1452).
-   *
-   * Rails returns the rewritten `relation`; every rewrite it performs (`none!`,
-   * `where!`, `limit_value=`/`offset_value=`) is an in-place mutation of the
-   * argument, so the caller holds the same object either way. TypeScript cannot
-   * return it: a trails `Relation` is thenable, so resolving it out of this
-   * `Promise` would run the relation and hand back its records instead. The
-   * caller therefore reuses the relation it passed in.
-   */
   async distinctRelationForPrimaryKey(relation: Relation<Base>): Promise<void> {
     const primaryKeyColumns = wrap(relation.primaryKey).map((column) =>
       this.visitor.compile(relation.table.get(column)),
@@ -1651,10 +1335,6 @@ export class SchemaStatements {
     return new Table(tableName, (base ?? this) as SchemaStatements);
   }
 
-  /**
-   * Rails takes `name`, `if_not_exists` and `internal` as their own kwargs, so
-   * they are out of the asserted set (schema_statements.rb:1476-1477).
-   */
   async addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -1685,9 +1365,6 @@ export class SchemaStatements {
       "nullsNotDistinct",
     ]);
 
-    // Mirrors Rails: a String column with non-word chars (e.g. "remind_at, place_id"
-    // or "(data->'foo')") is an expression — kept verbatim as the index columns,
-    // with the index name derived from its `\w+` runs joined by "_".
     const columnNames = this.indexColumnNames(columnName);
     const indexName = options.name?.toString() ?? this.indexName(tableName, columnNames);
 
@@ -1707,15 +1384,7 @@ export class SchemaStatements {
     return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT: `index_algorithms.fetch(algorithm) { raise ... }`
-   *   (schema_statements.rb:1504-1506). Hash#fetch is a Ruby core method with no JS
-   *   analogue: a plain object has no `fetch`, and there is no ported receiver to call
-   *   either — ActiveSupport's `core_ext/hash` defines no `fetch`, so a trails helper
-   *   would be surface Rails does not have. The key-presence test and the block's raise
-   *   are spelled inline at Rails' site, with Rails' arguments and message; the test is
-   *   `Object.hasOwn`, since a Hash has no prototype chain for `"toString"` to find.
-   */
+  /** @missingRailsCall fetch — PERMANENT */
   indexAlgorithm(algorithm?: string): string | undefined {
     if (algorithm == null) return undefined;
     const indexAlgorithms = this.indexAlgorithms();
@@ -1780,9 +1449,6 @@ export class SchemaStatements {
 
       if (typeof (this as any)[method] === "function") {
         const result = await (this as any)[method](table, ...arguments_);
-        // Ruby `Array(x)`: nil is [], an Array passes through, anything else
-        // wraps. `partition` then splits it on String, so every non-String —
-        // not only a callable — lands in `procs`.
         const values = result == null ? [] : Array.isArray(result) ? result : [result];
         const sqls: string[] = [];
         const procs: Array<() => Promise<void>> = [];
@@ -1831,14 +1497,8 @@ export class SchemaStatements {
 
   /**
    * @internal
-   *
-   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
-   *   the port slices (schema_statements.rb:1603).
-   * @missingRailsCall limit — CONVERGEABLE: `name.mb_chars.limit(short_limit)`
-   *   (schema_statements.rb:1608). ActiveSupport::Multibyte::Chars is unported, so
-   *   there is no `limit` receiver to call; `Chars#limit` is defined as
-   *   `truncate_bytes(limit, omission: nil)` (multibyte/chars.rb:118-120), which is
-   *   what the port calls directly, so the byte-truncation behaviour matches.
+   * @missingRailsCall first — PERMANENT
+   * @missingRailsCall limit — CONVERGEABLE
    */
   generateIndexName(tableName: string, column: string | string[]): string {
     const cols = Array.isArray(column) ? column : [column];
@@ -1935,10 +1595,6 @@ export class SchemaStatements {
       checks.push((i) => i.name === n);
     }
 
-    // Rails: `if column_names.present? && !(options.key?(:name) &&
-    // expression_column_name?(column_names))` — an expression passed via the
-    // `column:` option (kept as a raw string by indexColumnNames) is matched by
-    // name only, so the column check is skipped.
     if (
       columnNames.length > 0 &&
       !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
@@ -2015,14 +1671,7 @@ export class SchemaStatements {
     return new TableDefinition(this, name, options);
   }
 
-  /**
-   * Mirrors Rails `abstract/schema_statements.rb:1705`:
-   * `AlterTable.new(create_table_definition(name))`. Passing the
-   * TableDefinition lets `AlterTable#addColumn` route through
-   * `td.newColumnDefinition` for adapter-specific type normalization
-   * (PG virtual → underlying type, MySQL aliases, etc.).
-   * @internal
-   */
+  /** @internal */
   createAlterTable(name: string): AlterTable {
     return new AlterTable(this.createTableDefinition(name));
   }
@@ -2037,18 +1686,11 @@ export class SchemaStatements {
     ]);
   }
 
-  /**
-   * PostgreSQL never lands here — it defines its own async `fetchTypeMetadata`
-   * (postgresql-adapter.ts) keyed on OID — which is why the sync `Type` this
-   * reads is safe despite `PostgreSQLAdapter#lookupCastType` returning a promise.
-   * @internal
-   */
+  /** @internal */
   fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
     const castType = this.lookupCastType(sqlType) as Type;
     return new SqlTypeMetadata({
       sqlType,
-      // Rails' `cast_type.type` (schema_statements.rb:1721) — `Type#type` is a
-      // method here, not a getter, so it must be invoked.
       type: castType?.type(),
       limit: castType?.limit,
       precision: castType?.precision,
@@ -2078,14 +1720,7 @@ export class SchemaStatements {
     return typeof columnName === "string" && /\W/.test(columnName);
   }
 
-  /**
-   * @internal
-   * Rails reads `Base.table_name_prefix` / `Base.table_name_suffix` (model-class
-   * globals). Importing Base here creates a circular dependency
-   * (base.ts → connection-adapters/abstract/connection-handler.ts), so the globals
-   * arrive through the `table-name-options` registry Base populates at load; an
-   * adapter-level override still wins.
-   */
+  /** @internal */
   stripTableNamePrefixAndSuffix(tableName: string): string {
     const adapter = this as any;
     const prefix: string = adapter.tableNamePrefix ?? globalTableNamePrefix();
@@ -2097,12 +1732,8 @@ export class SchemaStatements {
 
   /**
    * @internal
-   *
-   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
-   *   the port slices (schema_statements.rb:1755-1762).
-   * @missingRailsCall map — PERMANENT: RFC 0106: Ruby Array#map(&:to_s) over already-string
-   *   column names — the port has no to_s hop to map
-   *   (schema_statements.rb:1757).
+   * @missingRailsCall first — PERMANENT
+   * @missingRailsCall map — PERMANENT
    */
   foreignKeyName(
     tableName: string,
@@ -2158,21 +1789,8 @@ export class SchemaStatements {
 
   /** @internal */
   /**
-   * `abstract/schema_statements.rb:1783-1785` — `@config.fetch(:foreign_keys, true)`.
-   *
-   * `Hash#fetch` yields the *stored* value whenever the key is present, so an
-   * explicit `foreign_keys: nil` disables foreign keys in Ruby; only an absent
-   * key takes the `true` default. `??` / `!== false` would answer `true` for
-   * that stored null, which is the one input the two expressions disagree on.
-   * The stored value is then read for Ruby truthiness, not as a boolean.
    * @internal
-   *
-   * @missingRailsCall fetch — PERMANENT: RFC 0106: schema_statements.rb:1783-1785 is
-   *   `@config.fetch(:foreign_keys, true)`. The port already matches its
-   *   SEMANTICS — schema-statements.ts:2328-2331 spells the key-present test as
-   *   `"foreignKeys" in this._config ? ... : true`, so a stored null stays falsy
-   *   — but `in` emits no callee, so no TS call can credit Ruby's `fetch`.
-   *   Language shortcoming: JS has no Hash#fetch.
+   * @missingRailsCall fetch — PERMANENT
    */
   isForeignKeysEnabled(): boolean {
     const foreignKeys = "foreignKeys" in this._config ? this._config.foreignKeys : true;
@@ -2180,21 +1798,8 @@ export class SchemaStatements {
   }
 
   /**
-   * `schema_statements.rb:1787-1795`, which is two `Hash#fetch` calls:
-   * `options.fetch(:name) { ... options.fetch(:expression) ... }`. `fetch` runs
-   * its block only when the KEY IS ABSENT, so a stored nil comes back as-is —
-   * `{name: nil, expression: "x"}.fetch(:name) { "derived" }` is nil, and a
-   * truthy check would instead conflate "no :name given" with "given, but nil".
-   * The `||=` in {@link checkConstraintOptions} (`:1305-1309`) is the
-   * deliberately different one.
-   *
-   * The inner fetch takes no default either, so an ABSENT `:expression` raises
-   * where a stored nil interpolates as the empty string ("users__chk"). Rails
-   * raises Ruby's core `KeyError` there, with `key not found: :expression`.
    * @internal
-   *
-   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
-   *   the port slices; no call to converge (schema_statements.rb:1787-1795).
+   * @missingRailsCall first — PERMANENT
    */
   checkConstraintName(
     tableName: string,
@@ -2227,16 +1832,7 @@ export class SchemaStatements {
     return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
   }
 
-  /**
-   * Mirrors: SchemaStatements#check_constraint_for!
-   * (schema_statements.rb:1802-1806) — the raise interpolates the options
-   * Hash, so the message carries Ruby's `{name: "x"}` rendering, not JSON's.
-   * Ruby's `expression: nil, **options` split happens in the body: an optional
-   * parameter cannot be destructured in the AbstractAdapter interface
-   * declaration the mixin-declaration-drift guard compares against, so `kwargs`
-   * carries the bag and `options` keeps Rails' name for the interpolated rest.
-   * @internal
-   */
+  /** @internal */
   async checkConstraintForBang(
     tableName: string,
     kwargs: { name?: string; expression?: string; validate?: boolean } = {},
@@ -2286,24 +1882,14 @@ export class SchemaStatements {
     return defaultOrChanges;
   }
 
-  /** @internal alias */
+  /** @internal */
   extractNewCommentValue(defaultOrChanges: CommentOrChanges): string | null {
-    // Rails aliases this to `extract_new_default_value`, which is untyped; the
-    // comment arm only ever carries a string or nil.
     return this.extractNewDefaultValue(defaultOrChanges) as string | null;
   }
 
   /**
    * @internal
-   *
-   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
-   *   `options.except(:name, :algorithm).empty?` (schema_statements.rb:1830) —
-   *   `empty?` on a Ruby Hash, whose faithful JS spelling is
-   *   `Object.keys(h).length === 0`. That emits no callee, so no TS call can
-   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
-   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
-   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
-   *   TS body was dropped.
+   * @missingRailsCall empty? — PERMANENT
    */
   canRemoveIndexByName(
     columnName: string | string[] | undefined | null,
@@ -2329,11 +1915,7 @@ export class SchemaStatements {
     return this.schemaCreation.accept(new AddColumnDefinition(cd));
   }
 
-  /** @internal Mirrors change_column_default_for_alter (schema_statements.rb:1843):
-   * routes through the adapter's build_change_column_default_definition (which
-   * attaches the reflected column, so PG's column-aware default quoting fires)
-   * and the schema-creation visitor. The base builder raises NotImplementedError
-   * as in Rails; PG and MySQL override it. */
+  /** @internal */
   async changeColumnDefaultForAlter(
     tableName: string,
     columnName: string,
@@ -2344,9 +1926,6 @@ export class SchemaStatements {
       columnName,
       defaultOrChanges,
     );
-    // ChangeColumnDefaultDefinition is dispatched by the PG/MySQL visitor
-    // subclasses' accept overrides, not the abstract union — same as Rails,
-    // where only those adapters define visit_ChangeColumnDefaultDefinition.
     return (this.schemaCreation as { accept(o: unknown): Promise<string> }).accept(cd);
   }
 
@@ -2400,8 +1979,6 @@ export class SchemaStatements {
     const smTable = this.quoteTableName(this._pool.schemaMigration.tableName);
 
     if (Array.isArray(versions)) {
-      // Ruby's Array#reverse returns a new array; copy before reversing so we
-      // don't mutate the caller's array (e.g. pool.schemaMigration.versions).
       const rows = [...versions].reverse().map((v) => `(${this.quote(v)})`);
       return `INSERT INTO ${smTable} (version) VALUES\n${rows.join(",\n")};`;
     }
@@ -2410,13 +1987,7 @@ export class SchemaStatements {
 
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /**
-   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
-   * callable with the kwargs alone, and TypeScript cannot skip a leading
-   * positional, so the options object may arrive in its place.
-   *
-   * @internal
-   */
+  /** @internal */
   dataSourceSql(options: { type?: string }): string;
   /** @internal */
   dataSourceSql(

@@ -22,8 +22,6 @@ describe("Arel::Nodes::ExtractTest", () => {
 
     it("should not mutate the extract", () => {
       const extract = users.get("timestamp").extract("date");
-      // Rails snapshots with `extract.dup`; arel's TS nodes carry no `dup`, so
-      // the untouched twin stands in for the copy.
       const before = users.get("timestamp").extract("date");
       extract.as("foo");
       expect(extract.eql(before)).toBe(true);

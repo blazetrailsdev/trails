@@ -1,27 +1,9 @@
-/**
- * Adapter-argument normalization helpers.
- *
- * Extracted from `connection-handling.ts` so `ConnectionPool.newConnection()`
- * can auto-resolve adapters from `dbConfig.adapter` + `dbConfig.configuration`
- * without back-edging through connection-handling.
- *
- * Mirrors Rails' `ActiveRecord::DatabaseConfigurations::HashConfig#connect`,
- * which builds the adapter constructor argument from the resolved
- * configuration hash.
- *
- * @internal
- */
+/** @internal */
 import { AdapterNotFound } from "../errors.js";
 
 /**
- * Best-effort adapter inference from a connection URL or scheme-less SQLite
- * shorthand. Returns the canonical adapter name, or `undefined` when the URL
- * carries no recognizable scheme/extension (e.g. a bare filesystem path or an
- * opaque `jdbc:` string). Used at config-build time so a scheme-less `:memory:`
- * shorthand already names its adapter on the resolved configuration hash.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the scheme read Ruby does inline in ConnectionUrlResolver#to_hash (database_configurations/connection_url_resolver.rb:38).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function inferAdapterNameFromUrl(url: string): string | undefined {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
@@ -42,10 +24,6 @@ export function inferAdapterNameFromUrl(url: string): string | undefined {
   return undefined;
 }
 
-/**
- * Like {@link inferAdapterNameFromUrl} but raises `AdapterNotFound` when the
- * URL carries no recognizable adapter, for connect-time paths that require one.
- */
 export function adapterNameFromUrl(url: string): string {
   const inferred = inferAdapterNameFromUrl(url);
   if (inferred !== undefined) return inferred;
@@ -56,11 +34,6 @@ export function adapterNameFromUrl(url: string): string {
   );
 }
 
-/**
- * Returns true for URL schemes that identify a remote libsql/Turso endpoint.
- * Inlined here (rather than imported from sqlite/libsql.ts) so adapter-args
- * does not transitively load the optional `libsql` native peer dependency.
- */
 function isRemoteLibsqlUrl(url: string): boolean {
   return (
     url.startsWith("libsql://") ||
@@ -71,18 +44,6 @@ function isRemoteLibsqlUrl(url: string): boolean {
   );
 }
 
-/**
- * Normalize adapter aliases to their canonical name.
- *
- *   postgres / postgresql          → postgresql
- *   mysql / mysql2                 → mysql
- *   sqlite / sqlite3 / node-sqlite → sqlite
- *
- * SQLite client-library adapters share the `(filename, options)` constructor
- * shape (their subclasses inherit it from `SQLite3Adapter`), so they
- * normalize to `sqlite` for argument building. This only affects
- * constructor-argument shape; class resolution still keys off the raw name.
- */
 export function normalizeAdapterName(name: string): string {
   switch (name) {
     case "postgresql":
@@ -104,12 +65,6 @@ export function normalizeAdapterName(name: string): string {
   }
 }
 
-/**
- * Strip the `sqlite[3]://` URL prefix, returning a bare filename
- * (`":memory:"`, path, or empty → `":memory:"`). Remote libsql URLs
- * (`libsql://`, `http(s)://`, `ws(s)://`) are passed through unchanged so the
- * driver receives the full endpoint URL.
- */
 export function parseSqliteUrl(url: string): string {
   if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
     const stripped = url.replace(/^sqlite3?:\/\//, "");
@@ -118,20 +73,6 @@ export function parseSqliteUrl(url: string): string {
   return url;
 }
 
-/**
- * Build the adapter-constructor argument *tuple* from a configuration hash.
- * Returned as an array so callers can spread directly: `new Klass(...args)`.
- *
- * Shape per adapter:
- *  - SQLite: `[filename, options]` — `SQLite3Adapter(filename, options?)`
- *    preserves SQLite-specific keys (`readonly`, `driver`, `pragmas`,
- *    `strict`, `statementLimit`, `preparedStatements`).
- *  - PG/MySQL: `[config]` — single config object (or URL string).
- *
- * Mirrors the inline normalization in `connectsTo` / `establishWithConfig`
- * and is the resolver {@link ConnectionPool#newConnection} builds every
- * connection through.
- */
 export function buildAdapterArg(
   adapterName: string,
   configuration: Record<string, unknown>,
@@ -161,12 +102,7 @@ export function buildAdapterArg(
     if (driver !== undefined) options.driver = driver;
     if (pragmas !== undefined) options.pragmas = pragmas;
     if (strict !== undefined) options.strict = strict;
-    // `DEFAULT_PRAGMAS["foreign_keys"]` (sqlite3_adapter.rb:84-85) — a config
-    // key the adapter reads, so it belongs in the options it is built with.
     if (foreignKeys !== undefined) options.foreignKeys = foreignKeys;
-    // Rails' SQLite3Adapter reads `@config[:timeout]` and applies it as the
-    // driver's busy timeout (sqlite3_adapter.rb:821-826); `config.example.yml:84`
-    // sets it on both arunit entries.
     if (timeout !== undefined) options.timeout = timeout;
     if (retries !== undefined) options.retries = retries;
     if (statementLimit !== undefined) options.statementLimit = statementLimit;
@@ -181,18 +117,6 @@ export function buildAdapterArg(
     return Object.keys(options).length > 0 ? [filename, options] : [filename];
   }
   if (url && database === undefined) {
-    // A bare URL string is the simplest connection arg, but when the config
-    // also carries adapter options (e.g. `advisory_locks`, `prepared_statements`)
-    // those must reach the adapter too — Rails' UrlConfig merges the parsed URL
-    // with the rest of the configuration hash. Forward the URL under the
-    // adapter-specific connection key alongside the remaining options instead
-    // of dropping them. Pure-URL configs (no extra keys) keep the `[url]` form.
-    // `username` is deliberately NOT remapped here. Rails maps the credential
-    // inside the adapter constructor (postgresql_adapter.rb:326), so forward
-    // Rails' spelling untouched and let Mysql2Adapter/PostgreSQLAdapter apply
-    // the mapping with Ruby-truthiness precedence. Remapping here as well used
-    // to shadow the constructor entirely — this layer stripped `username`, so
-    // the constructor never saw it — and did so with the wrong precedence.
     const { adapter: _ua, url: _uu, ...urlRest } = configuration;
     if (Object.keys(urlRest).length === 0) {
       return [url];
@@ -200,14 +124,8 @@ export function buildAdapterArg(
     const urlKey = normalized === "postgresql" ? "connectionString" : "uri";
     return [{ ...urlRest, [urlKey]: url }];
   }
-  // As in the URL branch above: `username` passes through under Rails'
-  // spelling and the adapter constructor maps it to the driver-native `user`.
   const { adapter: _a, url: _u, ...rest } = configuration;
   const adapterConfig: Record<string, unknown> = { ...rest };
-  // `socket` is deliberately NOT remapped here, for the same reason as
-  // `username` above: this layer used to strip it before the adapter saw it,
-  // shadowing the constructor entirely. Mysql2Adapter#constructor owns the
-  // single `socket` -> `socketPath` mapping; forward Rails' spelling untouched.
   if (normalized === "mysql") {
     if (adapterConfig.host === undefined && !adapterConfig.socketPath && !adapterConfig.socket) {
       adapterConfig.host = "localhost";

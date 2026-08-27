@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/auto_increment_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";

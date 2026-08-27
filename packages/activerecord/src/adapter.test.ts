@@ -39,16 +39,7 @@ import {
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
-// Drives Rails' AdapterTest casted/non-casted bind probes against the leased
-// connection and the canonical `events` table. The insert return value is
-// normalized (`Number(...)`) and skipped on MySQL, whose driver reports `0` for
-// an explicit-id INSERT rather than the inserted key.
 async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<void> {
-  // Build the placeholder the same way Rails does — `Arel::Nodes::BindParam.new(nil)
-  // .to_sql` collects the `?` marker — rather than hard-coding a literal `?`.
-  // `to_sql` compiles through an engine's connection (arel/nodes/node.rb:148-153),
-  // so it takes the leased `conn` and cannot be hoisted to module scope: Rails'
-  // helper.rb has a connection before test files load, trails' setup does not.
   const qm = new Nodes.BindParam(null).toSql({ connection: conn });
   const id = await conn.insert(
     `INSERT INTO events(id) VALUES (${qm})`,
@@ -58,10 +49,6 @@ async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<
     null,
     binds,
   );
-  // Rails asserts `assert_equal 1, id` unconditionally; the mysql2 driver reports
-  // insertId 0 for an explicit-id INSERT (the value isn't auto-generated), so skip
-  // only the insert-return check there. The bound SELECT below still asserts the
-  // row round-trips as `{ id: 1, ... }` on every adapter.
   if (adapterType !== "mysql") expect(Number(id)).toBe(1);
 
   const updated = await conn.update(
@@ -82,17 +69,11 @@ async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<
   expect(empty.first()).toBeUndefined();
 }
 
-// Mirrors Rails' AdapterConnectionTest#raw_transaction_open? — whether a
-// transaction is actually live on the *raw* connection (independent of the
-// adapter's lazy-transaction bookkeeping).
 async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
   if (adapterType === "postgres") {
     return Boolean((conn as unknown as { _inTransaction?: boolean })._inTransaction);
   }
   if (adapterType === "mysql") {
-    // Probe exactly as Rails does: a SAVEPOINT only succeeds inside a
-    // transaction; otherwise the RELEASE raises because the savepoint never
-    // existed.
     const raw = (
       conn as unknown as { _clientForTest(): { query(sql: string): Promise<unknown> } | null }
     )._clientForTest();
@@ -105,8 +86,6 @@ async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
       return false;
     }
   }
-  // SQLite: Rails probes `raw_connection.transaction { nil }` (raises if already
-  // inside a transaction). trails tracks that state on the adapter directly.
   return Boolean((conn as unknown as { inTransaction?: boolean }).inTransaction);
 }
 
@@ -114,17 +93,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// Mirrors Rails' AdapterConnectionTest#remote_disconnect — provokes the server
-// to drop the connection out from under the adapter. SQLite has no analog
-// (Rails `skip`s), so callers gate the dependent tests on a non-in-memory,
-// non-SQLite adapter.
 async function remoteDisconnect(conn: DatabaseAdapter): Promise<void> {
   if (adapterType === "postgres") {
-    // Rails: `connection.verify! if raw_connection.status == PG::CONNECTION_BAD`
-    // — a previous non-retryable query may have left the raw connection dead;
-    // reconnect it before provoking a fresh disconnect. node-pg exposes no
-    // `status`, so probe liveness (activePredicate issues a no-op `;`) and
-    // verify!/reconnect when it is not queryable.
     if (!(await activePredicate(conn))) {
       await conn.verifyBang();
     }
@@ -154,8 +124,6 @@ async function remoteDisconnect(conn: DatabaseAdapter): Promise<void> {
   }
 }
 
-// Mirrors Rails' AdapterConnectionTest#kill_connection_from_server — kills a
-// server-side connection by id from a *different* pooled connection.
 async function killConnectionFromServer(
   conn: DatabaseAdapter,
   connectionId: unknown,
@@ -175,13 +143,6 @@ async function killConnectionFromServer(
   }
 }
 
-// Mirrors Rails' `active?` — an active liveness probe (PG sends `;`, MySQL
-// issues mysql_ping) on the raw connection, which detects a *remote* disconnect
-// that the adapter doesn't yet know about. trails' sync `active` getter is
-// optimistic and only reflects an adapter-initiated disconnect
-// (postgresql-adapter.ts:2523 documents that it cannot run this async ping), so
-// the remote-disconnect cases drive the probe directly here. The raw ping has
-// no adapter-state side effects, matching Rails' pure `active?` check.
 async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
   if (adapterType === "postgres") {
     const raw = (
@@ -212,9 +173,6 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
   return conn.active();
 }
 
-// Faithful port of Rails' AdapterTest (adapter_test.rb). Rides the canonical
-// schema + official Book/Post/Author/Event models and real fixtures; the leased
-// `Base.connection` stands in for Rails' `@connection = ...lease_connection`.
 describe("AdapterTest", () => {
   fixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
     usesTransaction: [
@@ -230,14 +188,6 @@ describe("AdapterTest", () => {
     ],
   });
 
-  // The Event-backed `events` table (schema.rb `t.string :title, limit: 5`)
-  // rides the boot-laid canonical schema on every adapter (RFC 0059 Phase 1
-  // seeds it into each worker/slot DB), so no explicit create is needed here.
-
-  // Rails runs this `unless current_adapter?(:PostgreSQLAdapter) ||
-  // (current_adapter?(:SQLite3Adapter) && !prepared_statements)` (adapter_test.rb:19) —
-  // i.e. on MySQL and SQLite (SQLite defaults prepared_statements: true), excluding
-  // only PostgreSQL.
   it.skipIf(adapterType === "postgres")("update prepared statement", async () => {
     const b = await Book.create({ name: "my \x00 book" });
     await b.reload();
@@ -275,7 +225,6 @@ describe("AdapterTest", () => {
 
   it("table exists?", async () => {
     const conn = Base.connection;
-    // Rails passes both "accounts" and :accounts; symbols collapse to strings here.
     expect(await conn.tableExists("accounts")).toBe(true);
     expect(await conn.tableExists("nonexistingtable")).toBe(false);
     expect(await conn.tableExists("'")).toBe(false);
@@ -364,8 +313,6 @@ describe("AdapterTest", () => {
     expect(result.columns.length).toBeGreaterThan(0);
   });
 
-  // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
-  // re-established `:memory:` connection is a fresh, empty database.
   it.skipIf(inMemoryDb())("disable prepared statements", async () => {
     const original = ActiveRecord.disablePreparedStatements;
     try {
@@ -383,9 +330,6 @@ describe("AdapterTest", () => {
   });
 
   it("table alias", () => {
-    // Rails redefines `table_alias_length` on the connection's singleton class
-    // to return 10; TS has no per-instance method override, so a subclass that
-    // overrides the (mixed-in) `tableAliasLength` reproduces the same effect.
     class TableAliasAdapter extends AbstractAdapter {
       tableAliasLength(): number {
         return 10;
@@ -457,8 +401,6 @@ describe("AdapterTest", () => {
     expect(result).toBeInstanceOf(Result);
   });
 
-  // Rails gates these `if prepared_statements`; every adapter in our matrix
-  // (sqlite/mysql/postgres) defaults it on, so the gate is always satisfied.
   it("select all insert update delete with casted binds", async () => {
     const binds = [Event.typeForAttribute("id").serialize(1)];
     await roundTripBinds(Base.connection, binds);
@@ -501,16 +443,10 @@ describe("AdapterTest", () => {
 
   it("inspect does not show secrets", () => {
     const output = Base.connection.inspect();
-    // Rails: `/...::FooAdapter:0x[\da-f]+ env_name="\w+" role=:writing>/`. trails
-    // has no Ruby namespace and renders role as a quoted string, not a :symbol.
     expect(output).toMatch(/\w*Adapter:0x[\da-f]+ env_name="\w+" role="writing">/);
   });
 });
 
-// Rails declares `fixtures :fk_test_has_pk` and a real `foreign_key` on
-// fk_test_has_fk, which the canonical schema now declares too, so the tables
-// ride the boot-laid schema and are driven directly (Rails sets
-// `use_transactional_tests = false`).
 describe("AdapterForeignKeyTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -522,11 +458,6 @@ describe("AdapterForeignKeyTest", () => {
   beforeEach(cleanup);
   afterEach(cleanup);
 
-  // Rails' sqlite test connection always runs with `PRAGMA foreign_keys = ON`.
-  // The shared worker connection's pragma can drift OFF after a sibling
-  // describe's non-transactional fixture reloads (disableReferentialIntegrity
-  // toggles it around the load), so re-assert it here before the FK-violation
-  // probes — otherwise the INSERTs silently succeed and no error is raised.
   beforeEach(async () => {
     if (adapterType === "sqlite") {
       await Base.connection.executeMutation("PRAGMA foreign_keys = ON");
@@ -575,9 +506,6 @@ describe("AdapterForeignKeyTest", () => {
 });
 
 describe("AdapterTestWithoutTransaction", () => {
-  // Rails: `self.use_transactional_tests = false`. truncate commits (and on
-  // MySQL implicitly commits as DDL), so these run un-wrapped; fixtures()
-  // re-seeds each table in its beforeEach, standing in for `reset_fixtures`.
   const withoutTransaction = [
     "create with query cache",
     "truncate",
@@ -660,11 +588,6 @@ describe("AdapterTestWithoutTransaction", () => {
     }
   });
 
-  // Rails gates these on `respond_to?(:reset_pk_sequence!)` — a method-presence
-  // capability guard, not an adapter-fidelity gate (Rails runs the suite
-  // unconditionally). PostgreSQL is the only adapter that defines
-  // `resetPkSequenceBang` (exactly mirroring Rails, where only the PG adapter
-  // defines `reset_pk_sequence!`), so this capability flag is the faithful gate.
   const respondsToResetPkSequence = adapterType === "postgres";
   it.skipIf(!respondsToResetPkSequence)("reset empty table with custom pk", async () => {
     const conn = Base.connection as DatabaseAdapter & {
@@ -684,24 +607,13 @@ describe("AdapterTestWithoutTransaction", () => {
     await conn.resetPkSequenceBang("subscribers");
     const sub = new Subscriber({ name: "robert drake" });
     sub.id = "bob drake";
-    // Rails: assert_nothing_raised { sub.save! }
     await sub.saveBang();
     const found = await Subscriber.find("bob drake");
     expect(found.id).toBe("bob drake");
   });
 });
 
-// Faithful port of Rails' AdapterConnectionTest (adapter_test.rb), gated
-// `unless in_memory_db?`. These are integration tests against the real leased
-// `Base.connection` (Rails' `@connection = ...lease_connection`) and ride the
-// canonical schema + official Post/Author/AuthorAddress models and fixtures.
-// The `remote_disconnect` / `kill_connection_from_server` helpers only work on
-// MySQL/PostgreSQL (Rails `skip`s on SQLite), so the cases that depend on them
-// stay gated on a non-SQLite adapter.
 describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
-  // Rails: `self.use_transactional_tests = false`; the disconnect/reconnect
-  // lifecycle would be meaningless wrapped in a per-test transaction, so every
-  // case runs un-wrapped and fixtures re-seed each table in their beforeEach.
   const nonTransactional = [
     "reconnect after a disconnect",
     "materialized transaction state is reset after a reconnect",
@@ -736,18 +648,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   const remoteSupported = adapterType !== "sqlite";
 
-  // Cases blocked on genuine trails PG/MySQL adapter divergences that the faithful
-  // port surfaced (checked in verbatim; un-skip once the adapters converge):
-  //   - No-bind unprepared SELECT does not materialize a pending lazy
-  //     transaction on PG/MySQL (story thread-collector-preparable-for-
-  //     statement-cache; see transactions.test.ts "unprepared statement
-  //     materializes transaction"): "transaction restores after remote
-  //     disconnection" relies on `Post.count` — a no-bind unprepared read —
-  //     materializing (and thus retryably re-issuing BEGIN) to reconnect,
-  //     exactly as Rails' with_raw_connection does for every query. trails
-  //     skips materialize for such reads, so no BEGIN is issued, the read runs
-  //     on the severed connection, and it is not retried. Un-skip once that
-  //     read-materialization path converges.
   const itBlocked = it.skip;
 
   let connection: DatabaseAdapter;
@@ -764,9 +664,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await rawTransactionOpen(connection)).toBe(false);
   });
 
-  // Mirrors Rails' `@connection.stub(:retry_deadline, value) { ... }` — stub the
-  // getter (not the backing `_config` field) to match the Rails idiom and the
-  // project's vi.spyOn mocking convention.
   async function withRetryDeadline(value: number, body: () => Promise<void>): Promise<void> {
     vi.spyOn(connection, "retryDeadline", "get").mockReturnValue(value);
     try {
@@ -977,9 +874,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
     await remoteDisconnect(connection);
 
-    // Rails: `Post.find_by("updated_at < ?", 2.weeks.ago)` — find_by(*args) is
-    // `where(*args).take`, and trails' typed findBy only accepts a conditions
-    // hash, so spell the raw-SQL-fragment form as where(...).first().
     await expect(Post.where("updated_at < ?", twoWeeksAgo()).first()).rejects.toBeInstanceOf(
       ConnectionFailed,
     );
@@ -994,8 +888,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     const tagsCountAttr = Post.arelTable.get("tags_count");
     const absTagsCount = new Nodes.NamedFunction("ABS", [tagsCountAttr]);
 
-    // Rails: `Post.where(abs_tags_count.eq(2))` — where accepts a raw Arel node;
-    // trails' typed overloads only model the Hash and (string, ...binds) forms.
     await expect(
       (Post.where as (node: unknown) => ReturnType<typeof Post.where>)(absTagsCount.eq(2)).first(),
     ).rejects.toBeInstanceOf(ConnectionFailed);
@@ -1104,8 +996,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     const fresh = pool.newConnection();
     try {
       fresh.disconnectBang();
-      // Rails relies on the default connection_retries (1); trails' getter
-      // defaults to 1 too (abstract-adapter.ts:1581), so no explicit set needed.
       const failures: Error[] = [new ConnectionFailed("Oops"), new ConnectionFailed("Oops 2")];
       const original = fresh.configureConnection.bind(fresh);
       (
@@ -1126,8 +1016,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   });
 });
 
-// Rails' `find_by("updated_at < ?", 2.weeks.ago)` raw-SQL fragment — a date two
-// weeks in the past, formatted as an ISO timestamp the way the adapters bind it.
 function twoWeeksAgo(): string {
   return new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
     .toISOString()
@@ -1135,21 +1023,9 @@ function twoWeeksAgo(): string {
     .slice(0, 19);
 }
 
-// Rails' AdapterThreadSafetyTest ("#active? is synchronized" / "#verify! is
-// synchronized") is Ruby-only (Thread.new/GVL interleaving) and registered as
-// unported in scripts/api-compare/unported-files.ts.
-
-// MySQL-only: invalidateTransaction fires only when
-// isSavepointErrorsInvalidateTransactions() is true (Mysql2Adapter override);
-// the abstract/sqlite/pg default is false, matching Rails
-// savepoint_errors_invalidate_transactions?.
 describe("InvalidateTransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  // Rails wraps this in `if connection.savepoint_errors_invalidate_transactions?`
-  // — a capability guard (true only on MySQL), not an adapter-fidelity gate
-  // (Rails runs the file unconditionally). MySQL is the only adapter whose
-  // `isSavepointErrorsInvalidateTransactions()` returns true, mirroring Rails.
   const savepointErrorsInvalidateTransactions = adapterType === "mysql";
   it.skipIf(!savepointErrorsInvalidateTransactions)(
     "invalidates transaction on rollback error",
@@ -1217,12 +1093,6 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
 });
 
 describe("AdvisoryLocksEnabledTest", () => {
-  // Literal port of Rails' AdvisoryLocksEnabledTest (adapter_test.rb): lease
-  // the *global* connection and probe `advisory_locks_enabled?`, then toggle
-  // the `:advisory_locks` config via establish_connection inside
-  // `run_without_connection` so the worker's pool is restored afterward.
-  // `supports_advisory_locks?` is true on PostgreSQL + MySQL, so the gate is
-  // feature-only.
   itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
     expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(true);
 

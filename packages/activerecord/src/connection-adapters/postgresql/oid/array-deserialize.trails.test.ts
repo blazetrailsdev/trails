@@ -1,13 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Array as OidArray } from "./array.js";
 
-/**
- * Rails' `OID::Array#deserialize` only ever sees a String or a `Data`, because
- * `PG::TextDecoder::Array` decodes upstream. node-pg parses array OIDs itself,
- * so `deserialize` can be handed an already-decoded JS array — a shape Rails
- * cannot produce, and the one place the port must decide which subtype method
- * each element gets.
- */
 describe("PostgreSQL array deserialize of an already-decoded array", () => {
   const subtype = {
     cast: (value: unknown) => `cast(${String(value)})`,

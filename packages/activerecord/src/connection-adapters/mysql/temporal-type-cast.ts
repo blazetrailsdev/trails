@@ -1,24 +1,3 @@
-/**
- * Per-connection Temporal typeCast callback for the mysql2 driver.
- *
- * mysql2's default field decoder converts DATETIME/TIMESTAMP/DATE/TIME
- * columns into JS Date objects, losing microsecond precision. Passing
- * `{ typeCast }` to `mysql.createPool` intercepts those fields and
- * returns the appropriate Temporal type instead.
- *
- * In mysql2's typeCast callback, `field.type` is a string name (e.g.
- * "TIMESTAMP") not a numeric OID. The callback reads the raw wire string
- * via `field.string()` and dispatches to the matching parser.
- *
- * Precondition: the connection's `@@session.time_zone` must be `'+00:00'`
- * (enforced via the init SQL run in Mysql2Adapter.newClient). Without
- * this, TIMESTAMP strings arrive in the server's session timezone and
- * parseMysqlInstant would produce wrong instants.
- *
- * We do NOT call any global mysql2 type registration — that would mutate
- * a process-wide registry shared with other mysql2 users in the process.
- */
-
 import type mysql from "mysql2/promise";
 import {
   parseMysqlInstant,
@@ -29,16 +8,6 @@ import {
 type Field = { type: string; string: () => string | null };
 type NextFn = () => unknown;
 
-/**
- * mysql2 `typeCast` callback. Pass as `{ typeCast }` in pool/connection options.
- *
- * Returns Temporal types for temporal fields; delegates all other fields
- * to the driver default via `next()`.
- *
- * TIME / TIME2 are deliberately not intercepted: mysql2 leaves them as strings,
- * and `ActiveRecord::Type::Time#cast_value` is what turns one into a `::Time`
- * on the 2000-01-01 dummy date (time.rb:68-83).
- */
 export function temporalTypeCast(field: Field, next: NextFn): unknown {
   switch (field.type) {
     case "TIMESTAMP":
@@ -64,10 +33,6 @@ export function temporalTypeCast(field: Field, next: NextFn): unknown {
   }
 }
 
-/**
- * mysql2 pool options to wire up Temporal parsing.
- * Spread into the pool config alongside other options.
- */
 export const TEMPORAL_POOL_OPTIONS: Pick<mysql.PoolOptions, "typeCast"> = {
   typeCast: temporalTypeCast as unknown as mysql.PoolOptions["typeCast"],
 };

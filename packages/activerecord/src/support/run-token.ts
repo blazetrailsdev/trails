@@ -1,49 +1,12 @@
-/**
- * Per-run identity for the AR test harness: the token `globalSetup` stamps
- * before any worker forks, and the naming rules every lane derives from it.
- *
- * The sqlite lane already carried a run token so that two vitest invocations in
- * different worktrees could not touch each other's temp DB files
- * (`sqlite-template.ts`). PG and MySQL had no such discriminator: every run
- * named its slot databases `activerecord_unittest`, `activerecord_unittest_2`,
- * … and `globalSetup` opened with `DROP DATABASE IF EXISTS` on each, so a
- * second run against the same server dropped the first run's databases out from
- * under its live workers. The advisory locks that hand out slots are
- * server-wide too, so the two runs also shared one slot pool.
- *
- * This module is the single signal both lanes derive from, mirroring the
- * property `config.ts` documents: nothing rewrites a URL or a database name in
- * place — the token goes into the environment once and every consumer computes
- * the same name from it.
- *
- * Naming: `<base>_<runToken>_<slot>` for a slot database, plus
- * `<base>_<runToken>_template` for the PG clone template, and the `arunit2`
- * sibling of a slot database, `<base>2_<runToken>_<slot>` (via
- * `arunit2-config.ts`). Every database a run creates therefore starts with
- * `<base>_<runToken>_` or `<base>2_<runToken>_`, which is what makes "drop only
- * my own" expressible as a prefix test.
- *
- * Hard rules (RFC 0023): no `node:*` imports, no `process.*`, async fs only —
- * none of which this module needs.
- *
- * @internal
- */
+/** @internal */
 
-/** Env var: per-run token, stamped by `globalSetup` before workers fork. */
 export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
 
-/**
- * Age past which a run's leftovers are assumed orphaned by a killed run and
- * swept. No AR test run comes near this, so the cutoff cannot pull a database
- * (or a temp file) out from under a *concurrent* run — which a blanket
- * prefix-drop would, since parallel worktrees share one server and one tmpdir.
- */
 export const STALE_DB_AGE_MS = 6 * 60 * 60 * 1000;
 
 const RANDOM_LENGTH = 6;
 const TOKEN_PATTERN = "r[0-9a-z]+";
 
-/** A fresh token for this vitest invocation. */
 export function newRunToken(): string {
   const random = Math.floor(Math.random() * 36 ** RANDOM_LENGTH)
     .toString(36)
@@ -51,7 +14,6 @@ export function newRunToken(): string {
   return `r${Date.now().toString(36)}${random}`;
 }
 
-/** When the run that minted `runToken` started, or `null` if unparseable. */
 export function runTokenStartedAt(runToken: string): number | null {
   if (!runToken.startsWith("r") || runToken.length <= RANDOM_LENGTH + 1) return null;
   const millis = parseInt(runToken.slice(1, -RANDOM_LENGTH), 36);
@@ -62,69 +24,28 @@ function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** The prefix every database one run creates from `base` shares. */
 export function runDatabasePrefix(base: string, runToken: string): string {
   return `${base}_${runToken}_`;
 }
 
-/**
- * The database for one advisory-lock slot.
- *
- * Slot 1 gets `<base>_<token>_1` like every other slot — it deliberately no
- * longer aliases the bare `activerecord_unittest`. That alias is exactly what
- * made two concurrent runs collide on the un-suffixed name, and keeping it
- * would leave the one database `globalSetup` DROPs shared between runs. The
- * bare base name is now used only when no run token is stamped at all (see
- * `applySlot` in `config.ts`).
- */
 export function slotDatabaseName(base: string, runToken: string, slot: number): string {
   return `${runDatabasePrefix(base, runToken)}${slot}`;
 }
 
-/**
- * Splits a database name into the part a run derives its names from and the
- * `_<runToken>_<slot>` suffix a run appends to it (either half may be absent:
- * an unstamped name carries no token, and a name may carry no slot).
- *
- * `arunit2-config.ts` needs this to place its literal `"2"` on the base rather
- * than inside the suffix — `<base>2_<token>_<slot>` — so the token stays a
- * whole segment. Appending the `"2"` to the token instead made
- * `runTokenOfDatabase` read a sibling's token as `<token>2`: not this run's
- * token (so teardown leaked it), and a plausible *foreign* token (so a
- * concurrent run's stale sweep could DROP it while it was live).
- */
 export function splitRunDatabaseName(name: string): { base: string; suffix: string } {
   const suffix = new RegExp(`(_${TOKEN_PATTERN})?(_\\d+)?$`).exec(name)?.[0] ?? "";
   return { base: suffix === "" ? name : name.slice(0, -suffix.length), suffix };
 }
 
-/**
- * The run token a database name carries, or `null` if it carries none.
- *
- * The optional `2` is the `arunit2` sibling's marker (`arunit2-config.ts`): it
- * sits on the base, ahead of the token, so the capture is the minting run's
- * token whether or not it is there.
- */
 export function runTokenOfDatabase(base: string, name: string): string | null {
   const match = new RegExp(`^${escapeRegExp(base)}2?_(${TOKEN_PATTERN})_`).exec(name);
   return match?.[1] ?? null;
 }
 
-/**
- * The subset of `names` this run owns — the only databases `globalSetup` and
- * its teardown may ever DROP. A name minted by a different run (or an
- * unstamped name such as the bare `activerecord_unittest` a developer keeps by
- * hand) is never in it.
- */
 export function ownRunDatabases(base: string, runToken: string, names: string[]): string[] {
   return names.filter((name) => runTokenOfDatabase(base, name) === runToken);
 }
 
-/**
- * Databases orphaned by runs that were killed before their teardown ran (a
- * `^C`-ed vitest). Foreign token *and* older than {@link STALE_DB_AGE_MS}, so a
- * concurrent run's live databases are out of reach.
- */
 export function staleRunDatabases(
   base: string,
   runToken: string,
@@ -139,12 +60,6 @@ export function staleRunDatabases(
   });
 }
 
-/**
- * The advisory-lock key pair for a slot: `pg_try_advisory_lock(classId, objId)`
- * with the run token hashed into the class half, so a second concurrent run
- * scans a disjoint key space instead of exhausting this run's slot pool.
- * PostgreSQL advisory-lock keys are signed 32-bit, hence the `| 0`.
- */
 export function pgAdvisoryLockKey(runToken: string, slot: number): [number, number] {
   let hash = 0;
   for (let i = 0; i < runToken.length; i++) {
@@ -153,7 +68,6 @@ export function pgAdvisoryLockKey(runToken: string, slot: number): [number, numb
   return [hash, slot];
 }
 
-/** The `GET_LOCK` name for a slot — per-run for the same reason. */
 export function mysqlAdvisoryLockName(runToken: string, slot: number): string {
   return `ar_test_slot_${runToken}_${slot}`;
 }

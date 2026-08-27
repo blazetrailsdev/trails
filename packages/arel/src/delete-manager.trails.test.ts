@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, DeleteManager } from "./index.js";
 
-// TS-only coverage: the full ORDER BY / LIMIT rendering and the `wheres`
-// reader, which Rails' delete_manager_test.rb exercises only through
-// `assert_match(/LIMIT 10/)`.
 describe("DeleteManagerTest (trails)", () => {
   const users = new Table("users");
 

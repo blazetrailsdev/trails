@@ -11,8 +11,6 @@ import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import type { SchemaCreationConn } from "../abstract/schema-creation.js";
 
-// Rails' SQLite3 DDL-rendering tests run under `current_adapter?(:SQLite3Adapter)`
-// against `ActiveRecord::Base.lease_connection`.
 describeIfSqlite("SQLite3::SchemaCreation", () => {
   let conn: TableDefinitionConn & SchemaCreationConn;
   let sc: SchemaCreation;

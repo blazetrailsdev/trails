@@ -2,12 +2,8 @@ import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
-/** Mirrors: Arel::Visitors::PostgreSQL::BIND_BLOCK (postgresql.rb:81-82). */
 const BIND_BLOCK: (index: number) => string = (i: number) => `$${i}`;
 
-/**
- * Mirrors: Arel::Visitors::PostgreSQL
- */
 export class PostgreSQL extends ToSql {
   protected override visitArelNodesMatches(o: Nodes.Matches, collector: SQLString): SQLString {
     const op = o.caseSensitive ? " LIKE " : " ILIKE ";
@@ -54,8 +50,6 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
-  // Mirrors: Arel::Visitors::PostgreSQL#visit_Arel_Nodes_GroupingElement
-  // (postgresql.rb:44-47)
   protected visitArelNodesGroupingElement(
     o: Nodes.GroupingElement,
     collector: SQLString,
@@ -66,7 +60,6 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
-  // postgresql.rb
   protected visitArelNodesCube(o: Nodes.Cube, collector: SQLString): SQLString {
     collector.append("CUBE");
     return this.groupingArrayOrGroupingElement(o, collector);
@@ -107,15 +100,10 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
-  /** Mirrors: Arel::Visitors::PostgreSQL#bind_block (postgresql.rb:81-84). */
   protected override bindBlock(): (index: number) => string {
     return BIND_BLOCK;
   }
 
-  /**
-   * Mirrors: Arel::Visitors::PostgreSQL#grouping_array_or_grouping_element
-   * (postgresql.rb:88-96).
-   */
   protected groupingArrayOrGroupingElement(o: Nodes.Unary, collector: SQLString): SQLString {
     if (Array.isArray(o.expr)) {
       collector.append("( ");
@@ -127,12 +115,9 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
-  /**
-   * @internal
-   */
+  /** @internal */
   static registerDispatch(): void {
     PostgreSQL.dispatchCache().set(Nodes.Lateral, "visitArelNodesLateral");
-    // postgresql.rb:44-62, visitor.rb:36-39
     PostgreSQL.dispatchCache().set(Nodes.GroupingElement, "visitArelNodesGroupingElement");
     PostgreSQL.dispatchCache().set(Nodes.Cube, "visitArelNodesCube");
     PostgreSQL.dispatchCache().set(Nodes.RollUp, "visitArelNodesRollUp");

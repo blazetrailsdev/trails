@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model, Errors } from "./index.js";
 
-/**
- * Mirrors: ErrorsTest::Person (errors_test.rb:6-30) — the plain class the
- * Rails errors tests build their `ActiveModel::Errors` over.
- */
 class Person {
   errors: Errors;
   name: string | null = null;
@@ -42,9 +38,6 @@ describe("ErrorsTest", () => {
     expect(e.details.get("name")![0].error).toBe(":blank");
   });
 
-  // =========================================================================
-  // Additional tests to improve Rails test coverage
-  // =========================================================================
   it("first", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
@@ -545,18 +538,12 @@ describe("ErrorsTest", () => {
   });
 
   it("added? ignores callback option", () => {
-    // Rails errors_test.rb:258-263 — error added WITH `if:` callback option,
-    // queried without; strict_match strips CALLBACKS_OPTIONS from the
-    // error's own options so they don't block the match.
     const errors = new Errors({});
     errors.add("name", ":too_long", { if: () => true });
     expect(errors.added("name", ":too_long")).toBe(true);
   });
 
   it("added? ignores message option", () => {
-    // Rails errors_test.rb:265-270 — error added with `message:` proc,
-    // queried without; MESSAGE_OPTIONS are stripped from the error's
-    // own options for strict_match purposes.
     const errors = new Errors({});
     errors.add("name", ":too_long", { message: () => "foo" } as Record<string, unknown>);
     expect(errors.added("name", ":too_long")).toBe(true);

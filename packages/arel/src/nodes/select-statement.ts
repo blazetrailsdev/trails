@@ -5,15 +5,6 @@ import type { Table } from "../table.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
 
-/**
- * SelectStatement — the full SELECT with cores, order, limit, offset, lock.
- *
- * Mirrors: Arel::Nodes::SelectStatement (select_statement.rb).
- *
- * Comment lives on `SelectCore`, not here — Rails' attr_accessor list is
- * `:limit, :orders, :lock, :offset, :with` and only `SelectCore` carries
- * `:comment`. The visitor emits the comment in `visit_Arel_Nodes_SelectCore`.
- */
 export class SelectStatement extends NodeExpression {
   cores: SelectCore[];
   orders: Node[];
@@ -32,7 +23,6 @@ export class SelectStatement extends NodeExpression {
     this.with = null;
   }
 
-  // Mirrors Arel::Nodes::SelectStatement#hash / #eql? / #== (select_statement.rb:24-38).
   hash(): number {
     return rbHash([this.cores, this.orders, this.limit, this.lock, this.offset, this.with]);
   }
@@ -50,8 +40,6 @@ export class SelectStatement extends NodeExpression {
     );
   }
 
-  // Mirrors Arel::Nodes::SelectStatement#initialize_copy
-  // (select_statement.rb:19-23), which Ruby runs for `#clone`.
   clone(): this {
     const copy = objectClone(this);
     copy.cores = this.cores.map((x) => x.clone());

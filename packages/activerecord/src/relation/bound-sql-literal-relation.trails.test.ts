@@ -1,11 +1,3 @@
-/**
- * A Relation passed as a positional or named bind to `where` must be inlined
- * as a subquery, matching Rails' `build_bound_sql_literal` (query_methods.rb):
- * Arel nodes render to SQL and other `to_sql`-responding values pass through as
- * Arel literals rather than reaching the bind quoter. Trails-surfaced deviation
- * traced in PR #3598; the canonical `Topic` model carries `approved` exactly as
- * Rails' `topics` fixtures do.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
@@ -58,8 +50,6 @@ describe("bound SQL literal with Relation bind value", () => {
     const topic = await Topic.find(first);
     const relation = Topic.where("id = ?", topic);
 
-    // build_bound_sql_literal reduces the model to its id_for_database
-    // (query_methods.rb:1707-1709) before the value reaches the quoter.
     expect(relation.toSql()).toContain(String(first));
     const rows = await relation;
     expect(rows.map((r) => Number(r.id))).toEqual([first]);
@@ -74,10 +64,6 @@ describe("bound SQL literal with Relation bind value", () => {
     expect(ids.length).toBeGreaterThan(0);
   });
 
-  // Direct coverage for the builders that `buildWhereClause` now routes string
-  // fragments through (see `build_where_clause`, query_methods.rb:1625-1627);
-  // call them here so the Relation→`Arel.sql(toSql)` branch has a focused
-  // regression guard independent of the full `where(...)` path.
   it("buildBoundSqlLiteral inlines a Relation positional bind as a SqlLiteral", () => {
     const approvedIds = Topic.where({ approved: true }).select("id");
     const builders = Topic.all() as unknown as BoundSqlLiteralBuilders;

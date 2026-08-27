@@ -1,22 +1,3 @@
-/**
- * PostgreSQL range support.
- *
- * Rails has two distinct classes:
- *
- *   - Ruby's core `::Range` — the query value with primitive begin/end bounds,
- *     used everywhere in ActiveRecord (predicate builders, `where(x: 1..10)`,
- *     etc).
- *   - `ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range` — a
- *     `Type::Value` that owns a subtype and a type name, and whose
- *     `cast_value`/`serialize`/etc. return `::Range` instances.
- *
- * TypeScript has no `::Range` analog, so we expose:
- *
- *   - `Range` — query value class (matches core Ruby `::Range`).
- *   - `RangeType` — the Type::Value wrapper (matches `OID::Range`). It owns
- *     the subtype and emits `Range` instances from `castValue`/`serialize`.
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
 
@@ -31,24 +12,14 @@ export class Range {
     this.excludeEnd = excludeEnd;
   }
 
-  // Serializes to PG's range literal, identical to PostgreSQL::Quoting#encode_range
-  // (vendor rails quoting.rb:210). Rails does NOT quote bounds containing special
-  // chars — type_cast_range_value interpolates each bound raw, and the surrounding
-  // `quote`/`Quoted` adds the single outer quoting + escaping. This shares the
-  // same `rangeBoundLiteral` helper as `encode_range`, keeping the quote/typeCast
-  // literal paths in agreement.
   toString(): string {
     return `[${rangeBoundLiteral(this.begin)},${rangeBoundLiteral(this.end)}${this.excludeEnd ? ")" : "]"}`;
   }
 }
 
 /**
- * Mirrors PostgreSQL::Quoting#type_cast_range_value's nil/infinity handling plus
- * the raw interpolation in #encode_range: an unbounded/infinite bound renders as
- * the empty string, everything else as its bare string form (no per-bound quoting).
- * Shared by `Range#toString` and the adapter's `encodeRange`.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the nil/infinity bound rendering Ruby writes inline in Quoting#encode_range (postgresql/quoting.rb:210).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function rangeBoundLiteral(value: unknown): string {
   return value == null || isInfinity(value) ? "" : String(value);
@@ -63,9 +34,6 @@ export interface RangeSubtype {
   userInputInTimeZone?(value: unknown): unknown;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range.
- */
 export class RangeType extends ValueType<Range> {
   readonly name: string;
   readonly subtype: RangeSubtype;
@@ -80,11 +48,6 @@ export class RangeType extends ValueType<Range> {
     return this.name;
   }
 
-  /**
-   * Rails: `delegate :user_input_in_time_zone, to: :subtype`. A real delegation
-   * calls the subtype method (or raises if absent), so call directly rather
-   * than optional-chaining to `undefined`.
-   */
   userInputInTimeZone(value: unknown): unknown {
     return this.subtype.userInputInTimeZone!(value);
   }
@@ -95,11 +58,6 @@ export class RangeType extends ValueType<Range> {
 
   castValue(value: unknown): Range | null {
     if (value == null || value === "empty" || value === "") return null;
-    // Rails' cast_value passes non-String values through unchanged
-    // (`return value unless value.is_a?(::String)`). The cast is generic in
-    // Ruby so this just trusts the caller. In TS we keep the Rails semantic
-    // but acknowledge the Range | null return type is optimistic for non-
-    // string inputs — callers shouldn't pass garbage here.
     if (typeof value !== "string") return value as Range | null;
 
     const extracted = this.extractBounds(value);
@@ -143,10 +101,6 @@ export class RangeType extends ValueType<Range> {
   }
 
   private typeCastSingle(value: unknown): unknown {
-    // Rails calls @subtype.deserialize directly — no cast fallback. If a
-    // subtype doesn't implement deserialize, surface that as a failure
-    // rather than silently routing through cast and producing a different
-    // shape than Rails would.
     return isInfinity(value) ? value : this.subtype.deserialize(value);
   }
 
@@ -154,14 +108,7 @@ export class RangeType extends ValueType<Range> {
     return isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
   }
 
-  /**
-   * @missingRailsCall split — PERMANENT: Name-collision false positive (story
-   *   relation-delegation-rails-named-methods): exposing the `delegate ... to:
-   *   :records` set under Rails names made `split`/`reverse`/`rindex` recognized
-   *   ported method names, so this unrelated call to String#split /
-   *   Array#reverse / String#rindex on a non-Relation receiver is flagged by the
-   *   name-based wide call-set check.
-   */
+  /** @missingRailsCall split — PERMANENT */
   private extractBounds(value: string): {
     from: unknown;
     to: unknown;
@@ -194,22 +141,12 @@ export class RangeType extends ValueType<Range> {
     }
   }
 
-  /**
-   * Mirrors Rails' private `unquote`. Shares the module-level
-   * {@link unquoteRangeBound} so the adapter's range parser stays in sync.
-   * @internal
-   */
+  /** @internal */
   private unquote(value: string): string {
     return unquoteRangeBound(value);
   }
 }
 
-/**
- * Split a range-literal's inner string (without surrounding `[` / `)`) at
- * the top-level comma, skipping commas inside double-quoted bounds. PG
- * range output always uses `""` for an escaped quote, so that's what we
- * track here — matches Rails' `extract_bounds`.
- */
 export function findRangeSeparator(value: string): number {
   let inQuotes = false;
   for (let i = 0; i < value.length; i++) {
@@ -227,10 +164,6 @@ export function findRangeSeparator(value: string): number {
   return value.length;
 }
 
-/**
- * Unquote a range-bound value. PG emits `""` for literal `"` and `\\` for
- * literal `\` inside double-quoted bounds. Mirrors Rails' `unquote`.
- */
 export function unquoteRangeBound(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");
@@ -255,11 +188,6 @@ function infiniteFloatRangeCovers(value: unknown): boolean {
   return typeof value === "number" && !Number.isNaN(value);
 }
 
-/**
- * Approximates Ruby's Object#inspect for primitives so schema dumps match
- * Rails output: strings are double-quoted, dates are inspected, numbers/
- * booleans/null/undefined render bare.
- */
 function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;

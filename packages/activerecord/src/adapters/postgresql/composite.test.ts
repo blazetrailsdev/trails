@@ -1,14 +1,9 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/composite_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { ValueType } from "@blazetrails/activemodel";
 
-// Rails: class PostgresqlComposite < ActiveRecord::Base
-//   self.table_name = "postgresql_composites"
 class PostgresqlComposite extends Base {
   static {
     this.tableName = "postgresql_composites";
@@ -16,13 +11,11 @@ class PostgresqlComposite extends Base {
   }
 }
 
-// Rails: FullAddress = Struct.new(:city, :street)
 interface FullAddress {
   city: string;
   street: string;
 }
 
-// Rails: class FullAddressType < ActiveRecord::Type::Value
 class FullAddressType extends ValueType<FullAddress> {
   override readonly name = "full_address";
 
@@ -78,8 +71,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      // Rails: assert_nil column.type — an unknown composite OID maps to a
-      // ValueType, whose type() is nil; SqlTypeMetadata keeps `type` nil-faithful.
       const col = (PostgresqlComposite as any).columnsHash()["address"];
       expect(col.type).toBeNull();
       expect(col.sqlType).toBe("full_address");
@@ -89,13 +80,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("composite mapping", async () => {
-      // Rails: INSERT ... ROW('Paris', 'Champs-Élysées'); assert "(Paris,Champs-Élysées)"
       await connection.execute(
         `INSERT INTO postgresql_composites VALUES (1, ROW('Paris', 'Champs-Élysées'))`,
       );
       const composite = (await PostgresqlComposite.first())!;
       expect((composite as any).address).toBe("(Paris,Champs-Élysées)");
-      // Rails: composite.address = "(Paris,Rue Basse)"; save!; assert '(Paris,"Rue Basse")'
       (composite as any).address = "(Paris,Rue Basse)";
       await (composite as any).saveBang();
       const reloaded = (await PostgresqlComposite.first())!;
@@ -107,8 +96,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     beforeEach(async () => {
       connection = Base.connection as PostgreSQLAdapter;
       await setupCompositeType();
-      // Rails: @connection.send(:type_map).register_type "full_address", FullAddressType.new
-      // Pre-registering by name lets loadAdditionalTypes alias the numeric OID to the type.
       connection.typeMap.registerType("full_address", new FullAddressType());
       void PostgresqlComposite.resetColumnInformation();
       await PostgresqlComposite.loadSchema();
@@ -119,7 +106,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      // Rails: assert_equal :full_address, column.type
       const col = (PostgresqlComposite as any).columnsHash()["address"];
       expect(col.type).toBe("full_address");
       expect(col.sqlType).toBe("full_address");
@@ -129,7 +115,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("composite mapping", async () => {
-      // Rails: assert city/street via FullAddress struct after deserialize
       await connection.execute(
         `INSERT INTO postgresql_composites VALUES (1, ROW('Paris', 'Champs-Élysées'))`,
       );
@@ -137,7 +122,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const addr = (composite as any).address as FullAddress;
       expect(addr.city).toBe("Paris");
       expect(addr.street).toBe("Champs-Élysées");
-      // Rails: composite.address = FullAddress.new("Paris", "Rue Basse"); save!
       (composite as any).address = { city: "Paris", street: "Rue Basse" };
       await (composite as any).saveBang();
       const reloaded = (await PostgresqlComposite.first())!;

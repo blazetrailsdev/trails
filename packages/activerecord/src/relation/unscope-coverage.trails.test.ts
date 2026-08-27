@@ -1,8 +1,3 @@
-/**
- * Unscope coverage for keys that were missing from UnscopeType:
- * `:create_with`, `:preload`, `:eager_load`. Mirrors Rails'
- * `Relation::QueryMethods#unscope` switch (relation/query_methods.rb).
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
@@ -67,8 +62,6 @@ describe("Relation#unscope — full Rails key coverage", () => {
   });
 
   it("unscope('includes') clears includes only — leaves preload / eagerLoad alone (Rails-faithful)", () => {
-    // Pre-PR-B behavior: unscope('includes') ALSO cleared preload and
-    // eagerLoad. Rails' query_methods.rb scopes each key independently.
     const rel = (UscAuthor as any)
       .all()
       .preload(":uscPosts")

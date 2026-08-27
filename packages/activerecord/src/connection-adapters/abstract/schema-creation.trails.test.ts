@@ -8,9 +8,6 @@ import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresq
 import type { TableDefinitionConn } from "./schema-definitions.js";
 import type { SchemaCreationConn } from "./schema-creation.js";
 
-// Rails hands `SchemaCreation.new` an `ActiveRecord::Base.lease_connection`
-// (adapter_test.rb, migration/columns_test.rb); a suite whose assertions turn on
-// one dialect's quoting runs under that dialect's `current_adapter?` gate.
 let conn: TableDefinitionConn & SchemaCreationConn;
 
 beforeAll(async () => {
@@ -33,8 +30,6 @@ describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
   });
 
   it("passes 'virtual' through verbatim, with no options.type/string fallback", () => {
-    // Rails' type_to_sql has no :virtual case, so type_to_sql(:virtual) → "virtual".
-    // The :virtual → options[:type] mapping is newColumnDefinition-only.
     expect(new SchemaCreation(conn).typeToSql("virtual" as any, { type: "integer" } as any)).toBe(
       "virtual",
     );
@@ -88,9 +83,6 @@ describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
   });
 });
 
-// Rails delegates every capability probe to `@conn`
-// (abstract/schema_creation.rb:16-21), so the visitor's answer is the lane
-// connection's — version gates included.
 describe("SchemaCreation support predicates", () => {
   it("supports_indexes_in_create? is true only on MySQL", () => {
     expect((new SchemaCreation(conn) as any).supportsIndexesInCreate()).toBe(
@@ -119,9 +111,6 @@ describeIfPostgresqlAdapter("SchemaCreation quoting delegations", () => {
   });
 });
 
-// Sub-part index lengths (`col(N)`) are MySQL-only DDL. Rails applies them
-// exclusively in AbstractMysqlAdapter#add_index_length; the abstract visitor
-// must NOT, or it emits invalid `("name"(10))` on PG/SQLite.
 describeIfPostgresqlAdapter("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
   it("does not append sub-part length on postgres", async () => {
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
@@ -149,11 +138,6 @@ describeIfSqlite("SchemaCreation#quotedColumnsForIndex sub-part length gating", 
 });
 
 describe("SchemaCreation#quotedColumns delegates to the connection", () => {
-  // Rails' abstract SchemaCreation delegates :quoted_columns_for_index to @conn
-  // (schema_creation.rb:18). When a real adapter is threaded as the host, the
-  // visitor must route column quoting through it rather than re-deriving the
-  // order/opclass decoration inline — that's the single source of truth
-  // (SchemaStatements#quoted_columns_for_index -> add_options_for_index_columns).
   const host = {
     quoteColumnName: (c: string) => `"${c}"`,
     quoteTableName: (t: string) => `"${t}"`,
@@ -163,10 +147,6 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
     supportsNullsNotDistinct: async () => false,
     supportsPartialIndex: () => false,
     quotedColumnsForIndex(cols: string[], options: any) {
-      // Stand-in for the connection's decoration, incl. PG opclass folding.
-      // Mirrors options_for_index_columns: a String opclass applies to every
-      // column, a Record keys per-column (IndexDefinition#conciseOptions
-      // collapses a uniform Record to a String).
       const opc = (c: string) =>
         typeof options.opclass === "string" ? options.opclass : options.opclass?.[c];
       return cols.map((c) => `"${c}" ${opc(c) ?? "DEFAULT_OPS"}`).join(", ");
@@ -216,9 +196,6 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
   });
 
   it("emits a bare decimal with no precision when none is given", () => {
-    // Rails sources the default from native_database_types[:decimal], which
-    // carries no :precision on SQLite/MySQL/PostgreSQL — so a precision-less
-    // decimal dumps bare rather than defaulting to (10).
     expect(new SchemaCreation(conn).typeToSql("decimal")).toBe("decimal");
   });
 });

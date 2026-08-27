@@ -8,12 +8,10 @@ import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
-/** Ruby `Comparable`'s `<=>`, spelled `compareTo` in trails. */
 function hasCompareTo(value: unknown): value is { compareTo(other: unknown): number | null } {
   return value != null && typeof (value as { compareTo?: unknown }).compareTo === "function";
 }
 
-/** The `rb_cmperr` message from `value.public_send(op, other)`: "comparison of Integer with String failed". */
 function comparisonFailed(a: unknown, b: unknown): string {
   const nameOf = (x: unknown) => {
     if (x === null || x === undefined) return "NilClass";
@@ -59,22 +57,11 @@ export class ComparisonValidator extends EachValidator {
         }
       } catch (e) {
         if (!(e instanceof ArgumentError)) throw e;
-        // Rails comparison.rb:30 — uses the ArgumentError message as the
-        // error key/message and continues to the next compare option.
         record.errors.add(attrName, e.message);
       }
     }
   }
 
-  /**
-   * The `<=>` behind `value.public_send(COMPARE_CHECKS[option], option_value)`
-   * (comparison.rb:27). Ruby dispatches the operator off the value, so any
-   * object that `include Comparable` and defines `<=>` compares — `compareTo`
-   * is trails' spelling of `<=>` (date/src/date.ts:5147) and is tried first.
-   * A Date and a DateTime compare through the same astronomical Julian day
-   * (`Date#<=>` is `d_lite_cmp` over `ajd` in the date gem's `date_core.c`),
-   * a Date being that day at midnight.
-   */
   private compare(a: unknown, b: unknown): number {
     if (hasCompareTo(a)) {
       const cmp = a.compareTo(b);
@@ -103,11 +90,6 @@ export class ComparisonValidator extends EachValidator {
   }
 }
 
-/**
- * Mirrors: ActiveModel::Validations::HelperMethods (comparison.rb:79-81) — Ruby reopens the
- * one `HelperMethods` module here, so the TS half of it lives here too and
- * `validations.ts` reassembles them.
- */
 export const HelperMethods = {
   validatesComparisonOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
     return this.validatesWith(ComparisonValidator, this._mergeAttributes(attrNames));

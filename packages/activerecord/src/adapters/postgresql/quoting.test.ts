@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/quoting_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
@@ -87,8 +84,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote range", () => {
-      // Mirrors Rails test_quote_range: injection strings are neutralized by
-      // RangeType#serialize casting bounds through IntegerType before quoting.
       const type = new RangeType(new IntegerType(), "int8range");
       const range = new OidRange("1,2]'; SELECT * FROM users; --", "0; DROP TABLE users; --");
       const serialized = type.serialize(range);
@@ -107,17 +102,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("quote big decimal", async () => {
       expect(adapter.quote(4.2)).toBe("4.2");
     });
-
-    // NOTE: `quote rational` (Rails `test_quote_rational`) is Ruby-only —
-    // Rational(3, 4) has no JavaScript equivalent — and is reclassified in
-    // scripts/api-compare/unported-files.ts.
-
-    // NOTE: PG `quoting_test.rb` has no `test_quote_binary`. Binary-quoting
-    // coverage lives where Rails keeps it: `quotedBinary`/`escape_bytea` is
-    // unit-tested in connection-adapters/postgresql/quoting.trails.test.ts, and the
-    // bytea round-trip is covered by bytea.test.ts (Rails bytea_test.rb). The
-    // phantom-named stub that used to sit here was removed to avoid an
-    // unmatched parity:test entry.
 
     it("quote bit string", () => {
       expect(adapter.quote(new Bit().serialize("01")!)).toBe("B'01'");

@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Types, BigIntegerType, IntegerType } from "../index.js";
 
-// Trails-only coverage for ActiveModel::Type::BigInteger — behavior with no
-// counterpart test in activemodel/test/cases/type/big_integer_test.rb. The
-// ported Rails tests live in big-integer.test.ts.
-
 describe("BigIntegerType", () => {
   it("string with no leading digits casts to 0, following String#to_i", () => {
     const type = new BigIntegerType();
@@ -87,8 +83,6 @@ describe("BigIntegerType cast and serialize coverage", () => {
   });
 
   it("no range error for values outside int8 range even when limit is set", () => {
-    // BigIntegerType is unconditionally unlimited (big_integer.rb:33 — max_value = Infinity).
-    // The 8-byte guard belongs on the adapter column type, not on BigIntegerType itself.
     const type = new BigIntegerType({ limit: 8 });
     expect(() => type.serialize(9223372036854775808n)).not.toThrow();
     expect(type.isSerializable(BigInt("9".repeat(100)))).toBe(true);

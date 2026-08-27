@@ -1,25 +1,9 @@
-/**
- * SerializeCastValue — optimization for skipping redundant casts during serialization.
- *
- * Mirrors: ActiveModel::Type::SerializeCastValue
- *
- * In Rails, when a type's serialize method just calls cast then
- * serializes, SerializeCastValue lets the system skip the cast step
- * if the value is already cast. This avoids double-casting on save.
- */
-
 export interface SerializeCastValue {
   itselfIfSerializeCastValueCompatible(): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace SerializeCastValue {
-  /**
-   * Mirrors: ActiveModel::Type::SerializeCastValue::ClassMethods
-   *
-   * Provides serialize_cast_value_compatible? which checks if a type
-   * has overridden serialize_cast_value.
-   */
   export interface ClassMethods {
     serializeCastValueCompatible(): boolean;
   }
@@ -32,29 +16,6 @@ export namespace SerializeCastValue {
     return value;
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::SerializeCastValue.serialize
-   * (serialize_cast_value.rb:25-33)
-   *
-   *   def self.serialize(type, value)
-   *     # Using `type.equal?(type.itself_if_...)` is a performant way to also
-   *     # ensure that `type` is not just a DelegateClass instance ...
-   *     if type.equal?((type.itself_if_serialize_cast_value_compatible rescue nil))
-   *       type.serialize_cast_value(value)
-   *     else
-   *       type.serialize(value)
-   *     end
-   *   end
-   *
-   * The single faithful dispatcher for turning an already-cast value into its
-   * DB representation. Only takes the `serializeCastValue` fast-path when the
-   * type declares it compatible (serializeCastValue overridden at or above
-   * serialize); otherwise it must call full `serialize`, because a type that
-   * overrides `serialize` but not `serializeCastValue` inherits the identity
-   * `serializeCastValue` and would otherwise persist the in-memory value. The
-   * standalone `itselfIfSerializeCastValueCompatible` returns null when the
-   * method is absent — the analog of Rails' `rescue nil`.
-   */
   export function serialize(
     type: {
       serializeCastValue(value: unknown): unknown;
@@ -68,15 +29,6 @@ export namespace SerializeCastValue {
   }
 }
 
-/**
- * Standalone equivalents of `Type#itselfIfSerializeCastValueCompatible`
- * and `Type.serializeCastValueCompatible`. Both delegate to the
- * Rails-faithful ancestor-depth check on `Type` so a single source of
- * truth governs compatibility — see `type/value.ts`. Direct method/
- * static access on a `Type` instance is preferred; these wrappers
- * exist for callers that hold a structurally-typed reference rather
- * than a `Type` subclass.
- */
 type CompatibleType<T> = {
   itselfIfSerializeCastValueCompatible?: () => T | null;
 };

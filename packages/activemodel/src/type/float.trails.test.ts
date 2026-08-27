@@ -72,8 +72,6 @@ describe("FloatType (trails)", () => {
   });
 
   it("special strings are case-sensitive — lowercase variants take the to_f arm", () => {
-    // float.rb:55-58 matches "Infinity"/"-Infinity"/"NaN" exactly; anything else
-    // falls through to `value.to_f`, and "nan".to_f is 0.0.
     const type = new Types.FloatType();
     expect(type.cast("nan")).toBe(0);
     expect(type.cast("infinity")).toBe(0);

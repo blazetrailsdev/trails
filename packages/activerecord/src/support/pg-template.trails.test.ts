@@ -1,17 +1,3 @@
-/**
- * Phase 1 probe: confirms the PostgreSQL template-clone mechanism is active.
- *
- * globalSetup builds `<base>_template` once, stamps its `ar_internal_metadata`
- * with this run's canonical-schema token, then clones each advisory slot DB from it via
- * `CREATE DATABASE ... TEMPLATE`. The stamp is what makes every worker's
- * `canonicalSchemaUpToDate` report true for the worker that claims a slot, so
- * its boot takes the fast TRUNCATE path instead of a full purge+reload.
- *
- * The probe targets the template DB itself (deterministic, slot-independent)
- * rather than the worker's variably-assigned slot DB.
- *
- * Skipped automatically on sqlite/MySQL runs (ARCONN is not postgresql).
- */
 import { describe, it, expect } from "vitest";
 import pg from "pg";
 import { canonicalSchemaStamp } from "./canonical-schema-stamp.js";

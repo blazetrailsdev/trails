@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Model, ArgumentError } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 
-// Mirrors Rails' ProtectedParams stub (attribute_assignment_test.rb): a
-// params-like wrapper exposing `permitted?` and `to_h`. Trails dispatches on
-// the camelCase `permitted` / `toH` members.
 class ProtectedParams {
   private parameters: Record<string, unknown>;
   private _permitted = false;
@@ -22,9 +19,6 @@ class ProtectedParams {
     return this;
   }
 
-  // Rails ProtectedParams: `delegate :empty?, to: :@parameters`. The wrapper's
-  // own instance fields (`parameters`, `_permitted`) are NOT its contents, so
-  // emptiness must delegate to the private parameter store.
   get empty(): boolean {
     return Object.keys(this.parameters).length === 0;
   }
@@ -53,7 +47,6 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    // Rails raises UnknownAttributeError for a key with no setter / column.
     let raised: unknown;
     try {
       void p.assignAttributes({ unknown_attr: "value" });
@@ -115,8 +108,6 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     class Child extends Base {
-      // shadow with getter-only — Rails' `public_send("name=", v)` would still
-      // dispatch to Base#name=; our walk must too.
       override get name(): string {
         return super.name + "!";
       }
@@ -288,9 +279,6 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    // Empty AND unpermitted: Rails `assign_attributes` returns before
-    // sanitizing (`return if new_attributes.empty?`), so no
-    // ForbiddenAttributesError despite the wrapper being unpermitted.
     const params = new ProtectedParams({});
     expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).not.toThrow();
     expect(p._readAttribute("name")).toBeNull();

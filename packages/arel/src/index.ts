@@ -57,34 +57,24 @@ const _SqlLiteral = SqlLiteral as unknown as new (...args: unknown[]) => SqlLite
 type RuntimeModule = Record<string, (...args: unknown[]) => unknown>;
 const asRuntime = <T>(m: T): RuntimeModule => m as unknown as RuntimeModule;
 include(_Node, asRuntime(FactoryMethods));
-// Arel::Table includes FactoryMethods and AliasPredication (table.rb:5-6).
-// `Table` is a standalone class upstream (table.rb:4), so it does not inherit
-// FactoryMethods from Node the way the node tree does.
 const _Table = _TableClass as unknown as new (...args: unknown[]) => object;
 include(_Table, asRuntime(FactoryMethods));
 include(_Table, asRuntime(AliasPredication));
 include(_TreeManager, asRuntime(FactoryMethods));
-// Mirrors Rails: Arel::Nodes::NodeExpression includes Expressions,
-// Predications, AliasPredication, OrderPredications, Math.
 include(_NodeExpression, Predications);
 include(_NodeExpression, MathMixin);
 include(_NodeExpression, asRuntime(Expressions));
 include(_NodeExpression, asRuntime(AliasPredication));
 include(_NodeExpression, asRuntime(OrderPredications));
-// InfixOperation extends Binary (not NodeExpression) but includes the
-// same surface in Rails.
 include(InfixOperation, Predications);
 include(InfixOperation, MathMixin);
 include(InfixOperation, asRuntime(Expressions));
 include(InfixOperation, asRuntime(AliasPredication));
 include(InfixOperation, asRuntime(OrderPredications));
-// SqlLiteral < String in Rails; includes Expressions, Predications,
-// AliasPredication, OrderPredications.
 include(_SqlLiteral, Predications);
 include(_SqlLiteral, asRuntime(Expressions));
 include(_SqlLiteral, asRuntime(AliasPredication));
 include(_SqlLiteral, asRuntime(OrderPredications));
 include(FunctionNode, asRuntime(WindowPredications));
 include(FunctionNode, asRuntime(FilterPredications));
-// Filter includes WindowPredications (nodes/filter.rb:6).
 include(FilterNode, asRuntime(WindowPredications));

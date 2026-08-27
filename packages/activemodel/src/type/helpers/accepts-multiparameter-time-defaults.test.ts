@@ -4,13 +4,6 @@ import { include } from "@blazetrails/activesupport";
 import { Types, ValueType } from "../../index.js";
 import { AcceptsMultiparameterTime } from "./accepts-multiparameter-time.js";
 
-/**
- * `include Helpers::AcceptsMultiparameterTime.new(defaults: ...)` into a fresh
- * type, the way each type does in its own class body — the mixin's methods then
- * answer on the instance, so `cast` reaches its `::Time` assembly. The base is a
- * plain `ValueType`, since Ruby holds a module once per ancestry and each of
- * date.rb / date_time.rb / time.rb includes its own instance exactly once.
- */
 function typeIncluding(defaults?: Record<string, number>): { cast(value: unknown): unknown } {
   class IncludingType extends ValueType {}
   include(IncludingType, new AcceptsMultiparameterTime(defaults ? { defaults } : {}));

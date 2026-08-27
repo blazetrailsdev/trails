@@ -5,9 +5,6 @@ import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 import { sql } from "../arel.js";
 
-/**
- * Mirrors: Arel::Visitors::MySQL
- */
 export class MySQL extends ToSql {
   protected override visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
     collector.append("CAST(");
@@ -16,7 +13,6 @@ export class MySQL extends ToSql {
     return collector;
   }
 
-  // mysql.rb:13-15
   protected override visitArelNodesUnqualifiedColumn(
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
@@ -98,7 +94,6 @@ export class MySQL extends ToSql {
   }
 
   protected override visitArelNodesCte(o: Nodes.Cte, collector: SQLString): SQLString {
-    // mysql.rb:72-76
     collector.append(`${this.quoteTableName(o.name)} AS `);
     this.visit(o.relation, collector);
     return collector;
@@ -126,7 +121,6 @@ export class MySQL extends ToSql {
     return o;
   }
 
-  // arel/visitors/mysql.rb#build_subselect
   protected override buildSubselect(
     key: Node | Node[],
     o: {

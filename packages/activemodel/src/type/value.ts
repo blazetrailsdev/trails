@@ -12,13 +12,6 @@ export abstract class Type<T = unknown> {
     if (options?.limit !== undefined) this.#limit = options.limit;
   }
 
-  /**
-   * Rails defines `precision`, `limit` and `scale` as `attr_reader`s
-   * (value.rb:11-21), so subclasses — e.g. OID::Array's
-   * `delegate :limit, :precision, :scale, to: :subtype` — override them with
-   * live read-through methods. Expose them as getters here so subclass
-   * `override get …()` works (a getter cannot override a plain field in TS).
-   */
   get precision(): number | undefined {
     return this.#precision;
   }
@@ -43,19 +36,6 @@ export abstract class Type<T = unknown> {
     return this.cast(value);
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Value#cast (value.rb:53-55)
-   *
-   *   def cast(value)
-   *     cast_value(value) unless value.nil?
-   *   end
-   *
-   * Public coercion entrypoint. Subclasses normally override
-   * {@link castValue} (the protected hook) rather than `cast` itself,
-   * so the `value == null → null` short-circuit lives in one place.
-   * Subclasses with non-Rails-shaped coercion (e.g. Integer's blank
-   * string handling) may still override `cast` directly to match Rails.
-   */
   cast(value: unknown): T | null {
     if (value === null || value === undefined) return null;
     return this.castValue(value);
@@ -90,8 +70,6 @@ export abstract class Type<T = unknown> {
     return false;
   }
 
-  // Rails: `def map(value, &) = value` (value.rb:117-119). The block is the
-  // subtype's hook — the default drops it, OID::Range/OID::Array apply it.
   map(value: T | null, _block?: (value: unknown) => unknown): T | null {
     return value;
   }
@@ -110,19 +88,7 @@ export abstract class Type<T = unknown> {
     throw new NoMethodError("Unimplemented");
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Value#cast_value (value.rb:155-157)
-   *
-   *   def cast_value(value) # :doc:
-   *     value
-   *   end
-   *
-   * Convenience method for types which do not need separate type
-   * casting behavior for user and database inputs. Called by `cast`
-   * for non-nil values. The default passes the value through.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   protected castValue(value: unknown): T | null {
     return value as T | null;
   }
@@ -131,23 +97,6 @@ export abstract class Type<T = unknown> {
     return value;
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::SerializeCastValue#itself_if_serialize_cast_value_compatible
-   * (serialize_cast_value.rb:36-38)
-   *
-   *   def itself_if_serialize_cast_value_compatible
-   *     self if self.class.serialize_cast_value_compatible?
-   *   end
-   *
-   * Returns `this` when the type's serialize path can short-circuit
-   * through serialize_cast_value (i.e. the subclass has overridden
-   * serialize_cast_value at the same level or above its `serialize`
-   * override). Returns null otherwise. Callers can use this predicate
-   * to choose the cast-value fast-path via `serializeCastValue(...)`
-   * instead of a redundant `serialize(...)` call. Rails wires that
-   * dispatcher at `serialize_cast_value.rb:25-33`; trails callers do
-   * the same check inline against this method's truthiness.
-   */
   itselfIfSerializeCastValueCompatible(): this | null {
     return (
       this.constructor as unknown as { serializeCastValueCompatible(): boolean }
@@ -156,22 +105,7 @@ export abstract class Type<T = unknown> {
       : null;
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::SerializeCastValue::ClassMethods#serialize_cast_value_compatible?
-   * (serialize_cast_value.rb:9-12). Result is memoized on the class:
-   *
-   *   return @serialize_cast_value_compatible if defined?(@serialize_cast_value_compatible)
-   *
-   * Walks the prototype chain to compare ancestor depth of `serialize`
-   * vs `serializeCastValue` — compatible when serializeCastValue is
-   * defined at or above serialize.
-   */
   static serializeCastValueCompatible(this: { _serializeCastValueCompatible?: boolean }): boolean {
-    // Per-class memoization: JS static properties are inherited, so a
-    // subclass that overrides serialize/serializeCastValue would otherwise
-    // reuse a parent's cached result. Only treat the cache as set when it
-    // is an own property of THIS constructor — Rails caches in @ivars on
-    // the class object itself for the same reason (serialize_cast_value.rb:9-12).
     if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
       return this._serializeCastValueCompatible as boolean;
     }
@@ -202,18 +136,6 @@ export abstract class Type<T = unknown> {
 export class ValueType<T = unknown> extends Type<T> {
   readonly name: string = "value";
 
-  /**
-   * Mirrors: ActiveModel::Type::Value#type (value.rb:32-35)
-   *
-   *   def type
-   *   end
-   *
-   * Returns nil for the unmapped default. trails uses `name` as the
-   * type-name carrier (the base `Type#type` returns it), so the bare
-   * ValueType sentinel — `name === "value"` — must instead reflect as
-   * `undefined` to match Rails' nil. Subclasses set their own `name`
-   * (and usually override `type()`), so they keep reporting it.
-   */
   override type(): string | undefined {
     return this.name === "value" ? undefined : this.name;
   }

@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/select_test.rb
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
@@ -17,21 +12,7 @@ import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 registerModel(Post);
 registerModel(Comment);
 
-// ==========================================================================
-// SelectTest — targets relation/select_test.rb
-// ==========================================================================
 describe("SelectTest", () => {
-  // `fixtures` wires the handler suite internally. Mirrors Rails
-  // `fixtures :posts, :comments`; the canonical `welcome` post
-  // ("Welcome to the weblog") drives the `UPPER(title)` assertions and its
-  // `greetings` comment ("Thank you for the welcome") drives the merge tests.
-  //
-  // The `not exists` / `invalid nested field` tests deliberately SELECT against
-  // a non-existent column, which raises `StatementInvalid` and aborts the PG
-  // transaction. They still run transactionally: the fixture teardown skips its
-  // redundant DELETEs while the pinned transaction is open, so the abort no
-  // longer poisons the rollback (mirrors Rails, which runs these transactionally
-  // with no opt-out).
   fixtures(["posts", "comments"]);
   const q = (name: string) => escapeRegExp(quoteTableName(name));
 
@@ -92,12 +73,6 @@ describe("SelectTest", () => {
     const expected = new RegExp(`^SELECT ${q("foo")} AS ${q("post_title")} FROM`);
     expect(Post.select({ [":foo"]: ":post_title" } as never).toSql()).toMatch(expected);
 
-    // Rails guards the raise with `skip if sqlite3_adapter_strict_strings_disabled?`
-    // (select_test.rb:53). That guard only matters when the SQLite adapter is
-    // configured with `strict: false`, which makes a double-quoted unknown
-    // identifier (`"foo"`) parse as a string literal instead of raising. Our
-    // SQLite test adapter always runs with DQS off, so `"foo"` always errors;
-    // PG/MySQL raise too. The guard condition is therefore always false here.
     await expect(Post.select({ [":foo"]: ":post_title" } as never).take()).rejects.toThrow(
       StatementInvalid,
     );
@@ -192,7 +167,6 @@ describe("SelectTest", () => {
 
     const assertNonSelectColumnsWontBeLoaded = (post: { title: string; body: unknown }) => {
       expect(post.title).toBe("WELCOME TO THE WEBLOG");
-      // Rails: assert_raise(ActiveModel::MissingAttributeError, match: /attribute 'body' for Post/)
       expect(() => post.body).toThrow(MissingAttributeError);
       expect(() => post.body).toThrow(/attribute 'body' for Post/);
     };
@@ -222,20 +196,8 @@ describe("SelectTest", () => {
   });
 
   it("type casted extra select with eager loading", async () => {
-    // Rails reads the aliased extra select via `posts.first.foo`; trails exposes
-    // query-only aliases through `readAttribute` (no dynamic accessor is
-    // generated for non-schema columns), matching the sibling hash-select tests.
     const posts = Post.select("posts.id * 1.1 AS foo").eagerLoad(":comments");
     const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
-    // The explicit extra select is preserved through the JoinDependency and
-    // hydrated onto the base record, type-cast via the result set's column_types
-    // (mirrors Rails' JoinDependency#instantiate slicing `result_set.column_types`).
-    // Rails asserts `assert_equal 1.1, posts.first.foo`, which is numeric
-    // equality: SQLite yields a native Float, while PG (`numeric`) and MySQL
-    // (`NEWDECIMAL`) yield a BigDecimal — and Ruby's `BigDecimal == Float` is
-    // true. JS has no cross-type `===` for BigDecimal vs number, so we assert the
-    // same numeric equality (the value is now a typed numeric, not the raw "1.1"
-    // string it was before extra-select columns were cast by column type).
     const foo = post.readAttribute("foo");
     expect(Number(foo)).toBe(1.1);
     const adapterName = (Post.connection as unknown as { adapterName: string }).adapterName;
@@ -297,8 +259,6 @@ describe("SelectTest", () => {
   });
 
   it("select with block without any arguments", () => {
-    // In Ruby, `Post.select("arg") { }` passes both a column arg and a block;
-    // in TS the closest equivalent is passing a string and a function together.
     expect(() =>
       (Post.all().select as never as (...a: unknown[]) => unknown)("invalid_argument", () => {}),
     ).toThrow("`select' with block doesn't take arguments.");

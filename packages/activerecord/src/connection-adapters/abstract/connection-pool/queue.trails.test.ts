@@ -102,8 +102,6 @@ describe("ConnectionPool::Queue", () => {
     q.add(fakeConn(1));
     q.add(fakeConn(2));
 
-    // queue.rb:50-54 — `@queue.clear`; Rails manufactures no list of removed
-    // elements for callers, so neither does trails.
     q.clear();
     expect(q.length).toBe(0);
   });

@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/or_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { adapterType } from "../test-adapter.js";
@@ -13,9 +8,6 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Paragraph } from "../test-helpers/models/paragraph.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 
-// `Post` declares `has_many :categories, through: :categorizations`, whose
-// through reflection resolves Categorization during automatic-inverse /
-// class-name derivation. Rails autoloads it there; trails needs it registered.
 registerModel([Author, Post, SpecialPost, Comment, Paragraph, Categorization]);
 
 const byId = (records: any[]) =>
@@ -44,9 +36,6 @@ describe("OrTest", () => {
     expect(await Post.where("id = 1").or(Post.none())).toEqual(expected);
   });
 
-  // 2^63 overflows the int8 column range. QueryAttribute#isUnboundable() fires
-  // (query_attribute.rb:46-50) and the Arel equality visitor emits "1=0" for that
-  // predicate (to_sql.rb:643-647), so the OR collapses to id=1 only.
   it("or with large number", async () => {
     const expected = await Post.where("id = 1 or id = 9223372036854775808");
     expect(await Post.where({ id: 1 }).or(Post.where({ id: 9223372036854775808n }))).toEqual(
@@ -207,7 +196,6 @@ describe("OrTest", () => {
 
   it("or with annotate", () => {
     const quotedPosts = Post.quotedTableName();
-    // Rails anchors each match at `\z`: the annotation comment is the SQL tail.
     const tail = (sql: string) => sql.replace(/\s+/g, " ").trimEnd();
     expect(tail(Post.annotate("foo").or(Post.all()).toSql())).toMatch(
       new RegExp(`${quotedPosts} /\\* foo \\*/$`),
@@ -224,11 +212,6 @@ describe("OrTest", () => {
   });
 
   it("structurally incompatible values", () => {
-    // Rails wraps these in `assert_nothing_raised` and never executes them — it
-    // only asserts that `#or` doesn't raise on structurally-equal relations.
-    // Don't call `.toArray()`: e.g. `Post.group("author_id")` selecting
-    // `posts.*` would error on PG ("must appear in GROUP BY"), which Rails never
-    // hits because it doesn't run the query.
     let threw = false;
     try {
       Post.includes(":author").includes(":author").or(Post.includes(":author"));

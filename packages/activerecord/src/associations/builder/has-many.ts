@@ -1,8 +1,5 @@
 import { CollectionAssociation } from "./collection-association.js";
 
-/**
- * Mirrors: ActiveRecord::Associations::Builder::HasMany
- */
 export class HasMany extends CollectionAssociation {
   static override macro(): string {
     return "hasMany";

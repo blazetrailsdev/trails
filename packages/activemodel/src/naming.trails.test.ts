@@ -1,10 +1,3 @@
-/**
- * TS-only coverage that sits beside the ported `naming_test.rb` mirror in
- * `naming.test.ts`. Rails has no counterpart for these — they cover the
- * TypeScript spellings of `ActiveModel::Name` (a plain class where Rails
- * subclasses `String`) and the trails-side accessors — so they live here to
- * keep the mirrored file free of names `parity:test` reports as extra.
- */
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
@@ -46,7 +39,6 @@ describe("naming (trails-only)", () => {
       expect(name.singularRouteKey).toBe("post");
     });
     it("uncountable: routeKey gets `_index` suffix", () => {
-      // Rails naming.rb:184 — `@route_key << "_index" if @uncountable`.
       const name = new ModelName("Sheep");
       expect(name.plural).toBe("sheep");
       expect(name.routeKey).toBe("sheep_index");
@@ -66,10 +58,6 @@ describe("naming (trails-only)", () => {
     });
 
     it("uncountable full singular leaves collection on tableize's own inflection", () => {
-      // `@plural` is `pluralize(@singular)` and `@collection` is
-      // `tableize(@name)` (naming.rb:174, :178) — two independent inflections,
-      // so an uncountable registered on the `_`-joined singular does not reach
-      // the `/`-joined path form.
       Inflections.instance("en").uncountable("legal_status");
       const name = new ModelName("Legal::Status");
       expect(name.singular).toBe("legal_status");
@@ -116,10 +104,6 @@ describe("naming (trails-only)", () => {
     });
 
     it("match stays stable when reusing global and sticky regexps", () => {
-      // RegExp.prototype.test advances `lastIndex` on /g and /y flags, so a
-      // second call on the same regex can flip false without care. Our
-      // `match` saves/restores `lastIndex` so repeated calls are stable
-      // (Ruby `match?` is stateless).
       const mn = new ModelName("BlogPost");
       const globalRe = /Post/g;
       const stickyRe = /Blog/y;
@@ -167,9 +151,6 @@ describe("naming (trails-only)", () => {
       expect(adminPost.compare(blogPost)).toBe(-1);
       expect(blogPost.compare(blogPost2)).toBe(0);
 
-      // String coercion yields the full qualified constant path, matching
-      // Rails' `@name` (`"Blog::Post"`). A bare-name string is therefore not
-      // equal to a namespaced model.
       expect(String(blogPost)).toBe("Blog::Post");
       expect(String(adminPost)).toBe("Admin::Post");
       expect(blogPost.equals("Post")).toBe(false);
@@ -177,10 +158,6 @@ describe("naming (trails-only)", () => {
     });
 
     it("compare sorts by full qualified path, not bare name first", () => {
-      // Covers the Rails `String#<=>` parity: ordering is determined by
-      // the full namespace+name path as a single string — so a model
-      // under an earlier-sorting namespace outranks a later-sorting
-      // namespace even when its bare name comes later alphabetically.
       const adminOther = new ModelName("Admin::Other");
       const blogPost = new ModelName("Blog::Post");
       expect(adminOther.compare(blogPost)).toBe(-1);
@@ -191,10 +168,6 @@ describe("naming (trails-only)", () => {
     });
 
     it("== operator coerces via Symbol.toPrimitive to the class name", () => {
-      // Rails `model_name == "Post"` is true because Name < String.
-      // JS `==` between object and string triggers primitive coercion,
-      // which Symbol.toPrimitive steers at the class name — so the
-      // Rails-shaped comparison works verbatim.
       const mn: unknown = new ModelName("Post");
 
       expect(mn == "Post").toBe(true);
@@ -203,8 +176,6 @@ describe("naming (trails-only)", () => {
     });
 
     it("asJson / JSON.stringify emits the plain class name", () => {
-      // Rails `String#as_json` returns the string; `Name.new(BlogPost).to_json`
-      // emits '"BlogPost"', not a hash form.
       const mn = new ModelName("BlogPost");
       expect(mn.asJson()).toBe("BlogPost");
       expect(JSON.stringify(mn)).toBe('"BlogPost"');
@@ -241,8 +212,6 @@ describe("naming (trails-only)", () => {
       Inflections.instance("es").singular(/es$/, "");
       const name = new ModelName("Ley", undefined, undefined, "es");
       expect(name.plural).toBe("leyes");
-      // Rails' `@collection = tableize(@name)` (naming.rb:178) takes no locale,
-      // so the collection stays on the default `:en` inflections.
       expect(name.collection).toBe("leys");
       expect(name.routeKey).toBe("leyes");
       expect(name.singularRouteKey).toBe("ley");

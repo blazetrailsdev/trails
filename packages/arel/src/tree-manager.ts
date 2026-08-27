@@ -6,12 +6,6 @@ import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
 import { ArelError } from "./errors.js";
 
-/**
- * Methods from Arel::TreeManager::StatementMethods — mixed into
- * DeleteManager and UpdateManager in Rails (NOT SelectManager or
- * InsertManager). Apply with `include(Cls, StatementMethods)` from
- * @blazetrails/activesupport.
- */
 type StatementMethodsHost = {
   ast: {
     key?: unknown;
@@ -78,14 +72,10 @@ export abstract class TreeManager {
     return collector.value;
   }
 
-  /** Mirrors: Arel::TreeManager#to_sql (arel/tree_manager.rb:53). */
   toSql(engine: ArelEngine | null = _engine.current): string {
     return this.ast.toSql(engine);
   }
 
-  // Mirrors Arel::TreeManager#initialize_copy (tree_manager.rb:60-63), which
-  // Ruby runs for `#clone`: the AST is duplicated so a cloned manager does not
-  // share it with the original.
   clone(): this {
     const copy = objectClone(this);
     copy.ast = cloneSlot(this.ast);

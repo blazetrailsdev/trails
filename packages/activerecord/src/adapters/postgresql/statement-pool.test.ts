@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/statement_pool_test.rb
- */
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
@@ -33,9 +30,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("statement pool max", async () => {
-      // Rails' matching test sets statement_limit = 1 and asserts LRU
-      // eviction. The limit is constructor-only (statement_pool.rb:10-13), so
-      // the adapter is built at the limit under test.
       const limited = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: 1 });
       await limited.beginDbTransaction();
       try {
@@ -57,10 +51,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.executeMutation(`INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`, ["a"]);
         await adapter.executeMutation(`INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`, ["b"]);
         const pool = adapter._statements;
-        // Both INSERTs share the same SQL template → single cached
-        // plan. Rails exec_cache backs exec_insert the same way.
-        // The statement key is the RETURNING-rewritten form, so only
-        // one entry — the two mutations reused the plan.
         expect(pool.length).toBe(1);
       } finally {
         await adapter.rollback();
@@ -88,37 +78,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       const pool = adapter._statements;
       await adapter.rollback();
       await adapter.close();
-      // After close the driver pool has ended the client, so DEALLOCATE
-      // can't route anywhere. The fire-and-forget catch in dealloc()
-      // must swallow the failure rather than surface an unhandled
-      // rejection. Mirrors Rails' PG::StatementPool#dealloc which
-      // rescues PG::InvalidSqlStatementName and connection errors.
       expect(() => pool.clear()).not.toThrow();
     });
 
     it("prepared statements do not get stuck on query interruption", async () => {
-      // Rails' equivalent stubs `get_last_result` to raise after PREPARE,
-      // simulating a lost ack while the server has the statement. pg-js
-      // doesn't expose that hook, so we test the closest observable
-      // property: an execute-time error (outside a transaction, so the
-      // session is still usable) must not prevent a later query from
-      // reusing the prepared plan. Mirrors the spirit of
-      // `test_prepared_statements_do_not_get_stuck_on_query_interruption`
-      // in activerecord/test/cases/adapters/postgresql/statement_pool_test.rb.
       await expect(adapter.execute("SELECT 1 / $1::int", [0])).rejects.toThrow();
       const rows = await adapter.execute("SELECT 1 / $1::int", [1]);
       expect(rows[0]).toBeDefined();
     });
 
     it("PreparedStatementCacheExpired is exported for txn-retry callers", async () => {
-      // In-txn `exec_cache` can't transparently retry a cached-plan
-      // failure — any error aborts the enclosing txn, so subsequent
-      // commands raise 25P02 InFailedSqlTransaction. Rails raises
-      // `PreparedStatementCacheExpired` for the transaction machinery
-      // to catch and retry the whole txn. Triggering a real 0A000
-      // requires DDL on a referenced object between two queries in
-      // the same txn (covered by txn retry suite); here we just
-      // verify the error class round-trips.
       const { PreparedStatementCacheExpired } = await import("../../errors.js");
       expect(new PreparedStatementCacheExpired("test").name).toBe("PreparedStatementCacheExpired");
     });
@@ -144,9 +113,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("passes a non-boolean preparedStatements config through as Rails does", async () => {
-      // abstract_adapter.rb:159 pipes the config through
-      // `type_cast_config_to_boolean`, which maps the string `"false"` to
-      // `false` and returns everything else UNCHANGED (abstract_adapter.rb:65-71).
       const cast = new PostgreSQLAdapter({
         connectionString: PG_TEST_URL,
         preparedStatements: "false" as unknown as boolean,
@@ -156,8 +122,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       } finally {
         await cast.close();
       }
-      // `0` survives the cast and is truthy in Ruby, so
-      // `prepared_statements?` (abstract_adapter.rb:234-235) answers true.
       const zero = new PostgreSQLAdapter({
         connectionString: PG_TEST_URL,
         preparedStatements: 0 as unknown as boolean,
@@ -193,11 +157,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("clearCacheBang clears the just-released txn pool when called post-rollback", async () => {
-      // TransactionManager calls `clearCacheBang` AFTER `rollback()`
-      // (Rails' after_failure_actions ordering). With the single
-      // persistent connection, the StatementPool stays attached
-      // through commit/rollback — clearCacheBang issues DEALLOCATE
-      // per cached entry on the live connection.
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       await adapter.execute("SELECT $1::text", ["a"]);

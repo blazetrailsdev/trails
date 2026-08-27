@@ -1,24 +1,3 @@
-/**
- * Canonical test-schema loader — the `ActiveRecord::Schema.define` equivalent.
- *
- * A hand-written sequence of real `connection.createTable(name, opts, t => …)`
- * block calls that lays down the canonical AR test schema, mirroring
- * `vendor/rails/activerecord/test/schema/schema.rb`. Wired into
- * `template-global-setup.ts` so the schema is laid once at boot for every
- * adapter (SQLite / PostgreSQL / MySQL). It produces byte-for-byte the same
- * schema `defineSchema(TEST_SCHEMA)` did — the schema-dumper parity gate for
- * RFC 0059 Phase 1 — while removing the bespoke `defineSchema` DSL from the
- * boot path. `defineSchema` stays live in parallel until phases 2–4 retire it.
- *
- * This module holds only the schema.rb transcription and the loader that lays
- * it. The per-worker drop/rebuild machinery — an invention with no Rails
- * counterpart, since Rails' suite is one process against one database — lives
- * next door in `canonical-table-rebuild.ts` and consumes the registry exported
- * here.
- *
- * Hard rules: no `node:*` imports, no `process.*`, async fs only.
- */
-
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "../errors.js";
@@ -54,11 +33,6 @@ interface ColOpts {
 }
 
 interface IndexOpts {
-  /**
-   * Restrict the index to these adapters, mirroring schema.rb's inline
-   * `if ActiveRecord::TestCase.current_adapter?(...)` gate (e.g. the MySQL-only
-   * `full_name_index`, schema.rb:426). Omitted = all adapters.
-   */
   adapters?: readonly string[];
   unique?: boolean;
   where?: string;
@@ -70,14 +44,6 @@ interface IndexOpts {
   type?: string;
 }
 
-/**
- * Thin `create_table` block builder. Each `t.<type>()` maps to the same
- * `t.column(name, mappedType, options)` call `defineSchema` emits — including
- * the per-adapter type map, the single-column serial PK emitted inline at its
- * declared offset and the MySQL `DATETIME(6)` upgrade — so the resulting DDL is
- * identical. Indexes are collected and applied after the
- * table is created (with the same expression-index / MySQL-length gating).
- */
 class TableBuilder {
   readonly indexes: { columns: string | string[]; opts: IndexOpts }[] = [];
 
@@ -106,13 +72,6 @@ class TableBuilder {
     } else if (o.default !== undefined) {
       options["default"] = o.default;
     }
-    // Composite-PK columns get no forced NOT NULL: schema.rb:243-250 declares
-    // them bare and visit_PrimaryKeyDefinition (schema_creation.rb:79-81) emits
-    // only `PRIMARY KEY (a, b)`. SQLite does admit NULLs in a non-INTEGER PK,
-    // but Rails runs its own suite against that, so adding one here to match
-    // PG/MySQL would be a deviation, not a transcription.
-    // MySQL DATETIME without precision = DATETIME(0); upgrade to DATETIME(6)
-    // unless an explicit precision (incl. null) opted out.
     if (
       this.adapterName === "mysql2" &&
       primitive === "datetime" &&
@@ -161,12 +120,6 @@ class TableBuilder {
     this.col(name, "json", o);
   }
 
-  /**
-   * schema.rb's `t.foreign_key :to_table, column:, primary_key:, name:`. The
-   * constraint is carried on the TableDefinition, so every adapter emits it
-   * inline in the CREATE TABLE — the only form SQLite accepts (it has no
-   * `ALTER TABLE … ADD CONSTRAINT`).
-   */
   foreignKey(toTable: string, opts: Partial<AddForeignKeyOptions> = {}): void {
     this.t.foreignKey(toTable, opts);
   }
@@ -175,47 +128,18 @@ class TableBuilder {
     this.indexes.push({ columns, opts });
   }
 
-  /**
-   * schema.rb's trailing `add_check_constraint :products, …` (schema.rb:1020).
-   * Carried on the TableDefinition so every adapter emits it inline in the
-   * CREATE TABLE — the only form SQLite accepts, and the form that survives the
-   * per-worker drop/rebuild, which replays the block rather than the schema file.
-   */
   checkConstraint(expression: string, opts: { name?: string } = {}): void {
     this.t.checkConstraint(expression, opts);
   }
 }
 
 interface TableMeta {
-  /** Suppress the implicit auto-increment `id` (Rails `create_table id: false`). */
   id?: false;
-  /** Composite / non-`id` string PK (Rails `primary_key:` array form). */
   primaryKey?: string[];
-  /** Single-column integer PK emitted inline as a serial (Rails `t.primary_key`). */
   serialPk?: string;
-  /**
-   * `schema.rb:1444-1460` creates this table through the *second* connection
-   * (`Course`/`College`/`Professor.lease_connection`), so it belongs to
-   * `arunit2` and never to the primary `arunit` database.
-   * {@link loadCanonicalSchema} skips it; {@link loadCanonicalArunit2Schema}
-   * lays it in arunit2 for `setup-second-pool.ts`.
-   */
   arunit2?: true;
 }
 
-/**
- * Apply a table's collected indexes with the schema.rb gating both surviving
- * schema loaders share: an expression index (`"(lower(x))"` — a string column
- * with non-word chars) is skipped on adapters without
- * `supports_expression_index?`. The MySQL-only sub-part `length:` no longer
- * needs gating here — the abstract SchemaCreation visitor now drops it on
- * non-MySQL adapters (matching Rails), so it is passed through unconditionally
- * and silently ignored on PG/SQLite. Exported so the `schema-file-generator.ts`
- * parity guard can pin
- * `generateSchemaFile` against the *real* gating code here — this module outlives
- * `defineSchema` (RFC 0059 phase 4 retires the DSL), so the guard anchors to a
- * survivor, not a copy.
- */
 export async function emitTableIndexes(
   ss: {
     addIndex(
@@ -231,7 +155,6 @@ export async function emitTableIndexes(
   for (const { columns, opts } of indexes) {
     const isExpression = typeof columns === "string" && /\W/.test(columns);
     if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
-    // schema.rb's inline current_adapter? gate (e.g. the MySQL-only full_name_index).
     if (opts.adapters && !opts.adapters.includes(adapter.adapterName)) continue;
     await ss.addIndex(table, columns, {
       unique: opts.unique,
@@ -246,24 +169,14 @@ export async function emitTableIndexes(
   }
 }
 
-/** One canonical table's definition: its name, table-level metadata, and the
- *  column/index builder block. Pure data (no adapter, no DDL), so a named subset
- *  can be dropped and recreated on demand (see `rebuildCanonicalTables` in
- *  `canonical-table-rebuild.ts`). */
 interface CanonicalTableDef {
   name: string;
   meta: TableMeta;
   fn: (t: TableBuilder) => void;
 }
 
-/** Memoized ordered registry, built once per module instance. */
 let _registry: CanonicalTableDef[] | null = null;
 
-/**
- * Resolve the adapter's schema-statement helper and per-adapter column type map.
- *
- * Shared with `canonical-table-rebuild.ts`.
- */
 export async function prepareSchema(
   adapter: DatabaseAdapter,
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
@@ -277,12 +190,6 @@ export async function prepareSchema(
   return { ss, typeMap };
 }
 
-/**
- * Create one canonical table (and its indexes) from its definition, emitting the
- * same DDL `defineSchema` did.
- *
- * Shared with `canonical-table-rebuild.ts`.
- */
 export async function runTable(
   adapter: DatabaseAdapter,
   ss: SchemaStatements,
@@ -291,9 +198,6 @@ export async function runTable(
 ): Promise<void> {
   const { name, meta, fn } = def;
   const createOpts: { id?: false; primaryKey?: string[] } = {};
-  // Rails spells a composite PK `create_table t, primary_key: [...]` with the
-  // default `id` — `id: false` would skip set_primary_key's `if id` guard
-  // entirely (schema_definitions.rb:395).
   if (meta.primaryKey !== undefined) {
     createOpts.primaryKey = meta.primaryKey;
   } else if (meta.id === false || meta.serialPk !== undefined) {
@@ -305,23 +209,9 @@ export async function runTable(
     fn(builder);
   });
 
-  // Expression-index / MySQL-length gating (mirroring schema.rb) lives in the
-  // shared, exported emitTableIndexes so the generator parity guard can pin
-  // against the real code rather than a copy.
   await emitTableIndexes(ss, adapter, name, builder.indexes);
 }
 
-/**
- * Build (once) the ordered registry of canonical table definitions. The body is
- * the hand-written `create_table` sequence mirroring
- * `vendor/rails/activerecord/test/schema/schema.rb`; here `define` only records
- * each table, so the same data drives both the full boot-time lay
- * ({@link loadCanonicalSchema}) and a named-subset rebuild
- * (`rebuildCanonicalTables`, `canonical-table-rebuild.ts`).
- *
- * The registry is the one declaration site for every canonical table;
- * `canonical-table-rebuild.ts` reads it rather than restating any of them.
- */
 export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   if (_registry) return _registry;
   const tables: CanonicalTableDef[] = [];
@@ -532,9 +422,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.datetime("updated_at", { null: false });
   });
 
-  // Rails: `create_table :old_cars, id: :integer` — an integer (not bigint) PK,
-  // load-bearing for the mysql2 adapter FK type-mismatch tests, which reference
-  // old_cars.id from a bigint `<ref>_id` column and expect MismatchedForeignKey.
   await define("old_cars", { serialPk: "id" }, (t) => {
     t.integer("id");
   });
@@ -761,7 +648,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.index("(CASE WHEN rating > 0 THEN lower(name) END) DESC", {
       name: "company_expression_index",
     });
-    // schema.rb:426 — MySQL-only functional index (current_adapter?(:Mysql2, :Trilogy)).
     t.index("(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))", {
       name: "full_name_index",
       adapters: ["mysql2"],
@@ -1071,11 +957,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
-  // schema.rb declares `students` *after* `lessons_students` (schema.rb:715-724)
-  // and joins them with a standalone `add_foreign_key` (schema.rb:726). The
-  // registry has no post-table statement, so the FK rides inside the
-  // `lessons_students` block and `students` is laid first — the referenced
-  // table has to exist by then on PG/MySQL.
   await define("students", {}, (t) => {
     t.string("name");
     t.boolean("active");
@@ -1362,9 +1243,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("posts", {}, (t) => {
-    // Rails: `t.references :author` — references default `index: true`, so
-    // schema.rb emits index_posts_on_author_id (load-bearing for the SQLite
-    // explain eager-loading plan: SEARCH posts USING INDEX, not SCAN).
     t.bigInteger("author_id");
     t.index("author_id", { name: "index_posts_on_author_id" });
     t.string("title", { null: false });
@@ -1813,9 +1691,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("fk_test_has_fk", {}, (t) => {
-    // `t.references :fk, null: false` (schema.rb:1393): a bigint column plus the
-    // default index `t.references` builds — the sibling table at schema.rb:1403
-    // opts out with `index: false`, this one does not.
     t.bigInteger("fk_id", { null: false });
     t.index("fk_id");
     t.foreignKey("fk_test_has_pk", { column: "fk_id", name: "fk_name", primaryKey: "pk_id" });
@@ -1824,9 +1699,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("fk_object_to_point_tos", {}, (t) => {});
 
   await define("fk_pointing_to_non_existent_objects", {}, (t) => {
-    // Rails declares this via `t.references :fk_object_to_point_to` (schema.rb:1403),
-    // which defaults to bigint — and `fk_that_will_be_broken` below points it at a
-    // default bigint `id`, so an integer column is a MismatchedForeignKey on MySQL.
     t.bigInteger("fk_object_to_point_to_id", { null: false });
     t.foreignKey("fk_object_to_point_tos", {
       column: "fk_object_to_point_to_id",
@@ -1874,8 +1746,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("courses", { arunit2: true }, (t) => {
     t.string("name", { null: false });
     t.integer("college_id");
-    // `t.column :college_id, :integer, index: true` (schema.rb:1446); `column`
-    // turns `index: true` into an index entry (schema_definitions.rb:499-501).
     t.index("college_id");
   });
 
@@ -2177,41 +2047,15 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   return tables;
 }
 
-/**
- * Lay the full canonical AR test schema onto a freshly-created (empty) database.
- * The template DB is built once at boot, so — unlike `defineSchema` — this issues
- * no drops, no signature-cache bookkeeping, and no schema-cache warming.
- *
- * `arunit2`-only tables are skipped: `schema.rb:1444-1460` creates them through
- * the second connection, so Rails' primary `arunit` database never carries them.
- *
- * Plumbing for the boot/template setup paths only. Do NOT call this
- * from a `*.test.ts` file — wire the canonical schema + fixtures through the
- * `fixtures({ ... })` helper, which is the sanctioned public test surface. The
- * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces this.
- */
 export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<void> {
   const { ss, typeMap } = await prepareSchema(adapter);
   for (const def of await buildCanonicalRegistry()) {
     if (def.meta.arunit2) continue;
     await runTable(adapter, ss, typeMap, def);
   }
-  // create_table/drop_table clear the connection's prepared statements in Rails;
-  // mirror that so PostgreSQL doesn't reuse a stale cached plan (0A000).
   await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }
 
-/**
- * The arunit2 half of `schema.rb`: `schema.rb:1444-1460` creates `colleges`,
- * `courses`, `professors` and `courses_professors` through the *second*
- * connection (`Course`/`College`/`Professor.lease_connection`), which is why
- * {@link loadCanonicalSchema} skips them. Rails writes them `force: true`, so a
- * reused arunit2 database carrying stale shapes is replaced rather than kept.
- *
- * Plumbing for `setup-second-pool.ts`, the trails stand-in for the `db:create`
- * step Rails runs in front of `schema.rb`. Same rule as
- * {@link loadCanonicalSchema}: never call it from a `*.test.ts` file.
- */
 export async function loadCanonicalArunit2Schema(adapter: DatabaseAdapter): Promise<void> {
   const { ss, typeMap } = await prepareSchema(adapter);
   for (const def of await buildCanonicalRegistry()) {
@@ -2222,20 +2066,8 @@ export async function loadCanonicalArunit2Schema(adapter: DatabaseAdapter): Prom
   await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }
 
-/** Memoized dependent-table edges, built once per module instance. */
 let _dependents: Map<string, string[]> | null = null;
 
-/**
- * Map of referenced table -> tables whose definition declares a foreign key into
- * it. Built by replaying each table's block against a probe TableDefinition that
- * records `foreignKey` calls and discards columns, so the edges come from the
- * one declaration site rather than a hand-maintained second list.
- *
- * Read by `canonical-table-rebuild.ts` to widen a drop set. It lives
- * here, next to the registry it replays, so `TableBuilder` stays file-local:
- * exporting the class would publish all fifteen of its `t.<type>()` members as
- * extra TS surface just to let a sibling module construct one throwaway probe.
- */
 export async function canonicalForeignKeyDependents(): Promise<Map<string, string[]>> {
   if (_dependents) return _dependents;
   const dependents = new Map<string, string[]>();
@@ -2255,41 +2087,6 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
   return dependents;
 }
 
-/**
- * Declarative view of the registry: table -> column -> `ColumnSpec`, derived by
- * replaying every `create_table` block against a probe that records columns
- * instead of emitting DDL. This is what lets `parity:schema` diff the
- * transcription that actually lays the tables against `schema.rb`, rather than
- * only the parallel `TEST_SCHEMA` map (which lays nothing).
- *
- * The replay pins the SQLite adapter deliberately: it is the one adapter whose
- * type map is a near-identity and whose column path applies no adapter munging
- * (no MySQL `DATETIME(6)` upgrade, no `serial` PK rewrite), so what comes back
- * is the *declared* shape rather than one adapter's rendering of it. The probe
- * is likewise built with no `serialPk`, so `col`'s generic branch runs for every
- * column — the one branch it skips *discards* the declared options wholesale in
- * favour of `serialIdType` + `{primaryKey: true}`. Composite-PK columns need no
- * such handling any more: `col` no longer rewrites them, so what they declare is
- * what the DDL carries.
- * Taking the generic branch is therefore the right reading, but only while no
- * `serialPk` column declares something that branch would have rewritten;
- * {@link assertSerialPkIsPlainIntegral} fails loudly the moment one does, rather
- * than letting the replay report a shape the real DDL never had.
- *
- * The wrapper form carries what `TEST_SCHEMA` spells alongside its columns: the
- * index list, the inline foreign keys and the table-level primary key.
- * `serialPk` transcribes as the one-column `primaryKey` array `TEST_SCHEMA`
- * spells the same declaration with (`auto_id_tests`, test-schema.ts:134-144);
- * the serial rendering is the loader's business. A composite `column:` /
- * `primary_key:` collapses to its comma-joined spelling, `ForeignKeySpec` being
- * single-column as every canonical `t.foreignKey` is today. An omitted
- * `column:` defaults the way `foreign_key_column_for` does
- * (schema_statements.rb:1241-1244): the singularized table name plus `_id`.
- *
- * Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
- * registry it replays, for the same reason as
- * {@link canonicalForeignKeyDependents}: `TableBuilder` stays file-local.
- */
 export async function canonicalRegistrySchema(): Promise<Schema> {
   const schema: Schema = {};
   for (const def of await buildCanonicalRegistry()) {
@@ -2347,21 +2144,6 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
   return schema;
 }
 
-/**
- * Guard the one place the replay's generic branch and the real `serialPk` branch
- * can disagree. `TableBuilder.col` renders a `serialPk` column as
- * `serialIdType(primitive, adapter)` with `{primaryKey: true}` and nothing else,
- * so a declared `limit`/`default`/`precision`/`scale` never reaches the DDL.
- * The declared *type* does survive — `serialIdType` reads it, so `integer`
- * renders as `serial`/`integer` and `big_integer` as `bigserial`/`bigint`
- * (`integer` on SQLite, whose rowid alias must be INTEGER either way). A plain
- * `t.integer(pk)` / `t.bigInteger(pk)` (optionally spelling out the `null: false`
- * a primary key has regardless) is therefore the only form where "declared" and
- * "rendered" agree, which is every live `serialPk` column today. Anything else
- * must teach
- * {@link canonicalRegistrySchema} how to compare the rendered form instead of
- * being silently mis-reported.
- */
 function assertSerialPkIsPlainIntegral(
   table: string,
   column: string,
@@ -2384,14 +2166,6 @@ function assertSerialPkIsPlainIntegral(
   );
 }
 
-/**
- * The object form of a column the replay recorded. A missing entry means `meta`
- * names a primary-key column no `t.<type>()` call in the block declares — a
- * typo'd name that would otherwise sail past both guards — and the shorthand
- * string form is unreachable because {@link specFromColumnCall} always builds the
- * object form; both are raised rather than skipped, so neither can rot into a
- * silent no-op.
- */
 function declaredSpec(
   table: string,
   column: string,
@@ -2412,8 +2186,6 @@ function declaredSpec(
   return spec;
 }
 
-/** Rebuilds a `ColumnSpec` from the `t.column(name, type, options)` call the
- *  replay observed, undoing the one type-map rename SQLite applies. */
 function specFromColumnCall(type: string, options: Record<string, unknown>): ColumnSpec {
   const spec: Exclude<ColumnSpec, string> = {
     type: (type === "bigint" ? "big_integer" : type) as AnyPrimitiveColumnSpec,

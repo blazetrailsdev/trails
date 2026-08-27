@@ -1,32 +1,23 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/copy_table_test.rb
- */
 import { it, expect } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 
-// Rails calls the private `copy_table` with `{ temporary: true }.merge(options)`.
 function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {
   return conn.copyTable(from, to, { temporary: true, ...options });
 }
 
-// Rails: table_structure(table).map { |column| column["name"] }
 async function columnNames(conn: any, table: string): Promise<unknown[]> {
   const structure = await conn.tableStructure(table);
   return structure.map((column: Record<string, unknown>) => column["name"]);
 }
 
-// Rails: select_all("SELECT #{column} FROM #{table} ORDER BY id").map { |row| row[column] }
 async function columnValues(conn: any, table: string, column: string): Promise<unknown[]> {
   const rows = await conn.execute(`SELECT ${column} FROM ${table} ORDER BY id`);
   return rows.map((row: Record<string, unknown>) => row[column]);
 }
 
-// Rails: indexes(table).delete(:name). Ruby's Array#delete returns the deleted
-// element or nil; no IndexDefinition equals the symbol :name, so this is always
-// nil — mirror that exactly.
 async function tableIndexesWithoutName(conn: any, table: string): Promise<unknown> {
   const indexes = await conn.indexes(table);
   const at = indexes.indexOf("name");
@@ -35,7 +26,6 @@ async function tableIndexesWithoutName(conn: any, table: string): Promise<unknow
   return "name";
 }
 
-// Rails: select_one("SELECT COUNT(*) AS count FROM #{table}")["count"]
 async function rowCount(conn: any, table: string): Promise<unknown> {
   const rows = await conn.execute(`SELECT COUNT(*) AS count FROM ${table}`);
   return rows[0]["count"];
@@ -68,14 +58,7 @@ async function testCopyTable(
   } catch {}
 }
 
-// -- Rails test class: copy_table_test.rb (ActiveRecord::SQLite3TestCase) --
-// `copy_table` and `table_structure` are SQLite-specific private adapter methods
-// and the assertions probe SQLite identifier quoting / PRAGMA structure, so this
-// must skip when the handler connection is PG/MySQL in the CI matrix.
 describeIfSqlite("CopyTableTest", () => {
-  // Rails `fixtures :customers`. The canonical tables — including the
-  // copy_table source tables (comments, owners, …) — come from the template
-  // clone.
   fixtures(["customers"]);
 
   it("copy table", async () => {
@@ -104,8 +87,6 @@ describeIfSqlite("CopyTableTest", () => {
       async (from, to) => {
         const expected = await columnValues(conn, from, "name");
         expect(await columnValues(conn, to, "person_name")).toEqual(expected);
-        // Rails `assert_predicate expected, :any?`: Ruby's blockless `any?` is
-        // truthy for everything except nil/false, so 0/"" count as present.
         expect(expected.some((v) => v !== null && v !== undefined && v !== false)).toBe(true);
       },
     );
@@ -113,7 +94,6 @@ describeIfSqlite("CopyTableTest", () => {
 
   it("copy table allows to pass options to create table", async () => {
     const conn = (await Base.leaseConnection()) as any;
-    // testCopyTable drops `blocker_table` (its `to`) at the end, mirroring Rails.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await conn.createTable("blocker_table");
     await testCopyTable(conn, "customers", "blocker_table", { force: true });

@@ -1,19 +1,6 @@
 import { Attribute, FromUser, _registerUserProvidedDefault } from "../attribute.js";
 import { Type } from "../type/value.js";
 
-/**
- * Attribute with a user-provided default value, which may be a function (Proc).
- *
- * Mirrors: ActiveModel::Attribute::UserProvidedDefault
- *
- * Rails stores the raw Proc in @user_provided_value and lazily evaluates it
- * via value_before_type_cast. The class-level _default_attributes cache holds
- * unevaluated UserProvidedDefault instances, so each `deep_dup` copy memoizes
- * the Proc's result for itself — Rails defines no `initialize_dup` here.
- *
- * We pass a sentinel to the super constructor so valueBeforeTypeCast is never
- * read from the base class — all access goes through our override.
- */
 export class UserProvidedDefault extends FromUser {
   /** @internal */
   readonly userProvidedValue: unknown;
@@ -25,11 +12,6 @@ export class UserProvidedDefault extends FromUser {
     this.userProvidedValue = value;
   }
 
-  /**
-   * Lazily evaluate function defaults, memoize scalar defaults.
-   * Matches Rails: value_before_type_cast calls @user_provided_value.call
-   * for Procs and memoizes the result.
-   */
   override get valueBeforeTypeCast(): unknown {
     if (typeof this.userProvidedValue === "function") {
       if (!this._hasMemoizedVBTC) {

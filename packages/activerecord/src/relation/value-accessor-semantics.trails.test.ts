@@ -1,12 +1,3 @@
-/**
- * Rails-fidelity semantics for the `Relation::VALUE_METHODS`-generated value
- * accessors (query_methods.rb:162-181): the `joins_values=` split-routing
- * writer, the nil-vs-false tri-state of the single-value flags, and the
- * stored-reference reader semantics of the array readers. These exercise
- * trails-specific storage details (the unified `joins_values` store,
- * the `boolean | null` flag fields), so the names are descriptive rather
- * than mirrored from a metaprogrammed Rails test.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
@@ -17,7 +8,6 @@ import { EXCEPT_ONLY_KEYS } from "./query-methods.js";
 import { WhereClause } from "./where-clause.js";
 
 fixtures([]);
-/** The split join-storage and group fields the reader semantics build on. */
 type JoinInternals = {
   joinsValues: unknown[];
   groupValues: string[];
@@ -72,7 +62,6 @@ describe("Relation value accessor Rails semantics", () => {
     rel.readonlyValue = false;
     expect(rel.readonlyValue).toBe(false);
     expect(rel.isReadonly).toBe(false);
-    // relation.rb:1278-1280 — `readonly?` IS `readonly_value`, so unset is nil.
     expect(relation().isReadonly).toBeNull();
   });
 
@@ -111,11 +100,6 @@ describe("Relation value accessor Rails semantics", () => {
   });
 
   it("an unset clause reader hands back a fresh clause, so only the writer persists", () => {
-    // `where_clause` defaults to `Relation::WhereClause.empty` — a NEW instance
-    // per call while the `:where` key is absent, unlike the array readers'
-    // shared FROZEN_EMPTY_ARRAY. Callers that append must go through the writer
-    // (Rails' `scope.where_clause += item.where_clause`,
-    // association_scope.rb:153); mutating the value a reader returned is lost.
     const rel = relation();
     expect(rel.whereClause).not.toBe(rel.whereClause);
 
@@ -127,10 +111,6 @@ describe("Relation value accessor Rails semantics", () => {
   });
 
   it("values() covers exactly the Relation::VALUE_METHODS key set", () => {
-    // `values` is `@values.dup` (relation.rb:1281-1283), so it carries only the
-    // keys actually set — a fresh relation has none — and every key it can
-    // carry is a `Relation::VALUE_METHODS` entry, which is what `except`/`only`
-    // slice against (spawn_methods.rb:59-68).
     expect(Object.keys(Post.all().values())).toEqual([]);
     const rel = Post.all().order("id").limit(2).distinct();
     expect(new Set(Object.keys(rel.values()))).toEqual(new Set(["order", "limit", "distinct"]));

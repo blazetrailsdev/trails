@@ -2,11 +2,6 @@ import { describe, it, expect } from "vitest";
 import { testConnection } from "../test-helpers/connection.js";
 import { Table, star, Nodes, Visitors } from "../index.js";
 
-// TS-only coverage for the `when Enumerable` arm of Attribute#in / #notIn
-// (arel/predications.rb:65-74, 112-121). Ruby's Enumerable spans Set, Hash and
-// Range as well as Array, so the port matches any JS iterable rather than
-// Array.isArray. Rails has no equivalent test because in Ruby these are all
-// simply Enumerable; the distinction only exists on this side of the port.
 describe("AttributeTest (trails)", () => {
   const users = new Table("users");
   const visitor = new Visitors.ToSql(testConnection);
@@ -41,10 +36,6 @@ describe("AttributeTest (trails)", () => {
       );
     });
 
-    // The Hash half of the decided split (see isEnumerable in predications.ts):
-    // a Map is the Ruby Hash analogue, so it expands into PAIRS exactly as
-    // Rails' `in({a: 1})` does — distinct from iterating `.keys()`. The
-    // object-literal half is pinned by the scalar-arm test above.
     it("expands a Map into pairs, matching Ruby's Enumerable Hash", () => {
       const attribute = users.get("id");
       const map = new Map<string, number>([
@@ -90,9 +81,6 @@ describe("AttributeTest (trails)", () => {
     });
   });
 
-  // Ruby's Range has no two-argument spelling — Rails' between/not_between
-  // only accept a Range, so the (begin, end) overload below is a TS-only
-  // convenience signature with no Rails-side test.
   describe("two-argument between overload", () => {
     it("between generates BETWEEN", () => {
       expect(
@@ -104,7 +92,6 @@ describe("AttributeTest (trails)", () => {
     });
 
     it("notBetween generates NOT BETWEEN", () => {
-      // Mirrors Rails: not_between renders as `(col < begin OR col > end)`.
       expect(
         users
           .project(star())

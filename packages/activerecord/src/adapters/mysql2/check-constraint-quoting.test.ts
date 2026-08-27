@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/mysql2/check_constraint_quoting_test.rb
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import {
   describeIfMysqlAdapter,

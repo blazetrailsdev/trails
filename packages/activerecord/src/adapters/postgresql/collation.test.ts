@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/collation_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -10,7 +7,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    // Rails: @connection.create_table :postgresql_collations, force: true { |t| ... }
     await adapter.createTable("postgresql_collations", { force: true }, (t) => {
       t.string("string_c", { collation: "C" });
       t.text("text_posix", { collation: "POSIX" });
@@ -18,14 +14,12 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   afterEach(async () => {
-    // Rails: @connection.drop_table :postgresql_collations, if_exists: true
     await adapter.dropTable("postgresql_collations", { ifExists: true });
     await adapter.close();
   });
 
   describe("PostgresqlCollationTest", () => {
     it("string column with collation", async () => {
-      // Rails: assert_equal :string, column.type; assert_equal "C", column.collation
       const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "string_c")!;
       expect(col.type).toBe("string");
@@ -33,7 +27,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("text column with collation", async () => {
-      // Rails: assert_equal :text, column.type; assert_equal "POSIX", column.collation
       const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "text_posix")!;
       expect(col.type).toBe("text");
@@ -41,7 +34,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("add column with collation", async () => {
-      // Rails: @connection.add_column :postgresql_collations, :title, :string, collation: "C"
       await adapter.addColumn("postgresql_collations", "title", "string", { collation: "C" });
       const cols = await adapter.columns("postgresql_collations");
       const col = cols.find((c) => c.name === "title")!;
@@ -50,7 +42,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("change column with collation", async () => {
-      // Rails: add_column :description, :string; change_column :description, :text, collation: "POSIX"
       await adapter.addColumn("postgresql_collations", "description", "string");
       await adapter.changeColumn("postgresql_collations", "description", "text", {
         collation: "POSIX",
@@ -62,7 +53,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      // Rails: assert_match %r{t\.string\s+"string_c",\s+collation: "C"$}, output
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_collations");
       expect(output).toMatch(/t\.string\("string_c",\s*\{\s*collation:\s*"C"\s*\}\)/);
       expect(output).toMatch(/t\.text\("text_posix",\s*\{\s*collation:\s*"POSIX"\s*\}\)/);

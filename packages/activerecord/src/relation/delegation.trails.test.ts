@@ -1,13 +1,3 @@
-/**
- * trails-only mechanism tests for the per-model prototype-carrier delegation
- * (stories `delegation-generated-methods-per-model-prototype-carrier` and
- * `delegation-remaining-delegate-class-prototype-carriers`). These assert the
- * *mechanism* — that generated relation methods resolve as real methods via
- * per-model subclass prototype carriers for all four delegate classes
- * (`Relation`, `AssociationRelation`, `DisableJoinsAssociationRelation`,
- * `CollectionProxy`) — rather than observable behavior (covered by the
- * Rails-mirrored `delegation.test.ts`).
- */
 import { describe, it, expect } from "vitest";
 import {
   delegateArrayMethod,
@@ -40,9 +30,6 @@ describe("generated relation methods — per-model prototype carrier", () => {
   });
 
   it("keeps the first generated delegator for a name (Rails' method_defined? memo)", () => {
-    // delegation.rb:76 — `return if method_defined?(method)`: once a name is
-    // generated, a later generate_method for the same name is a no-op rather
-    // than a redefinition.
     generateRelationMethod(Post as never, "memoizedGenerated", () => "first");
     generateRelationMethod(Post as never, "memoizedGenerated", () => "second");
 
@@ -60,9 +47,6 @@ describe("generated relation methods — per-model prototype carrier", () => {
   });
 
   it("reports the base Relation class name (per-model carrier stays anonymous)", () => {
-    // Rails' ClassSpecificRelation::ClassMethods#name returns superclass.name so
-    // `Relation#inspect` (`this.constructor.name`) reads "Relation", not the
-    // anonymous per-model subclass identifier.
     const carrier = relationClassFor(Post as never);
     expect(carrier.name).toBe("Relation");
     expect((Post.limit(2) as unknown as { constructor: { name: string } }).constructor.name).toBe(
@@ -97,10 +81,6 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   ];
 
   it("feeds one generated method to all four per-model carriers (propagation)", () => {
-    // Realize all four carriers first, then generate: the single
-    // `generatedRelationMethods(model)` module must propagate the new method to
-    // every already-registered carrier (Rails' `delegate.include
-    // generated_relation_methods` across each subclass).
     const carriers = allCarriersFor(Post as never);
     const fn = () => "shared";
     generateRelationMethod(Post as never, "sharedAcrossCarriers", fn);
@@ -124,8 +104,6 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("each carrier reports its base delegate class name (per-model subclass stays anonymous)", () => {
-    // Rails' ClassSpecificRelation::ClassMethods#name returns `superclass.name`,
-    // so `#inspect` (`this.constructor.name`) reads the base class name.
     expect(associationRelationClassFor(Post as never).name).toBe("AssociationRelation");
     expect(disableJoinsAssociationRelationClassFor(Post as never).name).toBe(
       "DisableJoinsAssociationRelation",
@@ -134,12 +112,6 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("inherits an STI base model's generated module onto the child carrier (include_relation_methods recursion)", () => {
-    // Rails' `include_relation_methods` recurses up the STI chain
-    // (`superclass.include_relation_methods(delegate) unless base_class?`,
-    // delegation.rb:57-60): a method generated on the base model (`Company`)
-    // must be a real method on the child (`Firm`) carrier's prototype — resolved
-    // by ordinary prototype lookup, not re-derived via the Proxy miss path.
-    // `Firm extends Company`; `Company` is the STI base_class.
     generateRelationMethod(Company as never, "stiBaseGenerated", () => "base");
     const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(firmCarrier, "stiBaseGenerated")).toBe(true);
@@ -147,11 +119,6 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("lets a child model's own generated method win over an inherited one", () => {
-    // Rails' ancestor-chain MRO puts the child module before the ancestor, so an
-    // own generated method shadows an inherited one of the same name. The win is
-    // *structural* (per-carrier module priority), NOT temporal: generate the
-    // child's fn FIRST, then the ancestor's — the reverse order that a naive
-    // last-write-wins carrier would get wrong — and the child must still win.
     generateRelationMethod(Firm as never, "stiOverridden", () => "child");
     generateRelationMethod(Company as never, "stiOverridden", () => "base");
     const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
@@ -182,24 +149,12 @@ describe("generated relation methods — remaining delegate-class carriers", () 
 });
 
 describe("name delegate — property-reader typing invariant", () => {
-  // `delegate :name, to: :model` is a Rails property reader (`relation.name`,
-  // no parens). It is typed to return `RelationName` — a *supertype* of `string`
-  // — rather than plain `string` on purpose: a plain-string `name` getter would
-  // make the structurally typed `Relation` satisfy `{ name: string }`, flipping
-  // `Array#reduce` accumulator inference (`relations.test.ts` "find all with
-  // multiple should use and"). These assertions pin both halves of that
-  // invariant at compile time so a future regression fails loudly here.
-
   it("reads as a getter returning the model class name (no parens)", () => {
     expect(Comment.all().name).toBe("Comment");
   });
 
   it("keeps Relation off the `{ name: string }` structural surface (reduce guard)", () => {
     const rel = Comment.all();
-    // If `name` were typed `string`, `rel` would be assignable to
-    // `{ name: string }` and this assignment would compile — flipping reduce
-    // inference. The `@ts-expect-error` is load-bearing: regressing the getter
-    // to `string` makes the directive unused, which is itself a type error.
     // @ts-expect-error Relation must NOT be assignable to { name: string }
     const structural: { name: string } = rel;
     void structural;
@@ -215,11 +170,6 @@ describe("name delegate — property-reader typing invariant", () => {
 describe("delegated records operators without an Array.prototype counterpart", () => {
   const records = () => ["a", "b", "c"];
 
-  // delegation.rb:101 delegates `[]`, `&`, `|`, `+`, `-` to `records`. `[]` and
-  // `+` land on `Array.prototype` (`at`/`slice`, `concat`); `&`, `|` and `-`
-  // have no `Array.prototype` counterpart and are delegated under Ruby's own
-  // alias names for them (`Array#intersection` / `#union` / `#difference`),
-  // with Ruby's set semantics: `&` and `|` de-duplicate, `-` does not.
   it("delegates the records operators Array.prototype cannot spell", () => {
     const dup = () => ["a", "b", "b", "c"];
     expect(delegateArrayMethod("intersection", dup)!(["b", "c", "d"])).toEqual(["b", "c"]);
@@ -238,12 +188,6 @@ describe("delegated records operators without an Array.prototype counterpart", (
   });
 });
 
-/**
- * `respond_to_missing?` (delegation.rb:150-152) has no direct JS spelling — the
- * `in` operator is what a `respond_to?`-style probe reaches, and it routes to a
- * Proxy `has` trap. These assert both dispatch proxies answer `in` for every
- * name their `get` trap fabricates.
- */
 describe("respond_to_missing? — `in` on the dispatch proxies", () => {
   fixtures(["posts", "comments"]);
 

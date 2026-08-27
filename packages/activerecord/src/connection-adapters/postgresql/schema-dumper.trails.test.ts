@@ -130,7 +130,6 @@ describe("PostgreSQL::SchemaDumper", () => {
     });
 
     it("adds virtual column options when adapter supports virtual columns", () => {
-      // Mirrors createSchemaDumper(adapter) — raw adapter passed as source
       const mockAdapter = {
         tables: async () => [],
         columns: async () => [],

@@ -1,16 +1,3 @@
-/**
- * End-to-end coverage for the PG/MySQL bulk reverse-FK catalog query behind
- * `bulkInboundFkHost`. `canonical-schema.trails.test.ts` pins the seam and the
- * row -> blocker mapping against a fake adapter, and its live rebuild test
- * builds its own SQLite adapter — so the SQL itself only runs here.
- *
- * A query that *throws* would already surface on every PG/MySQL run; the two
- * cases below cover the two silent failures: returning no row (the blocker goes
- * unreported and the DROP fails) and returning a row for a same-named table
- * outside the resolution scope (a live constraint elsewhere gets dropped).
- *
- * DDL-heavy and deliberately not on transactional fixtures.
- */
 import { beforeAll, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { rebuildCanonicalTables } from "./canonical-table-rebuild.js";
@@ -28,8 +15,6 @@ beforeAll(() => {
 
 describe.skipIf(lane === "sqlite")("bulkInboundFkHost (live catalog)", () => {
   it("drops a foreign key reaching in from a table it is not rebuilding", async () => {
-    // The canonical schema already lays `lessons_students -> students`
-    // (schema.rb:726); the rebuild must drop only the `authors` edge added here.
     await adapter.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
     try {
       expect(await lessonsStudentsForeignKeyTargets()).toEqual(["authors", "students"]);
@@ -75,7 +60,6 @@ async function lessonsStudentsForeignKeyTargets(): Promise<string[]> {
   return fks.map((fk) => fk.toTable).sort();
 }
 
-/** Strip every FK off the join table and put the canonical one back. */
 async function restoreLessonsStudentsForeignKeys(): Promise<void> {
   for (const fk of await adapter.foreignKeys("lessons_students")) {
     await adapter.removeForeignKey("lessons_students", { name: fk.name });

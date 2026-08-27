@@ -13,23 +13,6 @@ import { TableAlias } from "./nodes/table-alias.js";
 import { True } from "./nodes/true.js";
 import { On } from "./nodes/unary.js";
 
-/**
- * Mirrors: Arel::FactoryMethods (Ruby module mixed into Node and TreeManager).
- *
- * Apply the runtime mixin with `include(Klass, FactoryMethods)` from
- * @blazetrails/activesupport. Model the added methods in TypeScript by
- * interface-merging `FactoryMethodsModule` (declared below) into the
- * relevant class types — see Node, TreeManager, Table, and SelectManager.
- *
- * Why an explicit `FactoryMethodsModule` interface (vs. deriving from
- * `typeof FactoryMethods` via `Included<>`): the Node↔FactoryMethods
- * type cycle (Node interface-merges this module; FactoryMethods values
- * reference Node) forces tsc into a structural fallback when emitting
- * composite .d.ts, widening `typeof FactoryMethods` to
- * `Record<string, ...>` and reintroducing a string index signature into
- * Node. Pinning the module type to a hand-written interface gives tsc
- * a fixed point and avoids the fallback.
- */
 export interface FactoryMethodsModule {
   createTrue(): True;
   createFalse(): False;
@@ -61,8 +44,6 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new TableAlias(relation, name);
   },
 
-  // Rails' create_join/create_and are duck-typed and its own tests exercise
-  // them with bare strings, so the params admit `string` too.
   createJoin(
     to: Node | Table | string,
     constraint?: Node | string | null,
@@ -92,16 +73,10 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new NamedFunction("LOWER", [buildQuoted(column)]);
   },
 
-  // Rails wraps nothing here — `NamedFunction.new "COALESCE", exprs`
-  // (factory_methods.rb:45-47) — so a raw value reaches `expressions`
-  // untouched (test/cases/arel/factory_methods_test.rb:69-76).
   coalesce(...exprs: NodeOrValue[]): NamedFunction {
     return new NamedFunction("COALESCE", exprs);
   },
 
-  // Mirrors: Arel::FactoryMethods#cast — `NamedFunction.new "CAST",
-  // [name.as(type)]`. Delegating to `name.as(type)` lets the receiver
-  // build an `As` with a retryable SqlLiteral alias, matching Rails.
   cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction {
     return new NamedFunction("CAST", [expr.as(type)]);
   },

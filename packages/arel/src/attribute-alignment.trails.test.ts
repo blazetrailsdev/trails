@@ -48,9 +48,6 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
   });
 
   it("contains/overlaps route a scalar RHS through quotedNode (Casted)", () => {
-    // Mirrors Rails' Predications#contains/#overlaps which call
-    // `quoted_node(other)`. On Attribute that wraps the value in
-    // Casted(value, this) so the visitor can apply column type-casting.
     const c = users.get("ids").contains([1, 2]);
     expect(c.right).toBeInstanceOf(Nodes.Casted);
     const o = users.get("ids").overlaps([1, 2]);
@@ -59,10 +56,6 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
 });
 
 describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
-  // Mirrors Rails' Arel::Predications#quoted_node — `build_quoted(other, self)`.
-  // Passing the attribute means every non-pass-through value, nil included,
-  // becomes Casted(value, this) and keeps the column type-cast path;
-  // ActiveModel::Attribute instances become BindParam and raw Nodes pass through.
   it("wraps a scalar in Casted(value, attribute)", () => {
     const attr = users.get("id");
     const out = attr.quotedNode(42);
@@ -88,13 +81,6 @@ describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
 });
 
 describe("Per-class `as(name)` marks the alias SqlLiteral as retryable", () => {
-  // Mirrors Arel::AliasPredication#as in Rails:
-  //   Nodes::SqlLiteral.new(other, retryable: true)
-  // The retryable flag tells the collector that the bare alias name
-  // doesn't break parameterized-SQL retry-by-bind-cache. Without it,
-  // visiting an `As(left, SqlLiteral("alias"))` would flip
-  // collector.retryable to false.
-
   const collectorIsRetryableAfter = (n: Nodes.Node): boolean =>
     new Visitors.ToSql(fakeRecordConnection).accept(n, new Collectors.SQLString()).retryable;
 

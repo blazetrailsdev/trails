@@ -15,10 +15,6 @@ describe("ImmutableStringType (trails)", () => {
   });
 
   it("serialize leaves a String alone, leading colon and all", () => {
-    // immutable_string.rb:56 sends a String to `super` — identity. There is no
-    // trails arm for `when ::Symbol` (immutable_string.rb:53): that arm is a
-    // type test a String cannot satisfy, and trails spells a Symbol as a
-    // `":name"` string, so keying it off the colon corrupts String data.
     const type = new ImmutableStringType();
     expect(type.serialize("::Alpha")).toBe("::Alpha");
     expect(type.serialize(":bob")).toBe(":bob");
@@ -34,8 +30,6 @@ describe("ImmutableStringType (trails)", () => {
 
 describe("ImmutableStringType casting", () => {
   it("casts booleans to the PG literal form", () => {
-    // Rails type/immutable_string.rb#cast_value:
-    //   case value when true then @true; when false then @false; else value.to_s.freeze
     const type = Types.typeRegistry.lookup("immutable_string");
     expect(type.cast(true)).toBe("t");
     expect(type.cast(false)).toBe("f");

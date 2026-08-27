@@ -1,17 +1,3 @@
-/**
- * PostgreSQL date OID type.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Date.
- * Rails: `class Date < Type::Date`. Overrides cast_value to handle
- * PG-specific string forms ("infinity" / "-infinity" / "… BC" for BCE
- * dates) and type_cast_for_schema so those sentinels render as
- * `::Float::INFINITY` / `-::Float::INFINITY` in schema dumps.
- *
- * Full Temporal-native driver integration lands in PR 5a; this file
- * is updated here so that `DateType#cast` returning `Temporal.PlainDate`
- * does not break compilation.
- */
-
 import { Temporal } from "@blazetrails/date";
 import {
   DateType,
@@ -25,18 +11,7 @@ import { parsePostgresDate } from "../../abstract/temporal-wire.js";
 export class Date extends DateType {
   override readonly name: string = "date";
 
-  /**
-   * Rails' `cast_value` — the hook cast delegates to. Kept public so
-   * subclasses and tests can call it directly. Base `cast()` handles
-   * the nil short-circuit and dispatches here, so we fall through to
-   * the parent's `castValue` (NOT `cast`) to avoid the virtual-dispatch
-   * loop that would re-enter this method.
-   *
-   * @missingRailsCall format — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   postgresql/oid/date.rb's `value.format` is Ruby's Date formatting; trails'
-   *   cast returns a Temporal.PlainDate and formats through Temporal's own API,
-   *   which has no `format` method.
-   */
+  /** @missingRailsCall format — PERMANENT */
   override castValue(
     value: unknown,
   ): Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType | null {
@@ -55,11 +30,6 @@ export class Date extends DateType {
     return super.castValue(value);
   }
 
-  /**
-   * `infinity` sentinels serialize to their wire strings; every other value
-   * returns the cast Temporal.PlainDate. The adapter's quoting/bind layer renders
-   * the SQL literal (incl. the " BC" suffix) downstream, matching Rails.
-   */
   override serialize(value: unknown): unknown {
     if (value === DateInfinity) return "infinity";
     if (value === DateNegativeInfinity) return "-infinity";

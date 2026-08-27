@@ -1,15 +1,3 @@
-/**
- * trails-only regression coverage for the `async:` kwarg on the select family.
- *
- * Rails' select_one/select_value/select_rows forward `async:` down to
- * select_all (database_statements.rb:85, :90, :102), which is what turns a
- * `load_async` relation into a FutureResult. trails previously dropped the
- * kwarg at every one of those call sites, so a caller asking for an async
- * select reached select_all with no record of having asked. Rails' own
- * coverage lives in relation/load_async_test.rb, which is fully excluded
- * (scripts/parity/unported-files/unscoped.ts) because it asserts
- * FutureResult/scheduled? semantics — the forwarding itself still needs a home.
- */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base } from "../../index.js";
 import type { AbstractAdapter } from "../abstract-adapter.js";

@@ -14,24 +14,6 @@ export class BinaryType extends ValueType<unknown> {
     return true;
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Binary#cast (binary.rb:18-26)
-   *
-   *   if value.is_a?(Data)
-   *     value.to_s
-   *   else
-   *     value = super
-   *     value = value.b if ::String === value && value.encoding != Encoding::BINARY
-   *     value
-   *   end
-   *
-   * `super` is Value#cast, whose `cast_value` is identity — so only a `::String`
-   * is coerced and everything else (an Integer, say) comes back out unchanged.
-   * A `Uint8Array` is trails' stand-in for a BINARY-encoded Ruby String, so
-   * `Data#to_s` is `bytes` (JS `toString()` would UTF-8-decode and lose bytes)
-   * and `String#b` is `textEncoder.encode`; a value that is already a
-   * `Uint8Array` passes through, as a BINARY String does in Ruby.
-   */
   cast(value: unknown): unknown {
     if (value instanceof Data) {
       return value.bytes;
@@ -42,35 +24,11 @@ export class BinaryType extends ValueType<unknown> {
     }
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Binary#serialize (binary.rb:30-33)
-   *
-   *   def serialize(value)
-   *     return if value.nil?
-   *     Data.new(super)
-   *   end
-   *
-   * `super` is Value#serialize — identity, *not* `cast` — so the raw value is
-   * handed to `Data`, whose constructor does the `to_s`/binary coercion. The
-   * wrapper is what `quote` dispatches on (abstract/quoting.rb:83).
-   */
   serialize(value: unknown): Data | null {
     if (value === null || value === undefined) return null;
     return new Data(super.serialize(value));
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Binary#changed_in_place? (binary.rb:35-38)
-   *
-   *   old_value = deserialize(raw_old_value)
-   *   old_value != value
-   *
-   * Rails does not coerce `value`; it relies on Ruby's `!=`. JS cannot compare
-   * byte arrays with `!=`, so the bytes are walked when both sides are bytes and
-   * `!==` carries the rest, as Ruby's `!=` does. `cast` is identity in practice:
-   * the only callers (`Attribute#changedInPlace` / `#changedInPlaceFromDatabase`)
-   * pass `this.value`, which is already cast.
-   */
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const old = this.deserialize(rawOldValue);
     const cur = this.cast(newValue);
@@ -88,22 +46,6 @@ export class BinaryType extends ValueType<unknown> {
 export class Data {
   readonly bytes: Uint8Array;
 
-  /**
-   * Mirrors: Data#initialize (binary.rb:42-46) — `value = value.to_s`, then `.b`
-   * to force BINARY encoding. `Uint8Array` is our stand-in for Ruby's
-   * binary-encoded String, so byte sources pass through unchanged (as Ruby's
-   * `.b` on an already-BINARY String returns it unchanged) and everything else
-   * is coerced via `String(value)`, standing in for `to_s`.
-   *
-   * The `Data` arm is not idempotence sugar — it is precisely Ruby's `to_s`
-   * step. Ruby gets it free because `Data#to_s` returns the byte string, but
-   * JS's `String(data)` runs our `toString()`, which UTF-8-decodes: it turns
-   * `de ad be ef` into `de ad ef bf bd ef bf bd` (U+FFFD replacements). So the
-   * arm is what makes `new Data(data)` byte-preserving, matching Ruby.
-   *
-   * `Uint8Array` is stored by reference, so mutating the source array mutates
-   * this `Data` — the same aliasing Ruby has when `.b` returns self.
-   */
   constructor(value: unknown) {
     if (value instanceof Data) this.bytes = value.bytes;
     else if (value instanceof Uint8Array) this.bytes = value;

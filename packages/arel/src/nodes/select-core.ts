@@ -5,11 +5,6 @@ import type { Table } from "../table.js";
 import { JoinSource } from "./join-source.js";
 import type { OptimizerHints } from "./unary.js";
 
-/**
- * SelectCore — the core of a SELECT statement (projections, from, where, etc.).
- *
- * Mirrors: Arel::Nodes::SelectCore
- */
 export class SelectCore extends Node {
   source: JoinSource;
   projections: Node[];
@@ -18,9 +13,6 @@ export class SelectCore extends Node {
   havings: Node[];
   windows: Node[];
   setQuantifier: Node | null;
-  // Mirrors Rails: `@ctx.optimizer_hints` is an `OptimizerHints` node (or
-  // nil) — not a bare array (select_core.rb). Narrowed to the concrete
-  // node type so the SQL visitor can rely on the `/*+ … */` formatting.
   optimizerHints: OptimizerHints | null;
   comment: Node | null;
 
@@ -45,17 +37,14 @@ export class SelectCore extends Node {
     this.source.left = value;
   }
 
-  /** Mirrors: `alias :froms :from` (select_core.rb:33). */
   get froms(): Node | Table | null {
     return this.from;
   }
 
-  /** Mirrors: `alias :froms= :from=` (select_core.rb:32). */
   set froms(value: Node | null) {
     this.from = value;
   }
 
-  // Mirrors Arel::Nodes::SelectCore#hash / #eql? / #== (select_core.rb:44-64).
   hash(): number {
     return rbHash([
       this.source,
@@ -86,8 +75,6 @@ export class SelectCore extends Node {
     );
   }
 
-  // Mirrors Arel::Nodes::SelectCore#initialize_copy (select_core.rb:35-43),
-  // which Ruby runs for `#clone`.
   clone(): this {
     const copy = objectClone(this);
     if (this.source) copy.source = cloneSlot(this.source);

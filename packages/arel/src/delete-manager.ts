@@ -6,15 +6,8 @@ import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 
-/**
- * DeleteManager — chainable API for building DELETE statements.
- *
- * Mirrors: Arel::DeleteManager
- */
 export class DeleteManager extends TreeManager {
   readonly ast: DeleteStatement;
-  // Installed via include(DeleteManager, StatementMethods) below. Rails
-  // mixes these in via `include TreeManager::StatementMethods`.
   declare key: unknown;
   declare wheres: Node[];
   declare where: (expr: Node) => this;
@@ -27,21 +20,11 @@ export class DeleteManager extends TreeManager {
     this.ast = new DeleteStatement(table);
   }
 
-  /**
-   * Set the target table.
-   *
-   * Mirrors: Arel::DeleteManager#from
-   */
   from(relation: Table): this {
     this.ast.relation = relation;
     return this;
   }
 
-  /**
-   * Add GROUP BY.
-   *
-   * Mirrors: Arel::DeleteManager#group
-   */
   group(columns: (Node | string)[]): this {
     for (const column of columns) {
       if (typeof column === "string") {
@@ -53,11 +36,6 @@ export class DeleteManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Add HAVING.
-   *
-   * Mirrors: Arel::DeleteManager#having
-   */
   having(expr: Node): this {
     this.ast.havings.push(expr);
     return this;

@@ -2,35 +2,16 @@ import { deepDup } from "@blazetrails/activesupport";
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
 
-/**
- * ErrorDetail is now an alias for ActiveModel::Error.
- * Previously a plain interface, now the real Error class.
- */
 export type ErrorDetail = ActiveModelError;
 
-/** Per-error details hash shape: { error: type, ...filteredOptions } */
 export type ErrorDetailHash = { error: string; [k: string]: unknown };
 
-// Singleton frozen empty array returned for missing-key lookups on messages/details.
-// Rails uses EMPTY_ARRAY = [].freeze (activemodel/lib/active_model/errors.rb:265).
 const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
-/**
- * Errors — collects validation error messages on a model.
- *
- * Mirrors: ActiveModel::Errors
- */
 export class Errors<TBase extends object = object> {
   private _errors: ActiveModelError[] = [];
   private _base: TBase | null;
 
-  /**
-   * The collection facade, forwarded to `@errors` — the TS spelling of
-   * `def_delegators :@errors, :each, :clear, :empty?, :size, :uniq!`
-   * (activemodel/lib/active_model/errors.rb:103). `each` also powers Ruby's
-   * `include Enumerable` (errors.rb:62); its TS analog is `[Symbol.iterator]`
-   * below.
-   */
   each(fn: (error: ActiveModelError) => void): void {
     this._errors.forEach(fn);
   }
@@ -57,11 +38,6 @@ export class Errors<TBase extends object = object> {
     return this;
   }
 
-  /**
-   * The actual array of `Error` objects, exposed as a plain array. Mirrors
-   * Rails' `attr_reader :errors` + `alias :objects :errors` where `objects`
-   * returns `@errors` directly (activemodel/lib/active_model/errors.rb:107-108).
-   */
   get objects(): ActiveModelError[] {
     return this._errors;
   }
@@ -70,21 +46,6 @@ export class Errors<TBase extends object = object> {
     this._base = base;
   }
 
-  /**
-   * Replace this collection's errors with a deep-duped copy of `other`'s,
-   * rebinding each error's `base` to this collection's base. Mirrors
-   * Rails' `ActiveModel::Errors#copy!`
-   * (activemodel/lib/active_model/errors.rb:138-143):
-   *
-   *   def copy!(other)
-   *     @errors = other.errors.deep_dup
-   *     @errors.each { |error| error.instance_variable_set(:@base, @base) }
-   *   end
-   *
-   * `Array#deep_dup` dups each element with `Object#deep_dup`, which for an
-   * Error is `dup` plus `initialize_dup` (error.rb:111-116) — see
-   * `Error#deepDup`, which the shared `deepDup` dispatches to.
-   */
   copyBang<U extends object>(other: Errors<U>): void {
     this._errors = deepDup(other._errors);
     this._errors.forEach((error) => {
@@ -92,32 +53,10 @@ export class Errors<TBase extends object = object> {
     });
   }
 
-  /**
-   * Import a single error, wrapping it as a `NestedError` so the original
-   * error object + its options stay reachable. Mirrors Rails'
-   * `ActiveModel::Errors#import`
-   * (activemodel/lib/active_model/errors.rb:154-161):
-   *
-   *   def import(error, override_options = {})
-   *     ...
-   *     @errors.append(NestedError.new(@base, error, override_options))
-   *   end
-   */
   import(error: ActiveModelError, overrideOptions?: { attribute?: string; type?: string }): void {
     this._errors.push(new NestedError(this._base, error, overrideOptions));
   }
 
-  /**
-   * Merge errors from `other`, wrapping each as a `NestedError` so the
-   * original error + its options remain accessible. Mirrors Rails'
-   * `ActiveModel::Errors#merge!`
-   * (activemodel/lib/active_model/errors.rb:174-180):
-   *
-   *   def merge!(other)
-   *     return errors if equal?(other)
-   *     other.errors.each { |error| import(error) }
-   *   end
-   */
   mergeBang<U extends object>(other: Errors<U>): void {
     if (Object.is(other, this)) return;
     for (const error of other._errors) {
@@ -125,11 +64,6 @@ export class Errors<TBase extends object = object> {
     }
   }
 
-  /**
-   * Search errors matching `attribute`, `type`, or `options`. Mirrors
-   * Rails `errors.rb:189-194` — delegates to `Error#match?` (subset
-   * match on options).
-   */
   where(
     attribute: string,
     type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
@@ -146,30 +80,14 @@ export class Errors<TBase extends object = object> {
     return this._errors.some((e) => e.attribute === attribute);
   }
 
-  /**
-   * Whether an error exists for `attribute`. Alias of {@link include}.
-   *
-   * Mirrors: `alias :has_key? :include?` (errors.rb).
-   */
   hasKey(attribute: string): boolean {
     return this.include(attribute);
   }
 
-  /**
-   * Whether an error exists for `attribute`. Alias of {@link include}.
-   *
-   * Mirrors: `alias :key? :include?` (errors.rb).
-   */
   isKey(attribute: string): boolean {
     return this.include(attribute);
   }
 
-  /**
-   * Remove and return errors matching `attribute`/`type`/`options`.
-   * Returns the removed errors when non-empty, or `null` when nothing was
-   * removed. Mirrors Rails `errors.rb:215-222` — `matches.map(&:message).presence`
-   * returns `nil` for an empty array.
-   */
   delete(
     attribute: string,
     type?: string,
@@ -194,22 +112,12 @@ export class Errors<TBase extends object = object> {
     return result;
   }
 
-  /**
-   * Returns a Map of attributes to their short message arrays. Missing-key
-   * `.get()` returns the singleton frozen `[]`. Mirrors Rails `errors.rb:268-273`.
-   */
   get messages(): Map<string, readonly string[]> {
     const hash = this.toHash();
     hash.get = (attribute: string) => Map.prototype.get.call(hash, attribute) ?? EMPTY_ARRAY;
     return hash;
   }
 
-  /**
-   * Returns a Map of attributes to arrays of per-error detail hashes.
-   * Each entry is `{ error: type, ...filteredOptions }` (reserved option keys
-   * stripped). Missing-key `.get()` returns the singleton frozen `[]`.
-   * Mirrors Rails `errors.rb:276-284` + `Error#details` (error.rb:154-157).
-   */
   get details(): Map<string, ReadonlyArray<ErrorDetailHash>> {
     const grouped = this.groupByAttribute();
     const map = new Map<string, ReadonlyArray<ErrorDetailHash>>();
@@ -223,7 +131,6 @@ export class Errors<TBase extends object = object> {
     return map;
   }
 
-  /** Mirrors: ActiveModel::Errors#group_by_attribute (errors.rb:289-291). */
   groupByAttribute(): Record<string, ActiveModelError[]> {
     const result: Record<string, ActiveModelError[]> = {};
     for (const error of this._errors) {
@@ -235,24 +142,6 @@ export class Errors<TBase extends object = object> {
     return result;
   }
 
-  /**
-   * Add an error for `attribute`. Returns the new `Error`. Mirrors Rails
-   * `Errors#add` (activemodel/lib/active_model/errors.rb:342-354):
-   *
-   *   def add(attribute, type = :invalid, **options)
-   *     error = Error.new(@base, attribute, type, **options)
-   *     if exception = options[:strict]
-   *       exception = ActiveModel::StrictValidationFailed if exception == true
-   *       raise exception, error.full_message
-   *     end
-   *     @errors.append(error)
-   *     error
-   *   end
-   *
-   * `strict: true` raises `StrictValidationFailed`; `strict:
-   * CustomErrorClass` raises the supplied exception class. The error is
-   * still returned when not strict so callers can chain on it.
-   */
   add(
     attribute: string,
     type:
@@ -276,16 +165,6 @@ export class Errors<TBase extends object = object> {
     return error;
   }
 
-  /**
-   * Returns `true` if an error with this exact attribute/type/options has
-   * been added. Mirrors Rails `Errors#added?`
-   * (activemodel/lib/active_model/errors.rb:372-382): `normalize_arguments`
-   * first (evaluating a callable `type` against the base), then Symbol-vs-String
-   * dispatch —
-   * a Ruby Symbol reaches us as a colon-prefixed string, so `":blank"` takes the
-   * strict-match branch and a bare String is a full message checked against
-   * `messagesFor`.
-   */
   added(
     attribute: string,
     type:
@@ -298,18 +177,9 @@ export class Errors<TBase extends object = object> {
     if (normType.startsWith(":")) {
       return this._errors.some((e) => e.strictMatch(attribute, normType, options));
     }
-    // String branch: full-message lookup (Rails else clause in added?).
     return this.messagesFor(attribute).includes(normType);
   }
 
-  /**
-   * Returns `true` if an error of the given type exists on `attribute`.
-   * Mirrors Rails `errors.rb:395-403`: `type` defaults to `:invalid` and the
-   * arguments go through `normalize_arguments` before the Symbol-vs-String
-   * dispatch — a Ruby Symbol
-   * reaches us as a colon-prefixed string, so `":blank"` goes through `where`
-   * and a bare String is a full message checked against `messagesFor`.
-   */
   ofKind(
     attribute: string,
     type:
@@ -320,7 +190,6 @@ export class Errors<TBase extends object = object> {
     if (type.startsWith(":")) {
       return this.where(attribute, type).length > 0;
     }
-    // String branch: full-message lookup (Rails else clause).
     return this.messagesFor(attribute).includes(type);
   }
 
@@ -348,15 +217,7 @@ export class Errors<TBase extends object = object> {
     return ActiveModelError.generateMessage(attribute, type, this._base, options);
   }
 
-  /**
-   * Coerce the arguments to `add` / `where` into a normalized triple.
-   * Mirrors Rails `normalize_arguments`
-   * (activemodel/lib/active_model/errors.rb:490-497): if `type` is
-   * callable, evaluate it against the base + options; return
-   * `[attribute, type, options]`.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   normalizeArguments(
     attribute: string,
     type: string | ((record: TBase | null, options: Record<string, unknown>) => string),
@@ -367,18 +228,7 @@ export class Errors<TBase extends object = object> {
     return [attribute, resolvedType, opts];
   }
 
-  /**
-   * Makes `Errors` iterable so `for (const e of errors)`, `[...errors]`,
-   * and `Array.from(errors)` all work. Mirrors Rails' `include Enumerable`
-   * on the Errors class (activemodel/lib/active_model/errors.rb:62) and
-   * its `def_delegators :@errors, :each, :clear, :empty?, :size, :uniq!`
-   * (errors.rb:103) — `each` powers the Enumerable surface in Ruby; the
-   * TS analog is the iterator protocol.
-   *
-   * @noRailsEquivalent PERMANENT (`vendor/rails/activemodel/lib/active_model/errors.rb:62, :103` —
-   *   `include Enumerable` plus `def_delegators :@errors, :each`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): IterableIterator<ActiveModelError> {
     return this._errors[Symbol.iterator]();
   }
@@ -391,11 +241,6 @@ export class Errors<TBase extends object = object> {
     return this._errors.length > 0;
   }
 
-  /**
-   * Returns a Map of attributes to message arrays. When `fullMessages` is
-   * true, each message is the full message (e.g. "Name can't be blank").
-   * Mirrors Rails `errors.rb:256-261`.
-   */
   toHash(fullMessages = false): Map<string, string[]> {
     const map = new Map<string, string[]>();
     for (const error of this._errors) {
@@ -420,11 +265,6 @@ export class Errors<TBase extends object = object> {
   }
 }
 
-/**
- * Raised when a strict validation fails.
- *
- * Mirrors: ActiveModel::StrictValidationFailed
- */
 export class StrictValidationFailed extends globalThis.Error {
   constructor(message?: string) {
     super(message);
@@ -432,11 +272,6 @@ export class StrictValidationFailed extends globalThis.Error {
   }
 }
 
-/**
- * Raised when an unknown attribute is set via mass assignment.
- *
- * Mirrors: ActiveModel::UnknownAttributeError
- */
 export class UnknownAttributeError<TRecord extends object = object> extends globalThis.Error {
   readonly record: TRecord;
   readonly attribute: string;
@@ -450,9 +285,6 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
   }
 }
 
-/**
- * Mirrors: ActiveModel::RangeError
- */
 export class RangeError extends globalThis.RangeError {
   constructor(message?: string) {
     super(message);

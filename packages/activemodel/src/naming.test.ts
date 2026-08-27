@@ -4,7 +4,6 @@ import { ModelName, Naming } from "./naming.js";
 import { assert, assertNot } from "@blazetrails/activesupport";
 
 describe("NamingTest", () => {
-  // models/track_back.rb — `Post::TrackBack`.
   const modelName = new ModelName("Post::TrackBack");
 
   it("singular", () => {
@@ -45,12 +44,9 @@ describe("NamingTest", () => {
 });
 
 describe("NamingHelpersTest", () => {
-  // models/contact.rb / models/sheep.rb
   class Contact extends Model {}
   class Sheep extends Model {}
 
-  // models/track_back.rb — `Post::TrackBack#to_model` returns a
-  // `Post::NamedTrackBack`, so naming goes through the proxy.
   class NamedTrackBack extends Model {
     static override get modelName(): ModelName {
       return new ModelName("Post::NamedTrackBack");
@@ -126,9 +122,6 @@ describe("NamingMethodDelegationTest", () => {
   });
 });
 
-// Ports Rails `NamingWithNamespacedModelInSharedNamespaceTest`
-// (activemodel/test/cases/naming_test.rb:87-125): `Name.new(Blog::Post)` with
-// no namespace argument, so `param_key`/`route_key` keep the prefix.
 describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
   it("singular", () => {
     expect(new ModelName("Blog::Post").singular).toBe("blog_post");
@@ -209,10 +202,6 @@ describe("NamingWithSuppliedLocaleTest", () => {
   });
 });
 
-// Ports Rails `NamingUsingRelativeModelNameTest`
-// (activemodel/test/cases/naming_test.rb:183-221). Rails' setup is
-// `Blog::Post.model_name`, and `Blog.use_relative_model_naming?` is true
-// (test/models/blog_post.rb), so `model_name` passes `Blog` as the namespace.
 describe("NamingUsingRelativeModelNameTest", () => {
   const namespace = { name: "Blog" };
   it("singular", () => {
@@ -241,8 +230,6 @@ describe("NamingUsingRelativeModelNameTest", () => {
   });
 });
 
-// Ports Rails `NamingWithNamespacedModelInIsolatedNamespaceTest`
-// (activemodel/test/cases/naming_test.rb:51-86): `Name.new(Blog::Post, Blog)`.
 describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
   const namespace = { name: "Blog" };
   it("singular", () => {
@@ -271,13 +258,6 @@ describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
   });
 });
 
-// Ports Rails `NameWithAnonymousClassTest`
-// (activemodel/test/cases/naming_test.rb:166-182): anonymous classes
-// (nil/blank `name`) must raise unless an explicit `name:` override is
-// supplied.
-// Rails' anonymous-class path is `ActiveModel::Name.new(klass, nil, "Anonymous")`
-// — `name` arg supplies the display name since `klass.name` is nil.
-// In TS the className arg is already a string, so just pass the name directly.
 describe("NameWithAnonymousClassTest", () => {
   it("anonymous class without name argument", () => {
     expect(() => new ModelName("")).toThrow(/cannot be blank/);
@@ -289,9 +269,6 @@ describe("NameWithAnonymousClassTest", () => {
   });
 });
 
-// Rails `ActiveModel::Name` includes Comparable and delegates ==/<=>/
-// =~/match?/to_s/to_str/as_json to @name (naming.rb:10, :151-152). JS
-// can't overload those operators, so we expose methods + Symbol.toPrimitive.
 describe("OverridingAccessorsTest", () => {
   it("overriding accessors keys", () => {
     const modelName = new ModelName("Post::TrackBack");

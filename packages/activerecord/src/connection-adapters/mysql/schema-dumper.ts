@@ -1,26 +1,8 @@
-/**
- * MySQL schema dumper — MySQL-specific schema dump logic.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper
- */
-
 import type { ColumnInfo } from "../../schema-dumper.js";
 import type { Result } from "../../result.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
-/**
- * Column shape expected by this dumper.
- *
- * Mirrors Rails' column contract: `column.type` is the DSL cast type (`:string`,
- * `:integer`, `:datetime` …) and `column.sqlType` is the raw SQL type from the
- * adapter (`"varchar(255)"`, `"timestamp"`, `"enum('a','b')"` …).
- *
- * `AdapterSchemaSource.columns()` carries the dsl type in `ColumnInfo.type` and
- * the raw SQL type in `ColumnInfo.sqlType` (Epic 3.3-U2), so these dialect hooks
- * see both on live adapter output.
- */
 interface MysqlColumn extends ColumnInfo {
-  /** Raw SQL type from the adapter (e.g. `"varchar(255)"`, `"timestamp"`). */
   sqlType?: string | null;
   bigint?: boolean;
   virtual?: boolean;
@@ -40,29 +22,11 @@ interface MysqlAdapterLike {
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {
-  /** Injected adapter; presence signals that caches have been (or will be) populated. */
   connection?: MysqlAdapterLike;
-  /** table → table-default collation. Populated by adapter before column iteration. */
   tableCollationCache: Record<string, string | undefined> = Object.create(null);
-  /**
-   * table → column → pre-serialized generation expression (already `.inspect`-equivalent,
-   * i.e. a JSON string literal like `"\"CONCAT(a, b)\""` ready to emit as schema value).
-   * Populated by adapter before column iteration via `information_schema` query.
-   */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
-  /**
-   * MySQL/MariaDB report `column_key = 'PRI'` not only for genuine PRIMARY KEY
-   * columns but also for a UNIQUE index over NOT NULL columns when the table has
-   * no PRIMARY KEY (the "promoted unique" case, e.g. `string_key_objects`'
-   * `t.index :id, unique: true`), so the per-column `primaryKey` flag over-reports.
-   * Rails resolves the primary key via `@connection.primary_key` (constraint
-   * `'PRIMARY'`), not `column_key`. `primaryKeyOrderCache[tableName]` already holds
-   * that authoritative list (populated by `table()` via `adapter.primaryKeys`), so
-   * trust it: a promoted unique index yields no PK column and the table dumps
-   * `id: false`, matching Rails/MySQL (which keeps the index a plain unique key).
-   * @internal
-   */
+  /** @internal */
   protected override resolvePrimaryKeyColumns(
     tableName: string,
     columns: ColumnInfo[],
@@ -85,17 +49,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return opts;
   }
 
-  /**
-   * Lazily fill `tableCollationCache` via `SHOW TABLE STATUS LIKE ...` when the
-   * cached `tableOptions` parse didn't surface a `COLLATE` clause (e.g. when the
-   * table uses the schema default and the dumper still needs to know that
-   * default in order to suppress per-column collation).
-   *
-   * Mirrors Rails' `MySQL::SchemaDumper#table_collation`, which falls back to
-   * `information_schema.tables.table_collation` when `SHOW CREATE TABLE` omits
-   * an explicit collation.
-   * @internal
-   */
+  /** @internal */
   protected async populateTableCollationFromStatus(tableName: string): Promise<void> {
     if (Object.hasOwn(this.tableCollationCache, tableName)) return;
     const conn = this.connection;
@@ -115,11 +69,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   *
-   * @missingRailsCall size — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   mysql/schema_dumper.rb:13-15 reads the `size` NAMED CAPTURE of the
-   *   tiny/medium/long regexp, not a method; trails reads the same capture as
-   *   `sizeMatch.groups.size` (mysql/schema-dumper.ts:124-132).
+   * @missingRailsCall size — PERMANENT
    */
   protected override prepareColumnOptions(column: MysqlColumn): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column);
@@ -131,8 +81,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const size = sizeMatch.groups["size"].toLowerCase();
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
-      // Rails dumps the symbol `size: :medium`; the TS DSL takes a string size
-      // (typeWithSizeToSql), so emit `size: "medium"`.
       Object.assign(spec, { size: JSON.stringify(size) }, rest);
     }
 
@@ -157,17 +105,12 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: MysqlColumn): boolean {
-    // Live bigint reflects as type:"integer" + sqlType:"bigint(20)" (the dsl cast type carries
-    // the limit), so detect bigint off sqlType too — mirrors Rails' Column#bigint?. The super
-    // arm keeps mock sources that pass type:"bigint" working.
     const isBigint = super.isDefaultPrimaryKey(column) || /^bigint\b/i.test(column.sqlType ?? "");
     return isBigint && !!column.autoIncrement && !column.unsigned;
   }
 
   /** @internal */
   protected override isExplicitPrimaryKeyDefault(column: MysqlColumn): boolean {
-    // Mirrors Rails `column.type == :integer && !column.auto_increment?`. Use `!autoIncrement`
-    // (not `=== false`) so a non-auto-increment PK whose flag is undefined still counts.
     return column.type === "integer" && !column.autoIncrement;
   }
 
@@ -183,17 +126,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaLimit(column: MysqlColumn): string | undefined {
     if (/^(?:tiny|medium|long)?(?:text|blob)\b/i.test(column.sqlType ?? "")) return undefined;
-    // enum/set register as bare string cast types in Rails (no limit), so column.limit is
-    // nil there and the dump emits a verbatim `t.column "c", "enum(...)"`. Our introspection
-    // fills limit from information_schema's CHARACTER_MAXIMUM_LENGTH (the longest member),
-    // so suppress it to keep the dumped type opaque.
     if (/^(?:enum|set)\b/i.test(column.sqlType ?? "")) return undefined;
-    // bigint reflects with limit 8 but Rails suppresses it (column.bigint?); detect off sqlType
-    // since the cast map reports type:"integer".
     if (/^bigint\b/i.test(column.sqlType ?? "")) return undefined;
     if (column.type === "integer" && column.limit === 4) return undefined;
-    // Mirrors Rails schema_limit: suppress limit when it equals the native default
-    // (string varchar(255), float 24, emulated boolean tinyint(1)).
     if (column.type === "string" && column.limit === 255) return undefined;
     if (column.type === "float" && column.limit === 24) return undefined;
     if (column.type === "boolean") return undefined;
@@ -206,8 +141,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (/^time(?:stamp)?\b/.test(sqlType) && column.precision === 0) return undefined;
     if (column.type === "datetime")
       return column.precision === 0 ? "null" : super.schemaPrecision(column);
-    // Precision is only meaningful for decimal and date/time in dumps; the cast map fills
-    // numeric_precision for integers/booleans where Rails leaves column.precision nil.
     if (column.type === "decimal" || /^time\b/.test(sqlType)) return super.schemaPrecision(column);
     return undefined;
   }
@@ -220,30 +153,15 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE SchemaDumper#prepare_column_options (abstract/schema_dumper.rb:25), which MySQL overrides for its per-column options where the port overrides `table` instead.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
-    // `schema_collation` fetches this lazily inside its own body
-    // (mysql/schema_dumper.rb:66-71); that query is async here and
-    // `schemaCollation` is sync, so it is issued from this async point.
     await this.populateTableCollationFromStatus(tableName);
     await super.table(tableName, stream);
   }
 
-  /**
-   * Query `information_schema.columns.generation_expression` for the table's
-   * generated columns and cache the inspect-ready (`as:`) literal per column,
-   * so `extractExpressionForVirtualColumn` can serve it during column iteration.
-   *
-   * Mirrors Rails' `MySQL::SchemaDumper#extract_expression_for_virtual_column`,
-   * which reads the same column and applies `gsub("\\'", "'").inspect`. MySQL's
-   * `generation_expression` already escapes single quotes inside string literals
-   * (e.g. `json_extract(\`profile\`,_utf8mb4\'$.email\')`); Rails strips that
-   * escape before re-quoting so the dumped `as:` round-trips. We do the same and
-   * emit a JSON string literal.
-   * @internal
-   */
+  /** @internal */
   protected async populateVirtualExpressionCache(tableName: string): Promise<void> {
     if (Object.hasOwn(this.virtualExpressionCache, tableName)) return;
     const conn = this.connection;
@@ -273,21 +191,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   *
-   * @missingRailsCall first — PERMANENT: Per-site verified (RFC 0106 wave 4b): the
-   *   `.first["Collation"]` of mysql/schema_dumper.rb:69 is
-   *   `rows[0]?.["Collation"]` in the prefetch (mysql/schema-dumper.ts:108);
-   *   `Array#first` is not a ported method name.
-   * @missingRailsCall internal_exec_query — PERMANENT: Per-site verified (RFC 0106 wave
-   *   4b): mysql/schema_dumper.rb:68-69 issues `SHOW TABLE STATUS` inline from a
-   *   SYNCHRONOUS dumper method; trails' query layer is promise-returning, so
-   *   the same query is issued by `populateTableCollationFromStatus` before the
-   *   column loop and `schemaCollation` reads the prefilled cache
-   *   (mysql/schema-dumper.ts:101-110, 266-274).
-   * @missingRailsCall quote — PERMANENT: Per-site verified (RFC 0106 wave 4b): the
-   *   `@connection.quote(table_name)` of mysql/schema_dumper.rb:69 moved with
-   *   that query into `populateTableCollationFromStatus`
-   *   (mysql/schema-dumper.ts:106) — see the internal_exec_query entry.
+   * @missingRailsCall first — PERMANENT
+   * @missingRailsCall internal_exec_query — PERMANENT
+   * @missingRailsCall quote — PERMANENT
    */
   protected override schemaCollation(column: MysqlColumn): string | undefined {
     if (!column.collation) return undefined;
@@ -300,28 +206,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /**
-   * Returns the generation expression for a virtual column from `virtualExpressionCache`.
-   * The adapter populates the cache before iterating columns (queries `information_schema`).
    * @internal
-   *
-   * @missingRailsCall query_value — PERMANENT: Per-entry verified (RFC 0032 wide-entry
-   *   verification): Rails mysql/schema_dumper.rb:74-93 queries
-   *   information_schema (query_value/quote/quote_column_name) per column;
-   *   trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the
-   *   adapter pre-populates with the same information_schema query before column
-   *   iteration.
-   * @missingRailsCall quote — PERMANENT: Per-entry verified (RFC 0032 wide-entry
-   *   verification): Rails mysql/schema_dumper.rb:74-93 queries
-   *   information_schema (query_value/quote/quote_column_name) per column;
-   *   trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the
-   *   adapter pre-populates with the same information_schema query before column
-   *   iteration.
-   * @missingRailsCall quote_column_name — PERMANENT: Per-entry verified (RFC 0032
-   *   wide-entry verification): Rails mysql/schema_dumper.rb:74-93 queries
-   *   information_schema (query_value/quote/quote_column_name) per column;
-   *   trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the
-   *   adapter pre-populates with the same information_schema query before column
-   *   iteration.
+   * @missingRailsCall query_value — PERMANENT
+   * @missingRailsCall quote — PERMANENT
+   * @missingRailsCall quote_column_name — PERMANENT
    */
   protected extractExpressionForVirtualColumn(column: MysqlColumn): string | undefined {
     const tableName = this.tableName;

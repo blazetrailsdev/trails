@@ -3,9 +3,6 @@ import { fakeRecordConnection, testConnection } from "./test-helpers/connection.
 import { Temporal } from "@blazetrails/date";
 import { Table, Nodes, Visitors } from "./index.js";
 
-// The Enumerable-arm distinctions below are trails-only: in Ruby a Set, a Hash
-// and a lazy enumerator are all simply `Enumerable`, so there is no Rails test
-// to mirror. See attribute.trails.test.ts for the same coverage on Attribute.
 describe("PredicationsMixin in/notIn Enumerable arm", () => {
   const users = new Table("users");
   const visitor = new Visitors.ToSql(testConnection);
@@ -32,9 +29,6 @@ describe("PredicationsMixin in/notIn Enumerable arm", () => {
       );
     });
 
-    // The Hash half of the decided split (see isEnumerable in predications.ts):
-    // a Map is the Ruby Hash analogue, so the Map ITSELF expands into pairs the
-    // way Rails' `in({a: 1})` does — not just an iterator taken off it.
     it("expands a Map into pairs, matching Ruby's Enumerable Hash", () => {
       const node = expr();
       const map = new Map<string, number>([["a", 1]]);
@@ -120,16 +114,11 @@ describe("PredicationsMixin", () => {
     const bn = new Nodes.BitwiseNot(users.get("flags"));
 
     it("eqAny([]) does not crash and renders as NULL (Rails 3-valued logic)", () => {
-      // Rails' `Or.inject` on [] returns nil and the visitor renders
-      // NULL — we preserve that, since NULL is not the same as FALSE
-      // under SQL three-valued logic.
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.eqAny([]));
       expect(sql).toBe("(NULL)");
     });
 
     it("eqAll([]) does not crash and renders as an empty grouped AND", () => {
-      // Matches Attribute#groupedAll: an empty And inside a Grouping
-      // visits to `()`, the same as Rails' empty-And rendering.
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.eqAll([]));
       expect(sql).toBe("()");
     });
@@ -155,10 +144,6 @@ describe("PredicationsMixin", () => {
   });
 });
 
-// Mirrors Rails' Arel attribute_test.rb #between / #not_between blocks.
-// The Trails port accepts `[begin, end]`, `{ begin, end, excludeEnd? }`,
-// and `(begin, end, excludeEnd?)` call shapes; the decision tree
-// (predications.rb) is the same in all cases.
 describe("Predications range semantics", () => {
   const users = new Table("users");
   const id = users.get("id");
@@ -175,8 +160,6 @@ describe("Predications range semantics", () => {
     });
 
     it("range begin == end collapses to Equality for equal-valued Dates", () => {
-      // predications.rb:56 compares the bounds with Ruby `==`, so two distinct
-      // but equal Date objects collapse — the shape AR's RangeHandler builds.
       const node = id.between({
         begin: Temporal.PlainDate.from("2002-03-19"),
         end: Temporal.PlainDate.from("2002-03-19"),
@@ -213,12 +196,6 @@ describe("Predications range semantics", () => {
       expect(((node as Nodes.NotIn).right as unknown[]).length).toBe(0);
     });
 
-    // A bare ±Infinity is open-ended, not unboundable: Float has no
-    // `unboundable?` (predications.rb:252-253), so Rails skips the `in([])` arm
-    // and treats the bound as absent (predications.rb:38-51). Rails' own
-    // `Float::INFINITY..` → `In([])` case (attribute_test.rb:679-684) reaches
-    // `in([])` through the nested `infinity?` check at predications.rb:42,
-    // which only applies when *both* bounds are open-ended.
     it("Infinity..end (open-ended begin) becomes LessThanOrEqual on the real end", () => {
       const node = id.between({ begin: Infinity, end: 3 });
       expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
@@ -370,9 +347,6 @@ describe("Predications range semantics", () => {
       expect(node).toBeInstanceOf(Nodes.In);
     });
 
-    // Same split as #between: a bare ±Infinity is open-ended, not unboundable,
-    // so it falls to the `gt(other.end)` / `lt(other.begin)` arms rather than
-    // the `not_in([])` arm (predications.rb:85-100).
     it("Infinity..end (open-ended begin) becomes GreaterThan on the real end", () => {
       const node = id.notBetween({ begin: Infinity, end: 3 });
       expect(node).toBeInstanceOf(Nodes.GreaterThan);
@@ -389,8 +363,6 @@ describe("Predications range semantics", () => {
     });
 
     it("..-Infinity (both bounds open-ended) still becomes NotIn([]) via infinity?", () => {
-      // Covers the second disjunct of predications.rb:89,
-      // `infinity?(other.end) == -1`.
       const node = id.notBetween({ begin: null, end: -Infinity });
       expect(node).toBeInstanceOf(Nodes.NotIn);
     });

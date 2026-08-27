@@ -1,11 +1,3 @@
-/**
- * Mirrors: ActiveModel::Callbacks (activemodel/lib/active_model/callbacks.rb)
- *
- * Ruby's `include ActiveSupport::Callbacks` (callbacks.rb:87) supplies
- * `set_callback` / `run_callbacks` and the whole chain engine; trails gets the
- * same members from `@blazetrails/activesupport`.
- */
-
 import { NoMethodError } from "./attribute-assignment.js";
 import {
   Value,
@@ -24,19 +16,9 @@ import {
   extended,
 } from "@blazetrails/activesupport";
 
-/** The `base` a Ruby `extended` hook receives: the class doing the extending. */
 type AnyClass = new (...args: never[]) => object;
 
-/**
- * Mirrors: ActiveModel::Callbacks (callbacks.rb:65-158) — the module itself.
- * A class module (see CLAUDE.md "Module mixins"): `extend(base, Callbacks)`
- * copies these statics onto `base` and then fires the `extended` hook.
- */
 export class Callbacks {
-  /**
-   * Mirrors: ActiveModel::Callbacks.extended (callbacks.rb:66-70) —
-   * `base.class_eval { include ActiveSupport::Callbacks }`.
-   */
   static [extended](base: AnyClass): void {
     extend(base, ASCallbacks.ClassMethods);
     include(base, ASCallbacks.InstanceMethods);
@@ -51,17 +33,6 @@ export class Callbacks {
   static _defineAfterModelCallback = _defineAfterModelCallback;
 }
 
-/**
- * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
- * name. Pass `{ only: ["before"] }` as the last argument to limit which
- * timing types are created (defaults to all three); every other option is
- * forwarded to `defineCallbacks`, as Rails does — including the default
- * `scope: [:kind, :name]` (callbacks.rb:113), which makes an object callback
- * registered by `beforeSave` dispatch to `beforeSave` rather than `before`.
- *
- * Mirrors: ActiveModel::Callbacks.define_model_callbacks
- * (activemodel/lib/active_model/callbacks.rb:109-127)
- */
 export function defineModelCallbacks(this: object, event: string, ...rest: string[]): void;
 export function defineModelCallbacks(
   this: object,
@@ -84,15 +55,11 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   const klass = this as { prototype?: object };
 
   for (const callback of callbacks as string[]) {
-    // `define_callbacks` registers on the prototype, where trails' instances
-    // resolve the chain; Ruby's `self` here is the class itself.
     if (klass.prototype) defineCallbacks(klass.prototype, callback, options);
 
     for (const type of types) {
       const methodName = `_define_${String(type)}_model_callback`;
       const generator = _defineModelCallbackByType[methodName];
-      // Ruby's `send` on an unknown name raises NoMethodError; a bare call of
-      // the missing entry would surface a TypeError instead.
       if (!generator) {
         throw new NoMethodError(
           `undefined method '${methodName}' for class ${(this as { name?: string }).name}`,
@@ -103,13 +70,7 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   }
 }
 
-/**
- * @noRailsEquivalent PERMANENT: stands in for `send("_define_#{type}_model_callback", ...)`
- *   (callbacks.rb:125) — TS has no `send`, and the three targets are
- *   module-private functions, not members of `this`. Keyed by the interpolated
- *   Ruby method name so an unknown `only:` entry misses exactly as `send` does.
- *   Not exported.
- */
+/** @noRailsEquivalent PERMANENT */
 const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback: string) => void> =
   {
     _define_before_model_callback: _defineBeforeModelCallback,
@@ -117,7 +78,6 @@ const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback:
     _define_around_model_callback: _defineAroundModelCallback,
   };
 
-/** Minimum shape required of a record object threaded through a callback chain. */
 export type CallbackRecord = object;
 
 export interface DefineModelCallbacksOptions extends DefineCallbacksOptions {
@@ -136,22 +96,11 @@ export type AroundCallbackFn = (
   record: CallbackRecord,
   proceed: () => void | Promise<void>,
 ) => void | Promise<void>;
-/** Rails supports passing an object with callback-named methods. */
 export type CallbackObject = object;
 export interface RunCallbacksOptions {
   strict?: "sync";
 }
 
-/**
- * `if:` / `unless:` accept one filter or an array of them, and a filter is a
- * callable or a Symbol naming a method on the record — the shape Rails hands
- * straight to `set_callback` (validations.rb:160-185).
- *
- * The method-in-object indirection keeps `TRecord` bivariant, which the
- * `if?(record): boolean` method shorthand this replaced gave for free; a plain
- * function-property type makes every `CallbackConditions<Subclass>` unassignable
- * to `CallbackConditions<object>` under `strictFunctionTypes`.
- */
 export type CallbackConditionFilter<TRecord = CallbackRecord> =
   | { _(record: TRecord, value?: unknown): boolean }["_"]
   | Value
@@ -163,18 +112,13 @@ export interface CallbackConditions<TRecord = CallbackRecord> {
   prepend?: boolean;
 }
 
-/** Extends CallbackConditions with the `on:` option available on commit/rollback callbacks. */
 export interface TransactionalCallbackConditions<
   TRecord = CallbackRecord,
 > extends CallbackConditions<TRecord> {
   on?: string | string[];
 }
 
-/**
- * Mirrors: ActiveModel::Callbacks#_define_before_model_callback (callbacks.rb:129-134)
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `before${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
@@ -189,11 +133,7 @@ export function _defineBeforeModelCallback(klass: CallbackHost, callback: string
 
 type CallbackHost = object;
 
-/**
- * Mirrors: ActiveModel::Callbacks#_define_around_model_callback (callbacks.rb:136-141)
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `around${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
@@ -206,11 +146,7 @@ export function _defineAroundModelCallback(klass: CallbackHost, callback: string
   });
 }
 
-/**
- * Mirrors: ActiveModel::Callbacks#_define_after_model_callback (callbacks.rb:143-153)
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `after${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
@@ -226,33 +162,7 @@ export function _defineAfterModelCallback(klass: CallbackHost, callback: string)
   });
 }
 
-/**
- * Ruby's `**options` capture in the three generated macros (callbacks.rb:130,
- * :137, :144): the keyword arguments, split off from the `*args` filter list.
- *
- * @noRailsEquivalent PERMANENT: this is not a second copy of
- *   `normalize_callback_params` — ActiveSupport's `setCallback` still owns that
- *   parse, and the filter list reaches it untouched. It exists because Rails
- *   separates the macro's kwargs from its `*args` *before* `set_callback` is
- *   ever called: `_define_after_model_callback` receives `**options`
- *   (callbacks.rb:144), sets `:prepend` and appends the value conditional to
- *   `:if` (:147-150), and only then calls `set_callback` (:151). The mutation
- *   provably precedes the parse, so the parse cannot supply it. TypeScript has
- *   no `**`, so that separation has to happen at runtime, and the trailing
- *   options bag must be told apart from a trailing CallbackObject filter — a
- *   distinction Ruby gets from the argument's class. The rule is the one
- *   ActiveSupport's own `extract_options!` discriminator uses
- *   (`isCallbackOptions`, activesupport/src/callbacks.ts): a plain object whose
- *   only function-valued keys are `if` and `unless`, the two option values
- *   Rails lets be callable (callbacks.rb:747, :752); any other callable key is
- *   the method an ObjectCall would dispatch to, so the object is a filter.
- *   Module-private, so it is not measured surface — `parity:api:extra` reports
- *   `callbacks.ts` at 0 novel, inside the story's `<= 1` budget. Importing
- *   ActiveSupport's helper instead was tried and reverted: Rails keeps
- *   `normalize_callback_params` private to `ClassMethods`
- *   (callbacks.rb:676-682), so exporting it would trade a private ActiveModel
- *   function for a public ActiveSupport one.
- */
+/** @noRailsEquivalent PERMANENT */
 function extractMacroOptions(
   args: FilterListEntry[],
 ): [FilterListEntry[], CallbackOptions & CallbackConditions] {

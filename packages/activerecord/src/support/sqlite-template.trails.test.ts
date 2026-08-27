@@ -1,11 +1,3 @@
-/**
- * Phase 0 probe: confirms the sqlite template-clone mechanism is active
- * and that canonical DDL was issued exactly once for this vitest invocation.
- * Skipped automatically on PG/MySQL runs (env vars not set).
- *
- * The `registerDbFileCleanupOnExit` suite is adapter-agnostic and always runs;
- * it takes its own listeners back off so they don't accumulate across files.
- */
 import { describe, it, expect, afterEach } from "vitest";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
@@ -140,11 +132,6 @@ describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
     const fs = await getFsAsync();
     expect(await fs.exists(workerDb!), `worker clone must exist at ${workerDb}`).toBe(true);
 
-    // The clone path embeds the vitest worker's pool slot ID
-    // (`ar-test-worker-<token>-<slot>.sqlite`), mirroring how Rails keys each
-    // parallel test DB by fork index (test_databases.rb). Two workers with
-    // different VITEST_POOL_IDs resolve to different paths, making cross-worker
-    // DB sharing structurally impossible.
     const slot = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
     expect(workerDb).toContain(`-${slot}.sqlite`);
 

@@ -1,15 +1,4 @@
 import { rbEqual } from "@blazetrails/activesupport";
-/**
- * WhereClause — manages WHERE predicates on a Relation.
- *
- * Stores a single array of predicates, matching Rails' WhereClause which
- * holds a flat `predicates` array. A predicate is an Arel node or a raw
- * String — `build_where_clause`'s sanitize_sql arm stores the bare String
- * (query_methods.rb:1627) and this class handles it at where_clause.rb:160,
- * 167, 190 and 203.
- *
- * Mirrors: ActiveRecord::Relation::WhereClause
- */
 
 import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -39,48 +28,30 @@ export class WhereClause {
     return this.predicates.length === 0;
   }
 
-  /**
-   * Mirrors WhereClause's `delegate :any?, :empty?, to: :predicates`
-   * (where_clause.rb:8) — true when any predicate is present.
-   */
   any(): boolean {
     return this.predicates.length > 0;
   }
 
-  /** Mirrors: where_clause.rb:14 `def +(other)` — Ruby `Array#+`, a plain concatenation. */
   plus(other: WhereClause): WhereClause {
     return new WhereClause([...this.predicates, ...other.predicates]);
   }
 
-  /** Mirrors: where_clause.rb:18 `def -(other)` — Ruby `Array#-`. */
   minus(other: WhereClause): WhereClause {
     return new WhereClause(subtractNodes(this.predicates, other.predicates));
   }
 
-  /**
-   * Mirrors: where_clause.rb:22 `def |(other)` — Ruby `Array#|`, which dedups
-   * identical predicates and keeps distinct ones. Named `union` after the Ruby
-   * operator's name (`Array#|` is "union"), the spelling
-   * `operator-order-spelling.ts` pins for this class.
-   */
   union(other: WhereClause): WhereClause {
     return new WhereClause(unionNodes(this.predicates, other.predicates));
   }
 
   merge(other: WhereClause): WhereClause {
-    // Rails: remove predicates from self that conflict with other's attributes,
-    // then union with other's predicates (other wins on conflict)
     const filtered = this.exceptPredicates(other.extractAttributes());
     return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
   /**
-   * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106):
-   *   `predicates.first` (where_clause.rb:85) — Ruby `Array#first`, spelled
-   *   `predicates[0]` in TS.
-   * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106):
-   *   `predicates.size == 1` (where_clause.rb:84) — Ruby `Array#size`, spelled
-   *   `.length` in TS.
+   * @missingRailsCall first — PERMANENT
+   * @missingRailsCall size — PERMANENT
    */
   invert(): WhereClause {
     if (this.predicates.length === 0) return this.clone();
@@ -131,25 +102,17 @@ export class WhereClause {
     return predicates.length === 1 ? predicates[0] : new Nodes.And(predicates);
   }
 
-  /** Mirrors: where_clause.rb:75 `def ==(other)`, aliased `eql?`. */
   equals(other: unknown): boolean {
     return (
       other instanceof WhereClause &&
       this.predicates.length === other.predicates.length &&
-      // A bare-String predicate (query_methods.rb:1627) compares with
-      // `String#==` in Ruby; a JS primitive has no method to dispatch, so it is
-      // seated in the SqlLiteral whose `eql` is that same `String#==`.
       this.predicates.every((predicate, i) =>
         rbEqual(typeof predicate === "string" ? sql(predicate) : predicate, other.predicates[i]),
       )
     );
   }
 
-  /**
-   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106):
-   *   `predicates.any? do |x| ... end` (where_clause.rb:100) — Enumerable#any?
-   *   with a block on a Ruby Array, spelled `.some(...)` in TS.
-   */
+  /** @missingRailsCall any? — PERMANENT */
   isContradiction(): boolean {
     for (const node of this.predicates) {
       if (node instanceof Nodes.In) {
@@ -186,8 +149,6 @@ export class WhereClause {
   private exceptPredicates(
     columns: (string | Nodes.Attribute | Nodes.Node)[],
   ): (Nodes.Node | string)[] {
-    // Rails: separate Attribute objects from string column names.
-    // Attributes compared via eql() (table-qualified), strings by name only.
     const attrNodes: Nodes.Attribute[] = [];
     const exprNodes: Nodes.Node[] = [];
     const colStrings = new Set<string>();
@@ -197,15 +158,12 @@ export class WhereClause {
         attrNodes.push(c);
         colStrings.add(`${String(c.relation.name)}.${c.name}`);
       } else if (c instanceof Nodes.Node) {
-        // Non-Attribute expression LHS (e.g. NamedFunction) — Rails' `non_attrs`.
         exprNodes.push(c);
       }
     }
     return this.predicates.filter((node) => {
       const attr = extractAttribute(node);
       if (attr === null) {
-        // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
-        // whose left expression matches one being merged in (last equality wins).
         const left = predicationLeft(node);
         if (left !== null && exprNodes.some((e) => rbEqual(e, left))) return false;
         return true;
@@ -218,8 +176,7 @@ export class WhereClause {
     });
   }
 
-  /** @internal Deviation: Rails keeps this private, but Relation's update/delete
-   *  manager paths build their WHERE list from it directly. */
+  /** @internal */
   predicatesWithWrappedSqlLiterals(): Nodes.Node[] {
     return this.nonEmptyPredicates().map((node) => {
       if (node instanceof Nodes.SqlLiteral || typeof node === "string") return wrapSqlLiteral(node);
@@ -227,11 +184,7 @@ export class WhereClause {
     });
   }
 
-  /**
-   * @internal
-   * Rails' `predicates - ARRAY_WITH_EMPTY_STRING` (where_clause.rb:197-200)
-   * drops a SqlLiteral("") too, because SqlLiteral subclasses String in Ruby.
-   */
+  /** @internal */
   private nonEmptyPredicates(): (Nodes.Node | string)[] {
     return this.predicates.filter(
       (n) => n !== "" && !(n instanceof Nodes.SqlLiteral && n.value === ""),
@@ -246,9 +199,6 @@ export class WhereClause {
       let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
       if (!attr && isEqualityNode(node)) {
         const left = (node as any).left;
-        // Rails' `node.left.is_a?(Arel::Predications)` (where_clause.rb:129): include()
-        // leaves no is_a? marker, so membership is tested via Predications#eq
-        // (predications.rb:17).
         if (left && typeof left.eq === "function") attr = left;
       }
       if (attr) fn(attr, node);
@@ -293,9 +243,6 @@ function subtractNodes(
   return result;
 }
 
-// Mirrors Rails: `node.left if equality_node?(node) && node.left.is_a?(Arel::Predications)`.
-// Returns the left-hand expression of an equality predicate when it is a
-// non-Attribute Arel node (a NamedFunction, etc.), else null.
 function predicationLeft(node: Nodes.Node | string): Nodes.Node | null {
   const isEquality = typeof (node as any).isEquality === "function" && (node as any).isEquality();
   if (!isEquality) return null;
@@ -320,15 +267,6 @@ function equalities(predicates: (Nodes.Node | string)[], equalityOnly: boolean):
 
 /** @internal */
 function extractNodeValue(node: unknown): unknown {
-  // Mirrors Rails where_clause.rb:209-215 `extract_node_value`: prefer
-  // `value_before_type_cast` (the raw, un-serialized value). Both Quoted and
-  // Casted alias it to their stored value — so a Casted wrapping an
-  // AdditionalValue (encryption deterministic queries) or any other rich value
-  // is returned intact for scope_for_create, not flattened via
-  // `value_for_database`. This matters now that multi-value arrays build
-  // `HomogeneousIn`, whose `right` is an array of Casted nodes.
-  // `build_quoted` seats an ActiveModel::Attribute unwrapped (casted.rb:50-51),
-  // and it answers `value_before_type_cast` like the wrappers below do.
   if (node instanceof ModelAttribute) return node.valueBeforeTypeCast;
   if (node instanceof Nodes.Quoted) return node.value;
   if (node instanceof Nodes.Casted) return node.valueBeforeTypeCast();

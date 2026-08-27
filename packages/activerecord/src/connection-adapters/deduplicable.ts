@@ -1,13 +1,3 @@
-/**
- * Deduplicable — mixin for deduplicating frozen value objects.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Deduplicable
- *
- * In Rails, this uses a WeakMap-based registry to ensure identical
- * value objects share a single instance. In TS we use a Map with
- * string keys for deduplication.
- */
-
 export interface Deduplicable {
   deduplicateKey(): string;
   /** @internal */
@@ -47,13 +37,6 @@ function deduplicated<T extends object>(obj: T): T {
   return obj;
 }
 
-/**
- * Base class for deduplicable value objects.
- * Subclasses must implement `deduplicateKey` and optionally override `deduplicated`.
- * The constructor deduplicates the instance against the global registry.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new
- */
 export abstract class DeduplicableBase implements Deduplicable {
   constructor() {
     return deduplicate(this);

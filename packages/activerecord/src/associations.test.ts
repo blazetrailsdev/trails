@@ -1,10 +1,3 @@
-/**
- * Associations tests — mirrors Rails activerecord/test/cases/associations_test.rb
- *
- * Covers the test classes that file defines: AssociationsTest,
- * AssociationProxyTest, PreloaderTest, OverridingAssociationsTest,
- * GeneratedMethodsTest, and WithAnnotationsTest.
- */
 import { findCollectionTarget as findHasManyTarget } from "./test-helpers/find-collection-target.js";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
@@ -47,10 +40,6 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Mirrors Rails `assert_match(/#{Regexp.escape(quote_table_name(col))} =/, sql)`:
-// build the adapter's own quoted `"table"."column"` form so the assertion holds
-// across sqlite/pg/mysql quoting. With `{ inWhere: true }` it mirrors Rails'
-// `/WHERE .*#{...} =/` form, requiring the predicate to live in the WHERE clause.
 function expectQuotedColumnInSql(
   sql: string,
   qualifiedColumn: string,
@@ -74,9 +63,6 @@ describe("AssociationsTest", () => {
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
-    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:84
-    // book is created THROUGH order.books so it lives in the association's
-    // in-memory target before the reload — exercises the CPK reconciliation path.
     const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
     const book = await (order as any).books.create({ id: [3, 4], title: "Book" });
     const dbBook = await CpkBook.where({ author_id: 3, id: 4 }).first();
@@ -177,9 +163,6 @@ describe("AssociationProxyTest", () => {
   });
 
   it("proxy object can be stubbed", async () => {
-    // Rails defines a singleton method on the proxy and asserts the cached
-    // proxy keeps it; the trails proxy is cached (same object), so a property
-    // assigned to it survives across accessor reads.
     const david = developers("david") as any;
     david.projects.extraMethod = () => 42;
     expect(david.projects.extraMethod()).toBe(42);
@@ -260,7 +243,6 @@ describe("AssociationProxyTest", () => {
     expect(david.projects.loaded).toBe(false);
   });
   it("inspect does not reload a not yet loaded target", async () => {
-    // Mirrors developer.rb `log=`: building an audit_log without loading.
     const andreas = new Developer({ name: "Andreas" });
     (andreas as any).log = "new developer added";
     expect(andreas.auditLogs.loaded).toBe(false);
@@ -268,11 +250,6 @@ describe("AssociationProxyTest", () => {
     expect(andreas.auditLogs.loaded).toBe(true);
   });
   it("pretty_print does not reload a not yet loaded target", async () => {
-    // Mirrors test_pretty_print_does_not_reload_a_not_yet_loaded_target: PP.pp
-    // on an unloaded proxy renders the built (in-memory) target without forcing
-    // a reload. trails has no Ruby `PP` library; `pp(obj, io)` drives the same
-    // pretty-printer protocol (CollectionProxy#prettyPrint → record#prettyPrint)
-    // rather than #inspect.
     const andreas = new Developer({});
     (andreas as any).log = "new developer added";
     expect(andreas.auditLogs.loaded).toBe(false);
@@ -290,8 +267,6 @@ describe("AssociationProxyTest", () => {
     const david = developers("david") as any;
     const once = await david.projects.reload();
     const reloaded = await once.reload();
-    // Rails: `assert_equal david.projects, david.projects.reload.reload`
-    // (associations_test.rb:588) — record equality, not identity.
     expect(await reloaded.toArray()).toEqual(await david.projects.toArray());
     expect(david.projects.loaded).toBe(true);
   });
@@ -303,8 +278,6 @@ describe("AssociationProxyTest", () => {
     expect(results).toEqual(expected);
   });
   it("inverses get set of subsets of the association", async () => {
-    // Rails: human.interests.where("1=1").first.human should not re-query —
-    // automatic inverse_of wires the parent onto each loaded child.
     const human = await Human.create({});
     await (human as any).interests.create({});
     const found = await Human.find((human as any).id);
@@ -318,8 +291,6 @@ describe("AssociationProxyTest", () => {
     const loaded = await david.firstPosts.load();
     expect(david.firstPosts.loaded).toBe(true);
     expect(loaded.length).toBeGreaterThan(0);
-    // Rails: assert_no_queries { david.first_posts.pluck(:title) } — pluck reads
-    // the loaded target rather than issuing a fresh SELECT.
     const sqls = await captureSql(async () => {
       expect(await david.firstPosts.pluck("title")).toEqual(expected);
     });
@@ -330,8 +301,6 @@ describe("AssociationProxyTest", () => {
     const expected = await david.firstPosts.pick("title");
     await david.firstPosts.load();
     expect(david.firstPosts.loaded).toBe(true);
-    // Rails: assert_no_queries { david.first_posts.pick(:title) } — pick reads
-    // the loaded target rather than issuing a fresh SELECT.
     const sqls = await captureSql(async () => {
       expect(await david.firstPosts.pick("title")).toEqual(expected);
     });
@@ -1043,9 +1012,6 @@ describe("PreloaderTest", () => {
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(1);
-    // Rails: `assert_predicate author.association(:essay_category), :loaded?`
-    // (associations_test.rb:1337) — the singular association object off the
-    // owner, not a CollectionProxy.
     expect((author as any).association("essayCategory").isLoaded()).toBe(true);
     const preloaded = (author as any).association("essayCategory").target;
     expect(allCategories).toContain(preloaded);
@@ -1334,8 +1300,6 @@ describe("PreloaderTest", () => {
 describe("OverridingAssociationsTest", () => {
   fixtures([]);
 
-  // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.
-  // vendor/rails/activerecord/test/cases/associations_test.rb:710
   class DifferentPerson extends Base {}
   registerModel("DifferentPerson", DifferentPerson);
 
@@ -1359,15 +1323,11 @@ describe("OverridingAssociationsTest", () => {
   }
 
   it("habtm association redefinition callbacks should differ and not inherited", () => {
-    // Mirrors Rails: PeopleList.before_add_for_has_and_belongs_to_many.length == 1,
-    //                DifferentPeopleList.before_add_for_has_and_belongs_to_many == []
     expect((PeopleList as any).beforeAddForHasAndBelongsToMany).toHaveLength(1);
     expect((DifferentPeopleList as any).beforeAddForHasAndBelongsToMany).toEqual([]);
   });
 
   it("has many association redefinition callbacks should differ and not inherited", () => {
-    // Mirrors Rails: PeopleList.before_add_for_has_many.length == 1,
-    //                DifferentPeopleList.before_add_for_has_many == []
     expect((PeopleList as any).beforeAddForHasMany).toHaveLength(1);
     expect((DifferentPeopleList as any).beforeAddForHasMany).toEqual([]);
   });
@@ -1397,9 +1357,6 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("requires symbol argument", async () => {
-    // Rails raises ArgumentError for belongs_to "author" (string literal, not symbol).
-    // TypeScript has no symbols; the type system enforces this at compile time.
-    // Verify that the runtime accepts a valid string name (cannot assert a compile-time error).
     class OaArgTest extends Base {
       static {
         this.hasMany("items");
@@ -1409,9 +1366,6 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("associations raise with name error if associated to classes that do not exist", () => {
-    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:779-798.
-    // Rails raises NameError synchronously in Association#initialize → check_validity! → klass,
-    // so record.association(:name) itself throws — not load_target.
     class ModelAssociatedToClassesThatDoNotExist extends Base {
       static {
         this._tableName = "accounts";
@@ -1448,11 +1402,6 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("included module overwrites association methods", () => {
-    // Rails: `include MyModule` (def comments; :none end) BEFORE `has_many :comments`;
-    // the module is inserted above GeneratedAssociationMethods in the ancestor chain so
-    // the module method wins. JS equivalent: define as non-configurable before hasMany —
-    // defineReaders' guard (`if (existing && !existing.configurable) return`) skips it,
-    // matching Ruby's outcome that a pre-included method is not replaced by the association.
     class MyArticle extends Base {
       static {
         Object.defineProperty(this.prototype, "comments", {
@@ -1470,8 +1419,6 @@ describe("GeneratedMethodsTest", () => {
 });
 
 describe("WithAnnotationsTest", () => {
-  // Mirrors Rails pirate.rb:SpacePirate (table "pirates") with annotated association scopes.
-  // vendor/rails/activerecord/test/models/pirate.rb:108-118
   class SpacePirateAnnotated extends Base {
     static {
       this.tableName = "pirates";
@@ -1587,19 +1534,7 @@ describe("WithAnnotationsTest", () => {
   });
 });
 
-// ==========================================================================
-// AssociationsTest cases that rely on the canonical Rails fixtures
-// (associations_test.rb test_subselect, test_using_limitable_reflections_helper,
-// test_association_with_references). They live in a second `AssociationsTest`
-// describe (same class name, so parity:test still maps them to the Rails
-// AssociationsTest). The canonical model modules are imported dynamically in
-// beforeAll — never at the top level — so their module-level side effects
-// (Company STI subtree registration, Developer type registration) run during
-// this block's execution rather than at collection time.
-// ==========================================================================
 describe("AssociationsTest", () => {
-  // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
-  // :author_favorites`); the subselect test reads them through the association.
   const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
     fixtures([
       "companies",
@@ -1650,10 +1585,6 @@ describe("AssociationsTest", () => {
     ShardedBlog = shardedMod.ShardedBlog as never;
     ShardedBlogPost = shardedMod.ShardedBlogPost as never;
     ShardedBlogPostWithRevision = shardedMod.ShardedBlogPostWithRevision as never;
-    // Rails defines this association inline in
-    // test_query_constraints_over_three_..._raises; its 3-attribute query
-    // constraints make the FK underivable, so loading it raises. Declared once
-    // here (a test-local mutation in Rails) to keep the conditional out of `it`.
     if (!reflectOnAssociation(ShardedBlogPostWithRevision, "commentsWithoutQueryConstraints")) {
       (ShardedBlogPostWithRevision as any).hasMany("commentsWithoutQueryConstraints", {
         primaryKey: ["blog_id", "id"],
@@ -1755,8 +1686,6 @@ describe("AssociationsTest", () => {
     const fav2 = await association(author, "authorFavorites").where({
       author: Author.where({ id: author.id }),
     });
-    // Rails: `assert_equal favs, fav2` compares arrays element-wise with AR
-    // record `==` (class + id), not mapped ids. Mirror that with `equals`.
     expect(fav2.length).toEqual(favs.length);
     fav2.forEach((f: any, i: number) => {
       expect(f.equals(favs[i])).toBe(true);
@@ -1767,9 +1696,6 @@ describe("AssociationsTest", () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
     const part = await (ship as any).parts.create({ name: "Mast" });
     part.markForDestruction();
-    // Rails `ship.parts[0]` routes through load_target → merge_target_lists,
-    // preserving in-memory records (marked-for-destruction kept); trails'
-    // `toArray()` merges in-memory over DB rows the same way.
     const parts = await (ship as any).parts.toArray();
     expect(parts[0].markedForDestruction()).toBe(true);
   });
@@ -1785,10 +1711,6 @@ describe("AssociationsTest", () => {
   });
 
   it("include with order works", async () => {
-    // Rails wraps both calls in `assert_nothing_raised` and runs two order
-    // forms: `order: "id"` (raw SQL string) then `order: :id` (symbol → quoted
-    // column reference). The hash form is the trails equivalent of the
-    // symbol/column-reference form.
     let raised: unknown;
     try {
       await Account.all().order("id").includes(":firm").first();
@@ -1867,8 +1789,6 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
 
     const loaded = await (comment as any).loadBelongsTo("blogPost");
-    // Rails asserts full-record equality (assert_equal(blog_post, comment.blog_post));
-    // check both composite-key components rather than just `id`.
     expect(loaded.id).toBe((blogPost as any).id);
     expect(loaded.blog_id).toBe((blogPost as any).blog_id);
   });
@@ -1967,13 +1887,8 @@ describe("AssociationsTest", () => {
     let blogPost: any = shardedBlogPosts("great_post_blog_one");
     blogPost = await ShardedBlogPostWithRevision.find(blogPost.id);
 
-    // Rails raises only when the association is loaded (`.to_a`), not when the
-    // proxy is built — the FK is derived lazily inside `load_target`'s scope
-    // build. Reading the accessor must NOT throw; awaiting/loading does.
     const proxy = blogPost.commentsWithoutQueryConstraints;
     await expect(proxy.toArray()).rejects.toThrow(
-      // Full Rails message tail (omitting the owner class name, which differs
-      // between Rails `Sharded::BlogPostWithRevision` and the trails class).
       /has more than 2 attributes\. Active Record is unable to derive the query constraints for the association\. You need to explicitly define the query constraints for this association\./,
     );
   });
@@ -1996,9 +1911,6 @@ describe("AssociationsTest", () => {
       ":blogPostById",
     );
     const loaded = comments[0];
-    // Rails reads `comment.blog_post_by_id` from the preloaded cache and compares
-    // it to the directly-loaded `comment.blog_post`; read the preloaded record
-    // rather than re-querying so the preload path is what gets verified.
     const preloaded = (loaded as any).association("blogPostById").target;
     expect(preloaded).toBeDefined();
     const byCompositeKey = await (loaded as any).loadBelongsTo("blogPost");
@@ -2123,8 +2035,6 @@ describe("AssociationsTest", () => {
     const blogPost = new ShardedBlogPost({ title: "New post", blog_id: (anotherBlog as any).id });
     (comment.association("blogPost") as any).writer(blogPost);
 
-    // Rails `comment.blog_post` returns the just-assigned in-memory target
-    // (the new record is unsaved, so reading is from the association cache).
     const loaded = (comment.association("blogPost") as any).target;
     expect(loaded).toBe(blogPost);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
@@ -2283,10 +2193,6 @@ describe("AssociationsTest", () => {
   });
 
   it("query constraints that dont include a composite primary key raise", async () => {
-    // Rails runs the primary-key-inclusion guard unconditionally: when the
-    // owner has a composite PK, `owner_pk` is an array that is never an element
-    // of the string-valued constraints list, so the guard always raises rather
-    // than silently exempting composite-PK owners.
     const originalList = (ShardedBlogPost as any)._queryConstraintsList;
     const originalPk = (ShardedBlogPost as any)._primaryKey;
     const originalReflections = { ...((ShardedBlogPost as any)._reflections ?? {}) };
@@ -2345,12 +2251,6 @@ describe("AssociationsTest", () => {
     expect(comments.map((c) => (c as any).body).sort()).toEqual(["A", "B"]);
   });
 
-  // Exercises the inline (no-reflection) fallback against a composite-PK owner
-  // WITHOUT query_constraints (CpkOrder's PK is `[shop_id, id]`). Invoked with a
-  // scalar FK and an unregistered association name, the fallback must collapse
-  // the composite owner PK to `"id"` (mirroring the `composite_primary_key?`
-  // branch of `reflection.activeRecordPrimaryKey`, reflection.rb:597-600) rather
-  // than reading the whole `[shop_id, id]` array as a scalar attribute.
   it("has many loads via inline fallback resolving composite owner key as id attribute", async () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const [, orderId] = order.id as [number, number];
@@ -2364,11 +2264,6 @@ describe("AssociationsTest", () => {
     expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
   });
 
-  // Rails only ever loads a singular association from a reflection
-  // (association.rb:41-45), and declares both composite-key has_one shapes on
-  // Cpk::Order (cpk/order.rb:14, 45), so the composite-FK and
-  // scalar-FK-on-a-composite-PK owner key derivations are covered through real
-  // reflections.
   it("has one loads through a declared reflection with a composite foreign key", async () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const [shopId, orderId] = order.id as [number, number];
@@ -2383,12 +2278,6 @@ describe("AssociationsTest", () => {
     expect((await (order as any).loadHasOne("book"))?.title).toBe("Only");
   });
 
-  // The inline (no-reflection) fallback must build from
-  // `scope_for_association` (default scopes only), not the enclosing scoping
-  // block's class `current_scope`. Inside `CpkOrderAgreement.where("1=0")
-  // .scoping`, a `.all()`-based fallback would inherit `1=0` and return 0
-  // agreements; Rails (and the converged reflection path) keep current_scope
-  // off association reads, so both agreements still load.
   it("has many loads via inline fallback ignoring enclosing current_scope", async () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const [, orderId] = order.id as [number, number];

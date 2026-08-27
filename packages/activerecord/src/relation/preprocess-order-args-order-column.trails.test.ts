@@ -4,14 +4,6 @@ import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { preprocessOrderArgs } from "./query-methods.js";
 
-/**
- * Rails' `preprocess_order_args` (query_methods.rb:2093-2110) routes every
- * Symbol and Hash order arg through `order_column(field.to_s)` — so the
- * columns_hash / from_clause gate, the `arel_column` fallback (a bare quoted
- * literal for an unknown column), and dotted `table.column` resolution all
- * apply to order args. trails previously built the attribute inline off
- * `this.table`, which qualified every arg to the relation's table regardless.
- */
 describe("preprocessOrderArgs routes through orderColumn", () => {
   fixtures([]);
 
@@ -56,10 +48,6 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
     expect(preprocess(Topic.all(), ["title ASC"])).toEqual(["title ASC"]);
   });
   it("quotes the fallback through quote_table_name, as Rails' order_column does", () => {
-    // `order_column`'s else arm is
-    // `Arel.sql(model.adapter_class.quote_table_name(attr_name), retryable: true)`
-    // (query_methods.rb:2153-2161). Both quoters emit the same bytes on every
-    // adapter trails ships, so only the dispatch is observable.
     const connection = (Topic as unknown as { connection: Record<string, unknown> }).connection;
     const quoteTableName = vi.spyOn(connection as never, "quoteTableName");
     const quoteColumnName = vi.spyOn(connection as never, "quoteColumnName");

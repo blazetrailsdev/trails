@@ -60,11 +60,6 @@ describe("Visitor dispatch", () => {
   });
 
   it("falls through to an ancestor's handler when its own dispatch entry names a missing method", () => {
-    // A class whose own dispatch entry names a missing method falls through to
-    // an ancestor's working handler and visits successfully — mirroring Rails'
-    // `respond_to?(dispatch[klass], true)` ancestor walk (visitor.rb:36-37),
-    // not raising on the mis-registration. B's entry names a typo'd method; A's
-    // works, so `visit(new B())` resolves upward to `visitA`.
     class FallUpVisitor extends Visitor {
       visitA(_n: A): string {
         return "A";
@@ -76,14 +71,10 @@ describe("Visitor dispatch", () => {
     }
     const v = new FallUpVisitor();
     expect(v.accept(new B())).toBe("A");
-    // Only the successful ancestor resolution is memoized onto B (visitor.rb:40).
     expect(FallUpVisitor.dispatchCache().get(B)).toBe("visitA");
   });
 
   it("raises TypeError when neither the class nor an ancestor has a responding handler", () => {
-    // Both the class's own entry and every ancestor's name a missing method, so
-    // no handler responds and the terminal is Rails' `TypeError, "Cannot visit
-    // X"` (visitor.rb:39) — not an UnsupportedVisitError for a mis-registration.
     class BadVisitor extends Visitor {
       static {
         this.dispatchCache().set(A, "visitTypoed");
@@ -118,13 +109,6 @@ describe("Visitor dispatch", () => {
   });
 
   describe("raw values dispatch on their Ruby class", () => {
-    // Rails' `visit` reads `object.class` for every object (visitor.rb:29), so
-    // raw values and nodes share one method table and one entry point — there
-    // is no separate raw-value path. These pin that the same `accept` that
-    // dispatches a Node also resolves a bare JS value to `visit<RubyClass>`.
-    // A real class registered in the ctor-keyed dispatch cache. A Hash whose
-    // `constructor` property happens to point here must still dispatch as Hash,
-    // not be hijacked onto this handler.
     class Registered {}
 
     class ValueVisitor extends Visitor {
@@ -162,9 +146,7 @@ describe("Visitor dispatch", () => {
 
     it.each([
       [1, "Integer:1"],
-      // Ruby has no fixnum/bignum split at this layer — both are Integer.
       [10n, "Integer:10"],
-      // Ruby splits Integer from Float; a non-integral number is a Float.
       [1.5, "Float:1.5"],
       ["x", "String:x"],
       [true, "TrueClass"],
@@ -178,9 +160,6 @@ describe("Visitor dispatch", () => {
     });
 
     it.each([
-      // Rails' `visit` walks object.class.ancestors (visitor.rb:36-41), so any
-      // record derived from a plain record reaches visit_Hash on every visitor,
-      // not just Dot. These are the JS analogues of `class MyHash < Hash`.
       ["record derived from a plain record", Object.create({ inherited: "x" })],
       ["record derived from a null-prototype record", Object.create(Object.create(null))],
       ["record inheriting a literal constructor key", Object.create({ constructor: "x" })],
@@ -189,11 +168,6 @@ describe("Visitor dispatch", () => {
     });
 
     it.each([
-      // Rails reads `object.class` (visitor.rb:28) before it looks inside, and a
-      // Hash's `:constructor` key can't change its class. A JS record's
-      // `constructor` — whether an own data key on a null-prototype record or an
-      // inherited one — must not hijack dispatch to that (registered) ctor's
-      // handler; the record is a Hash and routes to visit_Hash regardless.
       [
         "own constructor key pointing at a registered ctor",
         (() => {

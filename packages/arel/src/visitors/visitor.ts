@@ -1,13 +1,11 @@
 import { isHashAnalogue, rubyClassName } from "./ruby-class.js";
 
-// visitor.rb:39
 function describeClass(object: unknown): string {
   const rubyClass = rubyClassName(object);
   if (rubyClass !== null) return rubyClass;
   return (object as { constructor?: { name?: string } })?.constructor?.name ?? typeof object;
 }
 
-/** to_sql.rb:756 */
 export type NodeCtor = abstract new (...args: never[]) => object;
 
 /**
@@ -18,11 +16,6 @@ type VisitorCtor = (abstract new (...args: never[]) => Visitor) &
 
 const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
 
-/**
- * Mirrors: Arel::Visitors::Visitor (activerecord/lib/arel/visitors/visitor.rb).
- *
- * to_sql.rb:842
- */
 export abstract class Visitor {
   protected dispatch: Map<NodeCtor, string>;
 
@@ -36,9 +29,7 @@ export abstract class Visitor {
     return this.visit(object, collector);
   }
 
-  /**
-   * @internal
-   */
+  /** @internal */
   static dispatchCache(this: VisitorCtor): Map<NodeCtor, string> {
     let cache = PER_CLASS_CACHE.get(this);
     if (!cache) {
@@ -49,7 +40,6 @@ export abstract class Visitor {
           : undefined;
       cache = new Map(inherited);
       PER_CLASS_CACHE.set(this, cache);
-      // visitor.rb:28-30
       if (Object.hasOwn(this, "registerDispatch")) this.registerDispatch?.();
     }
     return cache;
@@ -67,7 +57,6 @@ export abstract class Visitor {
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`Cannot visit ${describeClass(object)}`);
     }
-    // visitor.rb:36-37
     const fn = (this as unknown as Record<string, unknown>)[methodName] as (
       n: unknown,
       c?: unknown,
@@ -75,11 +64,7 @@ export abstract class Visitor {
     return fn.call(this, object, collector);
   }
 
-  /**
-   * visitor.rb:29
-   */
   private dispatchMethod(object: unknown): string | undefined {
-    // visitor.rb:28
     if (!isHashAnalogue(object)) {
       const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
       if (typeof ctor === "function") {
@@ -93,16 +78,10 @@ export abstract class Visitor {
     return this.respondsTo(byName) ? byName : undefined;
   }
 
-  /**
-   * visitor.rb:36-37
-   */
   private respondsTo(methodName: string): boolean {
     return typeof (this as unknown as Record<string, unknown>)[methodName] === "function";
   }
 
-  /**
-   * visitor.rb:36-37, visitor.rb:40
-   */
   private resolveDispatch(ctor: NodeCtor): string | undefined {
     const direct = this.dispatch.get(ctor);
     if (direct && this.respondsTo(direct)) return direct;

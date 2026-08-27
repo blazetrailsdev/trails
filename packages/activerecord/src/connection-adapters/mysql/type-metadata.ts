@@ -1,38 +1,14 @@
-/**
- * MySQL type metadata — extended SQL type metadata with MySQL-specific info.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata
- *
- * Wraps the base SqlTypeMetadata with an `extra` field that captures
- * MySQL-specific column extras like "auto_increment", "on update CURRENT_TIMESTAMP",
- * "VIRTUAL GENERATED", etc.
- */
-
 import {
   SqlTypeMetadata,
   TYPE_METADATA_CLASSES,
   type SqlTypeMetadataJSON,
 } from "../sql-type-metadata.js";
 
-/** The `class`-tagged payload `toJSON` writes, so `extra` survives the
- *  schema-cache round trip the way Ruby's YAML tag carries it. */
 export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
   extra: string | null;
 }
 
-/**
- * Rails' `DelegateClass(SqlTypeMetadata)` forwards every base reader to the
- * wrapped metadata; TypeScript's equivalent of that forwarding is inheritance,
- * so the wrapped object's state lives on `super` rather than in an
- * `__getobj__`.
- */
 export class TypeMetadata extends SqlTypeMetadata {
-  /**
-   * `attr_reader :extra`, whose `initialize` default is `extra: nil`
-   * (mysql/type_metadata.rb:12-16) — `null` where none was given, not a `""`
-   * stand-in. `fetch_type_metadata`'s own `extra = ""` default
-   * (mysql/schema_statements.rb:221-223) is what live introspection passes.
-   */
   readonly extra: string | null;
 
   constructor(
@@ -45,9 +21,6 @@ export class TypeMetadata extends SqlTypeMetadata {
     },
     options: { extra?: string | null } = {},
   ) {
-    // Rails' MySQL TypeMetadata delegates `type` to the wrapped
-    // SqlTypeMetadata, which is nil for an unmapped sql_type — no sqlType
-    // fallback. Keep it nil-faithful.
     super(typeMetadata);
     this.extra = options.extra ?? null;
   }

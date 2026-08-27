@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Model } from "../model.js";
 import { resetI18n } from "../test-helpers/i18n.js";
 
-// models/person.rb
 class Person extends Model {
   static {
     this.attribute("title", "string");

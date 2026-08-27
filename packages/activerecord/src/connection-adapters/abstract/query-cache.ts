@@ -13,20 +13,10 @@ import {
 } from "./connection-pool/execution-context.js";
 import { ExecutorHooks } from "./connection-pool.js";
 
-/**
- * Matches the locking suffixes Rails refuses to cache (`SELECT ... FOR
- * UPDATE` and friends). Mirrors `arel.locked` short-circuit in
- * `QueryCache#select_all`.
- */
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
 const DEFAULT_MAX_SIZE = 100;
 
-/**
- * LRU cache store for query results.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache::Store
- */
 export class Store {
   private _map = new Map<string, Record<string, unknown>[]>();
   private _maxSize: number | null;
@@ -90,16 +80,11 @@ export class Store {
     }
 
     if (this._maxSize != null && this._map.size >= this._maxSize) {
-      // `@map.shift` (query_cache.rb:76) — evict the oldest entry, which for a
-      // JS `Map` is the first insertion-ordered key.
       const oldestKey = this._map.keys().next().value;
       if (oldestKey !== undefined) this._map.delete(oldestKey);
     }
 
     return compute().then((result) => {
-      // `@map[key] ||= yield` (query_cache.rb:79): the assignment loses to a
-      // value stored while this compute was in flight, so a second concurrent
-      // miss on the same key does not overwrite the first one's result.
       const stored = this._map.get(key);
       if (stored) return stored;
       this._map.set(key, result);
@@ -112,9 +97,6 @@ export class Store {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache::QueryCacheRegistry
- */
 export class QueryCacheRegistry {
   private _caches = new Map<string, Store>();
 
@@ -143,11 +125,6 @@ export class QueryCacheRegistry {
   }
 }
 
-/**
- * Module-level registry of live ConnectionPoolConfigurations. Wired so the
- * execution-context exit hook in `withExecutionContext` can evict each pool's
- * per-context Store, mirroring Rails' GC of `IsolatedExecutionState.context`.
- */
 const ACTIVE_CACHE_CONFIGS = new Set<WeakRef<ConnectionPoolConfiguration>>();
 
 function evictQueryCacheStoresForContext(contextId: string): void {
@@ -163,9 +140,6 @@ function evictQueryCacheStoresForContext(contextId: string): void {
 
 registerContextExitHook(evictQueryCacheStoresForContext);
 
-/**
- * Host interface for QueryCache connection-level mixin methods.
- */
 export interface QueryCachePool {
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
   disableQueryCache<T>(fn: () => T | Promise<T>, opts?: { dirties?: boolean }): T | Promise<T>;
@@ -178,9 +152,6 @@ export interface QueryCachePool {
 export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
   pool: DatabaseStatementsHost["pool"] & QueryCachePool;
-  // Mixed in from the QueryCache module below. Dispatched through `this` (not
-  // the module-level functions) so a per-connection override is honored, as in
-  // Rails' `def connection.cache_notification_info`.
   /** @internal */
   cacheNotificationInfo(
     sql: string,
@@ -209,11 +180,6 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
   ): Promise<Record<string, unknown>[]>;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache::ConnectionPoolConfiguration
- *
- * Mixin for connection pools that manages the per-thread query cache.
- */
 export class ConnectionPoolConfiguration {
   private _threadQueryCaches = new QueryCacheRegistry();
   private _queryCacheMaxSize: number | null;
@@ -221,13 +187,6 @@ export class ConnectionPoolConfiguration {
   private _pinnedCount = 0;
 
   constructor(queryCache?: unknown) {
-    // Mirrors Rails' `@query_cache_max_size = case query_cache = db_config&.query_cache`
-    // (`query_cache.rb:120-129`): `0`/`false` → nil, an Integer → itself, `nil`
-    // → DEFAULT_SIZE, and — since the case has no other branch — anything else
-    // (`true`, or a string such as "unlimited" or a `?query_cache=42` URL value
-    // that stays the string "42") falls through to nil, i.e. unbounded. A nil
-    // max size is NOT what marks a pool disabled — that gate is
-    // `db_config&.query_cache == false`, asked inline by `QueryCache.run`.
     if (queryCache === 0 || queryCache === false) {
       this._queryCacheMaxSize = null;
     } else if (typeof queryCache === "number") {
@@ -242,17 +201,13 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE removes a per-context query-cache store Ruby drops with the thread's IsolatedExecutionState (abstract/query_cache.rb:62).
+   * @noRailsEquivalent CONVERGEABLE
    */
   deleteStore(contextId: string): void {
     this._threadQueryCaches.deleteStore(contextId);
   }
 
   checkoutAndVerify(connection: QueryCacheHost): QueryCacheHost {
-    // Mirrors Rails' `connection.query_cache ||= query_cache`: only assign if
-    // the connection has no cache yet. Checkin nulls `_queryCache`, so this
-    // is equivalent to an unconditional set in steady state — but matches
-    // Rails for callers that wire a Store directly before pool adoption.
     if (!connection._queryCache) connection._queryCache = this.queryCache;
     return connection;
   }
@@ -271,10 +226,6 @@ export class ConnectionPoolConfiguration {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     };
-    // NOT an `async` method: Ruby's `ensure` fires when the block RETURNS, and
-    // `exec_main_query`'s block returns a pending FutureResult rather than
-    // rows, so the restore is synchronous there too. Awaiting the block would
-    // adopt that thenable and resolve the handle away.
     let result: T | Promise<T>;
     try {
       result = fn();
@@ -287,13 +238,6 @@ export class ConnectionPoolConfiguration {
     return result;
   }
 
-  /**
-   * NOT an `async` method, for the same reason `disableQueryCache` above is
-   * not: Ruby's `ensure` fires when the block RETURNS
-   * (abstract/query_cache.rb:149-157), so a block handing back a pending
-   * FutureResult restores synchronously and the handle passes through
-   * untouched. Awaiting it would adopt the thenable.
-   */
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
     const cache = this.queryCache;
     const oldEnabled = cache.enabled;
@@ -351,7 +295,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE explicit form of Ruby's `@pinned_connections_count += 1` inside pin_connection! (connection_pool.rb:325).
+   * @noRailsEquivalent CONVERGEABLE
    */
   incrementPinnedCount(): void {
     this._pinnedCount++;
@@ -359,53 +303,29 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE explicit form of Ruby's `@pinned_connections_count -= 1` inside unpin_connection! (connection_pool.rb:340).
+   * @noRailsEquivalent CONVERGEABLE
    */
   decrementPinnedCount(): void {
     this._pinnedCount--;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Connection-level mixin functions
-// Mirrors: ActiveRecord::ConnectionAdapters::QueryCache (module mixed into connection)
-// ---------------------------------------------------------------------------
-
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#query_cache (attr_accessor)
- */
 export function queryCache(this: QueryCacheHost): Store | null {
   return this._queryCache;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#query_cache_enabled
- */
 export function queryCacheEnabled(this: QueryCacheHost): boolean {
   return this._queryCache?.enabled ?? false;
 }
 
-/**
- * Enable the query cache within the block.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#cache
- */
 export function cache<T>(this: QueryCacheHost, fn: () => T | Promise<T>): T | Promise<T> {
   return this.pool.enableQueryCache(fn);
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#enable_query_cache!
- */
 export function enableQueryCacheBang(this: QueryCacheHost): void {
   this.pool.enableQueryCacheBang();
 }
 
-/**
- * Disable the query cache within the block.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#uncached
- */
 export function uncached<T>(
   this: QueryCacheHost,
   fn: () => T | Promise<T>,
@@ -415,27 +335,14 @@ export function uncached<T>(
   return this.pool.disableQueryCache(fn, { dirties });
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#disable_query_cache!
- */
 export function disableQueryCacheBang(this: QueryCacheHost): void {
   this.pool.disableQueryCacheBang();
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#clear_query_cache
- */
 export function clearQueryCache(this: QueryCacheHost): void {
   this.pool.clearQueryCache();
 }
 
-/**
- * The base (uncached) `selectAll` signature the override wraps via `super`.
- *
- * The base returns a pending `FutureResult` synchronously on the async arm
- * (database_statements.rb:74,671-694), so the union is not decorative: the
- * wrapper hands that handle straight back.
- */
 type BaseSelectAll = (
   this: QueryCacheHost,
   arel: string | unknown,
@@ -444,25 +351,7 @@ type BaseSelectAll = (
   opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
 ) => Result | Promise<Result> | FutureResult | FutureResultComplete;
 
-/**
- * Wrap a base `selectAll` (e.g. the one mixed in from `DatabaseStatements`)
- * with the query cache. When the cache is enabled and the query is not locked
- * (`FOR UPDATE` & friends), results are served from / stored in the cache;
- * otherwise the call delegates straight to `original` (Rails' `super`).
- *
- * The cache stores row hashes (`Result#toArray`), so a hit is reconstructed
- * via `Result.fromRowHashes` — matching the retired `QueryCacheAdapter`
- * wrapper's behavior.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#select_all
- * (query_cache.rb:236), which does `lookup_sql_cache(...) || super` /
- * `cache_sql(...) { super }`.
- */
 export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
-  // NOT an `async function`: `FutureResult#then` implements the JS thenable
-  // protocol, so an async wrapper's own promise would adopt a returned
-  // FutureResult and settle with the final Result, losing the pending handle
-  // Rails' `async` arm exists to hand back (future_result.rb:126-129).
   return function cachedSelectAll(
     this: QueryCacheHost,
     arel: string | unknown,
@@ -470,10 +359,6 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Result | Promise<Result> | FutureResult | FutureResultComplete {
-    // Rails' QueryCache#select_all first unwraps a Relation to its Arel AST
-    // (`arel = arel_from_relation(arel)`), then converts the Arel node to
-    // SQL + binds via `to_sql_and_binds` before consulting the cache. A SQL
-    // string passes through both steps unchanged with its binds intact.
     arel = arelFromRelation(arel);
     const [sql, resolvedBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
       this as DatabaseStatementsHost,
@@ -483,69 +368,30 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
       opts?.allowRetry ?? false,
     );
     binds = resolvedBinds;
-    // Rails query_cache.rb:242/248: to_sql_and_binds replaces the incoming
-    // preparable with collector.preparable for Arel inputs, and query_cache
-    // forwards that returned value to super. Mirror that: compiledPreparable
-    // (non-null only for Arel inputs via the visitor) wins; opts.preparable
-    // (the caller's value for string inputs) is the fallback.
     const resolvedPreparable = compiledPreparable ?? opts?.preparable;
-    // query_cache.rb:242,245,248: `allow_retry` comes back from
-    // `to_sql_and_binds` (the collector's post-traversal flag for an Arel
-    // input, the caller's value for a SQL string) and is forwarded to `super`
-    // alongside `preparable`.
     const forwardOpts = { ...opts, preparable: resolvedPreparable, allowRetry: compiledAllowRetry };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       if (opts?.async) {
-        // Rails: `result = lookup_sql_cache(sql, name, binds) || super(...)`,
-        // then `FutureResult.wrap(result)` (query_cache.rb:244-247). A miss is
-        // NOT written back to the cache on this arm — Rails doesn't either.
-        // No per-row copy: Rails' async arm hands `lookup_sql_cache`'s result
-        // back undup'd (query_cache.rb:244 — only `cache_sql`'s write path
-        // dups, :283), and `fromRowHashes` reads each hash into fresh column
-        // arrays, so the Result never aliases the stored rows anyway.
         const cached = this.lookupSqlCache(sql, name, binds ?? []);
         const result =
           cached !== undefined
             ? Result.fromRowHashes(cached)
             : original.call(this, sql, name, binds, forwardOpts);
-        // Ruby's `super` here is either a FutureResult or a Result; trails'
-        // base hands back a promise whenever the async arm isn't live (e.g.
-        // no async_query_executor), so that case wraps once it resolves —
-        // the same shape `select` uses (database_statements.rb:691-693).
         return result instanceof Promise
           ? result.then((r) => FutureResult.wrap(r))
           : FutureResult.wrap(result);
       }
-      // Rails' sync path is `cache_sql { super }` (query_cache.rb:249), which
-      // itself tracks `hit`, instruments and dups (query_cache.rb:278-297).
       return this.cacheSql(sql, name, binds ?? [], async () => {
         const result = await original.call(this, sql, name, binds, forwardOpts);
         return result.toArray();
       }).then((rows) => Result.fromRowHashes(rows));
     }
-    // Rails' `else` arm is a bare `super` (query_cache.rb:251).
     return original.call(this, sql, name, binds, forwardOpts);
   };
 }
 
-/**
- * Clear the query cache on every connection pool of the current thread,
- * mirroring `ActiveRecord::Base.clear_query_caches_for_current_thread`, which
- * Rails' `dirties_query_cache` decorator calls (query_cache.rb:24). A write
- * under one role (`:writing`) must invalidate the caches of the current
- * thread's *other* pools (`:reading`) too, so a subsequent read there does not
- * return a stale row.
- *
- * Clear every handler pool's per-thread Store, then the host's own Store if it
- * was not one of them: a standalone / NullPool adapter (`abstract-adapter.ts`)
- * owns a local Store that `eachConnectionPool` never enumerates, so clearing
- * only the handler pools would leave its own cached reads stale after a write.
- * Dedup by Store identity so the writing connection — whose `_queryCache` IS
- * its pool's per-thread Store — is cleared exactly once, preserving the
- * `times: 1` collapse.
- * @internal
- */
+/** @internal */
 function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
   const cleared = new Set<Store>();
   ExecutorHooks.connectionHandler()?.eachConnectionPool((pool) => {
@@ -556,16 +402,6 @@ function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
   if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();
 }
 
-/**
- * Wraps the named write methods on `base.prototype` so each clears the
- * per-connection query cache (when its `dirties` flag is set) before
- * delegating to the original implementation. Rails uses `class_eval` to
- * redefine each method as `clear if pool.dirties_query_cache; super`; here we
- * reassign the prototype slot to a wrapper that calls through to the captured
- * original.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
- */
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
   const proto = base.prototype as Record<string, unknown>;
   for (const methodName of methodNames) {
@@ -573,14 +409,6 @@ export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: s
     if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      // Clear unconditionally, mirroring Rails' `dirties_query_cache` (each wired
-      // method clears via `super`, query_cache.rb:13). The clear is idempotent, so
-      // a nested wired write clearing an already-cleared cache is harmless. Each
-      // logical write clears exactly once anyway: the write primitive
-      // (`executeMutation`) these funnel into is not itself wired, and DDL —
-      // which Rails also dirties — reaches the wired `execute` directly. Schema
-      // reflection never reaches here: it routes through the permanently
-      // unwrapped `internalExecQuery`, as in Rails.
       if (this._queryCache?.dirties) {
         clearCurrentThreadQueryCaches(this);
       }
@@ -589,13 +417,7 @@ export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: s
   }
 }
 
-/**
- * No-op base implementation. Each concrete adapter overrides
- * `AbstractAdapter#checkVersion` directly to raise when incompatible.
- *
- * @internal
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#check_version
- */
+/** @internal */
 export function checkVersion(this: QueryCacheHost): void {}
 
 /** @internal */
@@ -616,9 +438,6 @@ function cacheNotificationInfo(
   return {
     sql,
     binds,
-    // Lazy, mirroring Rails' `-> { type_casted_binds(binds) }` (query_cache.rb:311):
-    // self-dispatched so the adapter's `type_cast` override applies here exactly
-    // as it does on the uncached `log` path.
     type_casted_binds: () => this.typeCastedBinds(binds),
     name,
     connection: this,
@@ -640,16 +459,8 @@ function cacheNotificationInfoResult(
   return payload;
 }
 
-/**
- * Build the query-cache key. `JSON.stringify` throws on `BigInt`, and under the
- * PG bigserial default-PK flip a default-PK bind casts to a JS `BigInt`, so
- * stringify the binds with a replacer that renders BigInt losslessly.
- * @internal
- */
+/** @internal */
 function sqlCacheKey(sql: string, binds: unknown[]): string {
-  // Rails keys on `[sql, binds]` (query_cache.rb:261) — Ruby Attributes compare
-  // by value, so the key is really the database values. JS object identity is
-  // not, so key on `value_for_database` to get the same equivalence.
   const values =
     binds && binds.length > 0
       ? binds.map((b) => (b instanceof ModelAttribute ? b.valueForDatabase : b))
@@ -679,16 +490,7 @@ function lookupSqlCache(
   return result;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#cache_sql
- * (query_cache.rb:278-297) — key, `compute_if_absent` with the miss block,
- * the hit-path `sql.active_record` instrumentation, and `result.dup`.
- *
- * `hit` is settled synchronously: `computeIfAbsent` reaches its `get` before
- * returning, so the miss block has already run (or not) by the time the `then`
- * reads the flag — the JS stand-in for Rails' `@lock.synchronize`.
- * @internal
- */
+/** @internal */
 function cacheSql(
   this: QueryCacheHost,
   sql: string,
@@ -717,12 +519,6 @@ function cacheSql(
     });
 }
 
-/**
- * Mixin object for AbstractAdapter: bundles private QueryCache helpers so
- * `include(AbstractAdapter, QueryCache)` credits them to the host class.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache (included in AbstractAdapter)
- */
 export const QueryCache = {
   unsetQueryCacheBang,
   lookupSqlCache,

@@ -31,7 +31,6 @@ export class Nary extends NodeExpression {
     });
   }
 
-  // Mirrors Arel::Nodes::Nary#hash / #eql? / #== (nary.rb:24-33).
   hash(): number {
     return rbHash([this.constructor, this.children]);
   }
@@ -45,10 +44,8 @@ export class Nary extends NodeExpression {
   }
 }
 
-/** Mirrors: `And = Class.new(Nary)` (nary.rb:36). */
 export class And extends Nary {}
 
-/** Mirrors: `Or = Class.new(Nary)` (nary.rb:37). */
 export class Or extends Nary {}
 
 _setAnd(And);

@@ -3,9 +3,6 @@ import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
-/**
- * Mirrors: Arel::Visitors::SQLite
- */
 export class SQLite extends ToSql {
   protected override visitArelNodesLock(_node: Nodes.Lock, collector: SQLString): SQLString {
     return collector;
@@ -49,9 +46,6 @@ export class SQLite extends ToSql {
     return collector;
   }
 
-  /**
-   * Mirrors: Arel::Visitors::SQLite#infix_value_with_paren (sqlite.rb).
-   */
   protected override infixValueWithParen(
     o: Node & { left: Node; right: Node },
     collector: SQLString,

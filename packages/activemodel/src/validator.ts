@@ -2,16 +2,10 @@ import { isBlank, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, NotImplementedError } from "./attribute-assignment.js";
 import type { Errors } from "./errors.js";
 
-/** Minimum shape required of a record passed to validators. */
 export interface ValidatableRecord<TBase extends object = object> {
   errors: Errors<TBase>;
 }
 
-/**
- * Base validator class. Subclasses must implement validate().
- *
- * Mirrors: ActiveModel::Validator
- */
 export abstract class Validator<TBase extends object = object> {
   readonly options: Record<string, unknown>;
 
@@ -32,11 +26,6 @@ export abstract class Validator<TBase extends object = object> {
   abstract validate(_record: ValidatableRecord<TBase>): void | Promise<void>;
 }
 
-/**
- * Iterates through attributes and calls validateEach for each one.
- *
- * Mirrors: ActiveModel::EachValidator
- */
 export class EachValidator<TBase extends object = object> extends Validator<TBase> {
   readonly attributes: readonly string[];
 
@@ -74,21 +63,9 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     );
   }
 
-  /**
-   * Hook method that gets called by the initializer allowing verification
-   * that the arguments supplied are valid. Mirrors
-   * `EachValidator#check_validity!` (validator.rb:167-168).
-   */
   checkValidityBang(): void {}
 
-  /**
-   * Mirrors: ActiveModel::EachValidator#prepare_value_for_validation
-   * (validator.rb:170-172). Identity by default; subclasses (e.g.
-   * NumericalityValidator) override to coerce the value before
-   * validation. Wired through `validate` so subclass overrides fire.
-   *
-   * @internal Rails-private hook.
-   */
+  /** @internal */
   protected prepareValueForValidation(
     value: unknown,
     _record: ValidatableRecord<TBase>,
@@ -97,13 +74,6 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     return value;
   }
 
-  /**
-   * Mirrors: ActiveModel::Validations#read_attribute_for_validation.
-   * Defaults to `send(attr)` (record[attr]); ActiveRecord overrides to
-   * resolve associations. Subclasses that override `validate` (e.g.
-   * NumericalityValidator) reuse this helper so the lookup chain
-   * stays in one place.
-   */
   protected readAttributeForValidation(
     record: ValidatableRecord<TBase>,
     attribute: string,
@@ -119,11 +89,6 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
   }
 }
 
-/**
- * Receives a block and calls it for each attribute.
- *
- * Mirrors: ActiveModel::BlockValidator
- */
 export class BlockValidator<TBase extends object = object> extends EachValidator<TBase> {
   private block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void;
 

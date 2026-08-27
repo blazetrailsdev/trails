@@ -1,11 +1,3 @@
-/**
- * Rails' `arel` reader is `with_connection { |c| build_arel(c, aliases) }`
- * (query_methods.rb:1595), so a model with no connection raises out of the
- * reader rather than building Arel against a substitute. trails' `arel`
- * acquires through `_conn()` for the same reason. Rails has no test for this —
- * `with_connection` raising is a property of the pool, not of `arel` — so the
- * pin that `arel` does not swallow `ConnectionNotEstablished` lives here.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

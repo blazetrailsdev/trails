@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_authorization_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
@@ -19,10 +16,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaAuthorizationTest", () => {
     beforeEach(async () => {
-      // D-1: SchemaThing resolves its adapter through the handler chain, so the
-      // session-auth dance must run on the same connection the model uses —
-      // Base.connection. (Mirrors schema.test.ts, where search_path set on
-      // Base.connection persists across ops, proving a single stable connection.)
       adapter = Base.connection as PostgreSQLAdapter;
       await adapter.execute(`SET search_path TO '$user',public`);
       await adapter.sessionAuth("default");

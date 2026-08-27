@@ -1,11 +1,3 @@
-/**
- * JoinBase — the root node of a join dependency tree.
- *
- * Represents the base model's table in a JOIN query.
- *
- * Mirrors: ActiveRecord::Associations::JoinDependency::JoinBase
- */
-
 import type { Base } from "../../base.js";
 import type { Table } from "@blazetrails/arel";
 import { JoinPart } from "./join-part.js";

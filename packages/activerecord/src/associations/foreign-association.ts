@@ -4,16 +4,8 @@ import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 
 /**
- * Mirrors `options[:foreign_key] || reflection.foreign_key` — the two rungs
- * Rails has, the second being `compute_foreign_key` (reflection.rb) keyed on
- * `reflection.active_record`, the class that *declared* the association.
- *
- * In Rails an association always has a registered reflection, so
- * `reflection.foreign_key` has nothing to fall through to; reaching the third
- * rung here means the receiver is `nil`, which is Ruby's NoMethodError.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE `options[:foreign_key] || reflection.foreign_key` spelled as a helper instead of inline (foreign_association.rb:5).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,
@@ -36,16 +28,8 @@ export function ownerForeignKeyColumns(
 }
 
 /**
- * Mirrors `ActiveRecord::Associations::ForeignAssociation#foreign_key_present?`
- * (foreign_association.rb:5): the owner's `active_record_primary_key` columns
- * must be present for children — which carry the FK referencing them — to be
- * fetchable, so a new-record owner with its PK assigned can still load. Returns
- * false when the associated class has no primary key. Read by the OO
- * `CollectionAssociation`, which has_many's proxy delegates to through
- * `null_scope?` (collection_proxy.rb:1150-1152), so there is one copy.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE ForeignAssociation#foreign_key_present? as a free function so the proxy shares the one copy (foreign_association.rb:5).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function foreignKeyPresentFor(reflection: AssociationReflection, owner: Base): boolean {
   const klass = (reflection as { klass?: { primaryKey?: unknown } }).klass;
@@ -58,7 +42,6 @@ export function foreignKeyPresentFor(reflection: AssociationReflection, owner: B
     _readAttribute?: (key: string) => unknown;
     [key: string]: unknown;
   };
-  // Rails calls `owner.attribute_present?` (!nil && !empty), not a bare nil check.
   return keys.every((key) =>
     typeof rec.attributePresent === "function"
       ? rec.attributePresent(key)
@@ -66,12 +49,6 @@ export function foreignKeyPresentFor(reflection: AssociationReflection, owner: B
   );
 }
 
-/**
- * Module mixed into has_many and has_one associations to provide
- * foreign-key based behavior.
- *
- * Mirrors: ActiveRecord::Associations::ForeignAssociation
- */
 export class ForeignAssociation {
   foreignKeyPresent: boolean;
 
@@ -79,13 +56,6 @@ export class ForeignAssociation {
     this.foreignKeyPresent = false;
   }
 
-  /**
-   * Build the attribute hash that nullifies the owner-side foreign key
-   * (and the polymorphic type column, when applicable) on dependent
-   * records — used by `dependent: :nullify` bulk updates.
-   *
-   * Mirrors: ActiveRecord::Associations::ForeignAssociation#nullified_owner_attributes
-   */
   static nullifiedOwnerAttributes(
     reflection: Pick<AssociationReflection, "foreignKey" | "type">,
   ): Record<string, null> {

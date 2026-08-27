@@ -16,48 +16,30 @@ import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 type NumericValue = number | bigint | ((record: ValidatableRecord) => number) | string;
 
-/**
- * Mirrors: ActiveModel::Validations::NumericalityValidator (numericality.rb)
- *
- *   class NumericalityValidator < EachValidator
- *     include Comparability
- *     include ResolveValue
- *
- *     INTEGER_REGEX     = /\A[+-]?\d+\z/
- *     HEXADECIMAL_REGEX = /\A[+-]?0[xX]/
- *     ...
- */
 export class NumericalityValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
 
-  /**
-   * Coercion-pipeline privates declared here, attached to the prototype
-   * below so they're available during EachValidator's super-time
-   * checkValidityBang() call (same bootstrapping pattern as PRs #994 / #1002 /
-   * #1009). Class fields don't initialize until after super() returns.
-   *
-   * @internal Rails-private helpers.
-   */
-  /** @internal Rails-private helper. */
+  /** @internal */
+  /** @internal */
   declare optionAsNumber: typeof optionAsNumber;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare parseFloat: typeof parseFloat;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare round: typeof round;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isNumber: typeof isNumber;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isInteger: typeof isInteger;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isHexadecimalLiteral: typeof isHexadecimalLiteral;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare filteredOptions: typeof filteredOptions;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isAllowOnlyInteger: typeof isAllowOnlyInteger;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare prepareValueForValidation: typeof prepareValueForValidation;
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare isRecordAttributeChangedInPlace: typeof isRecordAttributeChangedInPlace;
 
   override checkValidityBang(): void {
@@ -65,9 +47,6 @@ export class NumericalityValidator extends EachValidator {
       slice(this.options, ...Object.keys(COMPARE_CHECKS)),
     )) {
       if (value === undefined) continue;
-      // Rails: unless value.is_a?(Numeric) || value.is_a?(Proc) || value.is_a?(Symbol).
-      // A trails Symbol is a colon-prefixed string, which is what separates
-      // `":maxApproved"` (send it) from `"foo"` (a String — Rails rejects it).
       if (!isNumeric(value) && typeof value !== "function" && !isSymbol(value)) {
         throw new ArgumentError(`:${underscore(option)} must be a number, a symbol or a proc`);
       }
@@ -83,15 +62,7 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 
-  /**
-   * Mirrors: numericality.rb:36-65
-   *
-   * @missingRailsArgs merge! — PERMANENT: `Hash#merge!` is a receiver method
-   * on the hash `filtered_options` returns; trails ports Ruby's Hash core
-   * methods as free functions taking the hash first (`hash-utils.ts:140`),
-   * which JS requires short of monkey-patching `Object.prototype`, so the
-   * receiver arrives as the first argument.
-   */
+  /** @missingRailsArgs merge! — PERMANENT */
   validateEach(
     record: ValidatableRecord,
     attribute: string,
@@ -104,43 +75,25 @@ export class NumericalityValidator extends EachValidator {
       return;
     }
 
-    // Rails dispatches through allow_only_integer?(record), not the
-    // raw options[:only_integer] read, so a Proc / method-name option
-    // is honored per-record.
     if (this.isAllowOnlyInteger(record) && !this.isInteger(value)) {
       record.errors.add(attribute, ":not_an_integer", this.filteredOptions(value));
       return;
     }
 
-    // Rails reassigns `value` (numericality.rb:47), so every filtered_options
-    // below interpolates the PARSED value, not the raw input.
     const num = parseAsNumber(value, precision, scale) as number | bigint;
     value = num;
 
-    // Rails uses filtered_options(value).merge!(count: option_value)
-    // for compare/range branches and filtered_options(value) (no count)
-    // for odd/even. A fresh filtered base each branch keeps non-reserved
-    // validator options (message, if, unless, …) reaching i18n.
-    // Ruby `Hash#slice(*keys)` yields the entries in the ARGUMENT order, not the
-    // receiver's, so `options.slice(*RESERVED_OPTIONS)` walks the options in
-    // RESERVED_OPTIONS order — COMPARE, then NUMBER, then RANGE (numericality.rb:16).
-    // Iterating the constant reproduces that, which is what fixes the order errors
-    // land in when one attribute fails several checks at once.
     for (const [option, rawOptionValue] of Object.entries(
       slice(this.options, ...RESERVED_OPTIONS),
     )) {
       let optionValue = rawOptionValue as NumericValue | undefined;
       if (optionValue === undefined) continue;
       if (option in NUMBER_CHECKS) {
-        // Rails: value.to_i.public_send(NUMBER_CHECKS[option]) — TS has no
-        // public_send, so the check Symbol selects the parity test.
         const odd = typeof num === "bigint" ? num % 2n !== 0n : Math.trunc(num) % 2 !== 0;
         if (NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS] === ":odd?" ? !odd : odd) {
           record.errors.add(attribute, `:${option}`, this.filteredOptions(value));
         }
       } else if (option in RANGE_CHECKS) {
-        // Rails: value.public_send(:in?, range) — Object#in? delegates to
-        // Range#include?, and :count interpolates the range's own to_s.
         const range = optionValue as unknown as Range<number>;
         if (!range.isInclude(num as number)) {
           record.errors.add(
@@ -162,28 +115,11 @@ export class NumericalityValidator extends EachValidator {
       }
     }
   }
-
-  // Rails: validate_each(record, attr_name, value, precision: Float::DIG, scale: nil)
-  // No `validate` override: like Rails' NumericalityValidator, the
-  // allowNil/allowBlank short-circuit lives in EachValidator#validate and runs
-  // against the CAST value (`read_attribute_for_validation`) before
-  // `prepare_value_for_validation` swaps in the raw `*_before_type_cast` input.
-  // That's what `test_allow_nil_works_for_casted_value` relies on — assigning
-  // `""` to a decimal column casts to nil, so `allow_nil: true` skips it; an
-  // integer `"abc"` without `allow_nil` still reaches validateEach and flags
-  // not_a_number via the prepared raw value.
 }
 
-// Rails: /\A[+-]?\d+\z/ — use a true end-of-string check rather than
-// JS `$`, which can match BEFORE a final trailing newline ("1\n" would
-// match `/^[+-]?\d+$/` but is rejected by Ruby's \z).
 const INTEGER_REGEX = /^[+-]?\d+(?![\s\S])/;
-// Rails: /\A[+-]?0[xX]/ — no leading whitespace permitted.
 const HEXADECIMAL_REGEX = /^[+-]?0[xX]/;
 
-// Mirrors Rails numericality.rb:16:
-//   RESERVED_OPTIONS = COMPARE_CHECKS.keys + NUMBER_CHECKS.keys + RANGE_CHECKS.keys + [:only_integer, :only_numeric]
-// camelCased for trails option-key conventions.
 const RANGE_CHECKS = { in: ":in?" } as const;
 const NUMBER_CHECKS = { odd: ":odd?", even: ":even?" } as const;
 
@@ -195,19 +131,7 @@ const RESERVED_OPTIONS = [
   "onlyNumeric",
 ];
 
-/**
- * Mirrors: numericality.rb:67-69
- *   def option_as_number(record, option_value, precision, scale)
- *     parse_as_number(resolve_value(record, option_value), precision, scale)
- *   end
- *
- * The single Rails call site that consumes `resolve_value` for compare
- * options (numericality.rb:60). With this private in place, validateEach
- * routes every numeric option through `this.optionAsNumber(...)` rather
- * than the previous inline resolve+coerce.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function optionAsNumber(
   this: {
     resolveValue(record: unknown, value: unknown): unknown;
@@ -221,41 +145,8 @@ export function optionAsNumber(
 }
 
 /**
- * Mirrors: numericality.rb:72-84
- *
- *   def parse_as_number(raw_value, precision, scale)
- *     if raw_value.is_a?(Float)
- *       parse_float(raw_value, precision, scale)
- *     elsif raw_value.is_a?(Numeric)
- *       raw_value
- *     elsif is_integer?(raw_value)
- *       raw_value.to_i
- *     elsif !is_hexadecimal_literal?(raw_value)
- *       parse_float(Kernel.Float(raw_value), precision, scale)
- *     end
- *   end
- *
- * Returns undefined when raw_value isn't parseable (matching Rails'
- * implicit-nil from the `elsif` chain falling through, and the
- * `rescue ArgumentError, TypeError` around `Kernel.Float` in `is_number?`).
- *
- * Ruby's `String#to_i` is an arbitrary-precision Integer, so the `is_integer?`
- * branch answers a bigint once the digits fall outside the safe-integer range —
- * `"10000000000000001"` has to stay greater than `10_000_000_000_000_000`,
- * which a double cannot express. Inside that range it answers a plain number,
- * leaving every float arm untouched.
- *
- * Ruby's Float-vs-Integer split has no JS counterpart — both are `number` —
- * so integrality stands in for it: a non-integral number takes the `Float`
- * branch, an integral one the `Numeric` (pass-through) branch. That is what
- * keeps a 17-digit integer out of the 15-significant-digit `parse_float`.
- *
- * @internal Rails-private helper.
- *
- * @missingRailsArgs parse_float — PERMANENT: Rails passes `Kernel.Float(raw_value)`
- *   (numericality.rb:82), whose trails spelling is the `kernelFloat` helper —
- *   `Kernel` is a Ruby module, not a JS object, so the call can never present the
- *   `Float` identifier the Ruby side names.
+ * @internal
+ * @missingRailsArgs parse_float — PERMANENT
  */
 export function parseAsNumber(
   rawValue: unknown,
@@ -263,10 +154,7 @@ export function parseAsNumber(
   scale?: number,
 ): number | bigint | undefined {
   if (typeof rawValue === "number") {
-    // Ruby `Float::NAN.to_d` raises, so the chain yields no number.
     if (Number.isNaN(rawValue)) return undefined;
-    // `% 1 === 0` stands in for Ruby's Float-vs-Integer type test (see above);
-    // an integral value takes the `Numeric` pass-through branch.
     return rawValue % 1 === 0 ? rawValue : parseFloat(rawValue, precision, scale);
   }
   if (rawValue instanceof BigDecimal) return round(Number(rawValue.toString("F")), scale);
@@ -284,55 +172,22 @@ export function parseAsNumber(
   return undefined;
 }
 
-/**
- * Ruby's `value.is_a?(Numeric)` over the numeric types trails carries — a
- * bigint among them, since it is how an Integer past 2^53 is spelled here.
- */
 function isNumeric(value: unknown): boolean {
   return typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal;
 }
 
-/** Ruby's `value.is_a?(Symbol)` — a colon-prefixed string in trails. */
 function isSymbol(value: unknown): boolean {
   return typeof value === "string" && value.startsWith(":");
 }
 
-/**
- * Mirrors: numericality.rb:90-92
- *   def round(raw_value, scale)
- *     scale ? raw_value.round(scale) : raw_value
- *   end
- *
- * Ruby Float#round defaults to half-away-from-zero (NOT banker's
- * rounding): 2.5.round == 3, (-2.5).round == -3, and it rounds the float's
- * shortest round-trip decimal string, which is `BigDecimal#round`'s default
- * mode over `String(num)`.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function round(num: number, scale?: number): number {
   if (scale === undefined || scale === null) return num;
   if (!Number.isFinite(num)) return num;
   return Number(new BigDecimal(String(num)).round(scale).toString("F"));
 }
 
-/**
- * Mirrors: numericality.rb:94-100
- *   def is_number?(raw_value, precision, scale)
- *     if options[:only_numeric] && !raw_value.is_a?(Numeric)
- *       return false
- *     end
- *     !parse_as_number(raw_value, precision, scale).nil?
- *   rescue ArgumentError, TypeError
- *     false
- *   end
- *
- * Treats a hex literal as not-a-number (Rails' `parse_as_number`
- * explicitly skips the `Kernel.Float` branch when `is_hexadecimal_literal?`
- * is true, so the chain returns nil).
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isNumber(
   this: { options: Record<string, unknown> },
   rawValue: unknown,
@@ -341,48 +196,20 @@ export function isNumber(
 ): boolean {
   if (this.options.onlyNumeric && !isNumeric(rawValue)) return false;
 
-  // Rails' `rescue ArgumentError, TypeError; false` is folded into
-  // `kernelFloat`, which returns undefined where Kernel.Float would raise.
   return parseAsNumber(rawValue, precision, scale) !== undefined;
 }
 
-/**
- * Mirrors: numericality.rb:102-104
- *   def is_integer?(raw_value)
- *     INTEGER_REGEX.match?(raw_value.to_s)
- *   end
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isInteger(rawValue: unknown): boolean {
   return INTEGER_REGEX.test(String(rawValue));
 }
 
-/**
- * Mirrors: numericality.rb:106-108
- *   def is_hexadecimal_literal?(raw_value)
- *     HEXADECIMAL_REGEX.match?(raw_value.to_s)
- *   end
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isHexadecimalLiteral(rawValue: unknown): boolean {
   return HEXADECIMAL_REGEX.test(String(rawValue));
 }
 
-/**
- * Mirrors: numericality.rb:110-114
- *   def filtered_options(value)
- *     filtered = options.except(*RESERVED_OPTIONS)
- *     filtered[:value] = value
- *     filtered
- *   end
- *
- * Builds the i18n interpolation hash for an error: strips the
- * comparison/range/number-check option keys and merges in :value.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function filteredOptions(
   this: { options: Record<string, unknown> },
   value: unknown,
@@ -397,18 +224,7 @@ export function filteredOptions(
   return filtered;
 }
 
-/**
- * Mirrors: numericality.rb:116-118
- *   def allow_only_integer?(record)
- *     resolve_value(record, options[:only_integer])
- *   end
- *
- * Resolves the :only_integer option per-record, supporting Proc /
- * symbol-method-name forms via resolveValue. Coerced to boolean to
- * match Ruby's truthiness expectation at the call site.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isAllowOnlyInteger(
   this: {
     options: Record<string, unknown>;
@@ -416,57 +232,17 @@ export function isAllowOnlyInteger(
   },
   record: ValidatableRecord,
 ): boolean {
-  // Ruby truthiness: only nil/false count as false. Boolean(0) and
-  // Boolean('') would diverge (Ruby treats both as truthy), so use the
-  // explicit nil-or-false check pattern used elsewhere in trails (see
-  // clusivity.ts:delimiter, comparison.ts).
   const resolved = this.resolveValue(record, this.options.onlyInteger);
   return resolved !== undefined && resolved !== null && resolved !== false;
 }
 
-/**
- * Mirrors: numericality.rb:120-138
- *
- *   def prepare_value_for_validation(value, record, attr_name)
- *     return value if record_attribute_changed_in_place?(record, attr_name)
- *     came_from_user = :"#{attr_name}_came_from_user?"
- *     if record.respond_to?(came_from_user)
- *       if record.public_send(came_from_user)
- *         raw_value = record.public_send(:"#{attr_name}_before_type_cast")
- *       elsif record.respond_to?(:read_attribute)
- *         raw_value = record.read_attribute(attr_name)
- *       end
- *     else
- *       before_type_cast = :"#{attr_name}_before_type_cast"
- *       if record.respond_to?(before_type_cast)
- *         raw_value = record.public_send(before_type_cast)
- *       end
- *     end
- *     raw_value || value
- *   end
- *
- * Lets numericality validate against the raw input the user typed
- * (before type-cast). In trails, IntegerType.cast returns null for
- * non-numeric strings — so "abc" on an integer column would otherwise
- * read as null and slip past via the allowNil short-circuit; this
- * surfaces the original "abc" so it's caught as not_a_number.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function prepareValueForValidation(
   this: unknown,
   value: unknown,
   record: ValidatableRecord,
   attrName: string,
 ): unknown {
-  // Rails has an early `return value if record_attribute_changed_in_place?`
-  // short-circuit (numericality.rb:121) — in-place mutation means the
-  // cast value IS what the user just changed; raw before_type_cast is
-  // stale. Trails does not yet gate on this: `isRecordAttributeChangedInPlace`
-  // is exported (Rails parity surface) but unused here. `attributeChangedInPlace`
-  // now infers genuine in-place mutation (value diverged from tracked change),
-  // so wiring the short-circuit is plausible — but left for a focused change
-  // with its own coverage rather than as a side effect of this path.
   const r = record as unknown as RecordWithRawAttribute;
   let rawValue: unknown;
   const cameFromUser = `${attrName}CameFromUser`;
@@ -482,9 +258,6 @@ export function prepareValueForValidation(
       rawValue = r[beforeTypeCast];
     }
   }
-  // Rails: raw_value || value — Ruby `||` falls back on nil/false. Use
-  // the same semantic so `false`/`null` raw values fall through to
-  // the cast value rather than being treated as "I read the raw".
   return rawValue !== undefined && rawValue !== null && rawValue !== false ? rawValue : value;
 }
 
@@ -494,15 +267,7 @@ interface RecordWithRawAttribute {
   [key: string]: unknown;
 }
 
-/**
- * Mirrors: numericality.rb:140-143
- *   def record_attribute_changed_in_place?(record, attr_name)
- *     record.respond_to?(:attribute_changed_in_place?) &&
- *       record.attribute_changed_in_place?(attr_name.to_s)
- *   end
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function isRecordAttributeChangedInPlace(
   record: ValidatableRecord,
   attrName: string,
@@ -511,24 +276,8 @@ export function isRecordAttributeChangedInPlace(
   return typeof r.attributeChangedInPlace === "function" && r.attributeChangedInPlace(attrName);
 }
 
-/**
- * Mirrors: numericality.rb:86-88
- *   def parse_float(raw_value, precision, scale)
- *     round(raw_value, scale).to_d(precision)
- *   end
- *
- * Rounds to `scale` decimal places, then rounds to `precision`
- * significant digits — `BigDecimal(float.round(scale), precision)`, which is
- * what `Float#to_d(precision)` (BigDecimal 3.1.4+) does. It rounds the
- * float's shortest decimal string, not its binary form, which is why this
- * cannot be `Number#toPrecision` — that rounds the binary value and diverges
- * on exact half-way decimals like `123.455`. See ruby/bigdecimal#70.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 function parseFloat(num: number, precision: number, scale?: number): number {
-  // Ruby `(1.0/0.0).to_d(15)` is BigDecimal Infinity, not an error, so an
-  // infinite Float survives the pipeline and reaches the comparisons.
   if (!Number.isFinite(num)) return num;
   return Number(new BigDecimal(round(num, scale), precision).toString("F"));
 }
@@ -544,11 +293,6 @@ NumericalityValidator.prototype.isAllowOnlyInteger = isAllowOnlyInteger;
 NumericalityValidator.prototype.prepareValueForValidation = prepareValueForValidation;
 NumericalityValidator.prototype.isRecordAttributeChangedInPlace = isRecordAttributeChangedInPlace;
 
-/**
- * Mirrors: ActiveModel::Validations::HelperMethods (numericality.rb:230-232) — Ruby reopens the
- * one `HelperMethods` module here, so the TS half of it lives here too and
- * `validations.ts` reassembles them.
- */
 export const HelperMethods = {
   validatesNumericalityOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
     return this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));

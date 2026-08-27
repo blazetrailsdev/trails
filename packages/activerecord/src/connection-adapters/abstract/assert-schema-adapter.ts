@@ -1,27 +1,15 @@
-/**
- * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:35); TS must narrow the union at the boundary instead.
- */
+/** @noRailsEquivalent PERMANENT */
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Quoting } from "./quoting.js";
 
-/**
- * Minimal subset of {@link Quoting} that `SchemaStatements` depends
- * on. Tightening to this surface lets wrapper adapters forward only
- * what schema operations actually need. @internal
- */
 export type SchemaQuoter = Pick<
   Quoting,
   "quoteColumnName" | "quoteTableName" | "quoteDefaultExpression"
 >;
 
 /**
- * Assert that `adapter` implements the {@link SchemaQuoter} surface
- * `SchemaStatements` depends on, and narrow its type. Used at the
- * boundary where callers hold a `DatabaseAdapter` reference but the
- * concrete adapter is known to mix in `Quoting` at runtime. Throws a
- * descriptive error rather than failing inside a quoting call later.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby mixes Quoting into every adapter at load time (abstract_adapter.rb:35); TS must narrow the union at the boundary instead.
+ * @noRailsEquivalent PERMANENT
  */
 export function assertSchemaAdapter(
   adapter: DatabaseAdapter,

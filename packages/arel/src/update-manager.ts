@@ -10,15 +10,8 @@ import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 import { Table } from "./table.js";
 import type { UpdateValues } from "./crud.js";
 
-/**
- * UpdateManager — chainable API for building UPDATE statements.
- *
- * Mirrors: Arel::UpdateManager
- */
 export class UpdateManager extends TreeManager {
   readonly ast: UpdateStatement;
-  // Installed via include(UpdateManager, StatementMethods) below. Rails
-  // mixes these in via `include TreeManager::StatementMethods`.
   declare key: unknown;
   declare wheres: Node[];
   declare where: (expr: Node) => this;
@@ -31,45 +24,17 @@ export class UpdateManager extends TreeManager {
     this.ast = new UpdateStatement(table);
   }
 
-  /**
-   * Set the target table.
-   *
-   * Mirrors: Arel::UpdateManager#table
-   */
   table(table: Table | Node): this {
     this.ast.relation = table;
     return this;
   }
 
-  /**
-   * Set column = value assignments.
-   *
-   * Mirrors: Arel::UpdateManager#set
-   */
   set(values: UpdateValues): this {
-    // Mirrors Arel::UpdateManager#set (update_manager.rb): pairs become
-    // `Assignment(UnqualifiedColumn(col), value)` with the value passed
-    // through raw — the visitor's `visit` class dispatch quotes
-    // primitives. The `UnqualifiedColumn` wrapper strips the table
-    // qualifier so the visitor does not need an `_inUpdateSet` mode flag.
     if (typeof values === "string") {
-      // Trails-only: keep the string form, but stash it as a SqlLiteral
-      // so the AST always contains Nodes (Rails stashes raw strings and
-      // relies on `visit_String`).
       this.ast.values = [new SqlLiteral(values)];
     } else if (values instanceof SqlLiteral || values instanceof BoundSqlLiteral) {
       this.ast.values = [values];
     } else {
-      // Boundary cast — the one that survives the NodeOrValue narrowing.
-      // `UpdateManager#set` is the package edge: ActiveRecord hands over
-      // already-type-cast-for-database column values as
-      // `Record<string, unknown>` (persistence.ts `_updateRecord`), so `value`
-      // is genuinely `unknown` here and cannot be narrowed without pushing a
-      // false type onto AR's DB-value layer. Rails passes these through raw
-      // too; the visitor's Assignment arm quotes a non-Node right rather than
-      // visiting it (to_sql.rb:637-639). This is why `undefined` can still
-      // reach dispatch and the `undefined`→NilClass normalization in
-      // ruby-class.ts / to-sql.ts stays load-bearing.
       this.ast.values = values.map(
         ([column, value]) => new Assignment(new UnqualifiedColumn(column), value as NodeOrValue),
       );
@@ -77,11 +42,6 @@ export class UpdateManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Add GROUP BY.
-   *
-   * Mirrors: Arel::UpdateManager#group
-   */
   group(columns: (Node | string)[]): this {
     for (const column of columns) {
       if (typeof column === "string") {
@@ -93,15 +53,7 @@ export class UpdateManager extends TreeManager {
     return this;
   }
 
-  /**
-   * Add HAVING.
-   *
-   * Mirrors: Arel::UpdateManager#having
-   */
   having(expr: Node | string): this {
-    // Rails pushes the raw expression and lets `visit_String` render it
-    // (update_manager.rb:43-46). A TS AST holds Nodes only, so a String arrives
-    // as the SqlLiteral it is in Ruby — the same wrap `group` above applies.
     this.ast.havings.push(typeof expr === "string" ? new SqlLiteral(expr) : expr);
     return this;
   }

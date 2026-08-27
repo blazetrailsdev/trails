@@ -1,9 +1,3 @@
-/**
- * PostgreSQL bit string type — casts PG bit strings.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bit
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Data {
@@ -18,12 +12,10 @@ export class Data {
     return this.value;
   }
 
-  /** Mirrors Rails' Bit::Data#binary? */
   isBinary(): boolean {
     return /^[01]*$/.test(this.value);
   }
 
-  /** Mirrors Rails' Bit::Data#hex? */
   isHex(): boolean {
     return /^[0-9A-F]*$/i.test(this.value);
   }
@@ -60,9 +52,6 @@ export class Bit extends ValueType<string> {
   }
 
   override serialize(value: unknown): Data | null {
-    // Rails: `Data.new(super) if value` — super is Type::Value#serialize which
-    // returns the value unchanged. Do NOT route through castValue here; the
-    // hex-notation normalisation only applies on read (cast/deserialize).
     if (value == null) return null;
     if (value instanceof Data) return value;
     return new Data(typeof value === "string" ? value : String(value));
@@ -72,18 +61,9 @@ export class Bit extends ValueType<string> {
     return this.castValue(value);
   }
 
-  /**
-   * Rails' OID::Bit#cast_value. Exposed publicly so parity:api matches
-   * the Rails method name and so callers can invoke the hook directly.
-   */
   castValue(value: unknown): string | null {
     if (value == null) return null;
     if (typeof value === "string") {
-      // Rails: `value[2..-1].hex.to_s(2)`. Ruby's String#hex extracts
-      // leading hex digits and returns 0 if none are present — so
-      // "0xff" → 255, "0x" → 0, "0xZZ" → 0, "0xabZZ" → 0xab.
-      // Use BigInt so arbitrarily long bit strings round-trip losslessly
-      // (JS Number loses precision past 53 bits).
       if (/^0x/i.test(value)) {
         const leadingHex = value.slice(2).match(/^[0-9a-f]+/i)?.[0] ?? "0";
         return BigInt(`0x${leadingHex}`).toString(2);

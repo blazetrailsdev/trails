@@ -1,17 +1,3 @@
-/**
- * Connection pool reaper — periodically reaps and flushes idle connections.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Reaper
- *
- * Every `frequency` seconds, the reaper calls `reap()` and `flush()` on each
- * registered pool. A reaper instantiated with a zero or null frequency will
- * never reap the connection pool.
- *
- * Rails uses a class-level registry (`@pools`, `@threads`) so that one reaper
- * timer is shared across all pools with the same frequency. We mirror this with
- * static maps and `setInterval`, using WeakRef to avoid preventing pool GC.
- */
-
 export interface ReapablePool {
   reap?(): void;
   flush?(): Promise<void>;
@@ -40,17 +26,10 @@ export class Reaper {
     Reaper.registerPool(this.pool, this.frequency);
   }
 
-  // --- Class-level registry (mirrors Rails @mutex/@pools/@threads) ---
-
   private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
   private static _timers = new Map<number, ReturnType<typeof setInterval>>();
 
-  /**
-   * @missingRailsCall spawn_thread — PERMANENT: connection_pool/reaper.rb:59
-   *   starts a background Thread per frequency bucket. JS has no threads, so the
-   *   same period is driven by a `setInterval` timer registered below; there is
-   *   no thread to spawn and no TypeScript spelling of `spawn_thread` to call.
-   */
+  /** @missingRailsCall spawn_thread — PERMANENT */
   static registerPool(pool: ReapablePool, frequency: number): void {
     if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
     if (pool.isDiscarded?.()) return;
@@ -120,16 +99,7 @@ export class Reaper {
   }
 }
 
-/**
- * Spawns the per-frequency reaper "thread". Rails creates a real thread
- * that loops on `sleep frequency; reap; flush; ...`; the JS analogue is a
- * `setInterval`-driven scan of registered weak-ref pools, set up by
- * `Reaper._spawnTimer`. Returns the underlying timer handle.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Reaper.spawn_thread
- *
- * @internal
- */
+/** @internal */
 function spawnThread(frequency: number): ReturnType<typeof setInterval> | null {
   if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return null;
   const internals = Reaper as unknown as {

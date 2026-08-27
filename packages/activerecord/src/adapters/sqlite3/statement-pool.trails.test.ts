@@ -29,9 +29,6 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
   });
 
   it("passes a non-boolean preparedStatements config through as Rails does", () => {
-    // abstract_adapter.rb:159 pipes the config through
-    // `type_cast_config_to_boolean`, which maps the string `"false"` to `false`
-    // and returns everything else UNCHANGED (abstract_adapter.rb:65-71).
     expect(
       track(
         new BetterSQLite3Adapter(":memory:", {
@@ -39,8 +36,6 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
         }),
       ).preparedStatements,
     ).toBe(false);
-    // `0` survives the cast and is truthy in Ruby, so
-    // `prepared_statements?` (abstract_adapter.rb:234-235) answers true.
     expect(
       track(new BetterSQLite3Adapter(":memory:", { preparedStatements: 0 as unknown as boolean }))
         .preparedStatements,

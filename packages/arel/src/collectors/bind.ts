@@ -1,8 +1,3 @@
-/**
- * Bind collector — collects bind params separately from the SQL.
- *
- * Mirrors: Arel::Collectors::Bind
- */
 export class Bind {
   private binds: unknown[];
   retryable = true;

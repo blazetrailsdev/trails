@@ -1,12 +1,3 @@
-/**
- * Focused tests for the FinderMethods shared id-normalization and
- * not-found helpers (`normalizeFindArgs`, `raiseNotFoundAll`,
- * `raiseNotFoundSingle`). The behavior is exercised transitively
- * through `Relation.find` / `CollectionProxy#find`,
- * but the normalizer's branch matrix (scalar / tuple / variadic /
- * flatten / composite arity / empty) is easier to pin here.
- */
-
 import { describe, it, expect, vi } from "vitest";
 import {
   normalizeFindArgs,
@@ -163,9 +154,6 @@ describe("normalizeFindArgs — composite primary key", () => {
   });
 
   it("find([1, 2], [1, 2]) via variadic → uniq'd to a single tuple, unwrapped", () => {
-    // Rails: expects_array = ids.first.first.is_a?(Array) is false for a
-    // variadic call, so the deduped size-1 result is the bare record, not
-    // `[record]` (finder_methods.rb:494-513).
     expect(
       normalizeFindArgs("Order", pk, [
         [1, 2],
@@ -621,12 +609,6 @@ describe("_orderColumns — Rails _order_columns precedence", () => {
     expect(_orderColumns.call(rel)).toEqual(["created_at", "shop_id", "id"]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// raise_record_not_found_exception! message fidelity — finder not-found paths
-// route through raiseRecordNotFoundExceptionBang and compose Rails' faithful
-// messages (finder_methods.rb#raise_record_not_found_exception!, line 417).
-// ---------------------------------------------------------------------------
 
 describe("finder not-found message fidelity", () => {
   it("test_find_one_message_on_primary_key", async () => {

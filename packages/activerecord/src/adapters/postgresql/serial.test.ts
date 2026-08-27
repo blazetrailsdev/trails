@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/serial_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -15,8 +12,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
-  // Mirrors Rails' `PostgresqlSerial.columns_hash[name]` — fetch a column by
-  // name from the live adapter introspection.
   const columnNamed = async (table: string, name: string): Promise<Column> => {
     const cols = await adapter.columns(table);
     const col = cols.find((c) => c.name === name);
@@ -24,9 +19,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     return col;
   };
 
-  // Mirrors Rails' SchemaDumpingHelper#dump_table_schema. The dumped DSL is
-  // TypeScript-flavored (`t.serial("seq", { null: false })`), so the Rails
-  // Ruby-format assertions below are translated to the equivalent TS shape.
   const dumpTableSchema = (table: string): Promise<string> =>
     SchemaDumper.dumpTableSchema(adapter, table);
 

@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "./index.js";
 import { uniq } from "./test-helpers/uniq.js";
 
-// Rails builds `Attribute.new("foo", "bar")` with bare Strings in both slots
-// (attributes_test.rb:16); the TS relation slot is typed to a real relation.
 const attribute = (relation: string, name: string): Nodes.Attribute =>
   new Nodes.Attribute(
     relation as unknown as ConstructorParameters<typeof Nodes.Attribute>[0],

@@ -7,17 +7,6 @@ import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 
-/**
- * Covers the per-attribute dirty method cascade generated when a typed
- * attribute is declared. Mirrors the ActiveModel::Dirty-generated
- * methods in activemodel/lib/active_model/dirty.rb:
- *   name_changed?, name_change, name_was, name_previously_changed?,
- *   name_previous_change, name_previously_was, restore_name!, clear_name_change
- *
- * The `saved_change_to_*` / `*_before_last_save` / `*_in_database` half of the
- * cascade is declared by ActiveRecord (activerecord/attribute_methods/dirty.rb:53-59)
- * and covered in activerecord/src/dirty-generated-methods.trails.test.ts.
- */
 describe("DirtyGeneratedMethods", () => {
   class Person extends Model {
     static {

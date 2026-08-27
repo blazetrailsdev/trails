@@ -19,9 +19,6 @@ import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
-// Rails hands `TableDefinition#initialize` / `SchemaCreation.new` an
-// `ActiveRecord::Base.lease_connection`, and its PostgreSQL DDL-rendering tests
-// run under `current_adapter?(:PostgreSQLAdapter)`.
 let leased: TableDefinitionConn;
 
 beforeAll(async () => {
@@ -363,8 +360,6 @@ describeIfPostgresqlAdapter("AlterTable", () => {
 });
 
 describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
-  // Rails generates CREATE TABLE SQL by accepting the TableDefinition into the
-  // adapter's SchemaCreation visitor; there is no TableDefinition#to_sql.
   const toSql = (td: TableDefinition): Promise<string> => {
     const adapter = (td as any).conn;
     return new PgSchemaCreation("typeToSql" in adapter ? adapter : undefined).accept(td);
@@ -471,10 +466,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", async () => {
-    // No adapter provided → PgSchemaCreation falls back to abstract typeToSql,
-    // whose default branch returns an unrecognized type verbatim (Rails parity:
-    // `type.to_s` — it never uppercases). This matches the real-PostgreSQLAdapter
-    // path, where typeToSql("cidr") also returns "cidr" via NATIVE_DATABASE_TYPES.
     const td = new TableDefinition(leased, "widgets");
     td.cidr("net");
     td.inet("addr");
@@ -510,8 +501,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
       typeToSql: (type: string) => type,
       validColumnDefinitionOptions: () => ColumnDefinition.OPTION_NAMES,
-      // `SchemaCreation` delegates its capability probes to `@conn`
-      // (abstract/schema_creation.rb:16-21); answer as PostgreSQLAdapter does.
       supportsCheckConstraints: async () => true,
       supportsIndexesInCreate: () => false,
       supportsPartialIndex: () => true,

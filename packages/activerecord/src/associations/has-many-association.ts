@@ -37,23 +37,8 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 
-/**
- * Proxy that handles a has_many association.
- *
- * Adds counter cache awareness, dependent handling, and FK setup
- * on record insertion. Delegates collection behavior to
- * CollectionAssociation and load functions in associations.ts.
- *
- * Mirrors: ActiveRecord::Associations::HasManyAssociation
- */
 export class HasManyAssociation extends CollectionAssociation {
-  /**
-   * Rails' `HasManyAssociation` counter-cache instance methods, installed onto
-   * the prototype at the bottom of this file (the trails mixin idiom) so each
-   * is called on `this` with Rails' own argument list.
-   *
-   * @internal
-   */
+  /** @internal */
   declare updateCounterInMemory: (difference: number) => void;
   /** @internal */
   declare updateCounterIfSuccess: <T>(savedSuccessfully: T, difference: number) => T;
@@ -62,50 +47,24 @@ export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
   declare deleteCount: (method: string, scope: any) => Promise<number>;
 
-  /**
-   * Set on an ad-hoc holder built by a CollectionProxy whose own Relation state
-   * has diverged from the seed (whereBang / orderBang / ...): `findTarget` then
-   * runs that mutated Relation instead of rebuilding the association scope.
-   * Rails has no counterpart because its CollectionProxy *is* the relation.
-   * @internal
-   */
+  /** @internal */
   _queryExecutor?: () => Promise<Base[]>;
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
   }
 
-  /**
-   * Set difference (Ruby's `a - b`) over AR record equality — a record present
-   * anywhere in `b` is excluded from the result however many times it occurs.
-   *
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#difference
-   */
   protected override difference(a: Base[], b: Base[]): Base[] {
     return setDifference(a, b);
   }
 
-  /**
-   * Set intersection (Ruby's `a & b`) over AR record equality.
-   *
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#intersection
-   */
   protected override intersection(a: Base[], b: Base[]): Base[] {
     return setIntersection(a, b);
   }
 
   /**
-   * Handle the :dependent option when the owner is being destroyed.
-   * Supports: restrict_with_exception, restrict_with_error, destroy,
-   * nullify, delete (delete_all).
-   *
-   * @missingRailsCall fetch — PERMANENT: Ruby
-   *   `options.fetch(:ensuring_owner_was, nil)` (has_many_association.rb:52); a
-   *   JS object has no `fetch`, so the stored-nil semantics are spelled as an
-   *   own-key check at the call site.
-   * @missingRailsCall first — PERMANENT: Ruby `target.first.class`
-   *   (has_many_association.rb:36); JS arrays have no `first`, so the same
-   *   element is read as `this.target[0]`.
+   * @missingRailsCall fetch — PERMANENT
+   * @missingRailsCall first — PERMANENT
    */
   async handleDependency(): Promise<void | false> {
     const dependent = this.reflection.options.dependent;
@@ -121,9 +80,6 @@ export class HasManyAssociation extends CollectionAssociation {
 
       case "restrictWithError": {
         if (!(await this.isEmpty())) {
-          // Rails: owner.errors.add(:base, ...); throw(:abort). The owner is
-          // NOT destroyed and no exception is raised — `destroy` returns false.
-          // We signal :abort to the before_destroy chain by returning false.
           const owner = this.owner as Base & {
             errors: { add(a: string, t: string, opts?: Record<string, unknown>): void };
           };
@@ -142,17 +98,6 @@ export class HasManyAssociation extends CollectionAssociation {
         for (const record of records) {
           (record as any).destroyedByAssociation = this.reflection;
         }
-        // Rails: `handle_dependency` does NOT rescue here. The child's
-        // RecordNotDestroyed propagates through the before_destroy callback chain
-        // and is rescued by Callbacks#destroy on the OWNER, which stores it as
-        // @_association_destroy_exception and returns false. destroy! then
-        // re-raises that stored exception via _raise_record_not_destroyed so
-        // error.record is the failed child, not the owner.
-        //
-        // Mirrors that: let RecordNotDestroyed propagate; addDestroyCallbacks
-        // (builder/association.ts) catches it, stores it on the owner, and
-        // calls throwAbort() so the owner's destroy() returns false. destroyBang
-        // then calls _raiseRecordNotDestroyed() which re-raises the child exception.
         await this.destroyAll();
         break;
       }
@@ -188,8 +133,6 @@ export class HasManyAssociation extends CollectionAssociation {
               associationClass: String((this.reflection.klass as typeof Base).name),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
-              // Ruby `options.fetch(:ensuring_owner_was, nil)` returns a stored
-              // `nil`/`false`; `??` would substitute the default for it.
               ensuringOwnerWasMethod:
                 "ensuringOwnerWas" in this.reflection.options
                   ? (this.reflection.options as any).ensuringOwnerWas
@@ -200,20 +143,11 @@ export class HasManyAssociation extends CollectionAssociation {
         break;
       }
 
-      // Rails has no `:nullify` case — it falls through to the `else` arm,
-      // whose bare `delete_all` reads `options[:dependent]` itself
-      // (has_many_association.rb:56, collection_association.rb:157).
       default:
         await this.deleteAll();
     }
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#insert_record
-   * (has_many_association.rb:61-64) — point the record's FK/type columns at the
-   * owner, then delegate to `CollectionAssociation#insert_record`, which picks
-   * the `save!` / `save` arm from `raise`.
-   */
   override async insertRecord(
     record: Base,
     validate = true,
@@ -224,16 +158,6 @@ export class HasManyAssociation extends CollectionAssociation {
     return super.insertRecord(record, validate, raise, block);
   }
 
-  /**
-   * Fetch the collection's target records.
-   *
-   * Mirrors: ActiveRecord::Associations::Association#find_target
-   * (association.rb:248) as reached through `CollectionAssociation#load_target`
-   * (collection_association.rb:272). This is the association-instance entry
-   * point; it wraps the module-private loader below, which the CollectionProxy
-   * and the through-association loaders reach through an ad-hoc holder built by
-   * `_buildAssociationInstance`.
-   */
   protected override async findTarget(): Promise<Base[]> {
     this._loaderWritebackSuppressed++;
     try {
@@ -244,8 +168,6 @@ export class HasManyAssociation extends CollectionAssociation {
         this._queryExecutor,
         this.isViolatesStrictLoading(),
       );
-      // Rails applies `set_strict_loading` per record inside `find_target`'s
-      // instantiation block (association.rb:269-271), not in `load_target`.
       for (const record of records) this.setStrictLoading(record);
       return records;
     } finally {
@@ -253,89 +175,43 @@ export class HasManyAssociation extends CollectionAssociation {
     }
   }
 
-  /**
-   * Source the FK/type-column null map from the Rails-named helper so
-   * `dependent: :nullify` honors the rich reflection (custom foreignKey,
-   * polymorphic foreignType, composite PKs).
-   */
   protected override computeNullifiedOwnerAttributes(): Record<string, null> {
     return nullifiedOwnerAttributes(this);
   }
 
-  /**
-   * Mirrors Rails' `HasManyAssociation#delete_or_nullify_all_records`
-   * (via `delete_count` + `update_counter`, has_many_association.rb): the
-   * `delete_all` dispatch point. Deletes the scoped rows for `"deleteAll"`,
-   * otherwise (including the `nil`/`undefined` default) nullifies their FK —
-   * then decrements the counter cache by the affected count.
-   * @internal
-   */
+  /** @internal */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
     const count = await this.deleteCount(method ?? "", (this as any).scope());
     await this.updateCounter(-count);
     return count;
   }
 
-  /**
-   * Delete the given records per the `:dependent` strategy. Reached from
-   * `removeRecords` (after `before_remove` fires), so `dependent: :destroy`
-   * on `owner.destroy` now destroys children through the callback path.
-   *
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#delete_records —
-   * `:destroy` destroys each record; otherwise a bulk delete/nullify scoped
-   * to the records, decrementing the counter cache by the affected count.
-   * @internal
-   */
+  /** @internal */
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     if (method === "destroy") {
-      // Rails: records.each(&:destroy!).
       for (const record of records) await (record as any).destroyBang();
-      // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
-      // (has_many_association.rb:130).
       if (!this.reflection.isInverseUpdatesCounterCache?.()) {
         await this.updateCounter(-records.length);
       }
       return records.length;
     }
-    // delete_all / nullify (Rails delete_records else-branch). Reached only via the
-    // association-layer `delete` with a dependent strategy; non-through has_many
-    // `delete` is intercepted by the CollectionProxy. Scope to the given records by
-    // their query-constraint columns so we delete/nullify only those rows.
-    // Rails: `reflection.klass.composite_query_constraints_list`
-    // (has_many_association.rb:132). Both routes here go through
-    // `record.association(name)` (instance-methods.ts:163-166, Rails
-    // associations.rb:290-296), which constructs from the registered
-    // reflection, so `reflection.klass` is always the rich reader.
     const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
     const values = records.map((r) =>
       queryConstraints.map((col) => (r as any)._readAttribute(col)),
     );
     const baseScope = (this as any).scope?.();
     if (!baseScope) return 0;
-    // Rails: `scope = self.scope.where(query_constraints => values)`. A single-column
-    // key takes the `WHERE id IN (...)` form; a composite key takes the tuple form
-    // (OR-of-AND), since `AND col1 IN (...) AND col2 IN (...)` is a cartesian product.
     const scope =
       queryConstraints.length === 1
         ? baseScope.where({ [queryConstraints[0]]: values.map((tuple) => tuple[0]) })
         : baseScope.where(queryConstraints, values);
-    // Canonical models map Rails' `dependent: :delete_all` to the `"delete"`
-    // string (deleteAll is not yet in the AssociationOptions type), so normalize
-    // it to the delete_all strategy here the same way `deleteAll()` does
-    // (collection-association.ts). Without this the per-record delete path falls
-    // through to nullify, which fails for NOT-NULL composite-PK foreign keys.
     method = method === "delete" ? "deleteAll" : method;
     const count = await this.deleteCount(method, scope);
     if (count > 0) await this.updateCounter(-count);
     return count;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#concat_records
-   * (has_many_association.rb:139-141) — `update_counter_if_success(super,
-   * records.length)`.
-   * @internal
-   */
+  /** @internal */
   protected override concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
     const concatenated = super.concatRecords(records, raise);
     return isThenable(concatenated)
@@ -343,13 +219,7 @@ export class HasManyAssociation extends CollectionAssociation {
       : this.updateCounterIfSuccess(concatenated, records.length);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#_create_record
-   * (has_many_association.rb:143-149). The Array arm delegates to plain
-   * `super` — each recursion inside `CollectionAssociation#_createRecord`
-   * re-enters here and bumps the counter once per element.
-   * @internal
-   */
+  /** @internal */
   protected override async _createRecord(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
@@ -365,11 +235,7 @@ export class HasManyAssociation extends CollectionAssociation {
     }
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::HasManyAssociation#count_records
-   * (has_many_association.rb:80-95).
-   * @internal
-   */
+  /** @internal */
   async countRecords(): Promise<number> {
     const reflection = this.reflection as unknown as {
       hasActiveCachedCounter(): boolean;
@@ -377,8 +243,6 @@ export class HasManyAssociation extends CollectionAssociation {
     };
     let count: number;
     if (reflection.hasActiveCachedCounter()) {
-      // has_active_cached_counter? guarantees a counter column, but guard
-      // against a null column anyway — `nil.to_i == 0` in Rails.
       const counterCacheColumn = reflection.counterCacheColumn();
       count =
         counterCacheColumn == null ? 0 : toI((this.owner as any).readAttribute(counterCacheColumn));
@@ -402,7 +266,6 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 }
 
-/** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
 function toI(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === "number") return Math.trunc(value);
@@ -411,11 +274,7 @@ function toI(value: unknown): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-/**
- * Mirrors: `HasManyAssociation#update_counter(difference, reflection =
- * reflection())` (has_many_association.rb:98-102).
- * @internal
- */
+/** @internal */
 async function updateCounter(
   this: HasManyAssociation,
   difference: number,
@@ -433,14 +292,7 @@ async function updateCounter(
   }
 }
 
-/**
- * Mirrors ActiveRecord::Associations::CollectionAssociation#update_counter_in_memory:
- * the has_many bumps the owner's counter in memory only when
- * `counter_must_be_updated_by_has_many?` — otherwise, with counter_cache on
- * both sides, this bump leaks into the belongs_to `increment!` delta
- * (in_memory − in_database) on the next insert and inflates the counter.
- * @internal
- */
+/** @internal */
 function updateCounterInMemory(this: HasManyAssociation, difference: number): void {
   const reflection = this.reflection;
   if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
@@ -451,13 +303,8 @@ function updateCounterInMemory(this: HasManyAssociation, difference: number): vo
   owner.clearAttributeChange?.(counter);
 }
 
-/**
- * Mirrors: `HasManyAssociation#delete_count(method, scope)`
- * (has_many_association.rb:112-118).
- * @internal
- */
+/** @internal */
 function deleteCount(this: HasManyAssociation, method: string, scope: any): Promise<number> {
-  // Rails: delete_all → scope.delete_all; nullify → scope.update_all(nullified_owner_attributes).
   if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
   const nullAttrs = (
     this as unknown as {
@@ -487,15 +334,7 @@ function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] 
   return a.filter((r) => b.includes(r));
 }
 
-/**
- * Build the attribute hash that nullifies the owner-side foreign key (and
- * polymorphic type column, when applicable) on dependent records — used by
- * `dependent: :nullify` bulk updates to drop the FK without destroying rows.
- *
- * Mirrors: ActiveRecord::Associations::ForeignAssociation#nullified_owner_attributes
- *
- * @internal
- */
+/** @internal */
 function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, null> {
   const ctor = assoc.owner.constructor as {
     name: string;
@@ -526,12 +365,8 @@ function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): s
 }
 
 /**
- * Bodies of `HasManyAssociation#difference` / `#intersection`, exposed so the
- * `CollectionProxy` replace path — which is one class covering both the plain
- * and the `:through` reflection, and so cannot pick a diff by inheritance —
- * can reach the same set semantics the OO association uses.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#difference, extracted so the reflection-agnostic proxy can reach it (has_many_association.rb:158).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function setDifference(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => !includesRecord(b, record));
@@ -539,32 +374,13 @@ export function setDifference(a: Base[], b: Base[]): Base[] {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE the body of HasManyAssociation#intersection, extracted for the same proxy path (has_many_association.rb:162).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function setIntersection(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => includesRecord(b, record));
 }
 
-/**
- * Find the has_many association's target records.
- *
- * The functional body behind `HasManyAssociation#findTarget`, which is the
- * Rails-shaped entry point (`ActiveRecord::Associations::Association#find_target`,
- * association.rb:248). It takes the owner/name/options triple rather than an
- * association instance because the CollectionProxy load path and the
- * through-association loaders build an *ad-hoc* holder for a name/options pair
- * the model never declared that way; that triple shape is a trails-only
- * calling convention, not Rails surface, and it is module-private.
- *
- * `violatesStrictLoading` carries the result of the association's
- * `violates_strict_loading?` (association.rb:284-292) into this loader: Rails
- * raises on it as `find_target`'s first statement, but trails only knows a
- * query is actually needed after the cache/preload lookups below, which are
- * Rails' `find_target?` guard (association.rb:190). The predicate reads only
- * owner/reflection state, so evaluating it at the call site is the same answer.
- *
- * @internal
- */
+/** @internal */
 async function findTarget(
   record: Base,
   assocName: string,
@@ -593,9 +409,6 @@ async function findTarget(
     }
   }
 
-  // `Association#find_target`'s first statement (association.rb:248-250). The
-  // `find_target?` gate is `Association#loadTarget`'s (association.rb:190), so
-  // the raise itself is unconditional as in Rails.
   if (violatesStrictLoading) {
     const ctor = record.constructor as typeof Base;
     const reflection = ctor._reflectOnAssociation?.(assocName);
@@ -634,11 +447,6 @@ async function findTarget(
   const rel = scope(record, assocName, assocDef);
   if (rel === null) return [];
 
-  // Set inverse_of on each loaded child. Resolve via the reflection so
-  // automatic_inverse_of also wires each child's parent reference.
-  // Mirrors HasManyAssociation#set_inverse_instance. Wiring runs inside the
-  // instantiation block (Rails' `find_target` yields `set_inverse_instance`
-  // per record) so it lands BEFORE the child's find/initialize callbacks.
   const inverseName = _resolveInverseName(ctor, assocName, options);
   if (inverseName) {
     rel._instantiateBlock = (child: Base) => {
@@ -652,23 +460,8 @@ async function findTarget(
 }
 
 /**
- * Build the has_many association's relation without executing it.
- *
- * Mirrors: ActiveRecord::Associations::Association#scope (association.rb:107) —
- * `target_scope.merge!(association_scope)`, where `association_scope` is
- * `AssociationScope.scope(self)`. `findTarget` runs this relation rather than
- * rebuilding it, and the non-executing callers (CollectionProxy's seed and
- * `scope()`) reach the same relation through here.
- *
- * Returns null when the owner-side key values are absent (unsaved owner / null
- * PK), which Rails expresses as the NullRelation fallback.
- *
- * Takes the owner/name/options triple rather than an association instance for
- * the same reason `findTarget` does — the CollectionProxy and the
- * through-association loaders reach it without one.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE Association#scope (association.rb:107) taken as an owner/name/options triple because the proxy has no Association instance to call it on.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function scope(
   record: Base,
@@ -686,25 +479,9 @@ export function scope(
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
 
-  // Route through AssociationScope when we have a reflection registered.
-  // AssociationScope handles scalar, composite, polymorphic `:as`, and
-  // STI in a single path matching Rails' `AssociationScope.scope`.
-  // Inline fallback only when the reflection hasn't been registered
-  // (happens in tests that define associations via the lower-level API
-  // without going through Reflection.create).
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through && !reflection) return null;
 
-  // Rails validates composite-key shape at exactly one site,
-  // `AssociationReflection#check_validity!` (reflection.rb:618), and that check
-  // opens with `!polymorphic? && ...` — a polymorphic reflection is never
-  // shape-checked at all, whatever its FK/PK lengths. `checkValidityBang`
-  // (reflection.ts) already ports that faithfully, so a reflection-backed `:as`
-  // association must reach AssociationScope unguarded. The guards below are the
-  // inline fallback's alone: with no reflection there is no canonical check to
-  // consult, and an unzippable FK/PK pairing would otherwise read
-  // `readAttribute(undefined)` into broken SQL. That fallback-only strictness is
-  // a trails limitation, not Rails behavior.
   if (options.as && !reflection) {
     if (Array.isArray(foreignKey)) {
       routeThroughCheckValidity(ctor, assocName);
@@ -740,16 +517,6 @@ export function scope(
 
   let rel: any;
   if (reflection) {
-    // Rails' `Association#scope` is
-    //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
-    // (association.rb:313), so the unscoped+constraints relation MUST
-    // be merged with `klass.scope_for_association` — otherwise default_scope
-    // / scope extensions silently disappear. AssociationScope.scope
-    // already merges `reflection.scope` (macro-time lambda) via scopeFor;
-    // skip re-applying the definition's scope ONLY when it's that exact same
-    // function. Callers like `loadHasManyThrough` synthesize a NEW
-    // scope (wrapping with `sourceType` filtering) — those
-    // must still run.
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
     const baseRelation = _scopeForAssociation(targetModel);
     rel = baseRelation.merge(built);
@@ -759,8 +526,6 @@ export function scope(
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
-        // Route through the reflection's canonical checkValidityBang (Rails'
-        // single raise site) so the error carries the Rails-faithful message.
         routeThroughCheckValidity(ctor, assocName);
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,

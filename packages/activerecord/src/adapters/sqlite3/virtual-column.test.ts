@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/virtual_column_test.rb
- */
 import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../index.js";
@@ -64,7 +61,6 @@ async function reloadColumnInformation(): Promise<void> {
   await VirtualColumn.loadSchema();
 }
 
-// -- Rails test class: virtual_column_test.rb --
 describeIfSqlite("SQLite3VirtualColumnTest", () => {
   itIfSupports("virtual_columns", "virtual column with full inserts", async () => {
     const partialInsertsWas = VirtualColumn.partialInserts;

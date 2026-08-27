@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
-// Ruby's `Module#ancestors`, which the Rails body greps for `Nodes::Node`.
 function ancestors(klass: unknown): unknown[] {
   const chain: unknown[] = [];
   for (let k: unknown = klass; k; k = Object.getPrototypeOf(k) as unknown) chain.push(k);
@@ -16,7 +15,6 @@ describe("TestNode", () => {
   it("all nodes are nodes", () => {
     for (const klass of Object.values(Nodes) as unknown[]) {
       if (typeof klass !== "function") continue;
-      // Ruby's `.grep(Class)` — a plain function (`buildQuoted`) is not one.
       if (Object.getOwnPropertyDescriptor(klass as object, "prototype")?.writable !== false) {
         continue;
       }

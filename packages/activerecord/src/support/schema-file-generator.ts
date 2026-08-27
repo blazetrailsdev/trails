@@ -1,14 +1,3 @@
-/**
- * Generates a loadable schema-file module from `TEST_SCHEMA` at runtime,
- * once per Vitest worker. The generated file exports a default function
- * `(ctx: DatabaseAdapter) => Promise<void>` that drives
- * `DatabaseTasks.loadSchema`, giving that path the same coverage it gets
- * in a Rails `db:test:prepare` flow without requiring a checked-in artifact.
- *
- * Hard rule: no `node:*` imports — all I/O goes through the activesupport
- * adapters. `getEnv` replaces `process.env` reads to stay browser-safe.
- */
-
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { Schema, ColumnSpec, TableSchema, IndexSpec, ForeignKeySpec } from "./schema-types.js";
@@ -82,18 +71,12 @@ function colOpts(spec: ColumnSpec, primitive: string, adapterName?: string): str
     if (spec.array) parts.push(`array: true`);
     if (spec.primary) parts.push(`primaryKey: true`);
   }
-  // Mirrors schema-types.ts: MySQL DATETIME without precision defaults to
-  // DATETIME(0), which rejects fractional seconds. Inject precision:6 unless
-  // the spec sets precision explicitly (even precision:null opts out).
   if (adapterName === "mysql2" && primitive === "datetime" && !hasPrecision) {
     parts.push(`precision: 6`);
   }
   return parts.length === 0 ? "{}" : `{ ${parts.join(", ")} }`;
 }
 
-// DJB2 hash — makes each unique schema state produce a unique file path so
-// `import(href)` (ESM-cached by URL) never returns a stale module when the
-// schema changes between calls, mirroring Rails' `load(file)` re-execution.
 function schemaChecksum(code: string): string {
   let h = 5381;
   for (let i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) >>> 0;
@@ -123,30 +106,17 @@ function generateCode(
   for (const [tableName, tableSpec] of Object.entries(schema)) {
     const cols = columnsOf(tableSpec);
     const pk = primaryKeyOf(tableSpec);
-    // A single-column integer PK declared via `primaryKey: ["col"]` mirrors
-    // Rails' `t.primary_key :col`, which makes the column a serial/identity.
-    // Emit it via the string `primaryKey` form (auto-increment) rather than the
-    // array form (plain integer PK, no sequence). Keep them in sync with
-    // schema-types.ts, which applies the same rule for the fixtures path.
     const serialPkName =
       Array.isArray(pk) && pk.length === 1 && isIntegerSpec(cols[pk[0]]) ? pk[0] : null;
 
     const tOptsEntries: string[] = [];
     if (pk === false) tOptsEntries.push(`id: false`);
     else if (serialPkName !== null) {
-      // Suppress the auto `id` column; the serial PK is emitted INLINE at its
-      // declared offset in the column loop below (mirrors schema-types.ts)
-      // rather than via createTable's string-`primaryKey` option, which hoists
-      // the PK column first. Inline emission keeps the reflected column order
-      // matching Rails — e.g. `auto_id_tests` declares `t.primary_key :auto_id`
-      // LAST (persistence_test `test_populates_autoincremented_id_pk_...`).
       tOptsEntries.push(`id: false`);
     } else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
     if (needsForce) tOptsEntries.push(`force: "cascade"`);
     const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
 
-    // Foreign keys ride inside the create-table block (Rails `t.foreign_key`),
-    // so a table declaring one always emits a block even with no columns.
     const fks = foreignKeysOf(tableSpec);
     const fkLines = fks.map(
       (fk) =>
@@ -180,17 +150,11 @@ function generateCode(
       lines.push(`  });`);
     }
 
-    // Emit indexes after the table (Rails `t.index`). The partial `where` is
-    // dropped at SQL generation on adapters without partial-index support, so
-    // it needs no gate here. An expression index (string column with non-word
-    // characters, e.g. "(lower(external_id))") is gated below.
     for (const index of indexesOf(tableSpec)) {
       const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
       const dropExpression =
         supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql2";
       if (isExpression && dropExpression) continue;
-      // schema.rb's inline current_adapter? gate (e.g. the MySQL-only
-      // full_name_index) — mirrors emitTableIndexes' `opts.adapters` skip.
       if (index.adapters && adapterName !== undefined && !index.adapters.includes(adapterName))
         continue;
       const optEntries: string[] = [];
@@ -198,9 +162,6 @@ function generateCode(
       if (index.where !== undefined) optEntries.push(`where: ${JSON.stringify(index.where)}`);
       if (index.name !== undefined) optEntries.push(`name: ${JSON.stringify(index.name)}`);
       if (index.order !== undefined) optEntries.push(`order: ${JSON.stringify(index.order)}`);
-      // Sub-part prefix length is MySQL-only DDL, but the abstract SchemaCreation
-      // visitor now drops it on non-MySQL adapters (matching Rails), so emitting it
-      // unconditionally is safe — it is silently ignored on PG/SQLite.
       if (index.length !== undefined) optEntries.push(`length: ${JSON.stringify(index.length)}`);
       if (index.nullsNotDistinct) optEntries.push(`nullsNotDistinct: true`);
       if (index.using !== undefined) optEntries.push(`using: ${JSON.stringify(index.using)}`);
@@ -216,20 +177,6 @@ function generateCode(
   return lines.join("\n") + "\n";
 }
 
-/**
- * Generate a TypeScript schema file from `schema` and write it to a
- * temp path keyed off `VITEST_POOL_ID`. Returns the absolute file path so
- * callers can pass it to `DatabaseTasks.loadSchema`.
- *
- * Pass `adapterName` to apply adapter-specific column mappings (e.g. MySQL
- * date/time/json → string, datetime precision:6 default).
- *
- * Pass `supportsExpressionIndex` (resolved from the caller's live DB version)
- * to gate expression indexes with `supportsExpressionIndex` semantics
- * (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB) instead of the coarse
- * `adapterName === "mysql2"` skip. Omitted for the PG-only template caller,
- * where PG always supports expression indexes.
- */
 export async function generateSchemaFile(
   schema: Schema,
   adapterName?: string,

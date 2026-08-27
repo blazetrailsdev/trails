@@ -14,13 +14,6 @@ const aliasQ = quoteTableName("omg_posts");
 const baseQ = quoteTableName("posts");
 const idQ = quoteTableName("id");
 
-// trails-only: guards the `Relation#table` attr_reader reads in the `relation/`
-// subfiles. Rails' arel_column / order_column / reverse_sql_order / build_arel /
-// find_some / construct_join_dependency all read the relation's own `table`
-// (relation.rb:71), so a relation created with an aliased table
-// (`Relation.create(model, table: arel_table.alias(...))`) must qualify against
-// the ALIAS. Reading `model.arel_table` instead silently resolves back to the
-// base table.
 describe("Relation on an aliased table", () => {
   fixtures(["posts", "comments"]);
 

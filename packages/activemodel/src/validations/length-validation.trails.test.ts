@@ -1,5 +1,3 @@
-// trails-only coverage for LengthValidator that has no Rails counterpart:
-// the option-leak and definition-time-error paths.
 import { describe, it, expect, afterEach } from "vitest";
 import { Range } from "@blazetrails/activesupport";
 import { Model, NoMethodError } from "../index.js";
@@ -36,7 +34,6 @@ describe("LengthValidator (trails)", () => {
   });
 
   it("resolves a Proc maximum against the record", async () => {
-    // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`.
     Person.validatesLengthOf("title", {
       maximum: (r: Person) => r._readAttribute("limit") as number,
     });
@@ -51,7 +48,6 @@ describe("LengthValidator (trails)", () => {
   });
 
   it("raises NoMethodError when a Symbol names a method the record lacks", async () => {
-    // resolve_value.rb:14-15 is `record.send(value)` with no respond_to? guard.
     Person.validatesLengthOf("title", { maximum: ":nonexistent" });
     await expect(new Person({ title: "abc" }).isValid()).rejects.toThrow(NoMethodError);
   });
@@ -72,8 +68,6 @@ describe("LengthValidator (trails)", () => {
   });
 
   it("does not leak reserved keys into errors.add options (is path)", async () => {
-    // Rails RESERVED_OPTIONS omits :wrong_length intentionally, so wrongLength
-    // does appear in error options — matching length.rb:13 behaviour.
     Person.validatesLengthOf("title", { is: 5, wrongLength: "bad length!" });
     const p = new Person({ title: "abc" });
     await p.isValid();
@@ -85,18 +79,12 @@ describe("LengthValidator (trails)", () => {
   });
 
   it("allowBlank: false with only maximum forces minimum of 1", async () => {
-    // Mirrors length.rb:22-24: if allow_blank == false && minimum.nil? && is.nil? → minimum = 1
     Person.validatesLengthOf("title", { maximum: 10, allowBlank: false });
     expect(await new Person({ title: "" }).isValid()).toBe(false);
     expect(await new Person({ title: "a" }).isValid()).toBe(true);
   });
 
   it("throws at definition time when the range is empty", () => {
-    // length.rb:18 is `options[:minimum] = range.min if range.begin`, and
-    // Ruby's `(1...1).min` is nil for an empty range — so :minimum is SET to
-    // nil, reaches check_validity!, and fails its non-negative Integer test.
-    // Verified against vendor/rails: `validates_length_of :title, in: 1...1`
-    // raises ":minimum must be a non-negative Integer, Infinity, Symbol, or Proc".
     expect(() => Person.validatesLengthOf("title", { in: new Range(1, 1, true) })).toThrow(
       /:minimum must be a non-negative Integer/,
     );

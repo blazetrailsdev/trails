@@ -3,45 +3,19 @@ import { IntegerType } from "./integer.js";
 export class BigIntegerType extends IntegerType {
   readonly name: string = "big_integer";
 
-  // Mirrors Rails big_integer.rb:29 — serialize_cast_value returns value as-is,
-  // bypassing Integer's ensureInRange. BigIntegerType is unconditionally unlimited.
   override serializeCastValue(value: number | null): number | null {
     return value;
   }
 
-  // Mirrors Rails big_integer.rb:33 — max_value is Float::INFINITY regardless of
-  // limit, so Integer's number-path range check never fires.
   protected override maxValue(): number {
     return Number.POSITIVE_INFINITY;
   }
 
-  // Mirrors Rails: `BigInteger < Integer` inherits `Integer#type`, hardcoded
-  // `:integer`. Our `name` ("big_integer") is the type-registry key, not the
-  // reflected column type — `column.type` for a bigint is `:integer`.
   override type(): string {
     return "integer";
   }
 
-  /**
-   * @internal Rails-private helper.
-   *
-   * Ruby has a single unbounded `Integer`, so Rails represents every id the
-   * same way regardless of magnitude. Trails is `number`-backed, so we keep a
-   * safe-range integer (`[MIN_SAFE_INTEGER, MAX_SAFE_INTEGER]`) as a plain JS
-   * `number` and only carry a `bigint` (under a `number` cast) for genuine
-   * bignums beyond float64's exact-integer range. This matches
-   * `IntegerType#castValue` and gives pg/MariaDB the same "safe-range integer
-   * is a number" contract better-sqlite3/mysql2 already honor, so a default
-   * `bigint` PK, `pluck`, collection `ids`, and an `integer` FK holding the
-   * same value all compare `===`.
-   *
-   * `BigInteger < Integer` (big_integer.rb:8) inherits `cast_value`
-   * (integer.rb:89-91) unchanged, so the string arm is `String#to_i`: a leading
-   * digit run converts (`"12abc".to_i == 12`) and its absence answers 0
-   * (`"bad".to_i == 0`), exactly as `IntegerType#castValue` does. The run is
-   * parsed as a `BigInt` so a bignum past float64's safe range stays exact;
-   * `BigInt()` rejects a leading "+", which is stripped first.
-   */
+  /** @internal */
   protected override castValue(value: unknown): number | null {
     if (typeof value === "bigint") return this.narrowBigInt(value);
     if (typeof value === "number") {

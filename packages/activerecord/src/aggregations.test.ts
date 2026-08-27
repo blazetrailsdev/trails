@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf, reflectOnAggregation } from "./index.js";
 import { reload as persistenceReload } from "./persistence.js";
@@ -23,18 +19,9 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// ==========================================================================
-// AggregationsTest — targets aggregations_test.rb
-// ==========================================================================
-// Fixture-backed AggregationsTest cases: mirror Rails' `fixtures :customers`
-// against the canonical Customer model + composed_of mappings, rather than the
-// ad-hoc inline Customer classes used elsewhere in this file.
 describe("AggregationsTest", () => {
-  // Mirrors Rails `fixtures :customers` via the shared Customer model; the
-  // canonical `customers` table comes from the template clone.
   const { customers } = fixtures(["customers"]);
 
-  // Rails: test_find_single_value_object
   it("find single value object", () => {
     const david = customers("david") as CustomerModel & { balance: MoneyClass };
     expect(david.balance.amount).toBe(50);
@@ -42,7 +29,6 @@ describe("AggregationsTest", () => {
     expect(david.balance.exchangeTo("DKK").amount).toBe(300);
   });
 
-  // Rails: test_find_multiple_value_object
   it("find multiple value object", () => {
     const david = customers("david") as CustomerModel & { address: Address };
     expect(david.address.street).toBe(david.readAttribute("address_street"));
@@ -57,7 +43,6 @@ describe("AggregationsTest", () => {
     ).toBe(true);
   });
 
-  // Rails: test_change_single_value_object
   it("change single value object", async () => {
     const david = customers("david") as CustomerModel & { balance: MoneyClass };
     david.balance = new MoneyClass(100);
@@ -66,7 +51,6 @@ describe("AggregationsTest", () => {
     expect(david.balance.amount).toBe(100);
   });
 
-  // Rails: test_immutable_value_objects
   it("immutable value objects", () => {
     const david = customers("david") as CustomerModel & { balance: MoneyClass };
     expect(() => {
@@ -79,7 +63,6 @@ describe("AggregationsTest", () => {
     }).toThrow();
   });
 
-  // Rails: test_reloaded_instance_refreshes_aggregations
   it("reloaded instance refreshes aggregations", async () => {
     const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation };
     expect(david.gpsLocation.latitude).toBe("35.544623640962634");
@@ -91,7 +74,6 @@ describe("AggregationsTest", () => {
     expect(david.gpsLocation.equals(new GpsLocation("24x113"))).toBe(true);
   });
 
-  // Rails: test_allow_nil_address_set_to_nil
   it("allow nil address set to nil", async () => {
     const zaphod = customers("zaphod") as CustomerModel & { address: Address | null };
     zaphod.address = null;
@@ -100,7 +82,6 @@ describe("AggregationsTest", () => {
     expect(zaphod.address).toBeNull();
   });
 
-  // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
   it("allow nil address loaded when only some attributes are nil", async () => {
     const zaphod = customers("zaphod") as CustomerModel & { address: Address };
     zaphod.writeAttribute("address_street", null);
@@ -110,7 +91,6 @@ describe("AggregationsTest", () => {
     expect(zaphod.address.street).toBeNull();
   });
 
-  // Rails: test_nil_assignment_results_in_nil
   it("nil assignment results in nil", () => {
     const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation | null };
     david.gpsLocation = new GpsLocation("39x111");
@@ -119,13 +99,11 @@ describe("AggregationsTest", () => {
     expect(david.gpsLocation).toBeNull();
   });
 
-  // Rails: test_allow_nil_gps_is_nil
   it("allow nil gps is nil", () => {
     const zaphod = customers("zaphod") as CustomerModel & { gpsLocation: unknown };
     expect(zaphod.gpsLocation).toBeNull();
   });
 
-  // Rails: test_do_not_run_the_converter_when_nil_was_set
   it("do not run the converter when nil was set", () => {
     CustomerModel.gpsConversionWasRun = false;
     const david = customers("david") as CustomerModel & { nonBlankGpsLocation: unknown };
@@ -133,7 +111,6 @@ describe("AggregationsTest", () => {
     expect(CustomerModel.gpsConversionWasRun).toBe(false);
   });
 
-  // Rails: test_inferred_mapping
   it("inferred mapping", async () => {
     const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation };
     expect(david.gpsLocation.latitude).toBe("35.544623640962634");
@@ -149,24 +126,20 @@ describe("AggregationsTest", () => {
     expect(david.gpsLocation.longitude).toBe("-110");
   });
 
-  // Rails: test_gps_equality
   it("gps equality", () => {
     expect(new GpsLocation("39x110").equals(new GpsLocation("39x110"))).toBe(true);
   });
 
-  // Rails: test_gps_inequality
   it("gps inequality", () => {
     expect(new GpsLocation("39x110").equals(new GpsLocation("39x111"))).toBe(false);
   });
 
-  // Rails: test_custom_constructor
   it("custom constructor", () => {
     const barney = customers("barney") as CustomerModel & { fullname: Fullname };
     expect(barney.fullname.toS).toBe("Barney GUMBLE");
     expect(barney.fullname).toBeInstanceOf(Fullname);
   });
 
-  // Rails: test_custom_converter
   it("custom converter", () => {
     const barney = customers("barney") as CustomerModel & { fullname: Fullname };
     (barney as { fullname: unknown }).fullname = "Barnoit Gumbleau";
@@ -174,7 +147,6 @@ describe("AggregationsTest", () => {
     expect(barney.fullname).toBeInstanceOf(Fullname);
   });
 
-  // Rails: test_hash_mapping
   it("hash mapping", () => {
     const barney = customers("barney") as CustomerModel & { addressHashMapping: Address };
     expect(barney.addressHashMapping.street).toBe("Quiet Road");
@@ -182,7 +154,6 @@ describe("AggregationsTest", () => {
     expect(barney.addressHashMapping.country).toBe("Tranquil Land");
   });
 
-  // Rails: test_value_object_with_hash_mapping_assignment_changes_model_attributes
   it("value object with hash mapping assignment changes model attributes", async () => {
     const barney = customers("barney") as CustomerModel & { addressHashMapping: Address };
     barney.addressHashMapping = new Address(
@@ -194,7 +165,6 @@ describe("AggregationsTest", () => {
     expect(barney.readAttribute("address_street")).toBe("Lively Street");
   });
 
-  // Rails: test_allow_nil_gps_set_to_nil
   it("allow nil gps set to nil", async () => {
     const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation | null };
     david.gpsLocation = null;
@@ -203,7 +173,6 @@ describe("AggregationsTest", () => {
     expect(david.gpsLocation).toBeNull();
   });
 
-  // Rails: test_allow_nil_set_address_attributes_to_nil
   it("allow nil set address attributes to nil", () => {
     const zaphod = customers("zaphod") as CustomerModel & { address: Address | null };
     zaphod.address = null;
@@ -212,7 +181,6 @@ describe("AggregationsTest", () => {
     expect(zaphod.readAttribute("address_country")).toBeNull();
   });
 
-  // Rails: test_nil_raises_error_when_allow_nil_is_false
   it("nil raises error when allow nil is false", () => {
     const david = customers("david");
     expect(() => {
@@ -220,7 +188,6 @@ describe("AggregationsTest", () => {
     }).toThrow();
   });
 
-  // Rails: test_nil_return_from_converter_is_respected_when_allow_nil_is_true
   it("nil return from converter is respected when allow nil is true", async () => {
     CustomerModel.gpsConversionWasRun = false;
     try {
@@ -232,12 +199,10 @@ describe("AggregationsTest", () => {
       await david.reload();
       expect(david.nonBlankGpsLocation).toBeNull();
     } finally {
-      // Rails resets the cattr in an `ensure` block (aggregations_test.rb:121).
       CustomerModel.gpsConversionWasRun = false;
     }
   });
 
-  // Rails: test_nil_return_from_converter_results_in_failure_when_allow_nil_is_false
   it("nil return from converter results in failure when allow nil is false", () => {
     const barney = customers("barney") as CustomerModel & { gpsLocation: GpsLocation | null };
     expect(() => {
@@ -245,14 +210,12 @@ describe("AggregationsTest", () => {
     }).toThrow();
   });
 
-  // Rails: test_assigning_hash_to_custom_converter
   it("assigning hash to custom converter", () => {
     const barney = customers("barney") as CustomerModel & { fullname: Fullname };
     (barney as any).fullname = { first: "Barney", last: "Stinson" };
     expect(barney.readAttribute("name")).toBe("Barney STINSON");
   });
 
-  // Rails: test_assigning_hash_without_custom_converter
   it("assigning hash without custom converter", () => {
     const barney = customers("barney");
     const hash = { first: "Barney", last: "Stinson" };
@@ -262,7 +225,6 @@ describe("AggregationsTest", () => {
 });
 
 describe("OverridingAggregationsTest", () => {
-  // Rails: test_composed_of_aggregation_redefinition_reflections_should_differ_and_not_inherited
   it("composed of aggregation redefinition reflections should differ and not inherited", () => {
     class DifferentName {}
     class PersonBase extends Base {
@@ -289,12 +251,6 @@ describe("OverridingAggregationsTest", () => {
   });
 });
 
-// trails-specific invariant (no Rails counterpart — in Ruby the ancestry is
-// implicit): mirror Rails' `include Aggregations unless self < Aggregations`
-// (aggregations.rb:225-230). Aggregations must be mixed in lazily by
-// composed_of, not unconditionally onto Base, and the `self < Aggregations`
-// guard must be inheritance-aware so a subclass of a composed_of model does not
-// re-wrap reload/initialize_dup.
 describe("lazy composed_of inclusion", () => {
   const own = (klass: typeof Base, key: string): boolean =>
     Object.prototype.hasOwnProperty.call(klass.prototype, key);

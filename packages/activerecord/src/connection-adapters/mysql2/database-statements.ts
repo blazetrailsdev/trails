@@ -1,9 +1,3 @@
-/**
- * Mysql2 database statements — Mysql2-specific query execution overrides.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements (module)
- */
-
 import type { Type } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
 import { Result, type ColumnTypes } from "../../result.js";
@@ -17,13 +11,7 @@ export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
 }
 
-/**
- * Field descriptor metadata we keep from node-mysql2's `FieldPacket` so the
- * adapter can report `column_types`. node-mysql2 exposes a numeric `type` (and,
- * for prepared statements, `columnType`) field-type code plus `decimals` for
- * the scale of a `DECIMAL`/`NEWDECIMAL` column.
- * @internal
- */
+/** @internal */
 export interface Mysql2FieldDescriptor {
   name: string;
   type?: number;
@@ -33,38 +21,13 @@ export interface Mysql2FieldDescriptor {
 
 /** @internal */
 export interface Mysql2RawResult {
-  // Array-mode (positional) rows, mirroring Rails' `query_options[:as] = :array`
-  // feeding `cast_result` from `result.to_a`. Positional rows keep duplicate
-  // column names (`SELECT 1 AS a, 2 AS a`) that hash-keyed rows would collapse.
   rows: unknown[][] | null;
   fields: Mysql2FieldDescriptor[];
   affectedRows: number;
-  // The driver's `insertId` from a non-row-returning statement's
-  // ResultSetHeader — 0/undefined for a SELECT. Sourced by `execInsert`'s write
-  // path (mysql2_adapter.rb's `last_inserted_id`).
   insertId?: number;
 }
 
-/**
- * node-mysql2 field-type codes (a subset of mysql2/lib/constants/types.js) for
- * the numeric families. We map these to a trails sql_type string so
- * `lookupCastType` builds the faithful `Type` — `DECIMAL`/`NEWDECIMAL` →
- * `BigDecimal`, `FLOAT`/`DOUBLE`/integers → number.
- *
- * Only `DECIMAL`/`NEWDECIMAL` fixes an actual divergence: node-mysql2 with
- * `decimalNumbers:false` returns decimals as raw strings, whereas the Ruby
- * mysql2 gem yields `BigDecimal`. The integer (1/2/3/8/9/13) and float (4/5)
- * codes are deliberately included for column_types parity even though they are
- * no-ops over values node-mysql2 already returns as JS numbers — the story's
- * acceptance criteria asks for the faithful numeric `Type` on every extra
- * numeric select, and this mirrors the PostgreSQL adapter's `cast_result`, which
- * reports a `Type` for every column via its OID map. The per-column
- * `lookupCastType` is a cheap type-map lookup. Non-numeric families (string,
- * blob, date/time) are intentionally absent so their driver value passes through
- * unchanged — matching Rails' `Mysql2Adapter#cast_result`, which builds no
- * column_types at all and relies on the gem's driver-level casting.
- * @internal
- */
+/** @internal */
 const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
   0: "decimal",
   246: "decimal",
@@ -79,15 +42,8 @@ const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
 };
 
 /**
- * Build a `Result` `column_types` map from node-mysql2 field descriptors,
- * mapping the numeric field-type codes to trails `Type` instances via the
- * adapter's `lookupCastType`. Returns `null` when no field carries a mapped
- * numeric type, so a plain string/blob result allocates nothing and falls back
- * to the driver value. Keyed by both positional index and column name, mirroring
- * the PostgreSQL adapter's `cast_result` (which Rails' `column_types` slicing
- * reads by name in `JoinDependency#instantiate`).
  * @internal
- * @noRailsEquivalent CONVERGEABLE builds the column_types map Ruby's cast_result reads (postgresql/database_statements.rb:171) from node-mysql2 field descriptors.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function buildColumnTypes(
   fields: ReadonlyArray<Mysql2FieldDescriptor>,
@@ -115,7 +71,6 @@ export function buildColumnTypes(
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
   _lastId?: number;
-  /** Rails' `@statements` (abstract_adapter.rb:156). */
   _statements?: StatementPool | null;
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
@@ -133,32 +88,15 @@ interface MultiStatementsHost {
   _config?: { flags?: string[] | number };
 }
 
-// Mysql2::Client::MULTI_STATEMENTS bitmask value from the Ruby gem.
 const MULTI_STATEMENTS_BIT = 0x10000;
 
-/**
- * Returns an ActiveRecord::Result instance.
- * Rails also wraps in `unprepared_statement` when collecting EXPLAIN with
- * prepared statements, but that path is deferred pending ExplainRegistry wiring.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#select_all
- *
- * @missingRailsCall unprepared_statement — PERMANENT: Per-site verified (RFC
- *   0106 wave 4b): mysql2/database_statements.rb's `select_all` wraps the super
- *   call in `unprepared_statement { }` when the arel is not preparable; trails'
- *   Mysql2 select_all delegates to the abstract implementation, which owns the
- *   unprepared-statement guard (abstract/database-statements.ts), so the block
- *   is applied one level up.
- */
+/** @missingRailsCall unprepared_statement — PERMANENT */
 export async function selectAll(
   this: DatabaseStatementsHost,
   sql: string,
   name?: string | null,
   binds?: unknown[],
 ): Promise<Result> {
-  // Rails' `select_all` calls `super` → `internal_exec_query`, NOT the public
-  // `exec_query` (which `dirties_query_cache` wraps) — routing through the
-  // public method would clear the query cache on every read.
   return this.internalExecQuery(sql, name, binds);
 }
 
@@ -176,23 +114,7 @@ interface ExecuteBatchHost extends MaxAllowedPacketHost {
   ): Promise<unknown>;
 }
 
-/**
- * Combines statements via `combineMultiStatements` then hands each combined
- * block to `raw_execute` with `batch: true`.
- *
- * Going through `raw_execute` rather than `execute` is what leaves batch
- * statements uncommented — `preprocess_query`, which runs the
- * query_transformers, is `internal_execute`'s step
- * (abstract/database_statements.rb:589-591) — so the `_inQueryTransformers`
- * suppression flag this used to need is gone with it.
- *
- * The positional arguments below are `raw_execute`'s own defaults
- * (abstract/database_statements.rb:552).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#execute_batch
- * (mysql2/database_statements.rb:17-21)
- * @internal
- */
+/** @internal */
 export async function executeBatch(
   this: ExecuteBatchHost,
   statements: string[],
@@ -216,17 +138,7 @@ export async function executeBatch(
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#last_inserted_id
- * (mysql2/database_statements.rb:22-29)
- *
- * Ruby's `@raw_connection&.last_id` reads the driver's own session accessor;
- * the node mysql2 client exposes the value only on the result header, so
- * `perform_query` above stashes it as `_lastId` — the same session-scoped
- * "id of the last INSERT on this connection" the Ruby accessor returns.
- *
- * @internal
- */
+/** @internal */
 export async function lastInsertedId(this: LastInsertedIdHost, result: Result): Promise<unknown> {
   if (await this.supportsInsertReturning()) {
     return abstractLastInsertedId(result);
@@ -234,10 +146,7 @@ export async function lastInsertedId(this: LastInsertedIdHost, result: Result): 
   return this._lastId;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#multi_statements_enabled?
- * @internal
- */
+/** @internal */
 export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   const flags = this._config?.flags;
   if (Array.isArray(flags)) return flags.includes("MULTI_STATEMENTS");
@@ -246,15 +155,8 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
 }
 
 /**
- * Unwraps mysql2's nested result sets from a CALL / multi-statement query so
- * callers see the single result set Rails' `cast_result` reads. For a plain
- * non-CALL query `rawFields` is a flat `FieldPacket[]`, so `rawFields[0]` is a
- * `FieldPacket` (not an array) and neither branch fires. CALL wraps rows AND
- * fields in parallel nested arrays: take the first set (Rails' `abandon_results!`
- * + first-result semantics), using `rawFields[0]` for the field descriptors
- * (or undefined for DML-only, matching Rails' `fields.empty?` check).
  * @internal
- * @noRailsEquivalent CONVERGEABLE the first-result-set selection Ruby gets from abandon_results! (mysql2/database_statements.rb:100).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function unwrapMultiResult(
   rawResult: unknown,
@@ -274,16 +176,7 @@ export function unwrapMultiResult(
   return { result, fields };
 }
 
-/**
- * Rails' `set_server_option` batch toggle is elided — node-mysql2 only supports
- * multi-statements as a connection-creation option, not at runtime.
- *
- * Requests array-mode rows (`rowsAsArray: true`) so duplicate column names
- * survive, mirroring Rails' `configure_connection` `query_options[:as] = :array`.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#perform_query
- * @internal
- */
+/** @internal */
 export async function performQuery(
   this: PerformQueryHost,
   rawConnection: mysql.PoolConnection | mysql.Connection,
@@ -294,10 +187,6 @@ export async function performQuery(
     prepare,
     notificationPayload,
   }: {
-    // Required, as in Rails (mysql2/database_statements.rb:41) — the
-    // prepared-statement decision is made once in `to_sql_and_binds`
-    // (`prepared_statements && preparable`, abstract/database_statements.rb:74)
-    // and threaded down; `perform_query` never re-derives it.
     prepare: boolean;
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
@@ -305,10 +194,6 @@ export async function performQuery(
 ): Promise<Mysql2RawResult> {
   const hasBinds = binds != null && binds.length > 0;
 
-  // Rails' prepared arm is `@statements[sql] ||= raw_connection.prepare(sql)`
-  // (mysql2/database_statements.rb:70); node-mysql2 prepares inside `execute`,
-  // so the pool is tracked here instead, before the statement is handed over —
-  // an eviction then sends COM_STMT_CLOSE while the entry is still ours.
   if (prepare) this._trackPrepared?.(rawConnection, sql);
 
   let rawResult: unknown;
@@ -325,7 +210,7 @@ export async function performQuery(
         typeCastedBinds as any[],
       )) as [unknown, mysql.FieldPacket[]];
     } catch (err) {
-      this._statements?.delete(sql); // mirrors Rails' @statements.delete(sql) rescue
+      this._statements?.delete(sql);
       throw err;
     }
   } else {
@@ -363,19 +248,13 @@ export async function performQuery(
   return { rows, fields: fieldList, affectedRows, insertId };
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#cast_result
- * @internal
- */
+/** @internal */
 export function castResult(
   this: { lookupCastType(sqlType: string): Type | Promise<Type> | null },
   rawResult: Mysql2RawResult,
 ): Result {
   if (rawResult.rows == null) return Result.empty();
 
-  // Rows are already positional (array-mode), mirroring Rails' `result.to_a`,
-  // so build the Result directly from `result.fields` + rows — no row[col]
-  // re-keying, which would collapse duplicate column names.
   const fields = rawResult.fields;
 
   const result =
@@ -384,9 +263,6 @@ export function castResult(
       : new Result(
           fields.map((f) => f.name),
           rawResult.rows,
-          // MySQL's `lookup_cast_type` is the plain type-map lookup
-          // (abstract/quoting.rb:234-236); only PostgreSQL's override is
-          // awaitable, and it never reaches this MySQL-only helper.
           buildColumnTypes(fields, (t) => this.lookupCastType(t) as Type),
         );
 
@@ -395,19 +271,11 @@ export function castResult(
   return result;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#affected_rows
- * @internal
- */
+/** @internal */
 export function affectedRows(this: PerformQueryHost, rawResult: Mysql2RawResult): number {
   if (rawResult) freeRawResult(rawResult);
   return this._affectedRowsBeforeWarnings ?? 0;
 }
 
-/**
- * No-op: node-mysql2 GCs results automatically; no equivalent for Rails'
- * `raw_result.free` + `@_ar_stmt_to_close.close`.
- * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#free_raw_result
- * @internal
- */
+/** @internal */
 export function freeRawResult(_rawResult: Mysql2RawResult): void {}

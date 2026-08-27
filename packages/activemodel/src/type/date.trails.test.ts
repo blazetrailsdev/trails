@@ -3,11 +3,6 @@ import { Temporal } from "@blazetrails/date";
 import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types, ValueType } from "../index.js";
 
-// AcceptsMultiparameterTime::InstanceMethods#assert_valid_value
-// (activemodel/lib/active_model/type/helpers/accepts_multiparameter_time.rb:24-30)
-// sends a non-Hash value on to `super`. `ActiveModel::Type::Value#assert_valid_value`
-// is a no-op, so the arm is only observable once an ancestor supplies a real one —
-// which ActiveRecord's Type::Serialized and the enum/PG OID types do.
 describe("DateType assert_valid_value", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -32,9 +27,6 @@ describe("DateType assert_valid_value", () => {
   });
 });
 
-// `serialize` comes from the AcceptsMultiparameterTime mixin and Type::Date
-// defines no `serialize_cast_value` of its own, so both are answered by the
-// same ancestor and the predicate (serialize_cast_value.rb:9-12) is true.
 describe("DateType serialize_cast_value_compatible?", () => {
   it("is compatible", () => {
     const type = new Types.DateType();
@@ -126,7 +118,6 @@ describe("DateType cast and serialize coverage", () => {
   });
 
   it("cast datetime with non-zero offset near midnight preserves local date", () => {
-    // Ruby Date._parse("2020-07-04T00:30:00+02:00") reports mday=4, not the UTC day (3).
     const result = type.cast("2020-07-04T00:30:00+02:00");
     expect(result).toBeInstanceOf(Temporal.PlainDate);
     expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");

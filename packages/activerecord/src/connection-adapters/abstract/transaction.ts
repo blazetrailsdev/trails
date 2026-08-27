@@ -14,29 +14,14 @@ import {
 } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../ar-config.js";
 
-/**
- * The execution-state slot holding the connection's open transaction, which is
- * what `ActiveRecord.current_transaction` (`transactions.rb:236-238`) reads and
- * `DatabaseStatements#transaction` installs. It lives here, beside the
- * `Transaction` it holds, because both that installer and the reader import it.
- *
- * @internal
- */
+/** @internal */
 export const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
 
-/**
- * Equality-keyed lookup of the candidate instance whose transactional
- * callbacks should fire for a given logical row.
- *
- * @internal
- */
+/** @internal */
 interface CandidateLookup {
   get(record: unknown): unknown;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::TransactionState
- */
 export class TransactionState {
   private _state:
     | "committed"
@@ -138,9 +123,6 @@ export class TransactionState {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationNotStartedError
- */
 export class InstrumentationNotStartedError extends ActiveRecordError {
   constructor(message = "Called finish on a transaction that hasn't started") {
     super(message);
@@ -148,9 +130,6 @@ export class InstrumentationNotStartedError extends ActiveRecordError {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationAlreadyStartedError
- */
 export class InstrumentationAlreadyStartedError extends ActiveRecordError {
   constructor(message = "Called start on an already started transaction") {
     super(message);
@@ -158,9 +137,6 @@ export class InstrumentationAlreadyStartedError extends ActiveRecordError {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::TransactionInstrumenter
- */
 export class TransactionInstrumenter {
   static readonly InstrumentationNotStartedError = InstrumentationNotStartedError;
   static readonly InstrumentationAlreadyStartedError = InstrumentationAlreadyStartedError;
@@ -182,9 +158,6 @@ export class TransactionInstrumenter {
 
     Notifications.instrument("start_transaction.active_record", this._basePayload);
 
-    // Mirror Rails: a handle spans the transaction so the published event's
-    // duration covers start→finish, and the outcome mutated into the payload
-    // before finish reaches subscribers (transaction.rb:90-107).
     this._payload = { ...this._basePayload };
     this._handle = Notifications.instrumenter.buildHandle(
       "transaction.active_record",
@@ -208,9 +181,6 @@ export class TransactionInstrumenter {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::NullTransaction
- */
 export class NullTransaction {
   state: TransactionState | undefined = undefined;
   readonly savepointName: string | null = null;
@@ -264,9 +234,6 @@ export class NullTransaction {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::Transaction::Callback
- */
 export class TransactionCallback {
   private _event: "before_commit" | "after_commit" | "after_rollback";
   private _callback: () => void | Promise<void>;
@@ -292,13 +259,6 @@ export class TransactionCallback {
   }
 }
 
-/**
- * Connection interface used by Transaction classes.
- * An AbstractAdapter plus the DatabaseStatements methods that Transaction
- * classes call; expressed as an intersection because an interface cannot
- * `extends` the class without inheriting its private/protected members
- * (TS2430). This avoids `as any` casts throughout.
- */
 export type TransactionConnection = DatabaseAdapter & {
   beginDbTransaction?(): void | Promise<void>;
   beginIsolatedDbTransaction?(isolation: string): void | Promise<void>;
@@ -310,19 +270,12 @@ export type TransactionConnection = DatabaseAdapter & {
   supportsLazyTransactions?(): boolean;
   supportsRestartDbTransaction?(): Promise<boolean>;
   addTransactionRecord?(record: unknown): void;
-  /** Rails' `@lock` (abstract_adapter.rb:181-192) — the monitor each of the
-   *  manager's critical sections takes inline, as Rails writes
-   *  `@connection.lock.synchronize` at abstract/transaction.rb:507, 581, 594,
-   *  611 and 623. */
   lock?: MonitorMixin;
   active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
   throwAwayBang?(): void;
 };
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::Transaction
- */
 export class Transaction {
   readonly state = new TransactionState();
   readonly savepointName: string | null = null;
@@ -511,9 +464,6 @@ export class Transaction {
         if (ActiveRecord.beforeCommittedOnAllRecords) {
           const ite = this.uniqueRecords();
 
-          // Rails' `records.each_with_object({}) { |record, candidates|
-          // candidates[record] = record }` (transaction.rb:280-282) — a Hash
-          // keyed by record equality, so the LAST equal copy is the candidate.
           const entries: Array<[unknown, unknown]> = [];
           const find = (rec: unknown): [unknown, unknown] | undefined =>
             entries.find((e) => this.recordsEqual(rec, e[0]));
@@ -534,10 +484,6 @@ export class Transaction {
             },
           );
         } else {
-          // Rails: `records.uniq.each(&:before_committed!)` (transaction.rb:288)
-          // — `Array#uniq` dedups by record equality, so only the first copy of
-          // each logical record runs and a deferred touch held on a second copy
-          // of a parent never flushes.
           for (const record of this.uniqueRecordsByEquality(recs)) {
             if (typeof (record as any).beforeCommittedBang === "function") {
               await (record as any).beforeCommittedBang();
@@ -594,10 +540,6 @@ export class Transaction {
     } else if (this._callbacks) {
       const current = this._connection.currentTransaction?.();
       if (current instanceof Transaction) {
-        // Rails passes `@callbacks` here (abstract/transaction.rb:320-323). The
-        // argument is the same ivar under the repo's `_`-prefixed spelling for
-        // private fields — TS has no `@` sigil, so the underscore IS the port
-        // of it, not a rename.
         current.appendCallbacks(this._callbacks);
       }
     }
@@ -650,13 +592,7 @@ export class Transaction {
     return result;
   }
 
-  /**
-   * Dedup by record equality (Ruby `Array#uniq`), keeping the first occurrence
-   * of each logical record. Two distinct in-memory copies of the same persisted
-   * row collapse to one; new records compare only to themselves.
-   *
-   * @internal
-   */
+  /** @internal */
   private uniqueRecordsByEquality(recs: unknown[]): unknown[] {
     const result: unknown[] = [];
     for (const record of recs) {
@@ -665,15 +601,7 @@ export class Transaction {
     return result;
   }
 
-  /**
-   * Symmetric like Ruby's `==`: try either side's `equals`, falling back to
-   * object identity for non-record entries. Mirrors how Rails keys the
-   * `candidates` Hash in prepare_instances_to_run_callbacks_on by record
-   * equality (`hash`/`eql?` → id-based for persisted rows), so two in-memory
-   * copies of the same persisted row collapse to one candidate.
-   *
-   * @internal
-   */
+  /** @internal */
   private recordsEqual(a: unknown, b: unknown): boolean {
     return (
       a === b ||
@@ -690,9 +618,6 @@ export class Transaction {
   ): Promise<void> {
     while (records.length > 0) {
       const record = records.shift()!;
-      // Identity comparison (Rails' `record.__id__ == ...`): only the exact
-      // instance chosen as the candidate runs its callbacks; sibling copies of
-      // the same logical row are skipped.
       const shouldRunCallbacks = instancesToRunCallbacksOn.get(record) === record;
       await callback(record, shouldRunCallbacks);
     }
@@ -700,9 +625,6 @@ export class Transaction {
 
   /** @internal */
   private prepareInstancesToRunCallbacksOn(records: unknown[]): CandidateLookup {
-    // [keyRecord, candidate] pairs keyed by record equality, mirroring Rails'
-    // `candidates` Hash. The candidate is the instance whose transactional
-    // callbacks will fire for that logical row.
     const entries: Array<[unknown, unknown]> = [];
     const find = (rec: unknown): [unknown, unknown] | undefined =>
       entries.find((e) => this.recordsEqual(rec, e[0]));
@@ -718,7 +640,6 @@ export class Transaction {
       const entry = find(record);
       const earlier = entry?.[1];
 
-      // Keep the FIRST saved instance as the candidate (Rails default `true`).
       if (
         earlier &&
         (record as any).constructor?.runCommitCallbacksOnFirstSavedInstancesInTransaction
@@ -751,9 +672,6 @@ export class Transaction {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::RestartParentTransaction
- */
 export class RestartParentTransaction extends Transaction {
   private _parent: Transaction;
 
@@ -805,9 +723,6 @@ export class RestartParentTransaction extends Transaction {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SavepointTransaction
- */
 export class SavepointTransaction extends Transaction {
   readonly savepointName: string;
 
@@ -831,14 +746,6 @@ export class SavepointTransaction extends Transaction {
   }
 
   override async materializeBang(): Promise<void> {
-    // A re-entrant `materializeTransactions` pass — triggered by queries the
-    // cascade issues while we await `createSavepoint` (e.g. a mutual
-    // `has_one`/`belongs_to` autosave pair re-entering the save of the
-    // original child) — no longer double-materializes this savepoint: the
-    // `TransactionManager._materializingTransactions` guard no-ops the nested
-    // pass before it touches the stack (mirroring Rails `materialize_transactions`'
-    // `return if @materializing_transactions`). No early `_materialized` flip
-    // is needed here.
     await this.connection.createSavepoint(this.savepointName);
     await super.materializeBang();
   }
@@ -880,9 +787,6 @@ export class SavepointTransaction extends Transaction {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::RealTransaction
- */
 export class RealTransaction extends Transaction {
   override async materializeBang(): Promise<void> {
     if (this.joinable) {
@@ -938,22 +842,12 @@ export class RealTransaction extends Transaction {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager
- */
 export class TransactionManager {
   private _stack: (Transaction | NullTransaction)[] = [];
   private _connection: TransactionConnection;
   private _hasUnmaterializedTransactions = false;
   private _lazyTransactionsEnabled = true;
-  /**
-   * @internal Mirrors Rails' `@materializing_transactions` boolean. Guards
-   * re-entrant `materializeTransactions` passes (queries the materialize loop
-   * issues re-enter the method on the same chain). Safe as a plain instance
-   * flag — not an AsyncContext token — because it is only ever read and written
-   * while holding the per-connection lock (`@connection.lock`); a foreign
-   * chain blocks on the lock and never observes it true.
-   */
+  /** @internal */
   private _materializingTransactions = false;
 
   static readonly NULL_TRANSACTION = Object.freeze(new NullTransaction());
@@ -962,46 +856,21 @@ export class TransactionManager {
     this._connection = connection;
   }
 
-  /**
-   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@stack.last ||
-   *   NULL_TRANSACTION` (`connection_adapters/abstract/transaction.rb:662`) —
-   *   the TS body reads the last stack slot and falls back to the same
-   *   `NULL_TRANSACTION`. `first`/`last`/`size` are positional/property idioms
-   *   with no JS call form, deliberately left uncredited by RFC 0092
-   *   (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment)
-   *   so the reason-text route is the sanctioned one; nothing was dropped from
-   *   the TS body.
-   */
+  /** @missingRailsCall last — PERMANENT */
   get currentTransaction(): Transaction | NullTransaction {
     return this._stack.length > 0
       ? this._stack[this._stack.length - 1]
       : TransactionManager.NULL_TRANSACTION;
   }
 
-  /**
-   * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106): `@stack.size`
-   *   (`connection_adapters/abstract/transaction.rb:658`) — the TS body is
-   *   `this._stack.length`, the whole method. `first`/`last`/`size` are
-   *   positional/property idioms with no JS call form, deliberately left
-   *   uncredited by RFC 0092 (`positional-idiom-analogues`, see
-   *   JS_ENUMERABLE_ALIASES' header comment) so the reason-text route is the
-   *   sanctioned one; nothing was dropped from the TS body.
-   */
+  /** @missingRailsCall size — PERMANENT */
   get openTransactions(): number {
     return this._stack.length;
   }
 
   /**
-   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `@stack.empty?`
-   *   (transaction.rb:510) — `empty?` on a Ruby Array, whose faithful JS
-   *   spelling is `xs.length === 0`. That emits no callee, so no TS call can
-   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
-   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
-   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
-   *   TS body was dropped.
-   * @missingRailsCall size — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   transaction.rb's `@stack.size` on a Ruby Array is `this._stack.length` on
-   *   the JS array — `Array#size` is not a ported method name.
+   * @missingRailsCall empty? — PERMANENT
+   * @missingRailsCall size — PERMANENT
    */
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
@@ -1009,12 +878,7 @@ export class TransactionManager {
     return await this._connection.lock.synchronize(() => this._beginTransactionInner(options));
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#begin_transaction
-   * inner body (the part inside `@connection.lock.synchronize`,
-   * `abstract/transaction.rb:507`).
-   * @internal
-   */
+  /** @internal */
   private async _beginTransactionInner(options: {
     isolation?: string | null;
     joinable?: boolean;
@@ -1103,21 +967,7 @@ export class TransactionManager {
   }
 
   async materializeTransactions(): Promise<void> {
-    // Mirrors Rails (`abstract/transaction.rb:577-591`): the pass runs under
-    // the per-connection lock. Foreign chains block on the lock; once they
-    // enter, an earlier holder will have flipped `_hasUnmaterializedTransactions`
-    // off and they no-op. `beginTransaction` is wrapped in the same lock
-    // (mirroring Rails line 507) so `_hasUnmaterializedTransactions` cannot
-    // flip back to true mid-pass — making the unconditional clear at the
-    // end of the loop safe by exclusion.
     await this._connection.lock.synchronize(async () => {
-      // `return if @materializing_transactions` (`transaction.rb:578`). A
-      // re-entrant call — a query the materialize loop issues (e.g. a
-      // cross-record autosave cascade) re-enters here on the same chain and
-      // re-acquires the lock reentrantly — no-ops directly. The flag is a
-      // plain boolean rather than an AsyncContext owner token because the lock
-      // already serializes foreign chains out: they never reach this read
-      // while it is true.
       if (this._materializingTransactions) return;
       if (!this._hasUnmaterializedTransactions) return;
       try {
@@ -1130,25 +980,11 @@ export class TransactionManager {
       } finally {
         this._materializingTransactions = false;
       }
-      // After the `ensure` clears the flag — mirrors Rails ordering
-      // (`transaction.rb:588`): `@has_unmaterialized_transactions = false`
-      // sits after the begin/ensure, still inside the lock. Skipped on a loop
-      // throw (the flag stays set for a later retry), same as Rails.
       this._hasUnmaterializedTransactions = false;
     });
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#commit_transaction
-   * (`abstract/transaction.rb:593`). Wrapped in `synchronize` so direct
-   * callers (manual TM use outside `within_new_transaction`) get the same
-   * exclusion the body-internal callers already have. Reentrant for the
-   * common case where this is called from inside `_withinNewTransactionBody`.
-   *
-   * @missingRailsCall last — PERMANENT: Per-site verified (RFC 0106 wave 4b): Ruby's
-   *   `@stack.last` is `this._stack[this._stack.length - 1]` on a JS array;
-   *   `Array#last` is not a ported method name.
-   */
+  /** @missingRailsCall last — PERMANENT */
   async commitTransaction(): Promise<void> {
     await this._connection.lock.synchronize(() => this._commitTransactionInner());
   }
@@ -1172,15 +1008,7 @@ export class TransactionManager {
     await transaction.commitRecords();
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#rollback_transaction
-   * (`abstract/transaction.rb:610`). Wrapped in `synchronize` for the same
-   * reason as {@link commitTransaction}.
-   *
-   * @missingRailsCall last — PERMANENT: Per-site verified (RFC 0106 wave 4b): Ruby's
-   *   `@stack.last` is `this._stack[this._stack.length - 1]` on a JS array;
-   *   `Array#last` is not a ported method name.
-   */
+  /** @missingRailsCall last — PERMANENT */
   async rollbackTransaction(transaction?: Transaction): Promise<void> {
     await this._connection.lock.synchronize(() => this._rollbackTransactionInner(transaction));
   }
@@ -1201,23 +1029,6 @@ export class TransactionManager {
     await txn.rollbackRecords();
   }
 
-  /**
-   * Clear the connection's prepared-statement cache after a failed
-   * (now rolled-back) transaction. The exact effect is adapter-defined
-   * (PG fires DEALLOCATE per entry on a held client; on a released
-   * client it drops the local map only — see `clearCacheBang` docs).
-   * Runs only when the rolled-back frame is a `RealTransaction` and
-   * the error is `PreparedStatementCacheExpired` — Savepoint frames
-   * don't drop the underlying connection's cached plans, and other
-   * errors aren't related to plan invalidation.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager
-   *   #after_failure_actions (abstract/transaction.rb:669-673):
-   *
-   *     return unless transaction.is_a?(RealTransaction)
-   *     return unless error.is_a?(ActiveRecord::PreparedStatementCacheExpired)
-   *     @connection.clear_cache!
-   */
   /** @internal */
   private afterFailureActions(transaction: unknown, error: unknown): void | Promise<void> {
     if (!(transaction instanceof RealTransaction)) return;
@@ -1239,10 +1050,6 @@ export class TransactionManager {
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {
-    // `transaction` stays undefined if `beginTransaction` raises while
-    // materializing (e.g. `begin_db_transaction` fails after a successful
-    // begin) — the outer `finally` then evicts the connection from the pool,
-    // mirroring Rails' `transaction&.state&.completed?` nil-safe guard.
     let transaction: Transaction | undefined;
     try {
       transaction = await this.beginTransaction({
@@ -1254,14 +1061,6 @@ export class TransactionManager {
         result = await fn(transaction.userTransaction);
       } catch (e) {
         await this.rollbackTransaction();
-        // Rails' ordering (abstract/transaction.rb:627-631):
-        // `after_failure_actions` runs AFTER `rollback_transaction` so
-        // the ROLLBACK isn't delayed behind DEALLOCATE traffic on the
-        // same client (PG StatementPool fires DEALLOCATE per entry via
-        // `.clear()`), and so the server is in a non-aborted state when
-        // cache-clear work runs. PG's adapter retains a WeakRef to the
-        // just-released txn client so the post-rollback `clearCacheBang`
-        // can still reach the StatementPool (see `_lastReleasedTxnClient`).
         await this.afterFailureActions(transaction, e);
         throw e;
       }
@@ -1269,11 +1068,6 @@ export class TransactionManager {
       try {
         await this.commitTransaction();
       } catch (commitError) {
-        // Rails (abstract/transaction.rb:632-643) distinguishes a dropped
-        // connection from other commit failures: a `ConnectionFailed` can't be
-        // ROLLBACK'd on the dead connection, so the transaction is invalidated
-        // (which cascades `invalidate!` to its child savepoint transactions)
-        // instead of attempting a ROLLBACK.
         if (commitError instanceof ConnectionFailed) {
           if (!transaction.state.isCompleted()) {
             transaction.invalidateBang();
@@ -1286,11 +1080,6 @@ export class TransactionManager {
 
       return result;
     } finally {
-      // Mirrors Rails' outer `ensure` (abstract/transaction.rb:646-651):
-      // an incomplete transaction means begin/commit/rollback raised before
-      // the state reached a terminal value, so the connection is in an unknown
-      // state — throw it away (evict from pool + disconnect) and mark the
-      // transaction incomplete.
       if (!transaction || !transaction.state.isCompleted()) {
         this._connection.throwAwayBang?.();
         transaction?.incompleteBang();

@@ -8,9 +8,6 @@ import {
 import { Model } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
-// Rails' Topic declares `attr_accessor :approved` with no type, which is the
-// untyped ValueType here (type/registry.ts:47).
 class Topic extends Model {
   static {
     this.attribute("title", "string");
@@ -19,11 +16,6 @@ class Topic extends Model {
   }
 }
 
-/**
- * Mirrors the `Struct.new(:amount) { include Comparable; def <=> ... }` of
- * `test_validates_comparison_with_custom_compare`. `compareTo` is trails'
- * spelling of Ruby's `<=>` (date/src/date.ts:5147).
- */
 class Custom {
   constructor(readonly amount: number) {}
 
@@ -424,12 +416,10 @@ interface Requested {
   requested(): unknown;
 }
 
-/** Rails' `Topic.define_method(:requested) { Date.new(2020, 8, 1) }`. */
 function defineRequested(): void {
   (Topic.prototype as unknown as Requested).requested = () => plainDate("2020-08-01");
 }
 
-/** Rails' `ensure Topic.remove_method :requested`. */
 function removeRequested(): void {
   delete (Topic.prototype as unknown as Partial<Requested>).requested;
 }

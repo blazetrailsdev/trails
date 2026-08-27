@@ -7,12 +7,6 @@ import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 
-/**
- * `dirty_test.rb` has no `dup` coverage, so these pin trails-only behaviour with
- * no Rails test to mirror. The expectations are transcribed from MRI run against
- * `vendor/rails/activemodel` with `ActiveModel::Model` + `Attributes` + `Dirty`,
- * since `Dirty#initialize_dup` (dirty.rb:248-251) is what they exercise.
- */
 describe("Dirty across dup", () => {
   class Topic extends Model {
     static {
@@ -33,12 +27,10 @@ describe("Dirty across dup", () => {
 
     const duped = t.dup();
 
-    // MRI: t.changes == dup.changes == {"title"=>["A", "B"]}
     expect(duped.changes).toEqual(t.changes);
     expect(duped.changes).toEqual({ title: ["A", "B"] });
     expect(duped.isChanged).toBe(true);
     expect(duped.attributeWas("title")).toEqual("A");
-    // MRI: dup.previous_changes == t.previous_changes
     expect(duped.previousChanges).toEqual(t.previousChanges);
   });
 
@@ -48,9 +40,6 @@ describe("Dirty across dup", () => {
 
     duped.body = "new";
 
-    // MRI: dup.changes == {"title"=>[nil, "A"], "body"=>[nil, "new"]} — the copy
-    // derives its dirtiness from its own rebuilt attributes, and the source
-    // keeps its own construction-time change.
     expect(duped.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
     expect(t.changes).toEqual({ title: [null, "A"] });
     expect(t.isChanged).toBe(true);
@@ -64,8 +53,6 @@ describe("Dirty across dup", () => {
     t.body = "new";
 
     expect(t.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
-    // MRI: dup.changes == {"title"=>[nil, "A"]}, and the source's later write
-    // does not reach it.
     expect(duped.changes).toEqual({ title: [null, "A"] });
     expect(duped.body).toBeNull();
   });
@@ -76,9 +63,6 @@ describe("Dirty across dup", () => {
 
     const duped = t.dup();
 
-    // MRI: `T.new(title: "A").freeze.dup` is unfrozen, reads back "A", and
-    // takes a write — `Object#dup` never carries the frozen state, and the
-    // initialize_dup chain rewrites @attributes/@errors/the tracker on it.
     expect(Object.isFrozen(duped)).toBe(false);
     expect(duped.title).toBe("A");
     duped.title = "B";
@@ -87,11 +71,6 @@ describe("Dirty across dup", () => {
   });
 });
 
-/**
- * The TS-only extras that used to live interleaved among the mirrored
- * `dirty_test.rb` names in `dirty.test.ts`. They pin trails behaviour with no
- * Rails test of the same name to mirror.
- */
 describe("DirtyTest extras", () => {
   class DirtyPerson extends Model {
     static {
@@ -532,8 +511,6 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.attributeWillChangeBang("ratio");
     m._writeAttribute("ratio", NaN);
     expect(m.changed).toContain("ratio");
-    // The "was" side must be the cloned pre-mutation snapshot from forceChange,
-    // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
     expect(m.changes["ratio"]).toEqual([NaN, NaN]);
   });
 

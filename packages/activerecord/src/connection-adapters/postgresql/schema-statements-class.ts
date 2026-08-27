@@ -31,18 +31,9 @@ import {
   type UniqueConstraintOptions,
 } from "./schema-definitions.js";
 
-/**
- * The three members of the PG adapter's runtime surface that the
- * `PostgreSQLAdapter` *type* does not carry: `query` is mixed in by `include()`
- * from `abstract/database-statements.ts` rather than declared on the class, and
- * `quoteLiteral` / `_schemaSearchPathMemo` are `private` there. The bodies below
- * reach all three the way Rails' module does — plain `this` calls — so they are
- * restated here and merged into the class's `this` type.
- */
 interface PgSchemaAdapterPrivates {
   query(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   quoteLiteral(value: unknown): string;
-  // Connection-scoped memo backing Rails' @schema_search_path.
   _schemaSearchPathMemo: string | null;
 }
 
@@ -51,30 +42,7 @@ function toS(value: unknown): string {
 }
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
-/**
- * PostgreSQL's `SchemaStatements` is only ever mixed into `PostgreSQLAdapter`
- * (`include()` at the bottom of the adapter module), so its bodies call plain
- * `this` methods the way Rails' module does. This merged interface gives those
- * calls the PG adapter's own type — `Pick`ed from `PostgreSQLAdapter` rather
- * than restated by hand, so a signature can no longer drift from the adapter it
- * describes.
- *
- * Only the members PG adds beyond `AbstractSchemaStatements` are listed: the
- * rest already reach `this` through the base class, and merging a second
- * declaration for them would collide with it — `PostgreSQLAdapter` narrows many
- * (`adapterName` to `AdapterName`, `createAlterTable` to `PgAlterTable`), which is
- * legal on a class and is what Ruby's untyped override translates to, but
- * declaration merging demands identical types.
- *
- * A declaration-only `declare` field in the class body outranks an inherited
- * method, but that trick cannot reach `typeMap`: `AbstractAdapter` declares it as an
- * accessor (`abstract-adapter.ts:2543`), and TypeScript refuses to narrow an
- * inherited accessor from either a merged-interface member or a `declare` field
- * (TS2610). A real accessor override here would shadow `PostgreSQLAdapter`'s own
- * `type_map` once `include()` installs the module on the prototype, so `columns`
- * keeps its cast.
- * @internal
- */
+/** @internal */
 export interface SchemaStatements
   extends
     PgSchemaAdapterPrivates,
@@ -109,7 +77,6 @@ export interface SchemaStatements
 export class SchemaStatements extends AbstractSchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-  /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): PgTable {
     return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
@@ -117,11 +84,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
   ): Promise<void> {
-    // Ruby's `*table_names, **options` swallows neither an omitted argument nor
-    // a block into `table_names` (abstract/schema_statements.rb:540); TS spells
-    // both as trailing arguments, so they come off first — the block is only
-    // ever read by CommandRecorder, which keeps it so `drop_table` can invert
-    // to `create_table`.
     const rest = [...args] as unknown[];
     while (
       rest.length > 0 &&
@@ -174,7 +136,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
         const comment = row[5] as string | null;
         const valid = row[6] as boolean;
 
-        // Mirrors Rails' regex: / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?\z/m
         const defMatch = inddef.match(
           / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
         );
@@ -190,10 +151,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
           ? includeStr.split(",").map((c) => unquoteIdentifier(c.trim().replace(/""/g, '"')))
           : [];
 
-        // Mirrors Rails (postgresql/schema_statements.rb:117-118): an expression
-        // index (`indkey.include?(0)`) stores `columns` as the raw expression
-        // string, so a conflict target / schema dump emits it verbatim rather
-        // than quoting it as a column name.
         let columns: string | string[];
         if (indkey.includes(0)) {
           columns = expressions;
@@ -202,9 +159,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
           columns = names.filter((c) => !includeColumns.includes(c));
 
-          // add info on sort order (only desc order is explicitly specified, asc is the default)
-          // and non-default opclasses
-          // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
           const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
           for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
             if (opclass) opclasses[column] = opclass;
@@ -223,7 +177,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
           using,
           include: includeColumns.length > 0 ? includeColumns : undefined,
           nullsNotDistinct: nullsNotDistinctStr ? true : undefined,
-          // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
           comment: comment?.trim() ? comment : undefined,
           valid,
         });
@@ -257,8 +210,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 
-  // Mirrors Rails #tables (data_source_sql type: "BASE TABLE" → relkind
-  // IN ('r','p')). pg_tables would omit partitioned tables (relkind 'p').
   async tables(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(this.dataSourceSql({ type: "BASE TABLE" }), "SCHEMA")
@@ -266,14 +217,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return rows.map((r) => r.relname as string);
   }
 
-  /**
-   * List views visible on the current search_path, including
-   * materialized views. Mirrors Rails'
-   * `ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#views`
-   * which uses `data_source_sql(type: "VIEW")` — relkind IN ('v','m').
-   * Plain `pg_views` would miss materialized views; querying `pg_class`
-   * directly catches both.
-   */
   async views(): Promise<string[]> {
     const rows = (
       await this.internalExecQuery(
@@ -288,28 +231,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return rows.map((r) => r.relname as string);
   }
 
-  /**
-   * Table-only existence check (no views). Mirrors Rails'
-   * `table_exists?` vs `data_source_exists?` distinction: a table is a
-   * data source but a data source isn't always a table. SchemaCache
-   * uses dataSourceExists; tableExists is here for callers that
-   * specifically need to exclude views (e.g. `drop_table`).
-   */
   async tableExists(name: string): Promise<boolean> {
-    // Rails' relkind 'r' + 'p' (plain + partitioned tables) — matches
-    // `data_source_sql(name, type: "BASE TABLE")` in
-    // `PostgreSQL::SchemaStatements#quoted_scope`.
     return this.relkindExists(name, ["r", "p"]);
   }
 
-  /**
-   * Backs the table existence check with Rails' pg_class-based predicate.
-   * Uses `SELECT 1 ... LIMIT 1` so the planner short-circuits instead of
-   * counting every match.
-   */
   private async relkindExists(name: string, relkinds: string[]): Promise<boolean> {
-    // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
-    // identifier to parse, so short-circuit before extractSchemaQualifiedName.
     if (!name) return false;
     const [schema, table] = this.extractSchemaQualifiedName(name);
     if (schema) {
@@ -639,21 +565,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
       )
     ).toArray();
 
-    // Mirrors Rails' load_additional_types batch call: gather all OIDs not
-    // yet in the map and load them in a single pg_type query before building
-    // Column objects. This avoids N concurrent queries for wide tables.
-    // TS2610: an inherited accessor cannot be narrowed, and overriding it here
-    // would shadow PostgreSQLAdapter's own `type_map` under `include()`. That is
-    // a permanent TypeScript limitation, not deferred work — the merged
-    // interface below cannot reach `typeMap` either, for the same reason.
     const typeMap = this.typeMap as HashLookupTypeMap;
     const missingOids = [
       ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
     ];
     if (missingOids.length > 0) {
       await this.loadAdditionalTypes(missingOids);
-      // Mirrors Rails' get_oid_type fallback: register any OIDs still absent
-      // after the pg_type query so repeated columns() calls don't re-query.
       for (const oid of missingOids) {
         if (!typeMap.has(oid)) {
           console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
@@ -662,13 +579,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       }
     }
 
-    // Mirrors Rails' SchemaStatements#columns (abstract/schema_statements.rb:107):
-    // `definitions.map { |field| new_column_from_field(table_name, field, definitions) }`.
-    // The rows arrive named rather than positional, so rebuild Rails'
-    // `column_definitions` field tuple (postgresql/schema_statements.rb:967) in
-    // its order before delegating. The batch preload above leaves every OID
-    // registered, so the `fetch_type_metadata` → `get_oid_type` hop inside
-    // `newColumnFromField` is a pure type-map read and issues no pg_type query.
     const columns: Column[] = [];
     for (const r of rows) {
       const field = [
@@ -713,9 +623,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): string {
     const base = Array.isArray(columns) ? columns.join(", ") : columns;
     const visitor = this.visitor;
-    // Mirrors Rails two-pass compact_blank: filter blanks before AND after stripping
-    // so an order that becomes empty after stripping (e.g. bare "DESC") doesn't
-    // consume an alias index slot and shift subsequent aliases.
     const orderColumns = (orders ?? [])
       .map((o) => (typeof o === "string" ? o : visitor.compile(o)))
       .filter((o) => o.trim().length > 0)
@@ -807,14 +714,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return array && type !== "primary_key" ? `${sql}[]` : sql;
   }
 
-  /**
-   * Mirrors: PostgreSQL::SchemaStatements#change_column
-   * (postgresql/schema_statements.rb:467-471) — clear the statement cache,
-   * partition `change_column_for_alter` into SQL clauses and procs, issue one
-   * ALTER TABLE with the comma-joined clauses, then run the procs. The DDL
-   * goes through the public `execute` rather than the raw `exec` so the
-   * `dirties_query_cache` wrapper clears the query cache on schema changes.
-   */
   override async changeColumn(
     tableName: string,
     columnName: string,
@@ -832,19 +731,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async addColumn(
     tableName: string,
     columnName: string,
-    // `ColumnType` already accepts arbitrary strings via its `(string & {})`
-    // branch — Rails passes adapter-specific types (`timestamptz`, enum
-    // type names, etc.) verbatim, so no cast is needed.
     type: ColumnType,
     options: ColumnOptions & {
       comment?: string | null;
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#add_column: clear the statement
-    // cache, defer to the abstract implementation (which builds an AlterTable
-    // and accepts it through schema_creation), then propagate :comment via
-    // change_column_comment.
     await this.clearCacheBang();
     await super.addColumn(tableName, columnName, type, options);
     if ("comment" in options) {
@@ -889,13 +781,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     type: ColumnType,
     options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): ChangeColumnDefinition {
-    // Mirrors PostgreSQL::SchemaStatements#build_change_column_definition: route
-    // through the table definition so PG-specific column normalization
-    // (virtual/`as:` resolution, datetime/timestamp physical-type recording,
-    // aliased types) is applied rather than constructing ColumnDefinition
-    // directly. Like Rails, sqlType is left unset on the builder's column
-    // definition — the visitor (visit_ChangeColumnDefinition) computes it on
-    // accept.
     const td = this.createTableDefinition(tableName);
     const cd = td.newColumnDefinition(columnName, type, options);
     return new ChangeColumnDefinition(cd, columnName);
@@ -918,16 +803,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
     nullable: boolean,
     defaultValue: unknown = null,
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#change_column_null: validate the
-    // boolean argument and clear the statement cache before issuing DDL.
     this.validateChangeColumnNullArgumentBang(nullable);
     await this.clearCacheBang();
     const quotedTable = this.quoteTableName(tableName);
     const quotedCol = this.quoteColumnName(columnName);
     if (!nullable && defaultValue != null) {
       const col = (await this.columns(tableName)).find((c) => c.name === columnName);
-      // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
-      // column can't be found rather than quoting against an undefined column.
       if (col) {
         const expr = await this.quoteDefaultExpression(defaultValue, col);
         await this.execute(
@@ -945,9 +826,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     columnName: string,
     commentOrChanges: CommentOrChanges,
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#change_column_comment: clear the
-    // statement cache and unwrap the {from:, to:} change hash before issuing
-    // the COMMENT ON statement.
     await this.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges);
     await this.execute(
@@ -959,7 +837,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     tableName: string,
     commentOrChanges: CommentOrChanges,
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
     await this.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges);
     await this.execute(
@@ -969,7 +846,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#validate_constraint (postgresql/schema_statements.rb:893); the port splits that file, so it scores misplaced.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = this.createAlterTable(tableName) as PgAlterTable;
@@ -1003,7 +880,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#assert_valid_deferrable (postgresql/schema_statements.rb:1031); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   assertValidDeferrable(deferrable: unknown): void {
     if (
@@ -1020,7 +897,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#extract_foreign_key_action (postgresql/schema_statements.rb:1023); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override extractForeignKeyAction(
     specifier: string,
@@ -1039,7 +916,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#extract_constraint_deferrable (postgresql/schema_statements.rb:1037); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   extractConstraintDeferrable(
     deferrable: boolean,
@@ -1076,8 +953,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
         const toTable = unquoteIdentifier(row.to_table as string);
         const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
-        // Rails returns composite column/primary_key as arrays and a bare
-        // string for single-column FKs (postgresql/schema_statements.rb#foreign_keys).
         let column: string | string[];
         let primaryKey: string | string[];
         if (conkey.length > 1) {
@@ -1102,11 +977,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  /**
-   * Mirrors: PostgreSQL::SchemaStatements#add_foreign_key
-   * (`postgresql/schema_statements.rb:578-582`) — the deferrable assertion,
-   * then `super`.
-   */
   override async addForeignKey(
     fromTable: string,
     toTable: string,
@@ -1221,9 +1091,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
         name: r.conname as string,
         using: using,
         where: predicate,
-        // Rails passes `deferrable:` straight through: a non-deferrable
-        // constraint reads back as `false`, not absent (Ruby truthiness would
-        // otherwise collapse it to nil here).
         deferrable,
       });
     });
@@ -1231,7 +1098,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#exclusion_constraint_name (postgresql/schema_statements.rb:1078); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
@@ -1243,7 +1110,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#exclusion_constraint_for (postgresql/schema_statements.rb:1088); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async exclusionConstraintFor(
     tableName: string,
@@ -1262,7 +1129,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     ).toArray();
     if (rows.length === 0) return undefined;
     const row = rows[0] as Record<string, string>;
-    // Split on WHERE first (Rails approach), then extract expression from EXCLUDE clause.
     const [excludePart] = row.constraintdef.split(/ WHERE /i);
     const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/s);
     return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
@@ -1270,7 +1136,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#exclusion_constraint_for! (postgresql/schema_statements.rb:1093); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async exclusionConstraintForBang(
     tableName: string,
@@ -1378,7 +1244,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#unique_constraint_name (postgresql/schema_statements.rb:1098); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
@@ -1396,17 +1262,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#unique_constraint_for (postgresql/schema_statements.rb:1108); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async uniqueConstraintFor(
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition | undefined> {
-    // Mirrors Rails: name is computed only when no :column option is given, then
-    // the full unique_constraints listing is filtered via defined_for? — which
-    // matches on column as well as name. Rails calls
-    // defined_for?(name: name, **options), so an explicit options.name overrides
-    // the computed fallback (the spread comes last).
     const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
     const constraints = await this.uniqueConstraints(tableName);
     return constraints.find((c) => c.definedFor({ name, ...options }));
@@ -1414,7 +1275,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::SchemaStatements#unique_constraint_for! (postgresql/schema_statements.rb:1113); the port splits that file.
+   * @noRailsEquivalent CONVERGEABLE
    */
   async uniqueConstraintForBang(
     tableName: string,
@@ -1432,10 +1293,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return result;
   }
 
-  // Mirrors: PostgreSQLAdapter#enum_types (postgresql_adapter.rb:518)
-  // Returns an array of [fullName, values] pairs for all enum types visible on the search path
-  // (current_schemas(false) — all schemas in search_path, not just the current one).
-  // Enum types in the default schema are returned without a schema prefix.
   async enumTypes(): Promise<[string, string[]][]> {
     const query = `
       SELECT
@@ -1473,9 +1330,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
       : this.quoteColumnName(enumName);
     const valueList = values.map((v) => this.quoteLiteral(v)).join(", ");
-    // Mirrors Rails create_enum: guard with IF NOT EXISTS so re-running a
-    // Schema.define under a different search_path is idempotent. The schema
-    // scope defaults to the search path (current_schemas) when unqualified.
     const schemaScope = schema ? this.quoteLiteral(schema) : "ANY (current_schemas(false))";
     await this.exec(`
       DO $$
@@ -1500,10 +1354,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     valuesOrOptions?: string[] | { ifExists?: boolean },
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
-    // Rails' `drop_enum(name, values = nil, **options)` (postgresql_adapter.rb:571)
-    // ignores `values` — it is carried only so CommandRecorder can invert the
-    // command to `create_enum`. TS has no kwargs, so an options hash may arrive
-    // in the `values` slot.
     if (
       valuesOrOptions !== null &&
       valuesOrOptions !== undefined &&
@@ -1517,10 +1367,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       : this.quoteColumnName(enumName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
-    // Mirrors Rails drop_enum: `internal_exec_query(query).tap { reload_type_map }`
-    // (postgresql_adapter.rb:571-576). reloadTypeMap also drops the
-    // prepared-statement name map so a cached plan referencing the dropped
-    // type's OID is never re-executed ("cache lookup failed for type <oid>").
     await this.reloadTypeMap();
   }
 
@@ -1537,8 +1383,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
       : this.quoteColumnName(enumName);
     await this.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.quoteColumnName(newName)}`);
-    // Mirrors Rails rename_enum: `exec_query(...).tap { reload_type_map }`
-    // (postgresql_adapter.rb:584).
     await this.reloadTypeMap();
   }
 
@@ -1564,8 +1408,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.exec(
       `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.quoteLiteral(value)}${position}`,
     );
-    // Mirrors Rails add_enum_value: `exec_query(...).tap { reload_type_map }`
-    // (postgresql_adapter.rb:602).
     await this.reloadTypeMap();
   }
 
@@ -1577,8 +1419,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.exec(
       `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.quoteLiteral(options.from)} TO ${this.quoteLiteral(options.to)}`,
     );
-    // Mirrors Rails rename_enum_value: `exec_query(...).tap { reload_type_map }`
-    // (postgresql_adapter.rb:614-616).
     await this.reloadTypeMap();
   }
 
@@ -1611,21 +1451,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
     }
     await this.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
-    // createRange/dropRange are deliberate, permanent trails surface, not
-    // unfinished porting: Rails supports PG range *column* types first-class but
-    // ships no range-type DDL helper because Ruby has a core `Range` to lean on,
-    // so a raw `execute("CREATE TYPE … AS RANGE")` suffices there. JavaScript has
-    // no Range analogue, so first-class range support in trails needs the DDL
-    // step to be explicit adapter surface. The shape is modelled on Rails' own
-    // enum type-DDL helpers (create_enum postgresql_adapter.rb:541, drop_enum
-    // :571, rename_enum :579, add_enum_value :588, rename_enum_value :606; all
-    // five stubbed as no-ops on the base at
-    // abstract_adapter.rb:576-593), which all `reload_type_map` after mutating
-    // the type universe. reloadTypeMap
-    // also drops the prepared-statement name map, so a cached write-path plan
-    // built against a prior incarnation of the type (drop + recreate reassigns
-    // the OID) is re-prepared instead of raising
-    // "cache lookup failed for type <oid>".
     await this.reloadTypeMap();
   }
 
@@ -1636,7 +1461,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       : this.quoteColumnName(rangeName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
-    // See createRange: mirror Rails' type-DDL `reload_type_map` pattern.
     await this.reloadTypeMap();
   }
 
@@ -1650,9 +1474,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      // Quote the identifier (mirrors Rails quote(quote_table_name(table))) so a
-      // mixed-case name like "CamelCase" resolves case-sensitively instead of
-      // folding to lowercase via a bare to_regclass.
       binds.push(table);
       tableCondition = `t.oid = to_regclass(quote_ident($1))`;
     }
@@ -1696,8 +1517,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async pkAndSequenceFor(tableName: string): Promise<[string, Name | null] | null> {
-    // Rails wraps the whole of `pk_and_sequence_for` in a bare `rescue nil`, so
-    // ANY error — not just an unknown table — yields nil.
     try {
       const quotedTable = this.quote(this.quoteTableName(tableName));
 
@@ -1780,7 +1599,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the sequence-name interpolation of PostgreSQL::SchemaStatements#default_sequence_name (postgresql/schema_statements.rb:301).
+   * @noRailsEquivalent CONVERGEABLE
    */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxIdentifierLength = this.maxIdentifierLength();
@@ -1793,10 +1612,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       const colMaxLen = Math.floor((maxIdentifierLength - suffix.length - 2) / 2);
       const newColLen = Math.min(colMaxLen, col.length);
       overLength -= col.length - newColLen;
-      // Mirrors Ruby's `column_name[0, column_name_length - [over_length, 0].min]`:
-      // when over_length is still positive the column is kept full (min → 0) and
-      // the table is truncated below instead; only a negative over_length (the
-      // column was over-truncated) adds characters back.
       col = col.slice(0, newColLen - Math.min(overLength, 0));
     }
     if (overLength > 0) {
@@ -1851,8 +1666,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
           : await this.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
     }
 
-    // Ruby's `max_pk ? true : false` is a nil check — 0 is truthy in Ruby, so a
-    // table whose max primary key is 0 must still emit `true`.
     await this.queryValue(
       `SELECT setval(${this.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
       "SCHEMA",

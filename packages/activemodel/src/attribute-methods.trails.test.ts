@@ -20,11 +20,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("alias attribute overrides a method inherited from a parent class", () => {
-    // `define_attribute_method_pattern`'s `override:` arm
-    // (activemodel/attribute_methods.rb:324-331): a regular attribute method
-    // leaves an already-implemented name alone, but `alias_attribute` — its only
-    // `override: true` caller (activerecord/attribute_methods.rb:94) — always
-    // defines.
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -72,11 +67,6 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("alias_attribute and attribute_method_suffix write only the declaring class", () => {
-    // `attribute_aliases` and `attribute_method_patterns` are `class_attribute`s
-    // (activemodel/attribute_methods.rb:70-73), whose writer is local to the
-    // class: Rails' `self.attribute_aliases = attribute_aliases.merge(...)`
-    // (:203) and `self.attribute_method_patterns += ...` (:141) leave every
-    // ancestor — and the shared default — untouched.
     class Person extends Model {
       static {
         this.attribute("name", "string");

@@ -4,18 +4,6 @@ import { MissingAttributeError } from "./attribute-methods.js";
 import { RuntimeError } from "./attribute-assignment.js";
 import { isDuplicable } from "@blazetrails/activesupport";
 
-/**
- * Ruby `Object#dup` on the memoized cast value — the shallow copy
- * `@value = @value.dup` makes in `Attribute#initialize_dup`
- * (attribute.rb:155-157). Not exported: Ruby gets `dup` from Object, so it is
- * not part of Attribute's surface.
- *
- * Only Ruby's mutable built-ins need a copy here; the scalars are already
- * immutable in JS. The generic-object arm is restricted to a plain object
- * because a built-in carrying internal slots (Temporal) throws on a slot-less
- * clone, and every such value in a cast attribute is immutable anyway, so
- * Ruby's `dup` of it is unobservable.
- */
 function dupValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.slice();
   if (value instanceof Map) return new Map(value);
@@ -27,31 +15,18 @@ function dupValue(value: unknown): unknown {
   return value;
 }
 
-/**
- * Symbol so identity comparisons work across module copies and can't collide with any user value.
- *
- * Mirrors activemodel/lib/active_model/attribute.rb:243, where this sentinel is `Object.new`; a JS Symbol keeps that identity across module copies.
- */
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
 );
 
-// Lazy reference to avoid circular import: attribute.ts ↔ user-provided-default.ts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _UserProvidedDefaultCtor: (new (...args: any[]) => Attribute) | null = null;
 
-/** Called by user-provided-default.ts to register itself after loading. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function _registerUserProvidedDefault(ctor: new (...args: any[]) => Attribute): void {
   _UserProvidedDefaultCtor = ctor;
 }
 
-/**
- * Wraps a single attribute value with its type, tracking the original
- * value before type cast and memoizing the cast result.
- *
- * Mirrors: ActiveModel::Attribute
- */
 export abstract class Attribute {
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
@@ -134,22 +109,10 @@ export abstract class Attribute {
     if (this.isAssigned()) {
       return this.originalAttribute!.originalValue;
     }
-    // Re-type-cast from the raw value (mirrors Rails FromDatabase#original_value →
-    // type_cast(value_before_type_cast)).  Uses this.typeCast() so that
-    // FromDatabase attrs call type.deserialize (not type.cast), matching Rails.
-    // For mutable types (Serialized, Array) the cached this.value may have been
-    // mutated in-place; re-casting from valueBeforeTypeCast returns the clean
-    // original.  For non-mutable types the result equals this.value.
     return this.typeCast(this.valueBeforeTypeCast);
   }
 
-  /**
-   * @missingRailsArgs changed_in_place? — PERMANENT: Rails passes the ivar
-   *   `@value_for_database` (attribute.rb:56), whose trails spelling is
-   *   `_valueForDatabase` — already taken by the port of the `_value_for_database`
-   *   method (attribute.rb:207). A TS class cannot carry a field and a method of
-   *   the same name, so the memo field keeps the `_cached` prefix.
-   */
+  /** @missingRailsArgs changed_in_place? — PERMANENT */
   get valueForDatabase(): unknown {
     if (
       !this._hasValueForDatabase ||
@@ -255,34 +218,16 @@ export abstract class Attribute {
     return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
   }
 
-  /**
-   * `Object#deep_dup` for an Attribute — `duplicable? ? dup : self`
-   * (activesupport/lib/active_support/core_ext/object/deep_dup.rb:16), which is
-   * what `attributes.transform_values(&:deep_dup)` reaches
-   * (attribute_set.rb:72-74). Ruby's `dup` shallow-copies every ivar and then
-   * runs {@link initializeDup}, so `@original_attribute` is carried into the
-   * copy by reference.
-   */
   deepDup(): Attribute {
     return this.dup();
   }
 
-  /**
-   * Mirrors: `def initialize_dup(other)` (attribute.rb:155-157). The guard
-   * reads the memo field rather than the `value` getter, because Ruby's
-   * `@value&.duplicable?` reads the ivar — nil until something forces the cast.
-   */
   private initializeDup(_other: Attribute): void {
     if (isDuplicable(this._value)) {
       this._value = dupValue(this._value);
     }
   }
 
-  /**
-   * Force-set the memoized cast value without replacing the Attribute or
-   * losing valueBeforeTypeCast. Used for post-cast transformations like
-   * normalization.
-   */
   overrideCastValue(value: unknown): void {
     this._value = value;
     this._hasValue = true;
@@ -305,33 +250,20 @@ export abstract class Attribute {
     );
   }
 
-  /**
-   * Ruby `Object#dup` for one Attribute — the call `LazyAttributeSet#default_attribute`,
-   * `LazyAttributeHash#deep_dup` and `#assign_default_value` make
-   * (`builder.rb:84`, `builder.rb:120`, `builder.rb:175`). A shallow copy that
-   * keeps the prototype and shares the `original_attribute` graph, then runs
-   * {@link initializeDup} (attribute.rb:155-159) exactly as Ruby's `dup` does.
-   */
   dup(): Attribute {
     const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
     dup.initializeDup(this);
     return dup;
   }
 
-  /** Access the original attribute for cloning. */
   getOriginalAttribute(): Attribute | null {
     return this.originalAttribute;
   }
 
-  /** Set the original attribute (used by deepDup). */
   setOriginalAttribute(attr: Attribute | null): void {
     this.originalAttribute = attr;
   }
 
-  /**
-   * Create an attribute where we already have both the raw and cast values.
-   * Used in the Model constructor after applying normalization/nullify.
-   */
   static fromUserWithValue(
     name: string,
     rawValue: unknown,
@@ -348,12 +280,6 @@ export class FromDatabase extends Attribute {
   }
 
   override forgettingAssignment(): Attribute {
-    // Rails condition: `!defined?(@value_for_database) && !changed_in_place?`
-    // → fast-path creates a new FromDatabase using the existing value_before_type_cast.
-    // We simplify: if nothing changed in place, `this` is already a correct baseline
-    // (valueBeforeTypeCast is the serialized DB value), so return self.
-    // If changed in place, delegate to base which serializes the current value into
-    // a new FromDatabase, resetting the baseline to the post-mutation state.
     if (!this.changedInPlace()) return this;
     return super.forgettingAssignment();
   }

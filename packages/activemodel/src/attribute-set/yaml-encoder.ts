@@ -11,50 +11,12 @@ import {
 
 const warnedKeys = new Set<string>();
 
-/**
- * Mirrors: ActiveModel::AttributeSet::YAMLEncoder
- *
- * Attempts to do more intelligent YAML dumping of an
- * ActiveModel::AttributeSet to reduce the size of the resulting string.
- *
- * Rails takes the model's `attribute_types` as `default_types` and encodes an
- * attribute whose type is that default as `attr.with_type(nil)`
- * (`yaml_encoder.rb:14-18`), restoring the default type on the way back in
- * (`:27-29`). trails writes that missing type as a `null` envelope key.
- *
- * Two things Rails gets from Psych and trails has to carry itself, both
- * consequences of the wire format rather than choices:
- *
- * - Psych dumps a non-default `Type` object inline; JSON cannot, so a
- *   non-default type travels as its registry key and comes back through
- *   `registry`. An unknown key falls back to the "value" type with a one-time
- *   warning per key (opt out with `silenceDriftWarnings`).
- * - Rails hands the concise attributes to the `Psych::Coder` its caller passes
- *   in (`yaml_encoder.rb:13`); there is no such object in JS, so `encode` takes
- *   the attribute set alone and returns what the injected codec wrote, and
- *   `decode` reads that string back.
- * - Psych round-trips an `Attribute::Uninitialized` as itself; a JSON envelope
- *   has no value to carry for one, so those names are listed in
- *   `defaultAttributes` and rebuilt as `Uninitialized` on decode.
- */
 export class YAMLEncoder {
   private defaultTypes: Record<string, Type>;
   private registry: TypeRegistry;
   private codec: AttributeSetCodec;
   private silenceDriftWarnings: boolean;
 
-  /**
-   * `YAMLEncoder#initialize` takes only `default_types` (`yaml_encoder.rb:8`)
-   * and `encode`/`decode` receive the `Psych::Coder` at the method boundary
-   * (`:12`, `:22`).
-   *
-   * `opts` carries what Psych supplies in Ruby and JS has no analogue of. Psych dumps a `Type` object inline, so a non-default type has
-   * to travel as a registry key and come back through `registry` (with
-   * `silenceDriftWarnings` muting the unknown-key warning), and there is no
-   * `Psych::Coder` object to pass per call, so the serializer is the injected
-   * `codec` instead. All three default, so `new YAMLEncoder(defaultTypes)` is
-   * the Rails call.
-   */
   constructor(
     defaultTypes: Record<string, Type>,
     opts: {

@@ -1,14 +1,3 @@
-/**
- * PostgreSQL hstore type — key/value string hash.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Hstore.
- * Rails: `class Hstore < Type::Value; include Helpers::Mutable`.
- * Deserialize parses the PG text format into a Hash; serialize renders
- * a Hash back to the text format. changed_in_place? compares the
- * deserialized hashes so key-order churn doesn't mark the attribute
- * dirty.
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
@@ -26,21 +15,10 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return true;
   }
 
-  /**
-   * Rails: `def accessor; ActiveRecord::Store::StringKeyedHashAccessor; end`.
-   * Returns the Store accessor class that Rails' store DSL uses to
-   * coerce symbol keys to string keys — matches PG's text-only hstore
-   * key model.
-   */
   accessor(): typeof StringKeyedHashAccessor {
     return StringKeyedHashAccessor;
   }
 
-  /**
-   * Rails' Helpers::Mutable overrides cast as `deserialize(serialize(value))`,
-   * producing a fresh hash so in-place mutations on a subsequent value
-   * don't leak into the attribute's cached representation.
-   */
   cast(value: unknown): Record<string, string | null> | null {
     if (value == null) return null;
     const serialized = this.serialize(value);
@@ -48,15 +26,10 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return this.deserialize(serialized);
   }
 
-  /**
-   * @missingRailsCall new — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   postgresql/oid/hstore.rb's scanner allocates a `Hash.new`; trails
-   *   accumulates into an object literal, which is not a `new` expression.
-   */
+  /** @missingRailsCall new — PERMANENT */
   override deserialize(value: unknown): Record<string, string | null> | null {
     if (value == null) return null;
     if (typeof value !== "string") {
-      // Rails: `return value unless value.is_a?(::String)`.
       return value as Record<string, string | null>;
     }
     if (value.trim() === "") return {};
@@ -65,36 +38,22 @@ export class Hstore extends ValueType<Record<string, string | null>> {
 
   override serialize(value: unknown): string | null {
     if (value == null) return null;
-    // Rails: `if value.is_a?(::Hash)` — only treat plain objects as a Hash.
-    // Date/Map/class instances are rejected by the else branch below
-    // rather than stringified as an empty hstore.
     if (isPlainObject(value)) {
       const hash = value as Record<string, unknown>;
       return Object.entries(hash)
         .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v as string | null)}`)
         .join(", ");
     }
-    // Rails' else branch returns value unchanged. Our declared return is
-    // string | null, so pass through only when it's already a string;
-    // anything else can't honestly satisfy the contract.
     if (typeof value === "string") return value;
     return null;
   }
 
-  /**
-   * Ruby Hash equality is value-based; JS object equality is identity-based.
-   * Override so assigning a deep-equal hash does not dirty the attribute.
-   */
   override isChanged(oldValue: unknown, newValue: unknown, _rawValue?: unknown): boolean {
     if (oldValue == null && newValue == null) return false;
     if (oldValue == null || newValue == null) return true;
     return !hashesEqual(oldValue as Record<string, unknown>, newValue as Record<string, unknown>);
   }
 
-  /**
-   * Rails' Hstore#changed_in_place? compares hashes (not raw strings)
-   * so key-order differences don't dirty the attribute.
-   */
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldHash = this.deserialize(rawOldValue);
     if (oldHash == null && newValue == null) return false;
@@ -121,44 +80,24 @@ function hashesEqual(a: Record<string, unknown>, b: Record<string, unknown>): bo
   return true;
 }
 
-/**
- * Back-compat parser — direct string parse, used by the adapter-level
- * hstore test suite. Prefer `new Hstore().deserialize(value)` in new
- * code.
- */
 export function parseHstore(input: string): Record<string, string | null> {
   if (!input || input.trim() === "") return {};
   return parseHstoreString(input);
 }
 
-/**
- * Back-compat serializer — direct object → string, used by the
- * adapter-level hstore test suite.
- */
 export function serializeHstore(obj: Record<string, string | null>): string {
   return Object.entries(obj)
     .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v)}`)
     .join(", ");
 }
 
-/**
- * Mirrors Rails' Hstore#escape_hstore:
- *   nil             → NULL
- *   ""              → "" (empty quoted string)
- *   "foo"           → quoted, with backslashes and double-quotes escaped
- *
- * @internal
- */
+/** @internal */
 function escapeHstore(value: string | null | undefined): string {
   if (value == null) return "NULL";
   if (value === "") return '""';
   return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
 }
 
-/**
- * Token-by-token parser mirroring Rails' StringScanner-based approach
- * in Hstore#deserialize.
- */
 function parseHstoreString(value: string): Record<string, string | null> {
   const hash: Record<string, string | null> = {};
   let i = 0;

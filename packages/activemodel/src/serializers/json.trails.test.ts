@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import { setParseJsonTimes } from "@blazetrails/activesupport";
 import { JSON as JSONHost } from "./json.js";
 
-// `from_json` decodes with `ActiveSupport::JSON.decode` (json.rb:147), not the
-// JSON gem, so Rails' own decoding applies — notably `parse_json_times`
-// (json/decoding.rb:22-32), which the plain parser has no notion of.
 describe("Serializers::JSON decoding (trails)", () => {
   class Event extends JSONHost {
     static {

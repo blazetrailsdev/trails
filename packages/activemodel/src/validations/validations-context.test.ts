@@ -3,7 +3,6 @@ import { assertPredicate } from "@blazetrails/activesupport";
 import { Model, Validator } from "../index.js";
 import type { ValidatableRecord } from "../validator.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
   static {
     this.attribute("title", "string");

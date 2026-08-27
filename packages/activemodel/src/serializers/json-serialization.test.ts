@@ -433,8 +433,6 @@ describe("JsonSerializationTest", () => {
   });
 
   it("from_json unwraps via first-value semantics on multi-key wrappers (Rails hash.values.first)", () => {
-    // Rails json.rb:147 — `hash = hash.values.first if include_root`,
-    // ignoring the configured root key and the wrapper's other keys.
     class Multi extends Model {
       declare static includeRootInJson: boolean | string;
 
@@ -490,9 +488,6 @@ describe("JsonSerializationTest", () => {
   });
 
   it("from_json defaults includeRoot to includeRootInJson when no second arg passed", () => {
-    // Rails json.rb:144 — `def from_json(json, include_root = include_root_in_json)`.
-    // When the class sets includeRootInJson = true, callers can pass a wrapped
-    // JSON payload without an explicit second arg.
     class Wrapped extends Model {
       declare static includeRootInJson: boolean | string;
 

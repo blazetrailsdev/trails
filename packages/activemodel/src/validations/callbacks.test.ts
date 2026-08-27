@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 
-// Mirrors Rails validations/callbacks_test.rb: a base `Dog` with a `history`
-// accumulator, plus subclasses registering before/after_validation callbacks
-// gated by `on:`.
 class Dog extends Model {
   history: string[] = [];
   static {
@@ -61,10 +58,6 @@ class DogValidatorWithOnMultipleCondition extends Dog {
 describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called", async () => {
     const order: string[] = [];
-    // Rails' `DogWithMethodCallbacks` registers by method NAME —
-    // `before_validation :set_before_validation_marker` (callbacks_test.rb:17-18),
-    // the Symbol filter this test's name is about. A Ruby Symbol is a
-    // colon-prefixed string in trails.
     class Person extends Model {
       static {
         this.attribute("name", "string");

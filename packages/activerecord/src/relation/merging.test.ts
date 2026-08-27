@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/merging_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -22,9 +17,6 @@ import { Computer } from "../test-helpers/models/computer.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 
-// `Post` declares `has_many :categories, through: :categorizations`, whose
-// through reflection resolves Categorization during automatic-inverse /
-// class-name derivation. Rails autoloads it there; trails needs it registered.
 registerModel([
   Categorization,
   Author,
@@ -166,8 +158,6 @@ describe("RelationMergingTest", () => {
 
     const authorId = quoteTableName("authors.id");
     await assertQueriesMatch(
-      // Rails uses `\g<1>` (subexpression call — re-match group 1's pattern);
-      // JS `\1` is a backreference, so repeat the alternation instead.
       new RegExp(
         `WHERE ${escapeRegExp(authorId)} NOT IN \\((?:\\?|\\W?\\w?\\d), (?:\\?|\\W?\\w?\\d)\\)$`,
       ),
@@ -228,9 +218,6 @@ describe("RelationMergingTest", () => {
       Post.eagerLoad(":lastComment").merge(Post.order("comments.id DESC")).merge(Post.all()),
     ];
 
-    // `lastComment` is a lazy hasOne: on a freshly-found record it returns a
-    // Promise, while on an eager-loaded row it's already materialized — await
-    // both so the comparison is between records, mirroring Rails' sync read.
     const expected = await (await Post.find(1)).lastComment;
     for (const rel of relations) {
       const posts = await rel;
@@ -275,10 +262,6 @@ describe("RelationMergingTest", () => {
   });
 
   it("relation merging preserves interleaved named/raw joins order", () => {
-    // Rails' `joins_values |= other.joins_values` is a single ordered array union
-    // that preserves the source relation's exact insertion order across the
-    // named/raw boundary — `joins(:a, "RAW", :b)` folds in as `[a, RAW, b]`, not
-    // reordered to `[RAW, a, b]`.
     const rawJoin = "INNER JOIN authors ON authors.id = posts.author_id";
     const source = Post.joins(":comments", rawJoin, ":author");
     const merged = Post.all().merge(source);
@@ -289,10 +272,6 @@ describe("RelationMergingTest", () => {
   });
 
   it("relation merging with cross-klass joins builds a join dependency", () => {
-    // merger.rb:122-132: when `other.model != relation.model`, association names
-    // resolve against `other`'s klass, not the receiver — they must NOT be pushed
-    // into the receiver's joins_values (which would resolve them on the wrong
-    // model). `merge` and `mergeBang` must agree here.
     const source = Post.joins(":author");
     const merged = Comment.all().merge(source);
     expect(merged.joinsValues.length).toBe(1);
@@ -305,11 +284,6 @@ describe("RelationMergingTest", () => {
   });
 
   it("relation merging with cross-klass left outer joins builds a join dependency", () => {
-    // merger.rb:136-152 merge_outer_joins: like merge_joins, when
-    // `other.model != relation.model` the left_outer_joins names resolve against
-    // `other`'s klass, so they build an OuterJoin JoinDependency on `other` rather
-    // than folding into the receiver's left_outer_joins_values. `merge` and
-    // `mergeBang` must agree — mergeBang's old inline block skipped this split.
     const source = Post.leftOuterJoins(":author");
     const merged = Comment.all().merge(source);
     expect(merged.leftOuterJoinsValues.length).toBe(1);

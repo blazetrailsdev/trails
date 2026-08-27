@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/enum_test.rb
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
@@ -12,8 +9,6 @@ import type {
   TableDefinition as PgTableDefinition,
 } from "../../connection-adapters/postgresql/schema-definitions.js";
 
-// Rails: class PostgresqlEnum < ActiveRecord::Base
-//   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true
 class PostgresqlEnum extends Base {
   static {
     this.tableName = "postgresql_enums";
@@ -26,9 +21,6 @@ class PostgresqlEnum extends Base {
   }
 }
 
-// Mirrors Rails' private with_test_schema helper in enum_test.rb:
-//   create_schema(name) / SET search_path / yield / ensure { drop_schema(name) / restore search_path }
-// Only used for tests that scope enums/tables to a named schema.
 async function withTestSchema(
   adapter: PostgreSQLAdapter,
   name: string,
@@ -53,12 +45,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   fixtures({}, { useTransactionalTests: false });
 
   let adapter: PostgreSQLAdapter;
-  // The scoped tests qualify enum sql_types relative to the live search_path, so
-  // a path leaked by a prior test (e.g. one whose `withTestSchema` cleanup raced
-  // a timeout) would flip `test_schema.mood_in_test_schema` to the unqualified
-  // `mood_in_test_schema`. Mirror the schema_test.rb port (schema.test.ts): capture
-  // the default once and restore it (plus clear the schema cache) after every test,
-  // recovering the `ensure` of Rails' `with_schema_search_path` at suite level.
   let defaultSearchPath: string;
   beforeAll(async () => {
     defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
@@ -99,8 +85,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(col!.type).toBe("enum");
       expect(col!.sqlType).toBe("mood");
       expect((col as any).array).toBeFalsy();
-      // Rails also asserts: type_for_attribute("current_mood").binary? → false
-      // BLOCKED: typeForAttribute is not yet ported to the adapter layer
     });
 
     it("enum defaults", async () => {
@@ -112,9 +96,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const col = cols.find((c) => c.name === "good_mood");
       expect(col).toBeDefined();
       expect(col!.default).toBe("happy");
-      // Rails also asserts: PostgresqlEnum.column_defaults["good_mood"] and
-      // PostgresqlEnum.new.good_mood — both require async schema cache refresh
-      // after ALTER TABLE, not yet wired for synchronous ORM column_defaults.
     });
 
     it("enum mapping", async () => {
@@ -136,9 +117,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }).toThrow(ArgumentError);
     });
 
-    // Rails: capture(:stderr) { PostgresqlEnum.first }; assert blank.
-    // The adapter's unknown-OID warning sink is console.warn, so spying on it
-    // is the vitest equivalent of capturing stderr.
     it("no oid warning", async () => {
       await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -147,13 +125,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum type cast", async () => {
-      // Rails: enum.current_mood = :happy (Ruby symbol → string via EnumType cast)
-      // TS has no symbol type; write the mapped string value directly.
-      // The cast path (symbol → string) is not exercisable in TS.
-      // Rails' `PostgresqlEnum.new` reflects `postgresql_enums` synchronously
-      // (model_schema.rb:592-594); trails' cache read is async, and this table
-      // is created per-test rather than warmed at boot, so reflect it first —
-      // `columns_hash` is a pure DB read and the enum needs its column.
       await PostgresqlEnum.loadSchema();
       const enumRecord = new PostgresqlEnum();
       (enumRecord as any).writeAttribute("current_mood", "happy");
@@ -240,7 +211,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("drop enum", async () => {
       await adapter.createEnum("unused", []);
-      // Rails order: drop (succeeds) → drop if_exists (succeeds, gone) → bare drop (raises)
       await adapter.dropEnum("unused");
       await expect(adapter.dropEnum("unused", { ifExists: true })).resolves.toBeUndefined();
       await expect(adapter.dropEnum("unused")).rejects.toThrow();
@@ -248,7 +218,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("works with activerecord enum", async () => {
       let model = await PostgresqlEnum.create();
-      // Rails: model.current_mood_okay! — our _enum bang is in-memory; persist with save().
       (model as any).currentMoodOkayBang();
       await model.save();
 
@@ -275,8 +244,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
-    // Rails uses create_schema + ensure { drop_schema } without changing search_path.
-    // withTestSchema is intentionally NOT used here — qualified names are used throughout.
     it("enum type explicit schema", async () => {
       await adapter.dropSchema("test_schema", { ifExists: true });
       await adapter.createSchema("test_schema");
@@ -355,9 +322,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           { drop: false },
         );
 
-        // Outside withTestSchema — query the schema-qualified table explicitly.
-        // The enum sql_type is schema-qualified now that test_schema is off the
-        // search path (Rails asserts "test_schema.mood_in_test_schema").
         const cols = await adapter.columns("test_schema.postgresql_enums_in_test_schema");
         const col = cols.find((c) => c.name === "current_mood");
         expect(col).toBeDefined();

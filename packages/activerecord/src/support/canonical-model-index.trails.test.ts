@@ -3,7 +3,6 @@ import { canonicalModelIndex } from "./canonical-model-index.js";
 import { autoloadModel, modelRegistry, registerModel } from "../associations.js";
 import { constantize, registerConstant, safeConstantize } from "@blazetrails/activesupport";
 
-/** Autoload-then-constantize: the two-step every AR call site now spells out. */
 function resolve(name: string): unknown {
   autoloadModel(name);
   return constantize(name);
@@ -21,9 +20,6 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
   });
 
   it("indexes namespaced models under their `::`-qualified Ruby name", () => {
-    // Rails resolves a namespaced association target through the namespace walk
-    // (`MyApplication::Business::Company`), not the flat JS constructor name, so
-    // the index must carry the qualified key for the walk to hit it.
     expect(canonicalModelIndex.get("MyApplication::Business::Company")).toBe(MyAppBusinessCompany);
     expect(resolve("MyApplication::Business::Company")).toBe(MyAppBusinessCompany);
   });
@@ -41,10 +37,6 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
   });
 
   it("autoloads through a `::`-prefixed absolute name", () => {
-    // reflection.ts `_klass` tries `computeClass("::#{class_name}")` first
-    // (reflection.rb:427). `constantize` strips the prefix itself, so
-    // `autoloadModel` must too — otherwise the index (keyed unprefixed) misses
-    // and an index-only model can never be faulted in on that path.
     expect(resolve("::Pet")).toBe(Pet);
   });
 

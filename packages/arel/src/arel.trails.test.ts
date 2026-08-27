@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { sql, Nodes, Visitors } from "./index.js";
 import { testConnection } from "./test-helpers/connection.js";
 
-// Trails-only: Rails has no unit test for `Arel.sql`'s two-arm dispatch
-// (arel.rb:51-57) — its bind arms are covered indirectly through Relation.
 describe("Arel.sql", () => {
   const compile = (node: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(node);
 

@@ -5,15 +5,6 @@ import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
 
-/** Structural view of `TableAlias#relation`.
- *
- *  Optionality here mirrors Rails' *guards*, not what the relation actually
- *  responds to — a `SelectManager` relation has none of these three members.
- *  `isAbleToTypeCast` is optional because table_alias.rb:26-28 guards it with
- *  `respond_to?`; the other two are required because table_alias.rb:18-24
- *  delegates to them bare, so a relation lacking them raises — Ruby's
- *  `NoMethodError`. The cast makes this unenforced either way; it documents
- *  which calls Rails protects. */
 interface TypeCastable {
   name?: string;
   typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
@@ -26,8 +17,6 @@ export class TableAlias extends Binary {
     super(relation, name);
   }
 
-  // Rails: `SelectManager#as` stores the alias as a `Nodes::SqlLiteral` (rendered
-  // bare), while `Table#alias` stores a plain string (quoted). Accept both.
   get name(): string | SqlLiteral {
     return this.right as string | SqlLiteral;
   }
@@ -36,10 +25,6 @@ export class TableAlias extends Binary {
     this.right = value;
   }
 
-  // Mirrors `alias :relation :left` / `alias :name :right` (table_alias.rb:6-7):
-  // these are the Binary slots under another spelling, not fields beside them,
-  // so a write through either name is the same write — which is what
-  // `Binary#eql` reads (binary.rb:19-27).
   get relation(): Node {
     return this.left as Node;
   }
@@ -48,7 +33,6 @@ export class TableAlias extends Binary {
     this.left = value;
   }
 
-  // Mirrors Rails `alias :table_alias :name` (table_alias.rb).
   get tableAlias(): string | SqlLiteral {
     return this.name;
   }
@@ -75,7 +59,6 @@ export class TableAlias extends Binary {
     return new Cte(this.name, this.relation);
   }
 
-  /** The alias as a bare string, unwrapping a `SqlLiteral` name. */
   private get nameString(): string {
     return this.name instanceof SqlLiteral ? this.name.value : this.name;
   }

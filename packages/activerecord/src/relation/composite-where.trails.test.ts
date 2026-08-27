@@ -1,16 +1,3 @@
-/**
- * Composite-key WHERE: `Relation#where(cols, tuples)` and the
- * underlying `PredicateBuilder.buildComposite(cols, tuples)`.
- *
- * Rails uses `where({[col1, col2] => [[v1, v2], ...]})` for
- * composite-key matching, routing through PredicateBuilder. JS object
- * keys can't be arrays, so we expose the same shape as a positional
- * overload — `where(['c1', 'c2'], [[v1a, v1b], ...])` — and a
- * matching `PredicateBuilder.buildComposite` method.
- *
- * Mirrors: ActiveRecord predicate-builder composite-key handling
- * (`relation/where_test.rb` composite-key `where` cases on `Cpk::Book`).
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -22,9 +9,6 @@ import { Company } from "../test-helpers/models/company.js";
 import { Contract } from "../test-helpers/models/contract.js";
 
 describe("Relation#where — composite-key form", () => {
-  // Rails creates the CPK rows inline with `Cpk::Book.create!` — no cpk
-  // fixtures are loaded — so we ride the canonical, empty `cpk_books`
-  // table and let transactional rollback clean up each test's inserts.
   fixtures([]);
 
   beforeAll(() => {
@@ -122,31 +106,14 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("composite predicate values flow through QueryAttribute (bind params, not inlined Casted)", () => {
-    // Regression: an earlier draft used `attribute.eq(rawValue)`,
-    // which wraps as Arel::Nodes::Casted and inlines values into SQL.
-    // That breaks bind extraction / prepared-statement caching.
-    // Switching to buildBindAttribute makes each value a
-    // QueryAttribute → BindParam at SQL emission. Inspect the node
-    // tree: the AND's right-hand sides should be QueryAttribute
-    // instances (carrying `name` / `type`), not raw literals or
-    // Casted nodes.
     const rel = (CpkBook as any).all();
     const nodes: any = rel.predicateBuilder.buildComposite(["author_id", "id"], [[1, 100]]);
-    // Single-tuple path returns the predicates flat ([eq, eq]), like Rails'
-    // grouping_queries. `build_quoted` seats an ActiveModel::Attribute
-    // unwrapped (casted.rb:50-51), so the first Eq's right-hand side is the
-    // QueryAttribute(name, value, type) itself.
     const rhs = nodes[0].right;
     expect(rhs?.name).toBe("author_id");
     expect(rhs?.constructor?.name).toBe("QueryAttribute");
   });
 
   it("single-tuple composite returns flat predicates (no wrapping Grouping/parens) — Rails grouping_queries one? path", () => {
-    // grouping_queries returns a single group's predicates flat
-    // (`queries.one? → queries.first`, predicate_builder.rb:155-156), so one
-    // surviving tuple is [c1 = ?, c2 = ?] — two addressable predicates, NOT a
-    // Grouping. The emitted SQL therefore has no wrapping parens, byte-for-byte
-    // Rails' `where({[c1,c2] => [[v1,v2]]})`.
     const rel = (CpkBook as any).all();
     const nodes: any = rel.predicateBuilder.buildComposite(["author_id", "id"], [[1, 100]]);
     expect(nodes.map((n: any) => n.constructor.name)).toEqual(["Equality", "Equality"]);
@@ -174,19 +141,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("qualified composite col naming a join-only table binds through that table's model type", () => {
-    // A qualified col naming a table that exists only as a join-dependency
-    // (`contracts` reached via `Comment.joins({ ":company": ":contracts" })`) — NOT
-    // a direct reflection on the base model — must still re-root on the joined
-    // model so the bind is typed by that model's column type. Rails threads
-    // `lookup_table_klass_from_join_dependencies` as the `associated_table`
-    // block (predicate_builder.rb:71-73); `buildComposite` mirrors that.
-    //
-    // `contracts.metadata` is `t.string` in the DB but Contract overrides it to
-    // `attribute("metadata", "json")`. Resolved through the join-dependency
-    // fallback, the bind uses that model type and JSON-serializes the value
-    // (`"x"` → `'"x"'`); without the fallback it falls to a bare Table with a
-    // generic `TypeCasterConnection` (klass === null), which reads the raw
-    // string column type and leaves it unquoted (`x`).
     const rel: any = (Comment as any)
       .joins({ ":company": ":contracts" })
       .where(["comments.id", "contracts.metadata"], [[1, "x"]]);
@@ -244,10 +198,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("multi-tuple composite builds Rails' grouping_queries tree: one Grouping wrapping an n-ary Or of And chains", () => {
-    // buildComposite delegates to grouping_queries
-    // (predicate_builder.rb:154-162), so the tree is Rails' verbatim:
-    // Grouping(Or([And([eq, eq]), And([eq, eq])])) — the per-tuple Grouping
-    // an earlier hand-rolled version added is not part of that shape.
     const rel = (CpkBook as any).all();
     const nodes: any = rel.predicateBuilder.buildComposite(
       ["author_id", "id"],
@@ -264,9 +214,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("composite tuple values dereference a record to its id (predicate_builder.rb:58)", async () => {
-    // Delegating through `build` inherits Rails' `value = value.id if
-    // value.respond_to?(:id)`, which the hand-rolled buildBindAttribute path
-    // skipped — a record used to be bound whole.
     const author: any = await (CpkAuthor as any).create({ name: "deref" });
     await CpkBook.create({ id: [author.id, 100], title: "by-record" });
     const matched = await (CpkBook as any).where(["author_id", "id"], [[author, 100]]).toArray();
@@ -274,12 +221,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("single-column composite over a composed_of key keeps every mapped column's predicate", () => {
-    // An aggregate key expands to one predicate per mapped column
-    // (expand_from_hash's aggregated_with? branch, predicate_builder.rb:124-141),
-    // so the delegation returns a multi-node array for a single key. Returning
-    // them all (Node[]) — rather than collapsing to [0] — is what keeps
-    // city/country from being silently dropped alongside street, and the caller
-    // spreads every predicate into the WhereClause.
     const rel = (Customer as any).all();
     const nodes: any = rel.predicateBuilder.buildComposite(
       ["address"],
@@ -296,18 +237,11 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("Relation#where(single array arg) routes to the sanitized-conditions form, not composite", () => {
-    // A single all-strings array is Rails' `where(["sql fragment"])` form, not
-    // the two-argument composite `where(cols, tuples)`, so it must sanitize
-    // rather than raise the composite-key ArgumentError.
     const sql = (CpkBook as any).all().where(["author_id = 1"]).toSql();
     expect(sql).toMatch(/author_id = 1/);
   });
 
   it("Relation#whereNot(single array arg) routes to the sanitized-conditions form, not composite", () => {
-    // Rails' `where.not(["name = ?", x])` (query_methods.rb:28) is the
-    // sanitized-conditions form built via `build_where_clause(...).invert`, so a
-    // single array must negate the fragment rather than raise the composite-key
-    // ArgumentError.
     const sql = (CpkBook as any).all().where().not(["author_id = 1"]).toSql();
     expect(sql).toMatch(/NOT \(author_id = 1\)/);
   });

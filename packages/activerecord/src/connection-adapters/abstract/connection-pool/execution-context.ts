@@ -7,7 +7,7 @@ const _exitHooks: ((contextId: string) => void)[] = [];
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby hangs per-thread pool state off Thread.current and reaps it on thread death (connection_pool.rb:711); JS has no thread lifetime.
+ * @noRailsEquivalent PERMANENT
  */
 export function registerContextExitHook(hook: (contextId: string) => void): void {
   _exitHooks.push(hook);
@@ -15,19 +15,12 @@ export function registerContextExitHook(hook: (contextId: string) => void): void
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT the JS stand-in for Ruby's ActiveSupport::IsolatedExecutionState.context (connection_pool.rb:711).
+ * @noRailsEquivalent PERMANENT
  */
 export function executionContextId(): number {
   return IsolatedExecutionState.get<number>(CONTEXT_ID_KEY) ?? 0;
 }
 
-/**
- * Run a callback in a new isolated execution context.
- * Leases obtained inside will not collide with the outer context.
- * On exit, registered hooks fire with the context id so per-context state
- * (e.g., per-pool query-cache Stores) can be evicted — mirrors Rails' GC of
- * `IsolatedExecutionState.context`.
- */
 export function withExecutionContext<T>(fn: () => T): T {
   const id = ++_contextIdCounter;
   const runHooks = () => {

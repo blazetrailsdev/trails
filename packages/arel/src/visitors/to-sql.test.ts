@@ -17,8 +17,6 @@ import { buildQuoted } from "../nodes/casted.js";
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
-  // Rails' `before` block and `compile` helper (`to_sql_test.rb:10-18`): the
-  // FakeRecord connection is what makes `true` render as `'t'` here.
   const visitor = new Visitors.ToSql(fakeRecordConnection);
   const table = new Table("users");
   const attr = table.get("id");
@@ -351,8 +349,6 @@ describe("the to_sql visitor", () => {
     it("ignores excess named parameters", () => {
       const node = new Nodes.BoundSqlLiteral("id = :id", [], { id: 1, extra: 2 });
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
-      // `:id` renders as a `?` placeholder (add_bind), `:extra` is unreferenced
-      // and silently ignored — Rails to_sql_test.rb.
       expect(sql).toBe("id = ?");
     });
   });
@@ -366,9 +362,6 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::BoundSqlLiteral", () => {
     it("quotes nested arrays", () => {
-      // Mirrors Rails to_sql_test.rb — two cases exercise the mixed
-      // Arel-node/scalar branch. An Arel node in the list is visited; every other
-      // element (including a nested array) is a single `add_bind` → one `?`.
       const innerLiteral = new Nodes.BoundSqlLiteral("? * 2", [4], {});
       const node = new Nodes.BoundSqlLiteral("id IN (?)", [[1, [2, 3], innerLiteral]], {});
       expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe("id IN (?, ?, ? * 2)");
@@ -379,10 +372,6 @@ describe("the to_sql visitor", () => {
   });
 
   it("unsupported input should raise UnsupportedVisitError", () => {
-    // Rails compiles `nil`, whose NilClass handler is aliased to `unsupported`
-    // (to_sql.rb:838) — the UnsupportedVisitError terminal. A class with no
-    // handler at all is the other terminal and raises TypeError
-    // (visitor.rb:38), covered in visitor.test.ts.
     let error: unknown;
     try {
       compile(null);
@@ -754,15 +743,10 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit_BigDecimal", () => {
-    // Rails exercises the visitor without asserting (to_sql_test.rb:344-346):
-    // reaching the end of the body is the assertion.
     compile(buildQuoted({ toString: () => "2.14" }));
   });
 
   it("should visit_Class", () => {
-    // Ruby `Class#to_s` is the class name, so `build_quoted(DateTime)` quotes
-    // `'DateTime'`. JS `String(klass)` is the constructor's source text, so the
-    // faithful analogue of Ruby's `to_s` here is the constructor's `name`.
     class DateTime {}
     expect(compile(buildQuoted(DateTime.name))).toBe("'DateTime'");
   });
@@ -920,9 +904,6 @@ describe("the to_sql visitor", () => {
     it("works with positional binds", () => {
       const node = new Nodes.BoundSqlLiteral("id = ?", [1], null);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
-      // Rails: `add_bind` emits the placeholder (BIND_BLOCK = proc { "?" }) into
-      // a plain SQLString collector, so `compile` renders `id = ?`, not the
-      // inlined value (to_sql_test.rb).
       expect(sql).toBe("id = ?");
     });
 
@@ -933,8 +914,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("works with array values", () => {
-      // Rails to_sql_test.rb: a single positional `?` bound to an array expands
-      // through `add_binds` to one placeholder per element.
       const node = new Nodes.BoundSqlLiteral("id IN (?)", [[1, 2, 3]], {});
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe("id IN (?, ?, ?)");

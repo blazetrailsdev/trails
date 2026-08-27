@@ -1,11 +1,3 @@
-/**
- * Adapter-agnostic regression tests for disableReferentialIntegrity.
- *
- * These drive the module function against a fake host (no live PG), pinning the
- * shape of referential_integrity.rb:7-38 — each ALTER pass collects `tables`
- * itself, and the enable pass swallows an ActiveRecordError. The live-PG
- * behavior lives in adapters/postgresql/referential-integrity.test.ts.
- */
 import { describe, it, expect, vi } from "vitest";
 import { disableReferentialIntegrity } from "./referential-integrity.js";
 import { InvalidForeignKey, StatementInvalid } from "../../errors.js";

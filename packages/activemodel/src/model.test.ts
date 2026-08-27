@@ -2,19 +2,6 @@ import { describe, it, expect } from "vitest";
 import { onLoad } from "@blazetrails/activesupport";
 import { Model, UnknownAttributeError } from "./index.js";
 
-/**
- * Port of `vendor/rails/activemodel/test/cases/model_test.rb`.
- *
- * `module DefaultValue` (model_test.rb:7-17) is a mixin whose `initialize`
- * seeds `@attr` and whose `included` hook adds `attr_accessor :hello`. Ruby
- * inserts it into the ancestor chain, so `BasicModel` and
- * `BasicModelWithReversedMixins` differ only in whether the seeding runs
- * before or after `ActiveModel::API#initialize` assigns the passed attributes
- * — an ordering that is unobservable either way, since `||=` never overwrites
- * an assigned value. JS has one linear constructor chain and `super()` must
- * run first, so both classes seed after `super`, which is BasicModel's own
- * ancestry (`API#initialize` assigns, then `super` reaches DefaultValue).
- */
 class DefaultValueModel extends Model {
   declare _hello?: string;
 

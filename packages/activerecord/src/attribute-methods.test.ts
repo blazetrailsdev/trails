@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
@@ -19,9 +15,6 @@ import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/dev
 
 registerModel([Developer, AuditLog, AuditLogRequired]);
 
-// ==========================================================================
-// AttributeMethodsTest — targets attribute_methods_test.rb
-// ==========================================================================
 describe("AttributeMethodsTest", () => {
   fixtures([]);
 
@@ -304,16 +297,10 @@ describe("AttributeMethodsTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "sel_test" });
     const result = await Post.select("title").first();
-    // Mirrors: computer[:developer] → assert_raises MissingAttributeError.
-    // `legacy_comments_count` is a real canonical `posts` column that wasn't in
-    // the SELECT, so reading it raises.
     expect(() => (result as any).get("legacy_comments_count")).toThrow(
       "missing attribute 'legacy_comments_count'",
     );
-    // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
     expect((result as any).get("title")).toBe("sel_test");
-    // Mirrors: assert_nothing_raised { computer[:no_column_exists] } — an unknown
-    // name returns nil even through `[]`'s raising block.
     expect((result as any).get("no_column_exists")).toBeNull();
   });
   it("user-defined time attribute predicate", async () => {
@@ -358,8 +345,6 @@ describe("AttributeMethodsTest", () => {
     expect(p.title).toBe("frozen");
   });
   it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", () => {
-    // Rails also lists `hash`, which has no instance method in trails and so is
-    // not in the dangerous population.
     for (const method of ["save", "createOrUpdate", "dup", "isFrozen"]) {
       const klass = class extends Base {};
       Object.defineProperty(klass.prototype, method, {
@@ -477,9 +462,6 @@ describe("AttributeMethodsTest", () => {
     }
     const topic = new TopicClass({ title: "New topic" }) as any;
     TopicClass.undefineAttributeMethods();
-    // Ruby brings the methods back on the next read, through `method_missing`.
-    // A JS property cannot trap a read (CLAUDE.md, "Generated attribute readers
-    // are properties"), so trails' trigger is `init_internals` (core.rb:849).
     expect((new TopicClass({ title: "New topic" }) as any).title).toBe("New topic");
     expect(topic.title).toBe("New topic");
   });
@@ -577,8 +559,6 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    // `Object.assign` goes through [[Set]] and hits the generated getter-only
-    // `titleWas`; Ruby's module include defines over it.
     Object.defineProperty(
       ClassWithDeprecatedAliasAttributeBehaviorFromModule.prototype,
       "titleWas",
@@ -786,9 +766,6 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
         this.attribute("author_name", "string");
         this.attribute("approved", "boolean");
-        // Rails schema.rb: `t.datetime :written_on` / `t.time :bonus_time`
-        // (topics table). Match the canonical column types now that this file
-        // rides the real `topics` table.
         this.attribute("written_on", "datetime");
         this.attribute("bonus_time", "time");
       }
@@ -965,9 +942,6 @@ describe("AttributeMethodsTest", () => {
   });
 });
 
-// ==========================================================================
-// AttributeMethodsTestExtra — additional targets for attribute_methods_test.rb
-// ==========================================================================
 describe("AttributeMethodsTest", () => {
   fixtures([]);
 
@@ -1194,11 +1168,8 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("inherited custom accessors", async () => {
-    // Mirrors Rails: an abstract parent with custom title accessors; the
-    // concrete subclass inherits them and they are not clobbered by generation.
     class Topic extends Base {
       static {
-        // Rails' `new_topic_like_ar_class` (attribute_methods_test.rb:1583).
         this.tableName = "topics";
         this.abstractClass = true;
         this.attribute("title", "string");
@@ -1328,13 +1299,10 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Mirrors Rails `topic = Topic.first`: a persisted record whose schema is
-    // warm, so the real columns are known and an unknown name is detectable.
     await Topic.create({ title: "orig" });
     const t = (await Topic.first()) as any;
     t.writeAttribute("title", "known");
     expect(t.readAttribute("title")).toBe("known");
-    // Mirrors: topic[:no_column_exists] = "Hello!" → assert_raises MissingAttributeError
     expect(() => t.writeAttribute("no_column_exists", "Hello!")).toThrow(
       "can't write unknown attribute `no_column_exists`",
     );
@@ -1344,17 +1312,9 @@ describe("AttributeMethodsTest", () => {
   });
 });
 
-// ==========================================================================
-// AttributeMethodsTest — targets attribute_methods_test.rb (continued)
-// ==========================================================================
-
 describe("attribute_alias arelTable integration", () => {
   fixtures([]);
   it("test_attribute_alias_in_where_references_association_name", () => {
-    // Unit cover for the `arelTable.get(alias)` mechanism, NOT the Rails port:
-    // the Rails `test_attribute_alias_in_where_references_association_name` lives
-    // in eager_test.rb (EagerAssociationTest) and is ported in eager.test.ts.
-    // Name kept verbatim per CLAUDE.md (never rename/reword test names).
     class User extends Base {
       static {
         this.attribute("username", "string");
@@ -1366,10 +1326,6 @@ describe("attribute_alias arelTable integration", () => {
   });
 });
 
-// ==========================================================================
-// AttributeMethods::ClassMethods#initialize_generated_modules
-// (attribute_methods.rb:42) — targets attribute_methods_test.rb
-// ==========================================================================
 describe("initialize_generated_modules", () => {
   fixtures([]);
 

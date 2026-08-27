@@ -69,7 +69,6 @@ describe("RailtieTest", () => {
   });
 
   it("ActiveModel::Railtie is registered in the global subclasses list", () => {
-    // Mirrors Rails::Railtie.subclasses which auto-populates via `inherited`.
     expect(BaseRailtie.subclasses).toContain(Trailtie);
   });
 

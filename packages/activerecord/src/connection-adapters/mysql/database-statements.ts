@@ -1,9 +1,3 @@
-/**
- * MySQL database statements — MySQL-specific query execution.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements (module)
- */
-
 import { sql as arelSql } from "@blazetrails/arel";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -30,14 +24,6 @@ export interface DatabaseStatements {
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
 }
 
-// MySQL-specific read-query pattern. Mirrors Rails'
-// `AbstractAdapter.build_read_query_regexp(:desc, :describe, :set, :show, :use,
-// :kill)` unioned with DEFAULT_READ_QUERY (:begin, :commit, :explain, :release,
-// :rollback, :savepoint, :select, :with). The leading group consumes any mix of
-// "(", whitespace, and SQL comments before the first keyword, so a
-// comment/paren-prefixed SELECT (e.g. a query-log-tagged read) still classifies
-// as a read.
-// Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements::READ_QUERY
 const COMMENT_REGEX = String.raw`(?:--.*\n)|/\*(?:[^*]|\*[^/])*\*/`;
 const READ_QUERY = new RegExp(
   `^(?:[(\\s]|${COMMENT_REGEX})*` +
@@ -45,13 +31,7 @@ const READ_QUERY = new RegExp(
   "i",
 );
 
-/**
- * Returns true when sql is NOT a read query (i.e., is a write).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#write_query?
- */
 export function isWriteQuery(sql: string): boolean {
-  // Rails rescues ArgumentError from invalid encoding and retries with .b (binary); JS has no equivalent
   return !READ_QUERY.test(sql);
 }
 
@@ -60,11 +40,6 @@ export interface BuildExplainClauseHost {
   databaseVersion?: Version | Promise<Version>;
 }
 
-/**
- * Build the EXPLAIN prefix clause for MySQL.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
- */
 export async function buildExplainClause(
   this: BuildExplainClauseHost | void,
   options: ExplainOption[] = [],
@@ -86,31 +61,24 @@ interface AutoIncrementColumnHost {
   autoIncrement?: boolean;
 }
 
-/**
- * @internal
- */
+/** @internal */
 export async function isAnalyzeWithoutExplain(
   this: BuildExplainClauseHost | void,
 ): Promise<boolean> {
   const host = this as BuildExplainClauseHost | null;
   if (!(await host?.isMariadb?.())) return false;
-  // Rails: `database_version >= "10.1.0"` (mysql/database_statements.rb:50).
   return ((await host?.databaseVersion)?.compare("10.1.0") ?? -1) >= 0;
 }
 
 /** @internal */
 export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLiteral | undefined {
-  // Rails: `super unless column.auto_increment?`
   if (column.autoIncrement) return undefined;
   return abstractDefaultInsertValue(column);
 }
 
 /**
  * @internal
- *
- * @missingRailsCall first — PERMANENT: Per-site verified (RFC 0106 wave 4b):
- *   mysql/database_statements.rb's `result.rows.first` is `result.rows[0]` on a
- *   JS array; `Array#first` is not a ported method name.
+ * @missingRailsCall first — PERMANENT
  */
 export async function returningColumnValues(
   this: SupportsInsertReturningHost | void,
@@ -124,7 +92,6 @@ export async function returningColumnValues(
 
 export interface MaxAllowedPacketHost {
   showVariable(name: string): Promise<string | null>;
-  /** Mirrors Rails' `@max_allowed_packet` memo. */
   _maxAllowedPacket?: number;
   /** @internal */
   maxAllowedPacket(): Promise<number>;
@@ -164,33 +131,15 @@ export async function isMaxAllowedPacketReached(
   return currentSize + Buffer.byteLength(previousPacket, "utf8") + 2 > maxPacket;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#max_allowed_packet
- * (`mysql/database_statements.rb:89-90`) — `@max_allowed_packet ||=
- * show_variable("max_allowed_packet")`. Rails carries no fallback because
- * `show_variable` always answers on a live MySQL connection; a host that cannot
- * answer surfaces at the raise site in `is_max_allowed_packet_reached?` rather
- * than silently combining forever.
- * @internal
- */
+/** @internal */
 export async function maxAllowedPacket(this: MaxAllowedPacketHost): Promise<number> {
   return (this._maxAllowedPacket ??= Number(await this.showVariable("max_allowed_packet")));
 }
 
-/**
- * Returns a SQL literal for MySQL's highest-precision current timestamp.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#high_precision_current_timestamp
- */
 export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
   return arelSql("CURRENT_TIMESTAMP(6)");
 }
 
-/**
- * Returns an EXPLAIN plan for the query.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#explain
- */
 export async function explain(
   this: BuildExplainClauseHost & {
     explainPrettyPrinter?(): { pp(result: Result, elapsed: number): string };

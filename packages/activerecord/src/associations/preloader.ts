@@ -12,26 +12,11 @@ export interface PreloaderOptions {
   associateByDefault?: boolean;
 }
 
-/**
- * Duck-type check for a Relation passed as `records`. Avoids a runtime import
- * of Relation (which would create a require cycle through associations).
- * @internal
- */
+/** @internal */
 function isRelation(records: Base[] | Relation<Base>): records is Relation<Base> {
   return !Array.isArray(records) && typeof (records as any).toArray === "function";
 }
 
-/**
- * Implements eager loading of associations. Given a set of records and
- * association names, loads all associated records in as few queries as
- * possible.
- *
- * Creates a Branch tree mirroring the requested association hierarchy,
- * then uses Batch to walk the tree, find runnable loaders, and execute
- * them in groups.
- *
- * Mirrors: ActiveRecord::Associations::Preloader
- */
 export class Preloader {
   readonly records: Base[] | Relation<Base>;
   readonly associations: any;
@@ -62,25 +47,12 @@ export class Preloader {
     }
   }
 
-  /**
-   * Rails' `empty?` is `associations.nil? || records.length == 0`, where
-   * `records.length` materializes a Relation. We can't run that query
-   * synchronously (async I/O), so emptiness is async: it materializes the
-   * Relation just as Rails does, then reads the final record count — so an
-   * *empty* Relation correctly reports `true`. `materialize()` runs the query
-   * once per preloader, so `Batch`'s reject-then-load keeps the observable
-   * query count unchanged.
-   */
   async isEmpty(): Promise<boolean> {
     if (this.associations == null) return true;
     await this.materialize();
     return (await this._tree.preloadedRecords()).length === 0;
   }
 
-  /**
-   * Loads a Relation's records into the root branch exactly once. A no-op for
-   * the array path (already set in the constructor) and for repeat calls.
-   */
   async materialize(): Promise<void> {
     if (this._materialized) return;
     this._tree.setPreloadedRecords(await (this.records as Relation<Base>));

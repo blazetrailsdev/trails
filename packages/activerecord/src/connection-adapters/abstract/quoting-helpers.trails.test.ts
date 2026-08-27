@@ -1,16 +1,3 @@
-/**
- * Trails-only unit coverage for the abstract quoting helpers — no Rails
- * counterpart file. Rails has `quoting_test.rb` (ported as `quoting.test.ts`),
- * but no `quoting_helpers_test.rb`, and the self-dispatch helpers exercised here
- * (`dispatchQuotedBinary` / `dispatchQuotedDate` / `dispatchQuotedTime`) are a
- * trails construct standing in for Ruby's `self.quoted_binary` sends. Nothing in
- * this file is matched by `parity:test` — it lands in "extra (TS only)" — so the
- * describe/it names here are ours to choose and are NOT bound by the
- * never-reword-a-test-name rule, which exists to protect Rails-matched names.
- *
- * Renamed to `.trails.test.ts` (was `quoting-helpers.test.ts`) to make that
- * self-evident; it is why reviewers kept having to re-derive it.
- */
 import { quotingHost } from "../../support/quoting-host.js";
 import { NotImplementedError } from "../../errors.js";
 import { describe, expect, it } from "vitest";
@@ -126,8 +113,6 @@ describe("quote dispatches through quoted_binary", () => {
   });
 
   it("passes the Type::Binary::Data itself to this.quotedBinary", () => {
-    // Rails: `when Type::Binary::Data then quoted_binary(value)` (rb:83) hands the
-    // wrapper to the override, which unwraps it (`value.to_s` / `value.hex`).
     let received: unknown;
     const host = quotingHost({
       quotedBinary: (value: unknown) => {
@@ -141,8 +126,6 @@ describe("quote dispatches through quoted_binary", () => {
   });
 
   it("passes normalized bytes to this.quotedBinary for a raw byte view", () => {
-    // Trails-only affordance: a raw view has no Ruby analogue (Rails only ever
-    // sees Type::Binary::Data here), so it is normalized before dispatch.
     let received: unknown;
     const host = quotingHost({
       quotedBinary: (value: unknown) => {
@@ -157,24 +140,16 @@ describe("quote dispatches through quoted_binary", () => {
   });
 
   it("falls back to the module quoted_binary helper without a host", () => {
-    // Rails' abstract quoted_binary is `"'#{quote_string(value.to_s)}'"` —
-    // the raw byte string, not a comma-joined element list.
     expect(quote.call(quotingHost(), new BinaryData("ab"))).toBe("'ab'");
   });
 
   it("normalises every byte source in the module quoted_binary fallback", () => {
-    // SQLite's boundary branch dispatches ArrayBuffer, and Rails' signature
-    // (abstract/quoting.rb:206) takes the Data itself.
     expect(quotedBinary(new Uint8Array([0x61, 0x62]))).toBe("'ab'");
     expect(quotedBinary(new Uint8Array([0x61, 0x62]).buffer)).toBe("'ab'");
     expect(quotedBinary(new BinaryData("ab"))).toBe("'ab'");
   });
 
   it("keeps non-UTF-8 bytes byte-exact in the module quoted_binary fallback", () => {
-    // Rails' `value.to_s` returns a BINARY-encoded String, so quoted_binary is
-    // byte-exact. BinaryData#toString() UTF-8-decodes, which turns invalid
-    // sequences into U+FFFD — String(value) would silently corrupt 0xde 0xad
-    // 0xbe 0xef into 3 replacement chars. Normalise to bytes instead.
     const bytes = [0xde, 0xad, 0xbe, 0xef];
     const expected = `'${bytes.map((b) => String.fromCharCode(b)).join("")}'`;
     expect(quotedBinary(new BinaryData(new Uint8Array(bytes)))).toBe(expected);
@@ -187,10 +162,6 @@ describe("quote dispatches through quoted_binary", () => {
 
 describe("type_cast unwraps Type::Binary::Data", () => {
   it("returns the raw bytes, not a lossy UTF-8 decode", () => {
-    // Rails: `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data
-    // then value.to_s` (abstract/quoting.rb:96) — `to_s` on a Data is the
-    // BINARY-encoded String, so the analogue is `.bytes`. 0xde 0xad 0xbe 0xef is
-    // not valid UTF-8: a `toString()` port would yield U+FFFD replacements.
     const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
     const out = typeCast.call(quotingHost(), new BinaryData(bytes));
     expect(out).toBeInstanceOf(Uint8Array);
@@ -234,9 +205,6 @@ describe("quote_table_name dispatches through quote_column_name", () => {
 });
 
 describe("boolean literals dispatch through the host", () => {
-  // Rails reaches the pair via self (abstract/quoting.rb:77-78, 98-99), so an
-  // adapter override applies to the *inherited* quote/type_cast. These pin the
-  // dispatch, not just the values: a host that overrides the pair must win.
   const host = quotingHost({
     quotedTrue: () => "1",
     quotedFalse: () => "0",

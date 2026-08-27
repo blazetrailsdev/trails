@@ -1,14 +1,3 @@
-/**
- * Rails' `references(:posts)` stores the Symbol unconverted (`references!`,
- * query_methods.rb:360-363) and `references_eager_loaded_tables?` reads it back
- * with `references_values.map(&:to_s)` (relation.rb:1488) before subtracting the
- * downcased joined-table list. trails spells a Ruby Symbol as a leading-colon
- * string, so `references(":posts")` must promote `includes` exactly as
- * `references("posts")` does — the colon is modelling, not part of the name.
- *
- * trails-only (hence `.trails.test.ts`): on the Ruby side the two spellings are
- * different types rather than two strings, so Rails cannot write this test.
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Post } from "../test-helpers/models/post.js";

@@ -6,7 +6,6 @@ import { Table, Visitors } from "../index.js";
 describe("MathTest", () => {
   const visitor = new Visitors.ToSql(fakeRecordConnection);
 
-  // These test names match the Ruby convention (interpolation-stripped names)
   it("average should be compatible with ", () => {
     const table = new Table("users");
     expect(mustBeLike(visitor.compile(table.get("id").average().multiply(2)))).toBe(

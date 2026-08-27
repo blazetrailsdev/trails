@@ -1,19 +1,3 @@
-/**
- * Sentinel values for Postgres out-of-range datetime literals.
- * Postgres can return 'infinity' / '-infinity' for timestamp/date columns;
- * these have no Temporal equivalent.
- *
- * Mirrors Rails: `Float::INFINITY` / `-Float::INFINITY` are the canonical
- * sentinels for PG date/datetime infinity. Using `Number.POSITIVE_INFINITY`
- * / `Number.NEGATIVE_INFINITY` so `record.date == Float::INFINITY` parity holds
- * — `record.date === Infinity` for both string-typed ("infinity") and
- * numeric-typed (`Float::INFINITY`) user input.
- *
- * The branded type narrows the public sentinel constants while still
- * permitting plain numeric Infinity to satisfy `value === DateInfinity`
- * comparisons throughout the date/datetime type chain.
- */
-
 declare const dateInfinityBrand: unique symbol;
 declare const dateNegativeInfinityBrand: unique symbol;
 

@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName } from "./naming.js";
 
-// models/contact.rb — `attr_accessor :id` plus `persisted? { id }`.
 class Contact extends Model {
   static {
     this.attribute("id");
@@ -12,10 +11,6 @@ class Contact extends Model {
   }
 }
 
-// models/helicopter.rb — `Helicopter`, `Helicopter::Comanche` and
-// `Helicopter::Apache`, the last overriding `model_name`. A TS class name
-// cannot contain `::`, so the qualified names are spelled on `ModelName`,
-// which is where Rails' `_to_partial_path` reads them from anyway.
 class Helicopter extends Model {}
 
 class Comanche extends Model {

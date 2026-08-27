@@ -1,10 +1,5 @@
 import { PlainString } from "./plain-string.js";
 
-/**
- * SQLString collector — accumulates SQL fragments into a single string.
- *
- * Mirrors: Arel::Collectors::SQLString
- */
 export class SQLString extends PlainString {
   preparable = false;
   retryable = true;

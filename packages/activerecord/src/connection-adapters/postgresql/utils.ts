@@ -1,10 +1,3 @@
-/**
- * PostgreSQL utilities — name parsing and schema-qualified name handling.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Utils (module)
- *          ActiveRecord::ConnectionAdapters::PostgreSQL::Name (class)
- */
-
 export class Name {
   static readonly SEPARATOR = ".";
 
@@ -45,8 +38,6 @@ export class Name {
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
   export function extractSchemaQualifiedName(name: string): Name {
-    // Mirrors Rails `schema, table = string.scan(...)`: destructure the first
-    // two scanned parts as schema, table and ignore any beyond the second.
     const parts = splitQuotedIdentifier(name);
     let schema: string | null = parts[0] ?? null;
     let table = parts[1] ?? null;
@@ -58,7 +49,6 @@ export namespace Utils {
   }
 }
 
-// Mirrors: Utils#unquote_identifier
 export function unquoteIdentifier(name: string): string {
   if (name.startsWith('"') && name.endsWith('"')) {
     return name.slice(1, -1).replace(/""/g, '"');

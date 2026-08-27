@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
 import { Model, StrictValidationFailed } from "../index.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
   static {
     this.attribute("title", "string");
@@ -10,14 +9,12 @@ class Topic extends Model {
   }
 }
 
-// Mirrors: activemodel/test/models/person.rb — the subset this file exercises.
 class Person extends Model {
   static {
     this.attribute("karma", "string");
   }
 }
 
-// Mirrors: activemodel/test/models/custom_reader.rb
 class CustomReader extends Model {
   data: Record<string, unknown> = {};
 
@@ -53,8 +50,6 @@ describe("PresenceValidationTest", () => {
   });
 
   it("accepts array arguments", async () => {
-    // Rails: `Topic.validates_presence_of %w(title content)` — a single array
-    // argument, flattened by `_merge_attributes` (`attr_names.flatten!`).
     Topic.validatesPresenceOf(["title", "content"]);
     const t = new Topic();
     assertPredicate(await t.isInvalid(), (invalid) => invalid);

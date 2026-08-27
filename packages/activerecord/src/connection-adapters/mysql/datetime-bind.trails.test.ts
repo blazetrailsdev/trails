@@ -4,14 +4,7 @@ import { describe, expect, it } from "vitest";
 import { typeCast as abstractTypeCast } from "../abstract/quoting.js";
 import { quotedDate as mysqlQuotedDate } from "./quoting.js";
 
-// MySQL/MariaDB datetime columns now use the base AR DateTime type (matching
-// Rails' `register_class_with_precision m, %r(datetime)i, Type::DateTime`);
-// value_for_database yields the cast Temporal.Instant and the mysql2 bind layer
-// renders the SQL literal with the 6-digit fractional cap that DATETIME(6)
-// enforces. These cases pin that bind-string formatting.
 describe("MySQL datetime bind formatting", () => {
-  // Rails' `type_cast` dispatches `quoted_date` on the connection
-  // (abstract/quoting.rb:104), so the MySQL cap comes from the receiver.
   const bind = (v: unknown) =>
     abstractTypeCast.call(quotingHost({ quotedDate: mysqlQuotedDate }), v);
 

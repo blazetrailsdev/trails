@@ -12,11 +12,6 @@ describe("ar-config module-level flags", () => {
     expect(ActiveRecord.asyncQueryExecutor).toBeNull();
     expect(ActiveRecord.queues).toEqual({});
     expect(ActiveRecord.maintainTestSchema).toBeNull();
-    // `belongsToRequiredValidatesForeignKey` is deliberately absent: the AR test
-    // harness flips it to false suite-wide (helper.rb:43), so the live binding
-    // never reads back the framework default here. `trailtie.test.ts` covers the
-    // `true` default via the untouched versioned-defaults hash; the round-trip
-    // below covers the live binding.
     expect(ActiveRecord.applicationRecordClass).toBeNull();
     expect(ActiveRecord.errorOnIgnoredOrder).toBe(false);
     expect(ActiveRecord.timestampedMigrations).toBe(true);
@@ -37,8 +32,6 @@ describe("ar-config module-level flags", () => {
       ActiveRecord.timestampedMigrations = true;
       ActiveRecord.generateSecureTokenOn = "create";
       ActiveRecord.raiseIntWiderThan64bit = true;
-      // Back to the value the AR harness installs (helper.rb:43), not the
-      // framework default.
       ActiveRecord.belongsToRequiredValidatesForeignKey = false;
     });
 

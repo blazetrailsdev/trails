@@ -33,7 +33,6 @@ function createUserClass(opts: { validations?: boolean } = {}) {
   return User;
 }
 
-// Simulate loading an existing user from the DB (secure_password_test.rb:18-21).
 function existingUser() {
   const User = createUserClass();
   const u = new User();

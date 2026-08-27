@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/range_test.rb
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
@@ -18,12 +15,6 @@ beforeAll(() => {
 afterAll(() => {
   vi.unstubAllEnvs();
 });
-
-// The `postgresql_ranges` table uses the PG-specific range
-// types (int4range, int8range, numrange, tsrange, tstzrange, daterange,
-// plus user-defined floatrange/stringrange), which aren't expressible via
-// createTable's typed builder; the table is created via raw DDL below
-// (mirroring Rails' `@connection.create_table "postgresql_ranges"`).
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
@@ -65,12 +56,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         this.attribute("id", "integer");
       }
     }
-    // Mirrors Rails' setup `PostgresqlRange.reset_column_information`
-    // (range_test.rb): the adapter's schema cache still holds the previous
-    // test's columns for `postgresql_ranges`, whose floatrange/stringrange
-    // OIDs were reassigned by the drop+recreate above. Clearing the data-source
-    // cache re-reflects columns against the live catalog so the custom range
-    // types resolve to their current OIDs.
     void PostgresqlRangesCls.resetColumnInformation();
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
@@ -302,12 +287,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("range schema dump", async () => {
-      // postgresql_ranges carries the user-defined `floatrange`/`stringrange`
-      // domains, whose DSL type is unmapped (not in native_database_types). Rails
-      // reflects them as OID::Range(:floatrange) and `valid_type?(:floatrange)` is
-      // false, so SchemaDumper#table raises and discards the whole create_table
-      // body in favor of the "Could not dump table" comment (schema_dumper.rb:196,
-      // 220-224) rather than fabricating a `t.column "float_range", "floatrange"`.
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_ranges");
       expect(output).toContain(
         '# Could not dump table "postgresql_ranges" because of following StandardError',
@@ -445,7 +424,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("custom range values", () => {
-      // Rails: 0.5..0.7, 0.5...0.7, 0.5...Infinity, -Infinity...Infinity, nil
       expect(parseRange("[0.5,0.7]", toFloat)!.excludeEnd).toBe(false);
       expect(parseRange("[0.5,0.7)", toFloat)!.excludeEnd).toBe(true);
       const endless = parseRange("[0.5,)", toFloat)!;
@@ -574,7 +552,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(post[3].end).toBeInstanceOf(TimeWithZone);
     });
     it("create tstzrange", async () => {
-      // Rails: Time.parse("2010-01-01 14:30:00 +0100")...Time.parse("2011-02-02 14:30:00 CDT") → UTC-normalised
       const begin = Temporal.Instant.from("2010-01-01T13:30:00Z");
       const end = Temporal.Instant.from("2011-02-02T19:30:00Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
@@ -586,7 +563,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("update tstzrange", async () => {
-      // Rails: assert_equal_round_trip + assert_nil_round_trip (same UTC instant → empty → null)
       const begin = Temporal.Instant.from("2010-01-01T19:30:00Z");
       const end = Temporal.Instant.from("2011-02-02T13:30:00Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
@@ -604,7 +580,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.tstz_range).toBeNull();
     });
     it("escaped tstzrange", async () => {
-      // Rails: Time.parse("-1000-01-01 14:30:00 CDT")...Time.parse("2020-02-02 14:30:00 CET"); BC round-trip
       const bcBegin = Temporal.ZonedDateTime.from(
         { year: -1000, month: 1, day: 1, hour: 19, minute: 30, second: 0, timeZone: "UTC" },
         { overflow: "reject" },
@@ -617,7 +592,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
     });
     it("unbounded tstzrange", async () => {
-      // Rails: endless (begin...nil) and beginless (nil..end) round-trips
       const t = Temporal.Instant.from("2010-01-01T19:30:00Z");
       const r1 = await PostgresqlRanges.create({ tstz_range: new Range(t, null, true) });
       await r1.reload();
@@ -633,7 +607,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(res2.excludeEnd).toBe(false);
     });
     it("create tsrange", async () => {
-      // Rails: Time.utc(2010,1,1,14,30,0)...Time.utc(2011,2,2,14,30,0) (default_timezone = :utc)
       const begin = Temporal.Instant.from("2010-01-01T14:30:00Z");
       const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
@@ -645,7 +618,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("update tsrange", async () => {
-      // Rails: assert_equal_round_trip + assert_nil_round_trip (same instant → empty → null)
       const begin = Temporal.Instant.from("2010-01-01T14:30:00Z");
       const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
@@ -662,7 +634,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.ts_range).toBeNull();
     });
     it("escaped tsrange", async () => {
-      // Rails: Time.utc(-1000,1,1,14,30,0)...Time.utc(2020,2,2,14,30,0); BC round-trip
       const bcBegin = Temporal.ZonedDateTime.from(
         { year: -1000, month: 1, day: 1, hour: 14, minute: 30, second: 0, timeZone: "UTC" },
         { overflow: "reject" },
@@ -675,7 +646,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
     });
     it("unbounded tsrange", async () => {
-      // Rails: endless (begin...nil) and beginless (nil..end) round-trips
       const t = Temporal.Instant.from("2010-01-01T14:30:00Z");
       const r1 = await PostgresqlRanges.create({ ts_range: new Range(t, null, true) });
       await r1.reload();
@@ -808,7 +778,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(post[3].end).toBeInstanceOf(TimeWithZone);
     });
     it("create tstzrange preserve usec", async () => {
-      // Rails: Time.parse("2010-01-01 14:30:00.670277 +0100")...Time.parse("2011-02-02 14:30:00.745125 CDT")
       const begin = Temporal.Instant.from("2010-01-01T13:30:00.670277Z");
       const end = Temporal.Instant.from("2011-02-02T19:30:00.745125Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
@@ -818,7 +787,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((result.end as Temporal.Instant).toString()).toBe(end.toString());
     });
     it("update tstzrange preserve usec", async () => {
-      // Rails: assert_equal_round_trip + assert_nil_round_trip with µs precision
       const begin = Temporal.Instant.from("2010-01-01T19:30:00.245124Z");
       const end = Temporal.Instant.from("2011-02-02T13:30:00.451274Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
@@ -832,7 +800,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.tstz_range).toBeNull();
     });
     it("create tsrange preserve usec", async () => {
-      // Rails: Time.utc(2010,1,1,14,30,0,125435)...Time.utc(2011,2,2,14,30,0,225435)
       const begin = Temporal.Instant.from("2010-01-01T14:30:00.125435Z");
       const end = Temporal.Instant.from("2011-02-02T14:30:00.225435Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
@@ -842,7 +809,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((result.end as Temporal.Instant).toString()).toBe(end.toString());
     });
     it("update tsrange preserve usec", async () => {
-      // Rails: assert_equal_round_trip + assert_nil_round_trip with µs precision
       const begin = Temporal.Instant.from("2010-01-01T14:30:00.142432Z");
       const end = Temporal.Instant.from("2011-02-02T14:30:00.224242Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
@@ -855,8 +821,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.ts_range).toBeNull();
     });
     it("timezone awareness tsrange preserve usec", async () => {
-      // Rails: time_string = "2017-09-26 07:30:59.132451 -0700"; assert time.usec > 0
-      // Verifies sub-millisecond (µs) precision is preserved through the PG round-trip.
       const tz = "Pacific Time (US & Canada)";
       const zone = TimeZone.find(tz)!;
       setZone(tz);
@@ -882,8 +846,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
     });
     it("create numrange", async () => {
-      // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))
-      // DecimalType.castValue returns a BigDecimal; bounds round-trip as such.
       const range = new Range("0.5", "1", true);
       const r = await PostgresqlRanges.create({ num_range: range });
       await r.reload();
@@ -894,8 +856,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("update numrange", async () => {
-      // Rails: assert_equal_round_trip => BigDecimal("0.5")...BigDecimal("1")
-      //        assert_nil_round_trip  => BigDecimal("0.5")...BigDecimal("0.5") (empty → nil)
       const range = new Range("0.5", "1", true);
       const r = await PostgresqlRanges.create({ num_range: range });
       await r.reload();
@@ -907,8 +867,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.num_range).toBeNull();
     });
     it("create daterange", async () => {
-      // Rails: assert_equal_round_trip(@new_range, :date_range, Date.new(2012,1,1)...Date.new(2013,1,1))
-      // OID::Date.deserialize returns Temporal.PlainDate; assert via toString().
       const range = new Range("2012-01-01", "2013-01-01", true);
       const r = await PostgresqlRanges.create({ date_range: range });
       await r.reload();
@@ -919,8 +877,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("update daterange", async () => {
-      // Rails: assert_equal_round_trip => Date.new(2012,2,3)...Date.new(2012,2,10)
-      //        assert_nil_round_trip  => Date.new(2012,2,3)...Date.new(2012,2,3) (empty → nil)
       const range = new Range("2012-02-03", "2012-02-10", true);
       const r = await PostgresqlRanges.create({ date_range: range });
       await r.reload();
@@ -933,7 +889,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.date_range).toBeNull();
     });
     it("create int4range", async () => {
-      // Rails: assert_equal_round_trip(@new_range, :int4_range, Range.new(3, 50, true))
       const range = new Range(3, 50, true);
       const r = await PostgresqlRanges.create({ int4_range: range });
       await r.reload();
@@ -944,7 +899,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("update int4range", async () => {
-      // Rails: assert_equal_round_trip => 6...10; assert_nil_round_trip => 3...3 (empty → nil)
       const range = new Range(6, 10, true);
       const r = await PostgresqlRanges.create({ int4_range: range });
       await r.reload();
@@ -956,8 +910,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.int4_range).toBeNull();
     });
     it("create int8range", async () => {
-      // Rails: assert_equal_round_trip(@new_range, :int8_range, Range.new(30, 50, true))
-      // BigIntegerType keeps safe-range bounds as JS numbers; they round-trip as 30/50.
       const range = new Range(30, 50, true);
       const r = await PostgresqlRanges.create({ int8_range: range });
       await r.reload();
@@ -968,8 +920,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("update int8range", async () => {
-      // Rails: assert_equal_round_trip => 60000...10000000; assert_nil_round_trip => 39999...39999 (empty → nil)
-      // BigIntegerType keeps safe-range bounds as JS numbers.
       const range = new Range(60000, 10000000, true);
       const r = await PostgresqlRanges.create({ int8_range: range });
       await r.reload();
@@ -981,8 +931,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.int8_range).toBeNull();
     });
     it("exclude beginning for subtypes without succ method is not supported", () => {
-      // Rails: assert_raises(ArgumentError) { PostgresqlRange.create!(num_range: "(0.1, 0.2]") }
-      // The parse-time throw covers the same invariant without needing the AR model.
       expect(() => parseRange("(0.1,0.2]", toFloat)).toThrow();
       expect(() => parseRange("(1,10]", toInt)).toThrow();
       expect(() => parseRange("(2012-01-02,2012-01-04]")).toThrow();
@@ -1007,7 +955,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const first = await PostgresqlRanges.first();
       expect(first!.int8_range).toBeInstanceOf(Range);
       expect((first!.int8_range as Range).begin).toBe(1);
-      // PG normalises [1,100] → [1,101) for discrete int8range (Rails: 1...101)
       expect((first!.int8_range as Range).end).toBe(101);
       expect((first!.int8_range as Range).excludeEnd).toBe(true);
     });
@@ -1018,8 +965,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(PostgresqlRanges.first()).resolves.not.toBeNull();
     });
     it("ranges correctly unescape output", () => {
-      // Rails: inserts '["ca""t","do\\\\g")' via SQL, reads back as 'ca"t'...'do\\g'
-      // Tests unquoteRangeBound handles PG's "" and \\ escaping.
       const r = parseRange('["ca""t","do\\\\g")')!;
       expect(r.begin).toBe('ca"t');
       expect(r.end).toBe("do\\g");

@@ -1,16 +1,5 @@
-/**
- * Shared inspection helpers used by both Core and AttributeMethods.
- * Extracted into a separate module to break the core ↔ attribute-methods
- * circular dependency.
- */
-
 import { ParameterFilter } from "@blazetrails/activesupport";
 
-/**
- * Placeholder used in inspect output when an attribute value is masked.
- *
- * Mirrors: ActiveRecord::Core::InspectionMask
- */
 export class InspectionMask {
   private _value: string;
 
@@ -45,12 +34,6 @@ function parentClass(klass: CoreHost): CoreHost | null {
   return typeof proto === "function" ? (proto as CoreHost) : null;
 }
 
-/**
- * Rails: creates an ActiveSupport::ParameterFilter with an InspectionMask.
- * Delegates up the class hierarchy if no own filterAttributes are set.
- *
- * Mirrors: ActiveRecord::Core#inspection_filter
- */
 export function inspectionFilter(this: CoreHost): ParameterFilter {
   if (this._inspectionFilter) return this._inspectionFilter;
   if (!Object.prototype.hasOwnProperty.call(this, "_filterAttributes")) {
@@ -80,13 +63,6 @@ function inspectArray(arr: unknown[]): string {
     .join(", ")}]`;
 }
 
-/**
- * Format a single attribute value for inspect output.
- * Shared implementation used by Core#inspect, Core#attribute_for_inspect,
- * and AttributeMethods#format_for_inspect.
- *
- * Mirrors: ActiveRecord::AttributeMethods#format_for_inspect
- */
 export function formatForInspect(this: any, name: string, value: unknown): string {
   if (value === null || value === undefined) return "nil";
   const filter = inspectionFilter.call(this.constructor);
@@ -97,7 +73,6 @@ export function formatForInspect(this: any, name: string, value: unknown): strin
     return filtered.length > 50 ? `"${filtered.substring(0, 50)}..."` : `"${filtered}"`;
   }
   // boundary: legacy custom-typed attributes may still be JS Date.
-  // Invalid (NaN) Date renders as `"Invalid Date"` instead of JSON's `null`.
   if (filtered instanceof Date) {
     return Number.isNaN(filtered.getTime())
       ? `"${String(filtered)}"`

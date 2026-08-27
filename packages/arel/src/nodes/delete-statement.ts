@@ -3,11 +3,6 @@ import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 
-/**
- * DeleteStatement — DELETE FROM ... WHERE ...
- *
- * Mirrors: Arel::Nodes::DeleteStatement
- */
 export class DeleteStatement extends Node {
   relation: Node | Table | null;
   wheres: Node[];
@@ -30,7 +25,6 @@ export class DeleteStatement extends Node {
     this.key = null;
   }
 
-  // Mirrors Arel::Nodes::DeleteStatement#hash / #eql? / #== (delete_statement.rb:25-41).
   hash(): number {
     return rbHash([
       this.constructor,
@@ -58,8 +52,6 @@ export class DeleteStatement extends Node {
     );
   }
 
-  // Mirrors Arel::Nodes::DeleteStatement#initialize_copy
-  // (delete_statement.rb:20-24), which Ruby runs for `#clone`.
   clone(): this {
     const copy = objectClone(this);
     if (this.relation) copy.relation = cloneSlot(this.relation);

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/postgresql_adapter_prevent_writes_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../base.js";

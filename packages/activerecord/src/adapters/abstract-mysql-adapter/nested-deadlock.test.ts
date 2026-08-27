@@ -1,7 +1,3 @@
-/**
- * Mirrors Rails
- * activerecord/test/cases/adapters/abstract_mysql_adapter/nested_deadlock_test.rb
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
 import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
@@ -11,8 +7,6 @@ import { Base } from "../../base.js";
 import { Deadlocked, Rollback, StatementInvalid } from "../../errors.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
-// Rails' `class Sample < ActiveRecord::Base` (nested_deadlock_test.rb:9-12) —
-// an inline model over the table the test creates itself.
 class Sample extends Base {
   declare id: number;
   declare value: number | null;
@@ -22,7 +16,6 @@ class Sample extends Base {
 }
 registerModel([Sample]);
 
-// `Concurrent::CyclicBarrier.new(2)` (nested_deadlock_test.rb:38).
 function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   let count = 0;
   let release!: () => void;
@@ -37,20 +30,15 @@ function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   };
 }
 
-// nested_deadlock_test.rb:177-180 — dirty the parent transaction so the next
-// nested one is a savepoint transaction.
 async function makeParentTransactionDirty(): Promise<void> {
   await Sample.take();
 }
 
-// nested_deadlock_test.rb:182-187.
 async function assertCurrentTransactionIsSavepointTransaction(): Promise<void> {
   const currentTransaction = (await Sample.leaseConnection()).currentTransaction();
   expect(currentTransaction).toBeInstanceOf(SavepointTransaction);
 }
 
-// nested_deadlock_test.rb:64-70 — the savepoint race surfaces as an opaque
-// StatementInvalid, so Rails flunks with a diagnosis rather than re-raising it.
 function flunkOnLostSavepoint(errors: unknown[]): void {
   const lost = errors.find(
     (e) =>
@@ -76,9 +64,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     afterEach(async () => {
-      // nested_deadlock_test.rb:24 — clear first, so no connection another
-      // execution context still holds is sitting on a `samples` lock when the
-      // drop runs.
       Base.connectionHandler.clearActiveConnectionsBang("all");
       const connection = await leaseMysqlAdapter();
       await connection.dropTable("samples", { ifExists: true });
@@ -91,10 +76,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const s1 = await Sample.create({ value: 1 });
       const s2 = await Sample.create({ value: 2 });
 
-      // Rails' `Thread.new` (nested_deadlock_test.rb:45). `withExecutionContext`
-      // is the trails analogue for the part that matters here: the pool leases
-      // per execution context (connection_pool.rb:711 `connection_lease`), so
-      // the two sides run on two connections and can really deadlock.
       const thread = withExecutionContext(async () =>
         Sample.transaction(async () => {
           await makeParentTransactionDirty();
@@ -152,10 +133,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
               } catch (e) {
                 if (!(e instanceof Deadlocked)) throw e;
                 deadlocks += 1;
-                // nested_deadlock_test.rb:99-101: "This rollback is actually
-                // wrong as mysql automatically rollbacks the transaction which
-                // means we have nothing to rollback on the db side but we
-                // expect the framework to handle our mistake gracefully".
                 throw new Rollback();
               }
             },

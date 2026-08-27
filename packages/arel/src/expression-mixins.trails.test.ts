@@ -4,18 +4,6 @@ import { Nodes, Visitors } from "./index.js";
 
 const compile = (n: Nodes.Node): string => new Visitors.ToSql(fakeRecordConnection).compile(n);
 
-// Behavior tests for the mixin surface added in this PR — Expressions,
-// AliasPredication, OrderPredications, FilterPredications,
-// WindowPredications, and the trailing Predications methods (when, concat,
-// contains, overlaps, quotedArray). Verifies the methods are reachable on
-// the right hosts AND build the AST shape Rails would.
-//
-// Receivers are SqlLiteral / Function / InfixOperation rather than
-// Attribute, because Attribute pre-dates this PR and ships hand-rolled
-// versions of count/sum/concat/contains/overlaps that return different
-// node types (NamedFunction, generic InfixOperation). Aligning Attribute
-// with Rails' Predications semantics is a separate refactor.
-
 describe("Expressions mixin (on SqlLiteral)", () => {
   const lit = new Nodes.SqlLiteral("col");
 
@@ -76,8 +64,6 @@ describe("WindowPredications.over (mixed into Function)", () => {
   });
 
   it("with a string emits OVER <name> as a raw SQL fragment", () => {
-    // Rails quotes a bare string window name as an identifier
-    // (to_sql.rb:306-307); only a SqlLiteral renders as a raw fragment.
     expect(compile(sum.over("w"))).toBe('SUM(col) OVER "w"');
     expect(compile(sum.over(new Nodes.SqlLiteral("w")))).toBe("SUM(col) OVER w");
   });

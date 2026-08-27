@@ -10,9 +10,6 @@ import {
 import { DateTimeType } from "../date-time.js";
 import { TimeType } from "../time.js";
 
-// Mirrors ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision
-// (time_value.rb:24-34). Truncation, not rounding — verify each
-// precision boundary against the Temporal types Rails would touch.
 describe("applySecondsPrecision", () => {
   const dt = Temporal.PlainDateTime.from("2024-01-02T03:04:05.123456789");
 
@@ -132,11 +129,6 @@ describe("fastStringToTime", () => {
     expect(i?.toString().startsWith("2026-04-26T14:23:55.123456")).toBe(true);
   });
 
-  // `value.change(nsec: value.nsec - rounded_off_nsec)` (time_value.rb:31)
-  // operates on `nsec`, which is always in `0...1_000_000_000`, so a pre-1970
-  // instant truncates DOWN the same way a post-1970 one does. `Type::Time` and
-  // `Type::DateTime` both `include Helpers::TimeValue` (time.rb, date_time.rb:47)
-  // and so must agree.
   it("truncates a pre-1970 sub-second instant on nsec, not toward zero", () => {
     const inst = Temporal.Instant.from("1969-12-31T23:59:59.123456789Z");
     const time = new TimeType({ precision: 3 });
@@ -147,9 +139,6 @@ describe("fastStringToTime", () => {
   });
 });
 
-// Mirrors ActiveModel::Type::Helpers::TimeValue#user_input_in_time_zone
-// (time_value.rb:42-44) — `value.in_time_zone`, whose else arm with no
-// Time.zone set is a bare `to_time` (date_and_time/zones.rb:20-27).
 describe("userInputInTimeZone", () => {
   it("answers String#to_time when Time.zone is unset", () => {
     const result = userInputInTimeZone("2024-06-15 14:30:00");

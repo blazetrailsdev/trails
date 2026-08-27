@@ -299,15 +299,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.rollback().catch(() => {});
       }
     });
-    // Regression for RFC 0061 pg-query-canceled-unhandled-rejection: rolling
-    // back must not fire a CancelRequest at a query some *other* chain put on
-    // the wire. Rails gets that from scope alone — `@lock.synchronize` wraps
-    // the whole `with_raw_connection` body (abstract_adapter.rb:984) and
-    // `rollback_transaction` takes the same lock (abstract/transaction.rb:611),
-    // so the rollback simply waits behind the query and finds an idle
-    // transaction status, which `cancel_any_running_query`'s
-    // IDLE_TRANSACTION_STATUSES gate (postgresql/database_statements.rb:128)
-    // returns on.
     it("rollback does not cancel a query issued by another chain", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
@@ -321,13 +312,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Same for `reset!`, which Rails runs under `@lock` and where it issues
-    // ROLLBACK / DISCARD ALL but never a CancelRequest — the two
-    // `cancel_any_running_query` callers are exec_rollback/restart
-    // (postgresql/database_statements.rb:79, :84), not `reset!`
-    // (postgresql_adapter.rb:371-381). The port cancelled here, killing a query
-    // another chain owned; with nothing left to observe that rejection it
-    // surfaced as vitest's run-end unhandled QueryCanceled.
     it("reset does not cancel a query issued by another chain", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
@@ -341,12 +325,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // `resetBang` is sync and cannot block, so it schedules its body onto the
-    // connection lock (Rails takes that lock inline, postgresql_adapter.rb:372)
-    // and returns. A query already holding the lock must therefore never wait
-    // on the queued reset — it would be waiting on work queued behind itself.
-    // This is what pins the one-mechanism arrangement: query paths serialize
-    // against the reset on the lock alone, never on a second barrier.
     it("a query holding the lock does not wait on a reset queued behind it", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
@@ -362,14 +340,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Regression for RFC 0061 pg-query-canceled-unhandled-rejection-recurrence:
-    // a CancelRequest is addressed to a backend, not to a statement, so firing
-    // it without waiting for delivery (`cancel`) and for the cancelled command
-    // to come back (`block` — postgresql/database_statements.rb:130-131) lets
-    // it land on whatever query is on the wire milliseconds later. Before the
-    // fix the sleep below was still running when cancelAnyRunningQuery
-    // resolved, and the follow-up SELECT died with "canceling statement due to
-    // user request".
     it("cancelAnyRunningQuery does not leak its cancel onto a later query", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
@@ -391,17 +361,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Regression for RFC 0061 pg-cancel-block-half-has-no-regression: nothing
-    // covered the `block` half of `cancel_any_running_query`
-    // (postgresql/database_statements.rb:131) — deleting the
-    // `await this._blockUntilCommandSettles(txClient)` line left the suite
-    // green. Its postcondition is libpq's own: once `block` returns, the
-    // cancelled command is off the wire, so `PQtransactionStatus` is no longer
-    // PQTRANS_ACTIVE. On an unloaded host the backend's ErrorResponse happens to
-    // land before the CancelRequest socket closes, so that byte alone does not
-    // discriminate; the deferred stand-in below reproduces the "command has not
-    // come back yet" state CI's loaded runner produces, and pins that the cancel
-    // does not resolve ahead of it.
     it("cancelAnyRunningQuery waits for the cancelled command to come back", async () => {
       const PQTRANS_ACTIVE = 1;
       const other = new PostgreSQLAdapter(PG_TEST_URL);
@@ -440,24 +399,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Rails' `cancel_any_running_query` has nothing to cancel once the lock
-    // covers each query's whole life — `rollback_transaction` takes the same
-    // lock (abstract/transaction.rb:611) and finds an idle transaction status.
-    // The two tests that lived here drove it by abandoning a query inside
-    // `synchronize`, the shape RFC 0085 removed; there is no Rails-faithful way
-    // to put a query on the wire under a lock this chain holds.
-
-    // Regression for RFC 0061 pg-query-canceled-unhandled-rejection-recurrence:
-    // `clear_cache!` mutates the statement pool under `@lock`
-    // (abstract_adapter.rb:741-747), which is the precondition `dealloc` states
-    // outright — "the statement pool is only accessed while holding the
-    // connection's lock" (postgresql_adapter.rb:308-310). The port skipped that
-    // lock, so `resetColumnInformation`'s sync, promise-dropping call left
-    // eviction DEALLOCATEs on the wire beside a chain that owned the
-    // connection; the rollback behind it read PQTRANS_ACTIVE where Rails reads
-    // PQTRANS_INTRANS and fired a CancelRequest, which — being addressed to a
-    // backend, not a statement — landed on a later query and surfaced as
-    // vitest's run-end unhandled QueryCanceled.
     it("clearCacheBang deallocates under the connection lock", async () => {
       const PQTRANS_INTRANS = 2;
       const other = new PostgreSQLAdapter(PG_TEST_URL);
@@ -465,8 +406,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.preparedStatements = true;
         await other.execute("SELECT $1::integer AS n", [1]);
         await other.beginDbTransaction();
-        // `reset_column_information`'s shape (model_schema.rb:523-524): a sync
-        // caller that drops the returned chain.
         void other.clearCacheBang();
         await new Promise<void>((r) => setTimeout(r, 0));
         const status = await other.lock.synchronize(() => other.transactionStatus);
@@ -1039,8 +978,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Rails: `transaction_isolation_levels.fetch(isolation)`
-    // (postgresql/database_statements.rb:69) raises Ruby's KeyError.
     it("beginIsolatedDbTransaction raises KeyError for an unknown isolation level", async () => {
       await expect(adapter.beginIsolatedDbTransaction("bogus")).rejects.toThrow(
         "key not found: :bogus",
@@ -1497,9 +1434,6 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
   function stubVersion(adapter: PostgreSQLAdapter, version: number): void {
     (adapter as any)._initialized = true;
     (adapter as any)._hasPgHintPlan = false;
-    // `database_version` reads the pool memo (`abstract_adapter.rb:854-856`),
-    // which is the only place the version is cached, so the stub is staged
-    // there.
     (adapter.pool as unknown as { _serverVersion: unknown })._serverVersion = version;
   }
 
@@ -1578,8 +1512,6 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
   });
 });
 
-// Rails has no test for the `is_a?(Integer) && bit_length <= 63` guard in
-// postgresql_adapter.rb:459-471, so these are trails-only covers for it.
 describe("PostgreSQLAdapter advisory lock id guard (unit)", () => {
   const message = "PostgreSQL requires advisory lock ids to be a signed 64 bit integer";
 
@@ -1622,11 +1554,6 @@ describe("PostgreSQLAdapter advisory lock id guard (unit)", () => {
   });
 });
 
-// trails-only: Rails' PostgreSQLAdapter#active? (postgresql_adapter.rb:347-356)
-// is a live probe — `@raw_connection.query ";"` then `verified!`, rescuing
-// PG::Error to false. Rails has no test that isolates the probe from the handle
-// guard, so this covers the half the guard alone cannot answer: a connected
-// client whose backend is gone still reports connected? true but active? false.
 describeIfPg("PostgreSQLAdapter#active", () => {
   it("returns false once the backend behind a live client is terminated", async () => {
     const adapter = new PostgreSQLAdapter(PG_TEST_URL);
@@ -1644,12 +1571,6 @@ describeIfPg("PostgreSQLAdapter#active", () => {
       await adapter.close();
     }
   });
-  // Regression: `internalExecQuery -> castResult -> getOidType ->
-  // loadAdditionalTypes -> internalExecQuery` was a cycle. Rails cannot reach it
-  // because `load_additional_types` runs the pg_type query through the UNCAST
-  // `internal_execute` (postgresql_adapter.rb:870), which never consults the
-  // type map — so `get_oid_type` is a two-line body with no reentrancy branch.
-  // Pre-fix trails ran it through the cast read path and recursed until timeout.
   it("loadAdditionalTypes runs uncast, so it cannot re-enter getOidType", async () => {
     const adapter = new PostgreSQLAdapter(PG_TEST_URL);
     try {

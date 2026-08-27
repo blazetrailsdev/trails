@@ -7,12 +7,6 @@ import {
 } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
-/**
- * Every unary visit in Rails is a bare `visit o.expr, collector` — the visitor
- * dispatches on the expression's class, so an `ActiveModel::Attribute` bind
- * renders as a placeholder like it does anywhere else. Each case below pins one
- * such site against the Rails line it mirrors.
- */
 describe("unary visitors dispatch their expr rather than stringifying it", () => {
   const users = new Table("users");
   const bind = (): AMAttribute => AMAttribute.fromDatabase("name", "x", new StringType());

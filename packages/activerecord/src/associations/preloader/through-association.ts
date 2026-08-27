@@ -8,18 +8,10 @@ import { pluralize, singularize } from "@blazetrails/activesupport";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
-/** `Hash#merge`, the block `reduce(:merge)` names (through_association.rb:89, :93). */
 function merge(acc: Map<Base, Base[]>, recordsByOwner: Map<Base, Base[]>): Map<Base, Base[]> {
   return new Map([...acc, ...recordsByOwner]);
 }
 
-/**
- * Handles preloading through associations by first loading the
- * intermediate (through) records, then loading the source records
- * from those intermediates.
- *
- * Mirrors: ActiveRecord::Associations::Preloader::ThroughAssociation
- */
 export class ThroughAssociation extends Association {
   private _sourcePreloaders: Association[] | undefined;
   private _throughPreloaders: Association[] | undefined;
@@ -39,8 +31,6 @@ export class ThroughAssociation extends Association {
     super(klass, owners, reflection, preloadScope, reflectionScope, associateByDefault);
   }
 
-  /** Mirrors: Preloader::ThroughAssociation#preloaded_records
-   *  (`preloader/through_association.rb:7-9`). */
   async preloadedRecords(): Promise<Base[]> {
     if (this._throughPreloadedRecords !== undefined) return this._throughPreloadedRecords;
     const records: Base[] = [];
@@ -51,20 +41,10 @@ export class ThroughAssociation extends Association {
     return this._throughPreloadedRecords;
   }
 
-  /** Mirrors: Preloader::ThroughAssociation#records_by_owner
-   *
-   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106 wave 4g):
-   *   `scope.order_values.any?` (preloader/through_association.rb:33) —
-   *   `Enumerable#any?` without a block on a Ruby Array, spelled
-   *   `this.scope?.orderValues?.length > 0` (through-association.ts:82). A
-   *   `.length` read emits no callee, so no TS call can credit the Ruby one (RFC
-   *   0092, JS_ENUMERABLE_ALIASES).
-   * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106 wave 4g):
-   *   `owners.first.association(through_reflection.name).loaded?`
-   *   (preloader/through_association.rb:20) is index-0 access on a Ruby Array,
-   *   spelled `this.owners[0].association(...)` (through-association.ts:69).
-   *   `Array#first` is a positional idiom with no JS call form (RFC 0092).
-   *  (`preloader/through_association.rb:11-37`). */
+  /**
+   * @missingRailsCall any? — PERMANENT
+   * @missingRailsCall first — PERMANENT
+   */
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
@@ -182,7 +162,6 @@ export class ThroughAssociation extends Association {
     );
   }
 
-  /** Mirrors: `preloader/through_association.rb:70-72`. */
   private async sourcePreloaders(): Promise<Association[]> {
     if (this._sourcePreloaders !== undefined) return this._sourcePreloaders;
 
@@ -225,7 +204,6 @@ export class ThroughAssociation extends Association {
     return [...(await this.throughRecordsByOwner()).values()].flat();
   }
 
-  /** Mirrors: `preloader/through_association.rb:88-90`. */
   private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
     this._sourceRecordsByOwner ??= (
       await Promise.all((await this.sourcePreloaders()).map((l) => l.recordsByOwner()))
@@ -233,7 +211,6 @@ export class ThroughAssociation extends Association {
     return this._sourceRecordsByOwner;
   }
 
-  /** Mirrors: `preloader/through_association.rb:92-94`. */
   private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
     this._throughRecordsByOwner ??= (
       await Promise.all((await this.throughPreloaders()).map((l) => l.recordsByOwner()))
@@ -250,28 +227,6 @@ export class ThroughAssociation extends Association {
     return this._preloadIndex;
   }
 
-  /**
-   * Build the through (intermediate) query's scope, mirroring Rails'
-   * `Preloader::ThroughAssociation#through_scope`
-   * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb:104-146).
-   *
-   * When the reflection scope carries a where-clause, EVERY source kind (to-one
-   * belongs_to/has_one, collection has_many, or nested through) takes the SAME
-   * Rails-faithful branch: the whole reflection-scope `where_clause` is copied
-   * onto the through query and the source reflection is eager-loaded via
-   * `includes!`/`references!` (a LEFT OUTER JOIN through the JoinDependency), so
-   * every column — through-table, source-table, or a scope-joined nested table —
-   * resolves in ONE query with no per-predicate table attribution. The
-   * JoinDependency instantiates distinct parents by primary key, so a to-many
-   * source no longer fans the middle records out, and a to-one source (e.g. a
-   * HABTM's belongs_to on the anonymous `HABTM_*` join model) joins the same way.
-   * The through query carries no LIMIT/OFFSET, so its composite-PK base
-   * (HABTM join model, or a real composite-PK through model) applies the eager
-   * JoinDependency — `Relation#_eagerLoadBypassesJoinDependency` bypasses a
-   * composite PK only on the LIMIT+collection `_materializeLimitedIds` path,
-   * which this query never takes. `disable_joins` and polymorphic `source_type`
-   * keep their own paths.
-   */
   private throughScope(): any {
     const throughRefl = this.throughReflection;
     if (!throughRefl) return undefined;
@@ -286,13 +241,10 @@ export class ThroughAssociation extends Association {
     let scope = (throughKlass as any).unscoped?.() ?? (throughKlass as any)._allForPreload();
     const options = (this.reflection as any).options ?? {};
 
-    // Rails returns the bare unscoped relation before annotate/where/join when
-    // the association opts out of joins (through_association.rb:108).
     if (options.disableJoins) return scope;
 
     const reflScope = this.reflectionScope;
 
-    // values[:annotate] → scope.annotate!(*annotations) (through_association.rb:111-113)
     const annotations: string[] = reflScope?.annotateValues ?? [];
     if (annotations.length > 0) {
       scope = scope.annotate(...annotations);
@@ -307,22 +259,6 @@ export class ThroughAssociation extends Association {
     } else if (reflScope != null && whereClause != null && !whereClause.isEmpty()) {
       const sourceRefl = this.sourceReflection;
       if (sourceRefl) {
-        // Mirror Rails' `through_scope` eager-load branch exactly for EVERY
-        // source kind (to-one, collection, nested through).
-        // Copy the FULL reflection-scope where_clause and `includes!(source)` +
-        // `references!(source.table_name)`, promoting the source reflection to a
-        // LEFT OUTER JOIN eager-load on this through query. Unlike a bare
-        // `leftOuterJoins`, the eager-load runs through the JoinDependency, which
-        // instantiates distinct parents by primary key — so a to-many source (or
-        // a to-many nested include such as the canonical `tag` source's own
-        // `includes(:tagging)`) no longer fans the middle records out. The
-        // instantiated middle records carry their source association already
-        // loaded, so the recursive `sourcePreloaders` stage finds it loaded
-        // and issues no further query — collapsing authors+posts+taggings+tags
-        // to two queries. Every referenced column (through-table, source-table,
-        // or sub-chain intermediate) resolves in this one join, closing the
-        // latent gap where an outer predicate qualified a sub-chain table no
-        // single trails stage joined.
         scope.whereClause = new WhereClause([
           ...scope.whereClause.predicates,
           ...whereClause.predicates,
@@ -335,14 +271,6 @@ export class ThroughAssociation extends Association {
           scope = scope.includes(sourceName);
         }
 
-        // references!(source.table_name) (rb:127-130): unless the scope already
-        // carries explicit references, reference the source table so `includes`
-        // promotes to the eager JOIN. Rails reads `source_reflection.table_name`
-        // unguarded here and raises for an unresolvable / polymorphic source
-        // (you can't get a static klass off a polymorphic belongs_to without an
-        // instance) — so this is intentionally NOT wrapped: it must fail loudly
-        // the way Rails does rather than silently degrade to an unreferenced
-        // `includes` (a differently-shaped query). This branch is a direct port.
         const refs: Array<string | Nodes.SqlLiteral> = reflScope?.referencesValues ?? [];
         if (refs.length > 0) {
           scope = scope.references(...refs);
@@ -350,19 +278,6 @@ export class ThroughAssociation extends Association {
           scope = scope.references(sourceRefl.klass.tableName);
         }
 
-        // joins!(source_reflection.name => joins) (rb:132-134): Rails applies the
-        // whole flattened `values[:joins]` bucket ONCE, nested under the source
-        // reflection name — trails reads the same single `joins_values` store, in
-        // insertion order. A raw string / Arel join anywhere in the FLATTENED chain
-        // scope raises `ConfigurationError` in Rails (`JoinDependency` rejects the
-        // bogus association name symbolized from the raw string), regardless of
-        // the collection/nested strategy — nesting it under the source reflection
-        // name makes trails' join builder raise identically. This branch is
-        // already gated on the flattened `where_clause` being non-empty (the same
-        // `elsif !reflection_scope.where_clause.empty?` gate, rb:117), so matching
-        // Rails means raising here too — a raw join declared only on a deeper
-        // sub-chain link is NOT deferred to its own recursive stage (verified
-        // against a live Rails nested-through repro).
         const nestedJoins: any[] = reflScope?.joinsValues ?? [];
         if (nestedJoins.length > 0) {
           scope = scope.joins({ [sourceName]: nestedJoins });
@@ -405,10 +320,6 @@ export class ThroughAssociation extends Association {
     if (!throughRefl) return null;
     const model = (this.reflection as any).activeRecord;
     const assocDef = model?._reflectOnAssociation?.(this.reflection.name);
-    // `source_reflection_names` (reflection.rb:1108-1110) is the candidate list
-    // Rails scans. Unlike `source_reflection_name` it never touches
-    // `through_reflection.klass`, so it cannot raise NameError while the model
-    // registry is still filling — which is what this whole fallback exists for.
     const sourceNames: string[] = assocDef?.options?.source
       ? [assocDef.options.source as string]
       : ((this.reflection as any).sourceReflectionNames?.() ?? []);

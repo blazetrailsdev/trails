@@ -82,9 +82,6 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
   });
 });
 
-// Story 3.3-U1: columnSpec must emit directly-emittable TypeScript-DSL text
-// (not Ruby schema.rb syntax) so the base `table` can route its column loop
-// through it via formatColspec. These pin the prerequisite.
 describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
   const dumper = SchemaDumper.create(emptySource) as any;
 
@@ -110,17 +107,12 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
     expect(text).toContain("precision: null");
     expect(text).toContain("null: false");
     expect(text).toContain('default: () => "now()"');
-    // No Ruby-isms leak into the emittable text.
     expect(text).not.toContain("nil");
     expect(text).not.toContain("-> {");
   });
 });
 
 describe("SchemaDumper raises on a column whose type is not a valid native type", () => {
-  // Mirrors Rails' SchemaDumper#table (schema_dumper.rb:196,220-224): an
-  // unmapped/composite column reflects a nil DSL type, so `valid_type?` is
-  // false, the per-column raise fires, and the whole create_table body is
-  // discarded in favor of the "Could not dump table" comment.
   const source = {
     tables: async () => ["widgets"],
     columns: (_t: string) => [

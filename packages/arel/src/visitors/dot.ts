@@ -16,7 +16,6 @@ function isAppendableCollector(c: unknown): c is AppendableCollector {
   return typeof obj.append === "function" && typeof obj.value === "string";
 }
 
-/** Mirrors: Arel::Visitors::Dot::Node */
 export class Node {
   readonly name: string;
   readonly id: number;
@@ -29,9 +28,6 @@ export class Node {
   }
 }
 
-/**
- * Mirrors: Arel::Visitors::Dot::Edge
- */
 export class Edge {
   readonly name: string;
   readonly from: Node;
@@ -43,9 +39,6 @@ export class Edge {
   }
 }
 
-/**
- * Mirrors: Arel::Visitors::Dot (activerecord/lib/arel/visitors/dot.rb).
- */
 export class Dot extends Visitor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
@@ -106,12 +99,10 @@ export class Dot extends Visitor {
     this.visitEdge(o, "caseSensitive");
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_Regexp :visit__regexp` (dot.rb:65). */
   protected visitArelNodesRegexp(o: Nodes.Regexp): void {
     this.visitRegexp(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_NotRegexp :visit__regexp` (dot.rb:66). */
   protected visitArelNodesNotRegexp(o: Nodes.NotRegexp): void {
     this.visitRegexp(o);
   }
@@ -153,12 +144,10 @@ export class Dot extends Visitor {
 
   protected visitNoEdges(_o: Nodes.Node): void {}
 
-  /** Rails: `alias :visit_Arel_Nodes_CurrentRow :visit__no_edges` (dot.rb:104). */
   protected visitArelNodesCurrentRow(o: Nodes.Node): void {
     this.visitNoEdges(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_Distinct :visit__no_edges` (dot.rb:105). */
   protected visitArelNodesDistinct(o: Nodes.Node): void {
     this.visitNoEdges(o);
   }
@@ -248,17 +237,14 @@ export class Dot extends Visitor {
     });
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_And :visit__children` (dot.rb:193). */
   protected visitArelNodesAnd(o: { children: ReadonlyArray<unknown> }): void {
     this.visitChildren(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_Or :visit__children` (dot.rb:194). */
   protected visitArelNodesOr(o: { children: ReadonlyArray<unknown> }): void {
     this.visitChildren(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_With :visit__children` (dot.rb:195). */
   protected visitArelNodesWith(o: { children: ReadonlyArray<unknown> }): void {
     this.visitChildren(o);
   }
@@ -270,59 +256,46 @@ export class Dot extends Visitor {
     top.fields.push(value == null ? "" : String(value));
   }
 
-  // dot.rb:199-208
-
-  /** Rails: `alias :visit_Time :visit_String` (dot.rb:200). */
   protected visitTime(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Date :visit_String` (dot.rb:201). */
   protected visitDate(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_DateTime :visit_String` (dot.rb:202). */
   protected visitDateTime(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_NilClass :visit_String` (dot.rb:203). */
   protected visitNilClass(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_TrueClass :visit_String` (dot.rb:204). */
   protected visitTrueClass(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_FalseClass :visit_String` (dot.rb:205). */
   protected visitFalseClass(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Integer :visit_String` (dot.rb:206). */
   protected visitInteger(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_BigDecimal :visit_String` (dot.rb:207). */
   protected visitBigDecimal(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Float :visit_String` (dot.rb:208). */
   protected visitFloat(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Symbol :visit_String` (dot.rb:209). */
   protected visitSymbol(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_SqlLiteral :visit_String` (dot.rb:210). */
   protected visitArelNodesSqlLiteral(o: Nodes.SqlLiteral): void {
     this.visitString(o);
   }
@@ -335,7 +308,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "valueBeforeTypeCast");
   }
 
-  /** Mirrors: `visit_Hash` (dot.rb:227). */
   protected visitHash(o: Record<string, unknown>): void {
     Object.entries(o).forEach((pair, i) => {
       this.edge(`pair_${i}`, () => this.visit(pair));
@@ -348,7 +320,6 @@ export class Dot extends Visitor {
     });
   }
 
-  /** Rails: `alias :visit_Set :visit_Array` (dot.rb:231). */
   protected visitSet(o: ReadonlySet<unknown>): void {
     this.visitArray([...o]);
   }
@@ -363,7 +334,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "default");
   }
 
-  /** Mirrors: Arel::Visitors::Dot#visit_edge */
   protected visitEdge(o: object, method: string): void {
     if (!(method in o)) {
       const klass = (o as { constructor?: { name?: string } }).constructor?.name ?? "Object";
@@ -373,7 +343,6 @@ export class Dot extends Visitor {
     this.edge(method, () => this.visit((o as Record<string, unknown>)[method]));
   }
 
-  /** Mirrors: Arel::Visitors::Dot#visit */
   protected override visit(object: unknown, _collector?: unknown): unknown {
     const seenKey: unknown = (() => {
       if (object === null || object === undefined) return Dot.NIL_SENTINEL;
@@ -406,13 +375,11 @@ export class Dot extends Visitor {
     }
     this.nodes.push(node);
     this.withNode(node, () => {
-      // visitor.rb:39, visitor.rb:36-37
       super.visit(object);
     });
     return undefined;
   }
 
-  /** Mirrors: Arel::Visitors::Dot#edge */
   protected edge(name: string, block: () => void): void {
     const edge = new Edge(name, this.nodeStack[this.nodeStack.length - 1]);
     this.edgeStack.push(edge);
@@ -424,7 +391,6 @@ export class Dot extends Visitor {
     }
   }
 
-  /** Mirrors: Arel::Visitors::Dot#with_node */
   protected withNode(node: Node, block: () => void): void {
     const e = this.edgeStack[this.edgeStack.length - 1];
     if (e) e.to = node;
@@ -436,12 +402,10 @@ export class Dot extends Visitor {
     }
   }
 
-  /** Mirrors: Arel::Visitors::Dot#quote */
   protected quote(string: unknown): string {
     return String(string).replace(/"/g, '\\"');
   }
 
-  /** Mirrors: Arel::Visitors::Dot#to_dot */
   protected toDot(): string {
     const header = 'digraph "Arel" {\nnode [width=0.375,height=0.25,shape=record];';
     const nodeLines = this.nodes.map((n) => {
@@ -469,7 +433,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "alias");
   }
 
-  /** dot.rb:253 */
   private classNameOf(o: unknown): string {
     if (o === null) return "NilClass";
     if (o === undefined) return "NilClass";
@@ -486,9 +449,7 @@ export class Dot extends Visitor {
     return ctor?.name ?? "Object";
   }
 
-  /**
-   * @internal
-   */
+  /** @internal */
   static registerDispatch(): void {
     const reg = (ctor: NodeCtor, m: string) => Dot.dispatchCache().set(ctor, m);
     reg(Nodes.Function, "visitArelNodesFunction");
@@ -530,7 +491,6 @@ export class Dot extends Visitor {
     reg(Nodes.BindParam, "visitArelNodesBindParam");
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.Case, "visitArelNodesCase");
-    // dot.rb:216, dot.rb:231
     reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Set, "visitSet");
     reg(Nodes.Quoted, "visitNoEdges");

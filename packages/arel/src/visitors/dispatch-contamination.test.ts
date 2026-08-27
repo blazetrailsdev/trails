@@ -6,15 +6,6 @@ describe("DispatchContaminationTest", () => {
     const node = new Nodes.Union(new Nodes.True(), new Nodes.False());
     expect(node.toSql()).toBe("( TRUE UNION FALSE )");
 
-    // Rails' anonymous `Class.new(Visitor)` with `visit_Arel_Nodes_Union` and
-    // its True/False aliases. Ruby derives dispatch names from class names, so
-    // defining the methods is registration; trails' Visitor routes through an
-    // explicit per-class cache instead, so registering on the subclass's own
-    // `dispatchCache()` is the analogue. The Union handler is registered under
-    // `Binary` (Union's superclass) so that accepting the node exercises
-    // `resolveDispatch`'s ancestor fallthrough and memoizes the corrected
-    // entry — the write that must land in the subclass's cache, never the
-    // shared one ToSql dispatches through.
     class ContaminatingVisitor extends Visitors.Visitor {
       protected visitArelNodesUnion(_node: unknown): void {}
     }
@@ -29,11 +20,6 @@ describe("DispatchContaminationTest", () => {
   });
 
   it("is threadsafe when implementing superclass fallback", () => {
-    // Rails' thread/CyclicBarrier machinery has no analogue: JS is
-    // single-threaded and dispatch is not interruptible. The portable core of
-    // the race is that the corrective write lands on the shared per-class
-    // cache, so a second visitor resolves the same handler the first resolved
-    // by ancestor fallthrough.
     class DummySuperNode {}
     class DummySubNode extends DummySuperNode {}
 

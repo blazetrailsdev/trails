@@ -1,31 +1,15 @@
-/**
- * PostgreSQL cidr type — network address (CIDR notation).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Cidr.
- *
- * Rails: `class Cidr < Type::Value`. cast_value parses a String into an
- * IPAddr; serialize renders it back as "addr/prefix". TypeScript has no
- * stdlib IPAddr, so we provide IPAddr as a lightweight equivalent.
- */
-
 import { ValueType } from "@blazetrails/activemodel";
 
-/**
- * Lightweight equivalent of Ruby's IPAddr, carrying address + prefix length.
- * Mirrors the Rails IPAddr shape used by Cidr#serialize and Cidr#changed?.
- */
 export class IPAddr {
   constructor(
     readonly address: string,
     readonly prefixLength: number,
   ) {}
 
-  /** Alias for prefixLength — matches Ruby IPAddr#prefix. */
   get prefix(): number {
     return this.prefixLength;
   }
 
-  /** Returns just the address portion, like Ruby IPAddr#to_s. */
   toString(): string {
     return this.address;
   }
@@ -46,28 +30,12 @@ export class Cidr extends ValueType<IPAddr> {
     return this.castValue(value);
   }
 
-  /**
-   * Rails Cidr#serialize:
-   *   if IPAddr === value then "#{value}/#{value.prefix}" else value
-   * "#{value}" calls IPAddr#to_s (address only); we mirror that via toString().
-   * Non-IPAddr values are coerced to string via String() (Rails returns them
-   * as-is, but our return type is string | null so coercion is required).
-   */
   override serialize(value: unknown): string | null {
     if (value instanceof IPAddr) return `${value}/${value.prefixLength}`;
     if (value == null) return null;
     return String(value);
   }
 
-  /**
-   * Rails Cidr#changed?:
-   *   !old_value.eql?(new_value) || !old_value.nil? && old_value.prefix != new_value.prefix
-   *
-   * Ruby's IPAddr#eql? compares only the address bits (not the prefix), hence
-   * the explicit prefix guard. We normalise both sides to { address, prefix }
-   * so the comparison is always prefix-aware regardless of whether the caller
-   * supplies strings or IPAddr instances.
-   */
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
@@ -80,12 +48,6 @@ export class Cidr extends ValueType<IPAddr> {
     return oldC.address !== newC.address || oldC.prefix !== newC.prefix;
   }
 
-  /**
-   * Rails Cidr#cast_value:
-   *   nil → nil
-   *   String → IPAddr.new(value) or nil on ArgumentError
-   *   else → value (pass-through for existing IPAddr instances)
-   */
   castValue(value: unknown): IPAddr | null {
     if (value == null) return null;
     if (value instanceof IPAddr) return value;
@@ -93,14 +55,6 @@ export class Cidr extends ValueType<IPAddr> {
     return parseIpAddr(value);
   }
 
-  /**
-   * Rails Cidr#type_cast_for_schema:
-   *   if value.prefix == 32 then "\"#{value}\"" else "\"#{value}/#{value.prefix}\""
-   *
-   * Rails omits the prefix for any IPAddr with prefix == 32, regardless of
-   * IP version (this means IPv6 /32 is also elided — Rails does not special-case it).
-   * "#{value}" calls IPAddr#to_s which returns just the address string.
-   */
   override typeCastForSchema(value: unknown): string {
     if (value instanceof IPAddr) {
       if (value.prefixLength === 32) return JSON.stringify(value.address);
@@ -121,11 +75,6 @@ function toComparable(value: unknown): { address: string; prefix: number } | nul
   return null;
 }
 
-/**
- * Parses a CIDR/inet string into an IPAddr. Mirrors IPAddr.new(str): returns
- * null for invalid input (Rails raises ArgumentError, which cast_value rescues).
- * Defaults to /32 for IPv4 and /128 for IPv6 when no prefix is specified.
- */
 function parseIpAddr(value: string): IPAddr | null {
   if (value === "") return null;
   const slash = value.indexOf("/");
@@ -146,29 +95,12 @@ function parseIpAddr(value: string): IPAddr | null {
   return null;
 }
 
-/**
- * Canonicalize an IPv6 address to its RFC 5952 form. Ruby's `IPAddr#to_s`
- * always emits the canonical form (lowercase hex, no leading zeros per group,
- * longest run of zero groups compressed to `::`, leftmost run on ties, only
- * when the run is ≥ 2 groups). IPv4-tailed forms (`::ffff:192.168.0.1`) are
- * preserved in mixed notation — PG and Ruby's IPAddr#to_s both use this form
- * for IPv4-mapped addresses.
- *
- * Without this, two textually different inputs that parse to the same address
- * (e.g. `2001:DB8::1` vs `2001:db8:0:0:0:0:0:1`) would compare unequal in
- * `isChanged`, marking the attribute spuriously dirty. PG normalizes on
- * round-trip, so DB-loaded rows are unaffected — this matters only for
- * manually-assigned values before save.
- */
 function canonicalizeIpv6(value: string): string {
   const lastColon = value.lastIndexOf(":");
   let ipv4Tail: string | null = null;
   let head = value;
 
   if (lastColon !== -1 && value.slice(lastColon + 1).includes(".")) {
-    // IPv4-tailed form (e.g. ::ffff:192.168.0.1): preserve the IPv4 tail
-    // as-is and canonicalize only the 6-group hex prefix. Both PG and Ruby
-    // IPAddr#to_s use mixed notation for IPv4-mapped addresses.
     ipv4Tail = value.slice(lastColon + 1);
     head = value.slice(0, lastColon + 1) + "0:0";
   }
@@ -186,10 +118,6 @@ function canonicalizeIpv6(value: string): string {
 
   groups = groups.map((g) => parseInt(g, 16).toString(16));
 
-  // For pure-hex IPv4-mapped addresses (::ffff:xxxx:xxxx with no IPv4 tail in
-  // the input string), Ruby's IPAddr#to_s outputs mixed notation (::ffff:a.b.c.d).
-  // Detect this case and synthesize the IPv4 tail so both textual forms
-  // canonicalize to the same string and don't produce spurious dirty marks.
   if (!ipv4Tail && groups[5] === "ffff" && groups.slice(0, 5).every((g) => g === "0")) {
     const g6 = parseInt(groups[6], 16);
     const g7 = parseInt(groups[7], 16);
@@ -231,13 +159,6 @@ function canonicalizeIpv6(value: string): string {
   return hexResult;
 }
 
-/**
- * Lightweight IP syntax validators. Rails uses IPAddr.new (which rescues
- * ArgumentError); we inline parsers here rather than pulling in
- * `node:net.isIP` (blocked by a repo-wide no-Node-builtins lint rule
- * for browser compat). Accepts IPv4, IPv6, and IPv4-embedded IPv6
- * (e.g. ::ffff:192.168.0.1) — enough to match PG's input syntax.
- */
 const IPV4_OCTET = /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
 
 function isIpv4(value: string): boolean {

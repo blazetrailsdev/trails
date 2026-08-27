@@ -13,12 +13,6 @@ import { argumentError } from "./query-methods.js";
 import type { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 
-/**
- * Converts hash conditions ({ name: "dean", age: 30 }) into
- * Arel predicate nodes. Used by Relation to build WHERE clauses.
- *
- * Mirrors: ActiveRecord::PredicateBuilder
- */
 export class PredicateBuilder {
   private _table: TableMetadata;
 
@@ -54,40 +48,18 @@ export class PredicateBuilder {
     attributes: Record<string, unknown>,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
-    // Mirrors Rails PredicateBuilder#expand_from_hash: `return ["1=0"] if
-    // attributes.empty?` (predicate_builder.rb:85). An empty hash is a
-    // contradiction, so `where(posts: {})` (nested empty hash) and
-    // `where(sink: {})` (empty hash, no foreign key) match nothing. Top-level
-    // `where({})` never reaches here — it short-circuits as a blank argument in
-    // `Relation#where` (like Rails' `args.first.blank?`), so this fires only for
-    // the nested/associated recursion. Like Rails, expansion is always
-    // positive: `where.not(...)` inverts the assembled WhereClause one level
-    // up (WhereClause#invert), so `where.not(sink: {})` becomes `NOT (1=0)`.
     if (Object.keys(attributes).length === 0) {
       return [sql("1=0")];
     }
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(attributes)) {
       if (isPlainObject(value) && !this.table.hasColumn(key)) {
-        // Mirrors Rails PredicateBuilder#expand_from_hash: pass the
-        // join-dependency resolver block to associatedTable so a nested-hash key
-        // that is not a direct reflection (e.g. a join table name) still
-        // resolves to the right klass/table instead of being used verbatim. The
-        // block is NOT threaded into the recursive expansion: it resolves the
-        // caller relation's join deps by table name and has no valid context
-        // against the now-resolved associated table (Rails passes &block only to
-        // associated_table, then calls expand_from_hash with no block).
         const assocPb: PredicateBuilder = this.table.associatedTable(
           key,
           block as (name: string) => never,
         ).predicateBuilder;
         nodes.push(...assocPb.expandFromHash(value));
       } else if (this.table.isAssociatedWith(key)) {
-        // No fallback here on purpose: this branch is gated by
-        // `isAssociatedWith(key)` (a direct reflection), matching Rails'
-        // `elsif table.associated_with?(key)` which calls `associated_table(key)`
-        // with NO block (predicate_builder.rb:107) — the join-dependency
-        // resolver only matters when a key is NOT a direct reflection.
         const assocNodes = this.buildFromHashAssociation(
           this.table.associatedTable(key),
           key,
@@ -98,31 +70,19 @@ export class PredicateBuilder {
       } else if (this.table.aggregatedWith(key)) {
         nodes.push(...this.buildFromHashAggregate(key, value));
       } else {
-        // Rails `self[key, value]` (predicate_builder.rb:53-55): the attribute
-        // is read straight off the builder's arel table — dotted keys were
-        // already normalized into nested hashes by convertDotNotationToHash.
         nodes.push(this.build(this.table.arelTable.get(key), value));
       }
     }
     return nodes;
   }
 
-  /**
-   * Expand a `composed_of` aggregate value into predicates over its mapped
-   * columns. Mirrors PredicateBuilder#expand_from_hash's `aggregated_with?`
-   * branch: `where(address: Address.new(...))` becomes
-   * `address_street = ? AND address_city = ? AND address_country = ?`.
-   *
-   * @internal
-   */
+  /** @internal */
   private buildFromHashAggregate(key: string, value: unknown): Nodes.Node[] {
     const reflection = this.table.reflectOnAggregation(key);
     const mapping: [string, string][] = reflection.mapping();
-    // Rails: `values = value.nil? ? [nil] : Array.wrap(value)`.
     const values = value === null || value === undefined ? [null] : wrap(value);
     if (mapping.length === 1 || values.length === 0) {
       const [columnName, aggregateAttr] = mapping[0];
-      // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
       const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
       return [this.build(this.table.arelTable.get(columnName), mapped)];
     }
@@ -149,8 +109,6 @@ export class PredicateBuilder {
       const ft = associatedTable.joinForeignType as string;
       const refl = associatedTable.reflection;
       const pkFor = (klass?: unknown): string | string[] => {
-        // predicate_builder/polymorphic_array_value.rb:33
-        // `associated_table.join_primary_key(klass(value))`.
         const pk = associatedTable.joinPrimaryKey(klass as typeof Base | undefined) ?? "id";
         return Array.isArray(pk) ? pk : String(pk);
       };
@@ -171,14 +129,10 @@ export class PredicateBuilder {
       const rawPk = associatedTable.primaryKey;
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
       if (Array.isArray(rawPk)) {
-        // JS object keys can't be arrays, so a composite primary key is routed
-        // to an inline mirror of Rails' array-key branch of expand_from_hash
-        // (predicate_builder.rb:87-97) instead of the recursive call below.
         if (rawPk.length === 1) {
           const flat = Array.isArray(value) ? value.flat(Infinity) : value;
           return assocPb.expandFromHash({ [rawPk[0]]: flat });
         }
-        // Ruby `Array(value)`: nil → [], array stays, scalar wraps.
         const values =
           value === null || value === undefined ? [] : Array.isArray(value) ? value : [value];
         const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
@@ -195,11 +149,6 @@ export class PredicateBuilder {
         });
         return assocPb.groupingQueries(queryGroups);
       }
-      // A klass-less through target makes primaryKey null; Rails passes the
-      // literal `{nil => value}` into the recursion, where the nil key falls
-      // through to `self[nil, value]` and produces degenerate SQL. The JS
-      // computed key coerces null to the string "null" — an equally degenerate
-      // column reference, so no guard beyond this note.
       return assocPb.expandFromHash({ [rawPk as string]: value });
     }
     const queries = new AssociationQueryValue(associatedTable, value).queries();
@@ -216,50 +165,18 @@ export class PredicateBuilder {
     return this.groupingQueries(queryGroups);
   }
 
-  /**
-   * Mirrors PredicateBuilder#grouping_queries: a single query group's predicates
-   * are returned *flat* (so each column stays an addressable predicate, which
-   * `WhereClause#extract_attributes` — and thus `rewhere` — relies on); multiple
-   * groups are each AND-reduced and ORed inside a Grouping.
-   *
-   * @internal
-   */
+  /** @internal */
   private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[] {
     if (queries.length === 0) return [];
     if (queries.length === 1) return queries[0];
-    // Rails `grouping_queries` (predicate_builder.rb:157-159):
-    // `queries.map! { |query| query.reduce(&:and) }` then an n-ary
-    // `Arel::Nodes::Or.new(queries)` wrapped in one Grouping. `Node#and`
-    // is binary (`And.new [self, right]`), so a 3-predicate group is the
-    // nested chain `And([And([p1, p2]), p3])` — mirrored here via the same
-    // pairwise reduce, not a flat n-ary `And`. SQL is identical either way
-    // (the And visitor joins children without parens), but the AST shape
-    // matches Rails for anything walking the tree.
     const reduced = queries.map((query) => query.reduce((left, right) => left.and(right)));
     return [new Nodes.Grouping(new Nodes.Or(reduced))];
   }
 
   build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
-    // Rails predicate_builder.rb:58 — `value = value.id if value.respond_to?(:id)`,
-    // the first thing build does. A bare `where(col: record)` for a scalar column
-    // dereferences the record to its id before any handler dispatch. The
-    // association/polymorphic hash-expansion path already coerces records via
-    // AssociationQueryValue and never reaches this scalar entry point, so this does
-    // not double-handle those values.
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;
     }
-    // Rails applies the attribute's cast type — including any NormalizedValueType
-    // decoration — to `where`/`find_by` keyword arguments. A normalizer that maps
-    // a scalar to nil (e.g. `presence`) must route through the same `IS NULL`
-    // path as an explicit nil so `where(col: "")` matches `where(col: nil)`. We
-    // only need the normalized value to decide nil-routing here; the non-nil
-    // value flows to the handler unchanged and is normalized once by the wrapped
-    // bind type (so it is not normalized twice). Multi-value forms
-    // (Array/Set/Range/Relation) are left untouched here: their handlers don't
-    // normalize, but each element is normalized downstream when it becomes a
-    // bind — `buildBindAttribute` resolves the wrapped type via `typeForAttribute`
-    // (and `HomogeneousIn#castedValues` serializes through it for the IN path).
     if (this.isScalarQueryValue(value)) {
       const normalized = this.normalizeQueryValue(toS(attribute.name), value);
       if (normalized === null || normalized === undefined) {
@@ -269,28 +186,12 @@ export class PredicateBuilder {
     if (value === null || value === undefined) {
       return attribute.eq(null);
     }
-    // Rails checks `table.type(attribute.name).force_equality?(value)` at the top
-    // of `build` — right after the `id` deref and BEFORE any handler dispatch
-    // (predicate_builder.rb:57-69). So a force-equality value (PG array, PG range,
-    // serialized coder object) never reaches a registered handler. Mirror that
-    // precedence, and run it on the value BEFORE the Set→Array normalization
-    // below: Rails routes a Set through handler_for (ArrayHandler), and
-    // `OID::Array#force_equality?` is `value.is_a?(::Array)` — a Ruby Set is not
-    // an Array, so a Set on an array column force-equalizes in neither Rails nor
-    // here. Normalizing Set→Array first would spuriously trip force-equality.
     if (this.table.type(toS(attribute.name)).isForceEquality?.(value) === true) {
       return attribute.eq(this.buildBindAttribute(toS(attribute.name), value));
     }
     return this.handlerFor(value).call(attribute, value);
   }
 
-  /**
-   * A scalar reaches the equality/`basicObjectHandler` path where a single
-   * normalized value applies. Multi-value forms (Array/Set/Range/Relation) and
-   * StatementCache Substitute placeholders are excluded: their elements are
-   * normalized later by the wrapped bind type, and a Substitute must stay
-   * un-cast so the cached statement binds the real value at execution time.
-   */
   private isScalarQueryValue(value: unknown): boolean {
     return !(
       value === null ||
@@ -303,13 +204,6 @@ export class PredicateBuilder {
     );
   }
 
-  /**
-   * Apply the attribute's normalizer (via its decorated cast type) to a scalar
-   * query value, but only for attributes that declare one — so non-normalized
-   * columns keep their raw query values and existing casting semantics. The
-   * decorated type's `cast` casts then normalizes, mirroring Rails'
-   * `type_for_attribute(name).cast(value)`.
-   */
   private normalizeQueryValue(columnName: string, value: unknown): unknown {
     const klass = this.table.klass as { normalizedAttributes?: Set<string> } | null;
     const normalizedAttributes = klass?.normalizedAttributes;
@@ -317,54 +211,6 @@ export class PredicateBuilder {
     return this.table.type(columnName).cast(value);
   }
 
-  /**
-   * Build the composite-key predicates for `where(cols, tuples)`:
-   *
-   *   (c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22) OR ...
-   *
-   * The Rails analog is `where({[c1, c2] => [[v1, v2], ...]})`, handled by
-   * the Array-key branch of `expand_from_hash` (predicate_builder.rb:87-98).
-   * JS object keys can't be arrays, so the composite shape is a separate
-   * method (with a matching `Relation#where(cols, tuples)` overload) — but
-   * only as an adapter: it zips `cols` with each tuple into the plain-hash
-   * shape and delegates, so associated-table re-rooting, bind construction
-   * and the grouping tree are inherited from that branch rather than
-   * re-implemented. `cols.length === 1` takes the same route and lands on a
-   * single `IN (...)`, matching Rails' one-element-key collapse
-   * (predicate_builder.rb:87-90).
-   *
-   * Returns a `Node[]`, the native `PredicateBuilder` currency — the caller
-   * pushes them straight into the WhereClause, exactly as `build_where_clause`
-   * spreads `build_from_hash`'s result (query-methods.ts:1059). That is what
-   * makes the output byte-for-byte Rails: `grouping_queries` returns a single
-   * group's predicates *flat* (`queries.one? → queries.first`), so one
-   * surviving tuple yields `[c1 = ?, c2 = ?]` → `WHERE c1 = ? AND c2 = ?` with
-   * no wrapping `Grouping`/parens, while multiple tuples collapse to the single
-   * `[Grouping(Or([And, ...]))]` node. An all-filtered/empty result is `[]`,
-   * which the caller turns into `Relation#none()`.
-   *
-   * Deviation: it delegates via `buildFromHash`, not `expand_from_hash`, so
-   * `convert_dot_notation_to_hash` is re-applied per tuple and a qualified
-   * column (`"comments.post_id"`) resolves against the associated table.
-   * Rails runs that conversion once at the top of `build_from_hash`
-   * (predicate_builder.rb:24-25) and its Array-key branch recurses straight
-   * into `expand_from_hash` (predicate_builder.rb:96), so a dotted string
-   * inside an Array key falls through to `self[key, value]` and yields a
-   * literal, broken attribute name. Qualified composite columns are a
-   * deliberate trails extension (#5186) that the `where(cols, tuples)`
-   * surface is expected to support; routing them here keeps that behavior
-   * on one code path instead of a second dot-splitting implementation.
-   *
-   * Tuples containing `null` / `undefined` are filtered out: SQL
-   * tuple-equality treats any null component as a non-match, whereas
-   * `Attribute#eq(null)` would emit `IS NULL`. Caller bugs — empty `cols`,
-   * non-array `tuples`, non-array tuple, arity mismatch — raise ArgumentError
-   * instead, since silently dropping them would collapse into that same empty
-   * → `none()` and hide the bug.
-   *
-   * Mirrors: ActiveRecord::PredicateBuilder#expand_from_hash, Array-key
-   * branch (predicate_builder.rb:87-98).
-   */
   buildComposite(
     cols: string[],
     tuples: unknown[][],
@@ -392,28 +238,6 @@ export class PredicateBuilder {
     }
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
     if (validTuples.length === 0) return [];
-    // Thread the join-dependency fallback through the per-tuple `buildFromHash`
-    // so a qualified col (`"contracts.metadata"`) naming a table that only
-    // exists as a join (`.joins(...)`, an alias) — not a direct reflection —
-    // resolves against the joined model (`lookup_table_klass_from_join_dependencies`,
-    // predicate_builder.rb:71-73). Without it the dotted key falls to a bare
-    // `Table` + generic `TypeCasterConnection`, so the bind is typed by the raw
-    // column type instead of the joined model's.
-    //
-    // Threading it UNIFORMLY across the single- and multi-column branches is a
-    // deliberate extension, not Rails-mirroring: qualified composite columns
-    // have no faithful Rails behavior to match (see this method's docstring —
-    // Rails' Array-key branch at predicate_builder.rb:93-96 recurses via
-    // `expand_from_hash(key.zip(ids_set).to_h)`, which neither re-applies
-    // `convert_dot_notation_to_hash` NOR forwards `&block`, so Rails emits a
-    // broken bare `"contracts.metadata"` attribute on the base table for either
-    // arity). The trails extension (#5186) already resolves REFLECTIONS in the
-    // multi-column branch by routing each tuple through `buildFromHash` (the
-    // "qualified composite cols bind through the joined table's type" test), so
-    // threading `fallback` there too keeps join-only tables consistent with both
-    // reflections and the single-column path — matching Rails' block-loss on
-    // recursion would instead resolve reflections but silently drop join-only
-    // tables to the generic caster, an arbitrary split.
     if (cols.length === 1) {
       return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) }, fallback);
     }
@@ -446,24 +270,12 @@ export class PredicateBuilder {
     columnName: string,
     fallback?: (name: string) => unknown,
   ): Nodes.Attribute {
-    // Mirrors predicate_builder.rb:71-73 — routing through `associated_table`
-    // (with Rails' block, `lookup_table_klass_from_join_dependencies`) is what
-    // resolves a table name that only exists as a join, and what keeps the
-    // resulting table's type caster attached.
-    // `arelTable` is a TableAlias (a Binary node, not a Table) whenever
-    // associated_table had to alias to the hash key (table-metadata.ts:83-84,
-    // mirroring table_metadata.rb:44) — both answer `get`, neither is
-    // `instanceof Table`.
     return this.table
       .associatedTable(tableName, fallback as (name: string) => never)
       .arelTable.get(columnName);
   }
 
   with(table: TableMetadata): PredicateBuilder {
-    // Rails: `other = dup; other.table = table` — dup shares the @handlers
-    // ARRAY OBJECT, so handlers registered on the model builder later are
-    // visible to builders already derived for associated metadata (and vice
-    // versa). A `[...this.handlers]` snapshot would leave them stale.
     const builder = new PredicateBuilder(table);
     builder.handlers = this.handlers;
     return builder;
@@ -471,8 +283,6 @@ export class PredicateBuilder {
 
   static references(conditions: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
     const refs: Nodes.SqlLiteral[] = [];
-    // Support array form: references(["schema.table.column"]) → ["schema.table"]
-    // Rails iterates attributes with each_with_object; for array input the "key" is each element.
     const entries: Array<[string, unknown]> = Array.isArray(conditions)
       ? conditions.map((k) => [k, undefined] as [string, unknown])
       : Object.entries(conditions);
@@ -526,14 +336,8 @@ export class PredicateBuilder {
     return converted;
   }
 
-  /**
-   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@handlers.detect {
-   *   ... }.last` (predicate_builder.rb:186) — Ruby `Array#last` on the matched
-   *   `[klass, handler]` pair, spelled `[1]` in TS (predicate-builder.ts:543).
-   */
+  /** @missingRailsCall last — PERMANENT */
   private handlerFor(object: unknown): { call(attr: Nodes.Attribute, value: any): Nodes.Node } {
-    // Rails: `@handlers.detect { |klass, _| klass === object }.last` — BasicObject
-    // matches every value, so the detect never comes back nil.
     return this.handlers.find(([klass]) =>
       klass === BasicObject
         ? true
@@ -544,41 +348,14 @@ export class PredicateBuilder {
   }
 }
 
-/**
- * Stand-in for Ruby's `BasicObject` as a `register_handler` key
- * (predicate_builder.rb:16): the root of Ruby's class hierarchy, so `===` holds
- * for every value. TypeScript has no such class — `Object` misses primitives —
- * so `handler_for`'s case-equality answers `true` for this marker.
- */
 class BasicObject {}
 
-/**
- * Stand-in for `ActiveRecord::Relation` as a `register_handler` key
- * (predicate_builder.rb:18). Importing `relation.js` here would close a module
- * cycle — relation.ts constructs a PredicateBuilder — so `handler_for`'s
- * case-equality answers this marker structurally, via `isRelation`, as the rest
- * of this file already does.
- */
 class Relation {}
 
-// Rails: `value.respond_to?(:id)`. In Ruby only Active Record records (and things
-// defining #id) respond, since Object#id was removed in 1.9 — a bare `Hash` does
-// NOT respond_to?(:id), so `where(col: { id: 5 })` routes `{ id: 5 }` to a handler
-// rather than dereferencing to `5`. The TS mirror: an object that carries an `id`
-// property but is not a plain object literal (those stand in for Ruby Hashes).
 function respondsToId(value: unknown): value is { id: unknown } {
   return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);
 }
 
-// Read an aggregate's mapped attribute off a value object. Mirrors Rails'
-// two call shapes in expand_from_hash: the single-mapping branch uses
-// `object.respond_to?(attr) ? object.public_send(attr) : object` (scalar
-// passthrough when the value isn't an aggregate object), while the
-// multi-mapping branch uses `object.try!(attr)` — which returns nil only when
-// the *receiver* is nil and RAISES NoMethodError when a non-nil object doesn't
-// respond to `attr` (a broken composed_of mapping is a programmer error, not a
-// silent no-match). Getters and methods both resolve — a function value is
-// invoked with the object as receiver.
 function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): unknown {
   if (object === null || object === undefined) return tryBang ? null : object;
   if (typeof object === "object" && attr in object) {
@@ -614,9 +391,6 @@ function isSameHash(a: Record<string, unknown>, b: Record<string, unknown>): boo
   return true;
 }
 
-// Value equality that matches Ruby hash equality: scalars by identity, arrays by element.
-// Needed so the FK-cycle guard catches cases like { author_id: [1] } == { author_id: [1] }
-// where AssociationQueryValue produces a new array each time (different reference, same content).
 function isSameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/bind_parameter_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -30,11 +27,6 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with float for string column using bind parameters", async () => {
-      // Tracked deviation pending convergence, RFC 0082
-      // `rational-value-quoting-analogue`: Rails passes `0.0` and expects the
-      // literal `0.0`, but JS has a single `Number` type, so `0.0 === 0` and the
-      // adapter renders `0`. That story decides whether a Float analogue is
-      // warranted or the limitation is terminal.
       await assertQuotedAs("0", 0.0);
     });
 
@@ -47,11 +39,6 @@ describeIfSqlite("SQLite3Adapter", () => {
     });
 
     it("where with rational for string column using bind parameters", async () => {
-      // Tracked deviation pending convergence, RFC 0082
-      // `rational-value-quoting-analogue`: Rails passes `Rational(0)` and
-      // expects `0/1`, but trails has no `Rational` analogue yet, so the nearest
-      // value is a plain `Number` — which makes this case duplicate the integer
-      // one above until that story ports the class (as `BigDecimal` already is).
       await assertQuotedAs("0", 0);
     });
   });

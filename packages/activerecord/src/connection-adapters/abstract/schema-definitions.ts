@@ -12,7 +12,7 @@ import {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE Ruby splats column names with Array() at each use site (abstract/schema_statements.rb:1173); named here so the arms share one spelling.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function splitColumnNames(
   args: unknown[],
@@ -30,19 +30,8 @@ export function splitColumnNames(
   return { names: rest as string[], options };
 }
 
-/**
- * @internal Shared identifier guard for MySQL bare-identifier emission
- * (charset/collation). MySQL requires `CHARACTER SET`/`COLLATE` as bare
- * identifiers — `quoteColumnName` (backtick-wrapping) produces invalid DDL
- * like `COLLATE \`utf8mb4_bin\``. This regex substitutes for quoting: only
- * safe charset/collation names pass.
- */
-/**
- * @internal RegExp#test with a g/y-flagged pattern mutates shared lastIndex
- * state across calls (Ruby's Regexp#match? has no such statefulness), so a
- * user-configured ignore pattern with those flags would alternate results.
- * schema-dumper.ts strips the flags the same way in its fallback paths.
- */
+/** @internal */
+/** @internal */
 function statelessTest(pattern: RegExp, value: string): boolean {
   const stateless =
     pattern.global || pattern.sticky
@@ -57,9 +46,6 @@ export function assertSafeMysqlIdentifier(value: string, kind: string): void {
   }
 }
 
-/**
- * Column type mapping.
- */
 export type ColumnType =
   | "string"
   | "text"
@@ -84,13 +70,7 @@ export type PrimaryKeyType = "uuid";
 
 export type ReferentialAction = "cascade" | "nullify" | "restrict";
 
-/**
- * The adapter surface {@link TableDefinition.newForeignKeyDefinition} reads
- * beyond {@link SchemaQuoter}: the table_name_prefix/suffix (Rails reads these
- * off `ActiveRecord::Base`) and `foreign_key_options` that fills the default
- * column and SHA256 `fk_rails_<hex>` name.
- * @internal
- */
+/** @internal */
 export interface ForeignKeyOptionsAdapter {
   tableNamePrefix?: string;
   tableNameSuffix?: string;
@@ -102,11 +82,7 @@ export interface ForeignKeyOptionsAdapter {
   ): Record<string, unknown>;
 }
 
-/**
- * The `@conn` surface `new_check_constraint_definition` reaches for.
- *
- * @internal
- */
+/** @internal */
 export interface CheckConstraintOptionsAdapter {
   /** @internal */
   checkConstraintOptions(
@@ -116,14 +92,7 @@ export interface CheckConstraintOptionsAdapter {
   ): Record<string, unknown>;
 }
 
-/**
- * The `@conn` surface `TableDefinition` reads (schema_definitions.rb:575-591:
- * `foreign_key_options`, `check_constraint_options`,
- * `valid_column_definition_options`), plus the quoting subset schema emission
- * needs. In Rails `@conn` is the adapter itself, with `SchemaStatements` mixed
- * in, so every one of these is always there.
- * @internal
- */
+/** @internal */
 export type TableDefinitionConn = SchemaQuoter &
   ForeignKeyOptionsAdapter &
   CheckConstraintOptionsAdapter & {
@@ -131,9 +100,6 @@ export type TableDefinitionConn = SchemaQuoter &
     validColumnDefinitionOptions(): string[];
   };
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
- */
 export class ColumnDefinition {
   static readonly OPTION_NAMES = [
     "limit",
@@ -157,16 +123,10 @@ export class ColumnDefinition {
   ) {}
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::AddColumnDefinition
- */
 export class AddColumnDefinition {
   constructor(readonly column: ColumnDefinition) {}
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::CreateIndexDefinition
- */
 export class CreateIndexDefinition {
   constructor(
     readonly index: IndexDefinition,
@@ -175,9 +135,6 @@ export class CreateIndexDefinition {
   ) {}
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition
- */
 export interface AddForeignKeyOptions {
   column?: string | string[];
   primaryKey?: string | string[];
@@ -189,25 +146,18 @@ export interface AddForeignKeyOptions {
   ifNotExists?: boolean;
 }
 
-/** Mirrors: the keyword args of `remove_foreign_key(from_table, to_table = nil, **options)` */
 export interface RemoveForeignKeyOptions extends AddForeignKeyOptions {
   toTable?: string;
   ifExists?: boolean;
 }
 
-/** Options accepted by the `foreignKey` field of `ReferenceDefinition`. */
 export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
   toTable?: string;
 }
 
 /**
- * Mirror Rails' composite-arity guard (schema_statements.rb:1258-1266): once
- * `foreign_key_options` has filled the default `column`, a composite FK
- * (either `column` or `primaryKey` given as an array) must reference exactly as
- * many `column`s as `primaryKey`s. `Array(nil)` is empty in Ruby, so a lone
- * array with no counterpart also mismatches.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the composite-arity guard Ruby writes inline in add_foreign_key (abstract/schema_statements.rb:1173-1266).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function assertCompositeForeignKeyArity(
   toTable: string,
@@ -224,10 +174,6 @@ export function assertCompositeForeignKeyArity(
   }
 }
 
-/**
- * Lookup options accepted by ForeignKeyDefinition#isDefinedFor / foreignKeyFor,
- * mirroring the keyword args Rails `defined_for?` matches generically.
- */
 export interface ForeignKeyLookupOptions {
   toTable?: string;
   column?: string | string[];
@@ -239,11 +185,6 @@ export interface ForeignKeyLookupOptions {
   deferrable?: "immediate" | "deferred" | false;
 }
 
-/**
- * The generic (sliceable) option keys Rails' `defined_for?` matches via
- * `options.slice(*self.options.keys)`. `to_table`/`validate` are handled
- * separately and are never sliced.
- */
 export type ForeignKeyStoredOptionKey =
   | "column"
   | "name"
@@ -253,14 +194,8 @@ export type ForeignKeyStoredOptionKey =
   | "deferrable";
 
 /**
- * The stored-option-key set produced by Rails' `foreign_key_options`: it always
- * fills in `:column` and `:name`, and carries `:primary_key`/`:on_delete`/
- * `:on_update`/`:deferrable` only when the caller explicitly passed them. Used
- * by every `add_foreign_key`-style construction path (DSL + abstract/PG
- * `addForeignKey`) so `isDefinedFor` slices a defaulted key (e.g. primaryKey
- * "id") out rather than mismatching it.
  * @internal
- * @noRailsEquivalent CONVERGEABLE reproduces the key set Ruby's foreign_key_options hash carries (abstract/schema_statements.rb:1246); TS has no options hash to read keys off.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function foreignKeyOptionsStoredKeys(
   options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,
@@ -284,23 +219,14 @@ export class ForeignKeyDefinition {
   readonly deferrable?: "immediate" | "deferred" | false;
   readonly validate: boolean | null;
   /**
-   * Whether `:validate` was stored on the options hash (Rails introspection
-   * sets it only on PostgreSQL; mysql/sqlite leave it absent). Mirrors the
-   * `options.fetch(:validate, validate)` fallback in `defined_for?`: when the
-   * definition did not store `validate`, a `validate` lookup is ignored.
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby reads `options.fetch(:validate, validate)` off the raw hash in defined_for? (abstract/schema_definitions.rb:161); TS has no such hash.
+   * @noRailsEquivalent PERMANENT
    */
   readonly storesValidate: boolean;
 
   /**
-   * Which generic option keys this FK actually carries, mirroring Rails'
-   * `self.options.keys`. `isDefinedFor` slices lookup keys to this set so a
-   * key the definition never stored is ignored (matches), per
-   * `options.slice(*self.options.keys)`. Rails reads this off the raw options
-   * hash; trails has no such hash, so we record the key set explicitly.
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby's `options.slice(*self.options.keys)` in defined_for? reads a raw hash TS does not keep (abstract/schema_definitions.rb:161).
+   * @noRailsEquivalent PERMANENT
    */
   readonly storedOptionKeys: ReadonlySet<ForeignKeyStoredOptionKey>;
 
@@ -324,11 +250,6 @@ export class ForeignKeyDefinition {
     this.onDelete = onDelete;
     this.onUpdate = onUpdate;
     this.deferrable = deferrable;
-    // Rails reads `validate?` off `options.fetch(:validate, true)`, so a stored
-    // value — nil included — survives and the `true` default applies only when
-    // the key is absent; storesValidate records whether `:validate` was actually
-    // on the options hash (PG introspection sets it; mysql/sqlite/DSL-without-it
-    // leave it absent), driving the fetch-fallback in isDefinedFor.
     this.storesValidate = validate !== undefined;
     this.validate = this.storesValidate ? (validate as boolean | null) : true;
     this.storedOptionKeys = new Set(
@@ -340,51 +261,26 @@ export class ForeignKeyDefinition {
     return this.primaryKey !== this.defaultPrimaryKey;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#default_primary_key
-   * @internal
-   */
+  /** @internal */
   get defaultPrimaryKey(): string {
     return "id";
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
-   *   `options.fetch(:validate, true)`
-   *   (`connection_adapters/schema_definitions.rb:153`) — `options` is a plain
-   *   TS object, not a Hash, so the default-substituting read has no `fetch`
-   *   call spelling; the body is `this.options.validate ?? true`.
-   */
+  /** @missingRailsCall fetch — PERMANENT */
   get isValidate(): boolean | null {
     return this.validate;
   }
 
-  /** Alias of isValidate (Rails: `alias validated? validate?`). */
   get isValidated(): boolean | null {
     return this.isValidate;
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
-  /**
-   * @missingRailsCall match? — PERMANENT: Verified per-site (RFC 0106):
-   *   `!ActiveRecord::SchemaDumper.fk_ignore_pattern.match?(name) if name`
-   *   (`connection_adapters/schema_definitions.rb:158`). Ruby's `Regexp#match?`
-   *   is stateless; JS `RegExp#test` advances `lastIndex` on a `/g` pattern, and
-   *   `fk_ignore_pattern` is user-assignable
-   *   (`schema-definitions.trails.test.ts` pins a `/g` pattern giving two
-   *   different answers on consecutive reads). The `statelessTest` wrapper is
-   *   that language shortcoming, and `test` is the only JS analogue the gate
-   *   credits for `match?`.
-   */
+  /** @missingRailsCall match? — PERMANENT */
   get isExportNameOnSchemaDump(): boolean {
     return this.name != null ? !statelessTest(SchemaDumper.fkIgnorePattern, this.name) : false;
   }
 
   isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
-    // Rails compares element-wise after to_s:
-    // Array(self.options[k]).map(&:to_s) == Array(v).map(&:to_s)
-    // A nil stored option becomes `Array(nil) => []`, so normalize
-    // undefined/null to an empty array rather than `["undefined"]`.
     const toArray = (c: unknown): string[] =>
       c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)];
     const optionEqual = (a: unknown, b: unknown): boolean => {
@@ -392,16 +288,9 @@ export class ForeignKeyDefinition {
       const bb = toArray(b);
       return aa.length === bb.length && aa.every((v, i) => v === bb[i]);
     };
-    // Rails opens defined_for? with `options = options.slice(*self.options.keys)`,
-    // dropping any lookup key the definition never stored before the generic
-    // compare. A sliced-out key is therefore ignored (matches).
     const stored = (key: ForeignKeyStoredOptionKey): boolean => this.storedOptionKeys.has(key);
     return (
       (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
-      // Mirrors `validate.nil? || validate == self.options.fetch(:validate, validate)`:
-      // when `:validate` was not stored on the definition (mysql/sqlite
-      // introspection, or an add/DSL path that didn't pass it), the fetch falls
-      // back to the lookup value, so the comparison is trivially true.
       (options.validate == null || !this.storesValidate || options.validate === this.validate) &&
       (options.column === undefined ||
         !stored("column") ||
@@ -423,17 +312,11 @@ export class ForeignKeyDefinition {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::PrimaryKeyDefinition
- * @internal
- */
+/** @internal */
 export class PrimaryKeyDefinition {
   constructor(readonly name: string[]) {}
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::CheckConstraintDefinition
- */
 export class CheckConstraintDefinition {
   readonly tableName: string;
   readonly expression: string;
@@ -453,10 +336,6 @@ export class CheckConstraintDefinition {
     return this.options.name as string;
   }
 
-  /**
-   * Mirrors: `validate?` (schema_definitions.rb:180-183). `options.fetch` returns
-   * a stored nil as nil; the `true` default applies only when the key is absent.
-   */
   get validate(): boolean | null {
     return "validate" in this.options ? (this.options.validate as boolean | null) : true;
   }
@@ -469,22 +348,6 @@ export class CheckConstraintDefinition {
     return this.name != null ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
   }
 
-  /**
-   * Mirrors: `defined_for?(name:, expression: nil, validate: nil, **options)`
-   * (schema_definitions.rb:189-195).
-   *
-   * `expression` is accepted but never compared — Rails does not compare it
-   * either (it is used upstream to derive the name), and a raw-string compare
-   * would spuriously fail against the adapter's normalized form (e.g.
-   * PostgreSQL's `pg_get_constraintdef`).
-   *
-   * The validate arm is `validate.nil? || validate == options.fetch(:validate,
-   * validate)`: with `:validate` unstored the fetch falls back to the lookup
-   * value, so the comparison is trivially true and the `validate?` getter's
-   * `true` default must not stand in for it. The residual arm is
-   * `options.slice(*self.options.keys)` followed by the `to_s` compare, where
-   * Ruby's `nil.to_s` is `""`.
-   */
   isDefinedFor(options: {
     name: string | null | undefined;
     expression?: string;
@@ -502,9 +365,6 @@ export class CheckConstraintDefinition {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ChangeColumnDefinition
- */
 export class ChangeColumnDefinition {
   constructor(
     readonly column: ColumnDefinition,
@@ -512,9 +372,6 @@ export class ChangeColumnDefinition {
   ) {}
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ChangeColumnDefaultDefinition
- */
 export class ChangeColumnDefaultDefinition {
   readonly default: unknown;
   constructor(
@@ -525,10 +382,6 @@ export class ChangeColumnDefaultDefinition {
   }
 }
 
-/**
- * Typed shape for the hash form of `createTable`'s `id:` option.
- * Mirrors the Rails subset: `id: { type: :string, collation: "utf8mb4_bin" }` etc.
- */
 export interface IdHashOptions {
   type?: ColumnType;
   limit?: number;
@@ -559,18 +412,9 @@ export interface ColumnOptions {
   ifNotExists?: boolean;
   autoIncrement?: boolean;
   unsigned?: boolean;
-  // MySQL column placement (Rails: `t.column x, :string, first: true`/`after:`),
-  // read by `add_column_options!` and carried through `ReferenceDefinition`'s
-  // `options.slice(:null, :first, :after)` (schema_definitions.rb:259).
   first?: boolean;
   after?: string;
-  // MySQL blob/text sizing (Rails: `t.binary x, size: :tiny`). Maps to the
-  // tiny/medium/long type prefix; ignored on adapters without sized blobs.
   size?: "tiny" | "medium" | "long";
-  // Virtual/generated-column options (Rails: `t.virtual ..., type:, as:, stored:`).
-  // `as`/`stored` are read by MySQL/PostgreSQL/SQLite `add_column_options!`;
-  // `type` is the underlying type read by their `new_column_definition` when the
-  // positional type is `:virtual`.
   type?: ColumnType;
   as?: string;
   stored?: boolean;
@@ -578,11 +422,6 @@ export interface ColumnOptions {
   _skipValidateOptions?: boolean;
 }
 
-/**
- * Options passed to `add_column_options!` — a column's options merged with a
- * `column` back-reference to the owning ColumnDefinition (Rails:
- * `column_options` returns `options.merge(column: o)`).
- */
 export interface AddColumnOptions extends ColumnOptions {
   column?: ColumnDefinition;
 }
@@ -591,18 +430,8 @@ export interface AddIndexOptions {
   unique?: boolean;
   name?: string;
   where?: string;
-  /**
-   * `add_index(table, columns, order: :desc)` applies one direction to every
-   * column — `options_for_index_columns` takes the bare value as well as the
-   * per-column Hash.
-   */
   order?: string | Record<string, string>;
   using?: string;
-  /**
-   * `internal:` is add_index's own kwarg, outside the asserted option set
-   * (schema_statements.rb:1476-1477); `copy_table_indexes` passes it
-   * (sqlite3_adapter.rb:668).
-   */
   internal?: boolean;
   type?: string;
   comment?: string;
@@ -630,15 +459,10 @@ export interface AddReferenceOptions extends Omit<ColumnOptions, "index"> {
   ifNotExists?: boolean;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::IndexDefinition
- */
 export class IndexDefinition {
   readonly table: string;
   readonly name: string;
   readonly unique: boolean;
-  // A string for expression indexes (the raw expression), an array of column
-  // names otherwise — mirrors Rails' IndexDefinition#columns.
   readonly columns: string | string[];
   readonly where?: string;
   readonly orders: Record<string, string> | string;
@@ -717,8 +541,6 @@ export class IndexDefinition {
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {
-    // Mirrors Rails: `columns = options[:column] if columns.blank?`
-    // Ruby `blank?` is true for nil, "" and [].
     const isBlank =
       columns == null || (Array.isArray(columns) ? columns.length === 0 : columns === "");
     if (isBlank) columns = options.column;
@@ -737,8 +559,6 @@ export class IndexDefinition {
       return false;
     if (columns !== undefined) {
       const cols = Array.isArray(columns) ? columns : [columns];
-      // Mirrors Rails' `Array(self.columns) == Array(columns)` — an expression
-      // index keeps `columns` as a bare string, wrapped here into one element.
       const own = Array.isArray(this.columns) ? this.columns : [this.columns];
       if (own.length !== cols.length || own.some((c, i) => c !== cols[i])) return false;
     }
@@ -756,11 +576,6 @@ export class IndexDefinition {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ColumnMethods
- *
- * Interface for column type methods shared between TableDefinition and Table.
- */
 export interface ColumnMethods {
   string(...names: string[]): unknown;
   string(...args: [...names: string[], options: ColumnOptions]): unknown;
@@ -811,9 +626,6 @@ export interface ReferenceDefinitionConnection {
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ReferenceDefinition
- */
 export class ReferenceDefinition {
   readonly name: string;
   /** @internal */
@@ -839,10 +651,6 @@ export class ReferenceDefinition {
     this.polymorphic = options.polymorphic ?? false;
     this.index = options.index !== false ? (options.index ?? true) : false;
     this.foreignKey = options.foreignKey ?? false;
-    // Rails' ReferenceDefinition defaults `type: :bigint`
-    // (schema_definitions.rb:204) — the same class backs both `t.references`
-    // and `add_reference`, so the reference column lines up with the default
-    // `bigint` primary key of the table it points at.
     this.type = options.type ?? "bigint";
     const { polymorphic: _, foreignKey: _fk, index: _idx, type: _t, ...rest } = options;
     this.options = rest;
@@ -885,11 +693,7 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   *
-   * @missingRailsCall slice — PERMANENT: Per-entry verified (RFC 0032 wide-entry
-   *   verification): Rails schema_definitions.rb:254-256 is
-   *   `options.slice(:if_exists, :if_not_exists)`; trails
-   *   schema-definitions.ts:675-680 picks the two keys explicitly.
+   * @missingRailsCall slice — PERMANENT
    */
   private conditionalOptions(): Pick<ColumnOptions, "ifExists" | "ifNotExists"> {
     const result: Pick<ColumnOptions, "ifExists" | "ifNotExists"> = {};
@@ -900,16 +704,8 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_definitions.rb:259 chains two `merge`s, spelled as one object
-   *   spread in trails (schema-definitions.ts:870-878). Same keys, same
-   *   precedence.
-   * @missingRailsCall slice — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_definitions.rb:259's `options.slice(:null, :first, :after)` is
-   *   spelled as three presence-guarded spreads in trails
-   *   (schema-definitions.ts:874-876) — `Hash#slice` has no ported analogue for
-   *   a plain object, and a bare spread would introduce the keys as `undefined`.
+   * @missingRailsCall merge — PERMANENT
+   * @missingRailsCall slice — PERMANENT
    */
   private polymorphicOptions(): ColumnOptions {
     return {
@@ -928,12 +724,7 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_definitions.rb:267 is
-   *   `as_options(index).merge(conditional_options)`, spelled as an object
-   *   spread in trails (schema-definitions.ts:884-895). Same keys, same
-   *   precedence.
+   * @missingRailsCall merge — PERMANENT
    */
   private indexOptions(tableName: string): AddIndexOptions {
     const opts: AddIndexOptions = {
@@ -948,12 +739,7 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_definitions.rb:277 is `as_options(foreign_key).merge(column:
-   *   column_name, **conditional_options)`; trails spells the same merge as an
-   *   object spread (schema-definitions.ts:896-902). `Hash#merge` has no ported
-   *   analogue for a plain object.
+   * @missingRailsCall merge — PERMANENT
    */
   private foreignKeyOptions(): ReferenceForeignKeyOptions {
     return {
@@ -975,13 +761,7 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   *
-   * @missingRailsCall fetch — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_definitions.rb:297-299 is `foreign_key_options.fetch(:to_table) {
-   *   ... }`; `to_table` is a declared optional property on trails'
-   *   ReferenceForeignKeyOptions, so the block default is spelled `?? (...)`
-   *   (schema-definitions.ts:922-925). The Ruby fetch/`??` difference (a STORED
-   *   nil) cannot arise: the key is only ever written with a table name.
+   * @missingRailsCall fetch — PERMANENT
    */
   private foreignTableName(): string {
     const fkOpts = this.foreignKeyOptions();
@@ -1000,9 +780,6 @@ export class ReferenceDefinition {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::AlterTable
- */
 export class AlterTable {
   /** @internal */
   protected readonly _td: TableDefinition;
@@ -1025,9 +802,6 @@ export class AlterTable {
   }
 
   addForeignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): void {
-    // Mirrors Rails' AlterTable#add_foreign_key, which routes through
-    // `@td.new_foreign_key_definition(to_table, options)` so the FK def picks up
-    // table_name_prefix/suffix and the converged foreign_key_options defaults.
     this.foreignKeyAdds.push(this._td.newForeignKeyDefinition(toTable, options));
   }
 
@@ -1051,39 +825,16 @@ export class AlterTable {
   }
 }
 
-/**
- * The table-definition type an adapter's own `create_table_definition` builds.
- *
- * Ruby resolves a yielded object's methods at call time, so a PostgreSQL
- * `create_table` block reaches `PostgreSQL::ColumnMethods` names
- * (postgresql/schema_definitions.rb:245) with nothing declared anywhere.
- * TypeScript resolves against the DECLARED parameter type instead, so the
- * `create_table` yield has to name the receiver's own definition class for the
- * same names to resolve.
- *
- * @noRailsEquivalent PERMANENT: Ruby needs no type to express what a
- *   `create_table` block yields, so there is nothing to mirror. This is the
- *   declaration-site expression of that same fact.
- */
+/** @noRailsEquivalent PERMANENT */
 export type TableDefinitionOf<A> = A extends {
   createTableDefinition(name: string, options?: Record<string, unknown>): infer T;
 }
   ? T
   : TableDefinition;
 
-/**
- * TableDefinition — used inside create_table blocks.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition
- */
 export class TableDefinition {
   readonly name: string;
   readonly columns: ColumnDefinition[] = [];
-  /**
-   * Rails stores the caller's options untouched — `indexes << [column_name,
-   * options]` (schema_definitions.rb:518) — and validates/normalizes them once,
-   * downstream in `add_index_options` (schema_statements.rb:1476).
-   */
   readonly indexes: Array<[string | string[], AddIndexOptions]> = [];
   readonly foreignKeys: ForeignKeyDefinition[] = [];
   readonly checkConstraints: CheckConstraintDefinition[] = [];
@@ -1118,14 +869,7 @@ export class TableDefinition {
     this.comment = tdOptions.comment;
   }
 
-  /**
-   * @missingRailsCall get_primary_key — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_definitions.rb:397 is `Base.get_primary_key(...)`; importing `Base`
-   *   from the connection-adapter layer is a module cycle, so trails reads it
-   *   through the `table-name-options.ts` registration slot as
-   *   `globalGetPrimaryKey` (schema-definitions.ts:1058). Same value, same
-   *   fallback.
-   */
+  /** @missingRailsCall get_primary_key — PERMANENT */
   setPrimaryKey(
     tableName: string,
     id: boolean | ColumnType | IdHashOptions,
@@ -1134,8 +878,6 @@ export class TableDefinition {
   ): void {
     if (!id || this.as) return;
 
-    // Rails' `primary_key || Base.get_primary_key(...)` — `||`, not `??`, so an
-    // explicit `primaryKey: false` still falls back to the conventional name.
     const pk = primaryKey || globalGetPrimaryKey(singularize(tableName));
 
     let pkOptions: ColumnOptions = { ...(options as Partial<ColumnOptions>) };
@@ -1143,8 +885,6 @@ export class TableDefinition {
     if (typeof id === "object" && id !== null) {
       const { type, ...rest } = id;
       pkOptions = { ...pkOptions, ...(rest as Partial<ColumnOptions>) };
-      // Rails' `id.fetch(:type, :primary_key)` is key-presence, not truthiness:
-      // an explicitly supplied falsy type is passed through, not defaulted.
       pkType = "type" in id ? (type as ColumnType) : "primary_key";
     }
 
@@ -1160,12 +900,6 @@ export class TableDefinition {
     return this._primaryKeys;
   }
 
-  /**
-   * Creates a new ColumnDefinition for a column with the given name, type, and options.
-   * Subclasses override to add adapter-specific type normalization.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#new_column_definition
-   */
   newColumnDefinition(
     name: string,
     type: ColumnType,
@@ -1175,11 +909,6 @@ export class TableDefinition {
       type = this.integerLikePrimaryKeyType(type, options);
     }
     type = this.aliasedTypes(type, type) as ColumnType;
-    // Mirrors Rails' TableDefinition#new_column_definition:
-    //   if @conn.supports_datetime_with_precision? && type == :datetime && !options.key?(:precision)
-    //     options[:precision] = 6
-    // All adapters we support report supports_datetime_with_precision? = true.
-    // precision: null means "no precision suffix"; absence means "use default (6)".
     if (type === "datetime" && !("precision" in options)) {
       options = { ...options, precision: 6 };
     }
@@ -1211,26 +940,11 @@ export class TableDefinition {
     return this;
   }
 
-  /**
-   * Returns the ColumnDefinition for the column named +name+.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#[]
-   */
   get(name: string): ColumnDefinition | undefined {
     return this.columns.find((c) => c.name === String(name));
   }
 
-  /**
-   * Remove the column +name+ from the table.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#remove_column
-   * (Rails deletes from `@columns_hash`; this port keeps an array.)
-   *
-   * @missingRailsCall delete — PERMANENT: Newly comparable (RFC 0072 arity sweep): Rails
-   *   deletes from the `@columns_hash` Hash; TableDefinition here stores
-   *   `columns` as an ordered array, so the same removal is a findIndex/splice.
-   *   Equivalent — no Hash to delete from.
-   */
+  /** @missingRailsCall delete — PERMANENT */
   removeColumn(name: string): void {
     const index = this.columns.findIndex((c) => c.name === String(name));
     if (index !== -1) this.columns.splice(index, 1);
@@ -1295,10 +1009,6 @@ export class TableDefinition {
     return this;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#new_foreign_key_definition
-   * (schema_definitions.rb:575-581).
-   */
   newForeignKeyDefinition(
     toTable: string,
     options: Partial<AddForeignKeyOptions> = {},
@@ -1317,9 +1027,6 @@ export class TableDefinition {
       opts.onUpdate as ReferentialAction | undefined,
       opts.deferrable as "immediate" | "deferred" | false | undefined,
       opts.validate as boolean | undefined,
-      // Mirror Rails' foreign_key_options stored-key set so a key we defaulted
-      // (e.g. primaryKey "id") is sliced out by isDefinedFor rather than
-      // mismatching.
       foreignKeyOptionsStoredKeys(options),
     );
   }
@@ -1337,10 +1044,6 @@ export class TableDefinition {
 
   /** @internal */
   static defineColumnMethods(...columnTypes: string[]): void {
-    // In Rails, this dynamically defines type-specific column methods.
-    // In TypeScript, these are defined statically on the class.
-    // This method exists for API parity — the column methods (string, text,
-    // integer, etc.) are already declared as instance methods above.
     for (const type of columnTypes) {
       if (!(type in TableDefinition.prototype)) {
         (TableDefinition.prototype as any)[type] = function (
@@ -1401,9 +1104,6 @@ export class TableDefinition {
   decimal(...names: string[]): this;
   decimal(...args: [...names: string[], options: ColumnOptions]): this;
   decimal(...args: unknown[]): this {
-    // Rails' TableDefinition#decimal performs no validation; a scale without a
-    // precision is rejected later in type_to_sql (schema_statements.rb:1400),
-    // so the same ArgumentError covers every column-creation path.
     return this.definedColumn("decimal", args);
   }
 
@@ -1443,9 +1143,6 @@ export class TableDefinition {
     return this.definedColumn("binary", args);
   }
 
-  // Mirrors Rails' `alias :blob :binary` / `alias :numeric :decimal` in
-  // abstract/schema_definitions.rb — `t.blob`/`t.numeric` create binary/decimal
-  // columns that introspect (and dump) back as `t.binary`/`t.decimal`.
   blob(...names: string[]): this;
   blob(...args: [...names: string[], options: ColumnOptions]): this;
   blob(...args: unknown[]): this {
@@ -1498,7 +1195,6 @@ export class TableDefinition {
     return this;
   }
 
-  /** Alias of references (Rails: `alias :belongs_to :references`). */
   belongsTo(
     name: string,
     options: Omit<ColumnOptions, "index"> & {
@@ -1517,11 +1213,6 @@ export class TableDefinition {
   }
 }
 
-/**
- * Table — proxy for modifying an existing table inside a changeTable block.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Table
- */
 export class Table {
   constructor(
     private _tableName: string,
@@ -1653,16 +1344,12 @@ export class Table {
       await this._schema.addIndex(this.name, columns, options);
     }
   }
-  // Rails: `Table#remove_index(column_name = nil, **options)` forwards to
-  // `@base.remove_index(table_name, column_name, **options)`.
   async removeIndex(
     columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
     const isColumn = typeof columnOrOptions === "string" || Array.isArray(columnOrOptions);
     const columnName = isColumn ? columnOrOptions : undefined;
-    // Ruby's `**options` collects the hash from either position, so an explicit
-    // nil column with the options behind it keeps them.
     options = isColumn ? options : { ...columnOrOptions, ...options };
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     if (Object.keys(options).length === 0) {
@@ -1851,8 +1538,6 @@ export class Table {
       }
       return this._schema.removeCheckConstraint(this.name, expressionOrOptions, options);
     }
-    // Ruby's `**options` collects the hash from either position, so an absent
-    // expression with the options behind it keeps them.
     const opts = { ...expressionOrOptions, ...options };
     if (Object.keys(opts).length === 0) {
       return this._schema.removeCheckConstraint(this.name);
@@ -1898,10 +1583,6 @@ export class Table {
   }
 }
 
-/**
- * Interface for the subset of SchemaStatements that Table needs.
- * Avoids circular dependency between schema-definitions and schema-statements.
- */
 export interface SchemaStatementsLike {
   addColumn(
     tableName: string,

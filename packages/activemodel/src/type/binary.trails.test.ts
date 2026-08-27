@@ -1,16 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Types, BinaryData } from "../index.js";
 
-/**
- * Trails-only extras for ActiveModel::Type::Binary. Rails'
- * `test_serialize_binary_strings` (activemodel/test/cases/type/binary_test.rb:21)
- * has exactly two assertions and does not cover these; they live here rather
- * than widening a Rails-mapped test.
- */
 describe("BinaryTypeTrails", () => {
   it("serialize returns null for nil rather than wrapping it", () => {
-    // Rails: `return if value.nil?` guards before `Data.new(super)`
-    // (binary.rb:31) — nil must not become a Data wrapping "".
     const type = new Types.BinaryType();
     expect(type.serialize(null)).toBe(null);
     expect(type.serialize(undefined)).toBe(null);

@@ -10,17 +10,10 @@ type CollectorLike = {
   value?: unknown;
 };
 
-/**
- * Composite collector — forwards calls to multiple collectors at once.
- *
- * Mirrors: Arel::Collectors::Composite
- */
 export class Composite {
-  // `attr_accessor :preparable` (composite.rb:7) — no default; nil until written.
   preparable?: boolean;
   #retryable?: boolean;
 
-  // `attr_reader :retryable` (composite.rb:8), written only by `retryable=`.
   get retryable(): boolean | undefined {
     return this.#retryable;
   }

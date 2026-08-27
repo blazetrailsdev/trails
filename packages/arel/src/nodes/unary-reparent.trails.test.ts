@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
-// Pins Rails-faithful inheritance for nodes that previously extended
-// Node directly. Rails (unary.rb): `Not < Unary`. Rails (window.rb):
-// `Rows < Unary`, `Range < Unary`, `Preceding < Unary`, `Following < Unary`.
-// Inheritance from Unary → NodeExpression brings the Predications/Math
-// /AliasPredication mixins along — pinned indirectly via .as() / .eq().
 describe("Unary reparenting (Rails fidelity)", () => {
   describe("Not extends Unary", () => {
     it("instanceof Unary", () => {

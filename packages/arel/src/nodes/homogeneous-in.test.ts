@@ -3,15 +3,9 @@ import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 import { StringType } from "@blazetrails/activemodel";
 
-// Mirrors Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50): a map that
-// converts any attribute name to a caster. Rails always builds this table with
-// a caster because `Table#type_for_attribute` delegates bare (table.rb:106-108).
 const STRING_TYPE = new StringType();
 const fakePgCaster = { typeForAttribute: () => STRING_TYPE };
 
-// Mirrors Rails' `TypedNode` (homogeneous_in_test.rb:34-42): a named function
-// that also has a data type, so `HomogeneousIn#casted_values` reads `type_caster`
-// off a node that is not an Attribute.
 class TypedNode extends Nodes.NamedFunction {
   readonly typeCaster: unknown;
 

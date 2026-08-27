@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/delete_all_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -18,9 +13,6 @@ for (const klass of [Author, AuthorAddress, Comment, Post, Pet, Toy, CpkOrder, C
   registerModel(klass as any);
 }
 
-// ==========================================================================
-// DeleteAllTest — targets relation/delete_all_test.rb
-// ==========================================================================
 describe("DeleteAllTest", () => {
   const { authors, posts, cpkOrderAgreements } = fixtures([
     "authors",
@@ -158,10 +150,6 @@ describe("DeleteAllTest", () => {
 
   it("delete all composite model with join subquery", async () => {
     const agreement = cpkOrderAgreements("order_agreement_three");
-    // Rails uses `where(order_agreements: { ... })` — an association-name key it
-    // resolves to the join table. trails resolves the camelCase association name
-    // `orderAgreements` the same way; the snake-vs-camel association-name spelling
-    // is the only difference (trails' naming convention), not a divergence.
     const joinScope = CpkOrder.joins(":orderAgreements").where({
       orderAgreements: { signature: agreement.signature },
     });

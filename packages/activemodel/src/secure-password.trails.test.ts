@@ -25,8 +25,6 @@ describe("SecurePasswordTrailsTest", () => {
     }
     hasSecurePassword(User, "password", {});
 
-    // Rails writes the digest with `self.public_send("#{attribute}_digest=", ...)`
-    // (secure_password.rb:188,193), so a model that overrides the writer sees it.
     class OverridingUser extends User {}
     Object.defineProperty(OverridingUser.prototype, "password_digest", {
       get(this: Model) {
@@ -55,8 +53,6 @@ describe("SecurePasswordTrailsTest", () => {
     }
     hasSecurePassword(User, "password", {});
 
-    // secure_password.rb:197 is a plain `attr_accessor`, so the confirmation
-    // lives in an ivar and never reaches the attribute set.
     expect(User._defaultAttributes().isKey("passwordConfirmation")).toBe(false);
 
     const u = new User({ name: "test" });

@@ -35,9 +35,6 @@ describe("AttributeMethodsTest", () => {
         this.attribute("name", "string");
       }
     }
-    // Rails defines `foo` straight into the module and then generates the bare
-    // `foo` reader over it. trails skips the bare pattern (readers are real
-    // accessor properties), so a suffix pattern's method stands in for it.
     Person.attributeMethodSuffix("Short");
     ClassMethods.generatedAttributeMethods.call(Person).moduleEval((mod) => {
       Object.defineProperty(mod, "nameShort", {
@@ -283,11 +280,6 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("should use attribute_missing to dispatch a missing attribute", () => {
-    // Mirrors Rails attribute_methods_test.rb:330-342. `ModelWithAttributes2`
-    // never runs `define_attribute_methods`, so `foo_test` is undefined and
-    // Ruby routes it through `method_missing` → `attribute_missing`. trails
-    // generates the method eagerly (no `method_missing`), so the equivalent
-    // route is a pattern whose proxy target the class does not answer.
     class ModelWithAttributes2 extends Model {
       static {
         this.attributeMethodSuffix("Test");
@@ -406,11 +398,6 @@ describe("attributeMissing", () => {
   });
 
   it("can be overridden to provide custom behavior", () => {
-    // Rails attribute_missing intercepts the method_missing dispatch
-    // path for *generated* per-attribute methods (name_changed?,
-    // name_was, restore_name, …), every one of which has a proxy target the
-    // class answers, so it is sent directly. attribute_missing is the
-    // method_missing arm: it catches a pattern whose proxy target is absent.
     class User extends Model {
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
@@ -426,8 +413,6 @@ describe("attributeMissing", () => {
     expect((u as unknown as { nameContrived(): string }).nameContrived()).toBe(
       "intercepted:attributeContrived:name",
     );
-    // Plain attribute reads still work normally — readAttribute is not
-    // routed through attribute_missing in either Rails or trails.
     expect(u._readAttribute("name")).toBe("Alice");
   });
 });

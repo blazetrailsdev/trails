@@ -1,9 +1,3 @@
-/**
- * Pool config — configuration for a connection pool.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PoolConfig
- */
-
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { SchemaCache } from "./schema-cache.js";
@@ -22,12 +16,6 @@ const registry =
     : null;
 
 export class PoolConfig {
-  /**
-   * Mirrors: `include MonitorMixin` (`pool_config.rb:6`) — assigned as a
-   * `this`-typed function, the settled trails spelling for a Ruby `include`.
-   * Ruby's monitor is owned by a Thread and ours by an async chain; see
-   * `activesupport/src/concurrency/monitor.ts`.
-   */
   synchronize = synchronize;
 
   readonly role: string;
@@ -56,34 +44,12 @@ export class PoolConfig {
 
   get schemaReflection(): SchemaReflection {
     if (!this._schemaReflection) {
-      // Rails: `SchemaReflection.new(db_config.lazy_schema_cache_path)` —
-      // the reflection remembers where to load its cache from on first
-      // access. HashConfig exposes lazySchemaCachePath when
-      // schemaCachePath is set, or falls back to
-      // `<DatabaseTasks.dbDir>/schema_cache.json`. A NullConfig or
-      // missing config leaves the cache path null, which is what
-      // SchemaReflection treats as "no persistent cache on disk"
-      // (possibleCacheAvailable → false).
       const lazySchemaCachePath = this._lazySchemaCachePath();
       this._schemaReflection = new SchemaReflection(lazySchemaCachePath);
     }
     return this._schemaReflection;
   }
 
-  /**
-   * Resolve the on-disk cache path for this pool's SchemaReflection.
-   *
-   * Pulls `DatabaseTasks.dbDir` as the `db_dir` argument to
-   * `HashConfig.defaultSchemaCachePath` so callers that customize
-   * `DatabaseTasks.dbDir` get a reflection that reads from the same
-   * directory `DatabaseTasks.cacheDumpFilename` writes to. Without
-   * this alignment, `trails db schema:cache:dump` would write to
-   * `<dbDir>/schema_cache.json` while the reflection looked for
-   * `db/schema_cache.json` on boot.
-   *
-   * Normalizes blank/empty results to `null` so downstream fs.existsSync
-   * doesn't chase a pathological "".
-   */
   private _lazySchemaCachePath(): string | null {
     const cfg = this.dbConfig as unknown as {
       defaultSchemaCachePath?: (dbDir?: string) => string | null | undefined;
@@ -100,18 +66,6 @@ export class PoolConfig {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  /**
-   * Read DatabaseTasks.dbDir so HashConfig.defaultSchemaCachePath uses
-   * the same directory DatabaseTasks.cacheDumpFilename writes to.
-   * Without this, customizing DatabaseTasks.dbDir would make
-   * `trails db schema:cache:dump` write to one place while the
-   * SchemaReflection loaded from another.
-   *
-   * DatabaseTasks doesn't import from pool-config, so the static
-   * import here introduces no cycle. Wrapped in try/catch as a
-   * belt-and-suspenders fallback for hypothetical bundler ordering
-   * weirdness.
-   */
   private _resolveDbDir(): string {
     try {
       return DatabaseTasks.dbDir ?? "db";
@@ -124,63 +78,20 @@ export class PoolConfig {
     this._schemaReflection = value;
   }
 
-  /**
-   * Mirrors: ActiveRecord::ConnectionAdapters::PoolConfig#server_version
-   * (`pool_config.rb:39-41`) — `@server_version || synchronize { @server_version
-   * ||= connection.get_database_version }`. This is the single cache every
-   * adapter's `get_database_version` is fetched through; the adapters
-   * themselves stay pure.
-   *
-   * The ported `synchronize` is async, so the reader is too — every consumer
-   * already awaits `AbstractAdapter#databaseVersion`, which is where the
-   * version-gated adapter branches read it.
-   *
-   * The reentry Ruby's Monitor tolerates is load-bearing here: the fetch opens
-   * the connection, whose `configureConnection` (`abstract_adapter.rb:1212`)
-   * reads the version back through this method from inside the fetch. Our
-   * monitor is reentrant too, so that nested call runs straight through and
-   * recomputes against a still-null `_serverVersion` exactly as Ruby's does.
-   */
   async serverVersion(connection: DatabaseAdapter): Promise<unknown> {
     return (
       this._serverVersion ??
       (await this.synchronize(async () => {
-        // trails-only: `getDatabaseVersion` is a real await on every adapter
-        // whose version comes off the wire, where Rails' is sync.
         this._serverVersion ??= await connection.getDatabaseVersion?.();
         return this._serverVersion;
       }))
     );
   }
 
-  /**
-   * Mirrors: `attr_writer :server_version` (`pool_config.rb:9`). TS cannot
-   * carry a method and a setter under one name, so the writer takes the
-   * settled `setX()` spelling and the reader keeps Rails' method shape.
-   */
   setServerVersion(value: unknown): void {
     this._serverVersion = value;
   }
 
-  /**
-   * Mirrors: `PoolConfig#pool` (`pool_config.rb:70-72`) —
-   * `@pool || synchronize { @pool ||= ConnectionPool.new(self) }`.
-   *
-   * The `synchronize` is deliberately omitted, ratified by a parity owner on
-   * 2026-08-14 (story `converge-pool-config-pool-under-the-monitor`). Ruby's
-   * monitor is load-bearing because threads preempt: two of them can interleave
-   * between the `@pool` read and the `@pool =` write and build two pools. Here
-   * the critical section is a single constructor call, and a constructor can
-   * never be `async` — so the body has no suspension point as a matter of the
-   * language, not of its current shape, and the mutual exclusion the monitor
-   * buys is already guaranteed by run-to-completion. A regression test in
-   * `pool-config.test.ts` pins that guarantee against a later edit.
-   *
-   * The ratification is scoped to this method only. `#serverVersion` (:160) and
-   * `#disconnectBang` (:214) both `await` inside their critical sections
-   * (`getDatabaseVersion`, `ConnectionPool#disconnectBang`), so their monitors
-   * are real and stay.
-   */
   get pool(): ConnectionPool {
     if (!this._pool) {
       this._pool = new ConnectionPool(this);
@@ -192,17 +103,6 @@ export class PoolConfig {
     return this._pool !== null;
   }
 
-  /**
-   * Mirrors: `PoolConfig#disconnect!` (`pool_config.rb:61-68`) — outer `@pool`
-   * guard, `synchronize`, inner `@pool` re-check, then the
-   * `automatic_reconnect` write and `@pool.disconnect!`.
-   *
-   * The monitor is load-bearing here in a way it is not for the other bodies
-   * on this class: `disconnectBang()` is a real suspension point, so without
-   * the lock two concurrent callers with different `automaticReconnect`
-   * values interleave — A writes `true` and suspends, B overwrites it with
-   * `false`, and A's disconnect runs under B's flag.
-   */
   async disconnectBang({
     automaticReconnect = false,
   }: { automaticReconnect?: boolean } = {}): Promise<void> {
@@ -216,34 +116,12 @@ export class PoolConfig {
     });
   }
 
-  /**
-   * Disconnects the pool, awaiting each adapter's pending async `driver.close()`
-   * (async-only SQLite drivers) before resolving, so the underlying handle is
-   * fully closed before the caller re-opens the DB. No-ops to a resolved promise
-   * when the pool is uninitialized or all drivers close synchronously.
-   */
   async disconnect(): Promise<void> {
     if (this._pool) {
       await this._pool.disconnect();
     }
   }
 
-  /**
-   * Run Rails' synchronous `discard_pool!` critical section: `@pool.discard!;
-   * @pool = nil`. `discardBangDraining()` performs the synchronous discard
-   * (throwing synchronously on failure, before `_pool` is cleared) and returns
-   * the in-flight async-close drains; we null `_pool` only once it succeeds and
-   * hand the drains back so the caller can await them after every config in a
-   * sweep has been discarded (the drain is a trails-only step for async-only
-   * drivers, with no Rails equivalent). No-ops when the pool is uninitialized.
-   *
-   * Runs under the caller's monitor, never on its own: `#disconnect!` and
-   * `#discard_pool!` (`pool_config.rb:61-68, 74-82`) share one monitor, so on
-   * Rails a thread suspended inside `disconnect!`'s `@pool.disconnect!` still
-   * holds the lock and a concurrent `discard_pool!` blocks on `synchronize`
-   * rather than nulling `@pool` underneath it. Every caller here therefore
-   * takes `synchronize` first.
-   */
   private _discardPoolBangSync(): Array<Promise<void>> {
     const pool = this._pool;
     if (!pool) return [];
@@ -252,11 +130,6 @@ export class PoolConfig {
     return drains;
   }
 
-  /**
-   * Discards the pool: drains each adapter's pending async `driver.close()`
-   * before dropping the pool, so an async-only driver's handle is fully closed
-   * before the caller re-opens the DB. No-ops when the pool is uninitialized.
-   */
   async discardPoolBang(): Promise<void> {
     if (!this._pool) return;
 
@@ -268,19 +141,8 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
-  /**
-   * @missingRailsCall each_key — PERMANENT: Per-site verified (RFC 0106 wave
-   *   4b): pool_config.rb:20 is `INSTANCES.each_key(&:discard_pool!)` over the
-   *   `ObjectSpace::WeakMap` at pool_config.rb:15, used as a set of weakly-held
-   *   configs; trails' INSTANCES is a Set of WeakRefs walked with `for..of`
-   *   (pool-config.ts:287-305), which also has to skip collected refs.
-   *   `WeakMap#each_key` has no ported analogue.
-   */
+  /** @missingRailsCall each_key — PERMANENT */
   static async discardPoolsBang(): Promise<void> {
-    // Match Rails' `INSTANCES.each_key(&:discard_pool!)`: take each config's
-    // monitor and discard (and null) its pool, with no inter-pool waiting, so a
-    // slow trails-only drain on one pool can't delay discarding the rest. The
-    // async drains are awaited only after the whole sweep has run.
     const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {
       const config = ref.deref();
@@ -295,11 +157,7 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
-  /**
-   * @missingRailsCall each_key — PERMANENT: Per-site verified (RFC 0106 wave
-   *   4b): pool_config.rb:23-25 is the same `INSTANCES.each_key { ... }` idiom
-   *   over the WeakRef Set (pool-config.ts:306-320).
-   */
+  /** @missingRailsCall each_key — PERMANENT */
   static async disconnectAllBang(): Promise<void> {
     const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {
@@ -313,14 +171,6 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
-  /**
-   * The raw `SchemaCache` shared by every connection in this pool. Backed by
-   * the SchemaReflection's own cache slot so the pool's BoundSchemaReflection
-   * (what `AbstractAdapter#schemaCache` returns) and the adapter-side
-   * `internalSchemaCache` — which DDL invalidates through
-   * `clearDataSourceCacheBang` — are one object. Two slots would let a
-   * reflection read serve entries a migration already invalidated.
-   */
   get schemaCache(): SchemaCache | null {
     return this.schemaReflection.loadedCache;
   }
@@ -358,96 +208,39 @@ export class PoolConfig {
   }
 }
 
-/**
- * Adapter-level options that travel alongside driver connection
- * params in a single config hash (Rails' database.yml shape).
- *
- * Mirrors: the adapter-level keys read in
- * `ActiveRecord::ConnectionAdapters::AbstractAdapter#initialize`.
- */
 export interface TrailsAdapterOptions {
   statementLimit?: number;
   preparedStatements?: boolean;
-  // Mirrors: database.yml `insert_returning` — set false to disable RETURNING
   insertReturning?: boolean;
-  // Mirrors: database.yml `advisory_locks` — set false to disable advisory
-  // locking (read by `advisoryLocksEnabled?`). Defaults to true.
   advisoryLocks?: boolean | string;
-  // Mirrors: database.yml `foreign_keys` — set false to disable foreign-key DDL
-  // (read by `foreignKeysEnabled?` / `useForeignKeys`). Defaults to true.
   foreignKeys?: boolean;
 }
 
-/**
- * SQLite3-specific adapter options that extend the shared base.
- */
 export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   readonly?: boolean;
-  /**
-   * Binds the adapter to a specific SQLite client library. Pass a SqliteDriver
-   * instance directly. When omitted, the concrete adapter subclass (e.g.
-   * `BetterSQLite3Adapter`) supplies its bundled driver via
-   * `defaultSqliteDriver()`. Mirrors database.yml `driver:`.
-   */
   driver?: import("../sqlite-adapter.js").SqliteDriver;
-  // Mirrors: database.yml `pragmas:` — applied via PRAGMA on each connection.
-  // Keys must be simple SQLite pragma identifiers (word characters only, e.g. "cache_size").
-  // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary
-  // strings are warned and skipped. Numbers and booleans are always accepted (boolean → "1"/"0").
   pragmas?: Record<string, string | number | boolean>;
-  // Mirrors: database.yml `strict:` — disables double-quoted string literal fallback
-  // (DQS) at the connection level. Defaults to SQLite3Adapter.strictStringsByDefault.
   strict?: boolean;
-  // Mirrors: database.yml `timeout:` — the driver's busy timeout, in ms
-  // (`sqlite3_adapter.rb:821-826` sets `busy_handler_timeout`).
   timeout?: number | string | false;
   retries?: number | string | false;
   driverOptions?: Record<string, unknown>;
 }
 
-/**
- * Rails-shaped SQLite3 configuration hash: the database file (or `:memory:`)
- * under `database`, merged with the adapter-level options. Mirrors the single
- * config hash `SQLite3Adapter#initialize(config)` reads in Rails, where the
- * file is `config[:database]`.
- */
 export interface SQLite3Config extends SQLite3AdapterOptions {
   database?: string;
 }
 
-/**
- * MySQL2-specific adapter options that extend the shared base.
- * Kept separate so PG/SQLite3 destructuring of `TrailsAdapterOptions`
- * never receives — and leaks — these keys into their driver configs.
- */
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {
-  // Mirrors: database.yml `strict:` — controls sql_mode STRICT_ALL_TABLES wiring.
-  // true/undefined → add STRICT_ALL_TABLES; false → remove strict flags; "default" → leave global value.
   strict?: boolean | "default";
-  // Mirrors: database.yml `wait_timeout:` — SET SESSION wait_timeout = N on each connection.
   waitTimeout?: number | string;
-  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection.
   variables?: Record<string, string | number | boolean | null | ":default" | "default">;
-  /**
-   * Session init SQL run on each new connection, derived from the other
-   * options by `_buildInitSql`. Carried on the config (rather than a separate
-   * argument) so `newClient(config)` mirrors Rails' single-arg
-   * `new_client(config)` and the mysql2 gem's `config[:init_command]`.
-   * @internal
-   */
+  /** @internal */
   initSql?: string;
   /** @internal */
   _fakeConnection?: boolean;
 }
 
-/**
- * PostgreSQL-specific adapter options that extend the shared base.
- * Kept separate so MySQL2/SQLite3 destructuring of `TrailsAdapterOptions`
- * never receives — and leaks — these keys into their driver configs.
- */
 export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {
-  // Mirrors: database.yml `min_messages` — SET client_min_messages on connect (default: "warning")
   minMessages?: string;
-  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection
   variables?: Record<string, string | number | boolean | null | ":default">;
 }

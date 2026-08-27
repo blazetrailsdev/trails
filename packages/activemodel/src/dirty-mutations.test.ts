@@ -7,13 +7,6 @@ import { Dirty } from "./dirty.js";
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 
-/**
- * Covers the Rails-canonical names exposed by
- * activemodel/lib/active_model/dirty.rb +
- * attribute_mutation_tracker.rb: `mutations_from_database`,
- * `mutations_before_last_save`, `forget_attribute_assignments`,
- * `clear_attribute_change`.
- */
 describe("DirtyMutations", () => {
   class Person extends Model {
     static {
@@ -43,8 +36,6 @@ describe("DirtyMutations", () => {
   it("mutationsBeforeLastSave snapshots pending changes at save time", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
-    // MRI: the first `changes_applied` hands the construction-time change to
-    // `mutations_before_last_save` (dirty.rb:274).
     expect(p.mutationsBeforeLastSave.changes()).toEqual({ name: [null, "Alice"] });
     (p as any).name = "Bob";
     p.changesApplied();
@@ -62,8 +53,6 @@ describe("DirtyMutations", () => {
   });
 
   it("forgetAttributeAssignments drops pending tracking without reverting values", () => {
-    // Matches Rails transactional rollback: the in-memory value stays, but
-    // the record no longer reports it as changed.
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
@@ -75,9 +64,6 @@ describe("DirtyMutations", () => {
   });
 
   it("forgetAttributeAssignments resets the baseline so later writes diff from current", () => {
-    // Rails `@attributes.map(&:forgotten_change)` rebinds each Attribute's
-    // original value to its current cast value, so a later A->B->forget->C
-    // reports [B, C] — not [A, C].
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
@@ -107,8 +93,6 @@ describe("DirtyMutations", () => {
   });
 
   it("clearAttributeChange rebinds the baseline for the cleared attribute", () => {
-    // Rails `mutation_tracker.forget_change(name)` treats the current cast
-    // value as the new clean state, so a later write reports [current, next].
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";

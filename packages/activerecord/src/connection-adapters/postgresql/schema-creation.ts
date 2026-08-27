@@ -1,9 +1,3 @@
-/**
- * PostgreSQL schema creation — PostgreSQL-specific DDL generation.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation
- */
-
 import { wrap } from "@blazetrails/activesupport";
 import {
   SchemaCreation as AbstractSchemaCreation,
@@ -30,26 +24,12 @@ type PgTableDef = AbstractTableDefinition & {
   uniqueConstraints: UniqueConstraintDefinition[];
 };
 
-/**
- * Narrowed host interface for the PG-specific schema-creation overrides:
- * the adapter must expose `typeToSql` since the visitor delegates type
- * resolution back to it (Rails parity: `delegate :type_to_sql, to: :@conn`).
- * @internal
- */
+/** @internal */
 export interface PgSchemaCreationHost extends SchemaCreationConn {
   typeToSql(type: string, options?: Record<string, unknown>): string;
 }
 
-/**
- * Build the `GENERATED ALWAYS AS (...) STORED` suffix for a PostgreSQL
- * column. Returns `""` when no `as` expression is provided. Throws the
- * Rails VIRTUAL-unsupported error when `stored` is falsy.
- *
- * Mirrors the `as` / `stored` branch of `PostgreSQL::SchemaCreation#add_column_options!`.
- * Single source of truth shared by the visitor and `PostgreSQLAdapter#addColumn`.
- *
- * @internal
- */
+/** @internal */
 export function _pgGeneratedClause(
   columnName: string,
   as: string | undefined,
@@ -73,36 +53,20 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /**
-   * Rails' `SchemaCreation` delegates `type_to_sql` to `@conn` (the adapter,
-   * abstract/schema_creation.rb:14-20). Trails' abstract `SchemaCreation`
-   * carries its own simplified implementation, so PG must override to route
-   * back to the adapter's `typeToSql` — otherwise `pgDatetimeConfig.datetimeType`
-   * and `nativeDatabaseTypesOverrides` are bypassed.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby's SchemaCreation delegates type_to_sql to the adapter (abstract/schema_creation.rb:16-20); ours must override to route back.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override typeToSql(
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
-    // Delegate to the adapter's typeToSql when available (Rails parity:
-    // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
-    // implementation when no real adapter is present (e.g. unit-test context
-    // where only the minimal SchemaQuoter shim is wired).
     if (typeof this.conn.typeToSql === "function") {
       return this.conn.typeToSql(type as string, options as Record<string, unknown>);
     }
     return super.typeToSql(type, options);
   }
 
-  /**
-   * Mirrors `PostgreSQLAdapter#native_database_types` (postgresql_adapter.rb:404):
-   * the constant's raw `datetime: {}` placeholder is replaced by the entry named
-   * by `datetime_type` before `type_to_sql` reads it. Without this override the
-   * host-less path (no adapter threaded) would resolve `datetime` against the
-   * unresolved placeholder and emit a literal `datetime`.
-   * @internal
-   */
+  /** @internal */
   protected override nativeDatabaseTypes(): NativeDatabaseTypes {
     return postgresqlNativeDatabaseTypes(
       pgDatetimeConfig.datetimeType,
@@ -172,9 +136,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.usingIndex) {
       p.push(`USING INDEX ${this.conn.quoteColumnName(o.usingIndex)}`);
     } else {
-      // Rails wraps with `Array(o.column)`, so a nil column renders `UNIQUE ()`
-      // and PostgreSQL owns the rejection — `[null]` would throw in the quoter
-      // first (add_unique_constraint has no pre-raise for the empty case).
       const cols = wrap(o.column)
         .map((column) => this.conn.quoteColumnName(column))
         .join(", ");
@@ -195,13 +156,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /**
-   * Route ChangeColumn{,Default}Definition to their visitors. Rails dispatches
-   * dynamically via `visit_#{o.class}`; our abstract `accept` is a manual chain
-   * that doesn't know these PG-only node types, so override it here (mirrors
-   * the MySQL SchemaCreation). Without this, bulk `changeColumnForAlter` throws
-   * "Unknown definition type: ChangeColumnDefinition".
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby dispatches visit_#{o.class} dynamically (abstract/schema_creation.rb:11); our manual chain must be extended per adapter.
+   * @noRailsEquivalent CONVERGEABLE
    */
   override accept(
     o:
@@ -244,9 +200,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
       if (options["default"] == null) {
         sql += `, ALTER COLUMN ${quotedName} DROP DEFAULT`;
       } else {
-        // Mirrors Rails postgresql/schema_creation.rb:99 — pass column to
-        // quote_default_expression so array/typeMap-aware serialization
-        // is preserved on ALTER COLUMN SET DEFAULT.
         sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${await this.conn.quoteDefaultExpression(options["default"], column)}`;
       }
     }
@@ -263,8 +216,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
     const col = this.conn.quoteColumnName(o.column.name);
-    // Mirrors Rails postgresql/schema_creation.rb:110 — column is passed
-    // to quote_default_expression so PG's typeMap/array branch fires.
     const action =
       o.default == null
         ? "DROP DEFAULT"
@@ -313,14 +264,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return result;
   }
 
-  /**
-   * Rails delegates `quoted_include_columns_for_index` to `@conn`
-   * (postgresql/schema_creation.rb:8). When the real adapter is threaded as the
-   * host it exposes that method, so route through it; fall back to inline
-   * identifier quoting on the host-less unit-test path (only the SchemaQuoter
-   * shim is wired).
-   * @internal
-   */
+  /** @internal */
   protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
     const host = this.conn as PgSchemaCreationHost & {
       quotedIncludeColumnsForIndex?(columns: string | string[]): Promise<string>;
@@ -332,12 +276,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return o.map((c) => this.conn.quoteColumnName(c)).join(", ");
   }
 
-  /**
-   * Rails' private `quoted_include_columns` returns a raw string verbatim and
-   * otherwise delegates to `quoted_include_columns_for_index`
-   * (postgresql/schema_creation.rb:143-144).
-   * @internal
-   */
+  /** @internal */
   protected override async quotedIncludeColumns(o: string | string[]): Promise<string> {
     return typeof o === "string" ? o : this.quotedIncludeColumnsForIndex(o);
   }

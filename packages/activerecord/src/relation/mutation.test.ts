@@ -1,31 +1,14 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/mutation_test.rb
- *
- * Rails' RelationMutationTest asserts that each bang method mutates the relation
- * in place, returns `self` (`assert relation.foo!(...).equal?(relation)`), and
- * writes the value into the matching internal accessor (`foo_values` /
- * `foo_value`). The trails port asserts the same contract against trails'
- * internal fields (`orderValues`, `selectValues`, `lockValue`, …), which
- * are the camelCase equivalents of Rails' `*_values` / `*_value`.
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 
 fixtures([]);
-/** Fresh relation per test — the trails analogue of Rails' `Relation.new(FakeKlass)`. */
 function relation(): any {
   return Post.all();
 }
 
 describe("RelationMutationTest", () => {
-  // Rails: `(MULTI_VALUE_METHODS - [...]).each { |m| test "##{m}!" { ... } }` —
-  // every multi-value bang returns self and appends its argument to the matching
-  // `*_values` array. The metaprogrammed loop extracts to a single `#!` test
-  // name; we sweep the supported multi-value bang methods to honor it.
   it("#!", () => {
     const MULTI: ReadonlyArray<[string, string]> = [
       ["includesBang", "includesValues"],
@@ -58,11 +41,6 @@ describe("RelationMutationTest", () => {
   });
 
   it("#order! with symbol prepends the table name", () => {
-    // Rails passes a Symbol (`order!(:name)`), which build_order resolves to an
-    // Arel attribute qualified by the table — `node.expr.name == "name"`,
-    // `node.expr.relation.name == "posts"`. trails has no symbols; the faithful
-    // analogue is an Arel attribute off the model's table, which orderBang stores
-    // verbatim, so we assert the same qualified node.
     const rel = relation();
     const attr = Post.arelTable.get("title");
     expect(rel.orderBang(attr)).toBe(rel);
@@ -72,9 +50,6 @@ describe("RelationMutationTest", () => {
   });
 
   it("#order! on non-string does not attempt regexp match for references", () => {
-    // Rails passes a bare Object and asserts it lands in order_values untouched
-    // (no String#=~ reference scan). trails' analogue is any Arel node, which is
-    // pushed by identity without raw-SQL/reference inspection.
     const rel = relation();
     const node = Post.arelTable.get("title");
     expect(rel.orderBang(node)).toBeTruthy();
@@ -95,8 +70,6 @@ describe("RelationMutationTest", () => {
     };
     expect(rel.extendingBang(mod)).toBe(rel);
     expect(rel.extendingValues).toEqual([mod]);
-    // Rails asserts `relation.is_a?(mod)`; the trails analogue is that the
-    // module's methods are mixed onto the relation instance.
     expect(typeof rel.greeting).toBe("function");
     rel.extendingBang(mod2);
     expect(rel.extendingValues).toEqual([mod, mod2]);
@@ -138,9 +111,6 @@ describe("RelationMutationTest", () => {
 
   it("reverse_order!", () => {
     const rel: any = Post.order("title ASC", "comments_count DESC");
-    // String order args stay bare (matching Rails), so reversing them keeps them
-    // as SqlLiteral strings with the trailing direction flipped — never
-    // re-qualified against the table.
     const litValues = (): string[] => rel.orderValues.map((c: any) => String(c.value));
     rel.reverseOrderBang();
     expect(litValues()).toEqual(["title DESC", "comments_count ASC"]);
@@ -155,21 +125,12 @@ describe("RelationMutationTest", () => {
   });
 
   it("merge!", () => {
-    // Rails uses the hash form `merge!(select: :foo)`. trails' HashMerger doesn't
-    // dispatch per-key yet (KNOWN BUG — see story relation-merge-hash-and-proc-
-    // fidelity; it treats every hash key as a WHERE), so we merge an equivalent
-    // relation carrying the select. Same end state (select_values == [:foo]) and
-    // returns self. Restore to the hash form once that story lands.
     const rel = relation();
     expect(rel.mergeBang(Post.select("body"))).toBe(rel);
     expect(rel.selectValues).toEqual(["body"]);
   });
 
   it("merge with a proc", () => {
-    // Rails: `merge(-> { select(:foo) })` instance-execs the proc. trails' non-bang
-    // `merge(fn)` throws on a function arg (KNOWN BUG — see story relation-merge-
-    // hash-and-proc-fidelity); `mergeBang` does support it via `fn.call(this)`, so
-    // we use that. Restore to `merge(fn)` once that story lands.
     const rel = relation();
     rel.mergeBang(function (this: any) {
       this._selectBang("body");
@@ -202,9 +163,6 @@ describe("RelationMutationTest", () => {
     expect(rel.groupValues).toEqual(["bar"]);
   });
 
-  // Rails generates two separate loops that both produce "##{method}!" test names:
-  // one for MULTI_VALUE_METHODS (above) and one for SINGLE_VALUE_METHODS (here).
-  // The duplicate name is intentional — parity:test matches by description count.
   it("#!", () => {
     const SINGLE: ReadonlyArray<[string, unknown, string, unknown]> = [
       ["limitBang", 5, "limitValue", 5],

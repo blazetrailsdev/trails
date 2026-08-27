@@ -7,8 +7,6 @@ describe("TestDot", () => {
   const dot = new Visitors.Dot();
 
   it("named function", () => {
-    // Rails' `test_named_function` ends in `pass` — building the node and
-    // accepting it without raising IS the test (dot_test.rb:33-37).
     const func = new Nodes.NamedFunction("omg", "omg" as never);
     dot.compile(func);
   });
@@ -70,8 +68,6 @@ describe("TestDot", () => {
     expect(out).toMatch('[label="<f0>Regexp"]');
     expect(out).toMatch(/->.*label="left"/);
     expect(out).toMatch(/->.*label="right"/);
-    // Rails' edge label is the reader name, `case_sensitive`; the ported
-    // reader is `caseSensitive`, so the emitted label follows the TS spelling.
     expect(out).toMatch(/->.*label="caseSensitive"/);
   });
 

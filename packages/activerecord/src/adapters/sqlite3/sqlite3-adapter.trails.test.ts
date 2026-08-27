@@ -38,10 +38,6 @@ describe("SqliteAdapter", () => {
     });
   });
 
-  /**
-   * The inherited `lookupCastType` signature is widened to `Promise`/`null`
-   * for PostgreSQL's async OID load; SQLite's map is always resolved.
-   */
   const castType = (sqlType: string) => adapter.lookupCastType(sqlType) as Type;
 
   describe("lookupCastType", () => {
@@ -187,11 +183,6 @@ describe("SQLite3 databaseExists", () => {
   });
 });
 
-// The write path binds every column value as a prepared-statement parameter,
-// and `toSqlAndBinds` now hands the adapter the `Attribute` objects Rails keeps
-// until `type_casted_binds` (abstract/quoting.rb:224). That is what lets
-// `_driverBind` see the cast `type` and bind a whole-valued float as
-// SQLITE_FLOAT, mirroring MRI's class-based INTEGER/FLOAT dispatch.
 describe("SQLite3 write-path float binds", () => {
   fixtures([]);
 

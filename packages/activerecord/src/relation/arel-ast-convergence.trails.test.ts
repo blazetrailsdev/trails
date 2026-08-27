@@ -1,30 +1,3 @@
-/**
- * Verification for RFC 0022 (relation-arel-ast-convergence).
- *
- * After the clusters landed — CTE/UnionAll body as an arel AST
- * (`build_with_expression_from_value`) and from()/pluck threaded through the
- * SelectManager (`build_from`) — the read path emits SQL by compiling one arel
- * node through the dialect visitor instead of assembling strings.
- *
- * These spot-checks drive the *relation* API (`Relation#with` / `#from`) and
- * inspect the compiled SQL +
- * threaded binds, so a regression back to string assembly in the relation
- * layer fails here. The connection's own `to_sql_and_binds` is the
- * pre-substitution compile (public `toSql()` inlines bind values for
- * human-readable output, mirroring Rails `to_sql`), so it exposes the raw
- * `?` / `$N` placeholders and the single ordered bind array the collector
- * produced.
- *
- * The dialect-specific assertions key off `adapterType` so each CI lane
- * (sqlite / postgres / mysql) verifies its own quoting + placeholder style:
- *   - SQLite / PostgreSQL quote identifiers with `"…"`; MySQL with backticks.
- *   - PostgreSQL numbers binds `$N` globally across both set-op operands (one
- *     collector — no per-side `rightSql.replace(/\$(\d+)/)` renumber); SQLite /
- *     MySQL use positional `?`.
- *
- * Not Rails-mirrored test names — RFC 0022 is a TS-internal refactor with no
- * new Ruby counterpart, so the names describe the invariant.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { adapterType } from "../test-adapter.js";
@@ -39,8 +12,6 @@ class Post extends Base {
 Post.attribute("id", "integer");
 Post.attribute("author", "string");
 
-// Compile the relation's arel the way `select_all` does — through the
-// connection's `to_sql_and_binds` (database_statements.rb:69-71).
 function compile(rel: unknown): [string, unknown[]] {
   const conn = Base.connection as unknown as {
     toSqlAndBinds(arel: unknown): [string, unknown[], boolean | null, boolean];
@@ -62,8 +33,6 @@ const placeholder1 = adapterType === "postgres" ? "$1" : "?";
 const placeholder2 = adapterType === "postgres" ? "$2" : "?";
 
 describe("RFC 0022 arel-AST convergence (relation layer)", () => {
-  // Cluster 1: CTE array body → Arel::Nodes::UnionAll
-  // (build_with_expression_from_value), not `.join(" UNION ALL ")`.
   describe("Relation#with with an array (UNION ALL) body", () => {
     function cteRelation() {
       return Post.with({
@@ -78,11 +47,6 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
     });
 
     it("threads both operand binds through one collector in order", async (ctx) => {
-      // Placeholders and a bind array only exist when prepared statements are
-      // on: Rails' non-prepared `to_sql_and_binds` compiles through
-      // `SubstituteBinds` and returns `binds == []`
-      // (database_statements.rb:31-45), which is MySQL/MariaDB's default. Rails
-      // gates its own bind assertions the same way (bind_parameter_test.rb:9).
       ctx.skip(!(await Base.connection).preparedStatements);
       const rel = cteRelation();
       const sql = rawSql(rel);
@@ -101,11 +65,6 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
       expect(sql).toContain(`SELECT ${q}posts${q}.*`);
     });
 
-    // pluck spawns its own relation and executes `relation.arel` via
-    // select_all (calculations.rb), a path distinct from the toSql() read
-    // path above. build_arel must apply `arel.from(build_from)` there too, so
-    // the derived-table subquery actually scopes the rows. Executes against
-    // the active adapter (each CI lane runs its own backend).
     describe("executing through Relation#pluck", () => {
       fixtures(["posts"]);
 

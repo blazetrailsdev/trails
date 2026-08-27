@@ -1,13 +1,3 @@
-/**
- * SQLite3 schema statements — SQLite-specific DDL operations.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements
- *
- * addForeignKey, removeForeignKey, checkConstraints, addCheckConstraint,
- * and removeCheckConstraint are implemented on SQLite3Adapter directly
- * (via alterTable rebuild). The functions below delegate to the adapter.
- */
-
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
@@ -87,20 +77,9 @@ export async function removeCheckConstraint(
   return adapter.removeCheckConstraint(tableName, expressionOrOptions, options);
 }
 
-// Matches the ON clause of a CREATE INDEX statement, capturing the
-// parenthesized column/expression list and an optional WHERE predicate.
-// Faithful translation of Rails' regex (schema_statements.rb#indexes); no
-// `s`/`m` flags so `.` and the `$` anchor behave like Ruby's default `.`
-// and `\z`.
 const INDEX_ON_REGEX =
   /\bON\b\s*"?(\w+?)"?\s*\((?<expressions>.+?)\)(?:\s*WHERE\b\s*(?<where>.+))?(?:\s*\/\*.*\*\/)?$/i;
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#indexes
- *
- * Houses the SQLite index introspection in the file Rails keeps it in; the
- * adapter delegates here.
- */
 export async function indexes(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -110,8 +89,6 @@ export async function indexes(
   ).toArray() as Array<{ name: string; unique: number; origin: string }>;
   const result: IndexDefinition[] = [];
   for (const idx of rows) {
-    // Skip SQLite's internal auto-indexes (named `sqlite_*`); user-visible
-    // PK/UNIQUE-backed indexes (origin "pk"/"u") are kept, matching Rails.
     if (idx.name.startsWith("sqlite_")) continue;
 
     const indexSql = (await adapter.queryValue(
@@ -150,15 +127,7 @@ export async function indexes(
   return result;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
- *
- * @missingRailsCall any? — PERMANENT: Per-entry verified (RFC 0072 sqlite3
- *   introspection cluster): Rails schema_statements.rb:88 ends the query_values
- *   probe with a block-less `.any?`; the port spells that emptiness test as
- *   `.length > 0` (JS arrays have no `any?`), same as the other `#any?` ->
- *   `.length > 0` entries in this baseline.
- */
+/** @missingRailsCall any? — PERMANENT */
 export async function virtualTableExists(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -199,13 +168,8 @@ export function validateIndexLengthBang(
 
 /**
  * @internal
- *
- * @missingRailsArgs extract_value_from_default — PERMANENT: Rails passes the
- *   local `default` (sqlite3/schema_statements.rb:144-147); `default` is a
- *   reserved word in JavaScript and cannot be a binding identifier, so the local
- *   keeps the PRAGMA column's own spelling, `dfltValue`.
- * @missingRailsArgs extract_default_function — PERMANENT: same `default`
- *   reserved-word substitution (sqlite3/schema_statements.rb:153).
+ * @missingRailsArgs extract_value_from_default — PERMANENT
+ * @missingRailsArgs extract_default_function — PERMANENT
  */
 export function newColumnFromField(
   adapter: SQLite3SchemaAdapter,
@@ -228,14 +192,6 @@ export function newColumnFromField(
 
   const rowid = isColumnTheRowid(field, definitions);
 
-  // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) wraps
-  // `Column.new` itself, so every constructed column goes through the registry
-  // (`deduplicable.rb:18`). TS cannot mirror that on the class: a base
-  // constructor returning the deduplicated instance freezes it before the
-  // subclass assigns its own fields, so `new SQLite3::Column(...)` would throw
-  // `Cannot add property _generatedType, object is not extensible`. Ruby has no
-  // such split — `new` wraps allocate+initialize for the most-derived class —
-  // so the hook fires here instead, on the fully-built object.
   return new Column(
     String(field["name"]),
     defaultValue,
@@ -244,9 +200,6 @@ export function newColumnFromField(
     {
       defaultFunction: defaultFunction ?? undefined,
       collation: field["collation"] as string | undefined,
-      // trails-only: Rails' new_column_from_field passes no primary_key (PKs are
-      // derived separately via primary_keys). trails' Column carries the flag and
-      // `columns()` reflection consumers expect it set, so seed it from PRAGMA pk.
       autoIncrement: Boolean(field["auto_increment"]),
       rowid,
       generatedType,
@@ -278,12 +231,7 @@ export function dataSourceSql(name?: string, { type }: { type?: string } = {}): 
 
 /**
  * @internal
- *
- * @missingRailsCall quote — PERMANENT: Per-site verified (RFC 0106 wave 4b):
- *   sqlite3/schema_statements.rb:202 is `quote(name)`; trails' `quote` is a
- *   `this`-typed dispatch function needing the adapter as receiver, and
- *   `quotedScope` is a free function with no adapter in hand, so it applies the
- *   same `''`-doubling inline (sqlite3/schema-statements.ts:293).
+ * @missingRailsCall quote — PERMANENT
  */
 export function quotedScope(
   name?: string,
@@ -332,29 +280,17 @@ export function extractGeneratedType(
 }
 
 /**
- * Mirrors: SQLite3Adapter#extract_value_from_default
  * @internal
- * @noRailsEquivalent CONVERGEABLE SQLite3Adapter#extract_value_from_default (sqlite3_adapter.rb:522) as a free function rather than a private adapter method.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (dfltValue === null) return null;
   if (/^null$/i.test(dfltValue)) return null;
-  // Quoted types — `[^|]` and the `m` flag mirror Rails' `/^'([^|]*)'$/m`
-  // exactly (sqlite3_adapter.rb:527,530). Ruby's `^`/`$` are always line
-  // anchors, so the faithful JS translation needs the `m` flag.
   const single = /^'([^|]*)'$/m.exec(dfltValue);
   if (single) return single[1].replace(/''/g, "'");
   const double = /^"([^|]*)"$/m.exec(dfltValue);
   if (double) return double[1].replace(/""/g, '"');
   if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
-  // Binary columns — unanchored `x'(.*)'` mirrors Rails (sqlite3_adapter.rb:535).
-  // Rails unpacks via `[ $1 ].pack("H*")`. SQLite's `PRAGMA table_info`
-  // serializes a blob default as `x'<HEX>'` where HEX is always an even-length
-  // run of valid hex digits and never contains an embedded quote, so the greedy
-  // `.*` capture equals that hex run and `Buffer.from(hex)` is byte-identical to
-  // `pack("H*")` for every value SQLite can emit. The two only differ on
-  // malformed/non-hex captures, which SQLite never produces; replicating
-  // `pack`'s nibble-masking there would be emulating undefined-domain behavior.
   const hex = /x'(.*)'/.exec(dfltValue);
   if (hex) return Buffer.from(hex[1], "hex");
   return null;
@@ -363,8 +299,6 @@ export function extractValueFromDefault(dfltValue: string | null): unknown {
 export { extractValueFromDefault as _extractValueFromDefault };
 
 function extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
-  // Mirrors Rails' SQLite3Adapter#has_default_function? regex
-  // (sqlite3_adapter.rb): a call, CURRENT_* keyword, or `||` concat.
   if (
     defaultValue == null &&
     dflt != null &&

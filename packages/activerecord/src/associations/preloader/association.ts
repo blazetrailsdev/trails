@@ -9,13 +9,6 @@ type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
-/**
- * Handles preloading a single association for a group of records.
- * Queries the database, maps results to owners by key, and associates
- * the loaded records to each owner's association target.
- *
- * Mirrors: ActiveRecord::Associations::Preloader::Association
- */
 export class Association {
   readonly klass: typeof Base;
   /** @internal */
@@ -92,11 +85,6 @@ export class Association {
     return this._recordsByOwner!;
   }
 
-  /** Mirrors: Preloader::Association#preloaded_records
-   *  (`preloader/association.rb:153-157`) — the reader forces the preload
-   *  query on first access. Ruby's `defined?(@preloaded_records)` is an
-   *  assignment check, so the guard is on the backing field being unassigned:
-   *  a legitimately-empty preload must not re-run the query. */
   async preloadedRecords(): Promise<Base[]> {
     if (this._preloadedRecords === undefined) {
       await this.loadRecords();
@@ -105,9 +93,6 @@ export class Association {
   }
 
   get associationKeyName(): string | string[] {
-    // preloader/association.rb:162 `reflection.join_primary_key(klass)` — the
-    // klass matters: a polymorphic reflection resolves its primary key against
-    // the concrete class the preloader is loading (reflection.rb:944-946).
     return (this.reflection as any).joinPrimaryKey(this.klass);
   }
 
@@ -219,14 +204,10 @@ export class Association {
     }
   }
 
-  /** Mirrors: Preloader::Association#model — `attr_reader :model` over `@model`
-   *  (`preloader/association.rb:239`). */
   private get model(): typeof Base | null {
     return this._model;
   }
 
-  /** Mirrors: Preloader::Association#owner_key_name
-   *  (`preloader/association.rb:241-243`). */
   private get ownerKeyName(): string | string[] {
     return (this.reflection as any).joinForeignKey;
   }
@@ -247,11 +228,6 @@ export class Association {
       association._setTargetFromLoader(value);
     }
 
-    // Route through `reflection.inverseName()` so automatic inverse detection
-    // (via `automaticInverseOf()`, made functional by C1) fires for non-rich
-    // reflections too — not just when `inverseOf` is explicitly configured.
-    // Mirrors Rails' `Preloader::Association#associate_records_to_owner`, which
-    // consults `reflection.inverse_of` (→ `inverse_name`).
     let inverseName: string | undefined;
     try {
       inverseName =
@@ -260,12 +236,6 @@ export class Association {
       inverseName = (this.reflection as any).options?.inverseOf;
     }
     if (inverseName) {
-      // Route through the shared inverse-wiring helper rather than poking the
-      // association cache directly. For a belongs_to inverse it caches the
-      // owner scalar (unchanged); for a has_many inverse it populates the
-      // child's collection proxy target — the single write path for has_many
-      // targets. Mirrors Rails' `add_to_target` → `set_inverse_instance`, where
-      // preloaded and inverse-wired records both land in `@target`.
       for (const child of records) {
         _wireInverseAssociation(owner, child, inverseName);
       }
@@ -282,11 +252,6 @@ export class Association {
   private convertKey(key: unknown): unknown {
     if (key == null) return key;
     if (this.isKeyConversionRequired()) return String(key);
-    // node-postgres parses int8 (a bigserial PK) to BigInt and int4 (an
-    // integer/references FK) to number, so an owner PK `1n` and a child FK `1`
-    // are distinct JS Map keys even though Ruby compares them equal (Integer ==
-    // is width-agnostic). Normalize both sides to a number when the value fits,
-    // so the owner/child lookup keys collide as they do in Rails.
     if (typeof key === "bigint") {
       return key >= MIN_SAFE_BIGINT && key <= MAX_SAFE_BIGINT ? Number(key) : key.toString();
     }
@@ -301,45 +266,19 @@ export class Association {
     return this._keyConversionRequired;
   }
 
-  /**
-   * Mirrors: Preloader::Association#association_key_type
-   * (`preloader/association.rb:282-284`).
-   *
-   * A composite key arrives here as an array of names, and Rails answers nil
-   * for it rather than raising: `type_for_attribute` runs the name through
-   * `resolve_attribute_name` → `name.to_s`
-   * (`activemodel/attribute_registration.rb:44,101-103`), so the array
-   * stringifies to a key no attribute has; `attribute_types` carries
-   * `hash.default = Type.default_value` (`:37-41`), which is a bare
-   * `Type::Value` whose `#type` is an empty method returning nil
-   * (`activemodel/type/value.rb:34-35`). Both sides answer nil, compare equal,
-   * and `key_conversion_required?` is false — which is what the guard below
-   * reproduces. ActiveRecord does not override `type_for_attribute`.
-   */
   private associationKeyType(): string | undefined {
     const associationKeyName = this.associationKeyName;
     if (Array.isArray(associationKeyName)) return undefined;
     return this.klass.typeForAttribute(associationKeyName).type();
   }
 
-  /** Mirrors: Preloader::Association#owner_key_type
-   *  (`preloader/association.rb:286-288`). Same composite-key answer as
-   *  {@link Association.associationKeyType}; `model` is null for an ownerless
-   *  loader, where Rails' `@model` would be nil and `type_for_attribute`
-   *  unreachable. */
   private ownerKeyType(): string | undefined {
     const ownerKeyName = this.ownerKeyName;
     if (this.model == null || Array.isArray(ownerKeyName)) return undefined;
     return this.model.typeForAttribute(ownerKeyName).type();
   }
 
-  /**
-   * Mirrors: ActiveRecord::Associations::Preloader::Association#reflection_scope
-   * (`preloader/association.rb:290-292`). Branch only passes a scope down for an
-   * instance-dependent reflection scope; every other reflection recomputes it
-   * lazily here, off the record.
-   * @internal
-   */
+  /** @internal */
   protected get reflectionScope(): any {
     this._reflectionScope ??= (this.reflection as any)
       .joinScopes((this.klass as any).arelTable, (this.klass as any).predicateBuilder, this.klass)
@@ -348,10 +287,6 @@ export class Association {
   }
 
   private buildScope(): any {
-    // Mirror Rails' build_scope `scope = klass.scope_for_association`. It bases
-    // on the pristine relation (ignoring any enclosing current_scope) and
-    // applies the target model's default_scope unless current_scope is itself
-    // an empty scope.
     let scope = (this.klass as any).scopeForAssociation();
 
     const type = (this.reflection as any).type;
@@ -372,12 +307,7 @@ export class Association {
     return this.cascadeStrictLoading(scope);
   }
 
-  /**
-   * Propagate strict loading from the preload scope onto a derived scope.
-   *
-   * Mirrors: ActiveRecord::Associations::Preloader::Association#cascade_strict_loading
-   * @internal
-   */
+  /** @internal */
   protected cascadeStrictLoading(scope: any): any {
     return this.preloadScope?.strictLoadingValue ? (scope.strictLoading?.() ?? scope) : scope;
   }
@@ -392,12 +322,6 @@ export class Association {
   }
 }
 
-/**
- * Wraps a scope and association key name for batch loading.
- * Loaders with equivalent LoaderQuery can be batched together.
- *
- * Mirrors: ActiveRecord::Associations::Preloader::Association::LoaderQuery
- */
 export class LoaderQuery {
   readonly scope: any;
   readonly associationKeyName: string | string[];
@@ -433,10 +357,6 @@ export class LoaderQuery {
     return this.scope?._model?.tableName ?? this.scope?.tableName ?? "";
   }
 
-  // Mirrors Rails' `scope.model.connection_specification_name` in
-  // Preloader::Association::LoaderQuery#hash/#eql?. The adapter getter may
-  // check out a connection on first call, but in practice the preloader runs
-  // after records are loaded so the adapter is already cached on the class.
   private _scopeAdapterId(): string {
     const klass = this.scope?._model;
     if (klass == null) return "";
@@ -472,9 +392,6 @@ export class LoaderQuery {
     if (Array.isArray(this.associationKeyName)) {
       const conditions: Record<string, Set<unknown>> = {};
       for (const values of keys) {
-        // Composite keys arrive JSON-stringified because JS Map lacks the
-        // structural array equality Ruby Hash uses in Rails' equivalent
-        // (Preloader::Association#derive_key returns the raw array there).
         const valArr = (typeof values === "string" ? JSON.parse(values) : values) as unknown[];
         for (let i = 0; i < this.associationKeyName.length; i++) {
           const keyName = this.associationKeyName[i];
@@ -509,11 +426,6 @@ export class LoaderQuery {
   }
 }
 
-/**
- * Manages loading records while checking for already-loaded ones.
- *
- * Mirrors: ActiveRecord::Associations::Preloader::Association::LoaderRecords
- */
 export class LoaderRecords {
   /** @internal */
   readonly loaders: Association[];

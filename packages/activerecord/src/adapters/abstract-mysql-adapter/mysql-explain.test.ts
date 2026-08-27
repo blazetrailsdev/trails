@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_explain_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysqlAdapter, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
@@ -23,16 +20,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("MySQLExplainTest", () => {
-    // mirrors Rails: fixtures :authors, :author_addresses
     const { authors } = fixtures(["authors", "authorAddresses", "posts"]);
 
-    // Mirror Rails' explain_option / expected_analyze_clause split exactly:
-    //   supports_analyze?         = mariadb && version >= 10.1.0       → "ANALYZE"
-    //   supports_explain_analyze? = mariadb ? version <= 10.0          → "EXPLAIN ANALYZE"
-    //                                       : version >= 6.0
-    //   else                                                          → "EXPLAIN EXTENDED"
-    // explain_option picks :analyze when either holds, else :extended.
-    // MariaDB >= 10.1 prints a bare ANALYZE clause (no EXPLAIN prefix).
     let explainOpt: string;
     let expectedClause: string;
     beforeAll(async () => {
@@ -50,14 +39,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("explain with options as symbol", async () => {
-      // Rails: Author.where(id: 1).explain(explain_option)
       const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
       expect(result).toContain(expectedClause);
       expect(result).toContain("SELECT `authors`");
     });
 
     it("explain with options as strings", async () => {
-      // Rails: Author.where(id: 1).explain(explain_option.to_s.upcase) — uppercase string
       const result = await Author.where({ id: authors("david").id }).explain(
         explainOpt.toUpperCase(),
       );
@@ -66,7 +53,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("explain options with eager loading", async () => {
-      // Rails: Author.where(id: 1).includes(:posts).explain(explain_option)
       const result = await Author.where({ id: authors("david").id })
         .includes(":posts")
         .explain(explainOpt);
@@ -89,13 +75,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(plan).toMatch(/EXPLAIN SELECT/);
     });
 
-    // trails-only regression: an already-loaded relation must still re-execute
-    // through the always-executing exec_queries path (Rails
-    // `collecting_queries_for_explain { exec_queries }`), capturing the real
-    // backtick-quoted SQL via sql.active_record — NOT short-circuit on the load
-    // cache and fall back to `_toSql()`'s double-quoted identifiers (which MySQL
-    // reads as a string literal). Loading first, then asserting backticks (and
-    // the absence of double quotes), proves the capture path was used.
     it("Relation#explain on MySQL re-executes an already-loaded relation", async () => {
       const relation = Author.where({ id: authors("david").id });
       await relation;
@@ -117,10 +96,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
   });
 
-  // TS-only coverage of our buildExplainClause/Relation#explain plumbing. Not
-  // Rails tests — kept in a sibling block so parity:test doesn't read them as
-  // members of the MySQLExplainTest class. These exercise the adapter directly
-  // (no DB rows), so they need no fixtures.
   describe("explain helpers (trails-only)", () => {
     it("buildExplainClause renders a format flag without parens", async () => {
       const clause = await adapter.buildExplainClause(["format=json"]);

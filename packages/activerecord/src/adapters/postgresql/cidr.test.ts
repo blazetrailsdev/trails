@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/cidr_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNot } from "@blazetrails/activesupport";
 import { Cidr, IPAddr } from "../../connection-adapters/postgresql/oid/cidr.js";

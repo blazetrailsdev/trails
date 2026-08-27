@@ -1,13 +1,3 @@
-/**
- * BatchEnumerator — wraps in_batches to provide batch-level operations.
- *
- * Returned by Relation#inBatches(). Each yielded item is a scoped
- * Relation for that batch, enabling operations like deleteAll/updateAll
- * per batch without loading records.
- *
- * Mirrors: ActiveRecord::Batches::BatchEnumerator
- */
-
 import { applyThenable } from "../thenable.js";
 import type { TouchAllArgs } from "../../timestamp.js";
 
@@ -28,14 +18,7 @@ export class BatchEnumerator<T extends BatchRelation> {
   private _cursor: string[];
   private _order: "asc" | "desc" | ("asc" | "desc")[];
   private _useRanges: boolean | null;
-  /**
-   * @internal The async generator that drives this enumerator's batches.
-   * Ruby re-derives them with `@relation.to_enum(:in_batches, ...)`, which
-   * calls `in_batches` with a block; TS has no block-to-enumerator protocol,
-   * so `Relation#inBatches` builds the generator and stows it here. Every
-   * re-enumeration below goes through `relation.inBatches(...)` exactly as
-   * Rails does, and reads the fresh generator off the enumerator it returns.
-   */
+  /** @internal */
   _generator!: () => AsyncGenerator<T>;
 
   constructor({
@@ -68,12 +51,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     return this._of;
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/relation/batches/batch_enumerator.rb:6, :108` —
-   *   `include Enumerable` plus a synchronous `def each`).
-   * JS async-iteration protocol — Ruby's Enumerable#each is synchronous
-   */
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     yield* this.each();
   }
@@ -103,14 +81,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
-  /**
-   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum(&:delete_all)`
-   *   (batch_enumerator.rb:66) — Enumerable#sum over the enumerator `include
-   *   Enumerable` supplies. trails' batches are an async iterator with no
-   *   Enumerable mixin, so the identical accumulation is the `for await` running
-   *   total (batch-enumerator.ts:106-112); adding a `sum` helper would be
-   *   surface Rails gets from a core module.
-   */
+  /** @missingRailsCall sum — PERMANENT */
   async deleteAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -119,11 +90,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /**
-   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum { |relation|
-   *   relation.update_all(updates) }` (batch_enumerator.rb:74-76) — same
-   *   Enumerable#sum-over-an-async-iterator case as the `delete_all` row.
-   */
+  /** @missingRailsCall sum — PERMANENT */
   async updateAll(updates: Record<string, unknown>): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -132,11 +99,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /**
-   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum { |relation|
-   *   relation.touch_all(...) }` (batch_enumerator.rb:84-86) — same
-   *   Enumerable#sum-over-an-async-iterator case as the `delete_all` row.
-   */
+  /** @missingRailsCall sum — PERMANENT */
   async touchAll(...args: TouchAllArgs): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -148,14 +111,8 @@ export class BatchEnumerator<T extends BatchRelation> {
   }
 
   /**
-   * @missingRailsCall count — PERMANENT. Verified per-site (RFC 0106):
-   *   `relation.destroy_all.count(&:destroyed?)` (batch_enumerator.rb:97) —
-   *   Enumerable#count WITH A BLOCK over the destroyed records Array, spelled
-   *   `.filter(...).length` in TS (batch-enumerator.ts:135-136). The homonymous
-   *   `Relation#count` is a different method and is not what this line calls.
-   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum { |relation| ...
-   *   }` (batch_enumerator.rb:96-98) — same
-   *   Enumerable#sum-over-an-async-iterator case as the `delete_all` row.
+   * @missingRailsCall count — PERMANENT
+   * @missingRailsCall sum — PERMANENT
    */
   async destroyAll(): Promise<number> {
     let total = 0;
@@ -206,21 +163,11 @@ export interface BatchEnumerator<T extends BatchRelation> {
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/relation/batches/batch_enumerator.rb:108` —
-   *   `def each` is synchronous; Ruby has no thenable to mirror).
-   * JS Promise protocol — Ruby has no thenable
-   */
+  /** @noRailsEquivalent PERMANENT */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/relation/batches/batch_enumerator.rb:108` —
-   *   `def each` is synchronous; Ruby has no thenable to mirror).
-   * JS Promise protocol — Ruby has no thenable
-   */
+  /** @noRailsEquivalent PERMANENT */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 

@@ -1,12 +1,3 @@
-/**
- * Mirrors: activemodel/lib/active_model/locale/en.yml.
- *
- * Rails appends this file to `I18n.load_path` from the `on_load(:i18n)` hook at
- * the bottom of `activemodel/lib/active_model.rb`. The data lives here as a
- * module instead, which `i18n.ts` registers before appending its path to
- * `I18n.load_path`.
- */
-
 import type { TranslationData } from "@blazetrails/i18n";
 
 export const en: TranslationData = {

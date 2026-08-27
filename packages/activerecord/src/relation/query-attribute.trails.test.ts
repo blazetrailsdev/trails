@@ -25,8 +25,6 @@ const intType = new IntType();
 
 describe("QueryAttribute", () => {
   it("does not cast value via type", () => {
-    // query_attribute.rb:22-24 is `def type_cast(value) = value` — the type is
-    // applied by `value_for_database`, never on the way in.
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.value).toBe("25");
     expect(attr.typeCast("25")).toBe("25");
@@ -85,9 +83,6 @@ describe("QueryAttribute", () => {
   });
 
   it("isInfinite returns the sign for Infinity/-Infinity", () => {
-    // Mirrors query_attribute.rb:42-44, whose `infinity?` yields `Float#infinite?`
-    // — 1 / -1 / nil, not a boolean. Arel's between reads the sign to pick which
-    // side of the range collapses; a boolean would make -Infinity look positive.
     expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(1);
     expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(-1);
     expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(false);
@@ -103,10 +98,6 @@ describe("QueryAttribute", () => {
   });
 
   it("isInfinite handles Ruby-style duck-typed `infinite()` (nil for finite, 1/-1 for infinite)", () => {
-    // Rails has ONE `respond_to?(:infinite?)` protocol (query_attribute.rb:53-55),
-    // which ports to `isInfinite()` — the spelling Quoted / BindParam /
-    // arel's Predications.isInfinity all use. Reading a second name here
-    // forked the protocol.
     const finite = { isInfinite: () => false };
     const positiveInf = { isInfinite: () => 1 };
     const negativeInf = { isInfinite: () => -1 };
@@ -134,8 +125,6 @@ describe("QueryAttribute", () => {
   });
 
   it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {
-    // query_attribute.rb:45-51 — serializable? yields the cast value when it is
-    // out of range for the column type; the sign tells Arel which side collapses.
     const int4 = new IntegerType({ limit: 4 });
     expect(new QueryAttribute("id", 2 ** 40, int4).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", -(2 ** 40), int4).isUnboundable()).toBe(-1);
@@ -148,9 +137,6 @@ describe("QueryAttribute", () => {
   });
 
   it("isUnboundable signs a STRING bound by its cast value", () => {
-    // `serializable?` yields `cast_value` (integer.rb:75-79), not the raw value,
-    // and a QueryAttribute's value IS raw (query_attribute.rb:22-24). Reading the
-    // raw string here would make `value <=> 0` answer 1 for both signs.
     const int4 = new IntegerType({ limit: 4 });
     expect(new QueryAttribute("id", "1099511627776", int4).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
@@ -158,21 +144,14 @@ describe("QueryAttribute", () => {
   });
 
   it("isUnboundable is never true for :big_integer, whose max_value is INFINITY", () => {
-    // big_integer.rb:33 — in_range? is always true, so serializable? never
-    // yields and unboundable? stays nil however large the value.
     const big = new BigIntegerType();
     expect(new QueryAttribute("id", 2n ** 63n, big).isUnboundable()).toBe(false);
     expect(new QueryAttribute("id", -(2n ** 100n), big).isUnboundable()).toBe(false);
-    // ±Infinity too: cast_value is `to_i rescue nil` => nil, and in_range?(nil)
-    // is `!value` => true (integer.rb:86,90).
     expect(new QueryAttribute("id", Infinity, big).isUnboundable()).toBe(false);
     expect(new QueryAttribute("id", -Infinity, big).isUnboundable()).toBe(false);
   });
 
   it("isUnboundable is false for ±Infinity — Rails casts it to nil, which is in range", () => {
-    // integer.rb:90 `value.to_i rescue nil` => nil for ±Infinity, so
-    // in_range?(nil) is true and unboundable? stays nil. The bound is still
-    // open-ended, but via infinity? (predications.rb:248) — not this predicate.
     const int4 = new IntegerType({ limit: 4 });
     expect(new QueryAttribute("id", Infinity, int4).isUnboundable()).toBe(false);
     expect(new QueryAttribute("id", -Infinity, int4).isUnboundable()).toBe(false);
@@ -181,8 +160,6 @@ describe("QueryAttribute", () => {
   });
 
   it("isUnboundable casts the value exactly once", () => {
-    // `serializable?` computes `cast_value` once and yields it (integer.rb:75-79);
-    // Ruby's single local is one cast, so reading the sign must not cast again.
     const int4 = new IntegerType({ limit: 4 });
     const spy = vi.spyOn(int4, "cast");
     expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
@@ -191,14 +168,9 @@ describe("QueryAttribute", () => {
   });
 
   it("isUnboundable memoizes so the value is inspected exactly once", () => {
-    // query_attribute.rb:45-51 guards with `unless defined?(@_unboundable)`, so
-    // the check happens once however often the predicate is read — and both
-    // `between` and the visitor read it.
     const int4 = new IntegerType({ limit: 4 });
     const spy = vi.spyOn(int4, "isSerializable");
 
-    // The `false` result caches too — Rails assigns on both paths, so `defined?`
-    // is true either way.
     const inRange = new QueryAttribute("id", 5, int4);
     expect(inRange.isUnboundable()).toBe(false);
     expect(inRange.isUnboundable()).toBe(false);

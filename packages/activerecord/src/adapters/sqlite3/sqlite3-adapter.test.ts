@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_test.rb
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { itIfSupports } from "../../support/supports.js";
@@ -109,9 +106,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(types).toContain("BLOB");
   });
 
-  // Structured (`default: {}`) json defaults must serialize to the JSON text
-  // `{}` on every DEFAULT-emitting path, not just addColumn. Mirrors Rails'
-  // quote_default_expression serializing through the column's cast type.
   it("change column default serializes a structured json default", async () => {
     await adapter.exec(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
     await adapter.changeColumnDefault("json_defs", "options", {});
@@ -120,9 +114,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("change column default treats a bare to object as a literal default", async () => {
-    // Rails' extract_new_default_value only unwraps a Hash carrying BOTH :from
-    // and :to; `{ to: 1 }` without :from is the literal default, not a changes
-    // hash (schema_statements.rb:1820).
     await adapter.exec(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
     await adapter.changeColumnDefault("json_defs", "options", { to: 1 });
     const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
@@ -136,9 +127,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(col?.default).toEqual("{}");
   });
 
-  // quote_default_expression serializes through the column's cast type exactly
-  // once (abstract/quoting.rb:161); a structured json default must not be
-  // double-encoded to `'"{}"'` by both a pre-serialize and `super`'s serialize.
   it("quote default expression serializes a structured json default once", async () => {
     expect(await adapter.quoteDefaultExpression({}, { sqlType: "json" })).toEqual("'{}'");
   });
@@ -657,11 +645,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
     const conn = new BetterSQLite3Adapter(":memory:");
     expect(conn._strictStrings).toBe(false);
-    // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
-    // — non-strict connections allow DQS fallback so unknown double-quoted
-    //   identifiers are treated as string literals and the index is created
-    //   silently. better-sqlite3 compiles SQLite with SQLITE_DQS=0 (always off),
-    //   so this assertion is omitted — DQS cannot be re-enabled via PRAGMA here.
     await conn.close();
 
     SQLite3Adapter.strictStringsByDefault = true;
@@ -711,9 +694,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter(":memory:", { strict: false });
     try {
       expect(conn._strictStrings).toBe(false);
-      // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
-      // — strict: false keeps DQS enabled so the index creation succeeds silently.
-      // Omitted here for the same reason as test 1 (better-sqlite3 SQLITE_DQS=0).
     } finally {
       await conn.close();
     }
@@ -732,9 +712,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("forwards strictStringsByDefault to the driver via openSync(config)", async () => {
-    // Mirrors Rails: strict_strings_by_default = true reaches the adapter
-    // through `strict: true` on the per-connection config, not via a runtime
-    // override after open. The driver hook receives that resolved value.
     const capture: { config: SqliteOpenConfig | null } = { config: null };
     const fakeStmt: SyncSqliteStatement = {
       run: () => ({ changes: 0, lastInsertRowid: 0 }),

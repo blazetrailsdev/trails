@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, InsertManager, Nodes } from "./index.js";
 
-// TS-only coverage for `InsertManager#insert`'s and `#select`'s AST bookkeeping.
-// Rails asserts these arms only indirectly, through the SQL the manager renders.
 describe("InsertManagerTest (trails)", () => {
   const users = new Table("users");
   const posts = new Table("posts");
@@ -12,7 +10,6 @@ describe("InsertManagerTest (trails)", () => {
     expect(manager.columns).toEqual([]);
   });
 
-  // Mirrors Rails: `Arel::InsertManager#insert` (insert_manager.rb).
   describe("insert (Rails parity)", () => {
     it("is a no-op for an empty fields array", () => {
       const mgr = new InsertManager();
@@ -42,9 +39,6 @@ describe("InsertManagerTest (trails)", () => {
     });
   });
 
-  // Mirrors Rails: `InsertManager#select` stores the manager itself
-  // (insert_manager.rb), not its inner `.ast`. The visitor handles
-  // the SelectManager-shaped duck-type via `visit`.
   describe("select (Rails parity)", () => {
     it("stores the SelectManager itself on ast.select", () => {
       const mgr = new InsertManager(users);

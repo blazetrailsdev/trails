@@ -12,11 +12,6 @@ import { ImmutableStringType } from "./immutable-string.js";
 import { BinaryType } from "./binary.js";
 import { TimeType } from "./time.js";
 
-/**
- * Mirrors the block ActiveModel::Type::Registry#register builds —
- * `proc { |_, *args| klass.new(*args) }` (registry.rb:16) — so `lookup`
- * can forward the caller's options the way `lookup(symbol, ...)` does.
- */
 export type TypeOptions = { precision?: number; scale?: number; limit?: number } & Record<
   string,
   unknown
@@ -24,14 +19,7 @@ export type TypeOptions = { precision?: number; scale?: number; limit?: number }
 export type TypeFactory = (name: string, options?: TypeOptions) => Type;
 
 export class TypeRegistry {
-  /**
-   * Mirrors: ActiveModel::Type::Registry's `@registrations` ivar
-   * (registry.rb:6, exposed via `attr_reader :registrations`).
-   * Storage is a Map (trails uses Map; Rails uses a Hash) but the
-   * accessor name matches Rails so subclasses can override or read it.
-   *
-   * @internal Rails-private storage.
-   */
+  /** @internal */
   protected registrationsMap = new Map<string, TypeFactory>();
 
   constructor() {
@@ -59,13 +47,7 @@ export class TypeRegistry {
     return factory(name, options);
   }
 
-  /**
-   * Mirrors: ActiveModel::Type::Registry#registrations (registry.rb:30,
-   * `attr_reader :registrations`). Private in Rails; protected here so
-   * subclasses can read or replace the registry.
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   protected get registrations(): Map<string, TypeFactory> {
     return this.registrationsMap;
   }

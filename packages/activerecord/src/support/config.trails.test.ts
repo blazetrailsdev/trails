@@ -13,7 +13,6 @@ import {
 } from "./config.js";
 import { activeLane, connectionName } from "./connection.js";
 
-/** A stub env reader backed by a fixed map (no ambient env mutation). */
 function reader(env: Record<string, string | undefined>): (key: string) => string | undefined {
   return (key) => env[key];
 }
@@ -31,8 +30,6 @@ describe("config", () => {
   });
 
   it("treats an empty ARCONN as a connection name, not as unset", () => {
-    // Ruby's `ENV["ARCONN"] || config["default_connection"]` falls back on nil
-    // alone, so "" is a selected name and takes the unknown-name path.
     expect(connectionName(reader({ ARCONN: "" }))).toBe("");
   });
 
@@ -43,11 +40,6 @@ describe("config", () => {
   });
 
   it("reads Postgres details from libpq's env vars, defaulting no credential", () => {
-    // Rails' postgresql: entries carry no connection fields at all
-    // (config.example.yml:74-81), so there is no credential to default: an
-    // unset PGUSER stays unset and pg resolves libpq's own default. The
-    // database comes from expand_config (support/config.rb:28-34), not from
-    // PGDATABASE — an entry's own database beats libpq's env in Rails too.
     expect(postgresSettings(reader({}))).toEqual({
       host: "localhost",
       port: 5432,
@@ -83,13 +75,6 @@ describe("config", () => {
   });
 
   it("interpolates exactly the sub-setting key set config.example.yml interpolates", () => {
-    // Rails interpolates only MYSQL_HOST/MYSQL_PORT/MYSQL_SOCK
-    // (config.example.yml:12-20) plus MYSQL_PREPARED_STATEMENTS
-    // (config.example.yml:7-11,27-31) and hard-codes the credential and database;
-    // its postgresql: entries carry no fields so libpq reads PG* itself
-    // (config.example.yml:74-81). AR_DB_SLOT and AR_TEST_RUN_TOKEN are the two
-    // trails additions — the per-worker, per-run database copy Rails has no
-    // analogue for. Re-widening this set is a decision, not a detail.
     const seen: string[] = [];
     const recording = (env: Record<string, string>) => (key: string) => {
       seen.push(key);
@@ -174,11 +159,6 @@ describe("config", () => {
   });
 
   it("carries MYSQL_SOCK through a rendered URL as socketPath", () => {
-    // Rails puts MYSQL_SOCK in both mysql2.arunit and mysql2.arunit2
-    // (config.example.yml:18-19,37-39), so every mysql path must preserve it.
-    // mysql2's parseUrl copies query params into its options and honours
-    // socketPath (connection_config.js:52,271-290) — verified against the
-    // driver, which attempts the socket rather than falling back to TCP.
     const settings = mysqlSettings(reader({ MYSQL_SOCK: "/tmp/mysql.sock" }));
     expect(settingsUrl("mysql", settings)).toBe(
       "mysql://rails@localhost:3306/activerecord_unittest?socketPath=%2Ftmp%2Fmysql.sock",
@@ -186,12 +166,6 @@ describe("config", () => {
   });
 
   it("spells a socket-directory PGHOST the way libpq does", () => {
-    // Rails' postgresql: entries carry no host and lean on libpq's PG* env
-    // (config.example.yml:74-81), where a leading "/" in PGHOST means a socket
-    // DIRECTORY. Putting that in the URL authority yields
-    // postgres://user@/var/run/postgresql:5432/db, which pg misreads as a
-    // hostname and reports as an authentication failure — verified against a
-    // real socket, as was the empty-authority + host= form emitted here.
     const settings = postgresSettings(reader({ PGHOST: "/var/run/postgresql" }));
     expect(settingsUrl("postgres", settings)).toBe(
       "postgres:///activerecord_unittest?host=%2Fvar%2Frun%2Fpostgresql&port=5432",
@@ -218,8 +192,6 @@ describe("config", () => {
   });
 
   it("driverConfig emits Rails' username and socket spellings only", () => {
-    // Both keys are Rails' canonical spelling — the adapters map them to the
-    // driver-native `user` / `socketPath`.
     const config = driverConfig(mysqlSettings(reader({ MYSQL_SOCK: "/tmp/m.sock" })));
     expect(config.username).toBe("rails");
     expect(config).not.toHaveProperty("user");

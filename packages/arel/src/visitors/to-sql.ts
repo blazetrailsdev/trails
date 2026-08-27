@@ -7,9 +7,6 @@ import { Visitor, type NodeCtor } from "./visitor.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { ArelError } from "../errors.js";
 
-/**
- * Mirrors: Arel::Visitors::UnsupportedVisitError (to_sql.rb:5-9).
- */
 export class UnsupportedVisitError extends Error {
   constructor(object: unknown) {
     super(`Unsupported argument type: ${constructorName(object)}. Construct an Arel node instead.`);
@@ -17,9 +14,6 @@ export class UnsupportedVisitError extends Error {
   }
 }
 
-/**
- * to_sql.rb:195, to_sql.rb:521, to_sql.rb:525
- */
 class NotImplementedError extends Error {
   constructor(message: string) {
     super(message);
@@ -30,25 +24,17 @@ class NotImplementedError extends Error {
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
-// visitor.rb:29-30
-
-// to_sql.rb:110, to_sql.rb:632
 function isActiveModelAttribute(v: unknown): boolean {
   return v instanceof ModelAttribute;
 }
 
-// to_sql.rb:5-8
 function constructorName(v: unknown): string {
   if (v === null || v === undefined) return "NilClass";
   return (v as { constructor?: { name?: string } }).constructor?.name ?? typeof v;
 }
 
-/** Mirrors: Arel::Visitors::ToSql::BIND_BLOCK */
 const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
 
-/**
- * Mirrors: Arel::Visitors::ToSql
- */
 export class ToSql extends Visitor {
   protected readonly connection: ArelConnection;
 
@@ -143,7 +129,6 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesCasted(o: Nodes.Casted, collector: SQLString): SQLString {
-    // to_sql.rb:87-88
     let valueForDatabase = o.valueForDatabase();
     if (
       valueForDatabase &&
@@ -158,7 +143,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_Quoted :visit_Arel_Nodes_Casted` (to_sql.rb:90). */
   private visitArelNodesQuoted(o: Nodes.Quoted, collector: SQLString): SQLString {
     return this.visitArelNodesCasted(o as unknown as Nodes.Casted, collector);
   }
@@ -180,7 +164,6 @@ export class ToSql extends Visitor {
       collector.append("(");
       for (let j = 0; j < o.rows[i].length; j++) {
         if (j > 0) collector.append(", ");
-        // to_sql.rb:106-114, to_sql.rb:631, to_sql.rb:867-870, quoting.rb:86, insert_manager_test.rb:10
         const value = o.rows[i][j];
         if (
           value instanceof Nodes.SqlLiteral ||
@@ -216,7 +199,6 @@ export class ToSql extends Visitor {
     return this.visitArelNodesSelectOptions(o, collector);
   }
 
-  /** Mirrors: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). */
   protected visitArelNodesSelectOptions(o: Nodes.SelectStatement, collector: SQLString): SQLString {
     this.maybeVisit(o.limit, collector);
     this.maybeVisit(o.offset, collector);
@@ -224,7 +206,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors: visit_Arel_Nodes_SelectCore (to_sql.rb:149).
   protected visitArelNodesSelectCore(o: Nodes.SelectCore, collector: SQLString): SQLString {
     collector.append("SELECT");
 
@@ -248,22 +229,18 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170).
   protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints, collector: SQLString): SQLString {
-    // to_sql.rb:170-172, to_sql.rb:171, select_manager.rb:147-149
     const hints = o.expr.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
     collector.append(`/*+ ${hints} */`);
     return collector;
   }
 
-  // Mirrors: visit_Arel_Nodes_Comment (to_sql.rb:175).
   protected visitArelNodesComment(o: Nodes.Comment, collector: SQLString): SQLString {
     const blocks = o.values.map((v) => `/* ${this.sanitizeAsSqlComment(v)} */`);
     collector.append(blocks.join(" "));
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#collect_nodes_for`. */
   protected collectNodesFor(
     nodes: Node[],
     collector: SQLString,
@@ -405,7 +382,6 @@ export class ToSql extends Visitor {
     } else if (o.right instanceof Nodes.SqlLiteral) {
       return this.infixValue(o as { left: Node; right: Node }, collector, " OVER ");
     } else if (typeof o.right === "string") {
-      // to_sql.rb:306-307
       this.visit(o.left, collector);
       collector.append(` OVER ${this.quoteColumnName(o.right)}`);
       return collector;
@@ -446,7 +422,6 @@ export class ToSql extends Visitor {
     collector.preparable = false;
     this.visit(o.left, collector);
     collector.append(o.type === "in" ? " IN (" : " NOT IN (");
-    // to_sql.rb:346-351
     const values = o.castedValues;
     if (values.length === 0) {
       collector.append(this.quote(null));
@@ -457,7 +432,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#visit_Arel_SelectManager`. */
   protected visitArelSelectManager(o: { ast: Node }, collector: SQLString): SQLString {
     collector.append("(");
     this.visit(o.ast, collector);
@@ -536,7 +510,6 @@ export class ToSql extends Visitor {
 
   private visitArelNodesTableAlias(o: Nodes.TableAlias, collector: SQLString): SQLString {
     this.visit(o.relation, collector);
-    // Mirrors: `visit_Arel_Nodes_TableAlias`.
     collector.append(` ${this.quoteTableName(o.name)}`);
     return collector;
   }
@@ -685,7 +658,6 @@ export class ToSql extends Visitor {
   }
 
   private visitArelTable(o: Table, collector: SQLString): SQLString {
-    // Mirrors: visit_Arel_Table (to_sql.rb).
     const name = o.name;
     if (name instanceof Node) {
       this.visit(name, collector);
@@ -776,7 +748,6 @@ export class ToSql extends Visitor {
   private visitArelNodesAssignment(o: Nodes.Assignment, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(" = ");
-    // to_sql.rb:630-641
     if (o.right instanceof Node || isActiveModelAttribute(o.right)) {
       this.visit(o.right, collector);
     } else {
@@ -871,7 +842,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors: visit_Arel_Nodes_When (to_sql.rb).
   protected visitArelNodesWhen(o: Nodes.When, collector: SQLString): SQLString {
     collector.append("WHEN ");
     this.visit(o.left, collector);
@@ -880,7 +850,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // Mirrors: visit_Arel_Nodes_Else (to_sql.rb).
   protected visitArelNodesElse(o: Nodes.Else, collector: SQLString): SQLString {
     collector.append("ELSE ");
     this.visit(o.expr as Nodes.NodeOrValue, collector);
@@ -891,7 +860,6 @@ export class ToSql extends Visitor {
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    // to_sql.rb:728-730
     collector.append(this.quoteColumnName(o.name as string | Node | null));
     return collector;
   }
@@ -903,7 +871,6 @@ export class ToSql extends Visitor {
     } else if (o.materialized === false) {
       collector.append("NOT MATERIALIZED ");
     }
-    // to_sql.rb:732-744
     this.visit(o.relation, collector);
     return collector;
   }
@@ -916,18 +883,15 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#bind_block`. */
   protected bindBlock(): (index: number) => string {
     return DEFAULT_BIND_BLOCK;
   }
 
-  /** Mirrors: `visit_ActiveModel_Attribute` (to_sql.rb:756). */
   protected visitActiveModelAttribute(o: ModelAttribute, collector: SQLString): SQLString {
     collector.addBind(o, this.bindBlock());
     return collector;
   }
 
-  /** Mirrors: `visit_Arel_Nodes_BindParam` (to_sql.rb:760-762). */
   protected visitArelNodesBindParam(o: Nodes.BindParam, collector: SQLString): SQLString {
     collector.addBind(o.value, this.bindBlock());
     return collector;
@@ -937,7 +901,6 @@ export class ToSql extends Visitor {
     if (!(o as { retryable?: boolean }).retryable) {
       collector.retryable = false;
     }
-    // to_sql.rb:764-767
     collector.preparable = false;
     collector.append(o.value);
     return collector;
@@ -970,85 +933,67 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `visit_Integer` (to_sql.rb:824-826). */
   protected visitInteger(o: number | bigint, collector: SQLString): SQLString {
     collector.append(String(o));
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#unsupported` (to_sql.rb:828-830). */
   protected unsupported(o: unknown, _collector: SQLString): never {
     throw new UnsupportedVisitError(o);
   }
 
-  // to_sql.rb:832-845
-
-  /** Rails: `alias :visit_ActiveSupport_Multibyte_Chars :unsupported`. */
   protected visitActiveSupportMultibyteChars(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_ActiveSupport_StringInquirer :unsupported`. */
   protected visitActiveSupportStringInquirer(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_BigDecimal :unsupported` (to_sql.rb:834). */
   protected visitBigDecimal(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_Class :unsupported`. */
   protected visitClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_Date :unsupported`. */
   protected visitDate(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_DateTime :unsupported`. */
   protected visitDateTime(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_FalseClass :unsupported`. */
   protected visitFalseClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_Float :unsupported`. */
   protected visitFloat(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_Hash :unsupported`. */
   protected visitHash(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_NilClass :unsupported`. */
   protected visitNilClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_String :unsupported`. */
   protected visitString(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_Symbol :unsupported` (to_sql.rb:843). */
   protected visitSymbol(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_Time :unsupported`. */
   protected visitTime(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
-  /** Rails: `alias :visit_TrueClass :unsupported`. */
   protected visitTrueClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
@@ -1061,18 +1006,15 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesUnaryOperation(o: Nodes.UnaryOperation, collector: SQLString): SQLString {
-    // visitors/to_sql.rb
     collector.append(` ${o.operator} `);
     this.visit(o.expr, collector);
     return collector;
   }
 
-  /** Mirrors: `visit_Array` (to_sql.rb:858). */
   protected visitArray(o: ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): SQLString {
     return this.injectJoin(o, collector, ", ");
   }
 
-  /** Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861). */
   protected visitSet(o: ReadonlySet<Nodes.NodeOrValue>, collector: SQLString): SQLString {
     return this.visitArray([...o], collector);
   }
@@ -1081,42 +1023,32 @@ export class ToSql extends Visitor {
     return this.injectJoin(o.values, collector, " ");
   }
 
-  /** Mirrors: `to_sql.rb#quote` (to_sql.rb:867-870). */
   protected quote(value: unknown): string {
     if (value instanceof Nodes.SqlLiteral) return value.value;
     return this.connection.quote(value);
   }
 
-  /**
-   * Mirrors: to_sql.rb:872-875 `def quote_table_name(name)`.
-   * @internal
-   */
+  /** @internal */
   protected quoteTableName(name: string | Node | null): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
     return this.connection.quoteTableName(name);
   }
 
-  /**
-   * Mirrors: to_sql.rb:877-880 `def quote_column_name(name)`.
-   * @internal
-   */
+  /** @internal */
   protected quoteColumnName(name: string | Node | null): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
     return this.connection.quoteColumnName(name);
   }
 
-  /** Mirrors: `to_sql.rb#sanitize_as_sql_comment` (to_sql.rb:882). */
   protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
     if (value instanceof Nodes.SqlLiteral) return value.value;
     return this.connection.sanitizeAsSqlComment(String(value));
   }
 
-  /** Mirrors `to_sql.rb#collect_optimizer_hints` (to_sql.rb:887-889). */
   protected collectOptimizerHints(o: Nodes.SelectCore, collector: SQLString): SQLString {
     return this.maybeVisit(o.optimizerHints, collector);
   }
 
-  /** Mirrors: `to_sql.rb#maybe_visit`. */
   protected maybeVisit(thing: Node | null | undefined, collector: SQLString): SQLString {
     if (!thing) return collector;
     collector.append(" ");
@@ -1124,7 +1056,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#inject_join`. */
   protected injectJoin(
     list: ReadonlyArray<Nodes.NodeOrValue>,
     collector: SQLString,
@@ -1137,7 +1068,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#unboundable?`. */
   protected isUnboundable(value: unknown): boolean {
     return this.unboundableSign(value) !== 0;
   }
@@ -1154,7 +1084,6 @@ export class ToSql extends Visitor {
     return !!(o.limit || o.offset || o.orders.length > 0);
   }
 
-  /** Mirrors: `to_sql.rb#has_group_by_and_having?`. */
   protected hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean {
     return o.groups.length > 0 && o.havings.length > 0;
   }
@@ -1222,7 +1151,6 @@ export class ToSql extends Visitor {
     return stmt;
   }
 
-  /** Mirrors: `to_sql.rb#infix_value`. */
   protected infixValue(
     o: { left: Nodes.NodeOrValue; right: Nodes.NodeOrValue },
     collector: SQLString,
@@ -1234,7 +1162,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#infix_value_with_paren`. */
   protected infixValueWithParen(
     o: Node & { left: Node; right: Node },
     collector: SQLString,
@@ -1260,7 +1187,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#grouping_parentheses`. */
   protected groupingParentheses(
     o: Node,
     collector: SQLString,
@@ -1276,12 +1202,10 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#require_parentheses?`. */
   protected isRequireParentheses(o: Nodes.SelectStatement): boolean {
     return o.orders.length > 0 || Boolean(o.limit) || Boolean(o.offset);
   }
 
-  /** Mirrors: `to_sql.rb#aggregate`. */
   protected aggregate(name: string, o: Nodes.Function, collector: SQLString): SQLString {
     collector.retryable = false;
     collector.append(`${name}(`);
@@ -1295,7 +1219,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#is_distinct_from`. */
   protected isDistinctFrom(
     o: { left: Nodes.NodeOrValue; right: Nodes.NodeOrValue },
     collector: SQLString,
@@ -1313,7 +1236,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors: `to_sql.rb#collect_ctes`. */
   protected collectCtes(
     children: ReadonlyArray<{ toCte(): Node }>,
     collector: SQLString,
@@ -1325,9 +1247,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * @internal
-   */
+  /** @internal */
   static registerDispatch(): void {
     const d = ToSql.dispatchCache();
     const reg = (ctor: NodeCtor, m: string) => {
@@ -1404,7 +1324,6 @@ export class ToSql extends Visitor {
     reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
     reg(Nodes.BoundSqlLiteral, "visitArelNodesBoundSqlLiteral");
     reg(Nodes.BindParam, "visitArelNodesBindParam");
-    // visitor.rb:29-30, to_sql.rb:756
     reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
@@ -1449,12 +1368,10 @@ export class ToSql extends Visitor {
   }
 
   private visitBindValue(value: unknown, collector: SQLString): void {
-    // to_sql.rb:774-795, to_sql.rb:775-778
     if (arelNode(value)) {
       this.visit(value as Node, collector);
     } else if (Array.isArray(value)) {
       if (value.length === 0) {
-        // to_sql.rb:779
         collector.append(this.quote(null));
       } else if (!value.some((v) => arelNode(v))) {
         collector.addBinds(
@@ -1463,7 +1380,6 @@ export class ToSql extends Visitor {
           this.bindBlock(),
         );
       } else {
-        // to_sql.rb:784-791
         value.forEach((v, i) => {
           if (i > 0) collector.append(", ");
           if (arelNode(v)) {
@@ -1485,11 +1401,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Mirrors: `to_sql.rb#unboundable?` (to_sql.rb:905-907), bind_param.rb:39-40,
-   * query_attribute.rb:46-51, predications.rb:256-258, casted.rb:43-45,
-   * casted.rb:5-35.
-   */
   protected unboundableSign(value: unknown): 1 | -1 | 0 {
     const v = value as { isUnboundable?: () => unknown } | null | undefined;
     if (typeof v?.isUnboundable !== "function") return 0;
@@ -1499,12 +1410,8 @@ export class ToSql extends Visitor {
     return 0;
   }
 
-  /**
-   * Mirrors: casted.rb:15, casted.rb:41, bind_param.rb:23-25.
-   */
   protected rightIsNull(right: unknown): boolean {
     if (right === null || right === undefined) return true;
-    // to_sql.rb:649
     const maybe = right as { isNil?: () => boolean };
     return typeof maybe?.isNil === "function" && maybe.isNil();
   }

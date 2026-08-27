@@ -1,14 +1,3 @@
-/**
- * Handles polymorphic association queries by grouping values by type
- * and building separate queries for each type.
- *
- * Mirrors: ActiveRecord::PredicateBuilder::PolymorphicArrayValue
- *
- * Examples:
- *   where({ commentable: [post, image] })
- *     → (commentable_type = 'Post' AND commentable_id = 1)
- *        OR (commentable_type = 'Image' AND commentable_id = 2)
- */
 import type { Base } from "../../base.js";
 import { rubyInspectArray } from "../ruby-inspect.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -42,15 +31,7 @@ export class PolymorphicArrayValue {
     return this._values;
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `values.empty?`
-   *   (polymorphic_array_value.rb:12) — `empty?` on a Ruby Array, whose faithful
-   *   JS spelling is `xs.length === 0`. That emits no callee, so no TS call can
-   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
-   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
-   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
-   *   TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   queries(): Record<string, unknown>[] {
     const fk = this.associatedTable.joinForeignKey;
     if (this.values.length === 0) {
@@ -62,14 +43,6 @@ export class PolymorphicArrayValue {
     const result: Record<string, unknown>[] = [];
     for (const [type, ids] of this.typeToIdsMapping()) {
       if (Array.isArray(fk)) {
-        // Composite FK: Ruby uses the FK array itself as the hash key
-        // (`query[associated_table.join_foreign_key] = ids`), which
-        // expand_from_hash later zips per tuple. JS object keys can't be
-        // arrays, so pre-expand here with the same validation and zip
-        // semantics (predicate_builder.rb:93-96): each ids_set must be an
-        // Array, and `key.zip(ids_set)` iterates only the FK columns —
-        // short tuples pad with nil, extra values are dropped. One query
-        // per tuple; queries are ORed by groupingQueries.
         for (const tuple of ids) {
           if (!Array.isArray(tuple)) {
             throw new ArgumentError(
@@ -129,7 +102,6 @@ export class PolymorphicArrayValue {
       }
       const pk = this.primaryKey(value);
       if (Array.isArray(pk)) {
-        // Rails: primary_key.map { |column| value._read_attribute(column) }
         return pk.map((column) => (value as any)._readAttribute(column));
       }
       if (pk in value) return (value as any)[pk];

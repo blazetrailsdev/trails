@@ -1,16 +1,7 @@
-// Trails-only cases with no Rails counterpart in
-// `vendor/rails/activerecord/test/cases/arel/nodes/bind_param_test.rb`, which
-// asserts only the three equality behaviours. These cover the `BindParam`
-// duck-typed delegations (`bind_param.rb:20-43`) directly. RFC 0122 keeps
-// trails-only rigour out of the mirrored file so a reader can diff it against
-// the Ruby one for one.
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
 
 describe("BindParam", () => {
-  // Rails parity: `BindParam#to_sql` always emits the `?` placeholder (the
-  // value is collected, not inlined). Mirrors Rails' visit_Arel_Nodes_BindParam
-  // with `BIND_BLOCK = proc { "?" }`. See the BindParam class doc.
   describe("toSql emits the ? placeholder", () => {
     it("renders a scalar value as ?", () => {
       expect(new Nodes.BindParam(1).toSql()).toBe("?");
@@ -63,8 +54,6 @@ describe("BindParam", () => {
 
   describe("isInfinite", () => {
     it("returns false when value has no isInfinite", () => {
-      // Mirrors bind_param.rb:33-35 — `value.respond_to?(:infinite?) &&
-      // value.infinite?` is false, not nil, for a value lacking the protocol.
       const bp = new Nodes.BindParam(42);
       expect(bp.isInfinite()).toBe(false);
     });
@@ -80,8 +69,6 @@ describe("BindParam", () => {
     });
 
     it("reports the sign for a bare ±Infinity value, which Float answers in Ruby", () => {
-      // bind_param.rb:33-35 duck-types `infinite?`, and Float responds — so
-      // BindParam(Float::INFINITY).infinite? is 1 and the bound is open-ended.
       expect(new Nodes.BindParam(Infinity).isInfinite()).toBe(1);
       expect(new Nodes.BindParam(-Infinity).isInfinite()).toBe(-1);
     });

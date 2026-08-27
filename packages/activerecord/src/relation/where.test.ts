@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/where_test.rb
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Range } from "../index.js";
@@ -94,10 +89,6 @@ describe("WhereTest", () => {
   });
 
   it("type cast is not evaluated at relation build time", async () => {
-    // PARTIAL: Rails wraps each `where` in `assert_not_called_on_instance_of(
-    // Type::Value, :cast)` to assert the cast is deferred to query time. There is
-    // no TS equivalent of that mock without a spy, so only the result equality is
-    // ported — the lazy-cast timing invariant is NOT covered here.
     const welcome = posts("welcome");
     expect(ids(await Post.where({ id: "1-foo" }))).toStrictEqual([(welcome as any).id]);
     expect(ids(await Post.where({ id: ["1-foo", "bar"] }))).toStrictEqual([(welcome as any).id]);
@@ -223,11 +214,6 @@ describe("WhereTest", () => {
     expect(() => CpkBook.where(["author_id", "id"], tupleIds).toSql()).not.toThrow();
   });
 
-  // Mirrors Ruby `opts, *rest = opts` (query_methods.rb:1616-1618): when the
-  // first argument is an array fragment, the array destructure OVERWRITES any
-  // rest passed alongside it — the stray trailing arg is dropped, binding only
-  // the array's own tail. Reachable via Relation#where with an array first arg
-  // plus an extra positional; Base.where drops rest before it gets here.
   it("array first arg discards extra positional rest", () => {
     const withStray = (Post.all().where as any)(["id = ?", 1], 2);
     const withoutStray = (Post.all().where as any)(["id = ?", 1]);
@@ -236,8 +222,6 @@ describe("WhereTest", () => {
 
   it("where with nil cpk association", async () => {
     const order = await CpkOrder.create({ id: [1, 2] });
-    // Rails: order.books.create!(id: [3, 4]) — composite Book PK [author_id, id]
-    // plus the order FK [shop_id, order_id] inherited from the order.
     const book = await CpkBook.create({
       id: [3, 4],
       shop_id: (order as any).readAttribute("shop_id"),
@@ -446,9 +430,6 @@ describe("WhereTest", () => {
   it("decorated polymorphic where", () => {
     const treasure = new Treasure();
     (treasure as any).id = 1;
-    // Rails decorates with a Struct that delegates class/id via method_missing.
-    // The JS analog is a prototype-delegating wrapper so polymorphic_name/id
-    // resolve through to the wrapped record.
     const decoratedTreasure = Object.create(treasure);
     const expected = PriceEstimate.where({ estimate_of_type: "Treasure", estimate_of_id: 1 });
     const actual = PriceEstimate.where({ estimateOf: decoratedTreasure });
@@ -509,17 +490,10 @@ describe("WhereTest", () => {
   });
 
   it("where with decimal for string column", async () => {
-    // SUBSTITUTION: Rails uses `BigDecimal(0)`; JS has no built-in BigDecimal, so
-    // the numeric literal `0` stands in. The cast-to-string behaviour under test
-    // (a numeric query value never matches a string column) is identical for
-    // either, unlike the Rational case which has no JS analog at all (skipped).
     expect(await Post.where({ title: 0 }).count()).toBe(0);
   });
 
-  it.skip("where with rational for string column", () => {
-    // PERMANENTLY BLOCKED: Ruby Rational has no JavaScript equivalent.
-    // Rails: Post.where(title: Rational(0)).count == 0 (Rational cast to "0/1").
-  });
+  it.skip("where with rational for string column", () => {});
 
   it("where with duration for string column", async () => {
     expect(await Post.where({ title: seconds(0) }).count()).toBe(0);
@@ -579,8 +553,6 @@ describe("WhereTest", () => {
     const authorAddress = await AuthorAddress.where({
       author: Author.where({ id: author.id }),
     }).first();
-    // Rails: assert_equal author_addresses(:david_address), author_address.
-    // Coerce ids — MariaDB/PG return bigint PKs as BigInt, sqlite as number.
     expect(Number((authorAddress as any).id)).toBe(
       Number((authorAddresses("david_address") as any).id),
     );
@@ -610,9 +582,6 @@ describe("WhereTest", () => {
   });
 
   it("where with large number", async () => {
-    // Rails treats `9223372036854775808` (2^63, one past signed-bigint max) as
-    // an un-boundable query value, so `where(id: [3, 2^63])` drops the
-    // out-of-range element and matches only id 3 → [bob] on every adapter.
     const bob = authors("bob") as any;
     const r1 = await Author.where({ id: [3, 9223372036854775808n] });
     expect(ids(r1)).toStrictEqual([bob.id]);

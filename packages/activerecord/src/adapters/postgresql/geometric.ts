@@ -1,13 +1,3 @@
-/**
- * PostgreSQL geometric type support.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Point,
- *          ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Lseg, etc.
- */
-
-/**
- * A 2D point. Mirrors ActiveRecord::Point.
- */
 export class PgPoint {
   constructor(
     public x: number,
@@ -28,11 +18,6 @@ function finitePointOrNull(x: number, y: number): PgPoint | null {
   return new PgPoint(x, y);
 }
 
-/**
- * Parse a PG point value into a PgPoint.
- * Accepts strings like "(1.5,2.3)" or objects like {x: 1.5, y: 2.3}
- * (the pg driver returns point columns as objects).
- */
 export function parsePoint(value: unknown): PgPoint | null {
   if (value == null || value === "") return null;
   if (value instanceof PgPoint) return value;
@@ -47,9 +32,6 @@ export function parsePoint(value: unknown): PgPoint | null {
   return finitePointOrNull(parseFloat(match[1]), parseFloat(match[2]));
 }
 
-/**
- * Convert various input formats to a PgPoint.
- */
 export function castPoint(value: unknown): PgPoint | null {
   if (value == null) return null;
   if (value instanceof PgPoint) return value;
@@ -66,17 +48,11 @@ export function castPoint(value: unknown): PgPoint | null {
   return null;
 }
 
-/**
- * Serialize a PgPoint to PG literal.
- */
 export function serializePoint(point: PgPoint | null): string | null {
   if (!point) return null;
   return `(${point.x},${point.y})`;
 }
 
-/**
- * Return the trimmed string representation of a PG line value.
- */
 export function parseLine(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -84,9 +60,6 @@ export function parseLine(value: string | null | undefined): string | null {
   return trimmed;
 }
 
-/**
- * Return the trimmed string representation of a PG lseg value.
- */
 export function parseLseg(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -94,9 +67,6 @@ export function parseLseg(value: string | null | undefined): string | null {
   return trimmed;
 }
 
-/**
- * Return the trimmed string representation of a PG box value.
- */
 export function parseBox(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -104,9 +74,6 @@ export function parseBox(value: string | null | undefined): string | null {
   return trimmed;
 }
 
-/**
- * Return the trimmed string representation of a PG path value.
- */
 export function parsePath(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -114,9 +81,6 @@ export function parsePath(value: string | null | undefined): string | null {
   return trimmed;
 }
 
-/**
- * Return the trimmed string representation of a PG polygon value.
- */
 export function parsePolygon(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -124,9 +88,6 @@ export function parsePolygon(value: string | null | undefined): string | null {
   return trimmed;
 }
 
-/**
- * Return the trimmed string representation of a PG circle value.
- */
 export function parseCircle(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();

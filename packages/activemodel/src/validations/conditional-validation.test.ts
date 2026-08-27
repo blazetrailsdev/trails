@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { assertEmpty, assertPredicate } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 
-// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
   static {
     this.attribute("title", "string");

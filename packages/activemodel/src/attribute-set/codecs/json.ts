@@ -1,20 +1,6 @@
 import { AttributeSetCodecError } from "./codec.js";
 import type { AttributeSetCodec, AttributeSetEnvelope } from "./codec.js";
 
-/**
- * Default JSON codec for YAMLEncoder.
- *
- * Known JSON format limitations (Rails YAMLEncoder stores full Ruby objects
- * and is not subject to these constraints):
- * - Type constructor params (precision, scale, limit) are not preserved — type
- *   is reconstructed from the registry with default params on decode.
- * - Binary attributes with non-string raw values (Uint8Array, Buffer) are not
- *   JSON-serializable and will corrupt on round-trip.
- * - Float specials (NaN, Infinity, -Infinity) serialize to null via
- *   JSON.stringify and decode as null. This also covers the
- *   `DateInfinity` / `DateNegativeInfinity` sentinels, which are aliases for
- *   `Number.POSITIVE_INFINITY` / `Number.NEGATIVE_INFINITY`.
- */
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }

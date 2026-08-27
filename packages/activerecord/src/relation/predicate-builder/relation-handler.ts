@@ -6,26 +6,8 @@ import { NotImplementedError } from "../../errors.js";
 import { rubyInspectArray } from "../ruby-inspect.js";
 import { DeferredDistinctPkIn } from "./deferred-distinct-pk-in.js";
 
-/**
- * Handles Relation values in where conditions by converting them to
- * IN subqueries.
- *
- * Mirrors: ActiveRecord::PredicateBuilder::RelationHandler
- *
- * Examples:
- *   where({ author_id: Author.where({ active: true }) })
- *     → author_id IN (SELECT authors.id FROM authors WHERE active = true)
- */
 export class RelationHandler {
-  /**
-   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
-   *   `value.select_values.empty?` (relation_handler.rb:11) — `empty?` on a Ruby
-   *   Array, whose faithful JS spelling is `xs.length === 0`. That emits no
-   *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
-   *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`,
-   *   which takes arguments since it gained Rails' `async:` kwarg
-   *   (result.rb:94-100) — nothing in the TS body was dropped.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
@@ -33,14 +15,6 @@ export class RelationHandler {
     return attribute.in(relation.arel());
   }
 
-  // Rails routes an eager-loading subquery with a limit/offset over a collection
-  // reflection through `distinct_relation_for_primary_key`, which executes a
-  // query to materialize the limited DISTINCT primary keys (finder_methods.rb:463,
-  // schema_statements.rb:1429). trails' `.where()` is synchronous, so we cannot
-  // run that query here. Instead emit a deferred marker carrying the inner
-  // relation; the relation load pipeline materializes the ids and substitutes a
-  // literal `attribute.in([...ids])` before compile. Returns null when `value`
-  // is not this special case (the normal `IN (subquery)` path applies).
   private deferDistinctPkMaterialization(
     attribute: Nodes.Attribute,
     value: any,
@@ -51,29 +25,9 @@ export class RelationHandler {
     return new DeferredDistinctPkIn(attribute, inlineSubquery, value);
   }
 
-  // Mirrors Rails `if value.eager_loading? value = value.send(:apply_join_dependency) end`
-  // (predicate_builder/relation_handler.rb:7): normalize an eager-loading
-  // subquery so its eager_load/includes become regular (OUTER) joins before the
-  // PK select + `value.arel`, rather than being dropped.
-  //
-  // Pass `group_values.empty?` for apply_join_dependency's
-  // `eager_loading: group_values.empty?` default (finder_methods.rb:457): a
-  // grouped subquery is eager_loading: false, which skips the
-  // distinct_relation_for_primary_key materialization branch
-  // (finder_methods.rb:463). Matches relation.ts's own call site (~L3542).
   private applyJoinDependency(value: any): any {
     if (typeof value?.applyJoinDependency !== "function") return value;
-    // relation_handler.rb:7 — `if value.eager_loading?`. Without it a plain
-    // `includes(...)` subquery (no `references`, so not eager-loading) would be
-    // join-converted here where Rails leaves it alone.
     if (value.isEagerLoading !== true) return value;
-    // finder_methods.rb:457-481 is synchronous in Ruby; trails' is async because
-    // `distinct_relation_for_primary_key` executes a query. Everything before
-    // that query is synchronous, so the block runs during the call and this
-    // synchronous handler gets its relation — unless the query branch WAS
-    // entered, which `deferDistinctPkMaterialization` above is supposed to have
-    // claimed first. `resolved` still being unset is that invariant breaking:
-    // fail loudly rather than emit an un-materialized `IN (subquery)`.
     let resolved: any;
     const pending = value.applyJoinDependency({}, (relation: any) => {
       resolved = relation;
@@ -93,10 +47,6 @@ export class RelationHandler {
     return resolved;
   }
 
-  // Mirrors Rails: inject the table-qualified primary key select only when the
-  // subquery has no explicit projection; otherwise pass the relation through
-  // unchanged and let the database raise on a column-count mismatch. Rails has
-  // no single-column validation here.
   private injectPrimaryKeySelect(attribute: Nodes.Attribute, value: any): any {
     if (value.selectValues.length !== 0) {
       return value;
@@ -105,16 +55,10 @@ export class RelationHandler {
     const model = value._model;
     const pk = model?.primaryKey ?? "id";
     if (Array.isArray(pk)) {
-      // Rails interpolates `model.primary_key` directly, so the composite array
-      // renders via Ruby's `Array#to_s` (e.g. `["shop_id", "id"]`).
       throw new ArgumentError(
         `Cannot map composite primary key ${rubyInspectArray(pk)} to ${attribute.name}`,
       );
     }
-    // Select the table-qualified primary key, mirroring Rails
-    // `value.select(value.arel_table[value.primary_key])`. Now that the
-    // subquery's arel carries joins (build_arel convergence), a bare `id`
-    // projection is ambiguous when the relation joins another table.
     return value.select(model.arelTable.get(pk));
   }
 }

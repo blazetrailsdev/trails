@@ -46,17 +46,12 @@ describe("Arel::Nodes.build_quoted", () => {
     const node = buildQuoted(amAttr);
     expect(node).toBe(amAttr as unknown as Nodes.Node);
 
-    // compileWithBinds should collect it (not inline it) — matches Rails'
-    // visit_ActiveModel_Attribute routing through add_bind.
     const [sql, binds] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), node);
     expect(sql).toBe("?");
     expect(binds).toEqual([amAttr]);
   });
 
   it("passes a TreeManager-shaped .ast holder through unchanged", () => {
-    // Rails' `build_quoted` returns an `Arel::SelectManager` as-is
-    // (casted.rb:47-51) so `visit_Arel_SelectManager` supplies the subquery
-    // parens; matching on `.ast` is only how the class arm is spelled here.
     const sub = new SelectManager(users).project(users.get("id"));
     const node = buildQuoted(sub);
     expect(node).toBe(sub);
@@ -90,17 +85,12 @@ describe("Arel::Nodes.build_quoted", () => {
     expect((node as Nodes.Quoted).value).toBeNull();
   });
 
-  // casted.rb:50-51's `when` arm returns `other` UNWRAPPED, so the AST holds
-  // the ActiveModel::Attribute itself and `visit_ActiveModel_Attribute`
-  // (to_sql.rb:756) is what lands its value as a bind.
   it("wraps an ActiveModel::Attribute in BindParam", () => {
     const attr = AMAttribute.fromUser("age", 42, new ValueType());
     const node = buildQuoted(attr);
     expect(node).toBe(attr as unknown as Nodes.Node);
   });
 
-  // Rails dispatches casted.rb:50's `when` arm on the class, so an object that
-  // merely looks like an ActiveModel::Attribute falls through to the `else`.
   it("does not treat an ActiveModel::Attribute duck-type as one", () => {
     expect(buildQuoted({ name: "age", valueForDatabase: 42 })).toBeInstanceOf(Nodes.Quoted);
     expect(buildQuoted({ name: "x" })).toBeInstanceOf(Nodes.Quoted);
@@ -116,10 +106,6 @@ describe("Arel::Nodes::Casted#nil?", () => {
     expect(new Nodes.Casted(0, attr).isNil()).toBe(false);
   });
 
-  // Ruby has one nil, so undefined is a nil? here too. This keeps
-  // attr.eq(undefined) spelling IS NULL: before this change quotedNode
-  // normalized undefined to Quoted(null), so a null-only isNil() would
-  // regress it to `= NULL`.
   it("treats undefined as nil, so eq(undefined) still renders IS NULL", () => {
     const attr = users.get("age");
     expect(new Nodes.Casted(undefined, attr).isNil()).toBe(true);
@@ -132,16 +118,12 @@ describe("Arel::Nodes::Casted#nil?", () => {
     expect(sql).toBe('"users"."id" IS NULL');
   });
 
-  // `= NULL` is never true in SQL; Quoted#nil? (casted.rb:41) is defined
-  // identically to Casted's, so an undefined-valued Quoted spells IS NULL too.
   it("renders IS NULL for a Quoted(undefined) right-hand side", () => {
     const eq = new Nodes.Equality(users.get("id"), new Nodes.Quoted(undefined));
     const [sql] = compileWithBinds(new Visitors.ToSql(fakeRecordConnection), eq);
     expect(sql).toBe('"users"."id" IS NULL');
   });
 
-  // casted.rb:15 reads the raw `value`, NOT `value_for_database` — a type whose
-  // serialize(nil) is non-nil must still spell IS NULL.
   it("reads the raw value, not value_for_database", () => {
     const table = new Table("users");
     (table as unknown as { isAbleToTypeCast?: () => boolean }).isAbleToTypeCast = () => true;

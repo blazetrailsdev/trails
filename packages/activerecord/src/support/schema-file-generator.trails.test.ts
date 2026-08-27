@@ -32,7 +32,6 @@ const MINI_SCHEMA: Schema = {
     primaryKey: ["book_id", "edition_num"],
   },
   drafts: { columns: {}, primaryKey: false },
-  // Single-column integer custom PK → serial (Rails `t.primary_key :gadget_id`).
   gadgets: {
     columns: { gadget_id: "integer", name: "string" },
     primaryKey: ["gadget_id"],
@@ -89,8 +88,6 @@ describe("generateSchemaFile", () => {
   it("handles primaryKey:false and composite PK", () => {
     expect(content).toContain('"drafts", { id: false }');
     expect(content).toContain('primaryKey: ["book_id","edition_num"]');
-    // Bare, as schema.rb declares composite-PK columns: Rails'
-    // visit_PrimaryKeyDefinition emits only PRIMARY KEY (a, b).
     expect(content).toContain('"book_id", "integer", {}');
     expect(content).toContain('"edition_num", "integer", {}');
   });
@@ -100,9 +97,6 @@ describe("generateSchemaFile", () => {
   });
 
   it("emits a single-column integer custom PK inline at its declared offset (serial)", () => {
-    // `id: false` suppresses the auto id; the serial PK column is emitted inline
-    // at its declared offset with an INT-width serial type (default → "integer")
-    // so its reflected position matches Rails (mirrors schema-types.ts).
     expect(content).toContain('"gadgets", { id: false }');
     expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
     expect(content).toContain('"name", "string"');
@@ -349,26 +343,6 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   });
 });
 
-// PARITY GUARD — schema-file-generator.ts hand-mirrors the schema.rb index
-// option gating (schema-file-generator.ts:178-204) that the canonical loader
-// applies in canonical-schema.ts's exported `emitTableIndexes`. A one-sided edit
-// reintroduces the silent-drift class PR #4461 fixed for the per-adapter TYPE map
-// — see the type-map parity guard above (PR #4464), which deliberately scoped out
-// this index-gating surface.
-//
-// The parity partner is `canonical-schema.ts`, NOT `schema-types.ts`: RFC 0059
-// phase 4 (retire-defineschema-and-one-schema-apparatus) DELETED the
-// schema-emitting DSL, leaving `schema-types.ts` as a bare type vocabulary that
-// issues no DDL — so anchoring here would die with the DSL. Both
-// `schema-file-generator.ts` and
-// `canonical-schema.ts` outlive that retirement, and both hand-mirror the same
-// schema.rb gating — so this guard drives BOTH through a recording adapter and
-// asserts they issue the same `addIndex(columns, options)` calls:
-//
-//   - `length:` sub-part prefix is MySQL-only DDL, dropped for non-MySQL in both.
-//   - unique/where/name/order/nullsNotDistinct/using/type pass through verbatim.
-//   - expression indexes (`"(lower(x))"`) gate per adapter — the KNOWN residual
-//     below, since the generator has no DB version.
 type RecordedIndex = { columns: string | string[]; options: Record<string, unknown> };
 
 function makeIndexRecorder(): { recorded: RecordedIndex[]; ctx: Record<string, unknown> } {
@@ -444,8 +418,6 @@ const PARITY_INDEXES: Parameters<typeof emitTableIndexes>[3] = [
     opts: { length: 8, using: "btree", type: "btree", nullsNotDistinct: true },
   },
   { columns: "(lower(external_id))", opts: {} },
-  // Adapter-restricted index (schema.rb's inline current_adapter? gate, e.g.
-  // the MySQL-only full_name_index) — both emitters must apply the same skip.
   { columns: "body", opts: { name: "idx_probe_mysql_only", adapters: ["mysql2"] } },
 ];
 const PARITY_EXPRESSION_INDEX = "(lower(external_id))";
@@ -488,10 +460,6 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
     expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
   });
 
-  // Both emitters now pass `length:` through unconditionally on every adapter —
-  // the MySQL-only gating moved down to the abstract SchemaCreation visitor,
-  // which drops sub-part length on non-MySQL (matching Rails), so the DDL stays
-  // valid while the emitters stay in lockstep.
   it("passes sub-part index length: through on non-MySQL adapters (both emitters)", async () => {
     for (const adapter of ["postgres", "sqlite"] as const) {
       const [gen, canon] = await Promise.all([

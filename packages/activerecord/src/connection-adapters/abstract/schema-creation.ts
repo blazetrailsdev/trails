@@ -1,12 +1,3 @@
-/**
- * SchemaCreation — visitor that accepts definition objects and produces SQL.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCreation
- *
- * This is the base implementation. Per-adapter subclasses can override
- * visit methods for dialect-specific SQL generation.
- */
-
 import {
   type ColumnType,
   type ColumnOptions,
@@ -38,10 +29,6 @@ type Definition =
   | CheckConstraintDefinition
   | PrimaryKeyDefinition;
 
-/**
- * The connection surface `SchemaCreation` delegates to — Rails' `@conn`
- * (abstract/schema_creation.rb:16-21). @internal
- */
 export interface SchemaCreationConn extends SchemaQuoter {
   nativeDatabaseTypes(): NativeDatabaseTypes;
   supportsCheckConstraints(): Promise<boolean>;
@@ -54,15 +41,6 @@ export interface SchemaCreationConn extends SchemaQuoter {
   useForeignKeys(): boolean;
 }
 
-/**
- * The MySQL-only half of the visitor. Rails' `accept` resolves
- * `visit_IndexDefinition` / `index_in_create` at call time through `send`
- * (abstract/schema_creation.rb:12-14), so the abstract visitor declares
- * neither; both live only on `MySQL::SchemaCreation`
- * (mysql/schema_creation.rb:40,98). TypeScript needs a type for the two call
- * sites that Rails reaches by name, so they are narrowed against this
- * non-exported interface instead of being declared on the base class.
- */
 interface IndexVisitor {
   visitIndexDefinition(o: IndexDefinition, create?: boolean): Promise<string>;
   indexInCreate(
@@ -73,22 +51,12 @@ interface IndexVisitor {
 }
 
 export class SchemaCreation {
-  /** Rails' `SchemaCreation#initialize(conn)` (abstract/schema_creation.rb:6-9). */
   constructor(protected conn: SchemaCreationConn) {}
-
-  // Capability probes. Eight of these are `delegate ... to: :@conn`
-  // (abstract/schema_creation.rb:16-21): supports_indexes_in_create?,
-  // supports_partial_index?, supports_check_constraints?, supports_index_include?,
-  // supports_exclusion_constraints?, supports_unique_constraints?,
-  // supports_nulls_not_distinct? and use_foreign_keys?. The connection answers
-  // them, so its version gates reach the visitor.
 
   protected supportsPartialIndex(): boolean {
     return this.conn.supportsPartialIndex();
   }
 
-  /** Not delegated: Rails defines it on `SchemaCreation` itself
-   * (abstract/schema_creation.rb:137-139), and only SQLite3 overrides it. */
   protected supportsIndexUsing(): boolean {
     return true;
   }
@@ -100,10 +68,6 @@ export class SchemaCreation {
   protected async supportsNullsNotDistinct(): Promise<boolean> {
     return this.conn.supportsNullsNotDistinct();
   }
-
-  // Quoting delegations. Rails declares these as `delegate ... to: :@conn`
-  // (abstract/schema_creation.rb:16-19); here `@conn` is the {@link SchemaQuoter}
-  // threaded in as `this.conn`. `quote_column_name` maps to `quoteColumnName`.
 
   /** @internal */
   protected quoteColumnName(name: string): string {
@@ -135,34 +99,15 @@ export class SchemaCreation {
     return this.conn.supportsUniqueConstraints();
   }
 
-  /**
-   * Quote the column list for an index's `INCLUDE (...)` clause. Rails defines
-   * `quoted_include_columns` only on `PostgreSQL::SchemaCreation`, where the
-   * INCLUDE path is the sole caller (`supports_index_include?` is PG-only); the
-   * base supplies an identifier-quoting default so the shared visitor type-checks.
-   * @internal
-   */
+  /** @internal */
   protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
     if (typeof o === "string") return o;
     return o.map((c) => this.conn.quoteColumnName(c)).join(", ");
   }
 
-  // Async since the PG quoter's default-expression path issues a live regtype
-  // query (postgresql/quoting.rb:195); Rails' accept is sync only because Ruby
-  // blocks on the query. Visitors that can reach quoteDefaultExpression are
-  // async; the leaf visitors that cannot (indexes, FKs, constraints) stay sync.
   /**
-   * @missingRailsCall last — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   schema_creation.rb:12 builds the visitor name with
-   *   `o.class.name.split('::').last` and `send`s it; TypeScript has no `send`,
-   *   so trails' accept (schema-creation.ts:137-148) dispatches through an
-   *   explicit `instanceof` chain and never splits a class name.
-   * @missingRailsCall split — PERMANENT: Name-collision false positive (story
-   *   relation-delegation-rails-named-methods): exposing the `delegate ... to:
-   *   :records` set under Rails names made `split`/`reverse`/`rindex` recognized
-   *   ported method names, so this unrelated call to String#split /
-   *   Array#reverse / String#rindex on a non-Relation receiver is flagged by the
-   *   name-based wide call-set check.
+   * @missingRailsCall last — PERMANENT
+   * @missingRailsCall split — PERMANENT
    */
   async accept(o: Definition): Promise<string> {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
@@ -183,10 +128,6 @@ export class SchemaCreation {
     if (o.ifNotExists) createSql += " IF NOT EXISTS";
     createSql += ` ${this.conn.quoteTableName(o.name)}`;
 
-    // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
-    // but map to thunks so each column visit runs only after the previous one
-    // settles: Rails' block is sequential, and PG's default quoting issues a
-    // live regtype query per defaulted column that must not run concurrently.
     const statements: string[] = [];
     for (const visit of o.columns.map((c) => () => this.accept(c))) {
       statements.push(await visit());
@@ -234,26 +175,12 @@ export class SchemaCreation {
     return this.conn.supportsCheckConstraints();
   }
 
-  /**
-   * Adapter-specific constraints to append to the CREATE TABLE statement
-   * (e.g. PostgreSQL exclusion/unique constraints). Returns empty by default.
-   * @internal
-   */
+  /** @internal */
   protected async tableConstraintStatements(_o: TableDefinition): Promise<string[]> {
     return [];
   }
 
   protected async visitColumnDefinition(o: ColumnDefinition): Promise<string> {
-    // Rails' `visit_ColumnDefinition` (abstract/schema_creation.rb:34) does an
-    // unconditional `o.sql_type = type_to_sql(...)`. Trails diverges deliberately:
-    // PG/MySQL `TableDefinition` helpers (`t.bit`, `t.inet`, `t.bigserial`,
-    // `t.unsignedInteger`, `t.mediumblob`, ...) pre-populate `sqlType` with a
-    // dialect literal while keeping `type` as a generic semantic type because
-    // trails' `NATIVE_DATABASE_TYPES` map omits these aliases. Clobbering the
-    // pre-set sqlType would regress those helpers, so we honor the existing
-    // value when present and resolve only when missing. `column_options(o) →
-    // column` still sees the resolved SQL type because the helpers set it
-    // before the column reaches the visitor.
     try {
       o.sqlType ??= this.typeToSql(o.type, o.options);
     } catch (e) {
@@ -323,18 +250,7 @@ export class SchemaCreation {
     return parts.join(" ");
   }
 
-  /**
-   * Rails delegates `quoted_columns_for_index` to `@conn`
-   * (abstract/schema_creation.rb:18), whose single source of truth is
-   * `SchemaStatements#quoted_columns_for_index` → `add_options_for_index_columns`
-   * (sort order in the base, opclass folded in by the PG override, sub-part
-   * length by MySQL). When the real adapter is threaded as the host it exposes
-   * that method, so route through it — this is the sole decoration path for
-   * every concrete adapter. Fall back to bare identifier quoting on the
-   * host-less unit-test path (only the SchemaQuoter shim is wired), mirroring
-   * the parallel `quotedIncludeColumns` delegation.
-   * @internal
-   */
+  /** @internal */
   protected async quotedColumnsForIndex(
     columnNames: string[],
     options: {
@@ -373,8 +289,6 @@ export class SchemaCreation {
 
   async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     if (this.optionsIncludeDefault(options)) {
-      // Rails: `sql << " DEFAULT #{quote_default_expression(...)}"`
-      // (schema_creation.rb:150) — the keyword lives here, not in the quoter.
       sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(
         options.default,
         (options as Record<string, unknown>)["column"],
@@ -392,27 +306,11 @@ export class SchemaCreation {
     return sql;
   }
 
-  /**
-   * Mirrors `options_include_default?` (abstract/schema_statements.rb:1517):
-   * `options.include?(:default) && !(options[:null] == false && options[:default].nil?)`.
-   * Use strict `=== null` to match Ruby's `.nil?` (which does not match
-   * `undefined`), keeping `{ default: undefined, null: false }` distinct
-   * from `{ default: nil, null: false }`.
-   */
   protected optionsIncludeDefault(options: ColumnOptions): boolean {
-    // `undefined` is trails' marker for an absent default (Rails has only
-    // `nil`); treat it as not-included so the ` DEFAULT ` keyword — now owned by
-    // this caller rather than the quoter — is not emitted with an empty literal.
     if (!("default" in options) || options.default === undefined) return false;
     return !(options.null === false && options.default === null);
   }
 
-  /**
-   * Mirrors the decimal branch of `type_to_sql` (schema_statements.rb:1400):
-   * a scale without a precision is an error. Lives in the abstract layer so
-   * every adapter raises identically rather than each override reimplementing
-   * the check.
-   */
   protected validateDecimalPrecision(options: ColumnOptions): void {
     if (options.precision == null && options.scale != null)
       throw new ArgumentError(
@@ -434,7 +332,6 @@ export class SchemaCreation {
         throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
       else sql = String(type);
     } else {
-      // schema_statements.rb:1387 — `native.is_a?(Hash) ? native[:name] : native`.
       const spec: NativeDatabaseType = typeof native === "string" ? { name: native } : native;
       sql = spec.name ?? String(type);
       let { precision, scale, limit } = options;
@@ -462,9 +359,6 @@ export class SchemaCreation {
       }
     }
 
-    // Rails' `type_to_sql` lives on the connection, and only PostgreSQL's
-    // (postgresql/schema_statements.rb:988) appends `[]`; every adapter that
-    // reaches this body is one whose `type_to_sql` has no array arm.
     if (options.array && type !== "primary_key") {
       throw new Error("Array columns are only supported on PostgreSQL");
     }
@@ -497,12 +391,7 @@ export class SchemaCreation {
     return `ADD ${await this.accept(o)}`;
   }
 
-  /**
-   * Rails' `quoted_columns` (abstract/schema_creation.rb:133): a String column
-   * set is an expression emitted verbatim (e.g. "remind_at, place_id",
-   * "(data->'foo')"); otherwise delegate to `quoted_columns_for_index`.
-   * @internal
-   */
+  /** @internal */
   protected async quotedColumns(o: IndexDefinition): Promise<string> {
     return typeof o.columns === "string"
       ? o.columns
@@ -517,11 +406,7 @@ export class SchemaCreation {
 
   /**
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Per-entry verified (RFC 0032 wide-entry
-   *   verification): Rails schema_creation.rb:146-148 is
-   *   `o.options.merge(column: o)`; trails schema-creation.ts:579-581 uses
-   *   object spread `{...o.options, column: o}`.
+   * @missingRailsCall merge — PERMANENT
    */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
     return { ...o.options, column: o };

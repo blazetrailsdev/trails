@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/where_chain_test.rb
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Range } from "../index.js";
@@ -15,8 +10,6 @@ import { Book } from "../test-helpers/models/book.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
-// Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
-// are resolved by name, as Rails resolves them from the autoloaded models tree.
 import "../support/canonical-model-index.js";
 
 registerModel(Post);

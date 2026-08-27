@@ -1,14 +1,9 @@
 import { rbEqual } from "@blazetrails/activesupport";
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
 import { WhereClause } from "./where-clause.js";
 import { fixtures } from "../test-fixtures.js";
 
-// Mirrors Rails' private helpers in WhereClauseTest
 function table(): Table {
   return new Table("table");
 }
@@ -18,8 +13,6 @@ function bindParam(value: unknown): Nodes.BindParam {
 }
 
 describe("ActiveRecord::Relation", () => {
-  // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
-  // so these Arel assertions need a connection, as Rails' do via helper.rb.
   fixtures({});
   describe("WhereClauseTest", () => {
     it("+ combines two where clauses", () => {
@@ -256,8 +249,6 @@ describe("ActiveRecord::Relation", () => {
     });
 
     it("supports hash equality", () => {
-      // Ruby Hash equality (eql?/hash) has no direct JS equivalent.
-      // Verify structural equality via predicates instead.
       const a1 = new WhereClause([new Nodes.SqlLiteral("a")]);
       const a2 = new WhereClause([new Nodes.SqlLiteral("a")]);
       const b = new WhereClause([new Nodes.SqlLiteral("b")]);

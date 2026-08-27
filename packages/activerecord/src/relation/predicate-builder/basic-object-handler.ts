@@ -1,17 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 import { toS } from "@blazetrails/activesupport";
 
-/**
- * Handles basic scalar values (strings, numbers, booleans) in where
- * conditions by building simple equality predicates via bind attributes.
- *
- * Mirrors: ActiveRecord::PredicateBuilder::BasicObjectHandler
- *
- * In Rails, this wraps the value in a QueryAttribute via
- * predicateBuilder.buildBindAttribute, then passes the bind
- * object to attribute.eq. This produces BindParam nodes in the
- * Arel tree for proper bind parameter extraction.
- */
 export class BasicObjectHandler {
   private _predicateBuilder: {
     buildBindAttribute(columnName: string, value: unknown): unknown;

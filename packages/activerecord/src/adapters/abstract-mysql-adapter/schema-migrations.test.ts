@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/schema_migrations_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
@@ -14,11 +11,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("SchemaMigrationsTest", () => {
-    // Ride the canonical `engines`/`cars` tables built into the worker DB by
-    // the global TEST_SCHEMA setup (Rails has no engines fixture — the schema
-    // alone provides the table). The handler suite skips the global adapter
-    // reset so the canonical tables stay put for the DDL test below, which
-    // restores their original state in its `finally`.
     fixtures({}, { useTransactionalTests: false });
 
     it("renaming index on foreign key", async () => {
@@ -59,10 +51,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 });
 
-/**
- * Mirrors Rails' `with_encoding_utf8mb4` helper — changes the test database's default
- * character set to utf8mb4, runs the block, then restores the original charset/collation.
- */
 async function withEncodingUtf8mb4(adapter: Mysql2Adapter, fn: () => Promise<void>): Promise<void> {
   const rows = (await adapter.execute(
     "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +

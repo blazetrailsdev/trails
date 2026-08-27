@@ -1,9 +1,3 @@
-/**
- * PostgreSQL schema dumper — PostgreSQL-specific schema dump logic.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaDumper
- */
-
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import type {
   ExclusionConstraintDefinition,
@@ -14,15 +8,7 @@ import type { ColumnInfo, IndexInfo } from "../../schema-dumper.js";
 export class SchemaDumper extends AbstractSchemaDumper {
   private _cachedExclConstraints: ExclusionConstraintDefinition[] | undefined;
   private _cachedUniqConstraints: UniqueConstraintDefinition[] | undefined;
-  /**
-   * Rails' PG dumper never reads a per-column `primary_key` flag — it asks
-   * `@connection.primary_key(table)` (`postgresql/schema_statements.rb:15`), and
-   * `column_definitions` (`postgresql_adapter.rb:1034`) selects ten fields, none
-   * of them `indisprimary`. `primaryKeyOrderCache[tableName]` already holds that
-   * authoritative list (populated by `table()` via `adapter.primaryKeys`), so
-   * resolve from it rather than from a flag PG columns don't carry.
-   * @internal
-   */
+  /** @internal */
   protected override resolvePrimaryKeyColumns(
     tableName: string,
     columns: ColumnInfo[],
@@ -41,12 +27,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (this.supportsVirtualColumns && this._isVirtual(column)) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
-      // enum_type must be set before the early return — Rails adds it after the virtual
-      // block but doesn't early-return, so a virtual enum column gets both attributes.
       if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
-      // Rails dumps the symbol `type: :bigserial`; the TS DSL takes a string
-      // ColumnType, so emit `type: "bigserial"` (consumed verbatim by
-      // formatColspec on the U3 columnSpec path).
       return { type: JSON.stringify(this.schemaType(column)), ...spec };
     }
 
@@ -57,25 +38,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: ColumnInfo): boolean {
-    // Mirrors Rails `schema_type(column) == :bigserial`. createTable now emits
-    // BIGSERIAL for the default PK, so only bigserial is the default; a `serial`
-    // PK is non-default and keeps its explicit `id: "serial"` option in dumps.
     return this.schemaType(column) === "bigserial";
   }
 
-  /**
-   * For PG array columns the OID::Array wrapper has no `limit` of its own;
-   * the limit belongs to the element type and is encoded in the SQL type
-   * string (e.g. `"character varying(255)"`, `"bit(8)"`). Parse it when
-   * `column.limit` is absent.
-   * @internal
-   */
+  /** @internal */
   protected override schemaLimit(column: ColumnInfo): string | undefined {
-    // int4's limit (4) is the native default, so Rails `schema_limit` omits it
-    // (`limit != native_database_types[:integer][:limit]`; typeToSql("integer", {limit: 4})
-    // === "integer"). Without this an explicit `id: :integer` PK would dump
-    // `id: { type: "integer", limit: 4 }` instead of the flat `id: "integer"`.
-    // Mirrors the MySQL dumper's identical guard.
     if (column.type === "integer" && column.limit === 4) return undefined;
     const base = super.schemaLimit(column);
     if (base !== undefined) return base;
@@ -91,11 +58,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return undefined;
   }
 
-  /**
-   * For PG array columns where `column.precision` is absent, parse precision
-   * from the element type's SQL type string (e.g. `"numeric(10,2)"`).
-   * @internal
-   */
+  /** @internal */
   protected override schemaPrecision(column: ColumnInfo): string | undefined {
     const base = super.schemaPrecision(column);
     if (base !== undefined) return base;
@@ -104,11 +67,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return m ? m[1] : undefined;
   }
 
-  /**
-   * For PG array columns where `column.scale` is absent, parse scale from
-   * the element type's SQL type string (e.g. `"numeric(10,2)"`).
-   * @internal
-   */
+  /** @internal */
   protected override schemaScale(column: ColumnInfo): string | undefined {
     const base = super.schemaScale(column);
     if (base !== undefined) return base;
@@ -129,7 +88,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (isBigSql || column.type === "bigint") return "bigint";
     const semantic = column.type ?? undefined;
     if (semantic === "big_integer") return "bigint";
-    // OID::BitVarying.type() returns Rails-style "bit_varying"; map to DSL "bitVarying".
     if (semantic === "bit_varying") return "bitVarying";
     return semantic ?? super.schemaType(column as any);
   }
@@ -140,10 +98,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column);
   }
 
-  /**
-   * Handles both real PG Column objects (which expose `isVirtual()`) and plain
-   * `ColumnInfo` objects from `AdapterSchemaSource` (which expose `virtual`).
-   */
   private _isVirtual(column: ColumnInfo): boolean {
     return typeof (column as any).isVirtual === "function"
       ? (column as any).isVirtual()
@@ -228,11 +182,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   *
-   * @missingRailsCall any? — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   postgresql/schema_dumper.rb:43 guards with `if (exclusion_constraints = @connection.exclusion_constraints(table)).any?`;
-   *   trails guards with `.length === 0` on the JS array — `Enumerable#any?`
-   *   without a block is not a ported method name.
+   * @missingRailsCall any? — PERMANENT
    */
   protected override async exclusionConstraintsInCreate(
     table: string,
@@ -258,10 +208,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   *
-   * @missingRailsCall any? — PERMANENT: Per-site verified (RFC 0106 wave 4b):
-   *   the same guard at postgresql/schema_dumper.rb:65 — `Enumerable#any?`
-   *   without a block is a `.length` check on the JS array.
+   * @missingRailsCall any? — PERMANENT
    */
   protected override async uniqueConstraintsInCreate(
     table: string,
@@ -292,8 +239,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return adapter.tableOptions(tableName);
   }
 
-  // Returns the Rails default ("bigserial"/BIGSERIAL); createTable emits
-  // BIGSERIAL for the default PK to match.
   defaultPrimaryKeyType(): string {
     return "bigserial";
   }

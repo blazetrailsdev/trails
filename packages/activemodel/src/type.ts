@@ -11,11 +11,6 @@ export function register(typeName: string, factory: TypeFactory): void {
   typeRegistry.register(typeName, factory);
 }
 
-/**
- * Mirrors: ActiveModel::Type.lookup (type.rb:34-36) — `registry.lookup(...)`
- * forwards every argument, so the options a caller passes reach the
- * registered block (type_test.rb:16-22 pins that forwarding).
- */
 export function lookup(name: string, options?: TypeOptions): Type {
   return typeRegistry.lookup(name, options);
 }

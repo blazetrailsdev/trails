@@ -16,12 +16,6 @@ import { Column } from "./column.js";
 import { Base } from "../../base.js";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 
-/**
- * Rails' `MySQL::SchemaCreation.new(conn)` always gets the live adapter, so these
- * DDL-rendering tests hand it `ActiveRecord::Base.lease_connection` under
- * `current_adapter?(:Mysql2Adapter)`; overrides for the support-flag branches sit
- * on a derived object so the leased connection stays clean.
- */
 let leased: VisitorHostAdapter;
 
 const mysqlConn = (overrides: Record<string, unknown> = {}): VisitorHostAdapter =>
@@ -40,8 +34,6 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("visitDropCheckConstraint uses CHECK for MySQL", async () => {
-    // The lane's leased connection is MariaDB in CI, so the MySQL arm of
-    // `mariadb?` (mysql/schema_creation.rb:35) is selected explicitly.
     const mysql = new SchemaCreation(mysqlConn({ isMariadb: () => false }));
     expect(await (mysql as any).visitDropCheckConstraint("chk")).toBe("DROP CHECK chk");
   });
@@ -204,17 +196,12 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("typeToSql preserves enum/set literal type fragments verbatim", async () => {
-    // Rails' type_to_sql returns an unrecognized type unchanged; the abstract
-    // default branch must not uppercase a quoted value list, or enum/set member
-    // values get corrupted (e.g. enum('text') -> enum('TEXT')).
     expect(sc.typeToSql("enum('text','blob','tiny')", {})).toBe("enum('text','blob','tiny')");
     expect(sc.typeToSql("set('a','b')", {})).toBe("set('a','b')");
   });
 });
 
 describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
-  // Rails has no MySQL::TableDefinition#to_sql; CREATE TABLE SQL is produced by
-  // accepting the TableDefinition into the adapter's SchemaCreation visitor.
   beforeAll(async () => {
     leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
   });
@@ -365,11 +352,6 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
   });
 });
 
-// `TableDefinition#index` stores the caller's options untouched
-// (schema_definitions.rb:518) and `index_in_create` normalizes them through
-// `@conn.add_index_options` (mysql/schema_creation.rb:99). Before that
-// convergence the visitor hand-copied a subset of the option keys, so an inline
-// `length:` (a MySQL prefix index) was silently dropped from the CREATE.
 describeIfMysqlAdapter("MySQL::SchemaCreation inline index options (trails)", () => {
   let sc: SchemaCreation;
 

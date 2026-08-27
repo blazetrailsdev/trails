@@ -1,16 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { JSON as JSONHost } from "./json.js";
 
-// Mirrors ActiveModel::Serializers::JSON (json.rb). Pinning the host
-// surface here so the mixin shape (model_name + serializable_hash +
-// as_json + from_json) doesn't regress.
-//
-// Rails' `read_attribute_for_serialization` is `alias :… :send`, so a host
-// must expose a per-key reader for every attribute name (`attr_accessor`
-// parity) — the `attributes` hash only names the keys, it is not a value
-// fallback. These test models therefore define per-key getters alongside the
-// `attributes` reader, and the `attributes=` alias `from_json` writes through
-// (json.rb:147) as `setAttributes` (attribute_assignment.rb:36).
 describe("Serializers::JSON host", () => {
   class Person extends JSONHost {
     static {
@@ -22,11 +12,6 @@ describe("Serializers::JSON host", () => {
       });
     }
 
-    /**
-     * The host `def attributes=(hash)` Rails' `from_json` docstring defines
-     * (json.rb:120-126); trails spells the `attributes=` alias
-     * `setAttributes` (attribute_assignment.rb:36).
-     */
     setAttributes(this: { _name: string; _age: number }, h: { name: string; age: number }) {
       this._name = h.name;
       this._age = h.age;
@@ -92,11 +77,6 @@ describe("Serializers::JSON host", () => {
         });
       }
 
-      /**
-       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
-       * (json.rb:120-126); trails spells the `attributes=` alias
-       * `setAttributes` (attribute_assignment.rb:36).
-       */
       setAttributes(this: { _x: number }, h: { x: number }) {
         this._x = h.x;
       }
@@ -133,11 +113,6 @@ describe("Serializers::JSON host", () => {
         });
       }
 
-      /**
-       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
-       * (json.rb:120-126); trails spells the `attributes=` alias
-       * `setAttributes` (attribute_assignment.rb:36).
-       */
       setAttributes(this: { _id: bigint }, h: { id: bigint }) {
         this._id = h.id;
       }
@@ -163,11 +138,6 @@ describe("Serializers::JSON host", () => {
         });
       }
 
-      /**
-       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
-       * (json.rb:120-126); trails spells the `attributes=` alias
-       * `setAttributes` (attribute_assignment.rb:36).
-       */
       setAttributes(this: { _name: string }, h: { name: string }) {
         this._name = h.name;
       }
@@ -182,10 +152,6 @@ describe("Serializers::JSON host", () => {
   });
 
   it("fromJson always unwraps via first-value semantics (Rails hash.values.first)", () => {
-    // Rails json.rb:147 — `hash = hash.values.first if include_root`,
-    // ignoring the configured root key. Pin that behavior explicitly so
-    // the read path stays Rails-faithful even when includeRootInJson is
-    // a string.
     class Keyed extends JSONHost {
       static {
         this.includeRootInJson = "data";
@@ -197,11 +163,6 @@ describe("Serializers::JSON host", () => {
         });
       }
 
-      /**
-       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
-       * (json.rb:120-126); trails spells the `attributes=` alias
-       * `setAttributes` (attribute_assignment.rb:36).
-       */
       setAttributes(this: { _v: number }, h: { v: number }) {
         this._v = h.v;
       }
@@ -215,8 +176,6 @@ describe("Serializers::JSON host", () => {
   });
 
   it("fromJson treats an explicitly passed nil includeRoot as nil, not the class default", () => {
-    // json.rb:144 — `include_root = include_root_in_json` is a Ruby optional
-    // parameter, so the default applies only when the argument is omitted.
     class ExplicitNil extends JSONHost {
       static {
         this.includeRootInJson = true;
@@ -251,11 +210,6 @@ describe("Serializers::JSON host", () => {
         });
       }
 
-      /**
-       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
-       * (json.rb:120-126); trails spells the `attributes=` alias
-       * `setAttributes` (attribute_assignment.rb:36).
-       */
       setAttributes(this: { _v: number }, h: { v: number }) {
         this._v = h.v;
       }
@@ -291,8 +245,6 @@ describe("Serializers::JSON host", () => {
     const p = new Person();
     p._name = "Hank";
     p._age = 70;
-    // Ruby: `if root` is true for "", and `root == true` is false, so
-    // Rails wraps under the empty key.
     expect(p.asJson({ root: "" })).toMatchObject({ "": { name: "Hank", age: 70 } });
   });
 });

@@ -8,10 +8,6 @@ import type { Column } from "../../connection-adapters/sqlite3/column.js";
 
 let adapter: SQLite3Adapter;
 
-// TS-only regression coverage: Rails' alter_table rebuilds from columns(from)
-// and re-adds generated columns with as:/stored: (sqlite3_adapter.rb:623),
-// but PRAGMA table_info hides them — a table_info-sourced rebuild silently
-// drops every pre-existing generated column.
 describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
   fixtures([]);
 

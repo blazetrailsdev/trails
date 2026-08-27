@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/deferred_constraints_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { InvalidForeignKey } from "../../errors.js";
@@ -30,8 +27,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction();
         try {
           await adapter.setConstraints("deferred");
-          // INSERT must succeed — FK is deferred (mirrors Rails assert_nothing_raised).
-          // If it throws the error propagates through finally and the test fails correctly.
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
           await expect(adapter.setConstraints("immediate")).rejects.toThrow(InvalidForeignKey);
         } finally {
@@ -58,7 +53,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction();
         try {
           await adapter.setConstraints("deferred", fkName);
-          // INSERT must succeed (mirrors Rails assert_nothing_raised).
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
           await expect(adapter.setConstraints("immediate", fkName)).rejects.toThrow(
             InvalidForeignKey,
@@ -95,7 +89,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction();
         try {
           await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
-          // INSERT must succeed (mirrors Rails assert_nothing_raised).
           await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
           await expect(adapter.setConstraints("immediate", "dc_m_fk1", "dc_m_fk2")).rejects.toThrow(
             InvalidForeignKey,
@@ -120,8 +113,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE TABLE dc_s_ch (id SERIAL PRIMARY KEY, p1_id INT NOT NULL, p2_id INT NOT NULL)`,
       );
       try {
-        // FK1 is deferrable but not in the SET CONSTRAINTS list — stays at INITIALLY IMMEDIATE.
-        // Mirrors Rails: @fk (authors.author_address_id) is DEFERRABLE INITIALLY IMMEDIATE.
         await adapter.addForeignKey("dc_s_ch", "dc_s_p1", {
           column: "p1_id",
           name: "dc_s_fk1",

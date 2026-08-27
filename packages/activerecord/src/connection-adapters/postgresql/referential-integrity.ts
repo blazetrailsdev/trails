@@ -1,9 +1,3 @@
-/**
- * PostgreSQL referential integrity — disable/enable FK constraints.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::ReferentialIntegrity
- */
-
 import { ActiveRecordError, InvalidForeignKey } from "../../errors.js";
 
 export interface ReferentialIntegrity {
@@ -18,8 +12,6 @@ interface ReferentialIntegrityHost {
   transaction(fn: () => Promise<void>, options: { requiresNew: boolean }): Promise<unknown>;
 }
 
-// Mirrors: ReferentialIntegrity#disable_referential_integrity
-// (referential_integrity.rb:7-38).
 export async function disableReferentialIntegrity(
   this: ReferentialIntegrityHost,
   fn: () => Promise<void>,
@@ -72,9 +64,6 @@ export async function disableReferentialIntegrity(
   }
 }
 
-// Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
-// Rails uses `transaction(requires_new: true)` — a savepoint when already
-// inside a transaction, or a fresh BEGIN otherwise.
 export async function checkAllForeignKeysValidBang(this: ReferentialIntegrityHost): Promise<void> {
   await this.transaction(
     async () => {

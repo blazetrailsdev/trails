@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/datatype_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
@@ -13,11 +10,6 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// Tables in this file (postgresql_times, postgresql_oids, ex) use PG-specific
-// types (interval, oid, name, char) that aren't expressible via createTable's
-// typed builder; they're created via raw DDL inside each test (mirroring
-// Rails' `@connection.create_table`). The outer per-test transaction rolls
-// back DDL between tests.
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
@@ -102,7 +94,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const first = await (M as any).find(1);
       expect(first.time_interval).toBe("P-1Y-2D");
       const { Duration } = await import("@blazetrails/activesupport");
-      // Rails' assert_equal on Duration compares total seconds, not parts.
       expect(first.scaled_time_interval.eql(Duration.days(-21))).toBe(true);
     });
 
@@ -117,9 +108,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       first.scaled_time_interval = seventyYearsSeconds;
       expect(await first.save()).toBeTruthy();
       await first.reload();
-      // Rails' assert_equal on Duration compares total seconds, not parts —
-      // PG stores numeric seconds as hours/minutes, so the value round-trips
-      // with the same inSeconds() but different shape.
       expect(first.scaled_time_interval.eql(Duration.years(70))).toBe(true);
     });
 

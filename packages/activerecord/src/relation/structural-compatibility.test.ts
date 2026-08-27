@@ -1,15 +1,9 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation/structural_compatibility_test.rb
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("StructuralCompatibilityTest", () => {
-  // Mirrors Rails `fixtures :posts`.
   fixtures(["posts"]);
 
   it("compatible values", () => {

@@ -1,16 +1,3 @@
-/**
- * trails-specific regression guard (no Rails counterpart): `Relation#where` /
- * `whereNot` / `or` / `having` hand hash values RAW to PredicateBuilder,
- * like Rails' build_where_clause (query_methods.rb) — the QueryAttribute bind
- * owns casting/serialization at compile time (predicate_builder.rb:57-69 →
- * build_bind_attribute → value_for_database). An earlier trails invention
- * (`Relation#_castWhereValue`, removed by RFC 0067) eagerly pre-cast string
- * values up front; these tests pin the deferred-bind behavior on every entry
- * point that used it, for the un-castable inputs the pre-cast used to mangle:
- * an un-castable string must serialize to NULL in the bind (`col = NULL` /
- * `IN (NULL)`, matches nothing) — never route onto the explicit-nil
- * `IS NULL` / `IS NOT NULL` path (matches nulls).
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../associations.js";

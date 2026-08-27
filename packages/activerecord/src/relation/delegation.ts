@@ -1,14 +1,3 @@
-/**
- * Delegation — delegates named scope calls on Relations via a Proxy.
- *
- * wrapWithScopeProxy creates a Proxy that intercepts missing property
- * access and dispatches named scopes from the model's scope registry.
- * Query methods (where/order/limit) are already defined on Relation
- * and don't go through the Proxy.
- *
- * Mirrors: ActiveRecord::Delegation
- */
-
 import type { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
@@ -32,66 +21,17 @@ import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods
 
 type AnyCallable = (...args: any[]) => any;
 
-/** Constructor shape of the shared `Relation` class and its per-model subclasses. */
 type RelationCtor = new (modelClass: typeof Base, table?: any, predicateBuilder?: any) => any;
-
-/**
- * The Delegation module interface.
- *
- * Mirrors: ActiveRecord::Delegation
- */
 
 export interface Delegation {
   delegatedClasses: Set<typeof Base>;
 }
 
-/**
- * ClassSpecificRelation — a relation subclass tied to a specific model.
- * In Rails this is dynamically created per model class. In our codebase,
- * the Proxy handles this transparently.
- *
- * Mirrors: ActiveRecord::Delegation::ClassSpecificRelation
- */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ClassSpecificRelation {}
 
-/**
- * GeneratedRelationMethods — the per-model module of dynamically generated
- * relation methods. Rails builds one anonymous module per model
- * (delegation.rb:71-91) and `include`s it into every delegate subclass, so a
- * generated delegator becomes a **real method** resolved by normal method
- * lookup rather than by re-entering `method_missing`.
- *
- * trails has no per-model subclass by default (relations are shared classes
- * dispatched through a `Proxy`), so this module carries the generated methods
- * on the **prototype carriers** it has been `include`d into (via
- * {@link GeneratedRelationMethods.includeInto}, Rails'
- * `delegate.include generated_relation_methods`). `generate` writes each
- * delegator onto every carrier already registered, so a `Reflect.get` on a
- * relation whose prototype chain contains a carrier resolves the delegator as a
- * real method — no side-table consulted in the `Proxy` `get` trap.
- *
- * Mirrors: ActiveRecord::Delegation::GeneratedRelationMethods
- */
-/**
- * Per-carrier record of the highest module *priority* that has installed each
- * method name, so a more-derived module's method structurally wins over a less-
- * derived one regardless of `generate()` call order — mirroring Ruby's ancestor-
- * chain MRO, where `Firm::GeneratedRelationMethods` precedes
- * `Company::GeneratedRelationMethods` in `FirmDelegate.ancestors` independent of
- * definition order. Without this, a late `generate()` on an ancestor module
- * would silently clobber a child module's already-installed method on the shared
- * carrier prototype (last-write-wins by time). Keyed by carrier prototype.
- */
 const _carrierNamePriority = new WeakMap<object, Map<string, number>>();
 
-/**
- * Install `fn` for `name` onto `carrier` only if `priority` is at least the
- * priority of whatever module last claimed that name on this carrier. Higher
- * priority = more-derived module (own wins over inherited); equal priority is a
- * same-module re-`generate()` (latest fn wins). Lower priority (an ancestor
- * writing after a child already claimed the name) is skipped.
- */
 function installOnCarrier(carrier: object, name: string, fn: AnyCallable, priority: number): void {
   let priorities = _carrierNamePriority.get(carrier);
   if (!priorities) {
@@ -109,41 +49,12 @@ export class GeneratedRelationMethods {
   private _carriers: { carrier: object; priority: number }[] = [];
 
   /**
-   * Install `fn` as this module's `name` method — Rails'
-   * `GeneratedRelationMethods#generate_method` (delegation.rb:74-90).
-   *
-   * @missingRailsCall define_method — PERMANENT: Verified per-site (RFC 0106):
-   *   delegation.rb:85 `define_method(method) { ... }` installs the delegator
-   *   into the module. trails' `GeneratedRelationMethods` is not a Ruby Module,
-   *   so the equivalent installation is the plain property write
-   *   `installOnCarrier` performs onto every registered prototype carrier
-   *   (delegation.ts:91-101).
-   * @missingRailsCall include? — PERMANENT: Verified per-site (RFC 0106): Rails'
-   * `RESERVED_METHOD_NAMES.include?(method.to_s)` guard (delegation.rb:78, over
-   * `ActiveSupport::Delegation::RESERVED_METHOD_NAMES`, delegation.rb:18)
-   * selects between Ruby's two INSTALLATION spellings — `module_eval` string
-   * codegen for a name that is a safe Ruby identifier, `define_method` for
-   * everything else — and both define the same delegator. The guard's purpose is
-   * protecting the codegen path from interpolating a Ruby keyword into source;
-   * TS has no codegen-from-string path, only the `define_method` equivalent
-   * below, so there is nothing for the name test to select. Porting the Ruby
-   * keyword list (`begin`, `elsif`, …) would guard against names that are
-   * harmless in JS while missing the ones that are not.
-   * @missingRailsCall match? — PERMANENT: Verified per-site (RFC 0106): the
-   *   `/\A[a-zA-Z_]\w*[!?]?\z/.match?(method)` test (delegation.rb:78) only
-   *   chooses between Ruby's two INSTALLATION spellings — `module_eval` codegen
-   *   vs `define_method` — which produce the same delegator. TS has one
-   *   installation spelling, so there is nothing for the test to select and the
-   *   `define_method` arm is what the port implements.
-   * @missingRailsCall scoping — PERMANENT: Verified per-site (RFC 0106): both
-   *   delegation.rb:81/86 arms wrap the call in `scoping { ... }`. trails builds
-   *   that wrapper in `classMethodDelegator` (delegation.ts) and PASSES it in as
-   *   `generate_method`'s `fn`, because a TS delegator must also defer scope
-   *   restoration across a Promise result; `generateMethod` therefore only
-   *   installs it.
+   * @missingRailsCall define_method — PERMANENT
+   * @missingRailsCall include? — PERMANENT
+   * @missingRailsCall match? — PERMANENT
+   * @missingRailsCall scoping — PERMANENT
    */
   generateMethod(name: string, fn: AnyCallable): void {
-    // Rails: `return if method_defined?(method)` (delegation.rb:76).
     if (this._methods.has(name)) return;
     this._methods.set(name, fn);
     for (const { carrier, priority } of this._carriers) {
@@ -151,14 +62,6 @@ export class GeneratedRelationMethods {
     }
   }
 
-  /**
-   * `include` this module into a delegate prototype carrier at `priority` (its
-   * position in the carrier's STI module chain — higher = more derived): install
-   * every already-generated method as a real own property, respecting per-name
-   * priority, and register the carrier so future {@link generateMethod}s propagate to
-   * it. Mirrors Rails' `DelegateCache#include_relation_methods`
-   * (delegation.rb:57-60).
-   */
   includeInto(carrier: object, priority: number): void {
     if (this._carriers.some((entry) => entry.carrier === carrier)) return;
     this._carriers.push({ carrier, priority });
@@ -180,23 +83,7 @@ export class GeneratedRelationMethods {
   }
 }
 
-/**
- * DelegateCache — helper for caching delegation lookups per model class.
- * Currently provided to match the Rails module structure; not yet wired
- * into the Proxy delegation path.
- *
- * Mirrors: ActiveRecord::Delegation::DelegateCache
- */
 export class DelegateCache {
-  /**
-   * Whether relation/collection-proxy `method_missing` may delegate into
-   * `ActiveRecord::Base` class methods. Rails defaults this to `true`
-   * (delegation.rb:25) so normal `Post.where(...).create` chains work, but its
-   * own test suite sets it `false` (test/cases/helper.rb:29) to ban AR-internal
-   * code from relying on delegation that silently mutates the global scope.
-   *
-   * Mirrors: ActiveRecord::Delegation::DelegateCache.delegate_base_methods
-   */
   static delegateBaseMethods = true;
 
   private _cache: Map<typeof Base, Set<string>> = new Map();
@@ -217,13 +104,6 @@ export class DelegateCache {
   }
 }
 
-/**
- * Wrap a Relation in a Proxy that delegates named scope lookups
- * to the model's scope registry.
- *
- * Constrained to `object` because Relation._model is private;
- * internal access uses `any` casts.
- */
 const _delegatedClasses = new Set<typeof Base>();
 const _delegateCache = new DelegateCache();
 
@@ -231,12 +111,6 @@ export function delegatedClasses(): Set<typeof Base> {
   return _delegatedClasses;
 }
 
-/**
- * Collect a class's own public instance method/accessor names down to (but not
- * including) `boundary` in its prototype chain — i.e. everything it adds on top
- * of the boundary class. Mirrors `klass.public_instance_methods(false)` summed
- * over the subclass chain above `Relation`.
- */
 function ownMethodNamesAbove(
   ctor: new (...args: never[]) => unknown,
   boundary: object | null,
@@ -252,16 +126,6 @@ function ownMethodNamesAbove(
   return names;
 }
 
-/**
- * Compute the uncacheable-method set the Rails way (delegation.rb:17-21):
- * `delegated_classes' public_instance_methods - Relation's`, which is exactly
- * the methods unique to the proxy/association-relation subclasses (e.g.
- * `target`) — those NOT also defined on Relation. Such a method must not be
- * generated: a generated copy on the per-model module would clobber the proxy
- * subclass's own method. (Methods the proxies override but Relation also
- * defines — build/create/reload/records — are real methods that never reach
- * the delegation branch anyway, so the subtraction correctly drops them.)
- */
 function computeUncacheableMethods(): Set<string> {
   const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
     _relationFamilySlot;
@@ -271,10 +135,6 @@ function computeUncacheableMethods(): Set<string> {
     if (!sub) continue;
     for (const n of ownMethodNamesAbove(sub, relationProto)) result.add(n);
   }
-  // Rails subtracts `Relation.public_instance_methods` (delegation.rb:19): a
-  // proxy method that *overrides* a Relation method is not uncacheable. Mirror
-  // the exact set difference by removing every name reachable on Relation's own
-  // prototype chain.
   if (relation) {
     for (const n of ownMethodNamesAbove(relation, null)) result.delete(n);
   }
@@ -296,35 +156,13 @@ export function uncacheableMethods(): Set<string> {
   return _uncacheableMethodsCache;
 }
 
-/**
- * Guard mirroring Rails' `delegate_base_methods` ban (delegation.rb:120-126):
- * when `DelegateCache.delegateBaseMethods` is `false`, delegating a relation /
- * collection-proxy `method_missing` into a method `ActiveRecord::Base` itself
- * responds to raises rather than silently scoping the call. Methods defined on
- * the model subclass (named scopes, custom class methods) are unaffected — only
- * methods reachable on the root `Base` class are banned. No-op while the flag is
- * `true` (the default), so ordinary `Post.where(...).find`-style chains work.
- *
- * Mirrors: ActiveRecord::Delegation::ClassSpecificRelation#method_missing
- */
 export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string): void {
   if (DelegateCache.delegateBaseMethods) return;
-  // Resolve `ActiveRecord::Base.respond_to?(method)` without importing `Base`
-  // at runtime (that creates a module cycle): walk the model's static prototype
-  // chain to the `Base` class itself (class names are preserved at runtime — the
-  // codebase already relies on them for table inference). Methods defined only on
-  // a model subclass (named scopes, custom class methods) live below `Base` in
-  // the chain, so they stay delegable; methods on `Base` or its ancestors are
-  // banned.
   let base: unknown = modelClass;
   while (typeof base === "function" && (base as { name?: string }).name !== "Base") {
     base = Object.getPrototypeOf(base);
   }
   if (typeof base !== "function") return;
-  // Reachability check restricted to the static chain at/above `Base`, stopping
-  // before `Function.prototype` so its builtins (`call`, `apply`, `bind`, `name`,
-  // `length`, …) are NOT treated as Base methods — `ActiveRecord::Base` doesn't
-  // `respond_to?` those, and `relation.call(...)` must not wrongly raise.
   for (
     let ctor: unknown = base;
     typeof ctor === "function" && ctor !== Function.prototype;
@@ -350,15 +188,8 @@ export function relationDelegateClass(klass: typeof Base): typeof Base {
 }
 
 /**
- * @missingRailsCall include — CONVERGEABLE (story delegation-relation-delegate-cache-builds-lazily): Verified per-site (RFC 0106): delegation.rb:36-37
- *   `Class.new(klass) { include ClassSpecificRelation }`. trails builds the
- *   per-model delegate subclass lazily on first use (`buildDelegateClass`,
- *   delegation.ts:416) rather than eagerly per model at `inherited` time, so no
- *   class is constructed — and nothing is included into one — in this body.
- * @missingRailsCall include_relation_methods — CONVERGEABLE (story delegation-relation-delegate-cache-builds-lazily): Verified per-site (RFC 0106):
- *   delegation.rb:38 — same lazy-subclass divergence as the `include` row above;
- *   `includeRelationMethods` runs from `buildDelegateClass` (delegation.ts:416)
- *   when the subclass is first needed.
+ * @missingRailsCall include — CONVERGEABLE
+ * @missingRailsCall include_relation_methods — CONVERGEABLE
  */
 export function initializeRelationDelegateCache(): void {
   for (const klass of _delegatedClasses) {
@@ -366,23 +197,9 @@ export function initializeRelationDelegateCache(): void {
   }
 }
 
-/**
- * The memoized per-model `GeneratedRelationMethods` module — Rails'
- * `DelegateCache#generated_relation_methods` (delegation.rb:63-68). Touched only
- * at generate/construct time (not inside the `Proxy` `get` trap), so it is a
- * module registry, not a hot-path lookup side-table: the generated methods it
- * holds are installed as real methods on the per-model prototype carriers it is
- * `include`d into and are resolved by ordinary prototype lookup.
- */
 const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
 
-/**
- * The memoized per-model `GeneratedRelationMethods` module for `modelClass`.
- *
- * Mirrors: ActiveRecord::Delegation::DelegateCache#generated_relation_methods
- *
- * @internal
- */
+/** @internal */
 export function generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
   let methods = _generatedRelationMethodsByModel.get(this);
   if (!methods) {
@@ -393,58 +210,17 @@ export function generatedRelationMethods(this: typeof Base): GeneratedRelationMe
 }
 
 /**
- * Rails' `DelegateCache#include_relation_methods` (delegation.rb:57-60):
- * `delegate.include generated_relation_methods` installs the per-model module's
- * generated methods as real methods on a delegate prototype carrier.
- *
  * @internal
- *
- * @missingRailsCall base_class? — PERMANENT: Mechanism divergence (story
- *   delegation-generated-methods-per-model-prototype-carrier): trails' per-model
- *   prototype-carrier port installs generated methods onto per-model Relation
- *   subclass prototypes (relationClassFor /
- *   GeneratedRelationMethods.includeInto) rather than replicating Rails'
- *   anonymous-module include, so the call-set differs by construction.
+ * @missingRailsCall base_class? — PERMANENT
  */
 export function includeRelationMethods(modelClass: typeof Base, delegate: object): void {
-  // Deviation: Ruby's recursion + include-order MRO is reproduced structurally
-  // by an install priority (base_class = 0, own = highest) instead.
   stiCarrierChain(modelClass).forEach((ancestor, priority) => {
     ancestor.generatedRelationMethods().includeInto(delegate, priority);
   });
 }
 
-/**
- * Constructor of any relation-family delegate class. Varargs because the four
- * carriers differ in shape (`Relation(model, table?)`,
- * `AssociationRelation(model, association)`,
- * `DisableJoinsAssociationRelation(model, key, ids, walker?)`,
- * `CollectionProxy(record, name, def)`) — the per-model subclass inherits the
- * base constructor unchanged, so construction is signature-agnostic here.
- */
 type FamilyCtor = new (...args: any[]) => any;
 
-/**
- * Build (once, memoized in `cache`) a per-model subclass of a relation-family
- * delegate class and `include` the model's `GeneratedRelationMethods` module
- * into its prototype. Rails builds a per-model delegate subclass and `include`s
- * the model's generated module into it (`relation_class_for`,
- * delegation.rb:32-45,144); Rails then `include`s that **same** module into
- * *every* delegate subclass (`DelegateCache#include_relation_methods`,
- * delegation.rb:57-60), so `AssociationRelation` / `CollectionProxy` /
- * `DisableJoinsAssociationRelation` all carry the generated methods too.
- *
- * trails' analogue: a lazily-created per-model subclass whose prototype carries
- * the generated methods. Instances built for `modelClass` from this subclass
- * resolve a generated delegator as a real method by ordinary prototype lookup —
- * no side-table consulted in either `Proxy` `get` trap. Every carrier for a
- * given model shares the one `generatedRelationMethods(modelClass)` module, so a
- * `generate` (from either proxy's miss path) propagates to all of them.
- *
- * The carrier is the subclass **prototype**, set once at subclass creation, so
- * no per-instance `Object.setPrototypeOf` runs on the construction hot path (the
- * V8 megamorphic-deopt the parent story flagged).
- */
 function perModelCarrier(
   cache: WeakMap<typeof Base, FamilyCtor>,
   modelClass: typeof Base,
@@ -454,11 +230,6 @@ function perModelCarrier(
   if (!subclass) {
     const baseCtor = base as unknown as new (...args: never[]) => object;
     subclass = class extends baseCtor {} as FamilyCtor;
-    // A class expression assigned to a `let` infers `.name` from the variable
-    // (`"subclass"`), which would leak through `#inspect`'s
-    // `this.constructor.name`. Rails' `ClassSpecificRelation::ClassMethods#name`
-    // (delegation.rb:111-115) returns `superclass.name` so a per-model delegate
-    // still reports the base class name — mirror that here.
     Object.defineProperty(subclass, "name", {
       value: (baseCtor as { name: string }).name,
       configurable: true,
@@ -469,14 +240,6 @@ function perModelCarrier(
   return subclass;
 }
 
-/**
- * The STI ancestor chain of generated-module owners for a model, ordered
- * `base_class`-first through the model itself. Mirrors the recursion in Rails'
- * `DelegateCache#include_relation_methods` (delegation.rb:57-60), which walks
- * Ruby superclasses up to (and stopping at) `base_class`. Each element's
- * `generatedRelationMethods` module is `include`d into a child carrier so an
- * STI child inherits every ancestor's generated relation methods.
- */
 function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
   const chain: (typeof Base)[] = [];
   let current: typeof Base | null = modelClass;
@@ -489,13 +252,6 @@ function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
   return chain.reverse();
 }
 
-/**
- * Per-model prototype carrier for the `Relation` delegate class. Relations
- * built for `modelClass` (via `Base.defaultScoped` &c.) are constructed
- * from this subclass.
- *
- * Mirrors: ActiveRecord::Delegation::ClassMethods#relation_class_for
- */
 const _relationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
 /** @internal */
@@ -507,16 +263,6 @@ export function relationClassFor(modelClass: typeof Base): RelationCtor {
   ) as RelationCtor;
 }
 
-/**
- * Build a relation of `model`'s own relation class.
- *
- * Mirrors: ActiveRecord::Delegation::ClassMethods#create
- * (relation/delegation.rb:139-141) — `relation_class_for(model).new(model, ...)`,
- * whose remaining arguments are `Relation#initialize`'s keywords (`table:`,
- * `predicate_builder:`) and are forwarded unchanged. The scope proxy is the
- * trails half of what Ruby's per-model delegate class does for named scopes, so
- * it is applied here rather than at each construction site.
- */
 export function create(
   model: typeof Base,
   kwargs: { table?: any; predicateBuilder?: any } = {},
@@ -525,11 +271,6 @@ export function create(
   return wrapWithScopeProxy(new (relationClassFor(model))(model, table, predicateBuilder));
 }
 
-/**
- * Per-model prototype carrier for the `AssociationRelation` delegate class.
- * `blog.posts.where(...)` and other association-relation construction sites are
- * built from this subclass so generated methods resolve as real methods on them.
- */
 const _associationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
 export function associationRelationClassFor(modelClass: typeof Base): FamilyCtor {
@@ -540,10 +281,6 @@ export function associationRelationClassFor(modelClass: typeof Base): FamilyCtor
   );
 }
 
-/**
- * Per-model prototype carrier for the `DisableJoinsAssociationRelation` delegate
- * class.
- */
 const _disableJoinsAssociationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
 export function disableJoinsAssociationRelationClassFor(modelClass: typeof Base): FamilyCtor {
@@ -554,9 +291,6 @@ export function disableJoinsAssociationRelationClassFor(modelClass: typeof Base)
   );
 }
 
-/**
- * Per-model prototype carrier for the `CollectionProxy` delegate class.
- */
 const _collectionProxyClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
 export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
@@ -567,12 +301,6 @@ export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
   );
 }
 
-/**
- * Cache a class-method delegation for `modelClass` as a real generated relation
- * method (delegation.rb:127-129) — installed onto every per-model prototype
- * carrier so subsequent calls resolve it by ordinary prototype lookup rather
- * than re-running the `Proxy` miss path.
- */
 export function generateRelationMethod(
   modelClass: typeof Base,
   name: string,
@@ -581,28 +309,6 @@ export function generateRelationMethod(
   modelClass.generatedRelationMethods().generateMethod(name, fn);
 }
 
-/**
- * Build the function that delegates a model class method through a relation /
- * collection-proxy scope — Rails' `ClassSpecificRelation#method_missing`
- * `scoping { model.public_send(method, ...) }` (delegation.rb:118-131). The
- * `this` it's invoked with becomes the current scope for the call's duration:
- * sync results (a Relation) restore the prior scope immediately so the result
- * is directly chainable; async results (a Promise) defer restoration until the
- * promise settles, mirroring Rails' synchronous block-scoping across the body.
- *
- * The delegator is **model-agnostic** (Rails' generated body is
- * `def m(...); scoping { model.m(...) }; end`, delegation.rb:76-88): it reads
- * the live model off the relation it's invoked on (`this._model`) rather
- * than capturing a specific `modelClass`, resolving and scoping that model's
- * class method at call time. This is what lets a single delegator be correct on
- * any model in an STI hierarchy — a parent model's generated module can be
- * inherited down onto an STI child carrier and still dispatch to the child
- * (child scope + child STI type-condition), matching Rails'
- * `include_relation_methods` superclass recursion.
- *
- * This is also what `generateRelationMethod` caches (delegation.rb:127-129) so
- * subsequent calls skip the proxy miss path.
- */
 export function classMethodDelegator(prop: string): AnyCallable {
   return function (this: any, ...args: any[]) {
     const modelClass = this._model as typeof Base;
@@ -660,7 +366,6 @@ export function name(): string {
  * succeeding.
  */
 const DELEGATED_ARRAY_METHODS = new Set<string>([
-  // curated delegate-to-records list (delegation.rb) → JS equivalents
   "forEach",
   "join",
   "reverse",
@@ -680,33 +385,12 @@ const DELEGATED_ARRAY_METHODS = new Set<string>([
   "flatMap",
 ]);
 
-/**
- * `Array#&`, `Array#|` and `Array#-` — three of the five operators
- * delegation.rb:101 sends to `records` (`[]`, `&`, `|`, `+`, `-`). `[]` and
- * `+` reach `Array.prototype` directly (`at`/`slice`, `concat`) and so live in
- * DELEGATED_ARRAY_METHODS; these three have no `Array.prototype` counterpart,
- * so they are spelled out here under Ruby's OWN alias names for them —
- * `Array#intersection`, `Array#union`, `Array#difference` — rather than
- * dropped. TS has no operator overloading, and the aliases are the spelling
- * Ruby itself offers when the operator can't be written.
- *
- * Ruby's set semantics, not JS's: `&` and `|` de-duplicate, `-` does not, and
- * membership compares with `eql?` — for records, `Core#==` (core.rb:631, ported
- * as `equals`), which matches on class + id rather than object identity.
- *
- * These are runtime delegation-table entries, not declared TS members, so
- * `OPERATOR_SPELLING_BY_FQN` (scripts/api-compare/operator-order-spelling.ts)
- * still leaves `ActiveRecord::Delegation`'s operators unmapped: that table only
- * accepts a spelling verified against a real member of the mapped container,
- * and delegation.ts's container holds top-level functions.
- */
 const DELEGATED_RECORD_SET_OPERATORS: Record<string, (a: unknown[], b: unknown[]) => unknown[]> = {
   intersection: (a, b) => uniqRecords(a).filter((record) => includesRecord(b, record)),
   union: (a, b) => uniqRecords([...a, ...b]),
   difference: (a, b) => a.filter((record) => !includesRecord(b, record)),
 };
 
-/** Ruby `eql?` for the delegated set operators: `Core#==` when the value has it. */
 function recordsEql(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   const equals = (a as { equals?: (other: unknown) => boolean } | null | undefined)?.equals;
@@ -723,20 +407,6 @@ function uniqRecords(records: unknown[]): unknown[] {
   return uniq;
 }
 
-/**
- * Array-method delegation — mirrors Rails' `delegate ... to: :records`
- * (delegation.rb): once a property isn't an own/scope/model method,
- * CollectionProxy/Relation route curated `Array`/`Enumerable` methods through
- * the loaded records (Ruby's method_missing → `to_a` → `Array#<method>`, e.g.
- * `categories.sort`). JS has no blocking IO, so this reads already-loaded
- * records — await the relation/proxy (or `load()`) first for a fresh load —
- * and operates on a copy of the records so Ruby's non-mutating semantics hold
- * (`sort`, not `sort!`).
- *
- * Returns a bound callable when `prop` names a delegated `Array.prototype`
- * method, otherwise `undefined` so the caller can fall through to its own
- * default (and raise for methods Rails would also reject).
- */
 export function delegateArrayMethod(
   prop: string,
   records: () => unknown[],
@@ -749,17 +419,6 @@ export function delegateArrayMethod(
   return (...args: any[]) => (arrayMethod as (...a: any[]) => unknown).apply([...records()], args);
 }
 
-/**
- * Async Array-method delegation — same curated set as `delegateArrayMethod`,
- * but forces a load first via `loadRecords()` before applying the Array method.
- * Used for *unloaded* relations/proxies so that `sort`, `map`, etc. are always
- * present (Rails `assert_respond_to` passes on unloaded targets) and calling
- * them hydrates the records, mirroring Rails' `records` → `load` path.
- * JS has no blocking IO, so the load-on-call path must be async.
- *
- * Returns a bound callable when `prop` names a delegated `Array.prototype`
- * method, otherwise `undefined`.
- */
 export function delegateArrayMethodAsync(
   prop: string,
   loadRecords: () => Promise<unknown[]>,
@@ -775,27 +434,6 @@ export function delegateArrayMethodAsync(
   };
 }
 
-/**
- * Enumerable-method delegation — Rails' `Relation`/`CollectionProxy`
- * `include Enumerable` plus `delegate ... to: :records` (delegation.rb).
- * All delegated methods here are **async + self-loading**: they are present
- * on an unloaded relation/proxy and force the load themselves via
- * `loadRecords()`, mirroring Rails where `records` → `load` runs before
- * enumeration. JS has no blocking IO, so the load-on-call path is async.
- *
- * Covers two surfaces:
- *   - `partition` — a pure Enumerable method with no JS `Array.prototype`
- *     analogue (returns `[matched, unmatched]` in one pass).
- *   - DELEGATED_ARRAY_METHODS — the curated `delegate ... to: :records` set
- *     (sort, map, join, …). These also have a sync path via `delegateArrayMethod`
- *     used when records are already loaded; this async path covers the
- *     unloaded case and must be checked *before* scope/model-class delegation
- *     in `wrapCollectionProxy` so it routes to the collection cache, not the
- *     underlying relation's records.
- *
- * Returns a bound callable when `prop` names a supported method, otherwise
- * `undefined` so the caller can fall through to its own default.
- */
 export function delegateEnumerableMethod(
   prop: string,
   loadRecords: () => Promise<unknown[]>,
@@ -823,26 +461,12 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 
       const modelClass = target._model as typeof Base;
 
-      // Generated relation methods (Rails' GeneratedRelationMethods) now resolve
-      // as real methods via the top-of-trap `Reflect.get` above: they live on
-      // the per-model subclass prototype (`relationClassFor` /
-      // `associationRelationClassFor` / `disableJoinsAssociationRelationClassFor`),
-      // which is this `target`'s prototype, so no explicit side-table branch is
-      // needed here. The `uncacheableMethods` gate below is therefore
-      // load-bearing — a subclass-only method (e.g. CollectionProxy#target) is
-      // never generated, so a generated copy can never shadow it.
       if (modelClass._scopes.has(prop)) {
         return (...args: any[]) => {
           const scopeFn = modelClass._scopes.get(prop)!;
-          // Rails named.rb:175 — `all._exec_scope(*args, &body)`, not a bare
-          // call: `_exec_scope` is what marks the relation delegate-to-model
-          // and nils the current scope for the duration of the body.
           const result = target._execScope(...args, scopeFn);
           const extensions = modelClass._scopeExtensions?.get(prop);
           if (extensions && result && typeof result === "object") {
-            // Register the extension as a module on the relation (mirrors Ruby's
-            // anonymous-module `extend`) so its methods survive spawning — e.g.
-            // `Topic.anonymous_extension.none.one`.
             if (typeof result.extendingBang === "function") {
               result.extendingBang(extensions);
             } else {
@@ -855,38 +479,18 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
         };
       }
 
-      // Array-method delegation (sync path) — when already loaded, delegate
-      // synchronously against the in-memory records (delegation.rb
-      // `delegate ... to: :records`). Checked before the async/enumerable
-      // path so a loaded relation uses the fast sync route.
       if (target._loaded) {
         const records = () => target._records ?? [];
         const arrayDelegate = delegateArrayMethod(prop, records);
         if (arrayDelegate) return arrayDelegate;
       }
 
-      // Enumerable-method delegation — async + self-loading. Covers `partition`
-      // and all DELEGATED_ARRAY_METHODS on unloaded relations (mirrors Rails'
-      // `records` → `load` path). Always present so `assert_respond_to` passes.
-      // `records()` forces a load and returns the rows.
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
-      // Rails delegation.rb:118-131 (ClassSpecificRelation#method_missing):
-      // a method the relation doesn't define but the model class does is
-      // delegated via `scoping { model.public_send(method, ...) }`, so the
-      // class method (and any bare scope calls inside it) honors this relation
-      // as the current scope. Sync methods (returning a Relation) restore the
-      // scope immediately so the result is directly chainable; async methods
-      // (returning a Promise) defer restoration until the promise settles,
-      // mirroring Rails' synchronous block-scoping across the full body.
       const classMethod = (modelClass as any)[prop];
       if (typeof classMethod === "function") {
         const delegator = classMethodDelegator(prop);
-        // Cache the delegation so subsequent calls resolve through the
-        // generated method above rather than re-running this proxy miss path
-        // (delegation.rb:127-129) — except uncacheable methods (to_a/records/
-        // inspect) which Rails never generates.
         if (!uncacheableMethods().has(prop)) {
           generateRelationMethod(modelClass, prop, delegator);
         }
@@ -894,8 +498,6 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       }
       return value;
     },
-    // delegation.rb:150-152 — `super || model.respond_to?(method)`, over the
-    // names the `get` trap above fabricates.
     has(target: any, prop: string | symbol) {
       if (Reflect.has(target, prop)) return true;
       if (typeof prop === "symbol") return false;
@@ -907,30 +509,11 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
   });
 }
 
-/**
- * The host surface `DelegationMethods` operates against once mixed into
- * `Relation` — the `model` accessor (Rails' delegation target `:model`) and the
- * loaded `records` (`:records`), which trails loads asynchronously.
- */
 export interface DelegationHost {
   readonly model: typeof Base;
   records(): Promise<Base[]>;
 }
 
-/**
- * DelegationMethods — the curated `delegate ... to: :records` and
- * `delegate ... to: :model` surface (delegation.rb:101-106) realized as real
- * named methods on `Relation` (mixed in via `include(Relation, DelegationMethods)`),
- * so `relation.each`, `relation.connection`, `relation.toSentence`, … resolve
- * exactly as in Rails rather than only through the runtime delegation Proxy.
- *
- * The `to: :records` methods are async + self-loading: Rails reads the loaded
- * `records` array synchronously, but trails loads asynchronously, so each forces
- * `records()` first and then applies the corresponding `Array`/`Enumerable`
- * helper to a copy (preserving Ruby's non-mutating semantics).
- *
- * Mirrors: ActiveRecord::Delegation
- */
 type RecordDelegate = (records: Base[], ...args: any[]) => unknown;
 type GroupFill = Base | null | false;
 export type GroupedRecords = GroupFill[][];
@@ -940,7 +523,6 @@ export type ToSentenceOptions = {
   lastWordConnector?: string;
 };
 
-/** Options for the collection {@link DelegationMethods.toXml} serializer. */
 export type ToXmlOptions = SerializeOptions &
   RenameKeyOptions & {
     root?: string;
@@ -949,11 +531,6 @@ export type ToXmlOptions = SerializeOptions &
     skipInstruct?: boolean;
   };
 
-/**
- * The `delegate ... to: :records` operations (delegation.rb:101) as pure sync
- * functions over an already-loaded `records` array, reused by `DelegationMethods`
- * (async, self-loading) and `delegateRecordMethodSync` (sync, loaded proxy).
- */
 const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   length: (records) => records.length,
   each: (records, fn: (record: Base, index: number) => void) => {
@@ -961,9 +538,6 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records;
   },
   join: (records, separator?: string) => records.join(separator),
-  // Ruby's `Array#intersect?` matches by `hash`/`eql?`, and `ActiveRecord::Core`
-  // aliases `eql?` to `==` (id equality) — so this must use record equality, not
-  // JS identity via `Array#includes`.
   isIntersect: (records, other: Base[]) =>
     records.some((record) => other.some((o) => record.equals(o))),
   reverse: (records) => [...records].reverse(),
@@ -1020,33 +594,17 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
       if (records.length === 0) return "null";
       return records.map((record) => (record as unknown as { id: unknown }).id).join(",");
     }
-    // Non-`:db` falls back to Ruby `Array#to_s` == `Array#inspect`
-    // (conversions.rb:103): bracketed, comma-separated element inspects, NOT a
-    // bare comma-join.
     return `[${records
       .map((record) => (record as unknown as { inspect(): string }).inspect())
       .join(", ")}]`;
   },
 };
-// `alias_method :to_formatted_s, :to_fs` (conversions.rb).
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 
-/**
- * The curated `to: :records` delegate names backed by `RECORD_DELEGATES` — the
- * methods `wrapCollectionProxy` resolves synchronously on a loaded proxy.
- */
 export const DELEGATION_RECORD_METHOD_NAMES: ReadonlySet<string> = new Set(
   Object.keys(RECORD_DELEGATES),
 );
 
-/**
- * Sync delegation of a curated `to: :records` method against an already-loaded
- * `records` array, so a *loaded* CollectionProxy keeps Rails' synchronous
- * `records` delegation (delegation.rb:101, `CollectionProxy#records` →
- * `load_target`) for the full curated set — including Rails-named entries
- * (`each`, `index`, …) the JS-name array delegate doesn't cover. Returns
- * `undefined` for non-record names so callers fall through.
- */
 export function delegateRecordMethodSync(
   prop: string,
   records: () => Base[],
@@ -1057,42 +615,34 @@ export function delegateRecordMethodSync(
 }
 
 export class DelegationMethods {
-  /** `Array#length` — the number of loaded records. */
   async length(this: DelegationHost): Promise<number> {
     return RECORD_DELEGATES.length(await this.records()) as number;
   }
 
-  /** `Array#each` — yields each loaded record, returning the records. */
   async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {
     return RECORD_DELEGATES.each(await this.records(), fn) as Base[];
   }
 
-  /** `Array#join`. */
   async join(this: DelegationHost, separator?: string): Promise<string> {
     return RECORD_DELEGATES.join(await this.records(), separator) as string;
   }
 
-  /** `Array#intersect?` — whether any record is also in `other`. */
   async isIntersect(this: DelegationHost, other: Base[]): Promise<boolean> {
     return RECORD_DELEGATES.isIntersect(await this.records(), other) as boolean;
   }
 
-  /** `Array#reverse` (non-mutating). */
   async reverse(this: DelegationHost): Promise<Base[]> {
     return RECORD_DELEGATES.reverse(await this.records()) as Base[];
   }
 
-  /** `Array#compact` — drop nil records. */
   async compact(this: DelegationHost): Promise<Base[]> {
     return RECORD_DELEGATES.compact(await this.records()) as Base[];
   }
 
-  /** `Array#index` — index of the first matching record, or `null` (Ruby `nil`). */
   async index(this: DelegationHost, v: Base | ((record: Base) => unknown)): Promise<number | null> {
     return RECORD_DELEGATES.index(await this.records(), v) as number | null;
   }
 
-  /** `Array#rindex` — index of the last matching record, or `null` (Ruby `nil`). */
   async rindex(
     this: DelegationHost,
     v: Base | ((record: Base) => unknown),
@@ -1100,32 +650,26 @@ export class DelegationMethods {
     return RECORD_DELEGATES.rindex(await this.records(), v) as number | null;
   }
 
-  /** `Array#sample` — a random record, or (with `n`) up to `n`; `null` if empty. */
   async sample(this: DelegationHost, n?: number): Promise<Base | Base[] | null> {
     return RECORD_DELEGATES.sample(await this.records(), n) as Base | Base[] | null;
   }
 
-  /** `Array#rotate` — rotate left by `count` (negative rotates right). */
   async rotate(this: DelegationHost, count = 1): Promise<Base[]> {
     return RECORD_DELEGATES.rotate(await this.records(), count) as Base[];
   }
 
-  /** `Array#shuffle` (non-mutating). */
   async shuffle(this: DelegationHost): Promise<Base[]> {
     return RECORD_DELEGATES.shuffle(await this.records()) as Base[];
   }
 
-  /** `Array#split` — split records on a value or predicate (ActiveSupport). */
   async split(this: DelegationHost, v: Base | ((record: Base) => boolean)): Promise<Base[][]> {
     return RECORD_DELEGATES.split(await this.records(), v) as Base[][];
   }
 
-  /** `Array#in_groups` — split records into `number` groups (ActiveSupport). */
   async inGroups(this: DelegationHost, n: number, fill: GroupFill = null): Promise<GroupedRecords> {
     return RECORD_DELEGATES.inGroups(await this.records(), n, fill) as GroupedRecords;
   }
 
-  /** `Array#in_groups_of` — split records into groups of `number` (ActiveSupport). */
   async inGroupsOf(
     this: DelegationHost,
     n: number,
@@ -1134,51 +678,22 @@ export class DelegationMethods {
     return RECORD_DELEGATES.inGroupsOf(await this.records(), n, fill) as GroupedRecords;
   }
 
-  /** `Array#to_sentence` — comma/`and`-joined record strings (ActiveSupport). */
   async toSentence(this: DelegationHost, options?: ToSentenceOptions): Promise<string> {
     return RECORD_DELEGATES.toSentence(await this.records(), options) as string;
   }
 
-  /** `Array#as_json` — each record's `as_json`. */
   async asJson(this: DelegationHost, options?: SerializeOptions): Promise<unknown[]> {
     return RECORD_DELEGATES.asJson(await this.records(), options) as unknown[];
   }
 
-  /**
-   * `Array#to_fs` / `Array#to_formatted_s` (conversions.rb:94-104): `:db` →
-   * `"null"` when empty else ids joined by `","`; else `Array#to_s` (bracketed
-   * inspect form).
-   */
   async toFs(this: DelegationHost, format?: string): Promise<string> {
     return RECORD_DELEGATES.toFs(await this.records(), format) as string;
   }
 
-  /** Alias of {@link toFs} — `alias_method :to_formatted_s, :to_fs`. */
   async toFormattedS(this: DelegationHost, format?: string): Promise<string> {
     return RECORD_DELEGATES.toFormattedS(await this.records(), format) as string;
   }
 
-  /**
-   * `Array#to_xml` (activesupport/lib/active_support/core_ext/array/conversions.rb:183-211):
-   * serialize the loaded records as an XML collection.
-   *
-   * One `XmlMini` builder is created (`:188`) and threaded through every
-   * `to_tag` call (`:208`), which is how nesting and indentation compose. The
-   * default root is `pluralize(underscore(first.class.name)).tr("/", "_")`
-   * (`:190-193`) when `first.class != Hash && all?(first.class)`, else
-   * `"objects"`. `all?` is `Class#===`, so a subclass still matches and an STI
-   * collection roots under its base's plural; the Hash guard is live in
-   * Rails' suite (conversions_test.rb `test_to_xml_with_options` roots an array
-   * of hashes under `<objects>`), and Ruby's Hash is a JS plain object. On an
-   * empty array `first` is nil and `all?` is vacuously true, so the same branch
-   * yields the *pre-rename* `"nil_classes"`, which `renameKey` then dasherizes.
-   *
-   * Rails renames the root first, then singularizes it for the child name, and
-   * deletes `:children` / `:skip_instruct` so neither reaches `to_tag`
-   * (`:199-202`). ActiveModel has carried no per-record `to_xml` since Rails 4.2
-   * moved XML out to the `activemodel-serializers-xml` gem, so records fall
-   * through `to_tag`'s generic arm (xml_mini.rb:132-135) as in gem-less Rails.
-   */
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
     const records = await this.records();
     const builder = new IndentedXmlStringBuilder();
@@ -1208,22 +723,18 @@ export class DelegationMethods {
     return instruct + builder.target();
   }
 
-  /** `delegate :connection, to: :model`. */
   get connection(): DatabaseAdapter {
     return (this as unknown as DelegationHost).model.connection;
   }
 
-  /** `delegate :primary_key, to: :model`. */
   get primaryKey(): string | string[] {
     return (this as unknown as DelegationHost).model.primaryKey;
   }
 
-  /** `delegate :table_name, to: :model`. */
   get tableName(): string {
     return (this as unknown as DelegationHost).model.tableName;
   }
 
-  /** `delegate :with_connection, to: :model`. */
   withConnection<R>(
     this: DelegationHost,
     fn: (conn: DatabaseAdapter) => R | Promise<R>,
@@ -1232,7 +743,6 @@ export class DelegationMethods {
     return this.model.withConnection(fn, options);
   }
 
-  /** `delegate :transaction, to: :model`. */
   transaction<R>(
     this: DelegationHost,
     fn: (tx: any) => Promise<R>,
@@ -1241,13 +751,11 @@ export class DelegationMethods {
     return this.model.transaction(fn, options);
   }
 
-  /** `delegate :sanitize_sql_like, to: :model`. */
   sanitizeSqlLike(this: DelegationHost, value: string, escapeChar?: string): string {
     return this.model.sanitizeSqlLike(value, escapeChar);
   }
 }
 
-/** Fisher–Yates in-place shuffle (Ruby `Array#shuffle`/`#sample` semantics). */
 function shuffleInPlace<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

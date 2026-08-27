@@ -1,10 +1,3 @@
-/**
- * trails-only: `define_model_callbacks` dispatches its generators with
- * `send("_define_#{type}_model_callback", self, callback)` (callbacks.rb:124-126),
- * so an `only:` entry with no matching generated method raises `NoMethodError`.
- * TypeScript has no `send`, and the failure mode of the map that stands in for
- * it has to be pinned rather than assumed.
- */
 import { describe, it, expect } from "vitest";
 import {
   Callbacks as ASCallbacks,
@@ -30,13 +23,6 @@ describe("defineModelCallbacks", () => {
   });
 });
 
-/**
- * trails-only: `ActiveModel::Callbacks.extended` (callbacks.rb:66-70) does
- * `base.class_eval { include ActiveSupport::Callbacks }`, so a bare class that
- * extends the module gets the chain engine from the module and never from its
- * own body. Ruby fires `self.extended` for free; trails routes it through the
- * `extended` symbol hook, which has to be pinned.
- */
 describe("Callbacks.extended", () => {
   it("installs ActiveSupport::Callbacks on the extending class", () => {
     class Topic {}
@@ -63,20 +49,6 @@ describe("Callbacks.extended", () => {
   });
 });
 
-/**
- * trails-only tests that were interleaved with the `callbacks_test.rb` mirror
- * in `callbacks.test.ts`. They cover surface Rails' file does not: the
- * `only:` option, class-based callback objects, `CallbackChain` ordering, the
- * generic `setCallback` / `skipCallback` / `resetCallbacks` trio, and the
- * unified sync/async runner TypeScript needs where Ruby has none.
- */
-
-/**
- * A throwaway class carrying the macros `define_model_callbacks` generates, so
- * a test registers through the same `before_save` / `after_save` surface user
- * code does. The Rails-model equivalent of the bare prototypes these tests used
- * to build by hand.
- */
 function modelWith(...events: string[]): any {
   class Klass {}
   extend(Klass, ASCallbacks.ClassMethods);
@@ -84,14 +56,6 @@ function modelWith(...events: string[]): any {
   return Klass;
 }
 
-/**
- * `define_model_callbacks` generates its macros with `define_singleton_method`
- * (activemodel/lib/active_model/callbacks.rb:130, :137, :144), so the names
- * exist only once the macro has run and TypeScript cannot see them on the
- * class. `generated()` is the single place this suite crosses that gap: it
- * names the shape those methods have rather than reaching for a cast at each
- * call site.
- */
 type GeneratedMacro<F> = (...args: Array<F | object | string | CallbackConditions>) => void;
 
 interface GeneratedModelCallbacks {
@@ -261,9 +225,6 @@ describe("CallbackChain.run", () => {
 });
 
 describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidelity)", () => {
-  // Rails `set_callback(name, type, filter, options)` /
-  // `skip_callback(...)` / `reset_callbacks(name)` from
-  // `ActiveSupport::Callbacks::ClassMethods`.
   it("setCallback registers a function for arbitrary event + timing", async () => {
     const log: string[] = [];
     class Thing extends Model {
@@ -354,11 +315,6 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   });
 
   it("skipCallback removes a CallbackObject registered by reference", async () => {
-    // Rails `set_callback(:save, :before, CallbackObject.new)` looks up
-    // `before_save` (or our camelCase `beforeSave`) on the object. The
-    // same reference must identify it for `skip_callback` — even though
-    // `register` internally resolves to a bound method, `skip` must
-    // match the original object reference.
     const log: string[] = [];
     class Thing extends Model {
       static {

@@ -1,13 +1,3 @@
-/**
- * trails-only coverage for the unified `perform_query` primitive.
- *
- * Rails' SQLite3 adapter has one SQL primitive, perform_query, which branches on
- * `stmt.column_count.zero?` and sources affected rows from a separate
- * `raw_connection.changes` read. These assert the branch and that read hold for
- * the better-sqlite3 analogue (`stmt.reader` / `SELECT changes()`), including
- * the case where a statement both returns rows and writes
- * (`INSERT ... RETURNING`).
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
@@ -43,16 +33,11 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("rawExecute returns an ActiveRecord::Result carrying the statement's columns", async () => {
-    // `ActiveRecord::Result.new(stmt.columns, stmt.to_a)`
-    // (sqlite3/database_statements.rb:93) sources the columns from the
-    // statement, so a SELECT matching no rows still reports them — which is
-    // what makes cast_result (`:117-121`) the identity.
     const empty = (await adapter.rawExecute(`SELECT "id", "nick" FROM "pq"`, "SQL")) as Result;
     expect(empty).toBeInstanceOf(Result);
     expect(empty.columns).toEqual(["id", "nick"]);
     expect(empty.rows).toEqual([]);
 
-    // A non-row-returning statement takes `stmt.step; ActiveRecord::Result.empty`.
     const written = (await adapter.rawExecute(
       `INSERT INTO "pq" ("nick") VALUES ('a')`,
       "SQL",
@@ -71,8 +56,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
     expect(adapter.affectedRows()).toBe(2);
 
-    // A read leaves the count alone — it tracks the last write, as
-    // raw_connection.changes does in Rails.
     await adapter.execute(`SELECT * FROM "pq"`);
     expect(adapter.affectedRows()).toBe(2);
   });
@@ -173,21 +156,13 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("does not close the handle out from under a statement holding the lock", async () => {
-    // Rails' disconnect! (sqlite3_adapter.rb:221) runs under the same @lock
-    // with_raw_connection holds around perform_query
-    // (abstract/database_statements.rb:552-559), so a pool teardown can never
-    // land between a statement's preparation and its execution.
     const closing = new BetterSQLite3Adapter(":memory:");
-    // Private :memory: handle, closed by the disconnect this test provokes —
-    // nothing outlives the test to collide with a sibling fork.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.exec(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
     const release = await acquireStatementLock(closing);
     const held = closing._statementLock;
 
     const queued = closing.executeMutation(`INSERT INTO "dc" DEFAULT VALUES`);
-    // Yield until the statement has joined the lock queue, so the disconnect
-    // below is provoked at exactly the moment Rails' @lock covers.
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
     expect(closing._statementLock).not.toBe(held);
 
@@ -202,11 +177,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
-    // Ruby's `@lock.synchronize` blocks (abstract_adapter.rb:696-701), so
-    // `active?` is already false the moment `disconnect!` returns. JS cannot
-    // block, so the close lands on `_statementLock`'s tail — and `active()`,
-    // the awaitable surface, drains it rather than reporting the open handle
-    // Rails never exposes.
     const closing = new BetterSQLite3Adapter(":memory:");
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.exec(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
@@ -234,11 +204,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect([...ids].sort((a, b) => a - b)).toEqual([1, 2]);
   });
 
-  // Rails' `preventing_writes?` returns false when `connection_descriptor` is nil
-  // (abstract_adapter.rb:229), so a `Base` scope only reaches a pool-backed
-  // connection — these two lease rather than reuse the standalone adapter above.
-  // The guard itself lives in preprocess_query's check_if_write_query, so it
-  // covers execute and executeMutation alike.
   it("errors when a write is routed through execute while preventing writes", async () => {
     const connection = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
     await expect(
@@ -265,9 +230,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("dirties the current transaction for a read too", async () => {
-    // Rails dirties in with_raw_connection's ensure gated on
-    // materialize_transactions, NOT on write — so a plain SELECT in an open
-    // transaction dirties it just like a write does.
     await adapter.transaction(async () => {
       await adapter.execute(`SELECT * FROM "pq"`);
       expect(adapter.currentTransaction().isDirty()).toBe(true);
@@ -275,8 +237,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("dirties the current transaction even when the statement raises", async () => {
-    // The dirty runs in the primitive's finally, mirroring Rails' ensure — a
-    // failed write still leaves the transaction dirty.
     await adapter.transaction(async () => {
       await expect(
         adapter.execute(`INSERT INTO "no_such_table" ("x") VALUES (1)`),
@@ -284,10 +244,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
       expect(adapter.currentTransaction().isDirty()).toBe(true);
     });
   });
-  // Rails' internal_execute forwards `prepare:` to raw_execute → perform_query,
-  // whose prepare branch pools the statement (`@statements[sql] ||=
-  // raw_connection.prepare(sql)`, sqlite3/database_statements.rb:81-91). The
-  // unprepared arm stays on `exec`, which never touches the pool.
   it("internalExecute prepares when prepare is true", async () => {
     const pool = (adapter as unknown as { _statements: { get(sql: string): unknown } })._statements;
     await adapter.internalExecute(`SELECT 1`, "SQL", [], { prepare: true });
@@ -321,11 +277,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 8`)).toBe("prepared");
   });
 
-  // Rails' perform_query takes `raw_connection.execute_batch2(sql)` when
-  // `batch: true` (sqlite3/database_statements.rb:79-80) — the only arm that
-  // accepts more than one statement, since `prepare` is single-statement. Only
-  // `raw_execute` carries the keyword (abstract/database_statements.rb:552);
-  // `internal_execute` has no `batch:` and so always prepares.
   it("rawExecute runs multi-statement SQL through the batch arm", async () => {
     await adapter.rawExecute(
       `INSERT INTO "pq" ("nick") VALUES ('one');\nINSERT INTO "pq" ("nick") VALUES ('two')`,

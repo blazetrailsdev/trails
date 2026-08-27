@@ -1,18 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Table, UpdateManager, Nodes } from "./index.js";
 
-// TS-only coverage for AST bookkeeping and rendering arms Rails covers only
-// indirectly, plus the string/BoundSqlLiteral `set` forms and the
-// `UnqualifiedColumn` counter-cache shape.
 describe("UpdateManagerTest (trails)", () => {
   const users = new Table("users");
 
   describe("UnqualifiedColumn", () => {
     it("renders without a table qualifier on the RHS of an UPDATE SET", () => {
-      // Mirrors Rails' ActiveRecord::CounterCache pattern:
-      //   SET "counter" = COALESCE("counter", 0) + 1
-      // without a `"posts"."counter"` table prefix on the RHS, which some
-      // adapters reject inside UPDATE statements.
       const posts = new Table("posts");
       const counter = posts.get("counter");
       const unqual = new Nodes.UnqualifiedColumn(counter);
@@ -56,15 +49,9 @@ describe("UpdateManagerTest (trails)", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       mgr.set(new Nodes.BoundSqlLiteral("name = ?", ["dean"], {}));
-      // `to_sql` compiles through a plain SQLString collector, where the
-      // BoundSqlLiteral's `add_bind` emits a `?` placeholder (Rails parity) —
-      // not the inlined value.
       expect(mgr.toSql()).toBe(`UPDATE "users" SET name = ?`);
     });
 
-    // Mirrors Rails: `set` wraps each LHS in `Nodes::UnqualifiedColumn`
-    // (update_manager.rb), so the visitor strips the table qualifier
-    // structurally rather than via a stateful flag.
     it("wraps each column in an UnqualifiedColumn", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
@@ -74,8 +61,6 @@ describe("UpdateManagerTest (trails)", () => {
       expect(assignment.left).toBeInstanceOf(Nodes.UnqualifiedColumn);
     });
 
-    // Mirrors Rails: values pass through raw (no Quoted wrap); the
-    // visitor's `visit` class dispatch quotes primitives.
     it("stores the raw value on the Assignment (no Quoted wrap)", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
@@ -111,9 +96,6 @@ describe("UpdateManagerTest (trails)", () => {
     expect(mgr.toSql()).toContain("'f'");
   });
 
-  // Mirrors Rails: `tree_manager.rb` `key=` calls `Nodes.build_quoted` on
-  // scalar values and maps over arrays, so the AST always holds Quoted
-  // (or pass-through Node) values rather than raw primitives.
   describe("key=", () => {
     it("wraps a scalar value in Quoted", () => {
       const um = new UpdateManager();

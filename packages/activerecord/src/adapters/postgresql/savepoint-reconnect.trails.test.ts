@@ -1,18 +1,3 @@
-/**
- * trails-only live-adapter coverage with no Rails counterpart: a savepoint
- * statement dirties the popped frame's real PARENT, so
- * `transactionManager.isRestorable()` becomes false — on the success path, on
- * the error path, and (only the live mysql2/PG adapters have this) when
- * `withRawConnection`'s retry loop genuinely reconnects mid-flight.
- *
- * PR #4732 converged the mysql2/PG/sqlite savepoint statements onto Rails'
- * default `materialize_transactions: true` and relocated Rails'
- * `with_raw_connection` `ensure dirty_current_transaction if
- * materialize_transactions` (abstract_adapter.rb:1046) into each adapter's
- * `internalExecute` finally. Its regression test runs on sqlite, which has no
- * reconnect loop; this file exercises the live-adapter reconnect path. Kept in
- * a `.trails` file so parity:test maps cleanly (no such Rails test exists).
- */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { ConnectionFailed } from "../../errors.js";
@@ -48,9 +33,6 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
     await tm.withinNewTransaction({}, async () => {
       await tm.materializeTransactions();
       expect(tm.isRestorable()).toBe(true);
-      // rollbackToSavepoint passes allowRetry:false, so a mid-flight
-      // ConnectionFailed is not retried — it propagates. internalExecute's
-      // finally must still dirty the parent, mirroring Rails' `ensure` on raise.
       const seams = adapter as unknown as RetryLoopSeams;
       vi.spyOn(seams, "rawConnectionForBlock").mockRejectedValueOnce(
         new ConnectionFailed("server closed the connection unexpectedly"),

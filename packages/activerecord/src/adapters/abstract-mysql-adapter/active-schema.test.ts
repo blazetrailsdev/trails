@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/active_schema_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
@@ -95,11 +92,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         );
       }
 
-      // Rails `with_real_execute` block: actually create the index against the
-      // seeded `people` table (no stub), confirm introspection sees it, then
-      // verify the `if_not_exists: true` pre-flight short-circuits without
-      // raising. Only the index we add is torn down — the canonical `people`
-      // table is owned by the fixtures framework.
       try {
         await adapter.addIndex("people", "first_name");
         expect(await adapter.indexExists("people", "first_name")).toBe(true);
@@ -178,10 +170,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("drop table", async () => {
-      // Stub mode: the DROP is instrumented and returned, never executed, so
-      // the canonical `people` survives and needs no rebuild. The disable also
-      // covers the "drop tables" case below — the rule reports a table once.
-      // Nothing reaches the database, so there is nothing to tear down either.
       // eslint-disable-next-line blazetrails/require-canonical-rebuild, blazetrails/require-table-teardown
       const sqls = await captureSql(() => adapter.dropTable("people"), { stub: adapter });
       expect(sqls[0]).toBe("DROP TABLE `people`");
@@ -268,9 +256,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("indexes in create", async () => {
-      // Stub mode mirrors Rails: `execute` is intercepted so the CREATE never
-      // runs (the test only asserts the generated DDL string). `temp` is never
-      // created, so no teardown is needed.
       const sqls = await captureSql(
         () =>
           // eslint-disable-next-line blazetrails/require-table-teardown -- stub mode intercepts execute, so `temp` is never created (no teardown needed); mirrors Rails ActiveSchemaTest

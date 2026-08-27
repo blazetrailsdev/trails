@@ -11,8 +11,6 @@ export class FloatType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): string {
-    // Mirrors Rails float.rb#type_cast_for_schema: the float specials dump as
-    // bare Ruby constants so the schema reload re-applies them as Float values.
     if (typeof value === "number") {
       if (isNaN(value)) return "::Float::NAN";
       if (value === Infinity) return "::Float::INFINITY";
@@ -21,17 +19,12 @@ export class FloatType extends NumericValueType {
     return super.typeCastForSchema(value);
   }
 
-  /** @internal Rails-private helper. */
+  /** @internal */
   protected castValue(value: unknown): number | null {
     if (typeof value === "number") return value;
-    // Case-sensitive exact match mirrors Rails float.rb:53-60; "nan"/"infinity" are not valid.
     if (value === "Infinity") return Number.POSITIVE_INFINITY;
     if (value === "-Infinity") return Number.NEGATIVE_INFINITY;
     if (value === "NaN") return Number.NaN;
-    // Mirrors float.rb:60's `else value.to_f`: Ruby's String#to_f reads the
-    // leading numeric prefix and answers 0.0 when there is none — "1ignore" is
-    // 1.0 and "bad" is 0.0, never nil (float_test.rb:14-19). A blank string
-    // never reaches here; Helpers::Numeric#cast has already turned it into nil.
     const parsed = parseFloat(String(value));
     return isNaN(parsed) ? 0 : parsed;
   }

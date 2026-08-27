@@ -22,8 +22,6 @@ function intAttr(name: string, value: number): Attribute {
 }
 
 describe("YAMLEncoder", () => {
-  // `default_types` is the model's `attribute_types`, whose values are the very
-  // Type instances its attributes carry — Rails' `equal?` check depends on that.
   const defaultTypes = { name: stringType, age: integerType };
   const coder = new YAMLEncoder(defaultTypes);
 
@@ -119,8 +117,6 @@ describe("YAMLEncoder", () => {
   });
 
   it("uses attr.type.name (registry key) not type() for type storage", () => {
-    // ImmutableStringType.type() returns "string" (Rails API alias) but
-    // name = "immutable_string" (registry key). Encode must store the key.
     const immutableType = typeRegistry.lookup("immutable_string");
     const attr = Attribute.fromUser("flag", "t", immutableType);
     const set = makeSet(new Map([["flag", attr]]));

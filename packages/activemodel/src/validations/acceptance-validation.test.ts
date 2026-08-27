@@ -100,12 +100,6 @@ describe("AcceptanceValidationTest", () => {
   });
 
   it("validates acceptance of true", async () => {
-    // Rails' Topic uses `attr_accessor :terms_of_service`, preserving the
-    // assigned value without casting; its tests rely on `true` matching the
-    // default accept list `["1", true]`. Our Model requires a declared
-    // attribute, so use `boolean` here — `true` round-trips through cast.
-    // A `string`-typed attribute would cast `true` to "t" (per
-    // type/immutable_string.rb) and rightly not match the default list.
     class Terms extends Model {
       static {
         this.attribute("terms", "boolean");
@@ -126,8 +120,6 @@ describe("AcceptanceValidationTest", () => {
   });
 
   it("validates acceptance with a scalar accept option", async () => {
-    // Rails' `acceptable_option?` does `Array(options[:accept]).include?(value)`,
-    // so a non-array `accept:` is normalized to a one-element list.
     class Terms extends Model {
       static {
         this.attribute("terms", "string");
@@ -139,8 +131,6 @@ describe("AcceptanceValidationTest", () => {
   });
 
   it("validates acceptance with an iterable (Set) accept option", async () => {
-    // Rails' `Array(options[:accept])` coerces via `to_a`, so a Set/Enumerator
-    // should be spread into the list of accepted values.
     class Terms extends Model {
       static {
         this.attribute("terms", "string");
@@ -158,8 +148,6 @@ describe("AcceptanceValidationTest", () => {
         this.validates("terms", { acceptance: true });
       }
     }
-    // setup! installs a prototype accessor (Rails attr_reader/attr_writer),
-    // not a declared attribute definition.
     expect(Object.getOwnPropertyDescriptor(Agreement.prototype, "terms")?.set).toBeTypeOf(
       "function",
     );

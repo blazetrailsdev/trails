@@ -1,9 +1,3 @@
-/**
- * Connection handler — manages connection pools per role/shard.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler
- */
-
 import type { ConnectionPool } from "./connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./connection-descriptor.js";
 import {
@@ -39,19 +33,8 @@ _setAdapterClassResolver(
 export { ConnectionDescriptor };
 export type { ConnectionOwner };
 
-// Ruby resolves `Base` in `establish_connection`'s `owner_name: Base` default
-// (`abstract/connection_handler.rb:115`) when the method runs, so
-// connection_handler.rb takes no load-order dependency on base.rb. An ESM
-// `import` from here would close a cycle (base.ts already imports this file),
-// so `base.ts` pushes itself in at the bottom of its own body instead — the
-// same `_registerBase` shape schema-migration.ts uses.
 let _base: BaseLike | undefined;
 
-/**
- * `Base` as `connection_handler.rb` reads it: the owner-name default plus the
- * `current_role` / `current_shard` readers `establish_connection`,
- * `retrieve_connection` and `connected?` default their selectors off.
- */
 type BaseLike = ConnectionOwner & {
   currentRole(): string;
   currentShard(): string;
@@ -66,11 +49,7 @@ export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
   private _preventWrites: boolean;
 
-  /**
-   * @missingRailsArgs new — PERMANENT: connection_handler.rb:78 writes
-   * `Concurrent::Map.new(initial_capacity: 2)`; a JS `Map` has no capacity
-   * hint, so the kwarg has no counterpart to pass.
-   */
+  /** @missingRailsArgs new — PERMANENT */
   constructor() {
     this._connectionNameToPoolManager = new Map();
     this._preventWrites = false;
@@ -84,21 +63,7 @@ export class ConnectionHandler {
     this._preventWrites = value;
   }
 
-  /**
-   * Normalize an owner into a form suitable for PoolConfig.connectionDescriptor=.
-   *
-   * Strings → ConnectionDescriptor. Classes pass through as-is so that
-   * PoolConfig.connectionDescriptor= can call primaryClassQ() on them.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name
-   *
-   * Returns undefined only when no owner was given at all — `establishConnection`
-   * defaults `ownerName` to `Base` (via `_registerBase`) as
-   * connection_handler.rb:115 does, and supplies a config-name descriptor for
-   * the window before base.ts has loaded.
-   *
-   * @internal
-   */
+  /** @internal */
   determineOwnerName(
     ownerName: string | ConnectionOwner | undefined,
     config?: DatabaseConfig | string | Record<string, unknown>,
@@ -117,11 +82,7 @@ export class ConnectionHandler {
     return [...this._connectionNameToPoolManager.keys()];
   }
 
-  /**
-   * @missingRailsCall map — PERMANENT: Per-site verified (RFC 0106 wave 4b): the inner
-   *   `map` of connection_handler.rb:75-79 is the same Ruby-Enumerable idiom,
-   *   spelled as the body of trails' explicit `for..of` accumulation.
-   */
+  /** @missingRailsCall map — PERMANENT */
   connectionPoolList(role?: string | null): ConnectionPool[] {
     const effectiveRole = role === "all" ? null : role;
     const pools: ConnectionPool[] = [];
@@ -139,10 +100,6 @@ export class ConnectionHandler {
     return this.connectionPoolList();
   }
 
-  // `each_connection_pool(role = nil, &block)` (`connection_handler.rb:104`):
-  // Ruby's block is syntactically separate from the optional `role`, so a
-  // caller with no role passes only the block. The overload keeps those call
-  // sites spelled as Rails spells them.
   eachConnectionPool(block: (pool: ConnectionPool) => void): void;
   eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
   eachConnectionPool(
@@ -169,20 +126,12 @@ export class ConnectionHandler {
       clobber?: boolean;
     } = {},
   ): ConnectionPool {
-    // `owner_name: Base` (connection_handler.rb:115). `_base` is unset only
-    // before base.ts has finished loading, where Rails' constant would not
-    // resolve either; fall back to the config-name descriptor then.
     const ownerName =
       this.determineOwnerName(options.ownerName ?? _base, config) ??
       (config instanceof DatabaseConfig
         ? new ConnectionDescriptor(config.name)
         : new ConnectionDescriptor("primary"));
 
-    // `role: Base.current_role, shard: Base.current_shard`
-    // (connection_handler.rb:115) — resolved at call time, so a caller inside
-    // `connected_to(role:)` establishes on the swapped role. Same pre-load
-    // window as `ownerName` above: fall back to the seeded defaults
-    // (`writing_role` / `default_shard`, core.rb:250) until base.ts registers.
     const role = options.role ?? _base?.currentRole() ?? "writing";
     const shard = options.shard ?? _base?.currentShard() ?? "default";
     const clobber = options.clobber ?? false;
@@ -221,11 +170,6 @@ export class ConnectionHandler {
 
     Notifications.instrument("!connection.active_record", payload);
 
-    // ESM's `import()` is async where Ruby's `require` is not, so kick the
-    // adapter load off here and let the synchronous cache be warm by the time
-    // the pool first calls newConnection(). Callers that need to await this can
-    // read `pool.adapterReady`. Detached `.catch` so unhandled-rejection
-    // warnings don't fire when callers never await it.
     if (poolConfig.dbConfig.adapter) {
       const adapterReady = resolveConnectionAdapter(poolConfig.dbConfig.adapter);
       adapterReady.catch(() => {});
@@ -235,13 +179,6 @@ export class ConnectionHandler {
     return poolConfig.pool;
   }
 
-  /**
-   * Mirrors: `active_connections?` (`connection_handler.rb:157-159`).
-   *
-   * `each_connection_pool(role)` is an Enumerator when Ruby calls it without a
-   * block; the TS signature always takes one, so the pools are collected before
-   * `any?`.
-   */
   activeConnectionsQ(role?: string | null): boolean {
     const pools: ConnectionPool[] = [];
     this.eachConnectionPool(role, (pool) => {
@@ -285,8 +222,6 @@ export class ConnectionHandler {
     connectionName: string,
     options?: { role?: string; shard?: string },
   ): Promise<DatabaseAdapter> {
-    // `role: ActiveRecord::Base.current_role, shard: ActiveRecord::Base.current_shard`
-    // (connection_handler.rb:193).
     const pool = this.retrieveConnectionPool(connectionName, {
       role: options?.role ?? _base?.currentRole(),
       shard: options?.shard ?? _base?.currentShard(),
@@ -296,8 +231,6 @@ export class ConnectionHandler {
   }
 
   isConnected(connectionName: string, options?: { role?: string; shard?: string }): boolean {
-    // `role: ActiveRecord::Base.current_role, shard: ActiveRecord::Base.current_shard`
-    // (connection_handler.rb:200).
     const pool = this.retrieveConnectionPool(connectionName, {
       role: options?.role ?? _base?.currentRole(),
       shard: options?.shard ?? _base?.currentShard(),
@@ -351,12 +284,12 @@ export class ConnectionHandler {
     return pool;
   }
 
-  /** @deprecated Use removeConnectionPool */
+  /** @deprecated */
   removeConnection(owner: string, options?: { role?: string; shard?: string }): void {
     this.removeConnectionPool(owner, options);
   }
 
-  /** @deprecated Use clearAllConnectionsBang */
+  /** @deprecated */
   async clearAllConnections(): Promise<void> {
     await this.clearAllConnectionsBang();
   }
@@ -394,10 +327,6 @@ export class ConnectionHandler {
   ): DatabaseConfig | undefined {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
-      // Rails' `remove_connection_pool` is synchronous; trails' `disconnect`
-      // returns a Promise (async `driver.close()`). The pool is already dropped
-      // from the manager, so let the drain settle in the background rather than
-      // forcing this sync API (and its `removeConnectionPool` callers) async.
       void poolConfig.disconnect();
       return poolConfig.dbConfig;
     }

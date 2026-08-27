@@ -1,9 +1,3 @@
-/**
- * Trails-internal harness for the thenable (Promise-like `.then`) relation
- * surface — `Relation`, `CollectionProxy`, and `BatchEnumerator` are all
- * directly awaitable. No 1:1 Rails counterpart; rides the canonical schema
- * (`Author` / `Post` / `Comment`) + fixtures, no inline tables.
- */
 import { describe, it, expect } from "vitest";
 import { Relation, association, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -132,9 +126,6 @@ describe("Thenable", () => {
     const davids = Author.where({ name: "David" });
 
     const once = await davids.load();
-    // Methods called on the view run with `this` bound to the view, so this
-    // re-enters stripThenable with the view itself. Rails' `load` returns
-    // `self`, so it must land back on the same object rather than wrapping.
     const twice = await once.load();
     const thrice = await (await twice.reload()).load();
 

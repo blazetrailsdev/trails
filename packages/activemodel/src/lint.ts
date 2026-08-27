@@ -1,30 +1,7 @@
-/**
- * Lint — compliance tests for ActiveModel-compatible objects.
- *
- * Mirrors: ActiveModel::Lint and ActiveModel::Lint::Tests
- *
- * In Rails, Lint::Tests is a module you include into your test class
- * to verify that an object complies with the ActiveModel interface.
- * Here we provide standalone assertion functions that do the same.
- */
-
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Lint {}
 
-/**
- * Raised when an ActiveModel::Lint compliance check fails.
- *
- * Rails' `Lint::Tests` are Minitest test methods whose `assert*` calls raise
- * `Minitest::Assertion` on failure (there is no ActiveModel error class for
- * these — the failures are test-framework assertions). This ports that
- * assertion-failure identity so the standalone lint functions surface a single
- * named class instead of a bare `Error`.
- *
- * @noRailsEquivalent PERMANENT: the assertion-failure class belongs to Minitest,
- * not to ActiveModel — `lint.rb`'s tests are Minitest test methods whose
- * `assert*` calls raise `Minitest::Assertion`, so no ActiveModel Ruby file can
- * ever grow a counterpart. Named for the Ruby class it stands in for.
- */
+/** @noRailsEquivalent PERMANENT */
 export class MinitestAssertion extends globalThis.Error {
   constructor(message: string) {
     super(message);
@@ -32,14 +9,7 @@ export class MinitestAssertion extends globalThis.Error {
   }
 }
 
-/**
- * Resolve the model fixture under test. Mirrors Rails
- * `Lint::Tests#model` (activemodel/lib/active_model/lint.rb:108-111)
- * which calls `@model.to_model` so the fixture can stand in via
- * Conversion.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function model<T>(m: T | { toModel(): T }): T {
   if (m && typeof (m as { toModel?: unknown }).toModel === "function") {
     return (m as { toModel(): T }).toModel();
@@ -47,12 +17,7 @@ export function model<T>(m: T | { toModel(): T }): T {
   return m as T;
 }
 
-/**
- * Assert a value is a strict boolean. Mirrors Rails
- * `Lint::Tests#assert_boolean` (activemodel/lib/active_model/lint.rb:113-115).
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function assertBoolean(result: unknown, name: string): void {
   if (result !== true && result !== false) {
     throw new MinitestAssertion(`${name} should be a boolean`);
@@ -62,7 +27,6 @@ export function assertBoolean(result: unknown, name: string): void {
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Tests {
   type ToKeyHost = { toKey(): unknown[] | null; isPersisted(): boolean };
-  /** Mirrors `Lint::Tests#test_to_key` (lint.rb:31-35). */
   export function testToKey(input: ToKeyHost | { toModel(): ToKeyHost }): void {
     const m = model(input);
     if (typeof m.toKey !== "function") {
@@ -79,7 +43,6 @@ export namespace Tests {
     toKey(): unknown[] | null;
     isPersisted(): boolean;
   };
-  /** Mirrors `Lint::Tests#test_to_param` (lint.rb:46-51). */
   export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
     const m = model(input);
     if (typeof m.toParam !== "function") {
@@ -93,7 +56,6 @@ export namespace Tests {
   }
 
   type ToPartialPathHost = { toPartialPath(): string };
-  /** Mirrors `Lint::Tests#test_to_partial_path` (lint.rb:58-61). */
   export function testToPartialPath(
     input: ToPartialPathHost | { toModel(): ToPartialPathHost },
   ): void {
@@ -107,7 +69,6 @@ export namespace Tests {
   }
 
   type PersistedHost = { isPersisted(): boolean };
-  /** Mirrors `Lint::Tests#test_persisted?` (lint.rb:70-73). */
   export function testPersisted(input: PersistedHost | { toModel(): PersistedHost }): void {
     const m = model(input);
     if (typeof m.isPersisted !== "function") {
@@ -120,7 +81,6 @@ export namespace Tests {
     modelName: { human: () => string; singular: string; plural: string };
     constructor: { modelName?: { human: () => string; singular: string; plural: string } };
   };
-  /** Mirrors `Lint::Tests#test_model_naming` (lint.rb:81-91). */
   export function testModelNaming(model: ModelNamingHost): void {
     const modelName = model.constructor.modelName;
     if (!modelName) {
@@ -140,12 +100,6 @@ export namespace Tests {
     }
   }
 
-  /**
-   * Mirrors `Lint::Tests#test_errors_aref` (lint.rb:102-105). Ruby's
-   * `errors[:hello]` is `Errors#[]`, an operator with no TS spelling; the
-   * method it forwards to (`messages_for`, errors.rb:229-231) is the port's
-   * name for it.
-   */
   export function testErrorsAref(model: {
     errors: { messagesFor(attribute: string): string[] };
   }): void {

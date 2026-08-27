@@ -9,9 +9,6 @@ import { Name } from "./utils.js";
 import { Result } from "../../result.js";
 
 function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
-  // `Object.setPrototypeOf` skips the AbstractAdapter constructor, which is what
-  // seats `@config` (`abstract_adapter.rb:132`); `foreign_keys_enabled?` reads it
-  // with `Hash#fetch`, so the shim has to seat it too.
   (adapter as unknown as { _config?: Record<string, unknown> })._config ??= {};
   return Object.setPrototypeOf(adapter, PostgreSQLAdapter.prototype) as PostgreSQLAdapter;
 }
@@ -64,8 +61,6 @@ function makeAdapter(options: FakeOptions = {}) {
       return options.queryValue ? await options.queryValue(text) : null;
     }),
     getDatabaseVersion: vi.fn(async () => 160000),
-    // `database_version` is `pool.server_version(self)` (`abstract_adapter.rb:854-856`),
-    // so the shim carries the pool that memo lives on.
     pool: {
       serverVersion: (connection: { getDatabaseVersion(): Promise<number> }) =>
         connection.getDatabaseVersion(),
@@ -75,10 +70,6 @@ function makeAdapter(options: FakeOptions = {}) {
   return { adapter: adapter as unknown as DatabaseAdapter, sql };
 }
 
-// Expected digests are the literals Rails asserts in
-// migration/exclusion_constraint_test.rb and migration/unique_constraint_test.rb,
-// so drift in the identifier shape or digest slice fails here rather than
-// silently changing emitted DDL and dumped schema.
 describe("SchemaStatements constraint name digests", () => {
   it("derives the exclusion constraint name Rails derives", () => {
     const ss = withSchemaStatements(makeAdapter().adapter);
@@ -150,9 +141,6 @@ describe("SchemaStatements sequence helpers warn without a sequence", () => {
   });
 });
 
-// Rails' index_name_exists? runs BOTH arguments through quoted_scope and
-// compares `i.relname = index[:name]` (schema_statements.rb:67-81), so a
-// schema-qualified index name matches on its bare identifier.
 describe("SchemaStatements#indexNameExists", () => {
   it("parses the index name through quotedScope rather than quoting it raw", async () => {
     const { adapter, sql } = makeAdapter({
@@ -189,7 +177,6 @@ describe("SchemaStatements#pkAndSequenceFor", () => {
     expect(await ss.pkAndSequenceFor("pg_uuids")).toEqual(["id", null]);
   });
 
-  // Rails' bare `rescue nil` covers the whole method, not just unknown tables.
   it("returns null when the lookup raises", async () => {
     const { adapter } = makeAdapter({
       query: async () => {
@@ -208,7 +195,6 @@ describe("SchemaStatements#pkAndSequenceFor", () => {
 });
 
 describe("SchemaStatements#resetPkSequenceBang", () => {
-  // Ruby's `max_pk ? true : false` is a nil check; 0 is truthy in Ruby.
   it("emits setval(..., 0, true) when the max primary key is 0", async () => {
     const { adapter, sql } = makeAdapter({ queryValue: async () => 0 });
     const ss = withSchemaStatements(adapter);
@@ -302,11 +288,6 @@ describe("SchemaStatements#indexes", () => {
   });
 });
 
-// Rails' SchemaStatements#columns (abstract/schema_statements.rb:107) maps
-// every field through new_column_from_field. trails' PG columns() batch-loads
-// the row OIDs first, so the fetch_type_metadata → get_oid_type hop inside
-// new_column_from_field must stay a pure type-map read: one pg_type query for
-// the whole table, never one per column.
 describe("SchemaStatements#columns delegates to newColumnFromField", () => {
   function columnsAdapter() {
     const { adapter, sql } = makeAdapter({
@@ -442,10 +423,6 @@ describe("SchemaStatements#dropTable", () => {
     expect(clearedTables).toEqual(["posts", "comments"]);
   });
 
-  // Ruby's `*table_names` splat makes the zero-name call a no-op
-  // (postgresql/schema_statements.rb:57-60 builds an empty `join(", ")`; no
-  // adapter raises), so there is nothing to assert here beyond the no-op the
-  // abstract body's own test pins.
   it("issues no statement when called with no table names", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
@@ -534,11 +511,6 @@ describe("SchemaStatements#schemaSearchPath", () => {
 
 describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
   it("is a no-op when the adapter does not support foreign keys (Rails super guard)", async () => {
-    // Rails PG add_foreign_key is `assert_valid_deferrable(deferrable); super`,
-    // and the abstract super begins with `return unless use_foreign_keys?`.
-    // The override replicates the abstract body inline, so it must replicate the
-    // guard too — otherwise a real PG migration (which lands in this override,
-    // not the base method) emits ADD CONSTRAINT even when FKs are disabled.
     const executed: string[] = [];
     const adapter = {
       adapterName: "postgres" as const,

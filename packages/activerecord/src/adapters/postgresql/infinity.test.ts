@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/infinity_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
@@ -114,17 +111,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("assigning 'infinity' on a datetime column with TZ aware attributes", async () => {
-      // setZone is the first statement inside try{} so the finally{} setZone(null)
-      // always restores it, even if a later await throws (mirrors Rails'
-      // in_time_zone ensure block).
       try {
         setZone("Pacific Time (US & Canada)");
         const { Base } = await import("../../index.js");
         const a = adapter;
-        // Rails' in_time_zone flips the global Base.time_zone_aware_attributes;
-        // we scope the flag to this subclass instead — the production hook reads
-        // `this.timeZoneAwareAttributes` per-class, so it's equivalent at runtime
-        // and avoids leaking global state across the shared-worker test suite.
         class PostgresqlInfinity extends Base {
           static tableName = "postgresql_infinities";
           static timeZoneAwareAttributes = true;
@@ -144,10 +134,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
         await record.reload();
         expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
-
-        // Rails also exercises `create!(datetime: BigDecimal::INFINITY)`. JavaScript
-        // has no BigDecimal type; `Number.POSITIVE_INFINITY` (covered above) is the
-        // only infinity literal, so that input-type variant has no TS counterpart.
       } finally {
         setZone(null);
       }

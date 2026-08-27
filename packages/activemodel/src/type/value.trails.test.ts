@@ -3,7 +3,6 @@ import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "
 
 describe("ValueType", () => {
   it("type is nil for the unmapped default", () => {
-    // Mirrors ActiveModel::Type::Value#type returning nil (value.rb:32-35).
     expect(new ValueType().type()).toBeUndefined();
   });
 

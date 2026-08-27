@@ -1,13 +1,3 @@
-/**
- * PostgreSQL schema definitions — PostgreSQL-specific table/column definitions.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition,
- *          ActiveRecord::ConnectionAdapters::PostgreSQL::Table,
- *          ActiveRecord::ConnectionAdapters::PostgreSQL::AlterTable,
- *          ActiveRecord::ConnectionAdapters::PostgreSQL::ColumnMethods,
- *          ActiveRecord::ConnectionAdapters::PostgreSQL (top-level module)
- */
-
 import { SchemaDumper, statelessTest } from "../../schema-dumper.js";
 import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
@@ -129,15 +119,7 @@ export class ExclusionConstraintDefinition {
     return this.options.deferrable;
   }
 
-  /**
-   * @missingRailsCall match? — PERMANENT: Rails
-   *   postgresql/schema_definitions.rb:209-211 is
-   *   `!ActiveRecord::SchemaDumper.excl_ignore_pattern.match?(name) if name`,
-   *   which this body mirrors — the pattern IS applied. `Regexp#match?` has no
-   *   JS call spelling: a JS RegExp answers `test`, and `test` is stateful on a
-   *   `/g` pattern, so the port routes through `statelessTest`
-   *   (schema-dumper.ts:349) to get Ruby's stateless semantics.
-   */
+  /** @missingRailsCall match? — PERMANENT */
   exportNameOnSchemaDump(): boolean {
     return this.name != null && !statelessTest(SchemaDumper.exclIgnorePattern, this.name);
   }
@@ -188,9 +170,6 @@ export class UniqueConstraintDefinition {
       const thatCol = (Array.isArray(column) ? column : [column]).map(String);
       if (thisCol.join(",") !== thatCol.join(",")) return false;
     }
-    // Mirrors Rails: options.slice(*self.options.keys).all? { |k, v| self.options[k].to_s == v.to_s }
-    // slice drops keys not present in self.options, so unknown keys are ignored.
-    // nil.to_s == "" in Ruby, so coerce null/undefined to "" like Rails does.
     const toS = (x: unknown): string => (x == null ? "" : String(x));
     const storedOpts = this.options as Record<string, unknown>;
     for (const [k, v] of Object.entries(rest)) {
@@ -201,11 +180,7 @@ export class UniqueConstraintDefinition {
   }
 }
 
-/**
- * The PG-only slice of `@conn` that `TableDefinition#new_exclusion_constraint_definition`
- * / `#new_unique_constraint_definition` read (postgresql/schema_definitions.rb:265-273).
- * @internal
- */
+/** @internal */
 type PgConstraintOptionsConn = {
   exclusionConstraintOptions(
     tableName: string,
@@ -254,9 +229,6 @@ export class TableDefinition extends AbstractTableDefinition {
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): ExclusionConstraintDefinition {
-    // postgresql/schema_definitions.rb:265-268 — this is where a constraint
-    // declared inside `create_table` gets its generated name and its
-    // `deferrable` validation, not just the `add_exclusion_constraint` path.
     options = (this.conn as unknown as PgConstraintOptionsConn).exclusionConstraintOptions(
       this.name,
       expression,
@@ -277,21 +249,12 @@ export class TableDefinition extends AbstractTableDefinition {
     return new UniqueConstraintDefinition(this.name, columnName, options);
   }
 
-  /**
-   * Creates a new ColumnDefinition with PostgreSQL-specific type normalization.
-   * Handles the :virtual type alias.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#new_column_definition
-   */
   override newColumnDefinition(
     name: string,
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
     if ((type as string) === "virtual") {
-      // Rails: `type = options[:type]` with no fallback (postgresql/schema_definitions.rb).
-      // Without `type:`, the type drops to nil and the generated column renders
-      // with no SQL type before its `GENERATED ALWAYS AS (...) STORED` clause.
       type = options.type as ColumnType;
     }
     const def = super.newColumnDefinition(name, type, options);
@@ -309,11 +272,7 @@ export class TableDefinition extends AbstractTableDefinition {
     return fallback;
   }
 
-  /**
-   * @internal
-   * Mirrors: PostgreSQL::TableDefinition#integer_like_primary_key_type
-   * (postgresql/schema_definitions.rb:293-299)
-   */
+  /** @internal */
   protected override integerLikePrimaryKeyType(
     type: ColumnType,
     options: ColumnOptions,
@@ -341,7 +300,7 @@ export class TableDefinition extends AbstractTableDefinition {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE PostgreSQL::Table/TableDefinition's define_column_methods macro (postgresql/schema_definitions.rb:185).
+   * @noRailsEquivalent CONVERGEABLE
    */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
@@ -561,11 +520,6 @@ export class TableDefinition extends AbstractTableDefinition {
     return this.pgColumn(name, "string" as ColumnType, enumName, options);
   }
 
-  /**
-   * Generated by Rails from `define_column_methods ... :enum`
-   * (postgresql/schema_definitions.rb:186-189); `type_to_sql` resolves and
-   * validates `enum_type` (postgresql/schema_statements.rb:854-857).
-   */
   enum(...names: string[]): this;
   enum(...args: [...names: string[], options: ColumnOptions & { enum_type?: string }]): this;
   enum(...args: unknown[]): this {
@@ -883,13 +837,7 @@ export class AlterTable extends AbstractAlterTable {
     super(td);
   }
 
-  /**
-   * Narrow inherited `_td` to PG's TableDefinition. PG `AlterTable` is
-   * always constructed with a TableDefinition (`createAlterTable` →
-   * `new AlterTable(td)`), so the assertion is informational; it fails
-   * loud if a caller ever resurrects the legacy string-only constructor.
-   * @internal
-   */
+  /** @internal */
   protected get _pgTd(): TableDefinition {
     if (this._td == null) {
       throw new Error(

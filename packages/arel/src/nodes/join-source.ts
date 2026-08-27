@@ -2,14 +2,7 @@ import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { Binary } from "./binary.js";
 
-/**
- * JoinSource — wraps the FROM table and an array of join clauses.
- *
- * Mirrors: Arel::Nodes::JoinSource
- */
 export class JoinSource extends Binary {
-  // Rails' JoinSource stores `joinop` (an array) as its `@right`; widen the
-  // inherited `Binary#right` here to mirror that usage on the TS side.
   declare left: Node | Table | null;
   declare right: Node[];
 

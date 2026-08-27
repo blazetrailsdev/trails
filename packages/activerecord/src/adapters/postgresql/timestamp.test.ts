@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/postgresql/timestamp_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
@@ -52,8 +49,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "updated_at");
       expect(col).toBeDefined();
-      // Rails' Column#default is nil for expression defaults; the SQL
-      // expression itself lives in #default_function (postgresql/column.rb).
       expect(col!.defaultFunction).toContain("now");
     });
 
@@ -144,8 +139,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
             time: Temporal.Instant;
           };
-          // time zone aware types defaults to [datetime, time] — timestamptz is
-          // NOT included, so the value stays a plain instant (Rails: instance_of Time).
           expect(record.time).toBeInstanceOf(Temporal.Instant);
           expect(record.time.epochNanoseconds).toBe(
             Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
@@ -206,8 +199,6 @@ describeIfPg("PostgreSQLAdapter", () => {
             const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
               time: TimeWithZone;
             };
-            // aware_types includes :timestamptz + a zone is set, so the timestamptz
-            // column is wrapped in TimeWithZone (Rails: instance_of ActiveSupport::TimeWithZone).
             expect(record.time).toBeInstanceOf(TimeWithZone);
             expect(record.time.utc().toTime().epochNanoseconds).toBe(
               Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
@@ -243,8 +234,6 @@ describeIfPg("PostgreSQLAdapter", () => {
               const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
                 time: Temporal.Instant;
               };
-              // aware_types includes :timestamptz but NO zone is set, so the
-              // converter passes the value through unwrapped (Rails: instance_of Time).
               expect(record.time).toBeInstanceOf(Temporal.Instant);
               expect(record.time.epochNanoseconds).toBe(
                 Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
@@ -328,9 +317,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("save infinity and beyond", async () => {
-      // Rails: Developer.create!(name:, updated_at: 1.0 / 0.0) → reads back +Infinity;
-      // -1.0 / 0.0 → -Infinity. TS uses the DateInfinity / DateNegativeInfinity
-      // sentinels (the timestamp OID round-trips them as "infinity" / "-infinity").
       class Dev extends Base {
         static tableName = "ts_infinity_dev";
         static {
@@ -359,7 +345,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("bc timestamp", async () => {
-      // Rails: Time.new(0) - 1.week = Dec 25, ISO year -1 (2 BC)
       const oidType = new OidDateTime();
       const instant = oidType.castValue("0002-12-25 00:00:00 BC") as Temporal.Instant;
       expect(instant.toZonedDateTimeISO("UTC").year).toBe(-1);
@@ -371,7 +356,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
     });
     it("bc timestamp leap year", async () => {
-      // Rails: Time.utc(-4, 2, 29) = Feb 29, ISO year -4 (5 BC)
       const oidType = new OidDateTime();
       const instant = oidType.castValue("0005-02-29 00:00:00 BC") as Temporal.Instant;
       expect(instant.toZonedDateTimeISO("UTC").year).toBe(-4);
@@ -383,7 +367,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
     });
     it("bc timestamp year zero", async () => {
-      // Rails: Time.utc(0, 4, 7) = Apr 7, ISO year 0 (1 BC)
       const oidType = new OidDateTime();
       const instant = oidType.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
       expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
@@ -406,9 +389,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         expect(rows[0]?.data_type).toBe("timestamp without time zone");
       } finally {
-        // Rails leans on transactional tests to roll the added column back;
-        // this file is non-transactional (the three classes above set
-        // use_transactional_tests = false), so it is removed by hand.
         await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
       }
     });

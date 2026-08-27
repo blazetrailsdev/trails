@@ -69,8 +69,6 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     const store = new HashLookupTypeMap();
     store.registerType("numeric", integerSubtype);
 
-    // Process only the array row (element OID 1700 not yet keyed in the store).
-    // Mirrors Rails' register_with_subtype skip-on-miss.
     new TypeMapInitializer(store).run([
       row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
     ]);

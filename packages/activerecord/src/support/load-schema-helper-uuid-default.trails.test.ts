@@ -1,30 +1,3 @@
-/**
- * trails-only cover for the `else` half of `postgresql_specific_schema.rb:7`'s
- * `uuid_default = supports_pgcrypto_uuid? ? {} : { default: "uuid_generate_v4()" }`.
- *
- * The branch is dead on our matrix — `supportsPgcryptoUuid()` is PG >= 9.4 and
- * CI runs pg17, so the ternary always yields `{}` and the three `id: :uuid`
- * tables ride the adapter's implicit `gen_random_uuid()` PK default. Without
- * this file nothing would notice the fallback rotting, and a reader would have
- * no signal that it is deliberately unreachable rather than unused. Rails has
- * no such test: on Ruby the predicate is genuinely false on old servers.
- *
- * The predicate is stubbed false on a real adapter and `createTable` is
- * intercepted, so the DDL is emitted and asserted without laying anything on
- * the shared per-worker database.
- *
- * That interception is why this calls `loadAdapterSpecificSchema` rather than
- * `loadSchema`: `loadSchema` would run `loadCanonicalSchema` through the same
- * proxy, so the canonical tables are never created and the first canonical
- * statement referencing one fails with `StatementInvalid: relation ... does not
- * exist`. It only shows up on the PG lane, so do not "fix" this to `loadSchema`
- * on the strength of a green unit run (PR #5676, reverted by #5688).
- *
- * Gating: `describeIfPg` probes a PostgreSQL server directly rather than
- * reading `ARCONN`, so this file runs on the sqlite lane too whenever a server
- * is reachable — including the local run a contributor makes before pushing. It
- * is skipped, never silently passed, when none is.
- */
 import { expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL } from "./describe-if-pg.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";

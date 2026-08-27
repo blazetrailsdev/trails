@@ -1,8 +1,3 @@
-/**
- * AR model fixtures for schema.test.ts and schema-authorization.test.ts.
- * Each factory builds fresh subclasses so tests are isolated from each other
- * and from the global model registry.
- */
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base, registerModel, modelRegistry } from "../../index.js";
 
@@ -59,10 +54,6 @@ export function makeSchemaThingModel(): ModelCtor {
   return SchemaThing as unknown as ModelCtor;
 }
 
-/**
- * Song/Album models for habtm-with-schema tests.
- * Returns cleanup function to remove the models from the registry.
- */
 export function makeSongAlbumModels(): {
   Song: ModelCtor;
   Album: ModelCtor;
@@ -81,7 +72,6 @@ export function makeSongAlbumModels(): {
       this.tableName = "music.albums";
     }
   }
-  // Rails: derive_join_table_name("music.songs", "music.albums") → "music.albums_songs"
   registerModel("Song", Song);
   registerModel("Album", Album);
   return {

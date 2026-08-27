@@ -7,9 +7,6 @@ describe("SQLite visitor boolean casting", () => {
 
   it("casts a Casted boolean to 1", () => {
     const visitor = new Visitors.SQLite(testConnection);
-    // `eq` wraps the raw `true` via quotedNode into a Casted node, which is
-    // how a boolean reaches the visitor; a raw `true` placed straight into
-    // Equality raises UnsupportedVisitError, as it does in Rails.
     expect(visitor.compile(users.get("active").eq(true))).toBe('"users"."active" = 1');
   });
 });
@@ -17,8 +14,6 @@ describe("SQLite visitor boolean casting", () => {
 describe("SQLite visitor set operations", () => {
   const users = new Table("users");
 
-  // SQLite rejects parens around SELECT operands of UNION/INTERSECT/EXCEPT.
-  // Mirrors `sqlite.rb#infix_value_with_paren` — strip Grouping wrappers.
   const q1 = () => users.project(star());
   const q2 = () => users.project(star());
 

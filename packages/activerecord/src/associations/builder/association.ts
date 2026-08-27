@@ -1,19 +1,9 @@
-/**
- * Base class for association builders. Configures association metadata
- * (reflection, callbacks, validations) based on options.
- *
- * Mirrors: ActiveRecord::Associations::Builder::Association
- */
-
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertValidKeys, throwAbort } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
 
-/**
- * Minimal instance shape for model instances that host association accessors.
- * @internal
- */
+/** @internal */
 export interface AssociationInstanceHost {
   association(name: string): AssociationProxyLike;
 }
@@ -140,9 +130,6 @@ export class Association {
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {
     if (scope && scope.length === 0) {
       const orig = scope;
-      // Rails: proc { instance_exec(&scope) }
-      // When scopeFor calls scope.call(relation, owner), `this` is the relation.
-      // 0-arity scopes ignore the owner arg and execute with relation as context.
       return function (this: unknown) {
         return orig.call(this);
       };
@@ -242,16 +229,6 @@ export class Association {
   static addDestroyCallbacks(model: any, reflection: any): void {
     const name = reflection.name ?? reflection;
     model.beforeDestroy(async (record: any) => {
-      // Rails' handle_dependency throws :abort to halt the owner's destroy when
-      // a dependent can't be removed (has_one_association.rb:34, etc.). Our
-      // handleDependency signals that with a `false` return; translate it to the
-      // abort sentinel here so the before_destroy chain halts (Rails 5+ only
-      // halts on throw :abort, never on a `false` return).
-      //
-      // When handleDependency propagates a child RecordNotDestroyed (dependent:
-      // :destroy and a child's before_destroy aborts), mirror Callbacks#destroy:
-      // store the child exception on the owner so _raiseRecordNotDestroyed can
-      // re-raise it with the correct error.record (the failed child, not the owner).
       try {
         if ((await record.association(name).handleDependency()) === false) throwAbort();
       } catch (e) {
@@ -264,9 +241,5 @@ export class Association {
     });
   }
 
-  static addAfterCommitJobsCallback(_model: any, _dependent: string): void {
-    // Rails registers an after_commit that runs _after_commit_jobs for
-    // dependent: :destroy_async. Requires after_commit infrastructure
-    // which is not yet wired to the callback chain — skip until then.
-  }
+  static addAfterCommitJobsCallback(_model: any, _dependent: string): void {}
 }
