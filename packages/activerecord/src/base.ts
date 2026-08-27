@@ -4619,6 +4619,10 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
+// attribute_methods.rb:14 includes BeforeTypeCast ahead of Dirty, so its
+// `included do` patterns (before_type_cast.rb:32-33) precede both halves of
+// Dirty's in `attributeMethodPatterns`.
+include(Base, _BeforeTypeCast);
 // `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
 // `ActiveRecord::AttributeMethods::Dirty` builds on, and which
 // `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
@@ -4627,10 +4631,6 @@ include(Base, ModelSchema.InstanceMethods);
 // splices the module's `init_internals` / `initialize_dup` links (dirty.rb:
 // 371-376, :248-251) into this prototype's chains, below Core — the position
 // they had while `ActiveModel::Model` carried them on its own prototype.
-// attribute_methods.rb:14 includes BeforeTypeCast ahead of Dirty, so its
-// `included do` patterns (before_type_cast.rb:32-33) precede both halves of
-// Dirty's in `attributeMethodPatterns`.
-include(Base, _BeforeTypeCast);
 include(Base, AMDirty);
 // The accessor-property half of AttributeMethods::Dirty. A class module, so
 // `include()` copies the getter descriptors rather than flattening them.
