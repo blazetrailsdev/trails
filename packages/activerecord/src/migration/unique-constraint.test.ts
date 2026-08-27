@@ -4,18 +4,31 @@
  *
  * The model-backed and schema-scoped arms are not ported here.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { PG_TEST_URL } from "../support/describe-if-pg.js";
 import { describeIfSupports } from "../support/supports.js";
-import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
+import { createTestUniqueConstraintsTable } from "../support/load-schema-helper.js";
+import { openScratchDatabase, type ScratchDatabase } from "../support/pg-scratch-database.js";
 
 describeIfSupports("unique_constraints", "Migration", () => {
+  let scratch: ScratchDatabase;
   let connection: PostgreSQLAdapter;
 
+  // `sections` is a canonical table (`schema.rb:1090`) the session/seminar
+  // association suites read, and this suite clobbers and drops it as Rails
+  // does, so it runs against a database of its own (RFC 0079).
+  beforeAll(async () => {
+    scratch = await openScratchDatabase("unique_constraints");
+    connection = scratch.connection;
+    await createTestUniqueConstraintsTable(connection);
+  }, 30000);
+
+  afterAll(async () => {
+    await scratch.drop();
+  }, 30000);
+
   beforeEach(async () => {
-    connection = new PostgreSQLAdapter(PG_TEST_URL);
     await connection.createTable("sections", { force: true }, (t) => {
       t.integer("position", { null: false });
     });
@@ -23,8 +36,6 @@ describeIfSupports("unique_constraints", "Migration", () => {
 
   afterEach(async () => {
     await connection.dropTable("sections", { ifExists: true });
-    await rebuildCanonicalTables(connection, ["sections"]);
-    await connection.close();
   });
 
   describe("UniqueConstraintTest", () => {

@@ -1,5 +1,3 @@
 {
-  "//": "RFC 0079 (drop-rebuild-canonical-tables) only-shrink baseline: repo-relative path -> number of rebuildCanonicalTables call sites that file is allowed. Enforced by eslint/no-new-rebuild-canonical-tables.mjs. Entries ONLY shrink: a burndown PR that removes a call decrements the count, or deletes the line when it reaches 0. Never add a row, and never raise a count -- if lint sent you here, stop dropping the canonical table instead. There is no reseed script, by design. Baseline: 3 call sites across 3 files. The helper is deleted, with this file, by the RFC final story.",
-  "packages/activerecord/src/migration/exclusion-constraint.test.ts": 1,
-  "packages/activerecord/src/migration/unique-constraint.test.ts": 1
+  "//": "RFC 0079 (drop-rebuild-canonical-tables) only-shrink baseline: repo-relative path -> number of rebuildCanonicalTables call sites that file is allowed. Enforced by eslint/no-new-rebuild-canonical-tables.mjs. Entries ONLY shrink: a burndown PR that removes a call decrements the count, or deletes the line when it reaches 0. Never add a row, and never raise a count -- if lint sent you here, stop dropping the canonical table instead. There is no reseed script, by design. Baseline: 3 call sites across 3 files. The helper is deleted, with this file, by the RFC final story."
 }
