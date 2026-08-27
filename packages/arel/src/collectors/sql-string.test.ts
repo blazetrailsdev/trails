@@ -16,10 +16,13 @@ describe("TestSqlString", () => {
   };
 
   it("returned sql uses utf8 encoding", () => {
-    const collector = new Collectors.SQLString();
-    collector.append("SELECT");
-    const result = collector.value;
-    expect(typeof result).toBe("string");
+    const sql = compile(astWithBinds());
+    // A JS string carries no encoding tag, so the nearest expressible form of
+    // Rails' `assert_equal sql.encoding, Encoding::UTF_8`
+    // (collectors/sql_string_test.rb:35-38) is a strict UTF-8 round trip.
+    expect(new TextDecoder("utf-8", { fatal: true }).decode(new TextEncoder().encode(sql))).toBe(
+      sql,
+    );
   });
 
   it("compile", () => {
