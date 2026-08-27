@@ -4,10 +4,6 @@ import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.j
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../test-fixtures.js";
-import type {
-  Table as PgTable,
-  TableDefinition as PgTableDefinition,
-} from "../../connection-adapters/postgresql/schema-definitions.js";
 
 class PostgresqlEnum extends Base {
   static {
@@ -190,10 +186,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema load", async () => {
-      await Schema.define(async (schema) => {
+      await Schema.define<PostgreSQLAdapter>(async (schema) => {
         await schema.createEnum("color", ["blue", "green"]);
         await schema.changeTable("postgresql_enums", async (t) => {
-          await (t as PgTable).enum("best_color", {
+          await t.enum("best_color", {
             enum_type: "color",
             default: "blue",
             null: false,
@@ -302,13 +298,13 @@ describeIfPg("PostgreSQLAdapter", () => {
           adapter,
           "test_schema",
           async () => {
-            await Schema.define(async (schema) => {
+            await Schema.define<PostgreSQLAdapter>(async (schema) => {
               await schema.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
               await schema.createEnum("public.mood", ["sad", "ok", "happy"]);
               await schema.createTable(
                 "postgresql_enums_in_test_schema",
                 { force: "cascade" },
-                (t: PgTableDefinition) => {
+                (t) => {
                   t.enum("current_mood", { enum_type: "mood_in_test_schema" });
                 },
               );

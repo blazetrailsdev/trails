@@ -76,7 +76,6 @@ import { SchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
   CommentOrChanges,
-  JoinTableOptions,
   ValidateConstraintStatements,
   CommentStatements,
   ExtensionStatements,
@@ -134,7 +133,6 @@ import {
   ChangeColumnDefaultDefinition,
   ForeignKeyDefinition,
   IndexDefinition as AbstractIndexDefinition,
-  TableDefinition as AbstractTableDefinition,
   type ColumnOptions,
   type ColumnType,
   type ForeignKeyLookupOptions,
@@ -2612,13 +2610,6 @@ export interface PostgreSQLAdapter {
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions & { using?: string; castAs?: string },
-  ): Promise<void>;
-
-  createJoinTable(
-    table1: string,
-    table2: string,
-    options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
-    fn?: (t: AbstractTableDefinition) => void,
   ): Promise<void>;
 
   addColumn(

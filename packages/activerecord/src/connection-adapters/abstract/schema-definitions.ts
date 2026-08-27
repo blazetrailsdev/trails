@@ -832,6 +832,13 @@ export type TableDefinitionOf<A> = A extends {
   ? T
   : TableDefinition;
 
+/** @noRailsEquivalent PERMANENT */
+export type TableOf<A> = A extends {
+  updateTableDefinition(tableName: string, base?: unknown): infer T;
+}
+  ? T
+  : Table;
+
 export class TableDefinition {
   readonly name: string;
   readonly columns: ColumnDefinition[] = [];

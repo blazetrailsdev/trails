@@ -29,7 +29,7 @@ import {
   type ForeignKeyLookupOptions,
   type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
-import type { TableDefinitionOf } from "./schema-definitions.js";
+import type { TableDefinitionOf, TableOf } from "./schema-definitions.js";
 import type { UniqueConstraintOptions } from "../postgresql/schema-definitions.js";
 import { SchemaCreation, type SchemaCreationConn } from "./schema-creation.js";
 import { maxIdentifierLength } from "./database-limits.js";
@@ -715,11 +715,11 @@ export class SchemaStatements {
   async createJoinTable(
     table1: string,
     table2: string,
-    kwargsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void,
+    kwargsOrFn?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
+    fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
     let kwargs: JoinTableOptions = {};
-    let definer: ((t: TableDefinition) => void) | undefined;
+    let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
     if (typeof kwargsOrFn === "function") {
       definer = kwargsOrFn;
     } else if (kwargsOrFn) {
@@ -752,8 +752,8 @@ export class SchemaStatements {
 
   async changeTable(
     tableName: string,
-    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: Table) => void | Promise<void>,
+    fnOrOptions?: ((t: TableOf<this>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<this>) => void | Promise<void>,
     base: unknown = this,
   ): Promise<void> {
     const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
@@ -765,11 +765,11 @@ export class SchemaStatements {
 
     if (options.bulk && supportsBulk) {
       const recorder = new CommandRecorder(this);
-      const bulkTable = this.updateTableDefinition(tableName, recorder as unknown);
+      const bulkTable = this.updateTableDefinition(tableName, recorder as unknown) as TableOf<this>;
       if (callback) await callback(bulkTable);
       await this.bulkChangeTable(tableName, recorder.commands);
     } else {
-      const table = this.updateTableDefinition(tableName, base);
+      const table = this.updateTableDefinition(tableName, base) as TableOf<this>;
       if (callback) await callback(table);
     }
   }

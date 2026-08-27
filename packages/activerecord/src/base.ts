@@ -2942,30 +2942,12 @@ export class Base extends Model {
     // of the scalar pass and calls `assign_multiparameter_attributes` itself
     // (attribute_assignment.rb:11-22).
     const ctor = new.target;
-    // Separate store accessor keys (virtual, backed by a store column rather
-    // than a direct DB column) from regular column attrs. Store accessor attrs
-    // are assigned AFTER the clean re-snapshot so they appear as dirty for new
-    // records — matching Rails' new-record dirty semantics where assign_attributes
-    // runs after init_internals / initialize_internals_callback.
-    const _storeKeys = new Set(Object.values(ctor.storedAttributes()).flat());
-    const _storeAttrs: Record<string, unknown> = {};
-    let attrsForSuper = attrs;
-    if (_storeKeys.size > 0) {
-      for (const [k, v] of Object.entries(attrs)) {
-        if (_storeKeys.has(k)) _storeAttrs[k] = v;
-      }
-      if (Object.keys(_storeAttrs).length > 0) {
-        attrsForSuper = Object.fromEntries(
-          Object.entries(attrs).filter(([k]) => !_storeKeys.has(k)),
-        );
-      }
-    }
     const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
     const wasSuppressed = suppressor._suppressInitializeCallback;
     suppressor._suppressInitializeCallback = true;
     try {
-      super(attrsForSuper);
+      super(attrs);
     } finally {
       if (hadOwn) {
         suppressor._suppressInitializeCallback = wasSuppressed;
@@ -2988,24 +2970,6 @@ export class Base extends Model {
           this as any,
           new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
         );
-      }
-      // Assign store accessor keys after the clean baseline so they appear
-      // as dirty on new records (mirrors Rails: new-record attrs are changed
-      // relative to nil). Dispatch through the prototype setter so the write
-      // lands in the store hash rather than a standalone attribute slot.
-      for (const [k, v] of Object.entries(_storeAttrs)) {
-        let proto = Object.getPrototypeOf(this);
-        let dispatched = false;
-        while (proto !== null && proto !== Object.prototype) {
-          const desc = Object.getOwnPropertyDescriptor(proto, k);
-          if (desc?.set) {
-            (desc.set as (val: unknown) => void).call(this, v);
-            dispatched = true;
-            break;
-          }
-          proto = Object.getPrototypeOf(proto);
-        }
-        if (!dispatched) (this as any)._writeAttribute(k, v);
       }
       if (assocPending) {
         _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);

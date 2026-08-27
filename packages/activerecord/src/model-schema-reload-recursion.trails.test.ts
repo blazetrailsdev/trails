@@ -9,13 +9,16 @@ class UuidType extends ValueType {
 }
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
+  const cache = {
+    isCached: () => true,
+    getCachedColumnsHash: () => columns,
+    dataSourceExists: async () => true,
+    columnsHash: async () => columns,
+    primaryKeys: async () => null,
+  };
   return {
-    internalSchemaCache: {
-      isCached: () => true,
-      getCachedColumnsHash: () => columns,
-      dataSourceExists: async () => true,
-      columnsHash: async () => columns,
-    },
+    internalSchemaCache: cache,
+    schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "uuid" ? new UuidType() : null;
     },

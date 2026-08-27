@@ -100,6 +100,7 @@ import type {
   AlterTable,
   TableDefinition,
   TableDefinitionOf,
+  TableOf,
   Table,
   ForeignKeyDefinition,
   IndexDefinition,
@@ -443,8 +444,8 @@ export interface AbstractAdapter {
   createJoinTable(
     table1: string,
     table2: string,
-    kwargsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void,
+    kwargsOrFn?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
+    fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void>;
   dropJoinTable(
     table1: string,
@@ -453,8 +454,8 @@ export interface AbstractAdapter {
   ): Promise<void>;
   changeTable(
     tableName: string,
-    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: Table) => void | Promise<void>,
+    fnOrOptions?: ((t: TableOf<this>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<this>) => void | Promise<void>,
     base?: unknown,
   ): Promise<void>;
   /** @internal */

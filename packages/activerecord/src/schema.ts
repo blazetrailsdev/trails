@@ -38,26 +38,31 @@ export interface SchemaDefineInfo {
  *
  *   await Schema.define({ version: 20240101000000 }, async (schema) => { ... });
  */
-export class Schema extends Current {
+export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current<A> {
   /**
    * Mirrors: ActiveRecord::Schema::Definition::ClassMethods#define
    * (schema.rb:50-52) — `new.define(info, &block)`.
    */
-  static async define(fn: (schema: Schema) => void | Promise<void>): Promise<void>;
-  static async define(
-    info: SchemaDefineInfo,
-    fn: (schema: Schema) => void | Promise<void>,
+  static async define<A extends DatabaseAdapter = DatabaseAdapter>(
+    fn: (schema: Schema<A>) => void | Promise<void>,
   ): Promise<void>;
-  static async define(
-    infoOrFn: SchemaDefineInfo | ((schema: Schema) => void | Promise<void>),
-    fnOpt?: (schema: Schema) => void | Promise<void>,
+  static async define<A extends DatabaseAdapter = DatabaseAdapter>(
+    info: SchemaDefineInfo,
+    fn: (schema: Schema<A>) => void | Promise<void>,
+  ): Promise<void>;
+  static async define<A extends DatabaseAdapter = DatabaseAdapter>(
+    infoOrFn: SchemaDefineInfo | ((schema: Schema<A>) => void | Promise<void>),
+    fnOpt?: (schema: Schema<A>) => void | Promise<void>,
   ): Promise<void> {
-    const { info, block }: { info: SchemaDefineInfo; block: (s: Schema) => void | Promise<void> } =
+    const {
+      info,
+      block,
+    }: { info: SchemaDefineInfo; block: (s: Schema<A>) => void | Promise<void> } =
       typeof infoOrFn === "function"
         ? { info: {}, block: infoOrFn }
         : { info: infoOrFn, block: fnOpt! };
 
-    await new Schema().define(info, block);
+    await new Schema<A>().define(info, block);
   }
 
   /**
@@ -68,11 +73,11 @@ export class Schema extends Current {
    */
   async define(
     info: SchemaDefineInfo,
-    block: (schema: Schema) => void | Promise<void>,
+    block: (schema: Schema<A>) => void | Promise<void>,
   ): Promise<void> {
     await this.connectionPool.withConnection(async (connection) => {
       this.connection = connection;
-      await block(this);
+      await block(this as Schema<A>);
 
       const schemaMigration = new SchemaMigration(this.connectionPool);
       await schemaMigration.createTable();
@@ -92,7 +97,7 @@ export class Schema extends Current {
     });
   }
 
-  constructor(adapter?: DatabaseAdapter) {
+  constructor(adapter?: A) {
     super();
     this.connection = adapter;
   }

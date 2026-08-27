@@ -185,6 +185,14 @@ interface PrimaryKeyHost {
  * :deprecated | :disallowed` — so model construction (which reads `primary_key`)
  * would permanently hold a connection. Mirrors Rails' `get_primary_key`, which
  * consults the schema cache rather than checking out a connection.
+ *
+ * The raw cache, not the bound handle: `get_primary_key` reads
+ * `schema_cache.primary_keys(table_name)` synchronously
+ * (attribute_methods/primary_key.rb:114) from inside the synchronous
+ * `primary_key` reader, and trails' `BoundSchemaReflection#primaryKeys`
+ * (schema_cache.rb:172, `primary_keys(@pool, table_name)`) returns a Promise —
+ * so only the raw cache's query-free `getCachedPrimaryKeys` peek can answer
+ * here. Retires with RFC 0073, which makes the reflection reads synchronous.
  */
 function cachedSchemaCacheFor(
   host: PrimaryKeyHost,

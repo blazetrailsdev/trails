@@ -17,13 +17,16 @@ function makeAdapter(
   typeByColumn: Record<string, Type>,
 ): unknown {
   const hash = columns as unknown as Record<string, unknown>;
+  const cache = {
+    dataSourceExists: async () => true,
+    columnsHash: async () => hash,
+    primaryKeys: async () => null,
+    getCachedColumnsHash: () => hash,
+    isCached: () => true,
+  };
   return {
-    internalSchemaCache: {
-      dataSourceExists: async () => true,
-      columnsHash: async () => hash,
-      getCachedColumnsHash: () => hash,
-      isCached: () => true,
-    },
+    internalSchemaCache: cache,
+    schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return typeByColumn[column.sqlType] ?? null;
     },
@@ -96,11 +99,14 @@ describe("loadSchemaFromAdapter", () => {
   });
 
   it("is a no-op when data source does not exist (explicit false)", async () => {
+    const cache = {
+      dataSourceExists: async () => false,
+      columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
+      primaryKeys: async () => null,
+    };
     const adapter = {
-      internalSchemaCache: {
-        dataSourceExists: async () => false,
-        columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
-      },
+      internalSchemaCache: cache,
+      schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     };
     (Model as unknown as { adapter: unknown }).adapter = adapter;
@@ -111,12 +117,15 @@ describe("loadSchemaFromAdapter", () => {
   });
 
   it("falls through when dataSourceExists returns undefined (probe not implemented)", async () => {
+    const cache = {
+      dataSourceExists: async () => undefined,
+      columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
+      primaryKeys: async () => null,
+      getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
+    };
     const adapter = {
-      internalSchemaCache: {
-        dataSourceExists: async () => undefined,
-        columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
-        getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
-      },
+      internalSchemaCache: cache,
+      schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     };
     (Model as unknown as { adapter: unknown }).adapter = adapter;
@@ -128,12 +137,15 @@ describe("loadSchemaFromAdapter", () => {
 
   it("falls back to ValueType when adapter has no cast type", async () => {
     const mysteryHash = { mystery: { sqlType: "weird" } };
+    const cache = {
+      dataSourceExists: async () => true,
+      columnsHash: async () => mysteryHash,
+      primaryKeys: async () => null,
+      getCachedColumnsHash: () => mysteryHash,
+    };
     const adapter = {
-      internalSchemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: async () => mysteryHash,
-        getCachedColumnsHash: () => mysteryHash,
-      },
+      internalSchemaCache: cache,
+      schemaCache: cache,
       lookupCastTypeFromColumn: () => null,
     };
     (Model as unknown as { adapter: unknown }).adapter = adapter;
@@ -259,11 +271,14 @@ describe("loadSchemaFromAdapter integration details", () => {
     const columnsPromise = new Promise<Record<string, unknown>>((r) => {
       resolveColumns = r;
     });
+    const firstCache = {
+      dataSourceExists: async () => true,
+      columnsHash: () => columnsPromise,
+      primaryKeys: async () => null,
+    };
     const firstAdapter = {
-      internalSchemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: () => columnsPromise,
-      },
+      internalSchemaCache: firstCache,
+      schemaCache: firstCache,
       lookupCastTypeFromColumn: () => new UuidType(),
     };
     const secondAdapter = makeAdapter({}, {});
