@@ -67,11 +67,11 @@ export interface FkSafeDropPlan {
  * that no ordering can work around and so must be removed first.
  *
  * Registry order cannot stand in for the ordering: it is roughly alphabetical,
- * not topological — `lessons_students` is registered before `students`, so
- * merely reversing it drops the target before its referencer. The canonical
- * registry declares no foreign keys of its own, but a test may add one (e.g.
- * `addForeignKey("lessons_students", "students")` in the abstract-mysql-adapter
- * schema tests), so the plan is derived from the FKs the database actually
+ * not topological — `author_favorites` is registered before `authors`, so
+ * merely reversing it drops a target before its referencer. The registry does
+ * declare foreign keys of its own (`lessons_students → students`,
+ * schema.rb:726; the `parrots`/`pirates`/`treasures` join tables), and a test
+ * may add more, so the plan is derived from the FKs the database actually
  * holds rather than from anything declared here.
  *
  * Two shapes have no safe order and surface as `blockers` instead:
