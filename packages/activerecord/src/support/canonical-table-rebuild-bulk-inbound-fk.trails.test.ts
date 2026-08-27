@@ -28,15 +28,16 @@ beforeAll(() => {
 
 describe.skipIf(lane === "sqlite")("bulkInboundFkHost (live catalog)", () => {
   it("drops a foreign key reaching in from a table it is not rebuilding", async () => {
-    await clearLessonsStudentsForeignKeys();
+    // The canonical schema already lays `lessons_students -> students`
+    // (schema.rb:726); the rebuild must drop only the `authors` edge added here.
+    await adapter.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
     try {
-      await adapter.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
-      expect(await adapter.foreignKeys("lessons_students")).toHaveLength(1);
+      expect(await lessonsStudentsForeignKeyTargets()).toEqual(["authors", "students"]);
 
       await rebuildCanonicalTables(adapter, ["authors"]);
-      expect(await adapter.foreignKeys("lessons_students")).toEqual([]);
+      expect(await lessonsStudentsForeignKeyTargets()).toEqual(["students"]);
     } finally {
-      await clearLessonsStudentsForeignKeys();
+      await restoreLessonsStudentsForeignKeys();
     }
   });
 
@@ -69,10 +70,21 @@ describe.skipIf(lane === "sqlite")("bulkInboundFkHost (live catalog)", () => {
   });
 });
 
-async function clearLessonsStudentsForeignKeys(): Promise<void> {
+async function lessonsStudentsForeignKeyTargets(): Promise<string[]> {
+  const fks = await adapter.foreignKeys("lessons_students");
+  return fks.map((fk) => fk.toTable).sort();
+}
+
+/** Strip every FK off the join table and put the canonical one back. */
+async function restoreLessonsStudentsForeignKeys(): Promise<void> {
   for (const fk of await adapter.foreignKeys("lessons_students")) {
     await adapter.removeForeignKey("lessons_students", { name: fk.name });
   }
+  await adapter.addForeignKey("lessons_students", "students", {
+    column: "student_id",
+    onDelete: "cascade",
+    deferrable: "immediate",
+  });
 }
 
 async function currentDatabase(): Promise<string> {

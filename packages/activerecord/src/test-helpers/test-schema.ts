@@ -956,6 +956,16 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
   },
 
+  // Rails sandwiches `students` inside the L-block, immediately after
+  // `lessons_students` (schema.rb:720-724), so it lands here rather than with
+  // the S-tables — but ahead of `lessons_students`, whose inline foreign key
+  // needs the referenced table to exist already.
+  students: {
+    name: "string",
+    active: "boolean",
+    college_id: "integer",
+  },
+
   lessons_students: {
     columns: {
       // Rails schema.rb uses `t.references :lesson` / `t.references :student`,
@@ -965,15 +975,17 @@ export const TEST_SCHEMA: Schema = {
       student_id: "big_integer",
     },
     indexes: [{ columns: "lesson_id" }, { columns: "student_id" }],
+    // schema.rb:726 `add_foreign_key :lessons_students, :students,
+    // on_delete: :cascade, deferrable: :immediate`.
+    foreignKeys: [
+      {
+        toTable: "students",
+        column: "student_id",
+        onDelete: "cascade",
+        deferrable: "immediate",
+      },
+    ],
     primaryKey: false,
-  },
-
-  // Rails sandwiches `students` inside the L-block, immediately after
-  // `lessons_students`, so it lands here rather than with the S-tables.
-  students: {
-    name: "string",
-    active: "boolean",
-    college_id: "integer",
   },
 
   lint_models: {},

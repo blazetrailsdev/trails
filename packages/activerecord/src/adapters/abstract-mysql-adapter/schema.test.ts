@@ -184,20 +184,12 @@ describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
     const a = ansi!;
     // Rails' schema.rb:715-726 lays `lessons_students` / `students` AND the
     // `add_foreign_key :lessons_students, :students, on_delete: :cascade,
-    // deferrable: :immediate` this reads, so schema_test.rb:125-128 is a bare
-    // read. trails' canonical schema lays the two tables but not the FK
-    // (`canonical-schema.ts:1074`), so it is added and taken back off here
-    // until `lessons-students-canonical-foreign-key` closes that gap; then
-    // this reverts to the bare read.
-    await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
-    try {
-      const fks = await a.foreignKeys("lessons_students");
-      expect(fks).toHaveLength(1);
-      expect(fks[0].fromTable).toBe("lessons_students");
-      expect(fks[0].toTable).toBe("students");
-      expect(fks[0].onDelete).toBe("cascade");
-    } finally {
-      await a.removeForeignKey("lessons_students", "students");
-    }
+    // deferrable: :immediate` this reads, and so does the canonical schema
+    // (`canonical-schema.ts`), so this is a bare read like
+    // schema_test.rb:125-128.
+    const fks = await a.foreignKeys("lessons_students");
+    expect(fks.map((fk) => [fk.fromTable, fk.toTable, fk.onDelete])).toEqual([
+      ["lessons_students", "students", "cascade"],
+    ]);
   });
 });

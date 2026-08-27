@@ -66,11 +66,18 @@ describe("rebuildCanonicalTables", () => {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
 
+      // The canonical schema lays `lessons_students -> students`
+      // (schema.rb:726), so the rebuild must drop the `authors` edge and leave
+      // that one standing.
       await sqlite.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
-      expect(await sqlite.foreignKeys("lessons_students")).toHaveLength(1);
+      expect((await sqlite.foreignKeys("lessons_students")).map((fk) => fk.toTable).sort()).toEqual(
+        ["authors", "students"],
+      );
 
       await rebuildCanonicalTables(adapter, ["authors"]);
-      expect(await sqlite.foreignKeys("lessons_students")).toEqual([]);
+      expect((await sqlite.foreignKeys("lessons_students")).map((fk) => fk.toTable)).toEqual([
+        "students",
+      ]);
       expect(await dumpSchema(adapter)).toBe(canonical);
     } finally {
       await pool.disconnect();
