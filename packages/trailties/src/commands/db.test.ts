@@ -2739,8 +2739,6 @@ export class CreateThings extends Migration {
   });
 
   it("db schema:load --format=sql refuses an in-memory database instead of reporting success", async () => {
-    // The sqlite3 child process opens its own throwaway :memory: database, so
-    // the load reaches nothing; the CLI must not print "Schema loaded.".
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
