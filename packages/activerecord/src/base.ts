@@ -4692,7 +4692,6 @@ include(Base, _PrimaryKey);
 include(Base, _CompositePrimaryKey);
 // attribute_methods.rb:18 — `include TimeZoneConversion`, whose members reach
 // `Base` by other routes; it holds this seat in the ordering.
-// attribute_methods.rb:19 — `include Dirty`.
 // `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
 // `ActiveRecord::AttributeMethods::Dirty` builds on, and which
 // `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
