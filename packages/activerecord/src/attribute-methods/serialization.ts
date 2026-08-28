@@ -120,8 +120,6 @@ export function isTypeIncompatibleWithSerialize(
   return false;
 }
 
-type CoderLike = { dump(v: unknown): string; load(v: unknown): unknown };
-
 /**
  * Builds the inner coder for a store column given raw options.
  * If coder responds to both load and dump, uses it directly.
@@ -217,12 +215,11 @@ export function serialize(
   attrName: string,
   options: SerializeOptions = {},
 ): void {
-  // serialization.rb:183 — `coder: nil, type: Object, yaml: {}, **options`.
+  // serialization.rb:183-190 — `coder: nil, type: Object, yaml: {}, **options`,
+  // then `coder ||= default_column_serializer` and the missing-keyword raise.
   const { type = Object, yaml = {} } = options;
-  // serialization.rb:184 — `coder ||= default_column_serializer`.
   const coder = options.coder ?? this.defaultColumnSerializer;
   if (!coder) {
-    // serialization.rb:185-190.
     throw new ArgumentError(
       "missing keyword: :coder. If no default coder is configured, a coder must be provided to `serialize`.",
     );
