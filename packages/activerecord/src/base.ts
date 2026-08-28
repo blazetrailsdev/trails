@@ -1268,15 +1268,6 @@ export class Base extends Model {
   }
 
   /**
-   * Create the database table for this model from its attribute definitions.
-   * Drops the table first if it already exists to handle schema changes
-   * between tests.
-   *
-   * This is a test/development helper — in production, use migrations.
-   * Wired via extend() after class.
-   */
-
-  /**
    * Set the database adapter for this model class.
    *
    * This is a convenience setter that bypasses the ConnectionHandler/ConnectionPool
