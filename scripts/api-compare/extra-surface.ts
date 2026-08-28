@@ -1668,7 +1668,7 @@ export function inlinedModuleMembers(
       const moduleBodies = bodiedByTsFile.get(moduleTs);
       for (const m of [...mod.instanceMethods, ...mod.classMethods]) {
         if (m.file !== undefined && m.file !== mod.file) continue;
-        const candidates = rubyMethodCandidates(m.name) ?? operatorSpelling(fqn, m.name);
+        const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
         const tsName = candidates.find((c) => hostBodies.has(c) && moduleBodies?.has(c) !== true);
         if (tsName === undefined) continue;
