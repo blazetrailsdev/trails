@@ -259,6 +259,7 @@ import {
   attributeCameFromUser as _attributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
 import { Query as _Query } from "./attribute-methods/query.js";
+import { Serialization as _AttrSerialization } from "./attribute-methods/serialization.js";
 import {
   toParam as _toParam,
   toParamClass as _toParamClass,
@@ -374,7 +375,6 @@ import {
 } from "./store.js";
 import { serialize as _serializeAttribute } from "./serialize.js";
 import { respondToMissing } from "./dynamic-matchers.js";
-import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
 _registerSerializeFn(_serializeAttribute as any);
@@ -1958,23 +1958,15 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for! (token_for.rb:108). */
   static findByTokenForBang = _findByTokenForBang;
 
-  // The fallback coder used by `serialize` when no explicit coder is given
-  // (`coder ||= default_column_serializer`). Subclasses inherit via JS
-  // prototype lookup and may override per-class.
-  //
-  // Mirrors: ActiveRecord::AttributeMethods::Serialization — `class_attribute
-  // :default_column_serializer, instance_accessor: false, default:
-  // Coders::YAMLColumn` (serialization.rb:19-20).
-  static _defaultColumnSerializer: unknown = _YAMLColumn;
-
-  /** Mirrors: ActiveRecord::Base.default_column_serializer */
-  static get defaultColumnSerializer(): unknown {
-    return this._defaultColumnSerializer;
-  }
-
-  static set defaultColumnSerializer(value: unknown) {
-    this._defaultColumnSerializer = value;
-  }
+  /**
+   * The fallback coder `serialize` uses when no explicit coder is given
+   * (`coder ||= default_column_serializer`, serialization.rb:184). Declared by
+   * `AttributeMethods::Serialization`'s `included do` block at its
+   * attribute_methods.rb:20 seat below.
+   *
+   * Mirrors: ActiveRecord::AttributeMethods::Serialization.default_column_serializer
+   */
+  declare static defaultColumnSerializer: unknown;
 
   /**
    * Declare that an attribute should be serialized using the given coder.
@@ -4695,9 +4687,15 @@ include(Base, AMDirty);
 // `include()` copies the getter descriptors rather than flattening them.
 include(Base, _Dirty);
 // attribute_methods.rb:20 — `include Serialization`. It defines no instance
-// methods either (serialization.rb:6-230 is a `ClassMethods` module and the
-// `ColumnSerializer` class), and its one public class method reaches `Base` as
-// the class-body `static serialize` above, so this seat takes no `include()`.
+// methods, so the include's payload is its `included do` block
+// (serialization.rb:19-21) declaring `default_column_serializer`. Its
+// `ClassMethods#serialize` (serialization.rb:183-205) still reaches `Base` as
+// the class-body `static serialize` above rather than an `extend()` here: the
+// body lives in `serialize.ts`, which imports this module's
+// `isTypeIncompatibleWithSerialize` and `ColumnNotSerializableError`, so
+// re-homing the class method onto the Rails file first has to untangle that
+// cycle — see the `rehome-serialize-onto-attribute-methods-serialization` story.
+include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
