@@ -2704,6 +2704,14 @@ registerVersion(CURRENT_VERSION, Current);
  * `:page_load`.
  *
  * Mirrors: `ActiveRecord::Migration::CheckPending` (`migration.rb:648-681`).
+ *
+ * `@mutex` is `Mutex.new` (`:651`), Ruby's non-reentrant core mutex. trails has
+ * no `Mutex` port — Ruby's core classes are ported only where Rails' own code
+ * is what needs them — so this holds `Monitor`
+ * (`activesupport/concurrency/monitor.ts`), the one lock primitive the repo
+ * carries whose `synchronize` takes an async block. It is `MonitorMixin`, so it
+ * is reentrant where Ruby's `Mutex` deadlocks; `call` is the sole caller and
+ * never re-enters, so the two agree on every path this class has.
  */
 export class CheckPending {
   private app: (env: Record<string, unknown>) => Promise<unknown>;
