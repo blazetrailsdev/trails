@@ -1218,6 +1218,41 @@ export function ownerRecordsNothing(
 }
 
 /**
+ * The owners of `tsName` a matched pair may be held to: the ones whose
+ * declaration has a BODY, wherever the file declares at least one.
+ *
+ * The extractor records a member for every exported interface, type alias and
+ * object-literal const, so a Rails-matched file that also exports its host type
+ * (`export interface AttributeMethodHost { attributeMethodPatternsCache(): … }`)
+ * declares the name twice: once on the type, once as the real
+ * `export function`. A declaration carries no `calls` / `callArgs`, so the
+ * second owner made the pairing ambiguous and the call gates recorded NOTHING —
+ * every baselined row for the method then read as STALE, and deleting it (the
+ * one sanctioned remedy) retired a live divergence nobody fixed. Whether a type
+ * is exported is not a fact about the port's fidelity, so the bodyless
+ * declarations drop out and the body answers (RFC 0126).
+ *
+ * All-bodyless is left alone: there is no body to prefer, and the population is
+ * the same one the resolution saw before. An owner NAME that declares the same
+ * method both ways — `class Relation` and the `interface Relation` that types
+ * its mixins — has a body and stays; dropping it left `ExplainProxy#first` as
+ * relation.ts's only owner of `first` and paired `FinderMethods#first` with the
+ * proxy, the very mispairing `ambiguousTsOwner` exists to prevent.
+ */
+export function ownersWithBodies(
+  owners: ReadonlySet<string> | undefined,
+  bodylessOwners: ReadonlySet<string> | undefined,
+  bodiedOwners: ReadonlySet<string> | undefined = undefined,
+): ReadonlySet<string> | undefined {
+  if (owners === undefined || bodylessOwners === undefined) return owners;
+  const withBody = [...owners].filter(
+    (o) => !bodylessOwners.has(o) || (bodiedOwners?.has(o) ?? false),
+  );
+  if (withBody.length === 0 || withBody.length === owners.size) return owners;
+  return new Set(withBody);
+}
+
+/**
  * The file a matched member is DECLARED in, when that is not the file the pair
  * matched under.
  *
@@ -2720,6 +2755,16 @@ export function main() {
     // owners) — the port's spelling of Ruby's `name=` writer, so
     // `resolveTsOwner` can keep a Ruby reader off it (RFC 0108).
     const tsWriterOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // The owners whose declaration of the name carries no body (file → name →
+    // owners) — an interface signature or an object-literal reference, see
+    // `MethodInfo.bodyless`. Subtracted by `ownersWithBodies` wherever the file
+    // also declares a real body, so an exported host type cannot outrank it.
+    const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // Its complement: the owners that declare the name WITH a body. One owner
+    // name can be both — relation.ts declares `first` on `class Relation` and
+    // again on the `interface Relation` that types its mixins — and such an
+    // owner has a body, so `ownersWithBodies` subtracts this set first.
+    const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -2796,6 +2841,10 @@ export function main() {
           byName.set(m.name, byOwner);
           tsDeclFileByFileNameOwner.set(file, byName);
         }
+        const byShape = m.bodyless === true ? tsBodylessOwnersByFileName : tsBodiedOwnersByFileName;
+        const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
+        shapeOwners.set(m.name, (shapeOwners.get(m.name) ?? new Set<string>()).add(owner));
+        byShape.set(file, shapeOwners);
         if (m.writer === true) {
           const writerOwners = tsWriterOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
           writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
@@ -2849,34 +2898,42 @@ export function main() {
           scope,
         );
       }
-      if (m.callSeq !== undefined) {
+      // The file-keyed BODY maps below are the package's own, `scope` and all:
+      // a relative path is not unique across packages — activemodel and
+      // activerecord both port `attribute_methods.rb` to `attribute-methods.ts`
+      // — so a dep's same-named member pooled under the same key joins the
+      // whole-file union the call gates compare against, and the ActiveModel
+      // body then answered for the ActiveRecord one. Every call
+      // `generate_alias_attribute_methods` (activerecord/lib/active_record/
+      // attribute_methods.rb:80-85) omitted was covered that way and the gate
+      // stayed green (RFC 0126). Only the by-NAME pools (above and below) are
+      // deliberately dep-wide.
+      if (m.callSeq !== undefined && scope === "package") {
         const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.callSeq]);
         tsCallSeqByFileName.set(file, byName);
       }
-      if (m.callArgs !== undefined) {
+      if (m.callArgs !== undefined && scope === "package") {
         const byName = tsCallArgsByFileName.get(file) ?? new Map<string, CallSite[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.callArgs]);
         tsCallArgsByFileName.set(file, byName);
-        if (scope === "package") {
-          const byOwner =
-            tsCallArgsByFileNameOwner.get(file) ?? new Map<string, Map<string, CallSite[][]>>();
-          const sets = byOwner.get(m.name) ?? new Map<string, CallSite[][]>();
-          sets.set(owner, [...(sets.get(owner) ?? []), m.callArgs]);
-          byOwner.set(m.name, sets);
-          tsCallArgsByFileNameOwner.set(file, byOwner);
-        }
+        const byOwner =
+          tsCallArgsByFileNameOwner.get(file) ?? new Map<string, Map<string, CallSite[][]>>();
+        const sets = byOwner.get(m.name) ?? new Map<string, CallSite[][]>();
+        sets.set(owner, [...(sets.get(owner) ?? []), m.callArgs]);
+        byOwner.set(m.name, sets);
+        tsCallArgsByFileNameOwner.set(file, byOwner);
       }
-      if (m.skeleton !== undefined) {
+      if (m.skeleton !== undefined && scope === "package") {
         const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.skeleton]);
         tsSkeletonByFileName.set(file, byName);
       }
       if (m.calls !== undefined) {
-        const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
-        byName.set(m.name, [...(byName.get(m.name) ?? []), m.calls]);
-        tsCallsByFileName.set(file, byName);
         if (scope === "package") {
+          const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
+          byName.set(m.name, [...(byName.get(m.name) ?? []), m.calls]);
+          tsCallsByFileName.set(file, byName);
           const byOwner =
             tsCallsByFileNameOwner.get(file) ?? new Map<string, Map<string, string[][]>>();
           const sets = byOwner.get(m.name) ?? new Map<string, string[][]>();
@@ -3323,13 +3380,46 @@ export function main() {
       // whether the pairing stayed ambiguous — in which case the gates record
       // nothing rather than compare against a member this Ruby body did not
       // port to.
+      //
+      // Resolved TWICE where the file's declarations of the name leave it
+      // ambiguous: the second pass drops the bodyless ones (see
+      // `ownersWithBodies`), so an exported host type sitting next to the real
+      // `export function` no longer silently retires every call-parity finding
+      // for the method. The retry runs only after the full population failed,
+      // which is what keeps it from answering a question the full population
+      // already answered — relation.ts declares `first` on the `Relation`
+      // interface that types its mixins and on `ExplainProxy`, and there the
+      // first pass names `Relation` (whose body is in relation/finder-methods.ts)
+      // and records nothing, exactly as before (RFC 0126).
       const resolveOwner = (
         rubyName: string,
         tsName: string,
         tsFile: string,
         rubyModule: string,
+      ): {
+        tsClass: string | undefined;
+        ambiguous: boolean;
+        tsOwners: ReadonlySet<string> | undefined;
+      } => {
+        const declared = tsOwnersByFileName.get(tsFile)?.get(tsName);
+        const bodied = ownersWithBodies(
+          declared,
+          tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
+          tsBodiedOwnersByFileName.get(tsFile)?.get(tsName),
+        );
+        const first = resolveOwnerIn(declared, rubyName, tsName, tsFile, rubyModule);
+        if (!first.ambiguous || bodied === declared) return { ...first, tsOwners: declared };
+        const retry = resolveOwnerIn(bodied, rubyName, tsName, tsFile, rubyModule);
+        return retry.ambiguous ? { ...first, tsOwners: declared } : { ...retry, tsOwners: bodied };
+      };
+
+      const resolveOwnerIn = (
+        tsOwners: ReadonlySet<string> | undefined,
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
       ): { tsClass: string | undefined; ambiguous: boolean } => {
-        const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
         const rubySeatOf = (rubyOwner: string) =>
           rubyOwnerSeat(rubyOwner, rubyKlassOwnerNames.has(ownerKey(rubyOwner, rubyName)));
         const rubySeat = rubySeatOf(rubyModule);
@@ -3385,8 +3475,7 @@ export function main() {
         // Returning early here keyed the denominator on the RUBY side alone, so
         // converging a false-positive class read as LOST coverage (RFC 0108).
         const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
-        const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
-        const { tsClass, ambiguous } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
         if (ambiguous) return;
         if (ownerRecordsNothing(tsCallsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
@@ -3531,8 +3620,7 @@ export function main() {
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a
         // skeleton record, only an unambiguous TS body compares.
-        const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
-        const { tsClass, ambiguous } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
         if (ambiguous) return;
         if (ownerRecordsNothing(tsCallArgsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) {
           return;

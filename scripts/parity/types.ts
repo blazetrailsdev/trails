@@ -149,6 +149,18 @@ export interface MethodInfo {
    */
   mixinFile?: string;
   /**
+   * TS-side only (RFC 0126): the declaration carries no body — an interface
+   * method/property signature, or an object-literal member that is a bare
+   * reference to a function declared elsewhere (`export const ClassMethods =
+   * { attributeMethodQ }`). Such a declaration records no `calls` / `callArgs`,
+   * so pairing a Ruby body with it retires every call-parity finding for the
+   * method silently: the gates then report the baselined rows as STALE and the
+   * only sanctioned remedy (delete the row) buries a live divergence. The call
+   * gates prefer an owner that HAS a body wherever the file declares one — see
+   * `ownersWithBodies` in compare.ts.
+   */
+  bodyless?: boolean;
+  /**
    * True when the method is not part of the public API surface:
    * Ruby `private`/`protected`, TS `private`/`protected`, or
    * TS `#`-prefixed private fields. Consumers should filter these

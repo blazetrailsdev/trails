@@ -88,6 +88,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "recv",
   "writer",
   "reExportedFrom",
+  "bodyless",
 ] as const;
 
 /**

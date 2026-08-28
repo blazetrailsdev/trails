@@ -3991,3 +3991,51 @@ describe("callArgs", () => {
     expect(create.callSeq).toEqual(["build", "save"]);
   });
 });
+
+describe("bodyless declarations (RFC 0126)", () => {
+  it("flags an interface's method and property signatures, not the body beside them", () => {
+    const info = extractFromFiles("/p", {
+      "attribute-methods.ts": `
+        export interface AttributeMethodHost {
+          attributeMethodPatternsCache(): Map<string, unknown>;
+          attributeMethodPatterns: unknown[];
+        }
+        export function attributeMethodPatternsCache(
+          this: AttributeMethodHost,
+        ): Map<string, unknown> {
+          return new Map();
+        }
+      `,
+    });
+    const iface = info.modules["attribute-methods.ts:AttributeMethodHost"];
+    expect(iface.instanceMethods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["attributeMethodPatternsCache", true],
+      ["attributeMethodPatterns", true],
+    ]);
+    const fn = info.fileFunctions!["attribute-methods.ts"].find(
+      (f) => f.name === "attributeMethodPatternsCache",
+    )!;
+    expect(fn.bodyless).toBeUndefined();
+  });
+
+  it("flags an object-literal member that is a bare reference, not an inline body", () => {
+    const methods = objectLiteralMethods(
+      `function attributeMethodQ(name: string): boolean { return true; }
+       const NS = { aliased: attributeMethodQ };
+       export const ClassMethods = {
+         attributeMethodQ,
+         viaProperty: attributeMethodQ,
+         viaNamespace: NS.aliased,
+         inline(name: string): boolean { return true; },
+         arrow: (name: string): boolean => true,
+       };`,
+    );
+    expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["attributeMethodQ", true],
+      ["viaProperty", true],
+      ["viaNamespace", true],
+      ["inline", false],
+      ["arrow", false],
+    ]);
+  });
+});
