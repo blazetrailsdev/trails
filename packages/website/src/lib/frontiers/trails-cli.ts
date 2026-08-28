@@ -168,6 +168,14 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
     output.push(msg);
   }
 
+  // Ruby loads a migration file by autoloading it; here it has to be evaluated,
+  // so running one is conditional on the host offering an eval context. The
+  // Migrator reaches AR's connection handler first, so without this the host's
+  // own explanation is masked by "No database connection defined.".
+  async function requireEvalContext(): Promise<void> {
+    await deps.executeCode("");
+  }
+
   async function withMigrationContext(
     fn: (migrationContext: MigrationContext) => Promise<void>,
   ): Promise<void> {
@@ -241,6 +249,7 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
       },
 
       "db:migrate": async (_args, opts) => {
+        await requireEvalContext();
         const version = opts.version && opts.version !== "true" ? opts.version : null;
         await withMigrationContext(async (migrationContext) => {
           await migrationContext.migrate(version);
@@ -254,6 +263,7 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
       },
 
       "db:rollback": async (_args, opts) => {
+        await requireEvalContext();
         const parsed = parseInt(opts.step ?? "1", 10);
         const step = Number.isNaN(parsed) ? 1 : parsed;
         await withMigrationContext(async (migrationContext) => {
