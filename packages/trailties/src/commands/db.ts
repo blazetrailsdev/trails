@@ -490,11 +490,9 @@ async function runTestLoadSchema(options: {
 async function structureLoadReachesDatabase(
   config: Parameters<typeof DatabaseTasks.withTemporaryConnection>[0],
 ): Promise<boolean> {
-  return DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
-    const supports = (adapter as unknown as { supportsConcurrentConnections?: () => boolean })
-      .supportsConcurrentConnections;
-    return typeof supports === "function" ? supports.call(adapter) : true;
-  });
+  return DatabaseTasks.withTemporaryConnection(config, async (adapter) =>
+    adapter.supportsConcurrentConnections(),
+  );
 }
 
 let _seedImportCounter = 0;
