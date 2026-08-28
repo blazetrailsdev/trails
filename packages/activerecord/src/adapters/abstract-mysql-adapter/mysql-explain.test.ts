@@ -111,6 +111,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       );
     });
 
+    it("buildExplainClause drops a Symbol option's leading colon", async () => {
+      const clause = await adapter.buildExplainClause([":analyze"]);
+      const analyzeWithoutExplain =
+        isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
+      expect(clause).toBe(analyzeWithoutExplain ? "ANALYZE" : "EXPLAIN ANALYZE");
+    });
+
     it("explain executes with a format flag and returns JSON plan", async () => {
       const result = await adapter.explain("SELECT 1", [], ["format=json"]);
       expect(typeof result).toBe("string");
