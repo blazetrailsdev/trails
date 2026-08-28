@@ -87,11 +87,7 @@ describe("SerializedAttributeTest", () => {
     class DefaultTopic extends Topic {
       static {
         this._tableName = "topics";
-        // Rails: serialize(:content, type: Hash, default: { key: "value" }).
-        // trails' serialize() has no `default:` option, so we pre-register via
-        // attribute() with the hash default — Serialized#cast serializes it first.
-        this.attribute("content", "text", { default: { key: "value" } });
-        this.serialize("content", { type: HashObject });
+        this.serialize("content", { type: HashObject, default: { key: "value" } });
       }
     }
     const t = new DefaultTopic();

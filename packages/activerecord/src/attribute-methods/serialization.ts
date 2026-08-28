@@ -9,7 +9,7 @@
 
 import { classAttribute, extend, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
-import { type Type, ArgumentError } from "@blazetrails/activemodel";
+import { type AttributeOptions, type Type, ArgumentError } from "@blazetrails/activemodel";
 import { Json } from "../type/json.js";
 import { Serialized, type Coder } from "../type/serialized.js";
 import { JSON as CodersJSON } from "../coders/json.js";
@@ -207,7 +207,7 @@ export class HashObject {
 
 type CoderOption = "json" | "array" | "hash" | InnerCoder | (new (...args: any[]) => any);
 
-export interface SerializeOptions {
+export interface SerializeOptions extends AttributeOptions {
   coder?: CoderOption;
   type?: "Array" | "Hash" | typeof Array | typeof Object | (new (...args: any[]) => any);
   /** Rails `serialize :x, coder: YAML, yaml: { permitted_classes: [...] }`. */
@@ -307,6 +307,14 @@ export function serialize(
 
   // serialization.rb:191 — `column_serializer = build_column_serializer(attr_name, coder, type, yaml)`.
   const columnSerializer = buildColumnSerializer(attrName, coder, type, options.yaml) as Coder;
+
+  // serialization.rb:193 — `attribute(attr_name, **options)`: the kwargs left
+  // over once `coder:` / `type:` / `yaml:` are bound are attribute options.
+  const attributeOptions: AttributeOptions = { ...options };
+  delete (attributeOptions as SerializeOptions).coder;
+  delete (attributeOptions as SerializeOptions).type;
+  delete (attributeOptions as SerializeOptions).yaml;
+  this.attribute(attrName, attributeOptions);
 
   const decorator = (name: string, castType: Type): Type => {
     // Already wrapped by this same coder (post-reflection replay) — no-op so the

@@ -1359,10 +1359,13 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("boolean attribute predicate", async () => {
-    const t = new CanonicalTopic({ approved: true }) as any;
-    expect(t["approved?"]).toBe(true);
-    const f = new CanonicalTopic({ approved: false }) as any;
-    expect(f["approved?"]).toBe(false);
+    for (const value of [null, "", false, "false", "f", 0]) {
+      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(false);
+    }
+
+    for (const value of [true, "true", "1", 1]) {
+      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(true);
+    }
   });
 
   it("boolean attributes writing and reading", async () => {

@@ -1,6 +1,5 @@
 [
   "packages/activerecord/src/associations/has-many-associations.test.ts",
-  "packages/activerecord/src/attribute-methods.test.ts",
   "packages/activerecord/src/autosave-association.test.ts",
   "packages/activerecord/src/base.test.ts",
   "packages/activerecord/src/batches.test.ts",

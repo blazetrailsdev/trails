@@ -1984,7 +1984,10 @@ export class Base extends Model {
    */
   declare static serialize: (
     attribute: string,
-    options?: { coder?: unknown; type?: "Array" | "Hash" | (new (...args: any[]) => any) },
+    options?: AttributeOptions & {
+      coder?: unknown;
+      type?: "Array" | "Hash" | (new (...args: any[]) => any);
+    },
   ) => void;
 
   /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
