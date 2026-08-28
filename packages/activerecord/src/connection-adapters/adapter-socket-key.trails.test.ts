@@ -1,24 +1,3 @@
-/**
- * Rails spells a Unix socket `socket` in `database.yml`
- * (`activerecord/test/config.example.yml:18-19,37-39`), and Ruby's mysql2 gem
- * reads `:socket` natively — `::Mysql2::Client.new(config)`
- * (`mysql2_adapter.rb:24`) hands the hash over untouched. Node's `mysql2`
- * instead reads `socketPath`, and IGNORES unknown keys, so an unmapped
- * `socket` config connects over TCP instead of failing: a silent wrong
- * connection, the same failure mode as the `username` key (see
- * `adapter-username-key.trails.test.ts`).
- *
- * There is no Rails guard to inherit for this one, so the semantics below are
- * a deliberate choice rather than a port. They match the `username` mapping so
- * the two agree: a *Ruby-truthy* `socket` overwrites `socketPath` and is
- * deleted from the driver hash. `""` is Ruby-truthy, so a blank socket maps —
- * and lands on mysql2 as a falsy `socketPath`, i.e. host/port, the same
- * outcome a blank socket has in Rails.
- *
- * The mapping lives in `Mysql2Adapter#constructor` ONLY. `adapter-args.ts`
- * used to remap the key as well, which stripped it before the constructor ever
- * saw it on the `connection-handling.ts:923` path every real connection takes.
- */
 import { describe, expect, it } from "vitest";
 
 import { buildAdapterArg } from "./adapter-args.js";
@@ -83,9 +62,6 @@ describe("Mysql2Adapter socket key through buildAdapterArg", () => {
       socket: "/nonexistent/trails-socket-key.sock",
     }) as [Record<string, unknown>];
     const adapter = new Mysql2Adapter(config as never);
-    // ENOENT *on the socket path* is the proof: a TCP fallback cannot produce
-    // it (it refuses, or on a MySQL lane silently succeeds against the wrong
-    // transport, which is the regression this guards).
     await expect(adapter.connect()).rejects.toThrow(
       "connect ENOENT /nonexistent/trails-socket-key.sock",
     );

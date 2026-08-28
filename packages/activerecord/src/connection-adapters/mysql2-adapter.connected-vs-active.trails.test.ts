@@ -1,13 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 
-// Trails-specific guard (no Rails counterpart, because in Rails the split is
-// structural): Rails' Mysql2Adapter#connected? is
-// `!(@raw_connection.nil? || @raw_connection.closed?)` — handle presence only —
-// while #active? is `connected?` PLUS a live ping. A failed ping must therefore
-// leave `isConnected()` true and only flip `active` false.
-//
-// Runs offline: newClient is stubbed, so no real socket is opened.
 describe("Mysql2Adapter connected? vs active?", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -16,9 +9,6 @@ describe("Mysql2Adapter connected? vs active?", () => {
   function stubNewClient(ping: () => Promise<void>): void {
     const fakeConn = {
       end: () => Promise.resolve(),
-      // The connect-once configure warms the server version off the driver's
-      // handshake banner (getFullVersion) before checkVersion; hand it one so
-      // the warm resolves offline.
       connection: { _handshakePacket: { serverVersion: "8.0.28" } },
       query: () => Promise.resolve([[]]),
       ping,

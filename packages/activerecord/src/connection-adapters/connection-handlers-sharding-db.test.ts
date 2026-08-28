@@ -484,7 +484,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
         true,
       );
     } finally {
-      // pop the stack entry added by connectingTo
       connectedToStack().pop();
     }
   });
@@ -588,12 +587,10 @@ describe("ConnectionHandlersShardingDbTest", () => {
         });
       }
 
-      // Create a record on :default
       await (
         await ShardConnectionTestModel.leaseConnection()
       ).executeMutation(`INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('foo')`);
 
-      // Can read it when explicitly connecting to :default
       await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
         const rows = await (
           await ShardConnectionTestModel.leaseConnection()
@@ -601,7 +598,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
         expect(rows.length).toBe(1);
       });
 
-      // Cannot read :default record on :one; add a record on :one
       await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
         const rows = await (
           await ShardConnectionTestModel.leaseConnection()
@@ -615,7 +611,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
         );
       });
 
-      // Cannot read 'bar' from :default, but can read 'foo'
       const barRows = await (
         await ShardConnectionTestModel.leaseConnection()
       ).execute(`SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'bar'`);
@@ -630,7 +625,4 @@ describe("ConnectionHandlersShardingDbTest", () => {
       (SecondaryBase as any).connectionClass = undefined;
     }
   });
-  // The 3 "swapping shards (and roles) in a multi threaded environment" Rails
-  // tests are permanently unported (Ruby GVL / Thread semantics). Tracked in
-  // scripts/api-compare/unported-files.ts.
 });

@@ -9,11 +9,6 @@ import type { QueryTransformer } from "../query-transformers.js";
 
 fixtures([]);
 
-// Integration proof for QL PR 3: a registered query transformer is applied in
-// preprocessQuery and the post-transform (commented) SQL flows all the way into
-// both the executed statement and the `sql.active_record` instrumentation
-// payload — the Rails-faithful ordering where preprocess_query runs before
-// raw_execute's log block.
 describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   let adapter: SQLite3Adapter;
   let savedTransformers: QueryTransformer[];
@@ -42,9 +37,7 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   it("appends the comment to read queries and instruments the commented SQL", async () => {
     ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { result, sqls } = await captureSql(() => adapter.execute("SELECT 1 AS one"));
-    // The query still executes correctly with the comment appended.
     expect(result).toEqual([{ one: 1 }]);
-    // The instrumentation payload carries the post-transform SQL.
     expect(sqls.some((s) => s === "SELECT 1 AS one /*app:test*/")).toBe(true);
   });
 
@@ -77,9 +70,6 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   });
 
   it("does not let a concurrent batch suppress a normal query's comment", async () => {
-    // The batch-suppression flag is consumed synchronously inside preprocessQuery
-    // (before any await), so a query interleaved with an in-flight batch still
-    // gets transformed. If the flag spanned the await, this comment would be lost.
     ActiveRecord.queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
     const { sqls } = await captureSql(() =>
       Promise.all([
@@ -90,7 +80,6 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
         adapter.execute("SELECT id FROM customers"),
       ]),
     );
-    // The batch statements stay uncommented; the concurrent SELECT keeps its comment.
     expect(sqls.some((s) => s === "SELECT id FROM customers /*app:test*/")).toBe(true);
     expect(sqls.some((s) => s.startsWith("INSERT") && s.includes("/*app:test*/"))).toBe(false);
   });

@@ -1,19 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 
-// Trails-specific guards (no Rails counterpart): verify the connect-time
-// configure_connection gate. Rails runs configure_connection on every fresh
-// connect (connect!/reconnect! → attempt_configure_connection). trails'
-// connectBang opens the raw socket directly (bypassing verify!), so the eager
-// query-loop connect must itself run configureConnection — its connect-once
-// work (super.configureConnection → checkVersion) exactly once per physical
-// socket, with no double-configure when verify/reconnect follows. The database
-// timezone reseed is deliberately ungated (Rails reassigns it on every call).
-//
-// These run offline: Mysql2Adapter.newClient is stubbed to return a fake
-// connection so no real socket is opened. `checkVersion` runs only when
-// configureConnection's gated body executes (past its gate), so spying on it
-// counts connect-once configures; `_syncDatabaseTimezone` runs every call.
 describe("Mysql2Adapter configure-on-fresh-connect", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -22,9 +9,6 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
   function stubNewClient(version = "8.0.28"): void {
     const fakeConn = {
       end: () => Promise.resolve(),
-      // getFullVersion() (run by the connect-once configure to warm the version
-      // before checkVersion) reads the driver's handshake banner; hand it one
-      // so the warm resolves offline.
       connection: { _handshakePacket: { serverVersion: version } },
       query: () => Promise.resolve([[]]),
     };
@@ -51,9 +35,6 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     );
 
     await adapter.connectBang();
-    // reconnectBang's attemptConfigureConnection issues configureConnection()
-    // argless after the raw connect — the gate must make the connect-once work
-    // a no-op, but the (idempotent) timezone reseed still runs.
     await adapter.configureConnection();
 
     expect(checkVersionSpy).toHaveBeenCalledTimes(1);
@@ -65,9 +46,6 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     stubNewClient("5.6.3");
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
-    // The connect-once configure warms the version, then checkVersion enforces
-    // the floor — a too-old server rejects the connect end-to-end (mirrors Rails'
-    // configure_connection → check_version raising during connect).
     await expect(adapter.connectBang()).rejects.toThrow(DatabaseVersionError);
   });
 

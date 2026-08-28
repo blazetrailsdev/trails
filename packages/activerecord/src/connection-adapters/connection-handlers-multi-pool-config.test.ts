@@ -31,7 +31,6 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
     expect(defaultPool).not.toBeUndefined();
     expect(defaultPool).not.toBe(otherPool);
 
-    // :default if passed with no key
     expect(handler.retrieveConnectionPool("primary")).toBe(defaultPool);
   });
 
@@ -42,7 +41,6 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
       shard: "pool_config_two",
     });
 
-    // remove default
     handler.removeConnectionPool("primary");
 
     expect(handler.retrieveConnectionPool("primary")).toBeUndefined();
@@ -58,7 +56,6 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
       shard: "pool_config_two",
     });
 
-    // connect to default
     await (await handler.connectionPoolList("writing")[0].checkout()).connectBang();
 
     expect(handler.isConnected("primary")).toBeTruthy();

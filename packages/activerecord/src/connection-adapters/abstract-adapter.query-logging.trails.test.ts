@@ -100,22 +100,15 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
     };
 
     it("reports an open transaction in the payload", async () => {
-      // A real Transaction wrapping a non-finalized internal transaction, so
-      // this exercises Transaction#isBlank rather than a hand-stubbed shape.
       const openTx = new Transaction({ state: { finalized: false } } as never);
       expect(await logTransactionPayload(openTx)).toBe(openTx);
     });
 
-    // Rails' `user_transaction.presence` — Transaction aliases blank? to
-    // closed?, so a closed transaction is reported as nil, not as itself.
     it("reports a closed transaction as null in the payload", async () => {
       const finalizedTx = new Transaction({ state: { finalized: true } } as never);
       expect(await logTransactionPayload(finalizedTx)).toBeNull();
     });
 
-    // NullTransaction#userTransaction hands back NULL_TRANSACTION rather than
-    // null, so the no-transaction case only reads as "no transaction" because
-    // NULL_TRANSACTION wraps a null internal transaction and is therefore blank.
     it("reports no transaction as null in the payload", async () => {
       expect(await logTransactionPayload(Transaction.NULL_TRANSACTION)).toBeNull();
     });

@@ -6,10 +6,6 @@ import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
 
-// Mirrors ActiveRecord::TestFixtures#setup_shared_connection_pool (test_fixtures.rb:220).
-// For each shard in each pool manager, replaces every non-writing role's pool
-// config with the writing role's pool config so all roles share one connection.
-// Throws ArgumentError (from PoolManager#setPoolConfig) when writing pool is missing.
 function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
   const writingRole = Base.writingRole;
   const managerMap: Map<string, any> = (handlerArg as any)._connectionNameToPoolManager;
@@ -121,7 +117,6 @@ describe("ConnectionHandlerTest", () => {
     localHandler.establishConnection(config, { ownerName: "ActiveRecord::Base", role: "writing" });
     localHandler.establishConnection(config, { ownerName: "ActiveRecord::Base", role: "reading" });
     expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
-    // After shared-pool setup reading pool IS the writing pool — same connection leased.
     const rwPool = localHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "writing" })!;
     const roPool = localHandler.retrieveConnectionPool("ActiveRecord::Base", { role: "reading" })!;
     expect(roPool).toBe(rwPool);
@@ -211,11 +206,6 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("symbolized configurations assignment", async () => {
-    // Rails asserts each config-hash key is a Symbol; the raw config here is
-    // string-keyed and DatabaseConfigurations normalizes via Object.entries,
-    // so that key-type assertion has no TS analogue. The rest of the test —
-    // that nested config normalizes to HashConfig instances with String
-    // envName/name — translates directly.
     const config = {
       development: {
         primary: { adapter: "sqlite3", database: "test/storage/development.sqlite3" },
@@ -299,14 +289,12 @@ describe("ConnectionHandlerTest", () => {
         role: "writing",
       });
 
-      // Before own pool: Klass2 delegates to Base's pool via spec-name walk
       expect(
         freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
           role: "writing",
         }),
       ).toBe(basePool);
 
-      // Give Klass2 its own pool (mirrors klass2.establish_connection in Rails)
       const ownPool = freshHandler.establishConnection(ownConfig, {
         ownerName: Klass2,
         role: "writing",
@@ -320,8 +308,6 @@ describe("ConnectionHandlerTest", () => {
       ).toBe(ownPool);
       expect(ownPool).not.toBe(basePool);
 
-      // Remove the connection — Klass2 falls back to Base's pool.
-      // connection_class stays true (Rails never resets it); connectedTo guards still pass.
       Klass2.removeConnection();
 
       expect(
@@ -339,14 +325,11 @@ describe("ConnectionHandlerTest", () => {
     class ParentModel extends Base {}
     class ChildModel extends ParentModel {}
 
-    // Without explicit names both walk up to Base
     expect(ChildModel.connectionSpecificationName).toBe(ParentModel.connectionSpecificationName);
 
-    // Setting on parent propagates to child via hierarchy walk
     ParentModel.connectionSpecificationName = "readonly";
     expect(ChildModel.connectionSpecificationName).toBe("readonly");
 
-    // Cleanup: reset so we don't leak into other tests
     (ParentModel as any)._connectionSpecificationName = undefined;
   });
 
@@ -455,25 +438,15 @@ describe("ConnectionHandlerTest", () => {
     expect(Base.readingRole).toBe("reading");
   });
 
-  it.skip("connection pool per pid", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
-  });
+  it.skip("connection pool per pid", () => {});
 
-  it.skip("forked child doesnt mangle parent connection", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
-  });
+  it.skip("forked child doesnt mangle parent connection", () => {});
 
-  it.skip("forked child recovers from disconnected parent", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
-  });
+  it.skip("forked child recovers from disconnected parent", () => {});
 
-  it.skip("retrieve connection pool copies schema cache from ancestor pool", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
-  });
+  it.skip("retrieve connection pool copies schema cache from ancestor pool", () => {});
 
-  it.skip("pool from any process for uses most recent spec", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
-  });
+  it.skip("pool from any process for uses most recent spec", () => {});
 
   it("connection pool names", async () => {
     const config = new HashConfig("development", "primary", {

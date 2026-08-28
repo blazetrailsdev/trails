@@ -6,8 +6,6 @@ import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { ActiveRecordError } from "../errors.js";
 
-// Mirrors Rails' AdapterLeasingTest::Pool, which adds a connection to the pool
-// without going through checkout so the leasing API can be exercised directly.
 function insertConnectionForTest(pool: ConnectionPool, conn: AbstractAdapter): void {
   (pool as unknown as { _connections: AbstractAdapter[] })._connections.push(conn);
   (pool as unknown as { _available: { add: (c: AbstractAdapter) => void } })._available.add(conn);
@@ -45,11 +43,9 @@ describe("AdapterLeasingTest", () => {
     insertConnectionForTest(pool, adapter);
     adapter.pool = pool;
 
-    // Make sure the pool marks the connection in use
     expect(await pool.leaseConnection()).toBe(adapter);
     expect(adapter.inUse).toBe(true);
 
-    // Close should put the adapter back in the pool
     await adapter.close();
     expect(adapter.inUse).toBe(false);
 

@@ -19,8 +19,6 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   afterEach(async () => {
-    // Throwaway file-backed tables (the TEMP table is discarded with tmpDir);
-    // these IF EXISTS drops balance require-table-teardown by name.
     await adapter
       .exec(
         "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS memberships; DROP TABLE IF EXISTS temp_widgets",
@@ -31,10 +29,6 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("shares one frozen Column instance between structurally identical columns", async () => {
-    // Rails' `Deduplicable::ClassMethods#new` (`deduplicable.rb:13-14`) sends
-    // every `Column.new` through the registry (`deduplicable.rb:18`), so two
-    // columns equal by `Column#==`/`#hash` (`column.rb:75`/`:87`) reflect as one
-    // frozen object. trails fires that hook at `new_column_from_field`.
     await adapter.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, label TEXT)");
     await adapter.executeMutation("CREATE TABLE memberships (id INTEGER PRIMARY KEY, label TEXT)");
 
@@ -76,16 +70,12 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("columns reflects a STORED generated column's expression as default_function", async () => {
-    // Mirrors Rails' new_column_from_field: for a generated column the
-    // table_structure_with_collation pass overrides dflt_value with the
-    // generation expression, which becomes the column's default_function.
     await adapter.executeMutation(
       `CREATE TABLE "widgets" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`,
     );
     const cols = await adapter.columns("widgets");
     const total = cols.find((c) => c.name === "total");
     expect(total?.defaultFunction).toBe(`"price" + "tax"`);
-    // Generated columns never emit a default in the schema dump.
     expect((total as { isVirtual(): boolean }).isVirtual()).toBe(true);
   });
 
@@ -101,9 +91,6 @@ describe("SQLite3Adapter schema introspection", () => {
       unique: boolean;
       orders: Record<string, string>;
     }>;
-    // Only the explicitly-created index should surface; the auto-index for
-    // UNIQUE(email) and the primary-key rowid mapping are filtered out
-    // (their names start with `sqlite_`, matching Rails' filter).
     expect(indexes).toMatchObject([
       {
         table: "widgets",
@@ -165,9 +152,6 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   it("alterTable preserves expression, partial and unique indexes across the rebuild", async () => {
-    // The rebuild used to replay each index's sqlite_master CREATE SQL
-    // verbatim; it now round-trips them through copy_table_indexes, which
-    // reconstructs from reflection. Pin the option-carrying shapes.
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, code TEXT, doomed TEXT)",
     );
@@ -189,7 +173,6 @@ describe("SQLite3Adapter schema introspection", () => {
       where?: string;
       orders?: Record<string, string>;
     }>;
-    // Sorted by name: index creation order is not part of the contract.
     expect(byNameSorted(indexes)).toEqual(before);
     const byName = Object.fromEntries(indexes.map((i) => [i.name, i]));
     expect(byName["widgets_on_lower_name"]?.columns).toBe("lower(name)");

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/connection_adapters/type_lookup_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Type } from "@blazetrails/activemodel";
 import { IntegerType } from "@blazetrails/activemodel";
@@ -22,8 +19,6 @@ function assertLookupType(expected: string, sqlType: string) {
   expect(castType.type()).toBe(expected);
 }
 
-// Rails: class TypeLookupTest, gated `unless current_adapter?(:PostgreSQLAdapter)`
-// (PostgreSQL has its own type-lookup suite). adapters: mysql + sqlite.
 describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
   it("boolean types", () => {
     assertLookupType("boolean", "boolean");
@@ -97,10 +92,6 @@ describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
   });
 
   it("bigint limit", () => {
-    // Mirrors Rails test_bigint_limit (type_lookup_test.rb:84): it asserts the
-    // PRIVATE `_limit` (`.send(:_limit)`), not the public `limit`. SQLite3Integer
-    // overrides `_limit` to default to 8 (the 8-byte INTEGER storage class) while
-    // leaving the public `limit` reader nil.
     const castType = adapter.lookupCastType("bigint") as IntegerType;
     const limit = (castType as unknown as { _limit(): number })._limit();
     expect(limit).toBe(8);

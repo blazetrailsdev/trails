@@ -73,7 +73,6 @@ describe("AbstractMysqlAdapter#_columnMethodNames", () => {
     ]) {
       expect(names).toContain(name);
     }
-    // Abstract names still present; native-types `primary_key` is not surfaced.
     expect(names).toContain("virtual");
     expect(names).toContain("bigint");
     expect(names).not.toContain("primary_key");
@@ -81,8 +80,6 @@ describe("AbstractMysqlAdapter#_columnMethodNames", () => {
 });
 
 describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
-  // Mirrors abstract_mysql_adapter.rb:863-878: when supports_rename_column? is false the
-  // arm rebuilds a CHANGE clause from column_for plus the live `SHOW COLUMNS ... LIKE` Type.
   async function makeAdapter(field: Record<string, unknown>) {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
@@ -143,10 +140,6 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
 });
 
 describe("AbstractMysqlAdapter#renameColumn wiring", () => {
-  // Drives the public renameColumn surface: it must wrap renameColumnForAlter's
-  // fragment in ALTER TABLE, then fix up index names via renameColumnIndexes —
-  // the whole of `abstract_mysql_adapter.rb:440-443`, which does not touch the
-  // schema cache.
   async function makeAdapter() {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
@@ -176,9 +169,6 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     return { adapter, events };
   }
 
-  // The cache clear this name refers to is gone: it was a trails-only addition
-  // to a Rails body (abstract_mysql_adapter.rb:440-443) that has no such call.
-  // The name is kept verbatim per CLAUDE.md's never-rename-a-test rule.
   it("clears the cache before issuing the ALTER TABLE RENAME COLUMN then fixes indexes", async () => {
     const { adapter, events } = await makeAdapter();
     await adapter.renameColumn("users", "old_name", "new_name");
@@ -316,15 +306,11 @@ describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", ()
     const adapter = await makeAdapter();
     const injection = "'; DROP TABLE users; --\\\0\n\r\x1a";
     const quoted = adapter.quote(injection);
-    // Must start and end with surrounding single quotes
     expect(quoted.startsWith("'")).toBe(true);
     expect(quoted.endsWith("'")).toBe(true);
     const inner = quoted.slice(1, -1);
-    // Single quote must be backslash-escaped (no unescaped bare single quote)
     expect(inner).not.toMatch(/(?<!\\)'/);
-    // Backslash must be doubled
     expect(inner).toContain("\\\\");
-    // Control chars must be escaped — no raw bytes
     expect(inner).not.toContain("\0");
     expect(inner).not.toContain("\n");
     expect(inner).not.toContain("\r");
@@ -333,16 +319,12 @@ describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", ()
 
   it("adapter.quote is consistent with standalone quote for strings containing single quotes and backslashes", async () => {
     const adapter = await makeAdapter();
-    // Rails' MySQL adapter has no `quote` override (mysql/quoting.rb); the
-    // inherited `quote` wraps the self-dispatched `quote_string`
-    // (abstract/quoting.rb:76), which lands on MySQL's backslash escaping.
     for (const s of ["it's", "back\\slash", "\0null\nbyte\rreturn\x1aeof", "'; DROP TABLE t; --"]) {
       expect(adapter.quote(s)).toBe(`'${adapter.quoteString(s)}'`);
     }
   });
 });
 
-// Minimal SHOW CREATE TABLE wrapper for parseTableOptions tests.
 function showCreate(tableName: string, options: string): string {
   return `CREATE TABLE \`${tableName}\` (\n  \`id\` bigint NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (\`id\`)\n) ${options}`;
 }
@@ -406,9 +388,6 @@ describe("parseTableOptions", () => {
   });
 });
 
-// Unit coverage for the four charset-collation slot helpers added in #1568,
-// complementing the existing fragment-shape coverage above.
-
 function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown } = {}) {
   return new Column(
     "body",
@@ -421,8 +400,6 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown 
 async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) {
   const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
   const adapter = Object.create(AbstractMysqlAdapter.prototype);
-  // Object.create skips the constructor, which is what plants Rails' NullPool
-  // (abstract_adapter.rb:153); every adapter carries one.
   adapter.pool = new NullPool();
   adapter.quoteColumnName = (s: string) => `\`${s}\``;
   adapter.quoteTableName = (s: string) => `\`${s}\``;
@@ -496,9 +473,6 @@ describeIfMysqlAdapter("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#
 });
 
 describe("AbstractMysqlAdapter#changeColumnDefault wiring (#1568)", () => {
-  // Drives the public surface end-to-end through changeColumnDefaultForAlter
-  // → buildChangeColumnDefaultDefinition → MysqlSchemaCreation.accept so a
-  // regression in the wiring (or in the ALTER TABLE wrap) is caught.
   async function build(column: Column) {
     const executed: string[] = [];
     const adapter = await makeMinimalMysqlAdapter({
@@ -536,10 +510,6 @@ describe("AbstractMysqlAdapter#changeColumnDefault wiring (#1568)", () => {
 });
 
 describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
-  // Record both `execute` (UPDATE backfill) and `changeColumn` (ALTER
-  // dispatch) into a single sequence so tests can assert relative ordering
-  // — Rails requires the UPDATE to run BEFORE the ALTER, otherwise existing
-  // NULL rows would fail the new NOT NULL constraint.
   async function makeSequencingAdapter() {
     const events: Array<["exec", string] | ["changeColumn", unknown[]]> = [];
     const adapter = await makeMinimalMysqlAdapter({
@@ -599,8 +569,6 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
 
 describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
   async function makeAdapterCapturingChangeColumn() {
-    // Use the real, inherited extractNewCommentValue so these tests exercise
-    // the production path and catch regressions in it.
     const calls: Array<[string, string, string | null, Record<string, unknown>]> = [];
     const adapter = await makeMinimalMysqlAdapter({
       changeColumn: async (
@@ -636,8 +604,6 @@ describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
 
 describe("AbstractMysqlAdapter#tableAliasLength", () => {
   it("table alias length", async () => {
-    // Rails' MySQL SchemaStatements#table_alias_length returns 256
-    // (mysql/schema_statements.rb:135), not max_identifier_length (64).
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
       typeof AbstractMysqlAdapter

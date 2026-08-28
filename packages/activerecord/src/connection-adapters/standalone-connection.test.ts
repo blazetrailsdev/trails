@@ -1,11 +1,3 @@
-/**
- * Faithful port of
- * activerecord/test/cases/connection_adapters/standalone_connection_test.rb.
- *
- * Rails builds the standalone adapter with `db_config.new_connection`; trails'
- * `DatabaseConfig#newConnection` is the same seam, pre-warmed via
- * `loadAdapter()` because ESM adapter resolution is async.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNot } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
@@ -29,12 +21,7 @@ describe("StandaloneConnectionTest", () => {
     expect(result.rows).toEqual([[1]]);
   });
 
-  it.skip("async fallback", () => {
-    // PERMANENT-SKIP: Rails' `select_all("SELECT 1", async: true)` returns a
-    // `FutureResult::Complete` from the load_async infrastructure. Trails has
-    // not ported FutureResult / load_async (selectAll takes no `async` option);
-    // un-skip when that infrastructure lands.
-  });
+  it.skip("async fallback", () => {});
 
   it("can throw away", async () => {
     connection.throwAwayBang();

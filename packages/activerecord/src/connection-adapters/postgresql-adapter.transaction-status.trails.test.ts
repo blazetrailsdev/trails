@@ -1,19 +1,8 @@
-/**
- * `PostgreSQLAdapter#transactionStatus` — the port of ruby-pg's
- * `PG::Connection#transaction_status` (libpq `PQtransactionStatus`), which
- * Rails reads in `retryable_query_error?` (postgresql_adapter.rb:850) and
- * `cancel_any_running_query` (postgresql/database_statements.rb:127).
- *
- * Trails-only: ruby-pg gets the value from libpq, so there is no Rails test to
- * mirror — the transitions are the driver-level invariant the two ported call
- * sites stand on. RFC 0085.
- */
 import { expect, it } from "vitest";
 import { Deadlocked } from "../errors.js";
 import { describeIfPg, PG_TEST_URL } from "../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
-// Same numbering as libpq's PGTransactionStatusType.
 const PQTRANS_IDLE = 0;
 const PQTRANS_INTRANS = 2;
 const PQTRANS_INERROR = 3;

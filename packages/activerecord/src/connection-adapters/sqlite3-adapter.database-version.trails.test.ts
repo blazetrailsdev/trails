@@ -3,10 +3,6 @@ import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { Version } from "./abstract-adapter.js";
 
-// Rails' SQLite3Adapter defines `get_database_version` (`sqlite3_adapter.rb:476-478`)
-// and no `database_version` of its own: the reader is
-// `abstract_adapter.rb:854-856`'s `pool.server_version(self)`, so the pool memo
-// is the only cache.
 describe("SQLite3Adapter database version", () => {
   let adapter: SQLite3Adapter | undefined;
 

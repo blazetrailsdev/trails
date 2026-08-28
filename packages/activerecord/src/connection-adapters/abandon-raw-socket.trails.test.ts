@@ -4,7 +4,6 @@ import { abandonRawSocket } from "./abandon-raw-socket.js";
 describe("abandonRawSocket", () => {
   it("unrefs and strips listeners on a node-postgres style socket", () => {
     const socket = { unref: vi.fn(), removeAllListeners: vi.fn() };
-    // node-postgres exposes the net socket at client.connection.stream.
     abandonRawSocket({ connection: { stream: socket } });
     expect(socket.removeAllListeners).toHaveBeenCalledOnce();
     expect(socket.unref).toHaveBeenCalledOnce();
@@ -12,7 +11,6 @@ describe("abandonRawSocket", () => {
 
   it("unrefs and strips listeners on a node-mysql2 style socket", () => {
     const socket = { unref: vi.fn(), removeAllListeners: vi.fn() };
-    // node-mysql2's core connection exposes the socket at .stream.
     abandonRawSocket({ stream: socket });
     expect(socket.removeAllListeners).toHaveBeenCalledOnce();
     expect(socket.unref).toHaveBeenCalledOnce();

@@ -116,10 +116,6 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
   }
 
   it("the derive step shares structurally identical columns between tables", () => {
-    // `derive_columns_hash_and_deduplicate_values` (`schema_cache.rb:440-446`)
-    // runs every cache through `deep_deduplicate`, whose `Deduplicable` arm is
-    // `-value` — the registry lookup that collapses equal value objects onto
-    // one frozen instance (`deduplicable.rb:18`).
     const cache = new SchemaCache();
     cache.initWith({
       columns: new Map([

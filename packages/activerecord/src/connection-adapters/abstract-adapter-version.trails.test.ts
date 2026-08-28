@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 
-// Rails has no test of its own for `AbstractAdapter::Version`'s state
-// (abstract_adapter.rb:243-259); these pin the shape its callers depend on.
 describe("AbstractAdapter::Version", () => {
   it("stringifies the parsed parts, not the string it was built from", () => {
     expect(new Version("8.0.31-log").toString()).toBe("8.0.31");
@@ -27,10 +25,6 @@ describe("AbstractAdapter::Version", () => {
   });
 });
 
-// Rails' `database_version` (`abstract_adapter.rb:854-856`) is
-// `pool.server_version(self)`, which issues the round-trip on demand — so
-// `check_version` and every `supports_*?` predicate read it from any state,
-// including an adapter that has never connected. These pin that.
 describe("AbstractAdapter#databaseVersion", () => {
   class AsyncVersionAdapter extends AbstractAdapter {
     fetches = 0;

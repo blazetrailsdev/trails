@@ -25,7 +25,6 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
 
-// All 5 methods are class-level in Rails (class << self private), so test via a subclass.
 class TestAdapter extends AbstractAdapter {
   static override readonly ADAPTER_NAME = "TestAdapter";
 }
@@ -187,8 +186,6 @@ describe("AbstractAdapter.initializeTypeMap", () => {
   });
 
   it("aliases timestamp to datetime", () => {
-    // Pins abstract_adapter.rb:881 — the alias must resolve against this map's
-    // overlaid tz-aware datetime, not the parent map's untouched one.
     expect(m.lookup("timestamp")).toMatchObject({ isUtc: true });
   });
 
@@ -203,8 +200,6 @@ describe("AbstractAdapter.extendedTypeMap", () => {
     expect(m.lookup("integer")).toBeInstanceOf(IntegerType);
     expect(m.lookup("datetime")).toMatchObject({ isUtc: true });
     expect(m.lookup("time")).toMatchObject({ isUtc: true });
-    // Pins abstract_adapter.rb:881 — the alias must resolve against this map's
-    // overlaid tz-aware datetime, not the parent map's untouched one.
     expect(m.lookup("timestamp")).toMatchObject({ isUtc: true });
   });
 
@@ -214,10 +209,6 @@ describe("AbstractAdapter.extendedTypeMap", () => {
     expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
   });
 
-  // TestAdapter declares no EXTENDED_TYPE_MAPS of its own, so — as in Ruby,
-  // where the constant lookup walks up to AbstractAdapter — the entry lands in
-  // the base class's shared map. Asserted on AbstractAdapter to keep that
-  // sharing visible rather than implying a per-class cache.
   it("is memoized per key in EXTENDED_TYPE_MAPS rather than rebuilt per read", () => {
     const adapter = new TestAdapter();
     (adapter as any)._defaultTimezone = "utc";
@@ -256,8 +247,6 @@ describe("AbstractAdapter#lookupCastType", () => {
 });
 
 describe("DatabaseStatements#insert id extraction", () => {
-  // execInsert/execute are include()-mixed methods, not class declarations,
-  // so we assign them via any rather than using class override syntax.
   class InsertTestAdapter extends AbstractAdapter {
     static override readonly ADAPTER_NAME = "InsertTestAdapter";
   }
@@ -290,7 +279,6 @@ describe("DatabaseStatements#insert id extraction", () => {
     await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
       returning: ["id"],
     });
-    // execInsert(sql, name, binds, pk, sequenceName, returning)
     expect(execInsert).toHaveBeenCalledWith("INSERT INTO t VALUES (1)", null, [], "id", null, [
       "id",
     ]);

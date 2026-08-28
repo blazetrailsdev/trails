@@ -1,16 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 
-// Trails-specific guards (no Rails counterpart): verify that connectBang /
-// reconnect populate the base `_connection` field so the run loop's
-// `_connection === null` guard fires connectBang once per connect rather than
-// on every withRawConnection call — matching Rails' `@raw_connection =
-// new_client(...)` posture and the PostgreSQLAdapter. The teardown paths
-// (disconnectBang / reconnect / discardBang / close) must null `_connection`
-// so a re-open re-fires connectBang.
-//
-// These run offline: Mysql2Adapter.newClient is stubbed to return a fake
-// connection so no real socket is opened.
 describe("Mysql2Adapter base _connection field", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -18,9 +8,6 @@ describe("Mysql2Adapter base _connection field", () => {
 
   function stubNewClient(): { end: ReturnType<typeof vi.fn> } {
     const end = vi.fn(() => Promise.resolve());
-    // The connect-once configure warms the server version (getFullVersion reads
-    // the driver's handshake banner before checkVersion); hand it one so the
-    // warm resolves.
     const fakeConn = {
       end,
       ping: () => Promise.resolve(),
@@ -53,10 +40,6 @@ describe("Mysql2Adapter base _connection field", () => {
     await adapter.connectBang();
     adapter.disconnectBang();
     expect(connectionOf(adapter)).toBeNull();
-    // Guards the teardown ordering: _client is unified onto the base
-    // _connection field, so _closeRawHandle() must end() the live socket
-    // BEFORE super.disconnectBang() nulls _connection — otherwise the handle is
-    // lost and the socket leaks.
     expect(end).toHaveBeenCalledTimes(1);
 
     await adapter.connectBang();
@@ -96,9 +79,6 @@ describe("Mysql2Adapter base _connection field", () => {
     const adapter = new Mysql2Adapter({ host: "localhost" });
     const connectSpy = vi.spyOn(adapter, "connectBang");
 
-    // Each withRawConnection call hits the base run-loop guard
-    // (`_connection === null` → connectBang). With _connection populated on the
-    // first connect, subsequent queries must NOT re-fire connectBang.
     const opts = { materializeTransactions: false, allowRetry: false } as const;
     await adapter.withRawConnection(opts, () => undefined);
     await adapter.withRawConnection(opts, () => undefined);

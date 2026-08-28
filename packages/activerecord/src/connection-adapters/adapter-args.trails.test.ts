@@ -112,9 +112,6 @@ describe("buildAdapterArg", () => {
     });
 
     it("forwards username under Rails' spelling when forwarding a URL with extra keys", () => {
-      // The credential is NOT remapped here: Rails maps it in the adapter
-      // constructor (postgresql_adapter.rb:326), so this layer must forward
-      // `username` untouched or it shadows that mapping entirely.
       const [config] = buildAdapterArg("mysql2", {
         adapter: "mysql2",
         url: "mysql://h/db",
@@ -124,8 +121,6 @@ describe("buildAdapterArg", () => {
     });
 
     it("forwards both username and user when forwarding a URL", () => {
-      // Precedence between the two is the constructor's call, not this
-      // layer's — Rails lets a truthy `username` overwrite `user`.
       const [config] = buildAdapterArg("postgresql", {
         adapter: "postgresql",
         url: "postgres://h/db",

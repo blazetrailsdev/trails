@@ -486,7 +486,6 @@ describe("ConnectionSwappingNestedTest", () => {
       });
     });
 
-    // emulate a reload in development mode
     await Base.connectionHandler.clearAllConnectionsBang();
     (ReloadedRecordV1 as any).connectionClass = false;
 
