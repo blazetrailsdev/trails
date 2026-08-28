@@ -21,6 +21,7 @@ export class StatementPool<T = unknown> {
     return stmt;
   }
 
+  /** @missingRailsCall last — PERMANENT */
   set(key: string, stmt: T): void | Promise<void> {
     this.cache.delete(key);
     const deallocating: Array<Promise<void>> = [];

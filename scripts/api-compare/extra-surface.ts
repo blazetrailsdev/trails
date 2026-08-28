@@ -759,6 +759,8 @@ interface PackageTotals {
   noCounterpartExtras: number;
   noCounterpartNovel: number;
   extraFiles: ExtraFile[];
+  /** Report-only (RFC 0126) — see {@link inlinedModuleMembers}. */
+  inlinedFrom: InlinedFromFinding[];
 }
 
 export interface TaggedSummary {
@@ -1610,6 +1612,76 @@ export function uncoveredTsFiles(
     .sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * One Ruby module member whose TS body sits on an INCLUDING class's file
+ * instead of the file mirroring the module's own (RFC 0126).
+ *
+ * `Arel::Crud` (`arel/crud.rb:6-47`) is four module bodies that
+ * `Arel::SelectManager` picks up with `include Crud` (`select_manager.rb:6`).
+ * trails puts the four bodies on `SelectManager` itself
+ * (`select-manager.ts:295-338`) and leaves `crud.ts` a bare `interface`, so
+ * `parity:api` scored `crud.rb → crud.ts` 4/4. The `moved` bucket is the
+ * mirror image of this — a TS name whose Ruby twin lives in a different
+ * `.rb` — and had no counterpart for a Ruby member whose TS body moved, so
+ * decomposition drift of this shape was invisible.
+ */
+export interface InlinedFromFinding {
+  /** The including class's TS file — where the body actually is. */
+  tsFile: string;
+  tsName: string;
+  /** The module's own Ruby file — where Rails puts the body. */
+  moduleRubyFile: string;
+  rubyName: string;
+}
+
+/**
+ * Ruby module members ported onto an includer's file rather than the module's
+ * twin — see {@link InlinedFromFinding}.
+ *
+ * Narrow by construction, so the settled trails mixin shapes never land here:
+ * the finding needs the includer's TS file to declare the name WITH a body
+ * AND the module's own twin to declare no body for it at all. `this`-typed
+ * functions assigned to the host class keep their body in the mixin's file, and
+ * an `Included<>` interface sits in that same file beside them, so both stay
+ * clear.
+ */
+export function inlinedModuleMembers(
+  pkg: string,
+  rubyClasses: Record<string, ClassInfo>,
+  rubyModules: Record<string, ClassInfo>,
+  moduleFqnByShort: Map<string, string[]>,
+  bodiedByTsFile: ReadonlyMap<string, ReadonlySet<string>>,
+): InlinedFromFinding[] {
+  const out: InlinedFromFinding[] = [];
+  const seen = new Set<string>();
+  for (const [hostFqn, host] of Object.entries(rubyClasses)) {
+    if (!host.file) continue;
+    const hostTs = rubyFileToTs(host.file, pkg);
+    const hostBodies = bodiedByTsFile.get(hostTs);
+    if (hostBodies === undefined) continue;
+    for (const incName of host.includes ?? []) {
+      const fqn = resolveModuleName(incName, hostFqn, moduleFqnByShort);
+      const mod = rubyModules[fqn];
+      if (mod === undefined || !mod.file || mod.file === host.file) continue;
+      const moduleTs = rubyFileToTs(mod.file, pkg);
+      if (moduleTs === hostTs) continue;
+      const moduleBodies = bodiedByTsFile.get(moduleTs);
+      for (const m of [...mod.instanceMethods, ...mod.classMethods]) {
+        if (m.file !== undefined && m.file !== mod.file) continue;
+        const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
+        if (!candidates) continue;
+        const tsName = candidates.find((c) => hostBodies.has(c) && moduleBodies?.has(c) !== true);
+        if (tsName === undefined) continue;
+        const key = `${hostTs}#${tsName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ tsFile: hostTs, tsName, moduleRubyFile: mod.file, rubyName: m.name });
+      }
+    }
+  }
+  return out.sort((a, b) => a.tsFile.localeCompare(b.tsFile) || a.tsName.localeCompare(b.tsName));
+}
+
 function buildPackageReport(
   pkg: string,
   ruby: ApiManifest,
@@ -1638,6 +1710,7 @@ function buildPackageReport(
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
     extraFiles: [],
+    inlinedFrom: [],
   };
   if (!rubyPkg || !tsPkg) return result;
 
@@ -1684,6 +1757,34 @@ function buildPackageReport(
   }
   const tsFileFunctions = tsPkg.fileFunctions ?? {};
   const fileTags = tsPkg.fileNoRailsEquivalent ?? {};
+
+  // TS file -> names the file declares WITH a body. A bare `interface` signature
+  // declares the name but ports nothing, so it is deliberately absent here —
+  // see `inlinedModuleMembers`.
+  const bodiedByTsFile = new Map<string, Set<string>>();
+  const addBodied = (file: string | undefined, ms: MethodInfo[]): void => {
+    if (!file) return;
+    const names = bodiedByTsFile.get(file) ?? new Set<string>();
+    for (const m of ms) if (m.bodyless !== true) names.add(m.name);
+    bodiedByTsFile.set(file, names);
+  };
+  for (const c of Object.values(tsPkg.classes)) {
+    if (c.reExportedFrom) continue;
+    addBodied(c.file, [...c.instanceMethods, ...c.classMethods]);
+  }
+  for (const m of Object.values(tsPkg.modules)) {
+    if (m.reExportedFrom) continue;
+    addBodied(m.file, [...m.instanceMethods, ...m.classMethods]);
+  }
+  for (const [file, fns] of Object.entries(tsFileFunctions)) addBodied(file, fns);
+
+  result.inlinedFrom = inlinedModuleMembers(
+    pkg,
+    rubyPkg.classes,
+    rubyPkg.modules,
+    moduleFqnByShort,
+    bodiedByTsFile,
+  );
 
   // A Ruby file can declare file-level constants and no class/module at all
   // (rails/engine/commands.rb:3-9 is `Rails::Command::…` constants only), so it
@@ -2052,6 +2153,23 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
       ` — allowed extras are subtracted from the counts above.${p.reset}`,
   );
   printClassificationBlock(report.tagged, p, maxDetail);
+
+  const inlined = report.packages.flatMap((pkg) =>
+    pkg.inlinedFrom.map((f) => ({ package: pkg.package, ...f })),
+  );
+  if (inlined.length > 0) {
+    console.log(
+      `\n${p.bold}Inlined module bodies${p.reset}  ${p.dim}(report-only) — a Ruby module member whose TS body sits on ` +
+        `an INCLUDING class's file instead of the file mirroring the module's own. The mirror image of \`moved\`.${p.reset}`,
+    );
+    for (const f of inlined.slice(0, maxDetail)) {
+      console.log(
+        `  ${f.package}/${f.tsFile} ${f.tsName} ${p.dim}inlined-from ${f.moduleRubyFile} (${f.rubyName})${p.reset}`,
+      );
+    }
+    const elided = inlined.length - Math.min(inlined.length, maxDetail);
+    if (elided > 0) console.log(`${p.dim}    … +${elided} more${p.reset}`);
+  }
 
   console.log(
     `\n${p.bold}Top ${Math.min(topN, report.topN.length)} most-divergent files${p.reset}  ${p.dim}(ranked by novel count, then total)${p.reset}`,

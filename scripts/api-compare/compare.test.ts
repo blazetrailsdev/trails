@@ -55,6 +55,9 @@ import {
   suppressTaggedCalls,
   tagsForOwner,
   recordTaggedCalls,
+  declarationOnlyInFile,
+  misplacedClusterVerdict,
+  rubyMethodToTsForFqn,
 } from "./compare.js";
 import { rubyMethodToTs } from "@blazetrails/parity/conventions";
 import type {
@@ -2565,7 +2568,11 @@ describe("mixinMethodCreditedToOwnFile", () => {
   it("credits a flattened mixin method to the file mirroring the mixin's own", () => {
     expect(
       mixinMethodCreditedToOwnFile(
-        { rubyName: "scheme_for", mixinFile: "encryption/encryptable_record.rb" },
+        {
+          rubyName: "scheme_for",
+          rubyModule: "Host",
+          mixinFile: "encryption/encryptable_record.rb",
+        },
         "base.rb",
         "activerecord",
         hasBucket,
@@ -2582,7 +2589,11 @@ describe("mixinMethodCreditedToOwnFile", () => {
     // own bucket to the call set, not the seam.
     expect(
       mixinMethodCreditedToOwnFile(
-        { rubyName: "quoted_date", mixinFile: "connection_adapters/postgresql/quoting.rb" },
+        {
+          rubyName: "quoted_date",
+          rubyModule: "Host",
+          mixinFile: "connection_adapters/postgresql/quoting.rb",
+        },
         "connection_adapters/postgresql_adapter.rb",
         "activerecord",
         (f) => f === "connection_adapters/postgresql/quoting.rb",
@@ -2597,7 +2608,7 @@ describe("mixinMethodCreditedToOwnFile", () => {
   it("does not credit a method the host declares itself", () => {
     expect(
       mixinMethodCreditedToOwnFile(
-        { rubyName: "scheme_for" },
+        { rubyName: "scheme_for", rubyModule: "Host" },
         "base.rb",
         "activerecord",
         hasBucket,
@@ -2609,7 +2620,11 @@ describe("mixinMethodCreditedToOwnFile", () => {
   it("does not credit a mixin method that is unported in the mixin's own file", () => {
     expect(
       mixinMethodCreditedToOwnFile(
-        { rubyName: "encrypt_attribute", mixinFile: "encryption/encryptable_record.rb" },
+        {
+          rubyName: "encrypt_attribute",
+          rubyModule: "Host",
+          mixinFile: "encryption/encryptable_record.rb",
+        },
         "base.rb",
         "activerecord",
         hasBucket,
@@ -2623,7 +2638,11 @@ describe("mixinMethodCreditedToOwnFile", () => {
     // expectation entirely instead of moving it.
     expect(
       mixinMethodCreditedToOwnFile(
-        { rubyName: "scheme_for", mixinFile: "encryption/encryptable_record.rb" },
+        {
+          rubyName: "scheme_for",
+          rubyModule: "Host",
+          mixinFile: "encryption/encryptable_record.rb",
+        },
         "base.rb",
         "activerecord",
         () => false,
@@ -2646,7 +2665,11 @@ describe("reopeningMethodCreditedToOwnFile", () => {
   it("credits each reopening's arm to the TS file mirroring that reopening", () => {
     expect(
       reopeningMethodCreditedToOwnFile(
-        { rubyName: "duplicable?", definedInFile: "core_ext/object/duplicable.rb" },
+        {
+          rubyName: "duplicable?",
+          rubyModule: "Host",
+          definedInFile: "core_ext/object/duplicable.rb",
+        },
         "core_ext/object/acts_like.rb",
         "activesupport",
         tsMethodsByFile,
@@ -2655,7 +2678,11 @@ describe("reopeningMethodCreditedToOwnFile", () => {
 
     expect(
       reopeningMethodCreditedToOwnFile(
-        { rubyName: "instance_values", definedInFile: "core_ext/object/instance_variables.rb" },
+        {
+          rubyName: "instance_values",
+          rubyModule: "Host",
+          definedInFile: "core_ext/object/instance_variables.rb",
+        },
         "core_ext/object/acts_like.rb",
         "activesupport",
         tsMethodsByFile,
@@ -2666,7 +2693,11 @@ describe("reopeningMethodCreditedToOwnFile", () => {
   it("does not credit a method the home file defines itself", () => {
     expect(
       reopeningMethodCreditedToOwnFile(
-        { rubyName: "acts_like?", definedInFile: "core_ext/object/acts_like.rb" },
+        {
+          rubyName: "acts_like?",
+          rubyModule: "Host",
+          definedInFile: "core_ext/object/acts_like.rb",
+        },
         "core_ext/object/acts_like.rb",
         "activesupport",
         tsMethodsByFile,
@@ -2677,7 +2708,11 @@ describe("reopeningMethodCreditedToOwnFile", () => {
   it("does not credit a reopening arm that is unported in its own file", () => {
     expect(
       reopeningMethodCreditedToOwnFile(
-        { rubyName: "deep_dup", definedInFile: "core_ext/object/duplicable.rb" },
+        {
+          rubyName: "deep_dup",
+          rubyModule: "Host",
+          definedInFile: "core_ext/object/duplicable.rb",
+        },
         "core_ext/object/acts_like.rb",
         "activesupport",
         tsMethodsByFile,
@@ -2688,7 +2723,7 @@ describe("reopeningMethodCreditedToOwnFile", () => {
   it("does not credit when the reopening's TS file is absent from the run", () => {
     expect(
       reopeningMethodCreditedToOwnFile(
-        { rubyName: "to_query", definedInFile: "core_ext/object/to_query.rb" },
+        { rubyName: "to_query", rubyModule: "Host", definedInFile: "core_ext/object/to_query.rb" },
         "core_ext/object/acts_like.rb",
         "activesupport",
         tsMethodsByFile,
@@ -3008,5 +3043,118 @@ describe("ownerRecordsNothing", () => {
         bodyless,
       ),
     ).toBe(false);
+  });
+});
+
+describe("declarationOnlyInFile", () => {
+  // arel/crud.rb:6-47 is four module bodies; packages/arel/src/crud.ts:10-24 is
+  // a bare `interface Crud` with the four signatures, and the bodies were
+  // inlined onto SelectManager (select-manager.ts:295-338).
+  const bodyless = new Map([["crud.ts", new Map([["compileInsert", new Set(["Crud"])]])]]);
+  const bodied = new Map([
+    ["select-manager.ts", new Map([["compileInsert", new Set(["SelectManager"])]])],
+  ]);
+
+  it("reports a name whose only declaration in the file is a signature", () => {
+    expect(declarationOnlyInFile("crud.ts", "compileInsert", bodyless, bodied)).toBe(true);
+  });
+
+  it("does not report a name the file declares with a body", () => {
+    expect(declarationOnlyInFile("select-manager.ts", "compileInsert", bodyless, bodied)).toBe(
+      false,
+    );
+  });
+
+  it("does not report the settled mixin shape, whose interface sits beside the bodies", () => {
+    // `Included<>` declares the mixin's members and the `this`-typed functions
+    // they type live in the SAME file, so the name has a bodied declaration
+    // there — see CLAUDE.md "Module mixins".
+    const sameFileBodyless = new Map([
+      ["relation/query-methods.ts", new Map([["where", new Set(["QueryMethods"])]])],
+    ]);
+    const sameFileBodied = new Map([
+      ["relation/query-methods.ts", new Map([["where", new Set([""])]])],
+    ]);
+    expect(
+      declarationOnlyInFile("relation/query-methods.ts", "where", sameFileBodyless, sameFileBodied),
+    ).toBe(false);
+  });
+
+  it("does not report a name the file never declares", () => {
+    expect(declarationOnlyInFile("crud.ts", "nope", bodyless, bodied)).toBe(false);
+  });
+});
+
+describe("rubyMethodToTsForFqn", () => {
+  it("credits an operator with a pinned TS spelling", () => {
+    // arel/math.rb:9 `def +(other)` -> math.ts `add`.
+    expect(rubyMethodToTsForFqn("Arel::Math", "+")).toEqual(["add"]);
+  });
+
+  it("leaves an operator with no pinned spelling dropped, exactly as before", () => {
+    // `<<` means append on SelectManager, not `bitwiseShiftLeft`, so it is
+    // unpinned there — neither expected nor reported missing.
+    expect(rubyMethodToTsForFqn("Arel::SelectManager", "<<")).toBeNull();
+    expect(rubyMethodToTsForFqn("Nothing::Pinned", "==")).toBeNull();
+  });
+
+  it("passes a non-operator straight through to rubyMethodToTs", () => {
+    expect(rubyMethodToTsForFqn("Arel::Math", "compile_insert")).toEqual(
+      rubyMethodToTs("compile_insert"),
+    );
+  });
+});
+
+describe("misplacedClusterVerdict", () => {
+  const bodyless = new Map([
+    ["cluster.ts", new Map([["compileInsert", new Set(["Crud"])]])],
+    ["other.ts", new Map([["createInsert", new Set(["Crud"])]])],
+  ]);
+  const bodied = new Map([["other.ts", new Map([["compileInsert", new Set(["Host"])]])]]);
+
+  it("scores declaration-only when every candidate in the cluster is bodyless", () => {
+    expect(
+      misplacedClusterVerdict(
+        ["compileInsert"],
+        new Set(["compileInsert"]),
+        "cluster.ts",
+        bodyless,
+        bodied,
+      ),
+    ).toEqual({ kind: "declaration-only", tsName: "compileInsert" });
+  });
+
+  it("credits the first candidate the cluster declares with a body", () => {
+    expect(
+      misplacedClusterVerdict(
+        ["compileInsert"],
+        new Set(["compileInsert"]),
+        "other.ts",
+        bodyless,
+        bodied,
+      ),
+    ).toEqual({ kind: "match", tsName: "compileInsert" });
+  });
+
+  it("prefers a bodied candidate over a bodyless one", () => {
+    // `other.ts` declares createInsert bodyless and compileInsert bodied; the
+    // bodied one is the port, whatever the candidate order.
+    expect(
+      misplacedClusterVerdict(
+        ["createInsert", "compileInsert"],
+        new Set(["createInsert", "compileInsert"]),
+        "other.ts",
+        bodyless,
+        bodied,
+      ),
+    ).toEqual({ kind: "match", tsName: "compileInsert" });
+  });
+
+  it("is absent, not declaration-only, when the cluster declares no candidate", () => {
+    // An ordinary miss: the cluster says nothing about the name, so there is no
+    // signature to report in the declaration-only column.
+    expect(
+      misplacedClusterVerdict(["nope"], new Set(["compileInsert"]), "cluster.ts", bodyless, bodied),
+    ).toEqual({ kind: "absent" });
   });
 });
