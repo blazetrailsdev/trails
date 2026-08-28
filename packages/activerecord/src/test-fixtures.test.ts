@@ -41,7 +41,7 @@ async function resolvePrimaryModel(entry: {
 
 function makeAdapter(): DatabaseAdapter {
   return {
-    adapterName: "sqlite" as const,
+    typeRegistryKey: "sqlite" as const,
     execute: vi.fn(async () => []),
     executeMutation: vi.fn(async () => 0),
     beginTransaction: vi.fn(async () => {}),

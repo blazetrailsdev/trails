@@ -40,7 +40,10 @@ export function arelNode(value: unknown): boolean {
   );
 }
 
-export function fetchAttribute(value: unknown, block: (attr: Node) => unknown): unknown {
+export function fetchAttribute(
+  value: unknown,
+  block: (attr: Node) => boolean,
+): boolean | undefined {
   if (typeof value !== "string") {
     return (value as Node).fetchAttribute(block);
   }

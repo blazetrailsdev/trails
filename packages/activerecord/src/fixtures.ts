@@ -309,7 +309,7 @@ export function resolveCompositeRefColumn(
  * ```
  */
 export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql2" | "sqlite" {
-  return adapter.adapterName as "postgres" | "mysql2" | "sqlite";
+  return adapter.typeRegistryKey;
 }
 
 // --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---
@@ -717,7 +717,7 @@ export async function insertPreparedFixtureSets(
 
   await checkAllForeignKeysValidBang(adapter);
 
-  if (adapter.adapterName === "postgres") {
+  if (adapter.typeRegistryKey === "postgres") {
     for (const p of prepared) {
       if (p.serialReset) await resetPkSequence(adapter, p.serialReset.table, p.serialReset.column);
     }

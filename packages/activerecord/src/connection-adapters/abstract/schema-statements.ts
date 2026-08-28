@@ -3,7 +3,7 @@ import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
 import type { MigrationCommand } from "../../migration/command-recorder.js";
 import { ArgumentError, type Type } from "@blazetrails/activemodel";
-import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Relation } from "../../relation.js";
 import type { Base } from "../../base.js";
 import {
@@ -454,7 +454,7 @@ export class SchemaStatements {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    if (this.adapterName === "mysql2") {
+    if (this.typeRegistryKey === "mysql2") {
       await this.execute(
         `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteColumnName(tableName)}`,
       );
@@ -867,7 +867,7 @@ export class SchemaStatements {
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
-    switch (this.adapterName as AdapterName) {
+    switch (this.typeRegistryKey) {
       case "sqlite":
         return sqliteIndexes(this as unknown as DatabaseAdapter, tableName);
       case "postgres": {
@@ -1417,7 +1417,7 @@ export class SchemaStatements {
 
   async changeTableComment(_tableName: string, _commentOrChanges: CommentOrChanges): Promise<void> {
     throw new Error(
-      `NotImplementedError: ${this.adapterName} does not support changing table comments`,
+      `NotImplementedError: ${this.constructor.name} does not support changing table comments`,
     );
   }
 
@@ -1427,7 +1427,7 @@ export class SchemaStatements {
     _commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     throw new Error(
-      `NotImplementedError: ${this.adapterName} does not support changing column comments`,
+      `NotImplementedError: ${this.constructor.name} does not support changing column comments`,
     );
   }
 

@@ -24,12 +24,7 @@ import { ActiveRecord } from "../ar-config.js";
 
 // All 5 methods are class-level in Rails (class << self private), so test via a subclass.
 class TestAdapter extends AbstractAdapter {
-  static get adapterName() {
-    return "TestAdapter";
-  }
-  override get adapterName() {
-    return "TestAdapter" as const;
-  }
+  static override readonly ADAPTER_NAME = "TestAdapter";
 }
 
 describe("AbstractAdapter#returnValueAfterInsert", () => {
@@ -261,12 +256,7 @@ describe("DatabaseStatements#insert id extraction", () => {
   // execInsert/execute are include()-mixed methods, not class declarations,
   // so we assign them via any rather than using class override syntax.
   class InsertTestAdapter extends AbstractAdapter {
-    static get adapterName() {
-      return "InsertTestAdapter";
-    }
-    override get adapterName() {
-      return "InsertTestAdapter" as const;
-    }
+    static override readonly ADAPTER_NAME = "InsertTestAdapter";
   }
 
   it("respects idValue override when provided, regardless of execInsert return type", async () => {
@@ -344,10 +334,8 @@ describe("DatabaseStatements#insert id extraction", () => {
 
 describe("per-adapter visitor isolation", () => {
   class SqliteAdapter extends AbstractAdapter {
-    static get adapterName() {
-      return "SQLite" as const;
-    }
-    override get adapterName() {
+    static override readonly ADAPTER_NAME = "SQLite";
+    override get typeRegistryKey() {
       return "sqlite" as const;
     }
     override arelVisitor() {
@@ -356,10 +344,8 @@ describe("per-adapter visitor isolation", () => {
   }
 
   class MysqlAdapter extends AbstractAdapter {
-    static get adapterName() {
-      return "MySQL" as const;
-    }
-    override get adapterName() {
+    static override readonly ADAPTER_NAME = "MySQL";
+    override get typeRegistryKey() {
       return "mysql2" as const;
     }
     override arelVisitor() {

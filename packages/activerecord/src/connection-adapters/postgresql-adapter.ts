@@ -183,7 +183,9 @@ export class PostgreSQLAdapter
     UniqueConstraintStatements,
     SchemaNamespaceStatements
 {
-  override get adapterName(): AdapterName {
+  static override readonly ADAPTER_NAME = "PostgreSQL";
+
+  override get typeRegistryKey(): AdapterName {
     return "postgres";
   }
 

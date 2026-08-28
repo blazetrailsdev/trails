@@ -4,7 +4,7 @@ import { SchemaStatements } from "./schema-statements.js";
 function makeStatements(options: { migrated?: number[]; versions?: number[] } = {}) {
   const executed: string[] = [];
   const adapter = {
-    adapterName: "sqlite" as const,
+    typeRegistryKey: "sqlite" as const,
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quote: (v: unknown) => (typeof v === "number" ? String(v) : `'${String(v)}'`),

@@ -168,14 +168,7 @@ export async function saveCollectionAssociation(
   reflection: any,
 ): Promise<void> {
   const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  if (!association) {
-    (
-      (this as unknown as Base)._associationInstances.get(reflection.name) as
-        | { resetScope?(): void }
-        | undefined
-    )?.resetScope?.();
-    return;
-  }
+  if (!association) return;
   const autosave = reflection.options?.autosave;
 
   const newRecordBeforeSave = !!(this as any)._newRecordBeforeSave;

@@ -19,7 +19,7 @@ import "./relation.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
-    adapterName: "sqlite" as const,
+    typeRegistryKey: "sqlite" as const,
     execute: vi.fn(async () => []),
     executeMutation: vi.fn(async () => 0),
     beginTransaction: vi.fn(async () => {}),
@@ -556,7 +556,7 @@ describe("defineFixtures", () => {
 describe("PrimaryKeyError", () => {
   it("generates the correct value", async () => {
     const adapter = {
-      adapterName: "sqlite" as const,
+      typeRegistryKey: "sqlite" as const,
       execute: vi.fn(async () => []),
       executeMutation: vi.fn(async () => 0),
       beginTransaction: vi.fn(async () => {}),

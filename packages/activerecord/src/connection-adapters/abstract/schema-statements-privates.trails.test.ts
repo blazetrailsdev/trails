@@ -24,7 +24,7 @@ function makeStatements(
   Statements: { prototype: SchemaStatements } = SchemaStatements,
 ) {
   const adapter: Record<string, unknown> = {
-    adapterName: "sqlite" as const,
+    typeRegistryKey: "sqlite" as const,
     _config: {},
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,

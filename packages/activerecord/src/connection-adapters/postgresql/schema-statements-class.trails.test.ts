@@ -24,7 +24,7 @@ interface FakeOptions {
 function makeAdapter(options: FakeOptions = {}) {
   const sql: string[] = [];
   const adapter = {
-    adapterName: "postgres" as const,
+    typeRegistryKey: "postgres" as const,
     logger: options.logger ?? null,
     quote: (v: unknown) => `'${String(v).replace(/'/g, "''")}'`,
     quoteColumnName: (n: string) => `"${n}"`,
@@ -372,7 +372,7 @@ function makeFakeAdapter() {
   const executed: string[] = [];
   const clearedTables: string[] = [];
   const adapter = {
-    adapterName: "postgres" as const,
+    typeRegistryKey: "postgres" as const,
     execute: vi.fn(async (sql: string) => {
       executed.push(sql);
     }),
@@ -434,7 +434,7 @@ describe("SchemaStatements#dropTable", () => {
 function makeSchemaAdapter() {
   const execed: string[] = [];
   const adapter = {
-    adapterName: "postgres" as const,
+    typeRegistryKey: "postgres" as const,
     _schemaSearchPathMemo: null as string | null,
     exec: vi.fn(async (sql: string) => {
       execed.push(sql);
@@ -513,7 +513,7 @@ describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
   it("is a no-op when the adapter does not support foreign keys (Rails super guard)", async () => {
     const executed: string[] = [];
     const adapter = {
-      adapterName: "postgres" as const,
+      typeRegistryKey: "postgres" as const,
       supportsForeignKeys: () => false,
       exec: vi.fn(async (sql: string) => {
         executed.push(sql);
@@ -531,7 +531,7 @@ describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
   it("with ifNotExists is a no-op when a composite FK already exists", async () => {
     const executed: string[] = [];
     const adapter = {
-      adapterName: "postgres" as const,
+      typeRegistryKey: "postgres" as const,
       supportsForeignKeys: () => true,
       execute: vi.fn(async (sql: string) => {
         executed.push(sql);

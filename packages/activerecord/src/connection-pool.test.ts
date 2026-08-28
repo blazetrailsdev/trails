@@ -51,7 +51,7 @@ function makePool(size: number = 5): ConnectionPool {
 }
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
-  override get adapterName(): AdapterName {
+  override get typeRegistryKey(): AdapterName {
     return "sqlite";
   }
   constructor() {
@@ -627,12 +627,15 @@ it("adapter proxy still dispatches genuine adapter methods to the connection", a
   const pool = makePool();
   const proxy = (
     pool as unknown as {
-      _getAdapterProxy(): { adapterName: string; quoteTableName(name: string): Promise<string> };
+      _getAdapterProxy(): {
+        typeRegistryKey: string;
+        quoteTableName(name: string): Promise<string>;
+      };
     }
   )._getAdapterProxy();
 
-  // adapterName is served directly off the proxy (no checkout).
-  expect(typeof proxy.adapterName).toBe("string");
+  // typeRegistryKey is served directly off the proxy (no checkout).
+  expect(typeof proxy.typeRegistryKey).toBe("string");
 
   // A real adapter method fabricates a callable and dispatches through the pool.
   const quoted = await proxy.quoteTableName("people");

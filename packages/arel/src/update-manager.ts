@@ -43,12 +43,10 @@ export class UpdateManager extends TreeManager {
   }
 
   group(columns: (Node | string)[]): this {
-    for (const column of columns) {
-      if (typeof column === "string") {
-        this.ast.groups.push(new Group(new SqlLiteral(column)));
-      } else {
-        this.ast.groups.push(new Group(column));
-      }
+    for (let column of columns) {
+      if (typeof column === "string") column = new SqlLiteral(column);
+
+      this.ast.groups.push(new Group(column));
     }
     return this;
   }

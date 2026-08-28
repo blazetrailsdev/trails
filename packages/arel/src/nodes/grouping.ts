@@ -7,9 +7,9 @@ export class Grouping extends Unary {
     super(expr);
   }
 
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
+  fetchAttribute(block: (attr: Node) => boolean): boolean | undefined {
     return (
-      this.expr as { fetchAttribute(block: (attr: Node) => unknown): unknown }
+      this.expr as { fetchAttribute(block: (attr: Node) => boolean): boolean | undefined }
     ).fetchAttribute(block);
   }
 }

@@ -673,7 +673,7 @@ export class Builder implements InsertBuilder {
       if (this._insertAll.inserts.length > 1) {
         throw new Error("Bulk insert with no explicit columns is not supported");
       }
-      if (this._connection.adapterName === "mysql2") {
+      if (this._connection.typeRegistryKey === "mysql2") {
         return `INTO ${tableName} () VALUES ()`;
       }
       return `INTO ${tableName} DEFAULT VALUES`;
@@ -773,8 +773,8 @@ export class Builder implements InsertBuilder {
     const v = this._connection.visitor;
     if (v) return v;
     const q = this._connection as unknown as Visitors.ArelConnection;
-    if (this._connection.adapterName === "mysql2") return new Visitors.MySQL(q);
-    if (this._connection.adapterName === "postgres") return new Visitors.PostgreSQL(q);
+    if (this._connection.typeRegistryKey === "mysql2") return new Visitors.MySQL(q);
+    if (this._connection.typeRegistryKey === "postgres") return new Visitors.PostgreSQL(q);
     return new Visitors.SQLite(q);
   }
 }

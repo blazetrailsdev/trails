@@ -31,7 +31,7 @@ export type NodeOrValue =
   | null;
 
 export const FetchAttribute = {
-  fetchAttribute(this: Binary, block: (attr: Node) => unknown): unknown {
+  fetchAttribute(this: Binary, block: (attr: Node) => boolean): boolean | undefined {
     if (_Attribute && this.left instanceof _Attribute) return block(this.left as Node);
     if (_Attribute && this.right instanceof _Attribute) return block(this.right as Node);
     return undefined;

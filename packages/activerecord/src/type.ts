@@ -66,7 +66,7 @@ export interface AdapterNameSource {
   // established connection (`Base._adapter`). Rails has no analogue — every
   // model resolves through a pool — so `adapter_name_from` has nothing to read
   // it from.
-  _adapter?: { adapterName?: string } | null;
+  _adapter?: { typeRegistryKey?: AdapterName } | null;
 }
 
 _registry.register("big_integer", BigIntegerType, { override: false });
@@ -156,8 +156,8 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
   // A directly-assigned adapter (see AdapterNameSource) IS the model's
   // connection and has no pool, so it both outranks the pool the class would
   // otherwise inherit from Base and is the only place its name can be read.
-  const directAdapterName = model._adapter?.adapterName;
-  if (directAdapterName) return adapterNameFromConfig(directAdapterName);
+  const directTypeRegistryKey = model._adapter?.typeRegistryKey;
+  if (directTypeRegistryKey) return directTypeRegistryKey;
 
   let configAdapter: string | undefined;
   try {

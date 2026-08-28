@@ -472,7 +472,7 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
 }
 
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
-  const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
+  const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.typeRegistryKey];
   if (adapterSpecificSchema) {
     noteAdapterSpecificSchemaLoaded();
     await adapterSpecificSchema(adapter);

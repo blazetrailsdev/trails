@@ -47,15 +47,15 @@ function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   return type === "integer" || type === "big_integer";
 }
 
-function serialIdType(spec: ColumnSpec | undefined, adapterName?: string): string {
+function serialIdType(spec: ColumnSpec | undefined, typeRegistryKey?: string): string {
   const type = typeof spec === "string" ? spec : spec?.type;
   const isBig = type === "big_integer";
-  if (adapterName === "postgres") return isBig ? "bigserial" : "serial";
-  if (adapterName === "sqlite") return "integer";
+  if (typeRegistryKey === "postgres") return isBig ? "bigserial" : "serial";
+  if (typeRegistryKey === "sqlite") return "integer";
   return isBig ? "bigint" : "integer";
 }
 
-function colOpts(spec: ColumnSpec, primitive: string, adapterName?: string): string {
+function colOpts(spec: ColumnSpec, primitive: string, typeRegistryKey?: string): string {
   const parts: string[] = [];
   const hasPrecision = typeof spec === "object" && spec.precision !== undefined;
   if (typeof spec === "object") {
@@ -71,7 +71,7 @@ function colOpts(spec: ColumnSpec, primitive: string, adapterName?: string): str
     if (spec.array) parts.push(`array: true`);
     if (spec.primary) parts.push(`primaryKey: true`);
   }
-  if (adapterName === "mysql2" && primitive === "datetime" && !hasPrecision) {
+  if (typeRegistryKey === "mysql2" && primitive === "datetime" && !hasPrecision) {
     parts.push(`precision: 6`);
   }
   return parts.length === 0 ? "{}" : `{ ${parts.join(", ")} }`;
@@ -85,7 +85,7 @@ function schemaChecksum(code: string): string {
 
 function generateCode(
   schema: Schema,
-  adapterName?: string,
+  typeRegistryKey?: string,
   supportsExpressionIndex?: boolean,
 ): string {
   const lines: string[] = [
@@ -94,7 +94,7 @@ function generateCode(
     `export default async function defineSchema(ctx: DatabaseAdapter): Promise<void> {`,
   ];
 
-  const needsForce = adapterName === "postgres" || adapterName === "mysql2";
+  const needsForce = typeRegistryKey === "postgres" || typeRegistryKey === "mysql2";
 
   if (needsForce) {
     for (const [tableName, tableSpec] of Object.entries(schema)) {
@@ -137,13 +137,13 @@ function generateCode(
       for (const [colName, colSpec] of colEntries) {
         if (colName === serialPkName) {
           lines.push(
-            `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(serialIdType(colSpec, adapterName))}, { primaryKey: true });`,
+            `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(serialIdType(colSpec, typeRegistryKey))}, { primaryKey: true });`,
           );
           continue;
         }
         const primitive = typeof colSpec === "string" ? colSpec : colSpec.type;
         lines.push(
-          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, primitive, adapterName)});`,
+          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, primitive, typeRegistryKey)});`,
         );
       }
       lines.push(...fkLines);
@@ -153,9 +153,15 @@ function generateCode(
     for (const index of indexesOf(tableSpec)) {
       const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
       const dropExpression =
-        supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql2";
+        supportsExpressionIndex !== undefined
+          ? !supportsExpressionIndex
+          : typeRegistryKey === "mysql2";
       if (isExpression && dropExpression) continue;
-      if (index.adapters && adapterName !== undefined && !index.adapters.includes(adapterName))
+      if (
+        index.adapters &&
+        typeRegistryKey !== undefined &&
+        !index.adapters.includes(typeRegistryKey)
+      )
         continue;
       const optEntries: string[] = [];
       if (index.unique) optEntries.push(`unique: true`);
@@ -179,12 +185,12 @@ function generateCode(
 
 export async function generateSchemaFile(
   schema: Schema,
-  adapterName?: string,
+  typeRegistryKey?: string,
   supportsExpressionIndex?: boolean,
 ): Promise<string> {
   const [os, fs, path] = await Promise.all([getOsAsync(), getFsAsync(), getPathAsync()]);
   const poolId = getEnv("VITEST_POOL_ID") ?? "0";
-  const code = generateCode(schema, adapterName, supportsExpressionIndex);
+  const code = generateCode(schema, typeRegistryKey, supportsExpressionIndex);
   const filePath = path.join(os.tmpdir(), `trails-schema-${poolId}-${schemaChecksum(code)}.ts`);
   if (fs.writeFile) {
     await fs.writeFile(filePath, code);

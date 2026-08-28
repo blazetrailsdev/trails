@@ -120,8 +120,8 @@ const SHAPE_QUERIES: Record<string, string[]> = {
 };
 
 async function shapeQueriesFor(adapter: DatabaseAdapter): Promise<string[]> {
-  const queries = SHAPE_QUERIES[adapter.adapterName] ?? [];
-  if (adapter.adapterName !== "mysql2") return queries;
+  const queries = SHAPE_QUERIES[adapter.typeRegistryKey] ?? [];
+  if (adapter.typeRegistryKey !== "mysql2") return queries;
   const expression = (await supportsExpressionIndex(adapter)) ? "COALESCE(EXPRESSION, '')" : "''";
   return queries.map((sql) => sql.replace("/*EXPRESSION*/''", expression));
 }

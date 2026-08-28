@@ -179,8 +179,8 @@ const FK_SCHEMA: Schema = {
 describe("generateSchemaFile foreign keys", () => {
   const written: string[] = [];
 
-  const generate = async (adapterName?: string): Promise<string> => {
-    const filePath = await generateSchemaFile(FK_SCHEMA, adapterName);
+  const generate = async (typeRegistryKey?: string): Promise<string> => {
+    const filePath = await generateSchemaFile(FK_SCHEMA, typeRegistryKey);
     written.push(filePath);
     return (await getFsAsync()).readFileSync(filePath, "utf-8");
   };
@@ -402,7 +402,7 @@ async function canonicalIndexes(
     addIndex(table: string, columns: string | string[], options: AddIndexOptions): Promise<void>;
   };
   const fakeAdapter = {
-    adapterName: adapter,
+    typeRegistryKey: adapter,
     supportsExpressionIndex: () => supportsExpressionIndex,
     getDatabaseVersion: async () => {},
   } as unknown as AbstractAdapter;

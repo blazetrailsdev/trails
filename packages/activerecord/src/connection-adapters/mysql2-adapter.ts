@@ -69,6 +69,8 @@ class Mysql2StatementPool extends MysqlStatementPool {
 let mysql2TypeMap: TypeMap | null = null;
 
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
+  static override readonly ADAPTER_NAME = "Mysql2";
+
   static readonly ER_BAD_DB_ERROR = 1049;
   static readonly ER_DBACCESS_DENIED_ERROR = 1044;
   static readonly ER_ACCESS_DENIED_ERROR = 1045;

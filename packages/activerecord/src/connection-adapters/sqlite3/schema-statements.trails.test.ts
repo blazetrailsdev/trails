@@ -17,7 +17,7 @@ import { SchemaDumper } from "./schema-dumper.js";
 describe("SQLite3::SchemaStatements", () => {
   describe("createSchemaDumper", () => {
     it("returns a SchemaDumper instance", () => {
-      const fakeAdapter = { adapterName: "sqlite" } as any;
+      const fakeAdapter = { typeRegistryKey: "sqlite" } as any;
       expect(createSchemaDumper.call(fakeAdapter)).toBeInstanceOf(SchemaDumper);
     });
   });

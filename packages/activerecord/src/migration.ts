@@ -420,7 +420,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** Return the normalized adapter name from the configured adapter. */
   protected get _adapterName(): "sqlite" | "postgres" | "mysql2" {
-    return this.connection.adapterName as "sqlite" | "postgres" | "mysql2";
+    return this.connection.typeRegistryKey;
   }
 
   /**

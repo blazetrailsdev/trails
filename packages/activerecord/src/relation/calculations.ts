@@ -58,7 +58,7 @@ interface AliasingConnection {
 }
 
 interface CalculationConnection {
-  adapterName: AdapterName;
+  typeRegistryKey: AdapterName;
   visitor?: { compile(node: any, collector?: any): any };
   toSql(arel: unknown): string;
   quote(value: unknown): string;
@@ -191,7 +191,7 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
 }
 
 function needsBigintCast(rel: CalculationRelation): boolean {
-  return rel._conn().adapterName === "sqlite";
+  return rel._conn().typeRegistryKey === "sqlite";
 }
 
 function wrapBigintAgg(

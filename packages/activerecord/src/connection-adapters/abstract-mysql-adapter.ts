@@ -190,7 +190,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   protected _statementLimit = 1000;
 
-  get adapterName(): AdapterName {
+  override get typeRegistryKey(): AdapterName {
     return "mysql2";
   }
 
