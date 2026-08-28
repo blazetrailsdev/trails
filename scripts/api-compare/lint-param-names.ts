@@ -57,9 +57,8 @@ async function main(tighten: boolean): Promise<number> {
   const absent = unmeasuredPackages(artifact.packages);
   if (absent.length > 0) {
     console.error(
-      `\nparam-name gate: ${absent.length} gated package(s) not measured: ${absent.join(", ")}.\n` +
-        "The artifact covers fewer packages than CI does, so the gate would pass on\n" +
-        "signatures it never looked at. Regenerate the full surface:\n" +
+      `\nparam-name gate: gated package(s) not measured: ${absent.join(", ")}.\n` +
+        "The gate would pass on signatures it never looked at. Regenerate:\n" +
         "  API_COMPARE_FORCE=1 pnpm parity:api\n",
     );
     return 1;
@@ -69,10 +68,9 @@ async function main(tighten: boolean): Promise<number> {
   const unmarked = unmarkedPackages(marks);
   if (unmarked.length > 0) {
     console.error(
-      `\nparam-name gate: ${unmarked.length} gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
-        "A gated package with no mark is skipped by every comparison, so the gate\n" +
-        "would pass on it silently rather than half-enabling. Seed it from a clean\n" +
-        "measurement before gating:\n" +
+      `\nparam-name gate: gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
+        "A gated package with no mark is skipped by every comparison, so gating it\n" +
+        "unseeded disarms rather than half-enables. Seed it from a clean run:\n" +
         "  pnpm parity:api --package <pkg> --params\n",
     );
     return 1;
@@ -86,7 +84,7 @@ async function main(tighten: boolean): Promise<number> {
     if (grew.length > 0) {
       console.error(
         "\nparam-name gate: refusing to tighten while the mark is EXCEEDED — " +
-          "`--tighten` only narrows.\nRename the parameters back to Rails' spelling first, then re-run.\n",
+          "`--tighten` only narrows.\nRestore Rails' spelling first, then re-run.\n",
       );
       return 1;
     }
@@ -101,8 +99,7 @@ async function main(tighten: boolean): Promise<number> {
     console.error(`\nparam-name gate: ${grew.length} dimension(s) GREW past the committed mark.`);
     console.error(
       "A parameter keeps the Rails identifier, camelCased (CLAUDE.md, " +
-        "docs/ruby-ts-conventions.md).\nRename it rather than raising the mark. " +
-        "See the offending positions with:\n" +
+        "docs/ruby-ts-conventions.md).\nRename it rather than raising the mark:\n" +
         "  pnpm parity:api --package <pkg> --params\n",
     );
     for (const v of grew) {
