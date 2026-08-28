@@ -91,7 +91,6 @@ export class LazilyDefineAttributes extends Module {
     this.defineOn(klass);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   equals(other: unknown): boolean {
     return (
       other instanceof LazilyDefineAttributes &&
