@@ -86,7 +86,7 @@ async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
       return false;
     }
   }
-  return Boolean((conn as unknown as { inTransaction?: boolean }).inTransaction);
+  return Boolean((conn as unknown as { _inTransaction?: boolean })._inTransaction);
 }
 
 function sleep(ms: number): Promise<void> {

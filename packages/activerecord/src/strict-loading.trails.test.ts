@@ -24,10 +24,6 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership, CurrentMembership } from "./test-helpers/models/membership.js";
 import { Club } from "./test-helpers/models/club.js";
 
-interface ReflectionHost {
-  _reflectOnAssociation(name: string): { options: Record<string, unknown> };
-}
-
 // The loaders mirror Rails' `find_target?` gate
 // (association.rb:320-321): `violates_strict_loading?` is reached only from
 // inside `find_target`, which `find_target?` enters when
@@ -75,28 +71,11 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   registerModel(Contract);
   registerModel([Author, Post, Comment, Member, Membership, CurrentMembership, Club]);
 
-  const optionsFor = (name: string) =>
-    (Developer as unknown as ReflectionHost)._reflectOnAssociation(name).options;
-
   it("does not raise on lazy loading a has_many on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(
-      findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
-    ).resolves.toEqual([]);
-  });
-
-  it("suppresses the query for an inline options set the owner never declared", async () => {
-    const developer = new Developer({ name: "New Dev" });
-    developer.strictLoadingBang();
-    expect(developer.isNewRecord()).toBe(true);
-    await expect(
-      findHasManyTarget(developer, "inline_audit_logs", {
-        className: "AuditLog",
-        foreignKey: "developer_id",
-      }),
-    ).resolves.toEqual([]);
+    await expect(findHasManyTarget(developer, "auditLogs")).resolves.toEqual([]);
   });
 
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
@@ -141,9 +120,9 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = new Developer({ name: "New Dev", id: 1 });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(
-      findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
-    ).rejects.toThrow(StrictLoadingViolationError);
+    await expect(findHasManyTarget(developer, "auditLogs")).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 
   // `SingularAssociation#find_target` (singular_association.rb:47-55) answers a
@@ -154,13 +133,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a disable_joins has_many :through on a strict-loading owner", async () => {
     const author = await Author.find(authors("david").id);
     author.strictLoadingBang();
-    await expect(
-      findHasManyTarget(
-        author,
-        "noJoinsComments",
-        (Author as unknown as ReflectionHost)._reflectOnAssociation("noJoinsComments").options,
-      ),
-    ).resolves.toBeInstanceOf(Array);
+    await expect(findHasManyTarget(author, "noJoinsComments")).resolves.toBeInstanceOf(Array);
   });
 
   it("does not raise on lazy loading a disable_joins has_one :through on a strict-loading owner", async () => {
@@ -173,8 +146,8 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = await Developer.find(developers("david").id);
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(false);
-    await expect(
-      findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
-    ).rejects.toThrow(StrictLoadingViolationError);
+    await expect(findHasManyTarget(developer, "auditLogs")).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 });

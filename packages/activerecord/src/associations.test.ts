@@ -764,8 +764,8 @@ describe("PreloaderTest", () => {
     expect(firstReads).toHaveLength(0);
 
     const reloaded = (await Invoice.where({ id: invoice.id }))[0];
-    const lineItems = await findHasManyTarget(reloaded, "lineItems", {});
-    for (const li of lineItems) await findHasManyTarget(li, "discountApplications", {});
+    const lineItems = await findHasManyTarget(reloaded, "lineItems");
+    for (const li of lineItems) await findHasManyTarget(li, "discountApplications");
     const secondSqls = await captureSql(async () => {
       await new Preloader({ records: [reloaded], associations: nested }).call();
     });
@@ -2243,10 +2243,7 @@ describe("AssociationsTest", () => {
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "B" });
     await ShardedComment.create({ blog_id: 2, blog_post_id: (post as any).id, body: "Other" });
-    const comments = await findHasManyTarget(post, "freshComments", {
-      className: "ShardedComment",
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
+    const comments = await findHasManyTarget(post, "comments");
     expect(comments).toHaveLength(2);
     expect(comments.map((c) => (c as any).body).sort()).toEqual(["A", "B"]);
   });
@@ -2256,10 +2253,7 @@ describe("AssociationsTest", () => {
     const [, orderId] = order.id as [number, number];
     await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
     await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    const agreements = await findHasManyTarget(order, "freshAgreements", {
-      className: "CpkOrderAgreement",
-      foreignKey: "order_id",
-    });
+    const agreements = await findHasManyTarget(order, "orderAgreements");
     expect(agreements).toHaveLength(2);
     expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
   });
@@ -2284,10 +2278,7 @@ describe("AssociationsTest", () => {
     await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
     await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
     await (CpkOrderAgreement as any).where("1=0").scoping(async () => {
-      const agreements = await findHasManyTarget(order, "freshAgreements", {
-        className: "CpkOrderAgreement",
-        foreignKey: "order_id",
-      });
+      const agreements = await findHasManyTarget(order, "orderAgreements");
       expect(agreements).toHaveLength(2);
       expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
     });
@@ -2337,10 +2328,7 @@ describe("AssociationsTest", () => {
       title: "Book",
     });
     await CpkBook.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
-    const books = await findHasManyTarget(order, "books", {
-      foreignKey: ["shop_id", "order_id"],
-      className: "CpkBook",
-    });
+    const books = await findHasManyTarget(order, "books");
     expect(books[0].id).toEqual([3, 4]);
   });
 });

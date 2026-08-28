@@ -146,7 +146,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     });
     try {
       const reflection = (RwAuthor as any)._reflectOnAssociation("noJoinsRwMembers");
-      const members = await findTarget(author, "noJoinsRwMembers", reflection.options);
+      const members = await findTarget(author, "noJoinsRwMembers");
       expect(members.map((m: any) => m.id).sort()).toEqual([m1.id, m2.id].sort());
       const count = await association(author, "noJoinsRwMembers").count();
       expect(count).toBe(2);

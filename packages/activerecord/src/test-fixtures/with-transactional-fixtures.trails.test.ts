@@ -191,7 +191,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     });
 
     let bObservedOpen = -1;
-    let bObservedInTransaction = true;
+    let bObservedTransactionOpen = true;
     let bObservedCurrentTxJoinable = true;
 
     await Promise.all([
@@ -209,7 +209,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
         await bReady;
         try {
           bObservedOpen = chainB.openTransactions;
-          bObservedInTransaction = chainB.inTransaction;
+          bObservedTransactionOpen = chainB.isTransactionOpen();
           // currentTransaction() returns null (current filter) or NullTransaction
           // (pool isolation, post-E2/E3). Both have joinable===false. Asserting on
           // joinable rather than identity keeps this green through E2–E5.
@@ -226,7 +226,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     // currentTransaction() is the most critical: Base.transaction() consults
     // it first to decide whether to join a foreign frame.
     expect(bObservedOpen).toBe(0);
-    expect(bObservedInTransaction).toBe(false);
+    expect(bObservedTransactionOpen).toBe(false);
     expect(bObservedCurrentTxJoinable).toBe(false);
   });
 
@@ -236,7 +236,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     // Pool-leased adapters return NullTransaction (not null) when no transaction
     // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
     expect(adapter.openTransactions).toBe(0);
-    expect(adapter.inTransaction).toBe(false);
+    expect(adapter.isTransactionOpen()).toBe(false);
     expect(adapter.currentTransaction()).toBeInstanceOf(NullTransaction);
   });
 });

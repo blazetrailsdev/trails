@@ -20,7 +20,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterAll(async () => {
     await adapter.exec(
-      `DROP TABLE IF EXISTS ex_relations, ex_authors, ex_books, ex_explain, op_authors, op_posts CASCADE`,
+      `DROP TABLE IF EXISTS ex_relations, ex_authors, ex_books, ex_explains, op_authors, op_posts CASCADE`,
     );
   });
   describe("PostgresqlExplainTest", () => {
@@ -78,10 +78,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("explain with options as symbols", async () => {
-      await adapter.exec(`CREATE TABLE "ex_explain" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
-      await adapter.executeMutation(`INSERT INTO "ex_explain" ("name") VALUES ('test')`);
-      const result = await adapter.explain(`SELECT * FROM "ex_explain"`);
-      expect(result).toContain("ex_explain");
+      class ExExplain extends Base {
+        static {
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+        }
+      }
+      await adapter.exec(`CREATE TABLE "ex_explains" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await ExExplain.create({ name: "test" });
+      const explain = await ExExplain.where({ id: 1 }).explain(":analyze", ":buffers");
+      expect(explain).toMatch(
+        /EXPLAIN \(ANALYZE, BUFFERS\) SELECT "ex_explains"\.\* FROM "ex_explains" WHERE "ex_explains"\."id" = (?:\$1 \[\["id", 1\]\]|1)/,
+      );
+      expect(explain).toMatch(/QUERY PLAN/);
     });
 
     it("explain with options as strings", async () => {
