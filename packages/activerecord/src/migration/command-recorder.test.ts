@@ -55,27 +55,29 @@ describe("Migration", () => {
       expect(recorder.foo("bar")).toBe("bar");
     });
 
-    it("inverse of raise exception on unknown commands", () => {
-      expect(() => recorder.inverseOf("execute", ["some sql"])).toThrow(IrreversibleMigration);
+    it("inverse of raise exception on unknown commands", async () => {
+      await expect(recorder.inverseOf("execute", ["some sql"])).rejects.toThrow(
+        IrreversibleMigration,
+      );
     });
 
     it("irreversible commands raise exception", async () => {
       await expect(
         recorder.revert(async () => {
-          recorder.execute("some sql");
+          await recorder.execute("some sql");
         }),
       ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("record", () => {
-      recorder.record("createTable", ["system_settings"]);
+    it("record", async () => {
+      await recorder.record("createTable", ["system_settings"]);
       expect(recorder.commands.length).toBe(1);
     });
 
     it("inverted commands are reversed", async () => {
       await recorder.revert(async () => {
-        recorder.record("createTable", ["hello"]);
-        recorder.record("createTable", ["world"]);
+        await recorder.record("createTable", ["hello"]);
+        await recorder.record("createTable", ["world"]);
       });
       const tables = recorder.commands.map(([, args]) => args);
       expect(tables).toEqual([["world"], ["hello"]]);
@@ -155,7 +157,7 @@ describe("Migration", () => {
 
     it("invert create table", async () => {
       await recorder.revert(async () => {
-        recorder.record("createTable", ["system_settings"]);
+        await recorder.record("createTable", ["system_settings"]);
       });
       const dropTable = recorder.commands[0];
       expect(dropTable).toEqual(["dropTable", ["system_settings"], undefined]);
@@ -163,15 +165,15 @@ describe("Migration", () => {
 
     it("invert create table with if not exists", async () => {
       await recorder.revert(async () => {
-        recorder.record("createTable", ["system_settings", { ifNotExists: true }]);
+        await recorder.record("createTable", ["system_settings", { ifNotExists: true }]);
       });
       const dropTable = recorder.commands[0];
       expect(dropTable).toEqual(["dropTable", ["system_settings", {}], undefined]);
     });
 
-    it("invert create table with options and block", () => {
+    it("invert create table with options and block", async () => {
       const block = () => {};
-      const dropTable = recorder.inverseOf("createTable", [
+      const dropTable = await recorder.inverseOf("createTable", [
         "people_reminders",
         { id: false },
         block,
@@ -183,9 +185,9 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert drop table", () => {
+    it("invert drop table", async () => {
       const block = () => {};
-      const createTable = recorder.inverseOf("dropTable", [
+      const createTable = await recorder.inverseOf("dropTable", [
         "people_reminders",
         { id: false },
         block,
@@ -197,9 +199,9 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert drop table with if exists", () => {
+    it("invert drop table with if exists", async () => {
       const block = () => {};
-      const createTable = recorder.inverseOf("dropTable", [
+      const createTable = await recorder.inverseOf("dropTable", [
         "people_reminders",
         { id: false, ifExists: true },
         block,
@@ -211,46 +213,46 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert drop table without a block nor option", () => {
+    it("invert drop table without a block nor option", async () => {
       const inverseOf = () => recorder.inverseOf("dropTable", ["people_reminders"]);
-      expect(inverseOf).toThrow(IrreversibleMigration);
-      expect(inverseOf).toThrow(
+      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
+      await expect(inverseOf()).rejects.toThrow(
         "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
       );
     });
 
-    it("invert drop table with multiple tables", () => {
+    it("invert drop table with multiple tables", async () => {
       const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists"]);
-      expect(inverseOf).toThrow(IrreversibleMigration);
-      expect(inverseOf).toThrow(
+      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
+      await expect(inverseOf()).rejects.toThrow(
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     });
 
-    it("invert drop table with multiple tables and options", () => {
+    it("invert drop table with multiple tables and options", async () => {
       const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists", { id: false }]);
-      expect(inverseOf).toThrow(IrreversibleMigration);
-      expect(inverseOf).toThrow(
+      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
+      await expect(inverseOf()).rejects.toThrow(
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     });
 
-    it("invert drop table with multiple tables and block", () => {
+    it("invert drop table with multiple tables and block", async () => {
       const block = () => {};
       const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists", block]);
-      expect(inverseOf).toThrow(IrreversibleMigration);
-      expect(inverseOf).toThrow(
+      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
+      await expect(inverseOf()).rejects.toThrow(
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     });
 
-    it("invert create join table", () => {
-      const dropJoinTable = recorder.inverseOf("createJoinTable", ["musics", "artists"]);
+    it("invert create join table", async () => {
+      const dropJoinTable = await recorder.inverseOf("createJoinTable", ["musics", "artists"]);
       expect(dropJoinTable).toEqual(["dropJoinTable", ["musics", "artists"], undefined]);
     });
 
-    it("invert create join table with table name", () => {
-      const dropJoinTable = recorder.inverseOf("createJoinTable", [
+    it("invert create join table with table name", async () => {
+      const dropJoinTable = await recorder.inverseOf("createJoinTable", [
         "musics",
         "artists",
         { tableName: "catalog" },
@@ -262,9 +264,9 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert drop join table", () => {
+    it("invert drop join table", async () => {
       const block = () => {};
-      const createJoinTable = recorder.inverseOf("dropJoinTable", [
+      const createJoinTable = await recorder.inverseOf("dropJoinTable", [
         "musics",
         "artists",
         { tableName: "catalog" },
@@ -277,30 +279,30 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert rename table", () => {
-      const rename = recorder.inverseOf("renameTable", ["old", "new"]);
+    it("invert rename table", async () => {
+      const rename = await recorder.inverseOf("renameTable", ["old", "new"]);
       expect(rename).toEqual(["renameTable", ["new", "old"]]);
     });
 
-    it("invert add column", () => {
-      const remove = recorder.inverseOf("addColumn", ["table", "column", "type", {}]);
+    it("invert add column", async () => {
+      const remove = await recorder.inverseOf("addColumn", ["table", "column", "type", {}]);
       expect(remove).toEqual(["removeColumn", ["table", "column", "type", {}], undefined]);
     });
 
-    it("invert change column", () => {
-      expect(() => recorder.inverseOf("changeColumn", ["table", "column", "type", {}])).toThrow(
-        IrreversibleMigration,
-      );
+    it("invert change column", async () => {
+      await expect(
+        recorder.inverseOf("changeColumn", ["table", "column", "type", {}]),
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert change column default", () => {
-      expect(() =>
+    it("invert change column default", async () => {
+      await expect(
         recorder.inverseOf("changeColumnDefault", ["table", "column", "default_value"]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert change column default with from and to", () => {
-      const change = recorder.inverseOf("changeColumnDefault", [
+    it("invert change column default with from and to", async () => {
+      const change = await recorder.inverseOf("changeColumnDefault", [
         "table",
         "column",
         { from: "old_value", to: "new_value" },
@@ -311,8 +313,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert change column default with from and to with boolean", () => {
-      const change = recorder.inverseOf("changeColumnDefault", [
+    it("invert change column default with from and to with boolean", async () => {
+      const change = await recorder.inverseOf("changeColumnDefault", [
         "table",
         "column",
         { from: true, to: false },
@@ -323,14 +325,14 @@ describe("Migration", () => {
       ]);
     });
 
-    itIfSupports("comments", "invert change column comment", () => {
-      expect(() =>
+    itIfSupports("comments", "invert change column comment", async () => {
+      await expect(
         recorder.inverseOf("changeColumnComment", ["table", "column", "comment"]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    itIfSupports("comments", "invert change column comment with from and to", () => {
-      const change = recorder.inverseOf("changeColumnComment", [
+    itIfSupports("comments", "invert change column comment with from and to", async () => {
+      const change = await recorder.inverseOf("changeColumnComment", [
         "table",
         "column",
         { from: "old_value", to: "new_value" },
@@ -341,8 +343,8 @@ describe("Migration", () => {
       ]);
     });
 
-    itIfSupports("comments", "invert change column comment with from and to with nil", () => {
-      const change = recorder.inverseOf("changeColumnComment", [
+    itIfSupports("comments", "invert change column comment with from and to with nil", async () => {
+      const change = await recorder.inverseOf("changeColumnComment", [
         "table",
         "column",
         { from: undefined, to: "new_value" },
@@ -353,14 +355,14 @@ describe("Migration", () => {
       ]);
     });
 
-    itIfSupports("comments", "invert change table comment", () => {
-      expect(() =>
+    itIfSupports("comments", "invert change table comment", async () => {
+      await expect(
         recorder.inverseOf("changeColumnComment", ["table", "column", "comment"]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    itIfSupports("comments", "invert change table comment with from and to", () => {
-      const change = recorder.inverseOf("changeTableComment", [
+    itIfSupports("comments", "invert change table comment with from and to", async () => {
+      const change = await recorder.inverseOf("changeTableComment", [
         "table",
         { from: "old_value", to: "new_value" },
       ]);
@@ -370,8 +372,8 @@ describe("Migration", () => {
       ]);
     });
 
-    itIfSupports("comments", "invert change table comment with from and to with nil", () => {
-      const change = recorder.inverseOf("changeTableComment", [
+    itIfSupports("comments", "invert change table comment with from and to with nil", async () => {
+      const change = await recorder.inverseOf("changeTableComment", [
         "table",
         { from: undefined, to: "new_value" },
       ]);
@@ -381,34 +383,34 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert change column null", () => {
-      const add = recorder.inverseOf("changeColumnNull", ["table", "column", true]);
+    it("invert change column null", async () => {
+      const add = await recorder.inverseOf("changeColumnNull", ["table", "column", true]);
       expect(add).toEqual(["changeColumnNull", ["table", "column", false]]);
     });
 
-    it("invert remove column", () => {
-      const add = recorder.inverseOf("removeColumn", ["table", "column", "type", {}]);
+    it("invert remove column", async () => {
+      const add = await recorder.inverseOf("removeColumn", ["table", "column", "type", {}]);
       expect(add).toEqual(["addColumn", ["table", "column", "type", {}], undefined]);
     });
 
-    it("invert remove column without type", () => {
-      expect(() => recorder.inverseOf("removeColumn", ["table", "column"])).toThrow(
+    it("invert remove column without type", async () => {
+      await expect(recorder.inverseOf("removeColumn", ["table", "column"])).rejects.toThrow(
         IrreversibleMigration,
       );
     });
 
-    it("invert rename column", () => {
-      const rename = recorder.inverseOf("renameColumn", ["table", "old", "new"]);
+    it("invert rename column", async () => {
+      const rename = await recorder.inverseOf("renameColumn", ["table", "old", "new"]);
       expect(rename).toEqual(["renameColumn", ["table", "new", "old"]]);
     });
 
-    it("invert add index", () => {
-      const remove = recorder.inverseOf("addIndex", ["table", ["one", "two"]]);
+    it("invert add index", async () => {
+      const remove = await recorder.inverseOf("addIndex", ["table", ["one", "two"]]);
       expect(remove).toEqual(["removeIndex", ["table", ["one", "two"]], undefined]);
     });
 
-    it("invert add index with name", () => {
-      const remove = recorder.inverseOf("addIndex", [
+    it("invert add index with name", async () => {
+      const remove = await recorder.inverseOf("addIndex", [
         "table",
         ["one", "two"],
         { name: "new_index" },
@@ -420,8 +422,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert add index with algorithm option", () => {
-      const remove = recorder.inverseOf("addIndex", [
+    it("invert add index with algorithm option", async () => {
+      const remove = await recorder.inverseOf("addIndex", [
         "table",
         "one",
         { algorithm: "concurrently" },
@@ -433,60 +435,64 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove index", () => {
-      const add = recorder.inverseOf("removeIndex", ["table", "one"]);
+    it("invert remove index", async () => {
+      const add = await recorder.inverseOf("removeIndex", ["table", "one"]);
       expect(add).toEqual(["addIndex", ["table", "one"]]);
     });
 
-    it("invert remove index with positional column", () => {
-      const add = recorder.inverseOf("removeIndex", ["table", ["one", "two"], { options: true }]);
+    it("invert remove index with positional column", async () => {
+      const add = await recorder.inverseOf("removeIndex", [
+        "table",
+        ["one", "two"],
+        { options: true },
+      ]);
       expect(add).toEqual(["addIndex", ["table", ["one", "two"], { options: true }]]);
     });
 
-    it("invert remove index with column", () => {
-      const add = recorder.inverseOf("removeIndex", [
+    it("invert remove index with column", async () => {
+      const add = await recorder.inverseOf("removeIndex", [
         "table",
         { column: ["one", "two"], options: true },
       ]);
       expect(add).toEqual(["addIndex", ["table", ["one", "two"], { options: true }]]);
     });
 
-    it("invert remove index with name", () => {
-      const add = recorder.inverseOf("removeIndex", [
+    it("invert remove index with name", async () => {
+      const add = await recorder.inverseOf("removeIndex", [
         "table",
         { column: ["one", "two"], name: "new_index" },
       ]);
       expect(add).toEqual(["addIndex", ["table", ["one", "two"], { name: "new_index" }]]);
     });
 
-    it("invert remove index with no special options", () => {
-      const add = recorder.inverseOf("removeIndex", ["table", { column: ["one", "two"] }]);
+    it("invert remove index with no special options", async () => {
+      const add = await recorder.inverseOf("removeIndex", ["table", { column: ["one", "two"] }]);
       expect(add).toEqual(["addIndex", ["table", ["one", "two"]]]);
     });
 
-    it("invert remove index with no column", () => {
-      expect(() => recorder.inverseOf("removeIndex", ["table", { name: "new_index" }])).toThrow(
-        IrreversibleMigration,
-      );
+    it("invert remove index with no column", async () => {
+      await expect(
+        recorder.inverseOf("removeIndex", ["table", { name: "new_index" }]),
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert rename index", () => {
-      const rename = recorder.inverseOf("renameIndex", ["table", "old", "new"]);
+    it("invert rename index", async () => {
+      const rename = await recorder.inverseOf("renameIndex", ["table", "old", "new"]);
       expect(rename).toEqual(["renameIndex", ["table", "new", "old"]]);
     });
 
-    it("invert add timestamps", () => {
-      const remove = recorder.inverseOf("addTimestamps", ["table"]);
+    it("invert add timestamps", async () => {
+      const remove = await recorder.inverseOf("addTimestamps", ["table"]);
       expect(remove).toEqual(["removeTimestamps", ["table"], undefined]);
     });
 
-    it("invert remove timestamps", () => {
-      const add = recorder.inverseOf("removeTimestamps", ["table", { null: true }]);
+    it("invert remove timestamps", async () => {
+      const add = await recorder.inverseOf("removeTimestamps", ["table", { null: true }]);
       expect(add).toEqual(["addTimestamps", ["table", { null: true }], undefined]);
     });
 
-    it("invert add reference", () => {
-      const remove = recorder.inverseOf("addReference", [
+    it("invert add reference", async () => {
+      const remove = await recorder.inverseOf("addReference", [
         "table",
         "taggable",
         { polymorphic: true },
@@ -498,13 +504,13 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert add belongs to alias", () => {
-      const remove = recorder.inverseOf("addBelongsTo", ["table", "user"]);
+    it("invert add belongs to alias", async () => {
+      const remove = await recorder.inverseOf("addBelongsTo", ["table", "user"]);
       expect(remove).toEqual(["removeReference", ["table", "user"], undefined]);
     });
 
-    it("invert remove reference", () => {
-      const add = recorder.inverseOf("removeReference", [
+    it("invert remove reference", async () => {
+      const add = await recorder.inverseOf("removeReference", [
         "table",
         "taggable",
         { polymorphic: true },
@@ -516,8 +522,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove reference with index and foreign key", () => {
-      const add = recorder.inverseOf("removeReference", [
+    it("invert remove reference with index and foreign key", async () => {
+      const add = await recorder.inverseOf("removeReference", [
         "table",
         "taggable",
         { index: true, foreignKey: true },
@@ -529,43 +535,43 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove belongs to alias", () => {
-      const add = recorder.inverseOf("removeBelongsTo", ["table", "user"]);
+    it("invert remove belongs to alias", async () => {
+      const add = await recorder.inverseOf("removeBelongsTo", ["table", "user"]);
       expect(add).toEqual(["addReference", ["table", "user"], undefined]);
     });
 
-    it("invert enable extension", () => {
-      const disable = recorder.inverseOf("enableExtension", ["uuid-ossp"]);
+    it("invert enable extension", async () => {
+      const disable = await recorder.inverseOf("enableExtension", ["uuid-ossp"]);
       expect(disable).toEqual(["disableExtension", ["uuid-ossp"], undefined]);
     });
 
-    it("invert disable extension", () => {
-      const enable = recorder.inverseOf("disableExtension", ["uuid-ossp"]);
+    it("invert disable extension", async () => {
+      const enable = await recorder.inverseOf("disableExtension", ["uuid-ossp"]);
       expect(enable).toEqual(["enableExtension", ["uuid-ossp"], undefined]);
     });
 
-    it("invert create schema", () => {
-      const disable = recorder.inverseOf("createSchema", ["myschema"]);
+    it("invert create schema", async () => {
+      const disable = await recorder.inverseOf("createSchema", ["myschema"]);
       expect(disable).toEqual(["dropSchema", ["myschema"], undefined]);
     });
 
-    it("invert drop schema", () => {
-      const enable = recorder.inverseOf("dropSchema", ["myschema"]);
+    it("invert drop schema", async () => {
+      const enable = await recorder.inverseOf("dropSchema", ["myschema"]);
       expect(enable).toEqual(["createSchema", ["myschema"], undefined]);
     });
 
-    it("invert add foreign key", () => {
-      const enable = recorder.inverseOf("addForeignKey", ["dogs", "people"]);
+    it("invert add foreign key", async () => {
+      const enable = await recorder.inverseOf("addForeignKey", ["dogs", "people"]);
       expect(enable).toEqual(["removeForeignKey", ["dogs", "people"], undefined]);
     });
 
-    it("invert remove foreign key", () => {
-      const enable = recorder.inverseOf("removeForeignKey", ["dogs", "people"]);
+    it("invert remove foreign key", async () => {
+      const enable = await recorder.inverseOf("removeForeignKey", ["dogs", "people"]);
       expect(enable).toEqual(["addForeignKey", ["dogs", "people"]]);
     });
 
-    it("invert add foreign key with column", () => {
-      const enable = recorder.inverseOf("addForeignKey", [
+    it("invert add foreign key with column", async () => {
+      const enable = await recorder.inverseOf("addForeignKey", [
         "dogs",
         "people",
         { column: "owner_id" },
@@ -577,8 +583,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove foreign key with column", () => {
-      const enable = recorder.inverseOf("removeForeignKey", [
+    it("invert remove foreign key with column", async () => {
+      const enable = await recorder.inverseOf("removeForeignKey", [
         "dogs",
         "people",
         { column: "owner_id" },
@@ -586,8 +592,8 @@ describe("Migration", () => {
       expect(enable).toEqual(["addForeignKey", ["dogs", "people", { column: "owner_id" }]]);
     });
 
-    it("invert add foreign key with column and name", () => {
-      const enable = recorder.inverseOf("addForeignKey", [
+    it("invert add foreign key with column and name", async () => {
+      const enable = await recorder.inverseOf("addForeignKey", [
         "dogs",
         "people",
         { column: "owner_id", name: "fk" },
@@ -599,8 +605,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove foreign key with column and name", () => {
-      const enable = recorder.inverseOf("removeForeignKey", [
+    it("invert remove foreign key with column and name", async () => {
+      const enable = await recorder.inverseOf("removeForeignKey", [
         "dogs",
         "people",
         { column: "owner_id", name: "fk" },
@@ -611,8 +617,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove foreign key with primary key", () => {
-      const enable = recorder.inverseOf("removeForeignKey", [
+    it("invert remove foreign key with primary key", async () => {
+      const enable = await recorder.inverseOf("removeForeignKey", [
         "dogs",
         "people",
         { primaryKey: "person_id" },
@@ -620,16 +626,16 @@ describe("Migration", () => {
       expect(enable).toEqual(["addForeignKey", ["dogs", "people", { primaryKey: "person_id" }]]);
     });
 
-    it("invert remove foreign key with primary key and to table in options", () => {
-      const enable = recorder.inverseOf("removeForeignKey", [
+    it("invert remove foreign key with primary key and to table in options", async () => {
+      const enable = await recorder.inverseOf("removeForeignKey", [
         "dogs",
         { toTable: "people", primaryKey: "uuid" },
       ]);
       expect(enable).toEqual(["addForeignKey", ["dogs", "people", { primaryKey: "uuid" }]]);
     });
 
-    it("invert remove foreign key with on delete on update", () => {
-      const enable = recorder.inverseOf("removeForeignKey", [
+    it("invert remove foreign key with on delete on update", async () => {
+      const enable = await recorder.inverseOf("removeForeignKey", [
         "dogs",
         "people",
         { onDelete: "nullify", onUpdate: "cascade" },
@@ -640,41 +646,43 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove foreign key with to table in options", () => {
-      let enable = recorder.inverseOf("removeForeignKey", ["dogs", { toTable: "people" }]);
+    it("invert remove foreign key with to table in options", async () => {
+      let enable = await recorder.inverseOf("removeForeignKey", ["dogs", { toTable: "people" }]);
       expect(enable).toEqual(["addForeignKey", ["dogs", "people"]]);
 
-      enable = recorder.inverseOf("removeForeignKey", [
+      enable = await recorder.inverseOf("removeForeignKey", [
         "dogs",
         { toTable: "people", column: "owner_id" },
       ]);
       expect(enable).toEqual(["addForeignKey", ["dogs", "people", { column: "owner_id" }]]);
     });
 
-    it("invert remove foreign key is irreversible without to table", () => {
-      expect(() =>
+    it("invert remove foreign key is irreversible without to table", async () => {
+      await expect(
         recorder.inverseOf("removeForeignKey", ["dogs", { column: "owner_id" }]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
 
-      expect(() => recorder.inverseOf("removeForeignKey", ["dogs", { name: "fk" }])).toThrow(
+      await expect(
+        recorder.inverseOf("removeForeignKey", ["dogs", { name: "fk" }]),
+      ).rejects.toThrow(IrreversibleMigration);
+
+      await expect(recorder.inverseOf("removeForeignKey", ["dogs"])).rejects.toThrow(
         IrreversibleMigration,
       );
-
-      expect(() => recorder.inverseOf("removeForeignKey", ["dogs"])).toThrow(IrreversibleMigration);
     });
 
     it("invert transaction with irreversible inside is irreversible", async () => {
       await expect(
         recorder.revert(async () => {
           await recorder.transaction(async () => {
-            recorder.execute("some sql");
+            await recorder.execute("some sql");
           });
         }),
       ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert add check constraint", () => {
-      const enable = recorder.inverseOf("addCheckConstraint", [
+    it("invert add check constraint", async () => {
+      const enable = await recorder.inverseOf("addCheckConstraint", [
         "dogs",
         "speed > 0",
         { name: "speed_check" },
@@ -686,8 +694,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert add check constraint if not exists", () => {
-      const enable = recorder.inverseOf("addCheckConstraint", [
+    it("invert add check constraint if not exists", async () => {
+      const enable = await recorder.inverseOf("addCheckConstraint", [
         "dogs",
         "speed > 0",
         { name: "speed_check", ifNotExists: true },
@@ -699,8 +707,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove check constraint", () => {
-      const enable = recorder.inverseOf("removeCheckConstraint", [
+    it("invert remove check constraint", async () => {
+      const enable = await recorder.inverseOf("removeCheckConstraint", [
         "dogs",
         "speed > 0",
         { name: "speed_check" },
@@ -712,14 +720,14 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove check constraint without expression", () => {
-      expect(() => recorder.inverseOf("removeCheckConstraint", ["dogs"])).toThrow(
+    it("invert remove check constraint without expression", async () => {
+      await expect(recorder.inverseOf("removeCheckConstraint", ["dogs"])).rejects.toThrow(
         IrreversibleMigration,
       );
     });
 
-    it("invert remove check constraint if exists", () => {
-      const enable = recorder.inverseOf("removeCheckConstraint", [
+    it("invert remove check constraint if exists", async () => {
+      const enable = await recorder.inverseOf("removeCheckConstraint", [
         "dogs",
         "speed > 0",
         { name: "speed_check", ifExists: true },
@@ -731,14 +739,14 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert add unique constraint constraint with using index", () => {
-      expect(() =>
+    it("invert add unique constraint constraint with using index", async () => {
+      await expect(
         recorder.inverseOf("addUniqueConstraint", ["dogs", { usingIndex: "unique_index" }]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert remove unique constraint constraint", () => {
-      const enable = recorder.inverseOf("removeUniqueConstraint", [
+    it("invert remove unique constraint constraint", async () => {
+      const enable = await recorder.inverseOf("removeUniqueConstraint", [
         "dogs",
         ["speed"],
         { deferrable: "deferred", name: "uniq_speed" },
@@ -750,53 +758,55 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert remove unique constraint constraint without options", () => {
-      const enable = recorder.inverseOf("removeUniqueConstraint", ["dogs", ["speed"]]);
+    it("invert remove unique constraint constraint without options", async () => {
+      const enable = await recorder.inverseOf("removeUniqueConstraint", ["dogs", ["speed"]]);
       expect(enable).toEqual(["addUniqueConstraint", ["dogs", ["speed"]], undefined]);
     });
 
-    it("invert remove unique constraint constraint without columns", () => {
-      expect(() =>
+    it("invert remove unique constraint constraint without columns", async () => {
+      await expect(
         recorder.inverseOf("removeUniqueConstraint", ["dogs", { name: "uniq_speed" }]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert create enum", () => {
-      const drop = recorder.inverseOf("createEnum", ["color", ["blue", "green"]]);
+    it("invert create enum", async () => {
+      const drop = await recorder.inverseOf("createEnum", ["color", ["blue", "green"]]);
       expect(drop).toEqual(["dropEnum", ["color", ["blue", "green"]], undefined]);
     });
 
-    it("invert drop enum", () => {
-      const create = recorder.inverseOf("dropEnum", ["color", ["blue", "green"]]);
+    it("invert drop enum", async () => {
+      const create = await recorder.inverseOf("dropEnum", ["color", ["blue", "green"]]);
       expect(create).toEqual(["createEnum", ["color", ["blue", "green"]], undefined]);
     });
 
-    it("invert drop enum without values", () => {
-      expect(() => recorder.inverseOf("dropEnum", ["color"])).toThrow(IrreversibleMigration);
+    it("invert drop enum without values", async () => {
+      await expect(recorder.inverseOf("dropEnum", ["color"])).rejects.toThrow(
+        IrreversibleMigration,
+      );
 
-      expect(() => recorder.inverseOf("dropEnum", ["color", { ifExists: true }])).toThrow(
+      await expect(recorder.inverseOf("dropEnum", ["color", { ifExists: true }])).rejects.toThrow(
         IrreversibleMigration,
       );
     });
 
-    it("invert rename enum", () => {
-      const enumCmd = recorder.inverseOf("renameEnum", ["dog_breed", "breed"]);
+    it("invert rename enum", async () => {
+      const enumCmd = await recorder.inverseOf("renameEnum", ["dog_breed", "breed"]);
       expect(enumCmd).toEqual(["renameEnum", ["breed", "dog_breed"]]);
     });
 
-    it("invert rename enum with to option", () => {
-      const enumCmd = recorder.inverseOf("renameEnum", ["dog_breed", { to: "breed" }]);
+    it("invert rename enum with to option", async () => {
+      const enumCmd = await recorder.inverseOf("renameEnum", ["dog_breed", { to: "breed" }]);
       expect(enumCmd).toEqual(["renameEnum", ["breed", "dog_breed"]]);
     });
 
-    it("invert add enum value", () => {
-      expect(() => recorder.inverseOf("addEnumValue", ["dog_breed", "beagle"])).toThrow(
+    it("invert add enum value", async () => {
+      await expect(recorder.inverseOf("addEnumValue", ["dog_breed", "beagle"])).rejects.toThrow(
         IrreversibleMigration,
       );
     });
 
-    it("invert rename enum value", () => {
-      const enumValue = recorder.inverseOf("renameEnumValue", [
+    it("invert rename enum value", async () => {
+      const enumValue = await recorder.inverseOf("renameEnumValue", [
         "dog_breed",
         { from: "retriever", to: "beagle" },
       ]);
@@ -806,20 +816,20 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert rename enum value without from", () => {
-      expect(() =>
+    it("invert rename enum value without from", async () => {
+      await expect(
         recorder.inverseOf("renameEnumValue", ["dog_breed", { to: "retriever" }]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert rename enum value without to", () => {
-      expect(() =>
+    it("invert rename enum value without to", async () => {
+      await expect(
         recorder.inverseOf("renameEnumValue", ["dog_breed", { from: "beagle" }]),
-      ).toThrow(IrreversibleMigration);
+      ).rejects.toThrow(IrreversibleMigration);
     });
 
-    it("invert create virtual table", () => {
-      const drop = recorder.inverseOf("createVirtualTable", [
+    it("invert create virtual table", async () => {
+      const drop = await recorder.inverseOf("createVirtualTable", [
         "searchables",
         "fts5",
         ["content", "meta UNINDEXED", "tokenize='porter ascii'"],
@@ -831,8 +841,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert drop virtual table", () => {
-      const create = recorder.inverseOf("dropVirtualTable", [
+    it("invert drop virtual table", async () => {
+      const create = await recorder.inverseOf("dropVirtualTable", [
         "searchables",
         "fts5",
         ["title", "content"],
@@ -844,8 +854,8 @@ describe("Migration", () => {
       ]);
     });
 
-    it("invert drop virtual table without options", () => {
-      expect(() => recorder.inverseOf("dropVirtualTable", ["searchables"])).toThrow(
+    it("invert drop virtual table without options", async () => {
+      await expect(recorder.inverseOf("dropVirtualTable", ["searchables"])).rejects.toThrow(
         IrreversibleMigration,
       );
     });
