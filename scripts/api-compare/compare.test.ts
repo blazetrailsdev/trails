@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  ownerRecordsNothing,
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
@@ -2916,5 +2917,96 @@ describe("suppressedCallClaims", () => {
       () => ["methodDefined"],
     );
     expect([...claimed]).toEqual([]);
+  });
+});
+
+describe("ownerRecordsNothing", () => {
+  // `dirty.ts` declares `forgetAttributeAssignments` twice: the top-level
+  // function that holds the body (owner "") and the `Dirty` interface member
+  // that types it for the host. Only the body records calls.
+  const mixinShape = new Map([
+    ["dirty.ts", new Map([["forgetAttributeAssignments", new Map([["", [["map"]]]])]])],
+  ]);
+  const owners = new Set(["", "Dirty"]);
+  const bodyless = new Set(["Dirty"]);
+
+  it("compares a bodyless declaration against the file's top-level body", () => {
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "Dirty",
+        owners,
+        bodyless,
+      ),
+    ).toBe(false);
+  });
+
+  it("records nothing when a sibling CLASS carries the file's only body", () => {
+    // `relation.ts` declares `first` on the `Relation` interface that types its
+    // mixins and on `ExplainProxy`, whose one-line body is the file's only one.
+    const ambiguous = new Map([
+      ["relation.ts", new Map([["first", new Map([["ExplainProxy", [["execExplain"]]]])]])],
+    ]);
+    expect(
+      ownerRecordsNothing(
+        ambiguous,
+        "relation.ts",
+        "first",
+        "Relation",
+        new Set(["ExplainProxy", "Relation"]),
+        new Set(["Relation"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("records nothing for an owner the maps merely failed to key", () => {
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "Dirty",
+        owners,
+        new Set(),
+      ),
+    ).toBe(true);
+  });
+
+  it("compares an owner that records its own body", () => {
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "",
+        owners,
+        bodyless,
+      ),
+    ).toBe(false);
+  });
+
+  it("stays inert for a single-owner file and for an unresolved owner", () => {
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "Dirty",
+        new Set([""]),
+        bodyless,
+      ),
+    ).toBe(false);
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        undefined,
+        owners,
+        bodyless,
+      ),
+    ).toBe(false);
   });
 });

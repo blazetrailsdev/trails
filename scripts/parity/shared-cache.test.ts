@@ -9,7 +9,11 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { foreignManifestMessage } from "../api-compare/extract-ts-api.js";
 import {
+  foreignAbsolutePath,
+  readSharedFor,
+  publishShared,
   sharedCacheDir,
   contentFingerprint,
   hashParts,
@@ -416,5 +420,146 @@ describe("resolutionShape", () => {
     writeDist(packagesDir, "activesupport", { "index.d.ts": "" });
     const shape = await resolutionShape(packagesDir);
     expect(shape.keyFor("arel")).toBe(shape.keyFor("activesupport"));
+  });
+});
+
+describe("foreignAbsolutePath", () => {
+  const root = "/mnt/theta/trails/worktrees/mine";
+
+  it("returns null for a worktree-independent payload", () => {
+    const body = JSON.stringify({
+      classes: { "base.ts:Base": { extends: ["Querying"], file: "base.ts" } },
+      inputs: { "packages/activerecord/src/base.ts": "abc" },
+    });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+
+  it("flags a path belonging to another worktree", () => {
+    const body = JSON.stringify({
+      classes: {
+        "base.ts:Base": {
+          extends: ['"/mnt/theta/trails/worktrees/other/packages/activerecord/src/querying"'],
+        },
+      },
+    });
+    expect(foreignAbsolutePath(body, root)).toBe(
+      "/mnt/theta/trails/worktrees/other/packages/activerecord/src/querying",
+    );
+  });
+
+  it("accepts an absolute path inside the invoking worktree", () => {
+    const body = JSON.stringify({ note: `${root}/packages/arel/src/crud.ts` });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+
+  it("ignores an absolute-looking token in prose", () => {
+    const body = JSON.stringify({ doc: "See //guides.rubyonrails.org/routing.html." });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+});
+
+/**
+ * The cross-worktree replay itself (RFC 0126), through the code path
+ * `extract-ts-api.ts` runs: prime the shared cache from worktree A, then serve
+ * worktree B and assert B's manifest is B's own — never A's.
+ *
+ * A and B are two linked worktrees of ONE repo, so `sharedCacheDir` resolves
+ * them to the same directory and A's entry is genuinely reachable from B. The
+ * payloads are the real shape the bug produced: a `ClassInfo.extends` entry
+ * carrying TypeScript's quoted absolute path for a namespace-imported module.
+ *
+ * The one thing this cannot do is BE a second checkout: `main()` resolves its
+ * root from the script's location, so running the real binary under B needs a
+ * second checkout plus a built `dist` for every package — a CI-scale run, not a
+ * unit test. Every root-dependent decision that run would make is exercised
+ * here: `readSharedFor` / `publishShared` are the calls `main()` makes.
+ */
+describe("a cache entry cannot supply another worktree's paths", () => {
+  const NAME = "ts-activerecord";
+  const KEY = "schema1-contentkey";
+
+  function linkedWorktrees(): { a: string; b: string } {
+    const repo = mkTmp();
+    const [a, b] = ["a", "b"].map((name) => {
+      const gitdir = path.join(repo, ".git", "worktrees", name);
+      fs.mkdirSync(gitdir, { recursive: true });
+      const root = mkTmp();
+      fs.writeFileSync(path.join(root, ".git"), `gitdir: ${gitdir}\n`);
+      return root;
+    });
+    return { a, b };
+  }
+
+  /** A package manifest as the extractor caches it, `extends` spelled as given. */
+  const manifestOf = (root: string, extendsName: string) =>
+    JSON.stringify({
+      package: { classes: { "base.ts:Base": { file: "base.ts", extends: [extendsName] } } },
+      inputs: { "packages/activerecord/src/base.ts": path.basename(root) },
+    });
+
+  const poisonedIn = (root: string) =>
+    manifestOf(root, `"${root}/packages/activerecord/src/querying"`);
+
+  /** What `main()` does for one package: serve a servable shared entry, else
+   *  extract (the stand-in for the compiler pass), publish, and use that. */
+  async function runIn(root: string, extract: () => string) {
+    const dir = (await sharedCacheDir(root))!;
+    const served = await readSharedFor(dir, NAME, KEY, root);
+    if (served !== null) return { manifest: served, extracted: false };
+    const own = extract();
+    await publishShared(dir, NAME, KEY, own, path.basename(root));
+    return { manifest: own, extracted: true };
+  }
+
+  it("gives B its own manifest when A's entry carries A's paths", async () => {
+    const { a, b } = linkedWorktrees();
+    expect(await sharedCacheDir(a), "A and B must share one cache dir").toBe(
+      await sharedCacheDir(b),
+    );
+    // A's own path is not FOREIGN to A: only the writer's test stops it here.
+    expect(await runIn(a, () => poisonedIn(a))).toEqual({
+      manifest: poisonedIn(a),
+      extracted: true,
+    });
+    expect(
+      await readShared((await sharedCacheDir(b))!, NAME, KEY),
+      "the poisoned entry must never have been published",
+    ).toBeNull();
+
+    const inB = await runIn(b, () => manifestOf(b, "Querying"));
+    expect(inB.extracted).toBe(true);
+    expect(inB.manifest).toBe(manifestOf(b, "Querying"));
+    expect(inB.manifest).not.toContain(a);
+  });
+
+  it("declines an already-poisoned entry rather than serving it to B", async () => {
+    const { a, b } = linkedWorktrees();
+    // Written past the publish gate, as an entry from before this fix would be.
+    await writeShared((await sharedCacheDir(a))!, NAME, KEY, poisonedIn(a), path.basename(a));
+
+    const inB = await runIn(b, () => manifestOf(b, "Querying"));
+    expect(inB.extracted).toBe(true);
+    expect(inB.manifest).toBe(manifestOf(b, "Querying"));
+    expect(foreignAbsolutePath(poisonedIn(a), b)).toBe(`${a}/packages/activerecord/src/querying`);
+  });
+
+  it("serves A's worktree-independent entry to B unchanged", async () => {
+    const { a, b } = linkedWorktrees();
+    const clean = manifestOf(a, "Querying");
+    expect((await runIn(a, () => clean)).extracted).toBe(true);
+
+    const inB = await runIn(b, () => {
+      throw new Error("B must not re-extract a servable entry");
+    });
+    expect(inB).toEqual({ manifest: clean, extracted: false });
+  });
+
+  it("B's refusal to write a foreign manifest names B's own root", () => {
+    const { a, b } = linkedWorktrees();
+    const foreign = foreignAbsolutePath(poisonedIn(a), b)!;
+    const message = foreignManifestMessage(path.join(b, "output/ts-api.json"), foreign, b);
+    expect(message).toContain(`outside this worktree (${b})`);
+    expect(message).toContain(path.join(b, "output/ts-api.json"));
+    expect(message).toContain(foreign);
   });
 });

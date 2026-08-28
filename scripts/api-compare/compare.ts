@@ -1203,18 +1203,57 @@ export function tsOwnerSeat(
   return isStatic ? "class" : "instance";
 }
 
-/** True when a file declares `tsName` on several owners and the one this pair
- *  resolved to records nothing in `byFileNameOwner` — its own copy is the
- *  counterpart, so a same-named sibling's body must not stand in for it. */
+/**
+ * True when a file declares `tsName` on several owners and the one this pair
+ * resolved to has no body to compare AND some same-named sibling might wrongly
+ * stand in for it.
+ *
+ * The extractor records a call set for every member that HAS a body, empty
+ * bodies included (`extractCalls` returns `undefined` only for a missing body
+ * node — an interface member, an ambient `declare`, an abstract signature). So
+ * a missing entry means "this owner is a bodyless DECLARATION", never "this
+ * owner's body makes no calls".
+ *
+ * A bodyless declaration beside the body is the settled trails mixin shape
+ * (CLAUDE.md "Module mixins"): `export function forgetAttributeAssignments()`
+ * at top level, re-declared on `interface Dirty` so the host types it. The
+ * guard's original reading — "the resolved owner records nothing, so compare
+ * nothing" — dropped every such pair, 68 of them measured across the compared
+ * packages (`activemodel dirty.ts forget_attribute_assignments`,
+ * `activerecord relation.ts exec_explain`, `activesupport callbacks.ts
+ * run_callbacks`, …). None was visible to either call gate and none was
+ * represented by a baseline row.
+ *
+ * `MethodInfo.bodyless` is that marker, and `resolveTsOwner`'s retry over
+ * {@link ownersWithBodies} already prefers a bodied owner where one resolves —
+ * but only when the full population came out ambiguous, so a pair that resolves
+ * cleanly TO the declaration still lands here. The relaxation is therefore
+ * exactly the shape left over: the resolved owner is bodyless AND the file's
+ * single recorded body is the TOP-LEVEL function (owner `""`).
+ *
+ * Both halves are load-bearing. Without the marker the test would relax for an
+ * owner that has a body the maps merely failed to key. And a single body is not
+ * enough on its own: `relation.ts` declares `first` on the `Relation` interface
+ * that types its mixins (body in `relation/finder-methods.ts`) and on
+ * `ExplainProxy`, whose one-line body is the file's only one — pairing
+ * `FinderMethods#first` with it reports `find_nth` / `find_nth_with_limit`
+ * missing, the exact mispairing this guard exists to prevent. A CLASS body is a
+ * sibling that can stand in wrongly; the top-level function is not any class's
+ * own copy but the one body every declaration in the file re-declares
+ * (RFC 0126).
+ */
 export function ownerRecordsNothing(
   byFileNameOwner: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<string, unknown[]>>>,
   tsFile: string,
   tsName: string,
   tsClass: string | undefined,
   owners: ReadonlySet<string> | undefined,
+  bodylessOwners: ReadonlySet<string> | undefined = undefined,
 ): boolean {
   if (tsClass === undefined || (owners?.size ?? 0) <= 1) return false;
-  return byFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) === undefined;
+  const byOwner = byFileNameOwner.get(tsFile)?.get(tsName);
+  if (byOwner?.get(tsClass) !== undefined) return false;
+  return !(bodylessOwners?.has(tsClass) === true && byOwner?.size === 1 && byOwner.has(""));
 }
 
 /**
@@ -3460,7 +3499,18 @@ export function main() {
         const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
         const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
         if (ambiguous) return;
-        if (ownerRecordsNothing(tsCallsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) return;
+        if (
+          ownerRecordsNothing(
+            tsCallsByFileNameOwner,
+            tsFile,
+            tsName,
+            tsClass,
+            tsOwners,
+            tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
+          )
+        ) {
+          return;
+        }
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
         // Helper extraction / delegation transparency: the body is compared
@@ -3605,7 +3655,16 @@ export function main() {
         // skeleton record, only an unambiguous TS body compares.
         const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
         if (ambiguous) return;
-        if (ownerRecordsNothing(tsCallArgsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) {
+        if (
+          ownerRecordsNothing(
+            tsCallArgsByFileNameOwner,
+            tsFile,
+            tsName,
+            tsClass,
+            tsOwners,
+            tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
+          )
+        ) {
           return;
         }
         const tsSites = ownerCallArgSites(

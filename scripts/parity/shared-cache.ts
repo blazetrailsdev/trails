@@ -364,6 +364,105 @@ function hashOf(file: string, cache?: Map<string, Promise<string | null>>): Prom
   return pending;
 }
 
+/**
+ * The shape a leaked path takes: a checkout path, which always names a
+ * `packages/` or `src/` segment or a module file. Prose in an extracted doc
+ * comment can spell an absolute-looking token too (`//guides.rubyonrails.org/
+ * routing.html`), and that is not a path — flagging it would refuse a run over
+ * a correct manifest.
+ */
+const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
+
+/** A `/`-rooted, multi-segment token, not preceded by a path or URL character. */
+const ABSOLUTE_PATH = /(?:^|[^A-Za-z0-9._@+:/\\-])(\/(?:[A-Za-z0-9._@+-]+\/)+[A-Za-z0-9._@+-]+)/g;
+
+/**
+ * The first checkout-shaped absolute path in `body`, whichever worktree it
+ * belongs to, or null when there is none.
+ *
+ * The invariant a shared-cache payload must satisfy, and the strictest of the
+ * pair: an entry is written once and read by every linked worktree, so a path
+ * that is merely LOCAL to the writer is exactly as poisonous as a foreign one —
+ * it is the reader for whom it is foreign. Publishing is therefore gated on
+ * this, not on {@link foreignAbsolutePath}.
+ */
+export function absoluteSourcePath(body: string): string | null {
+  for (const match of body.matchAll(ABSOLUTE_PATH)) {
+    if (SOURCE_PATH.test(match[1])) return match[1];
+  }
+  return null;
+}
+
+/**
+ * The first checkout-shaped absolute path in `body` that lies OUTSIDE
+ * `rootDir`, or null when there is none.
+ *
+ * The reader's half. The shared cache is anchored at the git COMMON dir, so
+ * every linked worktree reads and writes the same entries. A payload naming
+ * another checkout is not describing the tree being measured: measured on PR
+ * #6964, `extract-ts-api.ts` recorded a namespace import's module symbol —
+ * whose TypeScript `name` is the quoted absolute path of the module — onto
+ * `ClassInfo.extends`, so a sibling worktree's run was served entries naming
+ * `/mnt/.../worktrees/<since-deleted>/packages/activerecord/src/querying`. The
+ * name resolved to nothing, whole mixins dropped out of the compared surface,
+ * and the ratchet reported another branch's numbers (1488 baselined vs this
+ * branch's true 417) with no error and no warning.
+ *
+ * `extendsModuleName` fixed that producer; these two are the layers that keep
+ * the class of bug from crossing a worktree boundary again — a poisoned entry
+ * is neither published nor served, so a replay cannot be mistaken for a verdict
+ * (RFC 0126).
+ */
+export function foreignAbsolutePath(body: string, rootDir: string): string | null {
+  const prefix = rootDir.endsWith(path.sep) ? rootDir : rootDir + path.sep;
+  for (const match of body.matchAll(ABSOLUTE_PATH)) {
+    const candidate = match[1];
+    if (!SOURCE_PATH.test(candidate)) continue;
+    if (!candidate.startsWith(prefix)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Read a shared entry ON BEHALF OF the worktree at `rootDir`: {@link readShared},
+ * except that a payload naming a path outside `rootDir` is a MISS.
+ *
+ * The gate belongs to the cache contract, not to one caller's policy — the
+ * entries are reachable from every linked worktree, so any consumer that serves
+ * one unchecked can be handed another checkout's measurements. Pair with
+ * {@link publishShared}.
+ */
+export async function readSharedFor(
+  dir: string,
+  name: string,
+  key: string,
+  rootDir: string,
+): Promise<string | null> {
+  const body = await readShared(dir, name, key);
+  if (body === null) return null;
+  return foreignAbsolutePath(body, rootDir) === null ? body : null;
+}
+
+/**
+ * Publish a shared entry, unless it names an absolute path at all. Returns
+ * whether it was published.
+ *
+ * The writer's test is strictly stronger than {@link readSharedFor}'s, and has
+ * to be: the publisher's OWN path is not foreign to the publisher, yet it is
+ * exactly as poisonous to every other worktree that reads the entry.
+ */
+export async function publishShared(
+  dir: string,
+  name: string,
+  key: string,
+  body: string,
+  tag: string,
+): Promise<boolean> {
+  if (absoluteSourcePath(body) !== null) return false;
+  await writeShared(dir, name, key, body, tag);
+  return true;
+}
+
 function entryPath(dir: string, name: string, key: string): string {
   return path.join(dir, `${name}-${key}.json`);
 }
