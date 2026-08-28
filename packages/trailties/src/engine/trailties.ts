@@ -6,7 +6,7 @@ export class Trailties implements Iterable<Trailtie> {
   readonly all: Trailtie[] = Trailtie.subclasses().map((k) => k.instance());
 
   /**
-   * @noRailsEquivalent PERMANENT (`vendor/rails/railties/lib/rails/engine/railties.rb:6, :14` —
+   * @noRailsEquivalent PERMANENT (`use-site:vendor/rails/railties/lib/rails/engine/railties.rb:6, :14` —
    *   `include Enumerable` plus `def each`).
    * JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */

@@ -455,7 +455,27 @@ write.
    widening `GATED_PACKAGES` is a separate decision with its own burndown, not a
    mechanical step.
 
-5. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
+5. **Did you write a Rails citation in a receipt?** Every `gem/path.rb:LINE`
+   inside a `@noRailsEquivalent`, `@missingRailsCall`, or `@missingRailsArgs`
+   reason is checked by
+
+   ```bash
+   pnpm parity:api:cites   # the citation ratchet (RFC 0121)
+   ```
+
+   for three properties: the path resolves to exactly ONE `.rb` under `vendor/`
+   (an ambiguous basename — `quoting.rb`, `schema_statements.rb`, `column.rb` —
+   is an error whose fix is to qualify it, `abstract/schema_statements.rb`), the
+   line exists, and — when the reason names a Ruby method as `Klass#meth` or
+   `Klass.meth` that the cited file defines — the cited line is inside that
+   method's body. A receipt whose citation points at a **use** site rather than
+   a definition says so by writing `use-site:` immediately before it
+   (`` Rails reads it at `use-site:abstract_adapter.rb:1180` ``), which skips the
+   membership check and keeps the other two. Only-shrink over
+   `scripts/api-compare/cite-mark.json`; converged one?
+   `pnpm parity:api:cites:tighten` writes the mark DOWN, and there is no reseed.
+
+6. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
    it holds a member out of the generated API reference — but it also drops the
    member from the measured surface entirely, so an `@internal` with nothing
    behind it hides extra surface for free. Two rules police the pair, both over
@@ -479,12 +499,12 @@ write.
    are burnt down (one story per package under RFC 0121), and no package is ever
    removed to turn a red run green.
 
-6. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
+7. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
    `blazetrails/rails-file-structure-method-order` enforces Rails source order
    for class members and top-level functions and is autofixable, but it needs
    the manifest `pnpm parity:api` builds. Without a compare run it silently
    passes everything, then fails in the `Rails API/Test Comparison` CI job.
-7. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
+8. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
 
 ## Module mixins (Ruby `include` → TypeScript)
 

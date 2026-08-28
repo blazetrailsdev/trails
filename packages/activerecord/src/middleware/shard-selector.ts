@@ -77,7 +77,7 @@ export class ShardSelector {
 
   /**
    * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
-   *   `options.fetch(:lock, true)` (`shard_selector.rb:66`) — the options hash
+   *   `options.fetch(:lock, true)` (`shard_selector.rb:57`) — the options hash
    *   is a plain TS object, so the stored-key test `Hash#fetch` performs is
    *   spelled `"lock" in this.options ? ... : true`. `fetch` has no TS call
    *   spelling.

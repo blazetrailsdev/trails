@@ -54,7 +54,7 @@ export class Routes implements Iterable<Route> {
 
   /**
    * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/actionpack/lib/action_dispatch/journey/routes.rb:10, :35` — `include
+   *   (`use-site:vendor/rails/actionpack/lib/action_dispatch/journey/routes.rb:10, :35` — `include
    *   Enumerable` plus `def each`).
    * JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */
