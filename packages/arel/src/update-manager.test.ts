@@ -64,7 +64,7 @@ describe("UpdateManagerTest", () => {
 
       const updateManager = new UpdateManager();
       updateManager.table(joinSource);
-      updateManager.group(["posts.id"]);
+      updateManager.group([":posts.id"]);
       updateManager.having("count(posts.id) >= 2");
 
       expect(updateManager.ast.groups.length).toEqual(1);

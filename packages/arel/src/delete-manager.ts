@@ -27,7 +27,9 @@ export class DeleteManager extends TreeManager {
 
   group(columns: (Node | string)[]): this {
     for (let column of columns) {
-      if (typeof column === "string") column = new SqlLiteral(column);
+      if (typeof column === "string") {
+        column = new SqlLiteral(column.startsWith(":") ? column.slice(1) : column);
+      }
 
       this.ast.groups.push(new Group(column));
     }
