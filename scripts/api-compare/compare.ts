@@ -88,6 +88,7 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { operatorSpelling } from "./operator-order-spelling.js";
 import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {
   hasRubyFileTsOverride,
@@ -940,6 +941,11 @@ interface FileResult {
   missing: number;
   total: number;
   missingMethods: MethodResult[];
+  /**
+   * The subset of `missingMethods` whose TS name IS declared in this file, but
+   * only as a bodyless signature — see `declarationOnlyInFile`.
+   */
+  declarationOnly: MethodResult[];
   moves: MoveResult[];
 }
 
@@ -1281,6 +1287,32 @@ export function ownerRecordsNothing(
  * method both ways — `class Relation` and the `interface Relation` that types
  * its mixins — has a body and stays.
  */
+/**
+ * Is `name`'s ONLY declaration in `tsFile` a bodyless one (RFC 0126)?
+ *
+ * `parity:api` credits a Ruby method against a TS name wherever that name is
+ * declared, and an `interface`/`type` signature is a declaration. So
+ * `packages/arel/src/crud.ts` — four bare signatures mirroring `crud.rb`'s four
+ * module bodies — scored 4/4, and a Rails developer opening the two files side
+ * by side found nothing to compare. A signature is a shape claim, not a port,
+ * so it earns no matched credit.
+ *
+ * The settled trails mixin shapes are unaffected: an `Included<>` interface and
+ * the `this`-typed functions it types live in the SAME file, so the name has a
+ * bodied declaration there and this returns false. Only a file whose whole
+ * declaration of the name is a signature — the body inlined onto some other
+ * class — comes back true.
+ */
+export function declarationOnlyInFile(
+  tsFile: string,
+  name: string,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+): boolean {
+  if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
+  return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
+}
+
 export function ownersWithBodies(
   owners: ReadonlySet<string> | undefined,
   bodylessOwners: ReadonlySet<string> | undefined,
@@ -2220,7 +2252,7 @@ export function flattenIncludedMethodInfos(
  * same accounting the include-chain and misplaced-file arms already use.
  */
 export function mixinMethodCreditedToOwnFile(
-  rm: { rubyName: string; mixinFile?: string },
+  rm: { rubyName: string; rubyModule: string; mixinFile?: string },
   hostRubyFile: string,
   pkg: string,
   rubyFileHasBucket: (rubyFile: string) => boolean,
@@ -2229,7 +2261,7 @@ export function mixinMethodCreditedToOwnFile(
   const mixinFile = rm.mixinFile;
   if (mixinFile === undefined || mixinFile === hostRubyFile) return null;
   if (!rubyFileHasBucket(mixinFile)) return null;
-  const candidates = rubyMethodToTs(rm.rubyName);
+  const candidates = rubyMethodToTsForFqn(rm.rubyModule, rm.rubyName);
   if (candidates === null) return null;
   const tsFile = rubyFileToTs(mixinFile, pkg);
   const mixinTsMethods = tsMethodsByFile.get(tsFile);
@@ -2260,14 +2292,14 @@ export function mixinMethodCreditedToOwnFile(
  * and still reports missing.
  */
 export function reopeningMethodCreditedToOwnFile(
-  rm: { rubyName: string; definedInFile?: string },
+  rm: { rubyName: string; rubyModule: string; definedInFile?: string },
   hostRubyFile: string,
   pkg: string,
   tsMethodsByFile: ReadonlyMap<string, Set<string>>,
 ): { tsName: string; tsFile: string } | null {
   const definedInFile = rm.definedInFile;
   if (definedInFile === undefined || definedInFile === hostRubyFile) return null;
-  const candidates = rubyMethodToTs(rm.rubyName);
+  const candidates = rubyMethodToTsForFqn(rm.rubyModule, rm.rubyName);
   if (candidates === null) return null;
   const tsFile = rubyFileToTs(definedInFile, pkg);
   const reopeningTsMethods = tsMethodsByFile.get(tsFile);
@@ -2344,6 +2376,27 @@ export function splitOverriddenFileBuckets(entity: RubyEntity, pkg: string): Rub
 }
 
 /**
+ * `rubyMethodToTs`, plus the OPERATOR spellings pinned per declaring Ruby class
+ * in `OPERATOR_SPELLING_BY_FQN` (`operator-order-spelling.ts`).
+ *
+ * `rubyMethodToTs` returns `null` for every member of `OPERATORS` — they carry
+ * no canonical camelCase spelling — so an operator is dropped from the expected
+ * set entirely: a faithful port (`Arel::Math#+` → `math.ts` `add`) earns no
+ * matched credit, and an unported one is invisible rather than missing. The
+ * pinned table is the safe subset: each entry was verified against BOTH the
+ * Rails source position and the TS member, so a pinned operator is a real,
+ * locatable port. An operator with no entry keeps the old behaviour — still
+ * `null`, still neither expected nor reported missing — so no total can fall.
+ */
+export function rubyMethodToTsForFqn(
+  fqn: string,
+  name: string,
+  siblingRubyNames?: ReadonlySet<string>,
+): string[] | null {
+  return operatorSpelling(fqn, name) ?? rubyMethodToTs(name, siblingRubyNames);
+}
+
+/**
  * Dedup expected Ruby methods by Ruby method name (NOT first TS
  * candidate). Two distinct Ruby methods can produce the same first TS
  * candidate (`is_number?` and `number?` both → `"isNumber"`); keying
@@ -2360,7 +2413,7 @@ export function dedupeRubyMethodInto(
   itemFqn: string,
   rubyFile?: string,
 ): void {
-  if (rubyMethodToTs(rm.name) === null) return;
+  if (rubyMethodToTsForFqn(itemFqn, rm.name) === null) return;
   if (isRubyOnlyClass(itemFqn)) return;
   if (rubyFile !== undefined && isScopedSkip(rm.name, rubyFile)) return;
   const key = rm.name;
@@ -3270,6 +3323,7 @@ export function main() {
       const moves: MoveResult[] = [];
       let fileMatched = 0;
       let fileMissing = 0;
+      const declarationOnly: MethodResult[] = [];
 
       // Collect all includer method sets for modules in this file,
       // tracking which file each set came from (for move detection)
@@ -3812,8 +3866,8 @@ export function main() {
       let misplacedActualFile: string | null = null;
       if (!tsFileExists && seen.size > 0) {
         const fileHits = new Map<string, number>();
-        for (const [, { rubyName }] of seen) {
-          const candidates = rubyMethodToTs(rubyName);
+        for (const [, { rubyName, rubyModule }] of seen) {
+          const candidates = rubyMethodToTsForFqn(rubyModule, rubyName);
           if (!candidates) continue;
           const containingFiles = new Set<string>();
           for (const c of candidates) {
@@ -3840,11 +3894,27 @@ export function main() {
         _dedupeKey,
         { rubyName, rubyModule, umbrellaConfig, notes, mixinFile, definedInFile },
       ] of seen) {
-        const tsCandidates = rubyMethodToTs(rubyName, siblingRubyNames)!;
+        const tsCandidates = rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames)!;
 
         // Check direct match first — find which candidate matched
         const directMatch = tsCandidates.find((c) => tsMethods.has(c));
-        if (directMatch) {
+        // A candidate whose only declaration here is a bodyless signature is
+        // not a port — see `declarationOnlyInFile`. The direct-match arm is
+        // skipped so the mixin / reopening / misplaced arms below still get
+        // their shot: `Included<>` declares the mixin's members on the host and
+        // the bodies live in the mixin's own file, which is a real port and
+        // credits as a move. Only a name nothing else accounts for lands in the
+        // `declarationOnly` column, counted as a miss so the file's percentage
+        // states what a Rails developer would find on opening it.
+        const declOnly =
+          directMatch !== undefined &&
+          declarationOnlyInFile(
+            expectedTs,
+            directMatch,
+            tsBodylessOwnersByFileName,
+            tsBodiedOwnersByFileName,
+          );
+        if (directMatch && !declOnly) {
           fileMatched++;
           // A method Ruby flattened onto this host through `include` is ported
           // ONCE, in the file mirroring the mixin's own — `PostgreSQL::Quoting`
@@ -3854,7 +3924,7 @@ export function main() {
           // body; the mixin's own bucket compares the real one.
           const seam =
             mixinMethodCreditedToOwnFile(
-              { rubyName, mixinFile },
+              { rubyName, rubyModule, mixinFile },
               rubyFile,
               pkg,
               (f) => byFile.has(f),
@@ -3876,7 +3946,13 @@ export function main() {
           continue;
         }
 
-        // Check include chain — track which candidate and file matched
+        // Check include chain — track which candidate and file matched. Skipped
+        // for a declaration-only name: this arm credits the port to a TS class
+        // that mixes the module in, which for `crud.ts` is `select-manager.ts`
+        // — the includer holding the four bodies Rails puts in `crud.rb`. That
+        // is the drift, not a port of it. The mixin / reopening arms below are
+        // unaffected; they credit a body in the file mirroring the mixin's OWN
+        // Rails file, which is where Rails put it.
         let foundViaInclude: string | null = null;
         let matchedCandidate: string | null = null;
         for (const candidate of tsCandidates) {
@@ -3890,7 +3966,7 @@ export function main() {
           if (foundViaInclude) break;
         }
 
-        if (foundViaInclude) {
+        if (foundViaInclude && !declOnly) {
           fileMatched++;
           checkArity(
             rubyName,
@@ -3912,7 +3988,7 @@ export function main() {
         // Mixed in from another Ruby file and ported there, once, exactly as
         // Rails writes it — see `mixinMethodCreditedToOwnFile`.
         const creditedToMixin = mixinMethodCreditedToOwnFile(
-          { rubyName, mixinFile },
+          { rubyName, rubyModule, mixinFile },
           rubyFile,
           pkg,
           (f) => byFile.has(f),
@@ -3935,7 +4011,7 @@ export function main() {
         // Defined by a reopening of this class in another Ruby file, and ported
         // there — see `reopeningMethodCreditedToOwnFile`.
         const creditedToReopening = reopeningMethodCreditedToOwnFile(
-          { rubyName, definedInFile },
+          { rubyName, rubyModule, definedInFile },
           rubyFile,
           pkg,
           tsMethodsByFile,
@@ -4039,7 +4115,9 @@ export function main() {
         }
 
         fileMissing++;
-        missingMethods.push({ rubyName, tsName: tsCandidates[0], rubyModule });
+        const missed = { rubyName, tsName: directMatch ?? tsCandidates[0], rubyModule };
+        missingMethods.push(missed);
+        if (declOnly) declarationOnly.push(missed);
       }
 
       const total = fileMatched + fileMissing;
@@ -4054,6 +4132,7 @@ export function main() {
         missing: fileMissing,
         total,
         missingMethods,
+        declarationOnly,
         moves,
       });
 
@@ -4643,10 +4722,10 @@ function printReport(
 
     if (DETAIL_PACKAGES.has(pkg.package) || filterPkg || showFiles) {
       console.log(
-        `\n  ${"Ruby file".padEnd(55)} ${"Expected TS file".padEnd(40)} ${"Match".padStart(6)} ${"Miss".padStart(6)} ${"Tot".padStart(6)}  %`,
+        `\n  ${"Ruby file".padEnd(55)} ${"Expected TS file".padEnd(40)} ${"Match".padStart(6)} ${"Miss".padStart(6)} ${"DeclOnly".padStart(9)} ${"Tot".padStart(6)}  %`,
       );
       console.log(
-        `  ${"-".repeat(55)} ${"-".repeat(40)} ${"-".repeat(6)} ${"-".repeat(6)} ${"-".repeat(6)} ${"-".repeat(4)}`,
+        `  ${"-".repeat(55)} ${"-".repeat(40)} ${"-".repeat(6)} ${"-".repeat(6)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(4)}`,
       );
 
       for (const f of detailFiles) {
@@ -4663,12 +4742,14 @@ function printReport(
               ? " \u2713"
               : "";
         console.log(
-          `  ${f.rubyFile.padEnd(55)} ${f.expectedTsFile.padEnd(40)} ${String(f.matched).padStart(6)} ${String(f.missing).padStart(6)} ${String(f.total).padStart(6)} ${String(pct).padStart(3)}%${marker}`,
+          `  ${f.rubyFile.padEnd(55)} ${f.expectedTsFile.padEnd(40)} ${String(f.matched).padStart(6)} ${String(f.missing).padStart(6)} ${String(f.declarationOnly.length).padStart(9)} ${String(f.total).padStart(6)} ${String(pct).padStart(3)}%${marker}`,
         );
 
         if (showMissing) {
+          const declOnly = new Set(f.declarationOnly.map((m) => m.rubyName));
           for (const m of f.missingMethods) {
-            console.log(`      - ${m.rubyName} → ${m.tsName}`);
+            const why = declOnly.has(m.rubyName) ? "  [declaration-only]" : "";
+            console.log(`      - ${m.rubyName} → ${m.tsName}${why}`);
           }
         }
       }

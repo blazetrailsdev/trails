@@ -235,13 +235,12 @@ green).
 "100% on `parity:test`" is **name parity _and_ assertion parity, with
 `skipped = 0`** — all three, per package. A package whose names all match but
 whose assertion counters are non-zero is not done: the matched tests assert
-something other than what Rails asserts. Since RFC 0105 the assertion counters
-are measured for the whole in-scope closure (`ASSERTION_REPORT_PACKAGES` in
-`scripts/test-compare/compare.ts`), so the number means the same thing for
-activesupport, activemodel, arel, date, i18n, globalid and did-you-mean as it
-does for activerecord; before that widening a 100% claim outside activerecord
-was strictly the weaker claim, because nothing about its assertions was
-measured at all.
+something other than what Rails asserts. The assertion counters are measured for
+**every compared package** — RFC 0105 widened them from activerecord alone to
+the in-scope closure, and RFC 0126 dropped the scoping set entirely — so the
+number means the same thing everywhere. Before that, a 100% claim outside the
+measured set was strictly the weaker claim, because nothing about its assertions
+was measured at all.
 
 Two things that look like a pass and are not:
 
@@ -297,7 +296,14 @@ pnpm parity:test:assertions:reseed   # lower the mark after convergence
 ```
 
 The high-water mark is `scripts/test-compare/assertion-mismatch-mark.json`: one
-entry per package, three counters each. CI runs the gate in the
+entry per package, three counters each. **A `0` there means converged only
+because every package is measured.** While the counters were scoped to a subset,
+the eleven unmeasured packages carried a 0/0/0 mark that read as convergence and
+was really "never measured" — and because `--write` only lowers, reseeding could
+not correct it: those six remaining marks
+(abstractcontroller, actioncontroller, actiondispatch, actionview, rack,
+trailties) had to be written up to their first real measurement by hand, once,
+when the scoping set was removed. CI runs the gate in the
 `rails-comparison` job ("Assertion-mismatch ratchet"). Like the call-mismatch
 unreviewed counter, the arm is **aggregate** — the guarantee is "assertion-level
 debt never grows", not that every remaining mismatch has been reviewed.

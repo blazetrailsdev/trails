@@ -40,9 +40,8 @@
  *                 --gates so the CI log carries the per-test breakdown too.
  *   --assertions  Print the assertion-count-mismatch report — matched,
  *                 implemented tests whose trails port has a different assertion-
- *                 call count than its Rails counterpart. Scoped to the in-scope
- *                 closure (see ASSERTION_REPORT_PACKAGES); other packages never
- *                 contribute the metric. Report-only: no CI gate, no exclude.json.
+ *                 call count than its Rails counterpart. Measured for every
+ *                 compared package. Report-only: no CI gate, no exclude.json.
  *                 Prints per-file counts by default; add --missing for per-test
  *                 `rails N vs trails M` detail. The same section also reports
  *                 assertion-KIND divergences — matched pairs whose normalized
@@ -72,21 +71,6 @@ import { testPathsManifest } from "../../vendor/sources.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
-
-// Packages the assertion-count comparison is reported for: the full in-scope
-// closure of RFC 0105. A 100% name-parity claim for a package outside this set
-// would be a strictly weaker claim than the same number for one inside it,
-// because nothing about its assertions is measured at all.
-const ASSERTION_REPORT_PACKAGES = new Set([
-  "activerecord",
-  "activesupport",
-  "activemodel",
-  "date",
-  "i18n",
-  "arel",
-  "globalid",
-  "did-you-mean",
-]);
 
 export const GATE_ENFORCED_PACKAGES = new Set(["activerecord"]);
 
@@ -628,10 +612,9 @@ export function main(args: string[] = process.argv.slice(2)) {
       };
 
       // Report-only: compare the raw assertion-call count of a matched pair.
-      // Scoped to ASSERTION_REPORT_PACKAGES; pending/it.skip stubs are excluded
+      // Measured for every compared package; pending/it.skip stubs are excluded
       // by isAssertionCountMismatch (a stub legitimately has 0 assertions).
       const recordAssertion = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
-        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
         const railsCount = rubyTc.assertionCount;
         const trailsCount = tsInfo.assertionCount;
         if (!isAssertionCountMismatch(railsCount, trailsCount, tsInfo.pending)) return;
@@ -646,11 +629,10 @@ export function main(args: string[] = process.argv.slice(2)) {
 
       // Report-only: compare the *normalized assertion-kind histograms* of a
       // matched pair. Surfaces semantic divergences a count match hides (Rails
-      // asserts equality, trails only truthiness). Scoped to
-      // ASSERTION_REPORT_PACKAGES; pending stubs and pairs missing kind data are
-      // skipped. Unmapped kinds are recorded but never make a pair divergent.
+      // asserts equality, trails only truthiness). Measured for every compared
+      // package; pending stubs and pairs missing kind data are skipped.
+      // Unmapped kinds are recorded but never make a pair divergent.
       const recordKind = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
-        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
         const mismatch = assertionKindMismatch(
           rubyTc.assertionKinds,
           tsInfo.assertionKinds,
@@ -668,10 +650,9 @@ export function main(args: string[] = process.argv.slice(2)) {
       // Report-only: compare the literal EXPECTED VALUES of a matched pair for
       // value-bearing kinds where both sides are fully literal (assertion-
       // values.ts). Surfaces divergences a count/kind match hides (both assert
-      // equality once, but to different constants). Scoped to
-      // ASSERTION_REPORT_PACKAGES; pending stubs and non-literal args skipped.
+      // equality once, but to different constants). Measured for every compared
+      // package; pending stubs and non-literal args skipped.
       const recordValue = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
-        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
         const deltas = assertionValueMismatch(
           rubyTc.assertionKinds,
           rubyTc.assertionValues,

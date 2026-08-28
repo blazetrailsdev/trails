@@ -1,33 +1,33 @@
 {
   "packages": {
     "abstractcontroller": {
-      "assertionCount": 0,
-      "kind": 0,
+      "assertionCount": 5,
+      "kind": 18,
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 286,
+      "kind": 473,
+      "value": 76
     },
     "actiondispatch": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 364,
+      "kind": 519,
+      "value": 74
     },
     "actionview": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 41,
+      "kind": 96,
+      "value": 2
     },
     "activemodel": {
-      "assertionCount": 300,
-      "kind": 444,
-      "value": 54
+      "assertionCount": 286,
+      "kind": 437,
+      "value": 53
     },
     "activerecord": {
-      "assertionCount": 1940,
-      "kind": 3909,
+      "assertionCount": 1929,
+      "kind": 3897,
       "value": 32
     },
     "activesupport": {
@@ -61,14 +61,14 @@
       "value": 0
     },
     "rack": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 372,
+      "kind": 471,
+      "value": 61
     },
     "trailties": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 46,
+      "kind": 72,
+      "value": 4
     }
   }
 }

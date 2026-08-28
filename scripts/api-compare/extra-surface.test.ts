@@ -15,6 +15,7 @@ import {
   gateFileTagRejections,
   concernHookNames,
   concernHookKey,
+  inlinedModuleMembers,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -3419,5 +3420,62 @@ describe("buildReport — Ruby operator methods", () => {
     });
     const f = report.packages[0].extraFiles.find((f) => f.tsFile === "collectors/plain-string.ts");
     expect(f?.extras.map((e) => e.name)).toEqual(["append"]);
+  });
+});
+
+describe("inlinedModuleMembers", () => {
+  // arel/crud.rb:6-47 defines four bodies; select_manager.rb:6 `include Crud`.
+  // trails put the bodies on SelectManager (select-manager.ts:295-338) and left
+  // crud.ts a bare interface.
+  const rubyClasses = {
+    "Arel::SelectManager": rubyClass({
+      name: "SelectManager",
+      file: "select_manager.rb",
+      includes: ["Crud"],
+    }),
+  };
+  const rubyModules = {
+    "Arel::Crud": rubyClass({
+      name: "Crud",
+      file: "crud.rb",
+      instance: [method("compile_insert"), method("compile_update")],
+    }),
+  };
+  const byShort = new Map([["Crud", ["Arel::Crud"]]]);
+
+  it("reports a module body defined on the including class's file", () => {
+    const bodied = new Map([
+      ["select-manager.ts", new Set(["compileInsert", "compileUpdate"])],
+      ["crud.ts", new Set<string>()],
+    ]);
+    expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([
+      {
+        tsFile: "select-manager.ts",
+        tsName: "compileInsert",
+        moduleRubyFile: "crud.rb",
+        rubyName: "compile_insert",
+      },
+      {
+        tsFile: "select-manager.ts",
+        tsName: "compileUpdate",
+        moduleRubyFile: "crud.rb",
+        rubyName: "compile_update",
+      },
+    ]);
+  });
+
+  it("reports nothing when the module's own twin carries the body", () => {
+    // The settled shape: the body stays in the file mirroring the mixin's own
+    // Rails file, and the host keeps only the include seam.
+    const bodied = new Map([
+      ["crud.ts", new Set(["compileInsert", "compileUpdate"])],
+      ["select-manager.ts", new Set(["compileInsert", "compileUpdate"])],
+    ]);
+    expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
+  });
+
+  it("reports nothing when the includer's file declares no body for the name", () => {
+    const bodied = new Map([["select-manager.ts", new Set(["project"])]]);
+    expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
   });
 });
