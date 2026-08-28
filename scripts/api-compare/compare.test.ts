@@ -44,6 +44,7 @@ import {
   declFileFor,
   ownerCallArgSites,
   ambiguousTsOwner,
+  ownersWithBodies,
   ambiguousRubyOwner,
   rubyOwnerSeat,
   tsOwnerSeat,
@@ -2073,6 +2074,38 @@ describe("resolveTsOwner", () => {
   it("resolves nothing when no declaring class carries the Ruby name", () => {
     const owners = new Set(["ConnectionPool", "NullPool"]);
     expect(resolveTsOwner(owners, "ActiveRecord::ConnectionAdapters::PoolConfig")).toBeUndefined();
+  });
+});
+
+describe("ownersWithBodies", () => {
+  it("drops an exported host type so the real body answers (RFC 0126)", () => {
+    // attribute-methods.ts exports `AttributeMethodHost` beside the
+    // `export function attributeMethodPatternsCache` the Ruby body ported to;
+    // pairing with the declaration retired every call-parity row for it.
+    const owners = new Set(["", "AttributeMethodHost"]);
+    const bodyless = new Set(["AttributeMethodHost"]);
+    expect([...ownersWithBodies(owners, bodyless, new Set([""]))!]).toEqual([""]);
+  });
+
+  it("keeps an owner that declares the name BOTH ways", () => {
+    // relation.ts declares `first` on `class Relation` and on the `interface
+    // Relation` that types its mixins; the owner has a body and must stay, or
+    // `ExplainProxy` becomes the file's only owner of the name.
+    const owners = new Set(["Relation", "ExplainProxy"]);
+    expect([...ownersWithBodies(owners, new Set(["Relation"]), new Set(["Relation"]))!]).toEqual([
+      "Relation",
+      "ExplainProxy",
+    ]);
+  });
+
+  it("leaves an all-bodyless population alone", () => {
+    const owners = new Set(["Relation", "AttributeMethodHost"]);
+    expect(ownersWithBodies(owners, owners, undefined)).toBe(owners);
+  });
+
+  it("leaves the population alone when nothing in the file is bodyless", () => {
+    const owners = new Set(["Relation", "ExplainProxy"]);
+    expect(ownersWithBodies(owners, undefined, undefined)).toBe(owners);
   });
 });
 

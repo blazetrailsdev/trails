@@ -2081,6 +2081,8 @@ export function harvestObjectLiteralMethods(
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
     let writer = false;
+    // `{ qux }` / `{ foo: NS.bar }` — see MethodInfo.bodyless.
+    let bodyless = false;
     let internal = internalJsDocTagApplies(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
@@ -2096,6 +2098,7 @@ export function harvestObjectLiteralMethods(
       callArgs = extractCallArgs(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
+      bodyless = true;
       params = paramsOfCallableRef(prop.name, checker) ?? [];
       const valueSymbol = checker.getShorthandAssignmentValueSymbol(prop);
       internal = isInternalSymbol(valueSymbol, checker);
@@ -2128,6 +2131,7 @@ export function harvestObjectLiteralMethods(
         const resolved = paramsOfCallableRef(init, checker);
         if (resolved) {
           mname = prop.name.text;
+          bodyless = true;
           params = resolved;
           internal = isInternalCallableRef(init, checker);
           noRailsEquivalent ??= noRailsEquivalentOfSymbol(
@@ -2165,6 +2169,7 @@ export function harvestObjectLiteralMethods(
         ? { missingRailsArgsReasons: propMissingRailsArgsReasons }
         : {}),
       ...(writer ? { writer: true } : {}),
+      ...(bodyless ? { bodyless: true } : {}),
     });
   }
   return out;
@@ -2643,6 +2648,7 @@ function extractInterface(
         params: member.parameters ? extractParameters(member.parameters) : [],
         line,
         file,
+        bodyless: true,
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     } else if (ts.isPropertySignature(member)) {
@@ -2653,6 +2659,7 @@ function extractInterface(
         params: propertySignatureParams(member, checker),
         line,
         file,
+        bodyless: true,
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     }

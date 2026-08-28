@@ -1,0 +1,51 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "execute_callstack_for_multiparameter_attributes",
+    "call": "all?",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "execute_callstack_for_multiparameter_attributes",
+    "call": "join",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "execute_callstack_for_multiparameter_attributes",
+    "call": "new",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "extract_callstack_for_multiparameter_attributes",
+    "call": "find_parameter_position",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "extract_callstack_for_multiparameter_attributes",
+    "call": "first",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "extract_callstack_for_multiparameter_attributes",
+    "call": "type_cast_attribute_value",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "find_parameter_position",
+    "call": "first",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  }
+]

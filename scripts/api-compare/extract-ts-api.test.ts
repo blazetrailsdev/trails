@@ -3991,3 +3991,82 @@ describe("callArgs", () => {
     expect(create.callSeq).toEqual(["build", "save"]);
   });
 });
+
+describe("bodyless declarations (RFC 0126)", () => {
+  it("flags an interface's method and property signatures, not the body beside them", () => {
+    const info = extractFromFiles("/p", {
+      "attribute-methods.ts": `
+        export interface AttributeMethodHost {
+          attributeMethodPatternsCache(): Map<string, unknown>;
+          attributeMethodPatterns: unknown[];
+        }
+        export function attributeMethodPatternsCache(
+          this: AttributeMethodHost,
+        ): Map<string, unknown> {
+          return new Map();
+        }
+      `,
+    });
+    const iface = info.modules["attribute-methods.ts:AttributeMethodHost"];
+    expect(iface.instanceMethods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["attributeMethodPatternsCache", true],
+      ["attributeMethodPatterns", true],
+    ]);
+    const fn = info.fileFunctions!["attribute-methods.ts"].find(
+      (f) => f.name === "attributeMethodPatternsCache",
+    )!;
+    expect(fn.bodyless).toBeUndefined();
+  });
+
+  it("adds no owner at all for an exported TYPE ALIAS member", () => {
+    // The other half of the story: a type alias naming the method must not
+    // change the findings for it either. It cannot — the extractor never walks
+    // a TypeAliasDeclaration, so the alias contributes no member and
+    // `ownersWithBodies` is never reached. Pinned here because "no code path"
+    // is exactly the kind of guarantee a later walker addition would break
+    // silently, re-retiring every baselined row for the aliased name.
+    const info = extractFromFiles("/p", {
+      "attribute-methods.ts": `
+        export type AttributeMethodHost = {
+          attributeMethodPatternsCache(): Map<string, unknown>;
+        };
+        export function attributeMethodPatternsCache(
+          this: AttributeMethodHost,
+        ): Map<string, unknown> {
+          return new Map();
+        }
+      `,
+    });
+    const entities = { ...info.classes, ...info.modules };
+    // The only entity is the synthesized mixin over the file's `this`-typed
+    // exports, which carries the real body; the alias itself is not one.
+    expect(Object.keys(entities)).toEqual(["attribute-methods.ts:AttributeMethods"]);
+    const declarations = [
+      ...Object.values(entities).flatMap((e) => e.instanceMethods),
+      ...info.fileFunctions!["attribute-methods.ts"],
+    ].filter((m) => m.name === "attributeMethodPatternsCache");
+    expect(declarations.length).toBe(2);
+    expect(declarations.every((m) => m.bodyless === undefined)).toBe(true);
+  });
+
+  it("flags an object-literal member that is a bare reference, not an inline body", () => {
+    const methods = objectLiteralMethods(
+      `function attributeMethodQ(name: string): boolean { return true; }
+       const NS = { aliased: attributeMethodQ };
+       export const ClassMethods = {
+         attributeMethodQ,
+         viaProperty: attributeMethodQ,
+         viaNamespace: NS.aliased,
+         inline(name: string): boolean { return true; },
+         arrow: (name: string): boolean => true,
+       };`,
+    );
+    expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["attributeMethodQ", true],
+      ["viaProperty", true],
+      ["viaNamespace", true],
+      ["inline", false],
+      ["arrow", false],
+    ]);
+  });
+});

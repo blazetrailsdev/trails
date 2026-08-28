@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "touch-later.ts",
+    "rubyName": "before_committed!",
+    "call": "has_defer_touch_attrs?",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "touch-later.ts",
+    "rubyName": "touch",
+    "call": "has_defer_touch_attrs?",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "touch-later.ts",
+    "rubyName": "touch_later",
+    "call": "add_to_transaction",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  }
+]

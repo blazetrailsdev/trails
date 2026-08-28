@@ -1,0 +1,58 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_array",
+    "call": "match?",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_array",
+    "call": "replace_bind_variables",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_array",
+    "call": "replace_named_bind_variables",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_array",
+    "call": "with_connection",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_for_order",
+    "call": "sql",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_hash_for_assignment",
+    "call": "join",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_hash_for_assignment",
+    "call": "type_for_attribute",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "sanitization.ts",
+    "rubyName": "sanitize_sql_hash_for_assignment",
+    "call": "with_connection",
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  }
+]
