@@ -5,18 +5,10 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { deprecator } from "../deprecator.js";
 
-// A pre-opened raw driver connection is a class instance, not a plain config
-// hash — mirrors Rails' `is_a?(Hash)` discriminator in
-// `AbstractAdapter#initialize` (abstract_adapter.rb:141).
 class FakeRawConnection {
   query(): void {}
 }
 
-// Spy on the deprecator's `warn` (scoped + restored in `finally`) rather than
-// mutating its global `behavior`, keeping capture isolated and crash-safe —
-// uses the same `vi.spyOn` mechanism the suite relies on elsewhere
-// (adapters/abstract-mysql-adapter/connection.test.ts), scoped via
-// `spy.mockRestore()` instead of an `afterEach(restoreAllMocks)`.
 function captureDeprecations<T>(fn: () => T): { result: T; messages: string[] } {
   const messages: string[] = [];
   const spy = vi.spyOn(deprecator(), "warn").mockImplementation((message?: string) => {
@@ -93,7 +85,6 @@ describe("deprecated raw-connection initialize overload", () => {
     it("raises ArgumentError when a config hash is passed with extra arguments", () => {
       expect(
         // @ts-expect-error — the overload signatures forbid a second arg for the
-        // modern config form; this deliberately exercises the runtime guard.
         () => new PostgreSQLAdapter({ database: "blog" }, { database: "blog" }),
       ).toThrow(ArgumentError);
     });
@@ -106,10 +97,7 @@ describe("deprecated raw-connection initialize overload", () => {
     });
 
     it("treats a null trailing arg as absent for a config hash (does not raise)", () => {
-      // Rails' guard is falsy (`deprecated_config` nil → absent), so a null
-      // second argument alongside a config hash is allowed (abstract_adapter.rb:135).
       // @ts-expect-error — overloads forbid a second arg for the modern form;
-      // this verifies the runtime guard treats a null trailing arg as absent.
       expect(() => new PostgreSQLAdapter({ database: "blog" }, null)).not.toThrow();
     });
   });
@@ -154,18 +142,12 @@ describe("deprecated raw-connection initialize overload", () => {
     it("raises ArgumentError when a config hash is passed with extra arguments", () => {
       expect(
         // @ts-expect-error — the overload signatures forbid a second arg for the
-        // modern config form; this deliberately exercises the runtime guard.
         () => new Mysql2Adapter({ database: "blog", _fakeConnection: true }, { database: "blog" }),
       ).toThrow(ArgumentError);
     });
   });
 });
 
-// Rails: `AbstractAdapter#initialize` stores `@config = config`, and
-// `foreign_keys_enabled?` reads `@config.fetch(:foreign_keys, true)`
-// (schema_statements.rb:1783). The concrete adapters must persist the config
-// hash into `_config` so a `foreignKeys: false` config actually disables FK DDL
-// through the real constructor path — not just a test stub.
 describe("config-hash constructor retains foreignKeys in _config", () => {
   type FkGuards = {
     isForeignKeysEnabled(): boolean;

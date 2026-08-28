@@ -5,12 +5,6 @@ import * as path from "node:path";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
-// `readBigInts` is statement-wide, so a SELECT touching one BIGINT column also
-// widens every INTEGER column of the same row. The narrowing that undoes that
-// spill lives in the single `performQuery` reader arm, which every read path
-// funnels through — `execQuery`/`internalExecQuery`, `execute`, `rawExecute`,
-// and the `loadAsync` FutureResult path. Before, only `internalExecQuery`
-// narrowed, so the same SELECT answered `number` one way and `bigint` the other.
 describe("SQLite3Adapter bigint narrowing", () => {
   let adapter: SQLite3Adapter;
   let tmpDir: string;
@@ -39,7 +33,6 @@ describe("SQLite3Adapter bigint narrowing", () => {
     expect(typeof viaExecute.narrow).toBe("number");
     expect(typeof viaExecQuery.id).toBe("number");
     expect(typeof viaExecute.id).toBe("number");
-    // The bigint-declared column keeps the wide value on both paths.
     expect(typeof viaExecQuery.wide).toBe("bigint");
     expect(typeof viaExecute.wide).toBe("bigint");
     expect(viaExecute).toEqual(viaExecQuery);

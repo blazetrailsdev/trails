@@ -6,9 +6,6 @@ import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
-// Rails builds SQLite3Adapter from a single config hash whose `database` key is
-// the file (or `:memory:`). trails accepts that Rails-shaped hash while keeping
-// the legacy positional `(filename, options)` form as a bridge.
 describe("SQLite3Adapter hash-only constructor", () => {
   let adapter: SQLite3Adapter | undefined;
   let tmpDir: string | undefined;

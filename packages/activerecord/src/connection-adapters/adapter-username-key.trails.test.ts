@@ -1,26 +1,3 @@
-/**
- * Rails' `database.yml` spells the credential `username`
- * (`database_configurations/hash_config.rb`), while the Node `mysql2` and `pg`
- * drivers read the driver-native `user` — and both IGNORE unknown keys. Unmapped,
- * a Rails-spelled config hash connects as the OS user instead of failing.
- *
- * For PostgreSQL this mirrors a real Rails translation
- * (`postgresql_adapter.rb:326`):
- *
- *     conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
- *
- * so the precedence asserted here is Rails': a *Ruby-truthy* `username`
- * overwrites `user` rather than deferring to it, and is deleted from the hash.
- * Ruby-truthy, not JS-truthy, and the two differ in both directions here: `""`
- * is truthy in Ruby (so a blank username maps), while `false` is falsey and
- * survives `@config.compact` (which drops only nils), so `username: false` is
- * the one present value that does NOT map.
- *
- * For MySQL there is no Rails counterpart — Ruby's mysql2 gem reads `:username`
- * natively, so Rails passes the hash through untouched. The mapping is a
- * deviation forced by the Node driver; it follows the PostgreSQL semantics
- * above so the two adapters agree.
- */
 import { describe, expect, it } from "vitest";
 
 import { buildAdapterArg } from "./adapter-args.js";
@@ -55,28 +32,18 @@ describe.each([
   });
 
   it("lets username overwrite an explicit user", () => {
-    // Rails' `if conn_params[:username]` overwrites unconditionally — it does
-    // not defer to a `user` already in the hash.
     const driverConfig = driverConfigFor({ ...BASE, username: "rails", user: "driver" });
     expect(driverConfig.user).toBe("rails");
     expect(driverConfig).not.toHaveProperty("username");
   });
 
   it("maps a blank username, since Ruby treats an empty string as truthy", () => {
-    // `if conn_params[:username]` fires for "" — Ruby is falsy only for nil
-    // and false, and `@config.compact` has already dropped the nils. So a
-    // blank username still overwrites `user` rather than deferring to it.
     const driverConfig = driverConfigFor({ ...BASE, username: "", user: "driver" });
     expect(driverConfig.user).toBe("");
     expect(driverConfig).not.toHaveProperty("username");
   });
 
   it("leaves an explicit user alone when username is false", () => {
-    // `false` is the one present value the guard rejects: `@config.compact`
-    // drops only nils, so `username: false` survives to line 326 and Ruby
-    // reads it as falsey. Verified against Ruby:
-    //   {username: false, user: "driver"}.compact
-    //     => {:username=>false, :user=>"driver"}  (mapping does not run)
     const driverConfig = driverConfigFor({ ...BASE, username: false, user: "driver" });
     expect(driverConfig.user).toBe("driver");
   });
@@ -87,12 +54,6 @@ describe.each([
 });
 
 describe("through buildAdapterArg (the connection-handling path)", () => {
-  // Regression guard for the real failure mode: `connection-handling.ts:923`
-  // builds adapter args via `buildAdapterArg` and spreads them into the
-  // constructor. adapter-args.ts used to strip `username` and remap it itself,
-  // with the opposite precedence — so the constructor mapping never ran on the
-  // path users actually take, and unit tests that construct adapters directly
-  // could not see it. These go through the real path.
   it("maps username to user for mysql2", () => {
     const [config] = buildAdapterArg("mysql2", {
       adapter: "mysql2",
@@ -133,11 +94,6 @@ describe("through buildAdapterArg (the connection-handling path)", () => {
 });
 
 describe("retained config", () => {
-  // Rails maps `username` on the conn_params COPY and leaves `@config` alone
-  // (postgresql_adapter.rb:322 `conn_params = @config.compact`), so
-  // config-reading callers still see Rails' spelling. MySQLDatabaseTasks and
-  // PostgreSQLDatabaseTasks both depend on this — they read `username` off the
-  // config, not `user`.
   it.each([
     [
       "Mysql2Adapter",

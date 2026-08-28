@@ -93,16 +93,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
     }
   }
 
-  it.skip("multiple connections works in a threaded environment", () => {
-    // PERMANENT-SKIP: Ruby-only — relies on real OS threads + Concurrent::CountDownLatch
-    // (Thread.new) to prove the connection lease is thread-local under the GVL. JS has
-    // no shared-memory threads; the async-context analogue is already covered by
-    // connection-handling.test.ts "connected_to stack is isolated per async context".
-  });
+  it.skip("multiple connections works in a threaded environment", () => {});
 
   it("loading relations with multi db connections", async () => {
-    // We need to use a role for reading not named reading, otherwise we'll prevent
-    // writes and won't be able to write to the second connection.
     class SecondaryBase extends Base {
       static {
         this.abstractClass = true;

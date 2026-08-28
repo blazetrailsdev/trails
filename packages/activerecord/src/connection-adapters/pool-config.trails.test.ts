@@ -76,11 +76,6 @@ describe("PoolConfig", () => {
       expect(pool1).toBe(pool2);
     });
 
-    // Rails takes the monitor here (`pool_config.rb:70-72`); trails does not,
-    // ratified 2026-08-14 because the critical section has no suspension point
-    // and so cannot interleave. That premise is what this pins: an `await`
-    // between the `@pool` read and the `@pool =` write would reintroduce the
-    // race the monitor exists to prevent, and no timing test can observe it.
     it("keeps the pool critical section suspension-free", () => {
       const getter = Object.getOwnPropertyDescriptor(PoolConfig.prototype, "pool")?.get;
       expect(getter).toBeTypeOf("function");
@@ -162,8 +157,6 @@ describe("PoolConfig", () => {
       expect(config.poolInitialized).toBe(true);
       const spy = vi.spyOn(pool, "discardBangDraining");
       const promise = config.discardPoolBang();
-      // Rails nils @pool inside the synchronous discard! critical section, so
-      // the pool is gone before the async drain resolves.
       expect(config.poolInitialized).toBe(false);
       await promise;
       expect(spy).toHaveBeenCalled();
@@ -182,12 +175,8 @@ describe("PoolConfig", () => {
       const spy = vi.spyOn(pool, "discardBangDraining").mockImplementation(() => {
         throw new Error("discard failed");
       });
-      // Rails assigns `@pool = nil` only after `@pool.discard!` returns, so a
-      // raising discard leaves the pool reference intact.
       await expect(config.discardPoolBang()).rejects.toThrow("discard failed");
       expect(config.poolInitialized).toBe(true);
-      // Restore so this still-tracked PoolConfig doesn't poison the global
-      // `discardPoolsBang` sweep in a later test.
       spy.mockRestore();
     });
   });
@@ -224,10 +213,6 @@ describe("PoolConfig", () => {
       expect(mockConn.getDatabaseVersion).not.toHaveBeenCalled();
     });
 
-    // `@server_version || synchronize { @server_version ||= ... }`
-    // (`pool_config.rb:39-41`): the monitor is what makes the memo a memo under
-    // concurrency. Both callers arrive before either fetch resolves, so without
-    // the lock both issue the version query.
     it("two concurrent first callers issue one fetch", async () => {
       let fetches = 0;
       const mockConn = {
@@ -245,11 +230,6 @@ describe("PoolConfig", () => {
       expect(fetches).toBe(1);
     });
 
-    // Ruby's monitor is reentrant, which `configure_connection`
-    // (`abstract_adapter.rb:1212`) depends on: it reads the version back
-    // through this method from inside the fetch that opened the connection.
-    // The ported monitor is reentrant too, so the nested read runs straight
-    // through and recomputes rather than waiting on the lock it is inside.
     it("a read re-entered from inside the fetch resolves rather than deadlocking", async () => {
       let fetches = 0;
       const mockConn = {

@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/connection_adapters/merge_and_resolve_default_url_config_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   DatabaseConfigurations,
@@ -11,10 +8,6 @@ import { ActiveRecord } from "../ar-config.js";
 
 const DEFAULT_ENV = "default_env";
 
-// Per-name *_DATABASE_URL vars are cleared too: environment_value_for reads
-// NAME_DATABASE_URL (and PRIMARY_DATABASE_URL for the primary slot) ahead of
-// DATABASE_URL, so an ambient value would otherwise trample the primary config
-// in tests that only set DATABASE_URL.
 const ENV_KEYS = [
   "DATABASE_URL",
   "PRIMARY_DATABASE_URL",
@@ -67,9 +60,6 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("invalid symbol config", () => {
-    // Rails: `{ "foo" => :bar }` — a Symbol value. The TS-faithful analogue of a
-    // Ruby Symbol is a JS Symbol, which is neither a URL string nor a Hash, so
-    // _buildConfigs rejects it the same way Rails does.
     const config = { foo: Symbol("bar") };
     expect(() => resolveConfig(config as unknown as RawConfigurations)).toThrow(
       InvalidConfigurationError,
@@ -201,9 +191,6 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("url with hyphenated scheme", () => {
-    // Rails registers the ibm_db adapter here so it's loadable; the resolver
-    // itself derives the adapter name purely from the scheme (hyphens → underscores,
-    // falling through when no protocol mapping exists), so no registration is needed.
     process.env["DATABASE_URL"] = "ibm-db://localhost/foo";
     const config = {
       default_env: { adapter: "abstract", database: "not_foo", host: "localhost" },

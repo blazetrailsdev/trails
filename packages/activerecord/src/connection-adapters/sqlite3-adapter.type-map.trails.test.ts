@@ -6,13 +6,6 @@ import type { Type } from "@blazetrails/activemodel";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
-// trails-only coverage for the SQLite `register_class_with_limit` convergence
-// (RFC 0043 converge-sqlite-limit-to-register-class-with-limit). Rails threads a
-// column's limit at type-map lookup time — the `char`/`binary`/`text`/`int`/
-// `float` factories parse the matched `sql_type` string via `extract_limit`
-// (abstract_adapter.rb:919). These assert the full reflection path
-// (`fetchTypeMetadata` → `lookupCastTypeFromColumn`) carries the limit without
-// the reflective cast-type rebuild that previously stood in for it.
 describe("SQLite3Adapter type-map limit threading", () => {
   let adapter: SQLite3Adapter;
   let tmpDir: string;
@@ -42,7 +35,6 @@ describe("SQLite3Adapter type-map limit threading", () => {
       ["binary(16)", "binary", 16],
       ["int(11)", "integer", 11],
       ["float(24)", "float", 24],
-      // blob/clob alias to binary/text and must thread the limit through them.
       ["blob(8)", "binary", 8],
       ["clob(5)", "text", 5],
     ] as const) {
@@ -53,10 +45,6 @@ describe("SQLite3Adapter type-map limit threading", () => {
   });
 
   it("defaults SQLite integers to an 8-byte limit when the sql_type carries none", () => {
-    // Rails' SQLite3Integer overrides only the private `_limit` (→ 8), leaving
-    // the public `limit` reader nil so `fetch_type_metadata` reflects a bare
-    // `limit` and dumps stay bare. The 8-byte default still governs range: a
-    // value beyond a 4-byte int's max (2^31) but within 8 bytes is accepted.
     for (const sqlType of ["integer", "bigint"] as const) {
       const type = castType(sqlType);
       expect(type.limit).toBeUndefined();
@@ -81,9 +69,6 @@ describe("SQLite3Adapter type-map limit threading", () => {
   });
 
   it("reflects an unmapped sql_type as a nil cast type keeping the sql name", () => {
-    // The type map returns a ValueType for an unmapped sql_type, whose `type()`
-    // — like Rails' Value#type — is nil. fetchTypeMetadata carries that nil
-    // through to `type` while `sqlType` still holds the raw name.
     const meta = adapter.fetchTypeMetadata("mystery_type");
     expect(castType("mystery_type").type()).toBeUndefined();
     expect(meta.sqlType).toBe("mystery_type");

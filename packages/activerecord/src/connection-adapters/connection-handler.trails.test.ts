@@ -4,15 +4,6 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
 
-/**
- * TS-only extras for ConnectionHandler. Rails has no equivalent test: there the
- * selector defaults are literally `role: Base.current_role, shard:
- * Base.current_shard` in the signature (connection_handler.rb:115, :193, :200),
- * so a swapped role reaching an omitted kwarg is not a behavior anyone writes a
- * test for. trails resolves them through the `_registerBase` slot, and the port
- * hardcoded `"writing"` / `"default"` until this convergence, which no existing
- * test could see — every caller that cared passed the kwarg explicitly.
- */
 describe("ConnectionHandler selector defaults (trails)", () => {
   let handler: ConnectionHandler;
 

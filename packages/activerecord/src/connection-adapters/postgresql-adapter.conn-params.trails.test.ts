@@ -1,10 +1,3 @@
-/**
- * Mirrors Rails' PostgreSQLAdapter#initialize conn_params handling
- * (postgresql_adapter.rb:322-331): `@config.compact` followed by
- * `conn_params.slice!(*valid_conn_param_keys)`. The node-pg equivalent of
- * libpq's `PG::Connection.conndefaults_hash.keys` is the `pg.ClientConfig`
- * interface — see PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.
- */
 import { describe, expect, it } from "vitest";
 
 import { buildAdapterArg } from "./adapter-args.js";
@@ -80,15 +73,12 @@ describe("PostgreSQLAdapter conn_params", () => {
   });
 
   it("lets a truthy username overwrite an explicit user", () => {
-    // Ruby truthiness: "" is truthy, so a blank username still overwrites.
     expect(clientOptions({ username: "alice", user: "bob" }).user).toBe("alice");
     expect(clientOptions({ username: "", user: "bob" }).user).toBe("");
     expect(clientOptions({ username: false, user: "bob" }).user).toBe("bob");
   });
 
   it("forwards driver params that @types/pg omits", () => {
-    // pg/lib/connection-parameters.js:82,103 and pg/lib/client.js:75,86 read
-    // these even though the published ClientConfig interface lacks them.
     const options = clientOptions({
       binary: true,
       replication: "database",
@@ -109,10 +99,6 @@ describe("PostgreSQLAdapter conn_params", () => {
     expect(options).not.toHaveProperty("dbname");
   });
 
-  // Direct construction bypasses adapter-args, which is what hid the #4964
-  // username bug: unit tests went green while every real connection was
-  // broken. Assert the slice through the path connection-handling actually
-  // uses (buildAdapterArg -> constructor spread).
   describe("through buildAdapterArg (the connection-handling path)", () => {
     it("slices the residual database.yml hash the arg builder forwards", () => {
       const [config] = buildAdapterArg("postgresql", {

@@ -82,9 +82,6 @@ describe("Column", () => {
   });
 
   it("type is null when no semantic type is set", () => {
-    // Rails' SqlTypeMetadata#type is just `@type` — nil when a sql_type maps to
-    // the unmapped Value cast type — so Column#type stays nil rather than
-    // echoing the sqlType name.
     const col = new Column("body", null, new SqlTypeMetadata({ sqlType: "text" }));
     expect(col.type).toBeNull();
   });

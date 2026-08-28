@@ -4,12 +4,6 @@ import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
-// Only the `exec` inside `find_cmd_and_exec` is unported (see
-// AbstractAdapter.findCmdAndExec); these cover the option-key parity of the
-// arg/env builders — `include_password` (mysql/pg), `header`/`mode` (sqlite3) —
-// and that the client name at the head of the argv comes from
-// `ActiveRecord.databaseCli`, as `database_cli[...]` does in Rails.
-
 describe("AbstractMysqlAdapter.dbconsole option keys", () => {
   const config = { host: "localhost", username: "root", password: "secret", database: "blog" };
 

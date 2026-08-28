@@ -6,10 +6,6 @@ import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { RecordNotUnique, TransactionIsolationError } from "../errors.js";
 
-// Audit: Sqlite3Adapter uses only explicit BEGIN/COMMIT/ROLLBACK/SAVEPOINT SQL
-// via driver.exec() — never the better-sqlite3 db.transaction(fn) helper.
-// This keeps the adapter portable to async drivers (node:sqlite, wa-sqlite, expo-sqlite).
-
 describe("SQLite3Adapter transaction control", () => {
   let adapter: SQLite3Adapter;
   let tmpDir: string;
@@ -133,12 +129,6 @@ describe("SQLite3Adapter transaction control", () => {
     });
 
     it("rejects read_uncommitted without shared-cache mode", async () => {
-      // isSharedCache() returns false for a plain file path (requires ?cache=shared URI).
-      // better-sqlite3 cannot open a file:?cache=shared URI, so the full PRAGMA chain
-      // (BEGIN → read PRAGMA → set PRAGMA ON → resetIsolationLevel restore) cannot be
-      // integration-tested here. The guard itself is covered by this test.
-      // Rails raises a bare StandardError for this branch, not
-      // TransactionIsolationError (database_statements.rb:68).
       await expect(adapter.beginIsolatedDbTransaction("read_uncommitted")).rejects.toThrow(
         "You need to enable the shared-cache mode",
       );
@@ -149,9 +139,6 @@ describe("SQLite3Adapter transaction control", () => {
     it("writer changes are not visible to reader until committed", async () => {
       const reader = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"), { readonly: true });
       try {
-        // Confirm the readonly flag is honored — SQLite rejects writes with
-        // "attempt to write a readonly database" (StatementInvalid, not ReadOnlyError,
-        // because the adapter's ReadOnlyError gate checks _preventWrites, not _readonly).
         await expect(
           reader.executeMutation("INSERT INTO items (name) VALUES ('x')"),
         ).rejects.toThrow(/readonly/i);
@@ -159,7 +146,6 @@ describe("SQLite3Adapter transaction control", () => {
         await adapter.beginDbTransaction();
         await adapter.executeMutation("INSERT INTO items (name) VALUES ('secret')");
 
-        // SQLite default isolation: reader sees committed state only
         const beforeCommit = await reader.execute("SELECT name FROM items");
         expect(beforeCommit).toHaveLength(0);
 
@@ -175,8 +161,6 @@ describe("SQLite3Adapter transaction control", () => {
 
   describe("audit: no driver.transaction() callsites", () => {
     it("sqlite3-adapter and sqlite-drivers dirs use only explicit SQL for transactions", () => {
-      // Portability invariant: using driver.transaction(fn) would silently break async
-      // drivers (node:sqlite, wa-sqlite, expo-sqlite). Grep ensures this stays true.
       const dirs = [
         path.resolve(import.meta.dirname, "."),
         path.resolve(import.meta.dirname, "../../sqlite"),

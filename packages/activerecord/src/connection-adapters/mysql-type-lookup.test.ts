@@ -1,16 +1,8 @@
-/**
- * Mirrors Rails activerecord/test/cases/connection_adapters/mysql_type_lookup_test.rb
- */
 import { it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import type { Type } from "@blazetrails/activemodel";
 
-// Minimal subclass of the *concrete* Mysql2Adapter — char/varchar/enum/set
-// string registrations live on the concrete adapter (mysql2_adapter.rb:40-49),
-// not AbstractMysqlAdapter, so the type map under test must be the concrete
-// one. A string config constructs inert (no live connection); only the static
-// type map is exercised here.
 class TestMysqlAdapter extends Mysql2Adapter {
   constructor() {
     super("mysql2://localhost/test");

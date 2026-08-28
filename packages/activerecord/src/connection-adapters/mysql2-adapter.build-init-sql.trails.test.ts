@@ -1,12 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 
-// Trails-specific guards (no Rails counterpart): _buildInitSql() generates the
-// per-connection bootstrap SQL. mysql2 uses `charset`; Rails' database.yml uses
-// `encoding`. Both must produce a `SET NAMES ...` prefix, and a charset/collation
-// carrying anything outside [A-Za-z0-9_] is rejected up front so it can never be
-// interpolated into that SET NAMES clause. These run offline — constructing the
-// adapter does not open a connection.
 describe("Mysql2Adapter#_buildInitSql", () => {
   it("includes SET NAMES when charset is configured", async () => {
     const adapter = new Mysql2Adapter({ host: "localhost", charset: "utf8mb4" });

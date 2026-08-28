@@ -1,16 +1,4 @@
-/**
- * trails-only: importing the mysql2 adapter registers the adapter-scoped
- * `:string`/`:immutable_string`/`:unsigned_integer` cast types via
- * `Type.register(name, adapter: :mysql2)` (mysql2_adapter.rb:190-198), keyed by
- * the normalized `AdapterName` family (`"mysql2"`) that `Type.lookup` defaults
- * to under a mysql2 configuration. These assert the registrations resolve
- * through that lookup — the path `Mysql2Adapter.initializeTypeMap` uses for
- * char/varchar/enum/set — without a live MySQL connection. Rails covers the
- * end-to-end map in mysql_type_lookup_test (adapter-gated in trails).
- */
 import { it, expect } from "vitest";
-// Side-effect import: loading the concrete adapter runs its module-level
-// `Type.register(..., adapter: "mysql2")` calls.
 import "./mysql2-adapter.js";
 import { StringType, ImmutableStringType as ImmutableString } from "@blazetrails/activemodel";
 import { lookup } from "../type.js";

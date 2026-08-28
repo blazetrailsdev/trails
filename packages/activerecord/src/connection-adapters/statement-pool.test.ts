@@ -98,8 +98,8 @@ describe("StatementPoolTest", () => {
     const pool = new StatementPool<string>(2);
     await pool.set("a", "1");
     await pool.set("b", "2");
-    pool.get("a"); // touch a, making b the oldest
-    await pool.set("c", "3"); // should evict b, not a
+    pool.get("a");
+    await pool.set("c", "3");
     expect(pool.has("a")).toBe(true);
     expect(pool.has("b")).toBe(false);
     expect(pool.has("c")).toBe(true);
@@ -126,11 +126,6 @@ describe("SQLite3 StatementPool integration", () => {
       await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["a"]);
       await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["b"]);
 
-      // Same SQL executed twice — db.prepare called once, cached for second.
-      // Driven through `internal_exec_query` with an explicit `prepare:`, the
-      // only path Rails prepares on: `raw_execute` defaults `prepare: false`
-      // (abstract/database_statements.rb:552) and so takes sqlite3's "Don't
-      // cache statements if they are not prepared" arm (rb:93-94).
       const selectSql = 'SELECT * FROM "test_pool" WHERE "name" = ?';
       const rows1 = (
         await adapter.internalExecQuery(selectSql, "SQL", ["a"], { prepare: true })
@@ -143,7 +138,6 @@ describe("SQLite3 StatementPool integration", () => {
       expect(rows2).toHaveLength(1);
       expect(rows2[0].name).toBe("b");
 
-      // db.prepare should have been called once for the SELECT, not twice
       const selectCalls = prepareSpy.mock.calls.filter((c) => c[0] === selectSql);
       expect(selectCalls).toHaveLength(1);
     } finally {
@@ -164,7 +158,6 @@ describe("SQLite3 StatementPool integration", () => {
     const pool = new TestPool(2);
     await pool.set("a", "stmt_a");
     await pool.set("b", "stmt_b");
-    // Touch "a" so it's moved to MRU — LRU order becomes b, a.
     pool.get("a");
     await pool.set("c", "stmt_c");
     expect(pool.length).toBe(2);
@@ -174,9 +167,6 @@ describe("SQLite3 StatementPool integration", () => {
 
   it("a statement limit of 0 raises on the first insert", async () => {
     const pool = new StatementPool<string>(0);
-    // Rails' `[]=` has no zero-limit special case: `while 0 <= cache.size`
-    // runs on the empty cache, `Hash#shift` returns nil and `nil.last` raises
-    // (statement_pool.rb:31-33). A `statement_limit` of 0 is unsupported.
     expect(() => pool.set("c", "stmt_c")).toThrow();
     expect(pool.length).toBe(0);
   });
