@@ -16,15 +16,6 @@
  * that `fixtures({})` already owns. This rule fails any `*.test.ts` that imports
  * them directly.
  *
- * `rebuildCanonicalTables` is not banned by THIS rule — it is the documented
- * anti-contamination shield that test files call in a `beforeAll` to restore a
- * canonical table a sibling left in a reduced shape on the shared per-worker DB
- * (see its JSDoc), and it has no `fixtures({})` equivalent. It is not open
- * season either: RFC 0079 is driving its call sites to zero, and
- * `no-new-rebuild-canonical-tables` freezes the caller list at the
- * eslint/rebuild-canonical-tables-callers.json baseline. So an existing caller
- * keeps working while a NEW file cannot become one.
- *
  * Allowlist: the loaders' own unit tests (`canonical-schema.trails.test.ts`,
  * `canonical-table-rebuild.trails.test.ts`) import them to test them directly.
  * Non-`*.test.ts` internal helpers are already out of scope because this rule

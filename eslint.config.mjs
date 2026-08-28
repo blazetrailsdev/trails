@@ -30,7 +30,6 @@ import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import requireCanonicalRebuild from "./eslint/require-canonical-rebuild.mjs";
-import noNewRebuildCanonicalTables from "./eslint/no-new-rebuild-canonical-tables.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import { noRawSqlFiles, noRawSqlIgnores } from "./eslint/no-raw-sql-scope.mjs";
 import {
@@ -269,7 +268,6 @@ export default defineConfig(
           "test-fixture-parity": testFixtureParity,
           "require-table-teardown": requireTableTeardown,
           "require-canonical-rebuild": requireCanonicalRebuild,
-          "no-new-rebuild-canonical-tables": noNewRebuildCanonicalTables,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
@@ -607,7 +605,6 @@ export default defineConfig(
 
   // ── require-canonical-rebuild: a test file that drops a canonical table
   //    (a TEST_SCHEMA key) must restore it in the same file, via
-  //    rebuildCanonicalTables() (support/canonical-table-rebuild.ts) or
   //    loadCanonicalSchema() (support/canonical-schema.ts). A canonical table left
   //    dropped drifts the shared per-worker database for the next file.
   //    test-helpers/** is exempt — the canonical loaders are its subject under
@@ -621,24 +618,6 @@ export default defineConfig(
     ],
     rules: {
       "blazetrails/require-canonical-rebuild": ["error", { canonicalTables }],
-    },
-  },
-
-  // ── no-new-rebuild-canonical-tables: the RFC 0079 only-shrink ratchet over
-  //    rebuildCanonicalTables. The helper drops + recreates canonical tables on
-  //    the SHARED per-worker database, so every call site is a paid-per-run
-  //    patch over a contamination source; RFC 0079 drives the count to zero and
-  //    then deletes the helper. The sibling rule require-canonical-rebuild
-  //    MANDATES a rebuild after a canonical drop, so without this ratchet the
-  //    caller count can only grow — and did, by three sites. The baseline is
-  //    eslint/rebuild-canonical-tables-callers.json (path -> allowed count) and
-  //    only shrinks. Scoped to packages/ + scripts/ rather than to activerecord
-  //    test files, because a new caller anywhere is exactly what this stops.
-  //    See eslint/no-new-rebuild-canonical-tables.mjs. ──
-  {
-    files: ["packages/**/*.ts", "scripts/**/*.ts"],
-    rules: {
-      "blazetrails/no-new-rebuild-canonical-tables": "error",
     },
   },
 
@@ -678,8 +657,6 @@ export default defineConfig(
   //    canonical loaders (loadCanonicalSchema in support/canonical-schema.ts,
   //    ensureCanonicalTables in support/canonical-table-rebuild.ts)
   //    directly — wire the canonical schema + fixtures through `fixtures({ ... })`.
-  //    rebuildCanonicalTables is allowed by THIS rule (documented shared shield),
-  //    but its caller list is frozen separately by no-new-rebuild-canonical-tables.
   //    Only canonical-schema.trails.test.ts / canonical-table-rebuild.trails.test.ts may
   //    import them, to test them directly (allowlisted in the rule).
   //    Enforced across every workspace package, not just activerecord: the

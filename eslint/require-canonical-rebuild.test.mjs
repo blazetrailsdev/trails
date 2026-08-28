@@ -14,61 +14,7 @@ const options = [{ canonicalTables: ["subscribers", "people", "posts", "widgets"
 tester.run("require-canonical-rebuild", rule, {
   valid: [
     {
-      code:
-        'await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");\n' +
-        'await rebuildCanonicalTables(adapter, ["subscribers"]);',
-      options,
-    },
-
-    {
-      code: 'await ctx.dropTable("posts");\nawait rebuildCanonicalTables(ctx, ["posts"]);',
-      options,
-    },
-
-    {
-      code:
-        'it("…", async () => { await ctx.dropTable("posts"); });\n' +
-        'beforeEach(async () => { await rebuildCanonicalTables(ctx, ["posts"]); });',
-      options,
-    },
-
-    {
-      code:
-        'await ctx.dropTable("posts", "people");\n' +
-        'await rebuildCanonicalTables(ctx, ["people", "posts"]);',
-      options,
-    },
-
-    {
       code: 'await ctx.dropTable("posts");\nawait loadCanonicalSchema(ctx);',
-      options,
-    },
-
-    // A module-level const holding an array literal resolves to its names.
-    {
-      code:
-        'const CANONICAL_TABLES = ["people"];\n' +
-        "await ctx.dropTable(`people`);\n" +
-        "await rebuildCanonicalTables(ctx, CANONICAL_TABLES);",
-      options,
-    },
-
-    // …including through `as const` and through spreads of further such consts.
-    {
-      code:
-        'const A = ["people"] as const;\n' +
-        'const B = [...A, "posts"];\n' +
-        'await ctx.dropTable("people", "posts");\n' +
-        "await rebuildCanonicalTables(ctx, B);",
-      options,
-    },
-
-    {
-      code:
-        'for (const t of ["people", "subscribers"]) {\n' +
-        "  await adapter.executeMutation(`DROP TABLE IF EXISTS \\`${t}\\``);\n" +
-        "}\n" +
-        'await rebuildCanonicalTables(adapter, ["people", "subscribers"]);',
       options,
     },
 
@@ -157,14 +103,6 @@ tester.run("require-canonical-rebuild", rule, {
 
     {
       code:
-        "const tables = await adapter.execute(`SELECT tablename FROM pg_tables WHERE tablename IN ('subscribers')`);\n" +
-        'for (const t of tables) { await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}"`); }\n' +
-        'await rebuildCanonicalTables(adapter, ["subscribers"]);',
-      options,
-    },
-
-    {
-      code:
         'describe("suite", () => {\n' +
         '  const TABLE_NAME = "ex_foo";\n' +
         "  beforeEach(async () => {\n" +
@@ -229,50 +167,6 @@ tester.run("require-canonical-rebuild", rule, {
   ],
 
   invalid: [
-    // A name list forwarded through a parameter proves nothing: the file's own
-    // drops must still be covered by a readable restore. (Before RFC 0079's
-    // restore-arm fix, this exempted EVERY canonical drop in the file.)
-    {
-      code:
-        "async function restore(names) { await rebuildCanonicalTables(ctx, names); }\n" +
-        'await ctx.dropTable("posts", "people");\n' +
-        'await restore(["posts", "people"]);',
-      options,
-      errors: [
-        { messageId: "missingRebuild", data: { table: "posts" } },
-        { messageId: "missingRebuild", data: { table: "people" } },
-      ],
-    },
-
-    // Same for a spread of something unreadable, and for a computed list.
-    {
-      code:
-        'await ctx.dropTable("posts");\n' +
-        "await rebuildCanonicalTables(ctx, [...namesFrom(ctx)]);",
-      options,
-      errors: [{ messageId: "missingRebuild", data: { table: "posts" } }],
-    },
-
-    {
-      code:
-        'const TABLES = ["posts", "people"].filter((t) => t !== "people");\n' +
-        'await ctx.dropTable("posts");\n' +
-        "await rebuildCanonicalTables(ctx, TABLES);",
-      options,
-      errors: [{ messageId: "missingRebuild", data: { table: "posts" } }],
-    },
-
-    // A const reassigned after its initializer can hold anything by call time.
-    {
-      code:
-        'let tables = ["posts"];\n' +
-        "tables = other;\n" +
-        'await ctx.dropTable("posts");\n' +
-        "await rebuildCanonicalTables(ctx, tables);",
-      options,
-      errors: [{ messageId: "missingRebuild", data: { table: "posts" } }],
-    },
-
     {
       code:
         'await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");\n' +
@@ -290,25 +184,6 @@ tester.run("require-canonical-rebuild", rule, {
       code: 'await ctx.dropTable("posts");',
       options,
       errors: [{ messageId: "missingRebuild", data: { table: "posts" } }],
-    },
-
-    {
-      code:
-        'await ctx.dropTable("posts", "people", "widgets");\n' +
-        'await rebuildCanonicalTables(ctx, ["people"]);',
-      options,
-      errors: [
-        { messageId: "missingRebuild", data: { table: "posts" } },
-        { messageId: "missingRebuild", data: { table: "widgets" } },
-      ],
-    },
-
-    {
-      code:
-        'await adapter.execute("DROP TABLE subscribers");\n' +
-        'await rebuildCanonicalTables(adapter, ["people"]);',
-      options,
-      errors: [{ messageId: "missingRebuild", data: { table: "subscribers" } }],
     },
 
     {

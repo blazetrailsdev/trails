@@ -35,11 +35,6 @@ tester.run("no-internal-canonical-loaders", rule, {
       filename: FILENAME,
       code: 'import { fixtures } from "./test-fixtures.js";',
     },
-    // rebuildCanonicalTables is the documented anti-contamination shield — allowed.
-    {
-      filename: FILENAME,
-      code: 'import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";',
-    },
     // The loaders' own unit test may import them directly — via the real
     // same-directory specifier it actually uses.
     {
