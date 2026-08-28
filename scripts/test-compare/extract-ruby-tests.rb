@@ -270,9 +270,15 @@ class TestExtractor
       end
     end
 
-    # `[A, B].each do |klass| define_method("test_#{...}") do ... end end`
-    if inner.is_a?(Array) && inner[0] == :call && ident_name(inner[3]) == "each"
-      return if process_define_method_loop(inner, block, node)
+    # `[A, B].each do |klass| define_method("test_#{...}") do ... end end`.
+    # Any iterator taking a block qualifies, not just `each` — the loop is only
+    # claimed once its body is found to define test methods.
+    iterator = inner if inner.is_a?(Array) && inner[0] == :call
+    if inner.is_a?(Array) && inner[0] == :method_add_arg && inner[1].is_a?(Array) && inner[1][0] == :call
+      iterator = inner[1]
+    end
+    if iterator
+      return if process_define_method_loop(iterator, block, node)
     end
 
     # Fallback: walk children
@@ -578,16 +584,23 @@ class TestExtractor
   # is a literal array and the generated name resolves; report the loop
   # otherwise. Returns true when the node was handled.
   def process_define_method_loop(call, block, node)
-    receiver = call[1]
-    return false unless receiver.is_a?(Array) && receiver[0] == :array
     return false unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
 
     defines = []
     collect_define_methods(block[2], defines)
+    # A loop generating ordinary helpers (`define_method "fail_#{i}"` at
+    # actionpack/test/controller/filters_test.rb:53-57) defines no cases, so it
+    # is neither expanded nor reported.
+    defines.select! { |name_node, _| test_prefixed_name?(name_node) }
     return false if defines.empty?
 
+    # Past this point the loop generates methods, so it is ours to account for
+    # whatever its receiver is: a receiver that isn't a literal array (a hash
+    # literal at journey/path/pattern_test.rb:27, a call chain at
+    # inflector_test.rb:68) is reported, not dropped.
+    receiver = call[1]
     var = block_var_name(block[1])
-    elements = array_literal_values(receiver[1])
+    elements = receiver.is_a?(Array) && receiver[0] == :array ? array_literal_values(receiver[1]) : nil
     if var.nil? || elements.nil?
       report_unexpanded_loop(node)
       return true
@@ -647,6 +660,14 @@ class TestExtractor
       end
       nil
     end
+  end
+
+  # Whether a `define_method` name literal begins with a literal "test_".
+  def test_prefixed_name?(name_node)
+    content = name_node[1]
+    return false unless content.is_a?(Array)
+    first = content[0] == :string_content ? content[1] : content
+    first.is_a?(Array) && first[0] == :@tstring_content && first[1].start_with?("test_")
   end
 
   # The single block parameter (`do |klass|`), or nil when the block takes none

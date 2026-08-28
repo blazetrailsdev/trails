@@ -128,6 +128,36 @@ describe("Ruby extractor define_method loop expansion", () => {
     expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
   });
 
+  it("reports a loop whose receiver is not a literal array", () => {
+    const { cases, unexpandedLoops } = extract(`
+  ActiveSupport::Inflector.inflections.uncountable.each do |word|
+    define_method "test_uncountability_of_#{word}" do
+      assert_equal 1, 1
+    end
+  end
+
+  { "/:controller" => /a/ }.each do |path, expected|
+    define_method(:"test_to_regexp_#{path}") do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3", "cases/foo_test.rb:9"]);
+  });
+
+  it("neither expands nor reports a loop that generates ordinary helpers", () => {
+    const { cases, unexpandedLoops } = extract(`
+  (1..3).each do |i|
+    define_method "fail_#{i}" do
+      render plain: i.to_s
+    end
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
   it("leaves a non-define_method each block to the ordinary walk", () => {
     const { cases, unexpandedLoops } = extract(`
   [:a, :b].each do |name|
