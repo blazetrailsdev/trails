@@ -128,7 +128,7 @@ export { registerSubclass, findStiClass } from "./inheritance.js";
 // signedId requires MessageVerifier (node:crypto) — use subpath: @blazetrails/activerecord/signed-id
 export { LockingType } from "./locking/optimistic.js";
 // ModelSchema is consumed via the Base mixins — `User.columnNames()`,
-// `User.columnsHash()`, `User.contentColumns()`, `User.createTable()`, etc.
+// `User.columnsHash()`, `User.contentColumns()`, etc.
 // (mixed in via activesupport `extend()`). The underlying functions are
 // no longer exported as standalone free functions — their `this:`-typed
 // signatures are only callable on a Base subclass.

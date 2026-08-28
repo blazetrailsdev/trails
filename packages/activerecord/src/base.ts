@@ -1275,7 +1275,6 @@ export class Base extends Model {
    * This is a test/development helper — in production, use migrations.
    * Wired via extend() after class.
    */
-  declare static createTable: typeof ModelSchema.createTable;
 
   /**
    * Set the database adapter for this model class.

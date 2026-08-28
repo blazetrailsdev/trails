@@ -2,12 +2,9 @@ import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
-  AttributeSet,
   AttributeSetBuilder,
   YAMLEncoder,
-  PendingDefault,
-  PendingType,
-  type Attribute,
+  type AttributeSet,
   type Type,
 } from "@blazetrails/activemodel";
 import {
@@ -324,45 +321,6 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   return {};
 }
 
-/**
- * The attribute set a model's own `attribute()` declarations replay to, with no
- * schema columns underneath — Rails' `_default_attributes` seeded from an empty
- * hash instead of `columns_hash` (attribute_registration.rb:53-58 vs
- * attributes.rb:241-252).
- *
- * Rails never needs this: `columns_hash` is a DB read, so a model with no table
- * simply has no columns. It cannot go through `_defaultAttributes()`, which
- * re-enters `columnsHash()` on an unreflected class.
- */
-function declaredAttributes(host: SchemaHost): AttributeSet {
-  const attributeSet = new AttributeSet(new Map<string, Attribute>());
-  applyDeclarations(host, attributeSet);
-  return attributeSet;
-}
-
-/**
- * `apply_pending_attribute_modifications` (attribute_registration.rb:78-86)
- * restricted to the two modifications that INTRODUCE an attribute. The
- * decorators are skipped deliberately: they read the type the column seed put
- * there, and `enum`'s raises outright when it finds the `Type.default_value`
- * an unseeded set answers with (enum.ts:164-168).
- */
-function applyDeclarations(cls: SchemaHost, attributeSet: AttributeSet): void {
-  const superclass = Object.getPrototypeOf(cls) as
-    | (SchemaHost & { _defaultAttributes?: unknown; _pendingAttributeModifications?: unknown[] })
-    | null;
-  if (superclass && typeof superclass._defaultAttributes === "function") {
-    applyDeclarations(superclass, attributeSet);
-  }
-  if (!Object.hasOwn(cls, "_pendingAttributeModifications")) return;
-  for (const modification of (cls as unknown as { _pendingAttributeModifications: unknown[] })
-    ._pendingAttributeModifications) {
-    if (modification instanceof PendingType || modification instanceof PendingDefault) {
-      modification.applyTo(attributeSet);
-    }
-  }
-}
-
 type DatabaseAdapterLike = { internalSchemaCache?: unknown };
 
 /**
@@ -435,148 +393,6 @@ export function contentColumns(this: typeof Base): any[] {
     if (col.name.endsWith("_id") || col.name.endsWith("_count")) return false;
     return true;
   });
-}
-
-// ---------------------------------------------------------------------------
-// SQL type mapping
-// ---------------------------------------------------------------------------
-
-/**
- * Map ActiveModel type names to SQL column types.
- * Adapter-aware: PostgreSQL uses native types, MySQL uses its own,
- * SQLite uses affinity types.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#native_database_types
- */
-function sqlTypeFor(typeName: string, adapterName?: string): string {
-  if (adapterName === "postgres") {
-    switch (typeName) {
-      case "integer":
-        return "integer";
-      case "big_integer":
-        return "bigint";
-      case "float":
-        return "float";
-      case "decimal":
-        return "decimal";
-      case "boolean":
-        return "boolean";
-      case "binary":
-        return "bytea";
-      case "text":
-        return "text";
-      case "json":
-        return "jsonb";
-      case "datetime":
-        return "timestamp";
-      default:
-        return "varchar";
-    }
-  }
-  if (adapterName === "mysql2") {
-    switch (typeName) {
-      case "integer":
-        return "int";
-      case "big_integer":
-        return "bigint";
-      case "float":
-        return "float";
-      case "decimal":
-        return "decimal";
-      case "boolean":
-        return "tinyint(1)";
-      case "binary":
-        return "blob";
-      case "text":
-        return "text";
-      case "json":
-        return "json";
-      case "datetime":
-        return "datetime";
-      default:
-        return "varchar(255)";
-    }
-  }
-  // SQLite (default) — uses type affinity
-  switch (typeName) {
-    case "integer":
-    case "big_integer":
-      return "INTEGER";
-    case "float":
-    case "decimal":
-      return "REAL";
-    case "boolean":
-      return "INTEGER";
-    case "binary":
-      return "BLOB";
-    default:
-      return "TEXT";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Table creation (test/development helper)
-// ---------------------------------------------------------------------------
-
-/**
- * Create the database table for a model from its attribute definitions.
- * Drops the table first if it already exists.
- *
- * This is a test/development helper — in production, use migrations.
- *
- * Mirrors: used by test infrastructure, not a direct Rails API
- */
-export async function createTable(this: typeof Base): Promise<void> {
-  const table = this.tableName;
-  const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
-  const adapterName = this.connection.adapterName;
-  const isMysql = adapterName === "mysql2";
-  const isPg = adapterName === "postgres";
-  const pkSet = new Set(pks);
-  const a = this.connection;
-  const declared = declaredAttributes(this);
-
-  // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
-  await a.execute(`DROP TABLE IF EXISTS ${a.quoteTableName(table)}`);
-
-  const colDefs: string[] = [];
-  if (pks.length === 1) {
-    const pk = pks[0];
-    const pkDef = isPg
-      ? `${a.quoteColumnName(pk)} SERIAL PRIMARY KEY`
-      : isMysql
-        ? `${a.quoteColumnName(pk)} BIGINT AUTO_INCREMENT PRIMARY KEY`
-        : `${a.quoteColumnName(pk)} INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL`;
-    colDefs.push(pkDef);
-  } else {
-    for (const pk of pks) {
-      const pkType = sqlTypeFor(declared.getAttribute(pk).type?.name || "integer", adapterName);
-      colDefs.push(`${a.quoteColumnName(pk)} ${pkType} NOT NULL`);
-    }
-  }
-
-  for (const name of declared.keys()) {
-    if (pkSet.has(name)) continue;
-    const sqlType = sqlTypeFor(declared.getAttribute(name).type?.name || "string", adapterName);
-    colDefs.push(`${a.quoteColumnName(name)} ${sqlType}`);
-  }
-
-  if (pks.length > 1) {
-    colDefs.push(`PRIMARY KEY (${pks.map((pk) => a.quoteColumnName(pk)).join(", ")})`);
-  }
-
-  await a.execute(
-    // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
-    `CREATE TABLE IF NOT EXISTS ${a.quoteTableName(table)} (${colDefs.join(", ")})`,
-  );
-
-  // This helper issues raw DROP/CREATE DDL instead of routing through
-  // SchemaStatements, so it must invalidate the schema cache itself —
-  // otherwise a previously-warmed entry (e.g. from the test harness'
-  // eager warm) survives and reports the old table shape to the next
-  // `columnsHash()` read. Mirrors SchemaStatements#createTable's
-  // `clear_data_source_cache!`.
-  await a.schemaCache.clearDataSourceCacheBang(table);
 }
 
 // ---------------------------------------------------------------------------
@@ -1510,7 +1326,6 @@ export const ClassMethods = {
   columnNames,
   columnsHash,
   contentColumns,
-  createTable,
   quotedTableName,
   resetTableName,
   fullTableNamePrefix,
