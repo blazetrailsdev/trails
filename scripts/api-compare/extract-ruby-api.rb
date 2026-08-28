@@ -2542,8 +2542,6 @@ class ApiExtractor
     end
   end
 
-  # The Symbol keys an `@options`-style ivar is read by in a method body,
-  # collected through the same walk as the parameter-held case.
   def collect_ivar_option_keys(body)
     keys = []
     walk_for_option_keys(body, OPTION_IVAR_NAMES, {}, keys)
