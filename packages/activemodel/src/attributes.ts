@@ -21,7 +21,6 @@ import {
 import {
   AttributeRegistration,
   ClassMethods as AttributeRegistrationClassMethods,
-  attribute as registrationAttribute,
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
 
@@ -58,7 +57,7 @@ export function attribute(
   typeName?: string | Type | AttributeOptions,
   options?: AttributeOptions,
 ): void {
-  registrationAttribute.call(this, name, typeName, options);
+  AttributeRegistrationClassMethods.attribute.call(this, name, typeName, options);
   this.defineAttributeMethod(name);
 }
 

@@ -61,82 +61,18 @@ export class PendingType implements PendingModification {
 
 /** @internal */
 export class PendingDefault implements PendingModification {
-  constructor(
-    readonly name: string,
-    readonly default_: unknown,
-  ) {}
+  readonly name: string;
+  readonly default: unknown;
+
+  constructor(name: string, value: unknown) {
+    this.name = name;
+    this.default = value;
+  }
 
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
-    attributeSet.set(this.name, existing.withUserDefault(this.default_));
+    attributeSet.set(this.name, existing.withUserDefault(this.default));
   }
-}
-
-export interface AttributeRegistrationHost extends AttributeHostInternals {
-  /** @internal */
-  resolveTypeName(name: string, options?: Record<string, unknown>): Type;
-  /** @internal */
-  hookAttributeType(name: string, type: Type): Type;
-}
-
-export function attribute(
-  this: AttributeRegistrationHost,
-  name: string,
-  typeName?: string | Type | AttributeOptions,
-  options?: AttributeOptions,
-): void {
-  name = this.resolveAttributeName(name);
-  if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
-    options = typeName;
-    typeName = undefined;
-  }
-  const typeProvided = typeName !== undefined;
-  const { default: _default, ...typeOptions } = options ?? {};
-  let type: Type | null = null;
-  if (typeProvided) {
-    type =
-      typeName instanceof Type
-        ? typeName
-        : this.resolveTypeName(
-            typeName as string,
-            Object.keys(typeOptions).length > 0
-              ? (typeOptions as Record<string, unknown>)
-              : undefined,
-          );
-    type = this.hookAttributeType(name, type);
-  }
-
-  const noDefault = options?.default === undefined;
-  if (type != null || noDefault) {
-    this.pendingAttributeModifications().push(new PendingType(name, type));
-  }
-  if (!noDefault) {
-    this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));
-  }
-
-  this.resetDefaultAttributes();
-}
-
-export function decorateAttributes(
-  this: AttributeHostInternals,
-  names: string[] | null,
-  decorator: AttributeDecorator,
-): void {
-  names = names?.map((name) => this.resolveAttributeName(name)) ?? null;
-
-  this.pendingAttributeModifications().push(new PendingDecorator(names, decorator));
-
-  this.resetDefaultAttributes();
-}
-
-export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
-  if (!this._cachedDefaultAttributes) {
-    registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
-    const attributeSet = new AttributeSet(new Map<string, Attribute>());
-    this.applyPendingAttributeModifications(attributeSet);
-    this._cachedDefaultAttributes = attributeSet;
-  }
-  return this._cachedDefaultAttributes;
 }
 
 /** @internal */
@@ -158,116 +94,162 @@ export class PendingDecorator implements PendingModification {
   }
 }
 
-export function attributeTypes(this: AttributeHostInternals): Record<string, Type> {
-  if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
-    return this._cachedAttributeTypes;
-  }
-  const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
-  const cast = host._defaultAttributes().castTypes();
-  const proxy = new Proxy(cast, {
-    get(target, prop, receiver) {
-      if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
-        return defaultValue();
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-  this._cachedAttributeTypes = proxy;
-  return proxy;
+export interface AttributeRegistrationHost extends AttributeHostInternals {
+  /** @internal */
+  resolveTypeName(name: string, options?: Record<string, unknown>): Type;
+  /** @internal */
+  hookAttributeType(name: string, type: Type): Type;
 }
 
 type HostAsClass = new (...args: unknown[]) => unknown;
 
-export function typeForAttribute(
-  this: AttributeHostInternals,
-  attributeName: string,
-  block?: () => Type,
-): Type {
-  attributeName = this.resolveAttributeName(attributeName);
-
-  const types = this.attributeTypes();
-  if (block) {
-    return Object.hasOwn(types, attributeName) ? types[attributeName] : block();
-  }
-  return types[attributeName];
-}
-
-/** @internal */
-export function pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
-  if (!Object.hasOwn(this, "_pendingAttributeModifications")) {
-    this._pendingAttributeModifications = [];
-  }
-  return this._pendingAttributeModifications as PendingModification[];
-}
-
-/** @internal */
-export function applyPendingAttributeModifications(
-  this: AttributeHostInternals,
-  attributeSet: AttributeSet,
-): void {
-  const superclass = Object.getPrototypeOf(this) as
-    | (AttributeHostInternals & { applyPendingAttributeModifications?: unknown })
-    | null;
-  if (superclass && typeof superclass.applyPendingAttributeModifications === "function") {
-    superclass.applyPendingAttributeModifications(attributeSet);
-  }
-
-  for (const modification of this.pendingAttributeModifications()) {
-    modification.applyTo(attributeSet);
-  }
-}
-
-/** @internal */
-export function resetDefaultAttributes(this: AttributeHostInternals): void {
-  this.resetDefaultAttributesBang();
-  for (const sub of DescendantsTracker.subclasses(this as unknown as HostAsClass)) {
-    (sub as unknown as AttributeHostInternals).resetDefaultAttributes();
-  }
-}
-
-/** @internal */
-export function resetDefaultAttributesBang(this: AttributeHostInternals): void {
-  this._cachedDefaultAttributes = null;
-  this._cachedAttributeTypes = null;
-  this._attributesBuilder = undefined;
-}
-
-/** @internal */
-export function resolveAttributeName(this: AttributeHostInternals, name: string): string {
-  return name;
-}
-
-/** @internal */
-export function resolveTypeName(
-  this: AttributeHostInternals,
-  name: string,
-  options?: Record<string, unknown>,
-): Type {
-  return typeRegistry.lookup(name, options);
-}
-
-/** @internal */
-export function hookAttributeType(
-  this: AttributeHostInternals,
-  _attribute: string,
-  type: Type,
-): Type {
-  return type;
-}
-
 export const ClassMethods = {
-  attribute,
-  decorateAttributes,
-  _defaultAttributes,
-  attributeTypes,
-  typeForAttribute,
-  pendingAttributeModifications,
-  applyPendingAttributeModifications,
-  resetDefaultAttributes,
-  resetDefaultAttributesBang,
-  resolveAttributeName,
-  resolveTypeName,
-  hookAttributeType,
+  attribute(
+    this: AttributeRegistrationHost,
+    name: string,
+    typeName?: string | Type | AttributeOptions,
+    options?: AttributeOptions,
+  ): void {
+    name = this.resolveAttributeName(name);
+    if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
+      options = typeName;
+      typeName = undefined;
+    }
+    const typeProvided = typeName !== undefined;
+    const { default: _default, ...typeOptions } = options ?? {};
+    let type: Type | null = null;
+    if (typeProvided) {
+      type =
+        typeName instanceof Type
+          ? typeName
+          : this.resolveTypeName(
+              typeName as string,
+              Object.keys(typeOptions).length > 0
+                ? (typeOptions as Record<string, unknown>)
+                : undefined,
+            );
+      type = this.hookAttributeType(name, type);
+    }
+
+    const noDefault = options?.default === undefined;
+    if (type != null || noDefault) {
+      this.pendingAttributeModifications().push(new PendingType(name, type));
+    }
+    if (!noDefault) {
+      this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));
+    }
+
+    this.resetDefaultAttributes();
+  },
+
+  decorateAttributes(
+    this: AttributeHostInternals,
+    names: string[] | null,
+    decorator: AttributeDecorator,
+  ): void {
+    names = names?.map((name) => this.resolveAttributeName(name)) ?? null;
+
+    this.pendingAttributeModifications().push(new PendingDecorator(names, decorator));
+
+    this.resetDefaultAttributes();
+  },
+
+  _defaultAttributes(this: AttributeHostInternals): AttributeSet {
+    if (!this._cachedDefaultAttributes) {
+      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
+      const attributeSet = new AttributeSet(new Map<string, Attribute>());
+      this.applyPendingAttributeModifications(attributeSet);
+      this._cachedDefaultAttributes = attributeSet;
+    }
+    return this._cachedDefaultAttributes;
+  },
+
+  attributeTypes(this: AttributeHostInternals): Record<string, Type> {
+    if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
+      return this._cachedAttributeTypes;
+    }
+    const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
+    const cast = host._defaultAttributes().castTypes();
+    const proxy = new Proxy(cast, {
+      get(target, prop, receiver) {
+        if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
+          return defaultValue();
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    this._cachedAttributeTypes = proxy;
+    return proxy;
+  },
+
+  typeForAttribute(this: AttributeHostInternals, attributeName: string, block?: () => Type): Type {
+    attributeName = this.resolveAttributeName(attributeName);
+
+    const types = this.attributeTypes();
+    if (block) {
+      return Object.hasOwn(types, attributeName) ? types[attributeName] : block();
+    }
+    return types[attributeName];
+  },
+
+  /** @internal */
+  pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
+    if (!Object.hasOwn(this, "_pendingAttributeModifications")) {
+      this._pendingAttributeModifications = [];
+    }
+    return this._pendingAttributeModifications as PendingModification[];
+  },
+
+  /** @internal */
+  applyPendingAttributeModifications(
+    this: AttributeHostInternals,
+    attributeSet: AttributeSet,
+  ): void {
+    const superclass = Object.getPrototypeOf(this) as
+      | (AttributeHostInternals & { applyPendingAttributeModifications?: unknown })
+      | null;
+    if (superclass && typeof superclass.applyPendingAttributeModifications === "function") {
+      superclass.applyPendingAttributeModifications(attributeSet);
+    }
+
+    for (const modification of this.pendingAttributeModifications()) {
+      modification.applyTo(attributeSet);
+    }
+  },
+
+  /** @internal */
+  resetDefaultAttributes(this: AttributeHostInternals): void {
+    this.resetDefaultAttributesBang();
+    for (const sub of DescendantsTracker.subclasses(this as unknown as HostAsClass)) {
+      (sub as unknown as AttributeHostInternals).resetDefaultAttributes();
+    }
+  },
+
+  /** @internal */
+  resetDefaultAttributesBang(this: AttributeHostInternals): void {
+    this._cachedDefaultAttributes = null;
+    this._cachedAttributeTypes = null;
+    this._attributesBuilder = undefined;
+  },
+
+  /** @internal */
+  resolveAttributeName(this: AttributeHostInternals, name: string): string {
+    return name;
+  },
+
+  /** @internal */
+  resolveTypeName(
+    this: AttributeHostInternals,
+    name: string,
+    options?: Record<string, unknown>,
+  ): Type {
+    return typeRegistry.lookup(name, options);
+  },
+
+  /** @internal */
+  hookAttributeType(this: AttributeHostInternals, _attribute: string, type: Type): Type {
+    return type;
+  },
 };
 
 export const AttributeRegistration = {

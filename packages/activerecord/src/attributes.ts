@@ -3,8 +3,7 @@ import {
   AttributeSet,
   UserProvidedDefault,
   type Type,
-  applyPendingAttributeModifications,
-  resetDefaultAttributes as amResetDefaultAttributes,
+  AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
@@ -86,7 +85,10 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     }
 
     const attributeSet = new AttributeSet(attributesHash);
-    applyPendingAttributeModifications.call(cacheHost, attributeSet);
+    AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(
+      cacheHost,
+      attributeSet,
+    );
 
     cacheHost._cachedDefaultAttributes = attributeSet;
   }
@@ -96,7 +98,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 
 /** @internal */
 function reloadSchemaFromCache(this: AnyClass): void {
-  amResetDefaultAttributes.call(this);
+  AttributeRegistration.ClassMethods.resetDefaultAttributes.call(this);
 }
 
 const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
