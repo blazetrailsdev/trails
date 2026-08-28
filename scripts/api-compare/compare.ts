@@ -1232,12 +1232,15 @@ export function ownerRecordsNothing(
  * is exported is not a fact about the port's fidelity, so the bodyless
  * declarations drop out and the body answers (RFC 0126).
  *
+ * Consulted only by `resolveOwner`, and only as a SECOND pass after the full
+ * population came back ambiguous: preferring a body up front answers questions
+ * the full population already answers correctly, which is how
+ * `FinderMethods#first` came to be held to `ExplainProxy#first`.
+ *
  * All-bodyless is left alone: there is no body to prefer, and the population is
  * the same one the resolution saw before. An owner NAME that declares the same
  * method both ways — `class Relation` and the `interface Relation` that types
- * its mixins — has a body and stays; dropping it left `ExplainProxy#first` as
- * relation.ts's only owner of `first` and paired `FinderMethods#first` with the
- * proxy, the very mispairing `ambiguousTsOwner` exists to prevent.
+ * its mixins — has a body and stays.
  */
 export function ownersWithBodies(
   owners: ReadonlySet<string> | undefined,
@@ -2755,15 +2758,9 @@ export function main() {
     // owners) — the port's spelling of Ruby's `name=` writer, so
     // `resolveTsOwner` can keep a Ruby reader off it (RFC 0108).
     const tsWriterOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    // The owners whose declaration of the name carries no body (file → name →
-    // owners) — an interface signature or an object-literal reference, see
-    // `MethodInfo.bodyless`. Subtracted by `ownersWithBodies` wherever the file
-    // also declares a real body, so an exported host type cannot outrank it.
+    // (file → name → owners) split by declaration shape — see `MethodInfo.bodyless`
+    // and `ownersWithBodies`.
     const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    // Its complement: the owners that declare the name WITH a body. One owner
-    // name can be both — relation.ts declares `first` on `class Relation` and
-    // again on the `interface Relation` that types its mixins — and such an
-    // owner has a body, so `ownersWithBodies` subtracts this set first.
     const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
@@ -2898,16 +2895,11 @@ export function main() {
           scope,
         );
       }
-      // The file-keyed BODY maps below are the package's own, `scope` and all:
-      // a relative path is not unique across packages — activemodel and
-      // activerecord both port `attribute_methods.rb` to `attribute-methods.ts`
-      // — so a dep's same-named member pooled under the same key joins the
-      // whole-file union the call gates compare against, and the ActiveModel
-      // body then answered for the ActiveRecord one. Every call
-      // `generate_alias_attribute_methods` (activerecord/lib/active_record/
-      // attribute_methods.rb:80-85) omitted was covered that way and the gate
-      // stayed green (RFC 0126). Only the by-NAME pools (above and below) are
-      // deliberately dep-wide.
+      // A relative path is not unique across packages — activemodel and
+      // activerecord both port attribute_methods.rb to attribute-methods.ts —
+      // so the file-keyed BODY maps below take this package's members only, or
+      // a dep's same-named body joins the union the call gates compare against.
+      // The by-NAME pools stay dep-wide (RFC 0126).
       if (m.callSeq !== undefined && scope === "package") {
         const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.callSeq]);
@@ -3380,17 +3372,8 @@ export function main() {
       // whether the pairing stayed ambiguous — in which case the gates record
       // nothing rather than compare against a member this Ruby body did not
       // port to.
-      //
-      // Resolved TWICE where the file's declarations of the name leave it
-      // ambiguous: the second pass drops the bodyless ones (see
-      // `ownersWithBodies`), so an exported host type sitting next to the real
-      // `export function` no longer silently retires every call-parity finding
-      // for the method. The retry runs only after the full population failed,
-      // which is what keeps it from answering a question the full population
-      // already answered — relation.ts declares `first` on the `Relation`
-      // interface that types its mixins and on `ExplainProxy`, and there the
-      // first pass names `Relation` (whose body is in relation/finder-methods.ts)
-      // and records nothing, exactly as before (RFC 0126).
+      // Resolved twice where the full population leaves it ambiguous — see
+      // `ownersWithBodies` for why the retry runs second.
       const resolveOwner = (
         rubyName: string,
         tsName: string,

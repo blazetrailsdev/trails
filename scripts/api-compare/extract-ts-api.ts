@@ -2081,9 +2081,7 @@ export function harvestObjectLiteralMethods(
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
     let writer = false;
-    // A member that is a bare reference to a function declared elsewhere
-    // (`{ qux }` / `{ foo: NS.bar }`) declares the name without a body here —
-    // see MethodInfo.bodyless.
+    // `{ qux }` / `{ foo: NS.bar }` — see MethodInfo.bodyless.
     let bodyless = false;
     let internal = internalJsDocTagApplies(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
