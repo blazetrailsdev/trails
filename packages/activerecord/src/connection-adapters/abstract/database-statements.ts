@@ -59,6 +59,7 @@ export type ExplainOption = string;
 
 export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
+  unpreparedStatement?<T>(fn: () => Promise<T> | T): Promise<T> | T;
   /** @internal */
   collector?(): Collectors.Composite | Collectors.SubstituteBinds;
   /** @internal */
@@ -223,7 +224,12 @@ export function toSqlAndBinds(
       ];
 
       if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
-        return unpreparedStatement(host!, () => toSqlAndBinds.call(host, arelOrSqlString));
+        return host!.unpreparedStatement!(() => toSqlAndBinds.call(host, arelOrSqlString)) as [
+          string,
+          unknown[],
+          boolean | null,
+          boolean,
+        ];
       }
       preparable = collector.preparable ?? null;
     } else {
@@ -238,20 +244,6 @@ export function toSqlAndBinds(
   }
 
   return [arelOrSqlString as string, binds, preparable, allowRetry];
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function unpreparedStatement<T>(host: DatabaseStatementsHost, block: () => T): T {
-  const wasPreparedStatements = (host as { preparedStatements?: boolean }).preparedStatements;
-  (host as { preparedStatements?: boolean }).preparedStatements = false;
-  try {
-    return block();
-  } finally {
-    (host as { preparedStatements?: boolean }).preparedStatements = wasPreparedStatements;
-  }
 }
 
 export function cacheableQuery(

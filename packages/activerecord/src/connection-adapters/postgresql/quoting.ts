@@ -2,6 +2,7 @@ import { BinaryData, DateInfinity, DateNegativeInfinity } from "@blazetrails/act
 import { ActiveRecord } from "../../ar-config.js";
 import {
   quote as abstractQuote,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
   quotedDate as abstractQuotedDate,
   type TemporalDateLike,
   toBytes,
@@ -10,8 +11,7 @@ import {
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/date";
 import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
-import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
-import { ValueType } from "@blazetrails/activemodel";
+import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Range, rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
@@ -44,13 +44,9 @@ export interface DefaultExpressionColumn {
   fmod?: number | null;
 }
 
-export interface CastTypeLookup {
-  lookupCastTypeFromColumn(
-    column: DefaultExpressionColumn,
-  ):
-    | { serialize?(value: unknown): unknown }
-    | null
-    | Promise<{ serialize?(value: unknown): unknown } | null>;
+export interface CastTypeLookupHost {
+  lookupCastTypeFromColumn(column: DefaultExpressionColumn): { serialize(value: unknown): unknown };
+  lookupCastType(sqlType: string | null): unknown;
 }
 
 const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
@@ -124,37 +120,21 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   return abstractQuote.call(this, value);
 }
 
-export async function quoteDefaultExpression(
-  this: QuotingDispatchHost,
+export function quoteDefaultExpression(
+  this: QuotingDispatchHost & CastTypeLookupHost,
   value: unknown,
   column: DefaultExpressionColumn,
-  castTypeLookup?: CastTypeLookup | null,
-): Promise<string> {
+): string | Promise<string> {
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
-  }
-  if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {
+  } else if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {
     return value;
+  } else if (column != null && "array" in column) {
+    const type = this.lookupCastTypeFromColumn(column);
+    return quote.call(this, type.serialize(value));
+  } else {
+    return abstractQuoteDefaultExpression.call(this, value, column);
   }
-
-  let serialized: unknown = value;
-  if (column != null && "array" in column) {
-    const castType = (await castTypeLookup?.lookupCastTypeFromColumn(column)) ?? null;
-    if (column.array === true && globalThis.Array.isArray(value)) {
-      const fromTypeMap = castType?.serialize ? castType.serialize(value) : value;
-      if (fromTypeMap instanceof ArrayData) {
-        serialized = fromTypeMap;
-      } else {
-        const subtype = (castType ?? new ValueType()) as ConstructorParameters<typeof OidArray>[0];
-        serialized = new OidArray(subtype).serialize(value);
-      }
-    } else if (column.array === true) {
-      serialized = value;
-    } else if (castType?.serialize) {
-      serialized = castType.serialize(value);
-    }
-  }
-  return quote.call(this, serialized);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

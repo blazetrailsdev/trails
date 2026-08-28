@@ -10,6 +10,7 @@ import {
   castBoundValue,
   columnNameMatcher,
   columnNameWithOrderMatcher,
+  quoteString,
 } from "./quoting.js";
 import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
@@ -248,5 +249,31 @@ describe("MySQL quoting — columnNameWithOrderMatcher", () => {
 
   it("rejects injection", () => {
     expect(re.test("name; DROP TABLE users")).toBe(false);
+  });
+});
+
+describe("MySQL quoteString escapes per the connection's escaping state", () => {
+  it("doubles the quote and leaves backslash inert under NO_BACKSLASH_ESCAPES", () => {
+    const state = { noBackslashEscapes: true, charset: "utf8mb4" };
+    expect(quoteString("O'Reilly", state)).toBe("O''Reilly");
+    expect(quoteString("C:\\path", state)).toBe("C:\\path");
+    expect(quoteString("a\\'b", state)).toBe("a\\''b");
+  });
+
+  it("escapes with backslashes when NO_BACKSLASH_ESCAPES is not set", () => {
+    const state = { noBackslashEscapes: false, charset: "utf8mb4" };
+    expect(quoteString("O'Reilly", state)).toBe("O\\'Reilly");
+    expect(quoteString("C:\\path", state)).toBe("C:\\\\path");
+  });
+
+  it("copies a multi-byte character verbatim under a multi-byte charset", () => {
+    const state = { noBackslashEscapes: false, charset: "gbk" };
+    expect(quoteString("\u5c0f'", state)).toBe("\u5c0f\\'");
+    expect(quoteString("\uff3c", state)).toBe("\uff3c");
+    expect(quoteString("\u5c0f\\", state)).toBe("\u5c0f\\\\");
+  });
+
+  it("escapes with backslashes by default when no state is supplied", () => {
+    expect(quoteString("O'Reilly")).toBe("O\\'Reilly");
   });
 });

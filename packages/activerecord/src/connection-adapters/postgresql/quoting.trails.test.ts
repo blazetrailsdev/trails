@@ -20,6 +20,7 @@ import {
   lookupCastTypeFromColumn,
   quote as quoteFn,
   quoteDefaultExpression,
+  type CastTypeLookupHost,
   quotedBinary,
   quotedDate,
   quoteSchemaName,
@@ -88,112 +89,92 @@ describe("PostgreSQL quoting", () => {
 
   it("serializes defaults for any PostgreSQL column, not only array columns", async () => {
     const column = { sqlType: "integer", array: false };
-    const typeMap = {
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
       lookupCastTypeFromColumn(col: { sqlType?: string | null }) {
         expect(col.sqlType).toBe("integer");
         return { serialize: (value: unknown) => Number(value) + 1 };
       },
-    };
+    });
 
-    expect(await quoteDefaultExpression.call(HOST, 41, column, typeMap)).toBe("42");
+    expect(await quoteDefaultExpression.call(host, 41, column)).toBe("42");
+  });
+
+  it("serializes a non-array column's default through its cast type", async () => {
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
+      lookupCastType(sqlType: string | null) {
+        expect(sqlType).toBe("integer");
+        return { serialize: (value: unknown) => Number(value) + 1 };
+      },
+    });
+
+    expect(await quoteDefaultExpression.call(host, 41, { sqlType: "integer" })).toBe("42");
   });
 
   it("quotes a binary default through PG's quotedBinary", async () => {
-    expect(await quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]), {})).toBe(
-      "'\\x1f8b'",
-    );
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
+      lookupCastType: () => new BinaryType(),
+    });
     expect(
-      await quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b])), {}),
+      await quoteDefaultExpression.call(host, new Uint8Array([0x1f, 0x8b]), { sqlType: "bytea" }),
+    ).toBe("'\\x1f8b'");
+    expect(
+      await quoteDefaultExpression.call(host, new BinaryData(new Uint8Array([0x1f, 0x8b])), {
+        sqlType: "bytea",
+      }),
     ).toBe("'\\x1f8b'");
   });
 
   it("quotes a BC date default through PG's quotedDate", async () => {
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
+      lookupCastType: () => ({ serialize: (v: unknown) => v }),
+    });
     expect(
-      await quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"), {}),
+      await quoteDefaultExpression.call(host, Temporal.PlainDate.from("-000043-03-15"), {
+        sqlType: "date",
+      }),
     ).toBe("'0044-03-15 BC'");
   });
 
   it("quotes a binary default produced by BinaryType#serialize", async () => {
     const column = { sqlType: "bytea", array: false };
-    const typeMap = { lookupCastTypeFromColumn: () => new BinaryType() };
-    expect(await quoteDefaultExpression.call(HOST, "ab", column, typeMap)).toBe("'\\x6162'");
-  });
-
-  it("serializes array defaults via fallback OidArray when type map misses", async () => {
-    const column = { sqlType: "text[]", array: true };
-    const nullTypeMap = {
-      lookupCastTypeFromColumn() {
-        return null;
-      },
-    };
-    expect(await quoteDefaultExpression.call(HOST, [], column, nullTypeMap)).toBe("'{}'");
-    expect(await quoteDefaultExpression.call(HOST, ["a", "b"], column, nullTypeMap)).toBe(
-      "'{a,b}'",
-    );
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
+      lookupCastTypeFromColumn: () => new BinaryType(),
+    });
+    expect(await quoteDefaultExpression.call(host, "ab", column)).toBe("'\\x6162'");
   });
 
   it("does not quote function default values for UUID columns", async () => {
     const column = { type: "uuid", sqlType: "uuid" };
-    expect(await quoteDefaultExpression.call(HOST, "gen_random_uuid()", column)).toBe(
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
+      lookupCastType: () => ({ serialize: (v: unknown) => v }),
+    });
+    expect(await quoteDefaultExpression.call(host, "gen_random_uuid()", column)).toBe(
       "gen_random_uuid()",
     );
-    expect(await quoteDefaultExpression.call(HOST, "uuid_generate_v4()", column)).toBe(
+    expect(await quoteDefaultExpression.call(host, "uuid_generate_v4()", column)).toBe(
       "uuid_generate_v4()",
     );
     expect(
-      await quoteDefaultExpression.call(HOST, "11111111-1111-1111-1111-111111111111", column),
+      await quoteDefaultExpression.call(host, "11111111-1111-1111-1111-111111111111", column),
     ).toBe("'11111111-1111-1111-1111-111111111111'");
     expect(
-      await quoteDefaultExpression.call(HOST, "gen_random_uuid()", {
+      await quoteDefaultExpression.call(host, "gen_random_uuid()", {
         type: "text",
         sqlType: "text",
       }),
     ).toBe("'gen_random_uuid()'");
   });
 
-  it("does not apply array fallback when column.array is false", async () => {
-    const column = { sqlType: "text", array: false };
-    const nullTypeMap = {
-      lookupCastTypeFromColumn() {
-        return null;
-      },
-    };
-    expect(await quoteDefaultExpression.call(HOST, "hello", column, nullTypeMap)).toBe("'hello'");
-  });
-
   it("serializes array defaults through the type map", async () => {
     const arrayType = new PgTextEncoderArray({ name: "text[]", delimiter: "," });
     const column = { sqlType: "text[]", array: true };
-    const typeMap = {
+    const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
       lookupCastTypeFromColumn() {
         return { serialize: (value: unknown) => new ArrayData(arrayType, value as unknown[]) };
       },
-    };
+    });
 
-    expect(await quoteDefaultExpression.call(HOST, ["a", "b"], column, typeMap)).toBe("'{a,b}'");
-  });
-
-  it("serializes array defaults via an element subtype (per-element coercion)", async () => {
-    const column = { sqlType: "integer", array: true };
-    const typeMap = {
-      lookupCastTypeFromColumn() {
-        return { cast: (v: unknown) => v, serialize: (v: unknown) => Number(v) + 100 };
-      },
-    };
-    expect(await quoteDefaultExpression.call(HOST, [1, 2, 3], column, typeMap)).toBe(
-      "'{101,102,103}'",
-    );
-  });
-
-  it("passes raw array-literal string defaults through without scalar coercion", async () => {
-    const column = { sqlType: "integer", array: true };
-    const typeMap = {
-      lookupCastTypeFromColumn() {
-        return { serialize: (v: unknown) => Number(v) };
-      },
-    };
-    expect(await quoteDefaultExpression.call(HOST, "{}", column, typeMap)).toBe("'{}'");
-    expect(await quoteDefaultExpression.call(HOST, "{1,2,3}", column, typeMap)).toBe("'{1,2,3}'");
+    expect(await quoteDefaultExpression.call(host, ["a", "b"], column)).toBe("'{a,b}'");
   });
 
   it("supports nested function calls up to 2 levels deep", () => {

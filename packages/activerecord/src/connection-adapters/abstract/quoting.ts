@@ -161,12 +161,15 @@ export function quoteDefaultExpression(
   this: QuotingDispatchHost & QuotingHost,
   value: unknown,
   column: { sqlType?: string | null },
-): string {
+): string | Promise<string> {
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
   }
-  value = (this.lookupCastType(column.sqlType ?? null) as Type).serialize(value);
-  return this.quote(value);
+  const castType = this.lookupCastType(column.sqlType ?? null) as Type | Promise<Type>;
+  if (castType instanceof Promise) {
+    return castType.then((type) => this.quote(type.serialize(value)));
+  }
+  return this.quote(castType.serialize(value));
 }
 
 export function quotedTrue(): string {

@@ -1137,7 +1137,7 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  async unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> {
+  unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T {
     let cache: Set<unknown> | undefined;
     if (
       this._preparedStatements != null &&
@@ -1146,11 +1146,20 @@ export class AbstractAdapter implements Quoting {
     ) {
       cache = this.preparedStatementsDisabledCache.add(this);
     }
+    let result: Promise<T> | T;
     try {
-      return await fn();
-    } finally {
+      result = fn();
+    } catch (error) {
       cache?.delete(this);
+      throw error;
     }
+    if (result instanceof Promise) {
+      return result.finally(() => {
+        cache?.delete(this);
+      });
+    }
+    cache?.delete(this);
+    return result;
   }
 
   supportsExplain(): boolean {

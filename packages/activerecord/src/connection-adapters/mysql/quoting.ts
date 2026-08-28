@@ -64,7 +64,35 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
   "\x1a": "\\Z",
 };
 
-export function quoteString(value: string): string {
+export interface EscapeState {
+  noBackslashEscapes: boolean;
+  charset: string | null;
+}
+
+// eslint-disable-next-line no-control-regex
+const MYSQL_MULTI_BYTE_ESCAPE_RE = /[^\x00-\x7f]|[\\'"\x00\n\r\x1a]/g;
+
+const MULTI_BYTE_CHARSETS = new Set([
+  "big5",
+  "cp932",
+  "eucjpms",
+  "euckr",
+  "gb18030",
+  "gbk",
+  "sjis",
+  "ujis",
+]);
+
+export function quoteString(
+  value: string,
+  state: EscapeState = { noBackslashEscapes: false, charset: null },
+): string {
+  if (state.noBackslashEscapes) {
+    return value.replace(/'/g, "''");
+  }
+  if (state.charset != null && MULTI_BYTE_CHARSETS.has(state.charset)) {
+    return value.replace(MYSQL_MULTI_BYTE_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
+  }
   return value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
 }
 

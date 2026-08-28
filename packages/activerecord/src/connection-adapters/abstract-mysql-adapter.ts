@@ -41,6 +41,7 @@ import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
   quoteString as mysqlQuoteString,
+  type EscapeState,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
   quotedBinary as mysqlQuotedBinary,
@@ -925,7 +926,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @missingRailsCall with_raw_connection — PERMANENT */
   override quoteString(string: string): string {
-    return mysqlQuoteString(string);
+    return mysqlQuoteString(string, this._escapeState);
+  }
+
+  protected _escapeState: EscapeState = { noBackslashEscapes: false, charset: null };
+
+  protected async loadEscapeState(): Promise<void> {
+    const row = await this.selectOne(
+      "SELECT @@SESSION.sql_mode AS sql_mode, @@SESSION.character_set_connection AS charset",
+      "SCHEMA",
+    );
+    const sqlMode = row?.["sql_mode"];
+    const charset = row?.["charset"];
+    this._escapeState = {
+      noBackslashEscapes:
+        typeof sqlMode === "string" && sqlMode.split(",").includes("NO_BACKSLASH_ESCAPES"),
+      charset: typeof charset === "string" ? charset.toLowerCase() : null,
+    };
   }
 
   /** @missingRailsCall empty? — PERMANENT */

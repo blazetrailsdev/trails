@@ -7,7 +7,7 @@ import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
 } from "./abstract/schema-definitions.js";
-import { parseTableOptions } from "./abstract-mysql-adapter.js";
+import { AbstractMysqlAdapter, parseTableOptions } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
@@ -695,5 +695,33 @@ describe("AbstractMysqlAdapter#foreignKeys", () => {
     const [fk] = await adapter.foreignKeys("astronauts");
     expect(fk.onUpdate).toBeUndefined();
     expect(fk.onDelete).toBeUndefined();
+  });
+});
+
+describe("AbstractMysqlAdapter escaping state", () => {
+  const withState = async (sqlMode: string, charset: string) => {
+    const a = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter & {
+      selectOne(sql: string, name?: string | null): Promise<Record<string, unknown>>;
+      loadEscapeState(): Promise<void>;
+    };
+    a.selectOne = async () => ({ sql_mode: sqlMode, charset });
+    await a.loadEscapeState();
+    return a;
+  };
+
+  it("quotes with doubled quotes once NO_BACKSLASH_ESCAPES is cached", async () => {
+    const a = await withState("STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES", "utf8mb4");
+    expect(a.quoteString("O'Reilly")).toBe("O''Reilly");
+    expect(a.quoteString("C:\\path")).toBe("C:\\path");
+  });
+
+  it("quotes with backslashes when NO_BACKSLASH_ESCAPES is absent", async () => {
+    const a = await withState("STRICT_ALL_TABLES", "utf8mb4");
+    expect(a.quoteString("O'Reilly")).toBe("O\\'Reilly");
+  });
+
+  it("caches the connection character set for the multi-byte escape arm", async () => {
+    const a = await withState("STRICT_ALL_TABLES", "GBK");
+    expect(a.quoteString("\u5c0f'")).toBe("\u5c0f\\'");
   });
 });
