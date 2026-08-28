@@ -7,25 +7,17 @@
  * `ActiveRecord::Base.configurations` to a pair of on-disk sqlite databases in
  * a tmpdir — and this mirrors that gate.
  *
- * The `CheckPending.new(proc { }).call({})` half of Rails'
- * `assert_pending_migrations` / `assert_no_pending_migrations` is not asserted
- * here: trails' `CheckPending` still detects pending migrations through its own
- * invented `migrator` / `pendingConnection` / `migrations` constructor options
- * rather than by calling `Migration.check_pending_migrations`. Converging it
- * onto Rails' `build_watcher` shape is
- * `check-pending-has-no-file-update-checker-watcher`; until that lands the
- * middleware cannot answer these assertions.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { Base } from "../base.js";
-import { Migration, MigrationContext, PendingMigrationError } from "../migration.js";
+import { CheckPending, Migration, MigrationContext, PendingMigrationError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { InternalMetadata } from "../internal-metadata.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, Logger } from "@blazetrails/activesupport";
 import { currentAdapter, inMemoryDb } from "../support/adapter-helper.js";
 
 // Rails writes `class #{name.classify} < ActiveRecord::Migration::Current`; a
@@ -96,15 +88,37 @@ describe.skipIf(skip)("Migration", () => {
           (e: unknown) => e,
         );
         expect(error).toBeInstanceOf(PendingMigrationError);
-        const message = (error as Error).message;
-        expect(message).toContain("Migrations are pending.");
-        for (const migration of expectedMigrations) expect(message).toContain(migration);
+
+        const checkPendingError = await new CheckPending(async () => {
+          throw new Error("flunk");
+        })
+          .call({})
+          .then(
+            () => null,
+            (e: unknown) => e,
+          );
+        expect(checkPendingError).toBeInstanceOf(PendingMigrationError);
+
+        for (const message of [(error as Error).message, (checkPendingError as Error).message]) {
+          expect(message).toContain("Migrations are pending.");
+          for (const migration of expectedMigrations) expect(message).toContain(migration);
+        }
       }
     };
 
     const assertNoPendingMigrations = async (): Promise<void> => {
+      const calls: Record<string, unknown>[] = [];
+      const app = async (env: Record<string, unknown>): Promise<unknown> => {
+        calls.push(env);
+        return null;
+      };
+      const checkPending = new CheckPending(app);
+
       for (let i = 0; i < 2; i++) {
         await expect(Migration.checkAllPendingBang()).resolves.toBeUndefined();
+
+        await checkPending.call({});
+        expect(calls.length).toBe(i + 1);
       }
     };
 
@@ -145,6 +159,16 @@ describe.skipIf(skip)("Migration", () => {
       // It understands the new migration created at 01
       createMigration("01", "create_foo");
       await assertPendingMigrations("01_create_foo.ts");
+    });
+
+    it("with stdlib logger", async () => {
+      const old = Base.logger;
+      Base.logger = new Logger() as unknown as typeof Base.logger;
+      try {
+        await expect(new CheckPending(async () => {}).call({})).resolves.not.toThrow();
+      } finally {
+        Base.logger = old;
+      }
     });
 
     it("with multiple database", async () => {
