@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   asJson as objectAsJson,
-  extend,
   include,
   prepend,
   InstanceVariablesObject,
@@ -120,8 +119,7 @@ interface DirtyModel extends API, Dirty {
 
 include(DirtyModel, API);
 
-extend(DirtyModel, AttributeMethods.ClassMethods);
-include(DirtyModel, AttributeMethods.InstanceMethods);
+include(DirtyModel, AttributeMethods.AttributeMethods);
 
 include(DirtyModel, Dirty);
 const DirtyModelClass = DirtyModel as unknown as {

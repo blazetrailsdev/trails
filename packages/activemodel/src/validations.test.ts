@@ -25,13 +25,17 @@ import {
   Validator,
 } from "./index.js";
 import type { ConditionalOptions } from "./validations.js";
+import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { FormatValidator } from "./validations/format.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 class Topic extends Model {
+  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {
+    include(this, ValidationsCallbacks);
     include(this, Attributes);
     this.attribute("title", "string");
     this.attribute("author_name", "string");

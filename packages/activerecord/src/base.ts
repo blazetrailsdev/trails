@@ -44,6 +44,7 @@ import {
   type CallbackConditions,
   type CallbackObject,
 } from "@blazetrails/activemodel";
+import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -826,6 +827,14 @@ export class Base extends Model {
    * mixin installs is declared here.
    */
   declare static includeRootInJson: boolean | string;
+
+  /**
+   * `include ActiveModel::Validations::Callbacks` (callbacks.rb:413) — the
+   * mixin installs these at runtime through `Callbacks.[included]`; TS
+   * static-side inheritance needs the slots declared.
+   */
+  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 
   // --- Translation mixin (wired via extend() after class) ---
   // Normalization
@@ -4540,8 +4549,7 @@ include(Base, AttributeRegistration);
 // AttributeMethods lands second, which is what makes its alias-resolving
 // `resolve_attribute_name` (activemodel/attribute_methods.rb:396-398) win over
 // the registration one (attribute_registration.rb:101-103).
-extend(Base, AMAttributeMethods.ClassMethods);
-include(Base, AMAttributeMethods.InstanceMethods);
+include(Base, AMAttributeMethods.AttributeMethods);
 
 extend(Base, {
   defineAttribute: _defineAttribute,

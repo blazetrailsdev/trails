@@ -53,6 +53,7 @@ export { Trailtie } from "./trailtie.js";
 export { WithValidator } from "./validations/with.js";
 export { AbsenceValidator } from "./validations/absence.js";
 export type { AttrNameArg } from "./validations/helper-methods.js";
+export { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 export { PresenceValidator } from "./validations/presence.js";
 export { LengthValidator } from "./validations/length.js";
 export { NumericalityValidator } from "./validations/numericality.js";

@@ -11,6 +11,7 @@ import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttributeMethodPattern,
+  AttributeMethods,
   AttrNames,
   ClassMethods as AttributeMethodsClassMethods,
   InstanceMethods as AttributeMethodsInstanceMethods,
@@ -138,8 +139,7 @@ type AttributeMethodSuffixHost = AttributeMethodHost &
 export class Attributes {
   static [included](base: AttributeMethodSuffixHost): void {
     include(base, AttributeRegistration);
-    extend(base, AttributeMethodsClassMethods);
-    include(base, AttributeMethodsInstanceMethods);
+    include(base, AttributeMethods);
 
     include(base, { _writeAttribute, "attribute=": _writeAttribute });
 

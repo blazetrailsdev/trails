@@ -1,3 +1,10 @@
+import {
+  Callbacks as ASCallbacks,
+  defineCallbacks,
+  extend,
+  include,
+  included,
+} from "@blazetrails/activesupport";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 import type { Model } from "../model.js";
 
@@ -36,7 +43,21 @@ export interface CallbacksInstanceMethods {
   runValidationsBang(): Promise<boolean>;
 }
 
-export type Callbacks = typeof ClassMethods & CallbacksInstanceMethods;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+type AnyClass = (new (...args: any[]) => any) & { prototype: object };
+
+export const Callbacks = {
+  ClassMethods,
+  [included](base: AnyClass): void {
+    extend(base, ClassMethods);
+
+    include(base, ASCallbacks.InstanceMethods);
+    defineCallbacks(base.prototype, "validation", {
+      skipAfterCallbacksIfTerminated: true,
+      scope: ["kind", "name"],
+    });
+  },
+};
 
 type Conditional = ((record: unknown) => boolean) | string;
 
