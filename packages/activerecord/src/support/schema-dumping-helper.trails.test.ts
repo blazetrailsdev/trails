@@ -79,7 +79,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_keep");
     await createSdhTable("sdh_skip");
 
-    const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, ["sdh_skip"]);
+    const output = await dumpAllTableSchema(["sdh_skip"], adapter as unknown as SchemaSource);
 
     expect(output).toContain("sdh_keep");
     expect(output).not.toContain("sdh_skip");

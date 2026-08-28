@@ -1328,7 +1328,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   async rawConnection(): Promise<AbstractAdapter | null> {
-    return this.withRawConnection(async (conn) => {
+    return this.withRawConnection({}, async (conn) => {
       await this.disableLazyTransactionsBang();
       this._rawConnectionDirty = true;
       return conn;
@@ -1795,19 +1795,14 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   async withRawConnection<T>(
-    optsOrCallback:
-      | { allowRetry?: boolean; materializeTransactions?: boolean }
-      | ((raw: AbstractAdapter | null) => Promise<T> | T),
-    callback?: (raw: AbstractAdapter | null) => Promise<T> | T,
+    options: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
+    block?: (raw: AbstractAdapter | null) => Promise<T> | T,
   ): Promise<T> {
-    const isFn = typeof optsOrCallback === "function";
-    const opts = (isFn ? {} : optsOrCallback) ?? {};
-    const block = isFn ? optsOrCallback : callback;
     if (typeof block !== "function") {
       throw new TypeError("withRawConnection requires a callback");
     }
-    const allowRetry = opts.allowRetry ?? false;
-    const materializeTransactions = opts.materializeTransactions ?? true;
+    const allowRetry = options.allowRetry ?? false;
+    const materializeTransactions = options.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();

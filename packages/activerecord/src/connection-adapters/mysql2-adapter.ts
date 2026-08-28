@@ -522,7 +522,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
     return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
       try {
-        return await this.withRawConnection(async (conn) => {
+        return await this.withRawConnection({}, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
           const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
             prepare: false,

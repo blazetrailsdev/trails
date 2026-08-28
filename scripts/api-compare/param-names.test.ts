@@ -59,6 +59,28 @@ describe("compareParamNames", () => {
     );
   });
 
+  it("does not flag a MULTI-kwarg group collapsed into one options object", () => {
+    // abstract_adapter.rb:983 `with_raw_connection(allow_retry: false,
+    // materialize_transactions: true)` + block, ported as
+    // `withRawConnection(options, block)`: the two kwargs share one slot, so the
+    // second one has no TS position to be renamed at.
+    expect(
+      compareParamNames(
+        [kwopt("allow_retry"), kwopt("materialize_transactions")],
+        [req("options"), req("block")],
+      ),
+    ).toEqual([]);
+  });
+
+  it("still flags a rename under the collapsed kwarg form", () => {
+    expect(
+      compareParamNames(
+        [kwopt("allow_retry"), kwopt("materialize_transactions")],
+        [req("adapterOpts"), req("block")],
+      ),
+    ).toEqual([{ position: 0, ruby: "options", ts: "adapterOpts" }]);
+  });
+
   it("skips a `this:` receiver parameter", () => {
     expect(compareParamNames([req("value")], [req("this"), req("value")])).toEqual([]);
   });

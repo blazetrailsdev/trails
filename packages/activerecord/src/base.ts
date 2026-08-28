@@ -3065,7 +3065,7 @@ export class Base extends Model {
     const saveOk = await runCallbacks(this, "save", async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
-        const createOk = await this._createRecord(block);
+        const createOk = await this._createRecord(undefined, block);
         if (createOk) saved = true;
         else saved = false;
       } else {
@@ -4335,7 +4335,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   hasTransactionalCallbacks(): boolean;
   /** @internal */
-  _createRecord(block?: (record: this) => void): Promise<boolean>;
+  _createRecord(attributeNames?: string[], block?: (record: this) => void): Promise<boolean>;
   /** @internal */
   _updateRecord(block?: (record: this) => void): Promise<boolean>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
@@ -4894,9 +4894,13 @@ for (const [name, fn] of [
   ],
   [
     "_createRecord",
-    function (this: Base, block?: (record: Base) => void): Promise<boolean> {
+    function (
+      this: Base,
+      attributeNames?: string[],
+      block?: (record: Base) => void,
+    ): Promise<boolean> {
       return Timestamp._createRecord.call(this as any, () =>
-        callbacksCreateRecord.call(this, block),
+        callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
     },
   ],

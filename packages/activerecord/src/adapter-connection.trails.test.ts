@@ -109,8 +109,8 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
   it("withRawConnection is reentrant", async () => {
     const a = new AbstractAdapter();
     let innerRan = false;
-    const result = await a.withRawConnection(async () => {
-      await a.withRawConnection(async () => {
+    const result = await a.withRawConnection({}, async () => {
+      await a.withRawConnection({}, async () => {
         innerRan = true;
       });
       return "outer";

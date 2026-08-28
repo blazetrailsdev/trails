@@ -43,7 +43,7 @@ describe("SchemaDumperTest", () => {
     return Base.adapter as unknown as SchemaSource;
   }
   function standardDump(ignoreTables: (string | RegExp)[] = []): Promise<string> {
-    return dumpAllTableSchema(canonicalSource(), ignoreTables);
+    return dumpAllTableSchema(ignoreTables, canonicalSource());
   }
   function dumpCanonicalTable(...tables: string[]): Promise<string> {
     return dumpTableSchema(canonicalSource(), ...tables);

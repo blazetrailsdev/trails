@@ -904,7 +904,7 @@ export class PostgreSQLAdapter
     const pgSql = this.rewriteBinds(sql, binds);
     return await this.log(pgSql, name, originalBinds, binds, false, async (payload) => {
       try {
-        return await this.withRawConnection(async (conn) => {
+        return await this.withRawConnection({}, async (conn) => {
           const client = conn as unknown as pg.Client;
           const upper = sql.trimStart().toUpperCase();
 
@@ -1445,7 +1445,7 @@ export class PostgreSQLAdapter
   }
 
   async exec(sql: string): Promise<void> {
-    await this.withRawConnection(async (conn) => {
+    await this.withRawConnection({}, async (conn) => {
       const client = conn as unknown as pg.Client;
       try {
         this._commandSettled = false;

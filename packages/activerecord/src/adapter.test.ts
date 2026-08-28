@@ -957,7 +957,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   it("does not reconnect and retry queries when retries are disabled", async () => {
     let attempts = 0;
     await expect(
-      connection.withRawConnection(async () => {
+      connection.withRawConnection({}, async () => {
         if (attempts === 0) {
           attempts++;
           throw new ConnectionFailed("Something happened to the connection");
@@ -1035,7 +1035,7 @@ describe("InvalidateTransactionTest", () => {
 
       await connection.transaction(async () => {
         try {
-          await connection.withRawConnection(async () => {
+          await connection.withRawConnection({}, async () => {
             throw new Deadlocked("made-up deadlock");
           });
         } catch (error) {
