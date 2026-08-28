@@ -2043,8 +2043,8 @@ export function resolveTsClassForRuby(
  * nothing.
  *
  * This used to return a second map (`folding`) that named a file's lexical
- * parent so nested classes could be dropped from `allRuby`. They are no
- * longer dropped — see the comment at that call site — so nothing selects a
+ * parent so nested classes could be dropped from the population. They are no
+ * longer dropped — see {@link collectRubyEntities} — so nothing selects a
  * lexical parent any more.
  */
 export function primaryClassesPerFile(classes: Record<string, ClassInfo>): Map<string, string> {
