@@ -7,6 +7,7 @@ import { include } from "@blazetrails/activesupport";
 import { Serialization } from "../serialization.js";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { LazilyDefineAttributes } from "./acceptance.js";
 
 describe("AcceptanceValidationTest", () => {
   it("eula", async () => {
@@ -261,6 +262,17 @@ describe("AcceptanceValidationTest", () => {
     expect(Agreement.attributeTypes()["terms"].name).toBe("boolean");
   });
 });
+describe("LazilyDefineAttributes#matches?", () => {
+  it("matches the writer name as well as the reader", () => {
+    const mod = new LazilyDefineAttributes(["terms"]);
+
+    expect(mod.matches("terms")).toBe(true);
+    expect(mod.matches("terms=")).toBe(true);
+    expect(mod.matches("other")).toBe(false);
+    expect(mod.matches("other=")).toBe(false);
+  });
+});
+
 describe("acceptance skips nil", () => {
   it("skips nil by default", async () => {
     class Terms extends Model {

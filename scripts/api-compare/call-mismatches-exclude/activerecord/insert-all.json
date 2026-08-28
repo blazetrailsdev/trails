@@ -1,0 +1,32 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "extract_types_from_columns_on",
+    "call": "columns_hash",
+    "reason": "Pre-existing divergence in `Builder`, a class nested inside a same-file parent (insert_all.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "extract_types_from_columns_on",
+    "call": "first",
+    "reason": "Pre-existing divergence in `Builder`, a class nested inside a same-file parent (insert_all.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "touch_model_timestamps_unless",
+    "call": "join",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Pre-existing argument-shape divergence in `Builder`, a class nested inside a same-file parent (insert_all.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this call site was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "values_list",
+    "call": "order:_insertAll,extractTypesFromColumnsOn",
+    "reason": "Pre-existing divergence in `Builder`, a class nested inside a same-file parent (insert_all.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  }
+]

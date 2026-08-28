@@ -27,20 +27,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/cookies.ts",
-    "rubyName": "parse",
-    "call": "load",
-    "reason": "Rails' `SerializedCookieJars#parse` deserializes with `serializer.load` (cookies.rb:597); the TS `parse` it pairs with is `CookieJar.parse`, the static Cookie-header splitter (cookies.ts:264-273), which deserializes nothing."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/cookies.ts",
-    "rubyName": "parse",
-    "call": "reserialize?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/cookies.ts",
     "rubyName": "signed",
     "call": "new",
     "kind": "args",

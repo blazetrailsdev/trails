@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "associations/preloader/association.ts",
+    "rubyName": "load_records_for_keys",
+    "call": "load",
+    "reason": "Pre-existing divergence in `LoaderQuery`, a class nested inside a same-file parent (associations/preloader/association.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/preloader/association.ts",
+    "rubyName": "records",
+    "call": "load_records",
+    "reason": "Pre-existing divergence in `LoaderRecords`, a class nested inside a same-file parent (associations/preloader/association.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  }
+]

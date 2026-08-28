@@ -2034,42 +2034,30 @@ export function resolveTsClassForRuby(
 }
 
 /**
- * The two per-file "which class is this file about?" selections, both by
- * shortest fqn but over different populations:
+ * The per-file "which class is this file about?" selection used by the
+ * inheritance check: the shortest fqn, RUBY_ONLY_CLASSES excluded. A shim we
+ * deliberately do not port must not become the one class a file contributes
+ * to that check, or the real class in the file is never checked at all —
+ * `I18n::JSON` (key_value.rb:8, two segments) would otherwise win over
+ * `I18n::Backend::KeyValue` (:68, three) and key_value.rb would contribute
+ * nothing.
  *
- *   - `folding`: every class. Used to skip nested classes that share a file
- *     with a shorter-named parent — `Preloader::Association::LoaderQuery` in
- *     preloader/association.rb is an implementation detail whose methods
- *     shouldn't inflate the parent's count. This is a purely lexical
- *     question, so a RUBY_ONLY_CLASSES entry still counts as a parent here.
- *   - `inheritance`: RUBY_ONLY_CLASSES excluded. A shim we deliberately do
- *     not port must not become the one class a file contributes to the
- *     inheritance check, or the real class in the file is never checked at
- *     all — `I18n::JSON` (key_value.rb:8, two segments) otherwise wins over
- *     `I18n::Backend::KeyValue` (:68, three) and key_value.rb contributes
- *     nothing.
- *
- * Kept as two maps rather than one: reusing the inheritance selection for
- * folding would promote `KeyValue` to lexical parent and swallow
- * `KeyValue::SubtreeProxy` (key_value.rb:154), which has its own TS class
- * and its own measured methods.
+ * This used to return a second map (`folding`) that named a file's lexical
+ * parent so nested classes could be dropped from the population. They are no
+ * longer dropped — see {@link collectRubyEntities} — so nothing selects a
+ * lexical parent any more.
  */
-export function primaryClassesPerFile(classes: Record<string, ClassInfo>): {
-  folding: Map<string, string>;
-  inheritance: Map<string, string>;
-} {
-  const folding = new Map<string, string>();
+export function primaryClassesPerFile(classes: Record<string, ClassInfo>): Map<string, string> {
   const inheritance = new Map<string, string>();
   const shorter = (fqn: string, existing: string | undefined) =>
     !existing || fqn.split("::").length < existing.split("::").length;
 
   for (const [fqn, cls] of Object.entries(classes)) {
     if (!cls.file) continue;
-    if (shorter(fqn, folding.get(cls.file))) folding.set(cls.file, fqn);
     if (isRubyOnlyClass(fqn)) continue;
     if (shorter(fqn, inheritance.get(cls.file))) inheritance.set(cls.file, fqn);
   }
-  return { folding, inheritance };
+  return inheritance;
 }
 
 export function superclassesMatch(
@@ -2379,6 +2367,65 @@ export function reopeningMethodCreditedToOwnFile(
 export interface RubyEntity {
   fqn: string;
   info: ClassInfo;
+}
+
+/**
+ * The Rails-side population a package contributes: every class, plus every
+ * module that carries something (an empty module has no surface to measure).
+ *
+ * **Nested classes are included.** A class nested inside a same-file parent —
+ * `Preloader::Association::LoaderQuery` in preloader/association.rb — used to
+ * be skipped here, which dropped it from the population ENTIRELY rather than
+ * merely from file pairing: its methods never reached the coverage
+ * denominator, so an unported nested class scored as nothing missing (926
+ * Ruby methods across 187 classes repo-wide, 518 of them on a class that does
+ * have a TS counterpart). Pairing is per FILE and deduped by method name
+ * (`dedupeRubyMethodInto`), so a nested class is measured against the same TS
+ * file its parent pairs with, and a name both define is still counted once.
+ *
+ * A `ClassMethods` submodule is folded into its parent module's class methods
+ * first — Ruby's `included do extend ClassMethods end` shape — and then
+ * dropped, since the parent now accounts for it. That fold MUTATES the parent
+ * entry in `rubyPkg`, matching how the caller has always consumed it.
+ */
+export function collectRubyEntities(rubyPkg: PackageInfo): RubyEntity[] {
+  const allRuby: RubyEntity[] = [];
+
+  for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
+    allRuby.push({ fqn, info: info as unknown as ClassInfo });
+  }
+
+  const classMethodModuleFqns = new Set<string>();
+  for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
+    if (!fqn.endsWith("::ClassMethods")) continue;
+    const parentFqn = fqn.replace(/::ClassMethods$/, "");
+    const parentMod = rubyPkg.modules[parentFqn] as unknown as ClassInfo | undefined;
+    if (parentMod) {
+      const mod = info as unknown as ClassInfo;
+      for (const m of mod.instanceMethods) {
+        if (!parentMod.classMethods.some((pm: MethodInfo) => pm.name === m.name)) {
+          parentMod.classMethods.push(m);
+        }
+      }
+      classMethodModuleFqns.add(fqn);
+    }
+  }
+
+  for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
+    const mod = info as unknown as ClassInfo;
+    if (classMethodModuleFqns.has(fqn)) continue;
+    if (
+      mod.instanceMethods.length === 0 &&
+      mod.classMethods.length === 0 &&
+      mod.includes.length === 0 &&
+      mod.extends.length === 0
+    ) {
+      continue;
+    }
+    allRuby.push({ fqn, info: mod });
+  }
+
+  return allRuby;
 }
 
 /**
@@ -3207,51 +3254,11 @@ export function main() {
     }
 
     // Collect all Ruby classes and modules with their methods
-    const allRuby: RubyEntity[] = [];
+    const allRuby = collectRubyEntities(rubyPkg);
 
-    const { folding: primaryClassPerFile, inheritance: inheritanceClassPerFile } =
-      primaryClassesPerFile(rubyPkg.classes as unknown as Record<string, ClassInfo>);
-
-    for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
-      const cls = info as unknown as ClassInfo;
-      // Skip nested classes in same file as a shorter-named parent
-      if (cls.file) {
-        const primary = primaryClassPerFile.get(cls.file);
-        if (primary && primary !== fqn && fqn.startsWith(primary + "::")) continue;
-      }
-      allRuby.push({ fqn, info: cls });
-    }
-
-    // Fold ClassMethods into parent module
-    const classMethodModuleFqns = new Set<string>();
-    for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
-      if (!fqn.endsWith("::ClassMethods")) continue;
-      const parentFqn = fqn.replace(/::ClassMethods$/, "");
-      const parentMod = rubyPkg.modules[parentFqn] as unknown as ClassInfo | undefined;
-      if (parentMod) {
-        const mod = info as unknown as ClassInfo;
-        for (const m of mod.instanceMethods) {
-          if (!parentMod.classMethods.some((pm: MethodInfo) => pm.name === m.name)) {
-            parentMod.classMethods.push(m);
-          }
-        }
-        classMethodModuleFqns.add(fqn);
-      }
-    }
-
-    for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
-      const mod = info as unknown as ClassInfo;
-      if (classMethodModuleFqns.has(fqn)) continue;
-      if (
-        mod.instanceMethods.length === 0 &&
-        mod.classMethods.length === 0 &&
-        mod.includes.length === 0 &&
-        mod.extends.length === 0
-      ) {
-        continue;
-      }
-      allRuby.push({ fqn, info: mod });
-    }
+    const inheritanceClassPerFile = primaryClassesPerFile(
+      rubyPkg.classes as unknown as Record<string, ClassInfo>,
+    );
 
     // Build module FQN → short name mapping for include resolution.
     // Ruby `include Predications` uses the short name, but the module FQN
@@ -3395,17 +3402,23 @@ export function main() {
       let fileMissing = 0;
       const declarationOnly: MethodResult[] = [];
 
-      // Collect all includer method sets for modules in this file,
-      // tracking which file each set came from (for move detection)
-      const allIncluderMethodSets: { file: string; methods: Set<string> }[] = [];
+      // Includer method sets per OWNING entity, tracking which file each set
+      // came from (for move detection). Keyed by owner rather than pooled per
+      // file: a Ruby file often holds several entities, and a method of one
+      // must not be credited to a TS file that includes a SIBLING. Rails'
+      // http/content_security_policy.rb holds both a `Request` module that
+      // ActionDispatch::Request includes and a `Middleware` class that nothing
+      // includes; pooled, `Middleware#call` was credited to http/request.ts,
+      // whose only `call` is `PASS_NOT_FOUND`'s (request.rb:82) — an unrelated
+      // body the call gates then compared against.
+      const includerMethodSetsByOwner = new Map<string, { file: string; methods: Set<string> }[]>();
       for (const item of items) {
-        const includerFiles = moduleIncluderFiles.get(item.fqn);
-        if (includerFiles) {
-          for (const f of includerFiles) {
-            const methods = tsMethodsByFile.get(f);
-            if (methods) allIncluderMethodSets.push({ file: f, methods });
-          }
+        const sets: { file: string; methods: Set<string> }[] = [];
+        for (const f of moduleIncluderFiles.get(item.fqn) ?? []) {
+          const methods = tsMethodsByFile.get(f);
+          if (methods) sets.push({ file: f, methods });
         }
+        if (sets.length > 0) includerMethodSetsByOwner.set(item.fqn, sets);
       }
 
       // Deduplicate: collect all unique Ruby methods expected from this
@@ -4058,7 +4071,7 @@ export function main() {
         let foundViaInclude: string | null = null;
         let matchedCandidate: string | null = null;
         for (const candidate of tsCandidates) {
-          for (const { file, methods } of allIncluderMethodSets) {
+          for (const { file, methods } of includerMethodSetsByOwner.get(rubyModule) ?? []) {
             if (methods.has(candidate)) {
               foundViaInclude = file;
               matchedCandidate = candidate;
