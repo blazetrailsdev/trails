@@ -1,67 +1,21 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { except } from "@blazetrails/activesupport";
+import { except, include, included, isModuleIncluded, Module } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
-export class LazilyDefineAttributes {
-  /** @internal */
-  readonly attributes: readonly string[];
-
-  constructor(attributes: string[]) {
-    this.attributes = Object.freeze([...attributes]);
-  }
-
-  matches(methodName: string): boolean {
-    const attrName = methodName.replace(/=$/, "");
-    return this.attributes.some((name) => name === attrName);
-  }
-
-  include(attribute: string): boolean {
-    return this.attributes.includes(attribute);
-  }
-
-  define(attribute: string): LazilyDefineAttributes {
-    if (this.include(attribute)) return this;
-    return new LazilyDefineAttributes([...this.attributes, attribute]);
-  }
-}
-
-/** @internal */
-export function setupBang(this: AcceptanceHost, klass: unknown): void {
-  if (typeof klass !== "function") return;
-  const ctor = klass as { prototype: object };
-  for (const attribute of this.attributes) {
-    const inherited = inspectAccessor(ctor.prototype, attribute);
-    if (inherited.hasGetter && inherited.hasSetter) continue;
-    const slot = `_${attribute}`;
-    Object.defineProperty(ctor.prototype, attribute, {
-      configurable: true,
-      get:
-        inherited.getter ??
-        function (this: Record<string, unknown>) {
-          return this[slot];
-        },
-      set:
-        inherited.setter ??
-        function (this: Record<string, unknown>, v: unknown) {
-          this[slot] = v;
-        },
-    });
-  }
+interface AttributeMethodQueryable {
+  prototype: object;
+  isAttributeMethod(attribute: string): boolean;
 }
 
 export class AcceptanceValidator extends EachValidator {
-  static readonly lazilyDefineAttributes = new LazilyDefineAttributes([]);
-
-  /** @internal */
-  declare setupBang: typeof setupBang;
   /** @internal */
   declare isAcceptableOption: typeof isAcceptableOption;
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
     super(options);
-    this.setupBang(options.class);
+    this.setupBang(options.class as AttributeMethodQueryable);
   }
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
@@ -72,13 +26,79 @@ export class AcceptanceValidator extends EachValidator {
     }
   }
 
-  static setup(attributes: string[]): LazilyDefineAttributes {
-    return new LazilyDefineAttributes(attributes);
+  /**
+   * @internal
+   * @missingRailsCall include? — PERMANENT
+   */
+  setupBang(klass: AttributeMethodQueryable): void {
+    const defineAttributes = new LazilyDefineAttributes(this.attributes);
+    if (!isModuleIncluded(klass, defineAttributes)) {
+      include(klass as unknown as Parameters<typeof include>[0], defineAttributes);
+    }
   }
 }
 
-interface AcceptanceHost {
-  attributes: readonly string[];
+export class LazilyDefineAttributes extends Module {
+  protected readonly attributes: readonly string[];
+
+  #lock: object | null = null;
+
+  constructor(attributes: readonly string[]) {
+    super();
+    this.attributes = attributes.map((name) => String(name));
+  }
+
+  matches(methodName: string): boolean {
+    const attrName = methodName.replace(/=$/, "");
+    return this.attributes.some((name) => name === attrName);
+  }
+
+  defineOn(klass: AttributeMethodQueryable): void {
+    if (!this.#lock) return;
+
+    const attrReaders = this.attributes.filter((name) => !klass.isAttributeMethod(name));
+    const attrWriters = this.attributes.filter((name) => !klass.isAttributeMethod(`${name}=`));
+
+    this.moduleEval((mod) => {
+      for (const name of new Set([...attrReaders, ...attrWriters])) {
+        const inherited = inspectAccessor(klass.prototype, name);
+        const slot = `_${name}`;
+        Object.defineProperty(mod, name, {
+          configurable: true,
+          get: attrReaders.includes(name)
+            ? function (this: Record<string, unknown>) {
+                return this[slot];
+              }
+            : inherited.getter,
+          set: attrWriters.includes(name)
+            ? function (this: Record<string, unknown>, value: unknown) {
+                this[slot] = value;
+              }
+            : inherited.setter,
+        });
+      }
+    });
+
+    this.#lock = null;
+  }
+
+  /**
+   * @missingRailsCall define_method — PERMANENT
+   * @noRailsEquivalent PERMANENT
+   */
+  [included](klass: AttributeMethodQueryable): void {
+    this.#lock = {};
+    this.defineOn(klass);
+  }
+
+  equals(other: unknown): boolean {
+    return (
+      other instanceof LazilyDefineAttributes &&
+      this.constructor === other.constructor &&
+      this.attributes.length === other.attributes.length &&
+      this.attributes.every((name, i) => name === other.attributes[i])
+    );
+  }
 }
 
 /** @internal */
@@ -105,7 +125,6 @@ function isNonStringIterable(value: unknown): value is Iterable<unknown> {
   return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
 
-AcceptanceValidator.prototype.setupBang = setupBang;
 AcceptanceValidator.prototype.isAcceptableOption = isAcceptableOption;
 
 export const HelperMethods = {

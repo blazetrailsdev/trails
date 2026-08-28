@@ -287,10 +287,10 @@ export interface StoreOptions {
  *
  * Mirrors: ActiveRecord::Store::ClassMethods#store_accessor
  */
-export function storeAccessor(
-  modelClass: typeof Base,
+function storeAccessor(
+  this: typeof Base,
   storeAttribute: string,
-  options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
+  options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string } = {},
 ): void {
   const { accessors: keys = [], prefix = null, suffix = null } = options;
 
@@ -300,12 +300,12 @@ export function storeAccessor(
     typeof suffix === "string" ? `_${suffix}` : suffix === true ? `_${storeAttribute}` : "";
 
   // Install on the intermediate storeModule prototype so that user overrides
-  // on modelClass.prototype can reach the store accessor via `super`.
+  // on this.prototype can reach the store accessor via `super`.
   // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
-  const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
+  const storeModuleProto = getOrCreateStoreModuleProto(this);
   for (const key of keys) {
     const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
-    storeAccessorsModule(modelClass).add(accessorKey);
+    storeAccessorsModule(this).add(accessorKey);
 
     Object.defineProperty(storeModuleProto, accessorKey, {
       set: function (this: Base, value: unknown) {
@@ -364,10 +364,10 @@ export function storeAccessor(
 
   // assign new store attribute and create new hash to ensure that each class in the hierarchy
   // has its own hash of stored attributes.
-  let localStored = localStoredAttributes(modelClass);
+  let localStored = localStoredAttributes(this);
   if (!localStored) {
     localStored = {};
-    _storedAttributes.set(modelClass, localStored);
+    _storedAttributes.set(this, localStored);
   }
   localStored[storeAttribute] ??= [];
   localStored[storeAttribute] = [...new Set([...localStored[storeAttribute], ...keys])];
@@ -398,15 +398,11 @@ function dig(obj: unknown, key: string): unknown {
  * then delegates accessor definition to storeAccessor().
  *
  * Usage:
- *   store(User, 'settings', { accessors: ['theme', 'language'] })
- *   store(User, 'settings', { accessors: ['theme'], prefix: true })
- *   store(User, 'settings', { accessors: ['theme'], coder: JSON })
+ *   User.store('settings', { accessors: ['theme', 'language'] })
+ *   User.store('settings', { accessors: ['theme'], prefix: true })
+ *   User.store('settings', { accessors: ['theme'], coder: JSON })
  */
-export function store(
-  modelClass: typeof Base,
-  storeAttribute: string,
-  options: StoreOptions,
-): void {
+function store(this: typeof Base, storeAttribute: string, options: StoreOptions = {}): void {
   // Mirror Rails three-step: build_column_serializer → IndifferentCoder → serialize
   const coder = buildColumnSerializer(storeAttribute, options.coder, Object, options.yaml);
   // Validate: if a coder was resolved, it must implement dump/load. Strings, numbers,
@@ -421,18 +417,26 @@ export function store(
     );
   }
   // store.rb:108 — `serialize store_attribute, coder: IndifferentCoder.new(store_attribute, coder)`.
-  modelClass.serialize(storeAttribute, {
+  this.serialize(storeAttribute, {
     coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
   });
 
   if (options.accessors !== undefined) {
-    storeAccessor(modelClass, storeAttribute, {
+    this.storeAccessor(storeAttribute, {
       accessors: options.accessors,
       prefix: options.prefix,
       suffix: options.suffix,
     });
   }
 }
+
+/**
+ * Mirrors: ActiveRecord::Store::ClassMethods
+ */
+export const ClassMethods = {
+  store,
+  storeAccessor,
+};
 
 /**
  * Returns the HashAccessor class for a given store attribute column.

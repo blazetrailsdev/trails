@@ -9,6 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 
 import { Errors } from "./errors.js";
+import { inspectAccessor } from "./validations/_accessor.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
@@ -254,6 +255,11 @@ export const ClassMethods = {
       _predicatesForValidationContexts.set(key, cached);
     }
     return cached;
+  },
+  isAttributeMethod(this: { prototype: object }, attribute: string): boolean {
+    const isWriter = attribute.endsWith("=");
+    const accessor = inspectAccessor(this.prototype, isWriter ? attribute.slice(0, -1) : attribute);
+    return isWriter ? accessor.hasSetter : accessor.hasGetter;
   },
 };
 

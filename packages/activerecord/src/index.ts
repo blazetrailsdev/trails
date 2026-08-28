@@ -133,8 +133,6 @@ export { LockingType } from "./locking/optimistic.js";
 // no longer exported as standalone free functions — their `this:`-typed
 // signatures are only callable on a Base subclass.
 export {
-  store,
-  storeAccessor,
   storedAttributes,
   localStoredAttributes,
   HashAccessor,

@@ -216,9 +216,7 @@ describe("AcceptanceValidationTest", () => {
         this.validates("terms", { acceptance: true });
       }
     }
-    expect(Object.getOwnPropertyDescriptor(Agreement.prototype, "terms")?.set).toBeTypeOf(
-      "function",
-    );
+    expect(Agreement.isAttributeMethod("terms=")).toBe(true);
     const a = new Agreement({ terms: "1" });
     expect(await a.isValid()).toBe(true);
     expect((a as unknown as { terms: unknown }).terms).toBe("1");

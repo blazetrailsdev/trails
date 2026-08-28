@@ -365,8 +365,7 @@ import {
 } from "./secure-token.js";
 import { authenticateBy as _authenticateBy } from "./secure-password.js";
 import {
-  store as _storeFunction,
-  storeAccessor as _storeAccessorFunction,
+  ClassMethods as _StoreClassMethods,
   localStoredAttributesMethod as _localStoredAttributesMethod,
   storedAttributes as _storedAttributes,
   readStoreAttribute as _readStoreAttribute,
@@ -1900,51 +1899,11 @@ export class Base extends Model {
 
   // -- Store --
 
-  /**
-   * Declare a stored attribute backed by a JSON/text column.
-   * Registers an IndifferentCoder for the column. For plain text/string columns,
-   * also calls serialize() so readAttribute returns HashWithIndifferentAccess.
-   * Structured types (json/jsonb/hstore) have a type-level accessor and handle
-   * their own cast/serialize — IndifferentCoder is registered but serialize()
-   * is not called for those.
-   *
-   * Mirrors: ActiveRecord::Store::ClassMethods#store
-   */
-  static store(
-    attribute: string,
-    options?: {
-      accessors?: string[];
-      prefix?: boolean | string;
-      suffix?: boolean | string;
-      coder?: unknown;
-      yaml?: Record<string, unknown>;
-    },
-  ): void {
-    _storeFunction(this, attribute, {
-      accessors: options?.accessors,
-      prefix: options?.prefix,
-      suffix: options?.suffix,
-      coder: options?.coder,
-      yaml: options?.yaml,
-    });
-  }
+  /** Mirrors: ActiveRecord::Store::ClassMethods#store */
+  declare static store: typeof _StoreClassMethods.store;
 
-  /**
-   * Add accessors to an already-serialized store column without re-running
-   * the serialize step. Use store() instead when declaring a new store column.
-   *
-   * Mirrors: ActiveRecord::Store::ClassMethods#store_accessor
-   */
-  static storeAccessor(
-    attribute: string,
-    options?: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
-  ): void {
-    _storeAccessorFunction(this, attribute, {
-      accessors: options?.accessors,
-      prefix: options?.prefix,
-      suffix: options?.suffix,
-    });
-  }
+  /** Mirrors: ActiveRecord::Store::ClassMethods#store_accessor */
+  declare static storeAccessor: typeof _StoreClassMethods.storeAccessor;
 
   /** Mirrors: ActiveRecord::SecurePassword::ClassMethods#authenticate_by (secure_password.rb:40). */
   static authenticateBy = _authenticateBy;
@@ -4570,6 +4529,9 @@ extend(Base, {
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
   localStoredAttributes: _localStoredAttributesMethod,
 });
+
+// base.rb:326 — `include Store`, whose ClassMethods carry the two macros.
+extend(Base, _StoreClassMethods);
 
 // `include ActiveRecord::Serialization` (base.rb:325), which is
 // `include ActiveModel::Serializers::JSON` (serialization.rb:6) — the JSON
