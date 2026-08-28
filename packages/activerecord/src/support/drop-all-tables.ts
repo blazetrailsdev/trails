@@ -73,7 +73,7 @@ async function resetTables(
   mode: ResetMode,
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
-  switch (adapter.adapterName) {
+  switch (adapter.typeRegistryKey) {
     case "postgres":
       await resetPgTables(adapter, mode, bootLaid);
       break;

@@ -25,12 +25,12 @@ import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/s
 
 function emitTableSql(td: TableDefinition): Promise<string> {
   const adapter = (td as any).conn;
-  const adapterName = adapter.adapterName;
+  const typeRegistryKey = adapter.typeRegistryKey;
   // Every visitor takes its connection for identifier/default quoting (and, on MySQL,
   // the `supports*` / isMariadb() flags), so thread the table definition's through —
   // matching the real adapter call sites and the production `*.toSql()` overrides.
-  if (adapterName === "postgres") return new PgSchemaCreation(adapter).accept(td);
-  if (adapterName === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
+  if (typeRegistryKey === "postgres") return new PgSchemaCreation(adapter).accept(td);
+  if (typeRegistryKey === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation(adapter).accept(td);
 }
 import { Person } from "./test-helpers/models/person.js";
@@ -405,8 +405,8 @@ describe("MigrationTest", () => {
       // Integer, and trails matches now that DecimalWithoutScale inherits
       // BigIntegerType's arbitrary-precision cast (2**62 round-trips without
       // JS-number precision loss).
-      const adapterName = adapter.adapterName;
-      const isPgOrSqlite = adapterName === "postgres" || adapterName === "sqlite";
+      const typeRegistryKey = adapter.typeRegistryKey;
+      const isPgOrSqlite = typeRegistryKey === "postgres" || typeRegistryKey === "sqlite";
       class BigNumber extends Base {
         static _tableName = "big_numbers";
         static {
@@ -452,11 +452,11 @@ describe("MigrationTest", () => {
       // it should truncate to an Integer, but adapters diverge (see Rails'
       // per-adapter branch):
       const valueOfE = (b as any).value_of_e;
-      if (adapterName === "postgres") {
+      if (typeRegistryKey === "postgres") {
         // PG promotes bare `decimal` to full compile-time precision/scale.
         expect(valueOfE).toBeInstanceOf(BigDecimal);
         expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
-      } else if (adapterName === "sqlite") {
+      } else if (typeRegistryKey === "sqlite") {
         // SQLite3 stores a float, read back as a BigDecimal within 1e-14.
         expect(valueOfE).toBeInstanceOf(BigDecimal);
         expect(

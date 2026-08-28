@@ -38,7 +38,7 @@ export class Node {
     return engine.connection.visitor.accept(this, collector).value;
   }
 
-  fetchAttribute(_block?: (attr: Node) => unknown): unknown {
+  fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {
     return undefined;
   }
 

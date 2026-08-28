@@ -26,12 +26,12 @@ export class DeleteManager extends TreeManager {
   }
 
   group(columns: (Node | string)[]): this {
-    for (const column of columns) {
+    for (let column of columns) {
       if (typeof column === "string") {
-        this.ast.groups.push(new Group(new SqlLiteral(column)));
-      } else {
-        this.ast.groups.push(new Group(column));
+        column = new SqlLiteral(column.startsWith(":") ? column.slice(1) : column);
       }
+
+      this.ast.groups.push(new Group(column));
     }
     return this;
   }

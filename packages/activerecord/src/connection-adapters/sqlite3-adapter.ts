@@ -145,7 +145,13 @@ let sqlite3TypeMap: TypeMap | undefined;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
-  override get adapterName(): AdapterName {
+  static override readonly ADAPTER_NAME = "SQLite";
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
+   */
+  override get typeRegistryKey(): AdapterName {
     return "sqlite";
   }
 

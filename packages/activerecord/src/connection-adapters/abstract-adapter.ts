@@ -680,6 +680,7 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
+  static readonly ADAPTER_NAME: string = "Abstract";
   static readonly Version = Version;
 
   /**
@@ -922,7 +923,15 @@ export class AbstractAdapter implements Quoting {
   }
 
   get adapterName(): string {
-    return "Abstract";
+    return (this.constructor as typeof AbstractAdapter).ADAPTER_NAME;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
+   */
+  get typeRegistryKey(): AdapterName {
+    return adapterNameFromConfig(this.pool.dbConfig.adapter ?? undefined);
   }
 
   isConnected(): boolean {

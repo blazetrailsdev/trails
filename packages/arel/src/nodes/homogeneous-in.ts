@@ -79,7 +79,7 @@ export class HomogeneousIn extends Node {
       );
   }
 
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
+  fetchAttribute(block: (attr: Node) => boolean): boolean | undefined {
     if (this.attribute) return block(this.attribute);
     return undefined;
   }

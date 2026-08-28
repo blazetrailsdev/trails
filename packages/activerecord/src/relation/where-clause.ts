@@ -314,7 +314,7 @@ function wrapSqlLiteral(node: Nodes.SqlLiteral | string): Nodes.Node {
 /** @internal */
 function extractAttribute(node: Nodes.Node | string): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
-  fetchAttribute(node, (attr: Nodes.Node) => {
+  fetchAttribute(node, (attr: Nodes.Node): boolean => {
     if (!(attr instanceof Nodes.Attribute)) return true;
     if (attrNode !== null && !rbEqual(attrNode, attr)) {
       attrNode = null;

@@ -8,13 +8,13 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 let adapter: DatabaseAdapter;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
-  if (a.adapterName === "sqlite") {
+  if (a.typeRegistryKey === "sqlite") {
     return (
       (await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
       )) as Array<{ name: string }>
     ).map((r) => r.name);
-  } else if (a.adapterName === "postgres") {
+  } else if (a.typeRegistryKey === "postgres") {
     return (
       (await a.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
@@ -47,7 +47,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let executeCallCount = 0;
     const fakeAdapter = {
-      adapterName: "postgres" as const,
+      typeRegistryKey: "postgres" as const,
       execute: vi.fn(async () => {
         executeCallCount++;
         if (executeCallCount === 1) throw connErr;
@@ -64,7 +64,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   it("rethrows when execute throws a non-connection error", async () => {
     const appErr = new Error("syntax error");
     const fakeAdapter = {
-      adapterName: "postgres" as const,
+      typeRegistryKey: "postgres" as const,
       execute: vi.fn(async () => {
         throw appErr;
       }),
@@ -83,7 +83,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let mutationCallCount = 0;
     const fakeAdapter = {
-      adapterName: "postgres" as const,
+      typeRegistryKey: "postgres" as const,
       execute: vi.fn(async (sql: string) => {
         if (sql.includes("matviewname")) {
           return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
@@ -159,7 +159,7 @@ describe("dropAllTables", () => {
   });
 
   it("drops 3-table FK chain without error", async () => {
-    const int = dropAdapter.adapterName === "mysql2" ? "INT" : "INTEGER";
+    const int = dropAdapter.typeRegistryKey === "mysql2" ? "INT" : "INTEGER";
     await dropAdapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
     await dropAdapter.executeMutation(
       `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int}, FOREIGN KEY (parent_id) REFERENCES fk_parent(id))`,
@@ -196,12 +196,12 @@ describe("purge-only pre-snapshot path", () => {
   }
 
   const inertAdapter = {
-    adapterName: "none",
+    typeRegistryKey: "none",
     schemaCache: { clearBang() {} },
   } as unknown as DatabaseAdapter;
 
   const armOnlyAdapter = {
-    adapterName: "sqlite",
+    typeRegistryKey: "sqlite",
     createTable: async () => {},
   } as unknown as DatabaseAdapter;
 

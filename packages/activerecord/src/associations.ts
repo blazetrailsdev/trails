@@ -933,46 +933,7 @@ export function initializeDup(this: Base, super_: (other: unknown) => void, othe
 
 /** @internal */
 export function associationInstanceGet(this: Base, name: string): unknown {
-  const record = this as Base & {
-    association?(name: string): unknown;
-    _collectionProxies?: Map<string, unknown>;
-  };
-  const existing = record._associationInstances.get(name) as
-    | { isLoaded(): boolean; target?: unknown }
-    | undefined;
-  if (typeof record.association !== "function") {
-    return existing?.isLoaded() ? existing : null;
-  }
-  const proxy = record._collectionProxies?.get?.(name) as
-    | { loaded?: boolean; target?: unknown[] }
-    | undefined;
-  const proxyHasBuiltRecords = Array.isArray(proxy?.target) && proxy.target.length > 0;
-  const existingHasBuiltRecords =
-    Array.isArray(existing?.target) && (existing.target as unknown[]).length > 0;
-  const hasCachedData =
-    !!_preloadedHolderTarget(record, name) ||
-    !!proxy?.loaded ||
-    proxyHasBuiltRecords ||
-    existingHasBuiltRecords ||
-    !!existing?.isLoaded();
-  if (!hasCachedData) return null;
-  try {
-    const inst = record.association(name) as
-      | { isLoaded(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
-      | undefined;
-    if (inst?.isLoaded()) return inst;
-    if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
-      inst._writeTargetStore?.(proxy.target);
-      return inst;
-    }
-    if (existingHasBuiltRecords && inst && inst === existing) {
-      return inst;
-    }
-    return null;
-  } catch (err) {
-    if (err instanceof AssociationNotFoundError) return null;
-    throw err;
-  }
+  return this._associationInstances.get(name) ?? null;
 }
 
 /** @internal */

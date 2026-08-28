@@ -200,8 +200,9 @@ describe("SelectTest", () => {
     const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
     const foo = post.readAttribute("foo");
     expect(Number(foo)).toBe(1.1);
-    const adapterName = (Post.connection as unknown as { adapterName: string }).adapterName;
-    const expectsBigDecimal = adapterName === "postgres" || adapterName === "mysql2";
+    const typeRegistryKey = (Post.connection as unknown as { typeRegistryKey: string })
+      .typeRegistryKey;
+    const expectsBigDecimal = typeRegistryKey === "postgres" || typeRegistryKey === "mysql2";
     expect(foo instanceof BigDecimal).toBe(expectsBigDecimal);
   });
 

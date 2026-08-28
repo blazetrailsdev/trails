@@ -323,9 +323,9 @@ export class ConnectionPool implements ReapablePool {
       this._adapterProxy = new Proxy({} as DatabaseAdapter, {
         get(_target, prop) {
           if (prop === "pool") return pool;
-          if (prop === "adapterName")
+          if (prop === "typeRegistryKey")
             return (
-              (pool.activeConnection ?? pool.connections[0])?.adapterName ??
+              (pool.activeConnection ?? pool.connections[0])?.typeRegistryKey ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
           if (typeof prop === "symbol") return undefined;

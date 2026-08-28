@@ -20,16 +20,11 @@ export class Nary extends NodeExpression {
     return this.children[1];
   }
 
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    if (this.children.length === 0) return false;
-    return this.children.every((child) => {
-      if (typeof (child as unknown as { fetchAttribute: unknown }).fetchAttribute === "function") {
-        return (
-          child as unknown as { fetchAttribute(block: (attr: Node) => unknown): unknown }
-        ).fetchAttribute(block);
-      }
-      return false;
-    });
+  fetchAttribute(block: (attr: Node) => boolean): boolean {
+    return (
+      this.children.length > 0 &&
+      this.children.every((child) => Boolean(child.fetchAttribute(block)))
+    );
   }
 
   hash(): number {

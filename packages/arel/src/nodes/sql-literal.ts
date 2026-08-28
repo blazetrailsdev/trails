@@ -15,7 +15,7 @@ export class SqlLiteral extends Node {
     this.retryable = options?.retryable ?? false;
   }
 
-  fetchAttribute(_block?: (attr: Node) => unknown): unknown {
+  fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {
     return undefined;
   }
 

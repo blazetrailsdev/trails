@@ -300,18 +300,6 @@ export function resolveCompositeRefColumn(
   return compositeIdentify(fixtureName, targetPkCols)[targetColumn] ?? fixtureId(fixtureName);
 }
 
-/**
- * Returns the adapter's normalized name (`"postgres"` / `"mysql2"` / `"sqlite"`).
- * Lets ERB-style adapter-conditional fixture data translate to TS:
- *
- * ```ts
- * { data: adapterName(adapter) === "postgres" ? a : b }
- * ```
- */
-export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql2" | "sqlite" {
-  return adapter.adapterName as "postgres" | "mysql2" | "sqlite";
-}
-
 // --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---
 
 // WeakMap prevents cross-file leakage: each adapter object gets its own registry that
@@ -717,7 +705,7 @@ export async function insertPreparedFixtureSets(
 
   await checkAllForeignKeysValidBang(adapter);
 
-  if (adapter.adapterName === "postgres") {
+  if (adapter.typeRegistryKey === "postgres") {
     for (const p of prepared) {
       if (p.serialReset) await resetPkSequence(adapter, p.serialReset.table, p.serialReset.column);
     }

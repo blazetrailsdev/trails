@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 class StubAdapter extends AbstractAdapter {
-  get adapterName() {
+  override get typeRegistryKey() {
     return "sqlite" as const;
   }
   execute(_sql: string) {
@@ -36,7 +36,7 @@ class CapturingAdapter extends AbstractAdapter {
   constructor(private readonly dialect: "sqlite" | "postgres" | "mysql2") {
     super();
   }
-  get adapterName() {
+  override get typeRegistryKey() {
     return this.dialect as any;
   }
   execute(sql: string, params?: unknown[]) {
@@ -65,7 +65,7 @@ class SqliteCapturingAdapter extends AbstractAdapter {
   get lastSql() {
     return this.allSql.at(-1) ?? "";
   }
-  get adapterName() {
+  override get typeRegistryKey() {
     return "sqlite" as any;
   }
   execute(sql: string) {

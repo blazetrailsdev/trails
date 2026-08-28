@@ -20,16 +20,14 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Result } from "../result.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
 
 // All 5 methods are class-level in Rails (class << self private), so test via a subclass.
 class TestAdapter extends AbstractAdapter {
-  static get adapterName() {
-    return "TestAdapter";
-  }
-  override get adapterName() {
-    return "TestAdapter" as const;
-  }
+  static override readonly ADAPTER_NAME = "TestAdapter";
 }
 
 describe("AbstractAdapter#returnValueAfterInsert", () => {
@@ -261,12 +259,7 @@ describe("DatabaseStatements#insert id extraction", () => {
   // execInsert/execute are include()-mixed methods, not class declarations,
   // so we assign them via any rather than using class override syntax.
   class InsertTestAdapter extends AbstractAdapter {
-    static get adapterName() {
-      return "InsertTestAdapter";
-    }
-    override get adapterName() {
-      return "InsertTestAdapter" as const;
-    }
+    static override readonly ADAPTER_NAME = "InsertTestAdapter";
   }
 
   it("respects idValue override when provided, regardless of execInsert return type", async () => {
@@ -344,10 +337,8 @@ describe("DatabaseStatements#insert id extraction", () => {
 
 describe("per-adapter visitor isolation", () => {
   class SqliteAdapter extends AbstractAdapter {
-    static get adapterName() {
-      return "SQLite" as const;
-    }
-    override get adapterName() {
+    static override readonly ADAPTER_NAME = "SQLite";
+    override get typeRegistryKey() {
       return "sqlite" as const;
     }
     override arelVisitor() {
@@ -356,10 +347,8 @@ describe("per-adapter visitor isolation", () => {
   }
 
   class MysqlAdapter extends AbstractAdapter {
-    static get adapterName() {
-      return "MySQL" as const;
-    }
-    override get adapterName() {
+    static override readonly ADAPTER_NAME = "MySQL";
+    override get typeRegistryKey() {
       return "mysql2" as const;
     }
     override arelVisitor() {
@@ -428,5 +417,24 @@ describe("AbstractAdapter#defaultTimezone", () => {
     } finally {
       adapter.disconnectBang();
     }
+  });
+});
+
+describe("AbstractAdapter#adapterName", () => {
+  it("returns the class's ADAPTER_NAME rather than the type-registry key", () => {
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    try {
+      expect(adapter.adapterName).toBe("SQLite");
+      expect(adapter.typeRegistryKey).toBe("sqlite");
+    } finally {
+      adapter.disconnectBang();
+    }
+  });
+
+  it("declares each adapter's ADAPTER_NAME verbatim from Rails", () => {
+    expect(AbstractAdapter.ADAPTER_NAME).toBe("Abstract");
+    expect(SQLite3Adapter.ADAPTER_NAME).toBe("SQLite");
+    expect(PostgreSQLAdapter.ADAPTER_NAME).toBe("PostgreSQL");
+    expect(Mysql2Adapter.ADAPTER_NAME).toBe("Mysql2");
   });
 });

@@ -173,7 +173,7 @@ describe("the PostgreSQL OID registrations", () => {
 
   it("resolve for a model carrying a directly-assigned postgres adapter", () => {
     const model = {
-      _adapter: { adapterName: "postgres" },
+      _adapter: { typeRegistryKey: "postgres" as const },
       connectionDbConfig: () => {
         throw new ConnectionNotDefined("No database connection defined.");
       },

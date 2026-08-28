@@ -7,9 +7,9 @@ function sqliteId(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-/** Detect adapter type from the adapter's adapterName property. */
+/** Detect adapter type from the adapter's type-registry key. */
 function detectAdapter(adapter: DatabaseAdapter): "sqlite" | "postgres" | "mysql" {
-  const name = adapter.adapterName.toLowerCase();
+  const name = adapter.typeRegistryKey.toLowerCase();
   if (name.includes("postgres")) return "postgres";
   if (name.includes("mysql") || name.includes("maria")) return "mysql";
   return "sqlite";

@@ -622,7 +622,7 @@ describe("SchemaReflectionTest", () => {
 // rename_column, add_index et al. would pin behaviour Rails does not have.
 
 class MockAdapter {
-  adapterName = "sqlite" as const;
+  typeRegistryKey = "sqlite" as const;
   quoteColumnName = (n: string) => `"${n}"`;
   quoteTableName = (n: string) => `"${n}"`;
   executeMutation = vi.fn().mockResolvedValue(0);
@@ -633,7 +633,7 @@ class MockAdapter {
   supportsDatetimeWithPrecision = () => false;
   // `SchemaCreation` delegates every capability probe and its type map to
   // `@conn` (abstract/schema_creation.rb:16-21); answer as SQLite3Adapter does,
-  // matching the `adapterName` this mock reports.
+  // matching the `typeRegistryKey` this mock reports.
   nativeDatabaseTypes = () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
   supportsCheckConstraints = async () => true;
   supportsIndexesInCreate = () => false;

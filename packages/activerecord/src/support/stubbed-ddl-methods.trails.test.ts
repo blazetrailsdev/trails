@@ -7,7 +7,7 @@ import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   [
-    "adapterName",
+    "typeRegistryKey",
     "read — picks the per-adapter type map and gates schema.rb's inline adapter clauses",
   ],
   [

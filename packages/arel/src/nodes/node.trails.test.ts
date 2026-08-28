@@ -96,14 +96,17 @@ describe("Node base polymorphic defaults", () => {
 
   describe("fetchAttribute", () => {
     it("is a no-op on base Node (returns undefined)", () => {
-      const result = new Nodes.SqlLiteral("x").fetchAttribute(() => "hit");
+      const result = new Nodes.SqlLiteral("x").fetchAttribute(() => true);
       expect(result).toBeUndefined();
     });
 
     it("yields the left attribute on Binary nodes", () => {
       const attr = users.get("id");
       const collected: unknown[] = [];
-      new Nodes.GreaterThan(attr, new Nodes.Quoted(1)).fetchAttribute((a) => collected.push(a));
+      new Nodes.GreaterThan(attr, new Nodes.Quoted(1)).fetchAttribute((a) => {
+        collected.push(a);
+        return true;
+      });
       expect(collected).toHaveLength(1);
       expect(collected[0]).toBe(attr);
     });
@@ -111,7 +114,10 @@ describe("Node base polymorphic defaults", () => {
     it("yields the right attribute when left is not an attribute", () => {
       const attr = users.get("id");
       const collected: unknown[] = [];
-      new Nodes.GreaterThan(new Nodes.Quoted(1), attr).fetchAttribute((a) => collected.push(a));
+      new Nodes.GreaterThan(new Nodes.Quoted(1), attr).fetchAttribute((a) => {
+        collected.push(a);
+        return true;
+      });
       expect(collected).toHaveLength(1);
       expect(collected[0]).toBe(attr);
     });
@@ -132,7 +138,10 @@ describe("Node base polymorphic defaults", () => {
       ];
       for (const node of withFetch) {
         const hits: unknown[] = [];
-        node.fetchAttribute((a) => hits.push(a));
+        node.fetchAttribute((a) => {
+          hits.push(a);
+          return true;
+        });
         expect(hits).toHaveLength(1);
         expect(hits[0]).toBe(attr);
       }
@@ -150,7 +159,10 @@ describe("Node base polymorphic defaults", () => {
       ];
       for (const node of noFetch) {
         const hits: unknown[] = [];
-        node.fetchAttribute((a) => hits.push(a));
+        node.fetchAttribute((a) => {
+          hits.push(a);
+          return true;
+        });
         expect(hits).toHaveLength(0);
       }
     });

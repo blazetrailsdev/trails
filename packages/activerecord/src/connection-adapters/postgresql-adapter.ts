@@ -183,7 +183,13 @@ export class PostgreSQLAdapter
     UniqueConstraintStatements,
     SchemaNamespaceStatements
 {
-  override get adapterName(): AdapterName {
+  static override readonly ADAPTER_NAME = "PostgreSQL";
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
+   */
+  override get typeRegistryKey(): AdapterName {
     return "postgres";
   }
 

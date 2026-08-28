@@ -6,6 +6,7 @@ import type { Database } from "sql.js";
 // implement `ActiveRecord::ConnectionAdapters::AbstractAdapter`.
 export class SqlJsAdapter {
   readonly adapterName = "SQLite";
+  readonly typeRegistryKey = "sqlite" as const;
 
   constructor(private db: Database) {}
 

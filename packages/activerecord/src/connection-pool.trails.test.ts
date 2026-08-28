@@ -1183,7 +1183,7 @@ describe("checkout/checkin callbacks", () => {
   it("setCallback registers a custom :checkout callback that runs on checkout", async () => {
     const calls: string[] = [];
     AbstractAdapter.setCallback("checkout", "after", function () {
-      calls.push(this.adapterName);
+      calls.push(this.typeRegistryKey);
     });
     const pool = makeAmbientPool({ pool: 1 });
     try {

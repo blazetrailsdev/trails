@@ -49,14 +49,14 @@ class TableBuilder {
 
   constructor(
     private readonly t: TableDefinition,
-    private readonly adapterName: string,
+    private readonly typeRegistryKey: string,
     private readonly typeMap: Record<string, string | undefined>,
     private readonly serialPk: string | null,
   ) {}
 
   private col(name: string, primitive: string, o: ColOpts = {}): void {
     if (name === this.serialPk) {
-      this.t.column(name, serialIdType(primitive as ColumnSpec, this.adapterName), {
+      this.t.column(name, serialIdType(primitive as ColumnSpec, this.typeRegistryKey), {
         primaryKey: true,
       });
       return;
@@ -73,7 +73,7 @@ class TableBuilder {
       options["default"] = o.default;
     }
     if (
-      this.adapterName === "mysql2" &&
+      this.typeRegistryKey === "mysql2" &&
       primitive === "datetime" &&
       options["precision"] === undefined
     ) {
@@ -155,7 +155,7 @@ export async function emitTableIndexes(
   for (const { columns, opts } of indexes) {
     const isExpression = typeof columns === "string" && /\W/.test(columns);
     if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
-    if (opts.adapters && !opts.adapters.includes(adapter.adapterName)) continue;
+    if (opts.adapters && !opts.adapters.includes(adapter.typeRegistryKey)) continue;
     await ss.addIndex(table, columns, {
       unique: opts.unique,
       where: opts.where,
@@ -182,9 +182,9 @@ export async function prepareSchema(
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
   const ss = adapter as unknown as SchemaStatements;
   const typeMap =
-    adapter.adapterName === "postgres"
+    adapter.typeRegistryKey === "postgres"
       ? COLUMN_TYPE_MAP_PG
-      : adapter.adapterName === "mysql2"
+      : adapter.typeRegistryKey === "mysql2"
         ? COLUMN_TYPE_MAP_MYSQL
         : COLUMN_TYPE_MAP_SQLITE;
   return { ss, typeMap };
@@ -205,7 +205,7 @@ export async function runTable(
   }
   let builder!: TableBuilder;
   await ss.createTable(name, createOpts, (t: TableDefinition) => {
-    builder = new TableBuilder(t, adapter.adapterName, typeMap, meta.serialPk ?? null);
+    builder = new TableBuilder(t, adapter.typeRegistryKey, typeMap, meta.serialPk ?? null);
     fn(builder);
   });
 

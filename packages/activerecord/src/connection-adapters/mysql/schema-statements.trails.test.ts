@@ -664,7 +664,7 @@ describe("MySQL::SchemaStatements#tableAliasLength", () => {
 describe("MysqlSchemaStatements#changeTable", () => {
   it("yields the MySQL Table subclass", async () => {
     const ss = Object.setPrototypeOf(
-      { adapterName: "mysql2" },
+      { typeRegistryKey: "mysql2" },
       MysqlSchemaStatements.prototype,
     ) as MysqlSchemaStatements;
     let yielded: unknown;
