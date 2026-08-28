@@ -110,7 +110,6 @@ import {
   _defaultAttributes as _arDefaultAttributes,
   resolveTypeName as _resolveTypeName,
   resetDefaultAttributes as _resetDefaultAttributes,
-  reloadSchemaFromCache as _reloadSchemaFromCache,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
@@ -4548,9 +4547,10 @@ extend(Base, {
   // attributes.rb:293-295 — ActiveRecord's override of
   // AttributeRegistration::ClassMethods#reset_default_attributes.
   resetDefaultAttributes: _resetDefaultAttributes,
-  // attributes.rb:268-271 — ActiveRecord's override of ModelSchema's
-  // `reload_schema_from_cache`; every caller sends it, so this is the seat.
-  reloadSchemaFromCache: _reloadSchemaFromCache,
+  // timestamp.rb:84-89 — the outermost `reload_schema_from_cache` override in
+  // the chain (Timestamp -> Attributes -> ModelSchema); every caller sends it,
+  // so this is the seat, and each half calls the next as its `super`.
+  reloadSchemaFromCache: Timestamp.reloadSchemaFromCache,
 });
 // AttributeMethods class method — gates association/attribute names that would
 // clash with an Active Record instance method (Rails: dangerous_attribute_method?).

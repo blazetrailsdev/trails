@@ -137,7 +137,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized attribute calling dup method", () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const orig = new JsonTopic({ content: { foo: "bar" } } as any);
@@ -148,7 +148,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized json attribute returns unserialized value", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const myPost = posts("welcome");
@@ -167,7 +167,7 @@ describe("SerializedAttributeTest", () => {
   it("json read legacy null", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     // Rails: id = Topic.lease_connection.insert "INSERT INTO topics (content) VALUES('null')"
@@ -186,7 +186,7 @@ describe("SerializedAttributeTest", () => {
   it("json read db null", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     // Rails: id = Topic.lease_connection.insert "INSERT INTO topics (content) VALUES(NULL)"
@@ -216,7 +216,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized time attribute", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const myobj = new Date("2008-01-01T01:00:00Z").toISOString();
@@ -227,7 +227,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized string attribute", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const myobj = "Yes";
@@ -251,7 +251,7 @@ describe("SerializedAttributeTest", () => {
   it("nil not serialized without class constraint", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     await JsonTopic.create({ content: null as any });
@@ -361,7 +361,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized boolean value true", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const topic = await (await JsonTopic.create({ content: true as any })).reload();
@@ -371,7 +371,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized boolean value false", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const topic = await (await JsonTopic.create({ content: false as any })).reload();
@@ -444,7 +444,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized column should unserialize after update column", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const t = await JsonTopic.create({ content: "first" as any });
@@ -458,7 +458,7 @@ describe("SerializedAttributeTest", () => {
   it("serialized column should unserialize after update attribute", async () => {
     class JsonTopic extends Topic {
       static {
-        this.serialize("content", { coder: "json" });
+        this.serialize("content", { coder: JSON });
       }
     }
     const t = await JsonTopic.create({ content: "first" as any });

@@ -161,37 +161,17 @@ export function buildColumnSerializer(
   return coder;
 }
 
-interface InnerCoder {
-  dump(value: unknown): string | null;
-  load(raw: unknown): unknown;
-}
-
-// Resolved on first use rather than at module eval: Ruby names `Coders::JSON`
-// from inside the method body (serialization.rb:211), and eager construction
-// here evaluates `Json` while `type/json.ts` → `store.ts` → this module is
-// still in flight (CLAUDE.md, "Call-time constant resolution").
-let _jsonType: Json | undefined;
-
 /**
- * The default coder. Mirrors Rails' `ActiveRecord::Coders::JSON`, but loads
- * through the `Json` type so invalid JSON deserializes to `null` (rescue)
- * rather than raising — matching `Type::Json#deserialize`.
- */
-const JSON_INNER: InnerCoder = {
-  dump(value: unknown): string {
-    return (_jsonType ??= new Json()).serialize(value) ?? "null";
-  },
-  load(raw: unknown): unknown {
-    return (_jsonType ??= new Json()).deserialize(raw);
-  },
-};
-
-/**
- * Stand-in for Ruby's `Hash` class, used as the `object_class` for the
- * `hash`/`type: Hash` coders. JS has no distinct hash class (object literals
- * are plain `Object`, and arrays are also `Object`), so a `Symbol.hasInstance`
- * shim lets `Coders::ColumnSerializer` validate "is a plain object, not an
- * array" via `instanceof` and default to `{}` via `new`.
+ * Stand-in for Ruby's `Hash` class, passed as `serialize`'s `type:` object
+ * class where Rails writes `type: Hash` (serialization.rb:183). JS has no
+ * distinct hash class — an object literal is a plain `Object` and so is an
+ * array — so there is no constructor with Ruby `Hash`'s two properties that
+ * `Coders::ColumnSerializer` needs: `object_class === value` must reject an
+ * Array (assert_valid_value, column_serializer.rb:64-69) and `object_class.new`
+ * must produce an empty hash (`load`, column_serializer.rb:40-49). A
+ * `Symbol.hasInstance` shim supplies both. Passing `Object` instead would make
+ * ColumnSerializer's check vacuous, which is a behavior change, not a spelling
+ * one.
  *
  * @internal
  * @noRailsEquivalent PERMANENT
@@ -205,74 +185,13 @@ export class HashObject {
   }
 }
 
-type CoderOption = "json" | "array" | "hash" | InnerCoder | (new (...args: any[]) => any);
-
 export interface SerializeOptions extends AttributeOptions {
-  coder?: CoderOption;
-  type?: "Array" | "Hash" | typeof Array | typeof Object | (new (...args: any[]) => any);
+  /** Rails `coder:` (serialization.rb:183) — `JSON`, `YAML`, or any coder object. */
+  coder?: unknown;
+  /** Rails `type:` (serialization.rb:183) — the object class, default `Object`. */
+  type?: unknown;
   /** Rails `serialize :x, coder: YAML, yaml: { permitted_classes: [...] }`. */
   yaml?: YamlColumnOptions;
-}
-
-/**
- * Maps trails' `coder`/`type` option spellings onto the `(coder, type)` pair
- * Rails reads straight off its kwargs (serialization.rb:183). The string-keyed
- * `coder: "json" | "array" | "hash"` forms are a trails convenience for
- * `coder: JSON, type: Array | Hash`.
- */
-function resolveCoderAndType(
-  attrName: string,
-  options: SerializeOptions,
-  defaultSerializer: unknown,
-): { coder: unknown; coderIdentity: unknown; type: unknown } {
-  const { coder: coderOpt } = options;
-
-  // Mirrors `coder ||= default_column_serializer` (serialization.rb:183). With
-  // no explicit coder, fall back to the class-level configurable default
-  // (YAMLColumn by default) rather than a hardcoded path.
-  let rawCoder: unknown = defaultSerializer;
-  let coderIdentity: unknown = defaultSerializer;
-  let objectType: unknown = Object;
-
-  if (!coderOpt) {
-    // Mirrors `unless coder; raise ArgumentError, "missing keyword: :coder"`
-    // (serialization.rb:184-189): a coderless serialize with no configured
-    // default has nothing to fall back to.
-    if (!defaultSerializer) {
-      throw new ArgumentError(
-        "missing keyword: :coder. If no default coder is configured, a coder must be provided to `serialize`.",
-      );
-    }
-  } else if (coderOpt === "json") {
-    rawCoder = JSON_INNER;
-    // The JSON arm of type_incompatible_with_serialize? fires for `coder == ::JSON`.
-    coderIdentity = globalThis.JSON;
-  } else if (coderOpt === "array") {
-    // trails shorthand for `coder: JSON, type: Array`.
-    rawCoder = JSON_INNER;
-    coderIdentity = globalThis.JSON;
-    objectType = globalThis.Array;
-  } else if (coderOpt === "hash") {
-    // trails shorthand for `coder: JSON, type: Hash`.
-    rawCoder = JSON_INNER;
-    coderIdentity = globalThis.JSON;
-    objectType = HashObject;
-  } else {
-    rawCoder = coderOpt;
-    coderIdentity = coderOpt;
-  }
-
-  // An explicit `type:` constrains the object class (Rails `serialize :x, type: Array`).
-  const t = options.type;
-  if (t === globalThis.Array || t === "Array") {
-    objectType = globalThis.Array;
-  } else if (t === "Hash") {
-    objectType = HashObject;
-  } else if (typeof t === "function" && t !== Object) {
-    objectType = t;
-  }
-
-  return { coder: rawCoder, coderIdentity, type: objectType };
 }
 
 /**
@@ -288,9 +207,8 @@ function resolveCoderAndType(
  * (serialization.rb:183-205).
  *
  * Usage:
- *   User.serialize('preferences', { coder: 'json' })
- *   User.serialize('tags', { coder: 'array' })
- *   User.serialize('settings', { coder: 'hash' })
+ *   User.serialize('preferences', { coder: JSON })
+ *   User.serialize('tags', { coder: JSON, type: Array })
  *   User.serialize('data', { coder: customCoder })
  *   Post.serialize('tags', { type: Array })
  */
@@ -299,14 +217,19 @@ export function serialize(
   attrName: string,
   options: SerializeOptions = {},
 ): void {
-  const { coder, coderIdentity, type } = resolveCoderAndType(
-    attrName,
-    options,
-    this.defaultColumnSerializer,
-  );
+  // serialization.rb:183 — `coder: nil, type: Object, yaml: {}, **options`.
+  const { type = Object, yaml = {} } = options;
+  // serialization.rb:184 — `coder ||= default_column_serializer`.
+  const coder = options.coder ?? this.defaultColumnSerializer;
+  if (!coder) {
+    // serialization.rb:185-190.
+    throw new ArgumentError(
+      "missing keyword: :coder. If no default coder is configured, a coder must be provided to `serialize`.",
+    );
+  }
 
   // serialization.rb:191 — `column_serializer = build_column_serializer(attr_name, coder, type, yaml)`.
-  const columnSerializer = buildColumnSerializer(attrName, coder, type, options.yaml) as Coder;
+  const columnSerializer = buildColumnSerializer(attrName, coder, type, yaml) as Coder;
 
   // serialization.rb:193 — `attribute(attr_name, **options)`: the kwargs left
   // over once `coder:` / `type:` / `yaml:` are bound are attribute options.
@@ -323,7 +246,7 @@ export function serialize(
     if (castType instanceof Serialized && castType.coder === columnSerializer) return castType;
     // `castType instanceof Json` (computed here, where Json is already imported)
     // catches both Type::Json and its OID::Jsonb subclass — Rails' `is_a?(Json)`.
-    if (isTypeIncompatibleWithSerialize(castType, coderIdentity, type, castType instanceof Json)) {
+    if (isTypeIncompatibleWithSerialize(castType, coder, type, castType instanceof Json)) {
       throw new ColumnNotSerializableError(name, castType);
     }
     // Re-declaring serialize on the same attribute (e.g. switching coders)

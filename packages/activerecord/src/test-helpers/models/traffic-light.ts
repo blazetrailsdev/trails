@@ -10,7 +10,7 @@ export class TrafficLight extends Base {
   declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
-    this.serialize("state", { type: "Array" });
-    this.serialize("long_state", { type: "Array" });
+    this.serialize("state", { type: Array });
+    this.serialize("long_state", { type: Array });
   }
 }

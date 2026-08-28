@@ -6,6 +6,7 @@ import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 import { runCallbacks } from "@blazetrails/activesupport";
 import { withTransactionReturningStatus } from "./transactions.js";
+import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 
 /**
  * Timestamp handling for ActiveRecord models.
@@ -414,6 +415,7 @@ export function reloadSchemaFromCache(this: TimestampHost): void {
   this._timestampAttributesForCreateInModel = undefined;
   this._timestampAttributesForUpdateInModel = undefined;
   this._allTimestampAttributesInModel = undefined;
+  attributesReloadSchemaFromCache.call(this);
 }
 
 /** @internal */

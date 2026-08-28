@@ -345,8 +345,8 @@ export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
       this.attribute("long_state", "string");
       this.attribute("created_at", "datetime");
       this.attribute("updated_at", "datetime");
-      this.serialize("state", { type: "Array" });
-      this.serialize("long_state", { type: "Array" });
+      this.serialize("state", { type: Array });
+      this.serialize("long_state", { type: Array });
       this.adapter = adapter;
       this.encrypts("state");
     }
@@ -374,7 +374,7 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
       // factory declares its attributes explicitly rather than by schema
       // reflection, so the column is declared before serialize wraps it.
       this.attribute("long_state", "string");
-      this.serialize("long_state", { type: "Array" });
+      this.serialize("long_state", { type: Array });
       this.adapter = adapter;
       this.encrypts("state");
       // storeAccessorFor delegates to EncryptedAttributeType.accessor() which
