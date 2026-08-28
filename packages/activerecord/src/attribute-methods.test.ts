@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { BooleanType } from "@blazetrails/activemodel";
 import { Base, DangerousAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -9,14 +10,14 @@ import { inTimeZone } from "./cases/helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
-import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 
 registerModel([Developer, AuditLog, AuditLogRequired]);
 
 describe("AttributeMethodsTest", () => {
-  fixtures([]);
+  const { topics } = fixtures(["topics", "developers", "computers", "companies"]);
 
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
@@ -192,14 +193,9 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("attribute_for_inspect with an array", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "test" });
-    const inspected = (p as any).attributeForInspect?.("title") ?? (p as any).title;
-    expect(inspected).toBeTruthy();
+    const t = topics("first") as any;
+    t.content = ["some_value"];
+    expect(t.attributeForInspect("content")).toMatch(/\["some_value"\]/);
   });
 
   it("read attributes after type cast on a date", async () => {
@@ -267,21 +263,22 @@ describe("AttributeMethodsTest", () => {
     expect((o as any).id_value).toBe(2);
   });
   it("attribute_for_inspect with a date", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "inspect_date" });
-    expect(p.id).toBeDefined();
+    const t = topics("first") as any;
+
+    expect(t.attributeForInspect("written_on")).toBe(`"${t.written_on}"`);
   });
 
   it("attribute_for_inspect with a long array", async () => {
-    const t = new CanonicalTopic({} as any) as any;
+    const t = topics("first") as any;
     t.content = Array.from({ length: 11 }, (_, i) => i + 1);
 
     expect(t.attributeForInspect("content")).toBe("[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]");
   });
   it("attribute_for_inspect with a non-primary key id attribute", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "non_pk_id" });
-    expect(p.id).toBeDefined();
+    const t = (topics("first") as any).becomes(TitlePrimaryKeyTopic);
+    t.title = "The First Topic Now Has A Title With\nNewlines And More Than 50 Characters";
+
+    expect(t.attributeForInspect("id")).toBe("1");
   });
   it("read_attribute raises ActiveModel::MissingAttributeError when the attribute isn't selected", async () => {
     const { Post } = makeModel();
@@ -478,14 +475,28 @@ describe("AttributeMethodsTest", () => {
     expect(p.id).toBeDefined();
   });
   it("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "otf_super" });
-    expect(p.title).toBe("otf_super");
+    class Klass extends Base {
+      static {
+        this.tableName = "topics";
+      }
+      get title(): string {
+        return `${(super.title as string) ?? ""}!`;
+      }
+    }
+    const realTopic = topics("first") as any;
+    expect(((await Klass.find(realTopic.id)) as any).title).toBe(`${realTopic.title}!`);
   });
   it("on-the-fly super-invokable generated attribute predicates via method_missing", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "otf_pred" });
-    expect(p.title).toBe("otf_pred");
+    class Klass extends Base {
+      static {
+        this.tableName = "topics";
+      }
+      get ["title?"](): boolean {
+        return !(super["title?"] as boolean);
+      }
+    }
+    const realTopic = topics("first") as any;
+    expect(((await Klass.find(realTopic.id)) as any)["title?"]).toBe(!realTopic["title?"]);
   });
   it("calling super when the parent does not define method raises NoMethodError", async () => {
     const { Post } = makeModel();
@@ -645,9 +656,15 @@ describe("AttributeMethodsTest", () => {
     expect((p as any).id_value).toBe(1);
   });
   it("attribute_for_inspect with a string", () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "hello" });
-    expect(p.attributeForInspect("title")).toBe('"hello"');
+    const t = topics("first") as any;
+    t.title = "The First Topic Now Has A Title With\nNewlines And More Than 50 Characters";
+
+    expect(t.attributeForInspect("title")).toBe(
+      '"The First Topic Now Has A Title With\\nNewlines And ..."',
+    );
+    expect(t.attributeForInspect("heading")).toBe(
+      '"The First Topic Now Has A Title With\\nNewlines And ..."',
+    );
   });
   it("attribute_present", () => {
     const { Post } = makeModel();
@@ -750,37 +767,28 @@ describe("AttributeMethodsTest", () => {
     expect(names).toContain("score");
   });
 
-  function makeTopic() {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.attribute("approved", "boolean");
-        this.attribute("written_on", "datetime");
-        this.attribute("bonus_time", "time");
-      }
-    }
-    return Topic;
-  }
-
   it("set attributes", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({});
-    await t.assignAttributes({ title: "Set", author_name: "Alice" });
-    expect(t.title).toBe("Set");
-    expect(t.author_name).toBe("Alice");
+    const topic = (await CanonicalTopic.find(1)) as any;
+    await topic.assignAttributes({ title: "Budget", author_name: "Jason" });
+    await topic.save();
+    expect(topic.title).toBe("Budget");
+    expect(topic.author_name).toBe("Jason");
+    expect(((await CanonicalTopic.find(1)) as any).author_email_address).toBe(
+      (topics("first") as any).author_email_address,
+    );
   });
 
   it("read attributes_before_type_cast on a datetime", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ written_on: "2023-01-15" });
-    const raw = t.readAttributeBeforeTypeCast("written_on");
-    expect(raw).toBeDefined();
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const record = new CanonicalTopic({}) as any;
+
+      record.written_on = "2009-10-11 12:13:14";
+      expect(record.readAttributeBeforeTypeCast("written_on")).toBe("2009-10-11 12:13:14");
+    });
   });
 
   it("write_attribute", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({});
+    const t = new CanonicalTopic({}) as any;
     t.writeAttribute("title", "Still another topic");
     expect(t.title).toBe("Still another topic");
 
@@ -795,8 +803,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ title: "Don't change the topic" });
+    const t = new CanonicalTopic({ title: "Don't change the topic" }) as any;
     expect(t.readAttribute("title")).toBe("Don't change the topic");
     expect(t.get("title")).toBe("Don't change the topic");
 
@@ -805,11 +812,15 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("string attribute predicate", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ title: "Hello" });
-    expect(t.attributePresent("title")).toBe(true);
-    const empty = new Topic({ title: "" });
-    expect(empty.attributePresent("title")).toBe(false);
+    for (const value of [null, "", " "]) {
+      expect((new CanonicalTopic({ author_name: value }) as any)["author_name?"]).toBe(false);
+    }
+
+    expect((new CanonicalTopic({ author_name: "Name" }) as any)["author_name?"]).toBe(true);
+
+    for (const value of BooleanType.FALSE_VALUES) {
+      expect((new CanonicalTopic({ author_name: value }) as any)["author_name?"]).toBeTruthy();
+    }
   });
 
   it("converted values are returned after assignment", async () => {
@@ -823,27 +834,22 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("write nil to time attribute", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ bonus_time: Temporal.Now.instant() });
-    t.bonus_time = null;
-    expect(t.bonus_time).toBeNull();
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const record = new CanonicalTopic({}) as any;
+      record.written_on = null;
+      expect(record.written_on).toBeNull();
+    });
   });
 
   it("read overridden attribute", async () => {
-    const Topic = makeTopic();
-    const topic = new Topic({ title: "a" });
+    const topic = new CanonicalTopic({ title: "a" }) as any;
     Object.defineProperty(topic, "title", { get: () => "b" });
-    expect((topic as any).get("title")).toBe("a");
+    expect(topic.get("title")).toBe("a");
   });
 
   it("non-attribute read and write", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({});
-    try {
-      t.nonexistent = "value";
-    } catch (e) {
-      expect(e).toBeDefined();
-    }
+    const topic = new CanonicalTopic({}) as any;
+    expect(topic.mumbo).toBeUndefined();
   });
 
   it("attributes without primary key", async () => {
@@ -900,6 +906,52 @@ describe("AttributeMethodsTest", () => {
         2007, 12, 31, 16, 0, 0,
       ]);
     });
+  });
+
+  it("boolean attributes", async () => {
+    expect(((await CanonicalTopic.find(1)) as any)["approved?"]).toBe(false);
+    expect(((await CanonicalTopic.find(2)) as any)["approved?"]).toBe(true);
+  });
+
+  it("read_attribute when false", async () => {
+    const topic = topics("first") as any;
+    topic.approved = false;
+    expect(topic["approved?"]).toBe(false);
+    topic.approved = "false";
+    expect(topic["approved?"]).toBe(false);
+  });
+
+  it("read_attribute when true", async () => {
+    const topic = topics("first") as any;
+    topic.approved = true;
+    expect(topic["approved?"]).toBe(true);
+    topic.approved = "true";
+    expect(topic["approved?"]).toBe(true);
+  });
+
+  it("boolean attribute predicate", async () => {
+    for (const value of [null, "", false, "false", "f", 0]) {
+      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(false);
+    }
+
+    for (const value of [true, "true", "1", 1]) {
+      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(true);
+    }
+  });
+
+  it("boolean attributes writing and reading", async () => {
+    const topic = new CanonicalTopic({}) as any;
+    topic.approved = "false";
+    expect(topic["approved?"]).toBe(false);
+
+    topic.approved = "false";
+    expect(topic["approved?"]).toBe(false);
+
+    topic.approved = "true";
+    expect(topic["approved?"]).toBe(true);
+
+    topic.approved = "true";
+    expect(topic["approved?"]).toBe(true);
   });
 });
 
@@ -1331,55 +1383,5 @@ describe("initialize_generated_modules", () => {
     }
     Topic.initializeGeneratedModules();
     expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Set);
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  const { topics } = fixtures(["topics"]);
-
-  it("boolean attributes", async () => {
-    expect(((await CanonicalTopic.find(1)) as any)["approved?"]).toBe(false);
-    expect(((await CanonicalTopic.find(2)) as any)["approved?"]).toBe(true);
-  });
-
-  it("read_attribute when false", async () => {
-    const topic = topics("first") as any;
-    topic.approved = false;
-    expect(topic["approved?"]).toBe(false);
-    topic.approved = "false";
-    expect(topic["approved?"]).toBe(false);
-  });
-
-  it("read_attribute when true", async () => {
-    const topic = topics("first") as any;
-    topic.approved = true;
-    expect(topic["approved?"]).toBe(true);
-    topic.approved = "true";
-    expect(topic["approved?"]).toBe(true);
-  });
-
-  it("boolean attribute predicate", async () => {
-    for (const value of [null, "", false, "false", "f", 0]) {
-      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(false);
-    }
-
-    for (const value of [true, "true", "1", 1]) {
-      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(true);
-    }
-  });
-
-  it("boolean attributes writing and reading", async () => {
-    const topic = new CanonicalTopic({}) as any;
-    topic.approved = "false";
-    expect(topic["approved?"]).toBe(false);
-
-    topic.approved = "false";
-    expect(topic["approved?"]).toBe(false);
-
-    topic.approved = "true";
-    expect(topic["approved?"]).toBe(true);
-
-    topic.approved = "true";
-    expect(topic["approved?"]).toBe(true);
   });
 });
