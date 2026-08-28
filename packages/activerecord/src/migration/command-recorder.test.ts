@@ -101,13 +101,13 @@ describe("Migration", () => {
       });
       /* eslint-enable blazetrails/require-table-teardown */
       expect(recorder.commands).toEqual([
-        ["createTable", ["apples", block], undefined],
+        ["createTable", ["apples"], block],
         ["dropTable", ["elderberries"], undefined],
-        ["createTable", ["clementines", block], undefined],
+        ["createTable", ["clementines"], block],
         ["createTable", ["dates"], undefined],
-        ["dropTable", ["bananas", block], undefined],
+        ["dropTable", ["bananas"], block],
         ["dropTable", ["grapes"], undefined],
-        ["dropTable", ["figs", block], undefined],
+        ["dropTable", ["figs"], block],
       ]);
     });
 
@@ -173,44 +173,32 @@ describe("Migration", () => {
 
     it("invert create table with options and block", async () => {
       const block = () => {};
-      const dropTable = await recorder.inverseOf("createTable", [
-        "people_reminders",
-        { id: false },
+      const dropTable = await recorder.inverseOf(
+        "createTable",
+        ["people_reminders", { id: false }],
         block,
-      ]);
-      expect(dropTable).toEqual([
-        "dropTable",
-        ["people_reminders", { id: false }, block],
-        undefined,
-      ]);
+      );
+      expect(dropTable).toEqual(["dropTable", ["people_reminders", { id: false }], block]);
     });
 
     it("invert drop table", async () => {
       const block = () => {};
-      const createTable = await recorder.inverseOf("dropTable", [
-        "people_reminders",
-        { id: false },
+      const createTable = await recorder.inverseOf(
+        "dropTable",
+        ["people_reminders", { id: false }],
         block,
-      ]);
-      expect(createTable).toEqual([
-        "createTable",
-        ["people_reminders", { id: false }, block],
-        undefined,
-      ]);
+      );
+      expect(createTable).toEqual(["createTable", ["people_reminders", { id: false }], block]);
     });
 
     it("invert drop table with if exists", async () => {
       const block = () => {};
-      const createTable = await recorder.inverseOf("dropTable", [
-        "people_reminders",
-        { id: false, ifExists: true },
+      const createTable = await recorder.inverseOf(
+        "dropTable",
+        ["people_reminders", { id: false, ifExists: true }],
         block,
-      ]);
-      expect(createTable).toEqual([
-        "createTable",
-        ["people_reminders", { id: false }, block],
-        undefined,
-      ]);
+      );
+      expect(createTable).toEqual(["createTable", ["people_reminders", { id: false }], block]);
     });
 
     it("invert drop table without a block nor option", async () => {
@@ -239,7 +227,7 @@ describe("Migration", () => {
 
     it("invert drop table with multiple tables and block", async () => {
       const block = () => {};
-      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists", block]);
+      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists"], block);
       await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
       await expect(inverseOf()).rejects.toThrow(
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
@@ -266,16 +254,15 @@ describe("Migration", () => {
 
     it("invert drop join table", async () => {
       const block = () => {};
-      const createJoinTable = await recorder.inverseOf("dropJoinTable", [
-        "musics",
-        "artists",
-        { tableName: "catalog" },
+      const createJoinTable = await recorder.inverseOf(
+        "dropJoinTable",
+        ["musics", "artists", { tableName: "catalog" }],
         block,
-      ]);
+      );
       expect(createJoinTable).toEqual([
         "createJoinTable",
-        ["musics", "artists", { tableName: "catalog" }, block],
-        undefined,
+        ["musics", "artists", { tableName: "catalog" }],
+        block,
       ]);
     });
 
