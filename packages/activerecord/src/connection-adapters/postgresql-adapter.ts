@@ -185,6 +185,10 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
+   */
   override get typeRegistryKey(): AdapterName {
     return "postgres";
   }

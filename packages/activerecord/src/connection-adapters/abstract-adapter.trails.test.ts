@@ -20,6 +20,9 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Result } from "../result.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
 
 // All 5 methods are class-level in Rails (class << self private), so test via a subclass.
@@ -414,5 +417,24 @@ describe("AbstractAdapter#defaultTimezone", () => {
     } finally {
       adapter.disconnectBang();
     }
+  });
+});
+
+describe("AbstractAdapter#adapterName", () => {
+  it("returns the class's ADAPTER_NAME rather than the type-registry key", () => {
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    try {
+      expect(adapter.adapterName).toBe("SQLite");
+      expect(adapter.typeRegistryKey).toBe("sqlite");
+    } finally {
+      adapter.disconnectBang();
+    }
+  });
+
+  it("declares each adapter's ADAPTER_NAME verbatim from Rails", () => {
+    expect(AbstractAdapter.ADAPTER_NAME).toBe("Abstract");
+    expect(SQLite3Adapter.ADAPTER_NAME).toBe("SQLite");
+    expect(PostgreSQLAdapter.ADAPTER_NAME).toBe("PostgreSQL");
+    expect(Mysql2Adapter.ADAPTER_NAME).toBe("Mysql2");
   });
 });

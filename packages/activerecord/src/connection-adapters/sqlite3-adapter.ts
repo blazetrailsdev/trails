@@ -147,6 +147,10 @@ let sqlite3TypeMap: TypeMap | undefined;
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override readonly ADAPTER_NAME = "SQLite";
 
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
+   */
   override get typeRegistryKey(): AdapterName {
     return "sqlite";
   }

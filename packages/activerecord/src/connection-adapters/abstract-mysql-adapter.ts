@@ -190,6 +190,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   protected _statementLimit = 1000;
 
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
+   */
   override get typeRegistryKey(): AdapterName {
     return "mysql2";
   }

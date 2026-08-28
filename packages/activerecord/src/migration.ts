@@ -418,11 +418,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
   private static _disableDdlTransaction = false;
 
-  /** Return the normalized adapter name from the configured adapter. */
-  protected get _adapterName(): "sqlite" | "postgres" | "mysql2" {
-    return this.connection.typeRegistryKey;
-  }
-
   /**
    * Mirrors: ActiveRecord::Migration#initialize
    */

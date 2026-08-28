@@ -305,10 +305,10 @@ export function resolveCompositeRefColumn(
  * Lets ERB-style adapter-conditional fixture data translate to TS:
  *
  * ```ts
- * { data: adapterName(adapter) === "postgres" ? a : b }
+ * { data: typeRegistryKey(adapter) === "postgres" ? a : b }
  * ```
  */
-export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql2" | "sqlite" {
+export function typeRegistryKey(adapter: DatabaseAdapter): "postgres" | "mysql2" | "sqlite" {
   return adapter.typeRegistryKey;
 }
 

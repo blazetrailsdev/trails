@@ -21,17 +21,10 @@ export class Nary extends NodeExpression {
   }
 
   fetchAttribute(block: (attr: Node) => boolean): boolean {
-    if (this.children.length === 0) return false;
-    return this.children.every((child) => {
-      if (typeof (child as unknown as { fetchAttribute: unknown }).fetchAttribute === "function") {
-        return (
-          child as unknown as {
-            fetchAttribute(block: (attr: Node) => boolean): boolean | undefined;
-          }
-        ).fetchAttribute(block);
-      }
-      return false;
-    });
+    return (
+      this.children.length > 0 &&
+      this.children.every((child) => Boolean(child.fetchAttribute(block)))
+    );
   }
 
   hash(): number {
