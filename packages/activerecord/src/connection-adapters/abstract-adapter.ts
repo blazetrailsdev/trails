@@ -629,7 +629,6 @@ export interface AbstractAdapter {
   releaseSavepoint(name: string): Promise<void>;
   rollbackToSavepoint(name: string): Promise<void>;
   currentSavepointName(): string | null;
-  readonly inTransaction: boolean;
   changeTableComment?(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
   currentDatabase?(): Promise<string>;
   /** @internal */

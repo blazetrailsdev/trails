@@ -68,7 +68,7 @@ describe("has_many mid-flight reassignment", () => {
     expect(persisted.length).toBeGreaterThan(0);
 
     const inFlight = firm.association("clients").loadTarget();
-    await findTarget(firm, "clients", {});
+    await findTarget(firm, "clients");
     const loaded = (await inFlight) as Base[];
 
     expect(loaded.length).toBe(persisted.length);

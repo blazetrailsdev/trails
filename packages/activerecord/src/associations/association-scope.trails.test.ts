@@ -275,27 +275,15 @@ describe("AssociationScope", () => {
     // `HasManyAssociation#findTarget`. The migrated
     // path skips re-applying when options.scope === reflection.scope
     // (avoid double-application), but augmented scopes must still run.
-    // Canonical Author has_many :posts carries no macro scope, so the
-    // caller-supplied `where(title:)` is necessarily an augmented scope.
+    // `Author#welcomePosts` is the canonical `has_many ... -> { where(title:) }`
+    // (`test/models/author.rb:80`), so the macro scope must filter the load.
     const author = await Author.create({ name: "Alice" });
     await Post.create({ author_id: author.id, title: "draft", body: "x" });
-    await Post.create({ author_id: author.id, title: "published", body: "y" });
+    await Post.create({ author_id: author.id, title: "Welcome to the weblog", body: "y" });
 
-    // Augmented options.scope — NOT equal to the reflection's macro
-    // scope (which is null here). Loader must still apply it. No reader form:
-    // the caller-supplied `options.scope` IS the subject, and the generated
-    // `author.posts` accessor can only pass the reflection's own options.
-    const results = await findTarget(
-      author,
-      "posts",
-      (rel: any) => rel.where({ title: "published" }),
-      {
-        className: "Post",
-        foreignKey: "author_id",
-      },
-    );
+    const results = await findTarget(author, "welcomePosts");
     expect(results).toHaveLength(1);
-    expect((results[0] as any).title).toBe("published");
+    expect((results[0] as any).title).toBe("Welcome to the weblog");
   });
 
   it("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {

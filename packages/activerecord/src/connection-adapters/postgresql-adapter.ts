@@ -1302,7 +1302,10 @@ export class PostgreSQLAdapter
 
   async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     if (options.length === 0) return "EXPLAIN";
-    return `EXPLAIN (${options.join(", ").toUpperCase()})`;
+    return `EXPLAIN (${options
+      .map((option) => (option.startsWith(":") ? option.slice(1) : option))
+      .join(", ")
+      .toUpperCase()})`;
   }
 
   static nativeDatabaseTypes(): NativeDatabaseTypes {

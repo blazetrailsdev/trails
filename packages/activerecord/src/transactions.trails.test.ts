@@ -551,24 +551,24 @@ describe("SchemaAdapter TM delegation", () => {
     }
     await Item.create({ name: "prime" });
 
-    expect(testAdapter.inTransaction).toBe(false);
+    expect(testAdapter.isTransactionOpen()).toBe(false);
     expect(testAdapter.openTransactions).toBe(0);
     expect((testAdapter as unknown as AdapterTxView).currentTransaction?.()).toBeInstanceOf(
       NullTransaction,
     );
 
     await testAdapter.beginTransaction();
-    expect(testAdapter.inTransaction).toBe(true);
+    expect(testAdapter.isTransactionOpen()).toBe(true);
     expect(testAdapter.openTransactions).toBeGreaterThan(0);
 
     await testAdapter.commit();
-    expect(testAdapter.inTransaction).toBe(false);
+    expect(testAdapter.isTransactionOpen()).toBe(false);
     expect(testAdapter.openTransactions).toBe(0);
 
     await testAdapter.beginTransaction();
-    expect(testAdapter.inTransaction).toBe(true);
+    expect(testAdapter.isTransactionOpen()).toBe(true);
     await testAdapter.rollback();
-    expect(testAdapter.inTransaction).toBe(false);
+    expect(testAdapter.isTransactionOpen()).toBe(false);
   });
 });
 

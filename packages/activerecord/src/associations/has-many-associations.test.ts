@@ -948,10 +948,7 @@ describe("HasManyAssociationsTest", () => {
     await DestroyAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DestroyAllPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "destroy_all_posts", {
-      className: "DestroyAllPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "destroy_all_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -986,10 +983,7 @@ describe("HasManyAssociationsTest", () => {
     await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     // delete all without pre-loading the collection
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "delete_all_unloaded_posts", {
-      className: "DeleteAllUnloadedPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "delete_all_unloaded_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -1117,10 +1111,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -1129,10 +1120,7 @@ describe("HasManyAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
   });
@@ -1149,10 +1137,7 @@ describe("HasManyAssociationsTest", () => {
   it("included in collection", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "Included", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.some((p: any) => p.id === post.id)).toBe(true);
   });
 
@@ -1161,10 +1146,7 @@ describe("HasManyAssociationsTest", () => {
     const newPost = HmPost.new({ author_id: author.id, title: "New" });
     expect(newPost.isNewRecord()).toBe(true);
     // Not in DB yet
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.some((p: any) => p.id === newPost.id)).toBe(false);
   });
 
@@ -1201,10 +1183,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearPost.create({ author_id: author.id, title: "A", body: "body" });
     await ClearPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const posts = await findHasManyTarget(author, "clear_posts", {
-      className: "ClearPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "clear_posts");
     expect(posts.length).toBe(0);
   });
 
@@ -1238,10 +1217,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ClearDepAuthor.create({ name: "Alice" });
     await ClearDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "clear_dep_posts", {
-      className: "ClearDepPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "clear_dep_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -1483,14 +1459,8 @@ describe("HasManyAssociationsTest", () => {
   it("no sql should be fired if association already loaded", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const posts2 = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "posts");
+    const posts2 = await findHasManyTarget(author, "posts");
     expect(posts1.length).toBe(posts2.length);
   });
 
@@ -1528,14 +1498,8 @@ describe("HasManyAssociationsTest", () => {
   it("does not duplicate associations when used with natural primary keys", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const posts2 = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "posts");
+    const posts2 = await findHasManyTarget(author, "posts");
     expect(posts1.length).toBe(posts2.length);
   });
 
@@ -1548,10 +1512,7 @@ describe("HasManyAssociationsTest", () => {
   it("prevent double insertion of new object when the parent association loaded in the after save callback", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     // Should only have one instance
     const unique = new Set(posts.map((p: any) => p.id));
     expect(unique.size).toBe(posts.length);
@@ -1561,10 +1522,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(2);
   });
 
@@ -1596,10 +1554,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(AnonPost);
     const author = await AnonAuthor.create({ name: "Alice" });
     await AnonPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "anon_posts", {
-      className: "AnonPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "anon_posts");
     expect(posts.length).toBe(1);
   });
   it("default scope on relations is not cached", async () => {
@@ -1828,10 +1783,7 @@ describe("HasManyAssociationsTest", () => {
     await DelAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "del_all_posts", {
-      className: "DelAllPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "del_all_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -2202,6 +2154,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("finder_dirty_posts", {
+          className: "FinderDirtyPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FinderDirtyPost extends Base {
@@ -2218,10 +2174,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FinderDirtyPost);
     const author = await FinderDirtyAuthor.create({ name: "Alice" });
     const post = await FinderDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "finder_dirty_posts", {
-      className: "FinderDirtyPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "finder_dirty_posts");
     const found = posts.find((p: any) => p.id === post.id);
     expect(found).toBeDefined();
   });
@@ -2230,10 +2183,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     // Array-like access
     expect(Array.isArray(posts)).toBe(true);
     expect(posts.length).toBe(2);
@@ -2249,6 +2199,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("merged_posts", {
+          className: "MergedPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class MergedPost extends Base {
@@ -2266,10 +2220,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await MergedAuthor.create({ name: "Alice" });
     const p1 = await MergedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await MergedPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "merged_posts", {
-      className: "MergedPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "merged_posts");
     expect(posts.length).toBe(2);
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
@@ -2282,6 +2233,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("app_ord_posts", {
+          className: "AppOrdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class AppOrdPost extends Base {
@@ -2299,10 +2254,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await AppOrdAuthor.create({ name: "Alice" });
     await AppOrdPost.create({ author_id: author.id, title: "B", body: "body" });
     await AppOrdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "app_ord_posts", {
-      className: "AppOrdPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "app_ord_posts");
     expect(posts.length).toBe(2);
   });
   it("dynamic find should respect association order", async () => {
@@ -2312,6 +2264,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("dyn_ord_posts", {
+          className: "DynOrdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class DynOrdPost extends Base {
@@ -2329,10 +2285,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DynOrdAuthor.create({ name: "Alice" });
     await DynOrdPost.create({ author_id: author.id, title: "Z", body: "body" });
     await DynOrdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "dyn_ord_posts", {
-      className: "DynOrdPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "dyn_ord_posts");
     expect(posts.length).toBe(2);
   });
   it("taking", async () => {
@@ -2370,10 +2323,7 @@ describe("HasManyAssociationsTest", () => {
   it("taking with inverse of", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBeGreaterThan(0);
     expect(posts[0]).toBeDefined();
   });
@@ -2417,10 +2367,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: 9999, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
   });
@@ -2487,6 +2434,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("upd_all_fk_posts", {
+          className: "UpdAllFkPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class UpdAllFkPost extends Base {
@@ -2506,10 +2457,7 @@ describe("HasManyAssociationsTest", () => {
     // Update via explicit FK
     post.title = "Updated";
     await post.save();
-    const posts = await findHasManyTarget(author, "upd_all_fk_posts", {
-      className: "UpdAllFkPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "upd_all_fk_posts");
     expect((posts[0] as any).title).toBe("Updated");
   });
   it("belongs to with new object", async () => {
@@ -2529,10 +2477,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -2541,10 +2486,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "match", body: "body" });
     await HmPost.create({ author_id: author.id, title: "other", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     const matched: any[] = [];
     for (const p of posts) {
       if ((p as any).title === "match") matched.push(p);
@@ -2583,19 +2525,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(2);
   });
   it("find first sanitized", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts[0]).toBeDefined();
   });
   it("find first after reset scope", async () => {
@@ -2605,6 +2541,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("reset_posts", {
+          className: "ResetPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ResetPost extends Base {
@@ -2621,10 +2561,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ResetPost);
     const author = await ResetAuthor.create({ name: "Alice" });
     await ResetPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await findHasManyTarget(author, "reset_posts", {
-      className: "ResetPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "reset_posts");
     expect(posts[0]).toBeDefined();
     expect((posts[0] as any).title).toBe("First");
   });
@@ -2635,6 +2572,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("reload_posts", {
+          className: "ReloadPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ReloadPost extends Base {
@@ -2652,16 +2593,10 @@ describe("HasManyAssociationsTest", () => {
     const author = await ReloadAuthor.create({ name: "Alice" });
     await ReloadPost.create({ author_id: author.id, title: "First", body: "body" });
     // Load once
-    const posts1 = await findHasManyTarget(author, "reload_posts", {
-      className: "ReloadPost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "reload_posts");
     expect(posts1[0]).toBeDefined();
     // Load again (simulating reload)
-    const posts2 = await findHasManyTarget(author, "reload_posts", {
-      className: "ReloadPost",
-      foreignKey: "author_id",
-    });
+    const posts2 = await findHasManyTarget(author, "reload_posts");
     expect(posts2[0]).toBeDefined();
     expect((posts2[0] as any).title).toBe("First");
   });
@@ -2758,10 +2693,7 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     // Group by title manually
     const groups: Record<string, any[]> = {};
     for (const p of posts) {
@@ -2778,20 +2710,14 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "X", body: "body" });
     await HmPost.create({ author_id: author.id, title: "X", body: "body" });
     await HmPost.create({ author_id: author.id, title: "Y", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     const xPosts = posts.filter((p: any) => p.title === "X");
     expect(xPosts.length).toBe(2);
   });
   it("default select", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     // Default select should return all attributes
     expect((posts[0] as any).title).toBe("A");
   });
@@ -2799,20 +2725,14 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     const selected = posts.filter((p: any) => p.title === "A");
     expect(selected.length).toBe(1);
   });
   it("select without foreign key", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
   });
@@ -2895,6 +2815,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("size_dirty_posts", {
+          className: "SizeDirtyPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class SizeDirtyPost extends Base {
@@ -2911,10 +2835,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(SizeDirtyPost);
     const author = await SizeDirtyAuthor.create({ name: "Alice" });
     await SizeDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "size_dirty_posts", {
-      className: "SizeDirtyPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "size_dirty_posts");
     expect(posts.length).toBe(1);
   });
 
@@ -2925,6 +2846,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("empty_dirty_posts", {
+          className: "EmptyDirtyPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class EmptyDirtyPost extends Base {
@@ -2940,10 +2865,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(EmptyDirtyAuthor);
     registerModel(EmptyDirtyPost);
     const author = await EmptyDirtyAuthor.create({ name: "Alice" });
-    const posts = await findHasManyTarget(author, "empty_dirty_posts", {
-      className: "EmptyDirtyPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "empty_dirty_posts");
     expect(posts.length === 0).toBe(true);
   });
 
@@ -2954,6 +2876,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("size_twice_posts", {
+          className: "SizeTwicePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class SizeTwicePost extends Base {
@@ -2971,15 +2897,9 @@ describe("HasManyAssociationsTest", () => {
     const author = await SizeTwiceAuthor.create({ name: "Alice" });
     await SizeTwicePost.create({ author_id: author.id, title: "A", body: "body" });
     await SizeTwicePost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await findHasManyTarget(author, "size_twice_posts", {
-      className: "SizeTwicePost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "size_twice_posts");
     expect(posts1.length).toBe(2);
-    const posts2 = await findHasManyTarget(author, "size_twice_posts", {
-      className: "SizeTwicePost",
-      foreignKey: "author_id",
-    });
+    const posts2 = await findHasManyTarget(author, "size_twice_posts");
     expect(posts2.length).toBe(2);
   });
 
@@ -2990,6 +2910,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("build_save_posts", {
+          className: "BuildSavePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class BuildSavePost extends Base {
@@ -3008,10 +2932,7 @@ describe("HasManyAssociationsTest", () => {
     const post = BuildSavePost.new({ author_id: author.id, title: "Built", body: "body" });
     await post.save();
     expect(post.isNewRecord()).toBe(false);
-    const posts = await findHasManyTarget(author, "build_save_posts", {
-      className: "BuildSavePost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "build_save_posts");
     expect(posts.length).toBe(1);
   });
 
@@ -3049,6 +2970,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("create_save_posts", {
+          className: "CreateSavePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class CreateSavePost extends Base {
@@ -3071,10 +2996,7 @@ describe("HasManyAssociationsTest", () => {
     });
     post.title = "Updated";
     await post.save();
-    const posts = await findHasManyTarget(author, "create_save_posts", {
-      className: "CreateSavePost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "create_save_posts");
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Updated");
   });
@@ -3108,10 +3030,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ExclDepAuthor.create({ name: "Alice" });
     await ExclDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "excl_dep_posts", {
-      className: "ExclDepPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "excl_dep_posts");
     expect(remaining.length).toBe(0);
   });
   it("dependent association respects optional conditions on delete", async () => {
@@ -3146,15 +3065,7 @@ describe("HasManyAssociationsTest", () => {
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(2);
-    const scoped = await findHasManyTarget(
-      firm,
-      "conditionalClients",
-      (rel: any) => rel.where({ name: "BigShot Inc." }),
-      {
-        className: "DcClient",
-        foreignKey: "firm_id",
-      },
-    );
+    const scoped = await findHasManyTarget(firm, "conditionalClients");
     expect(scoped.length).toBe(1);
     await firm.destroy();
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(1);
@@ -3257,14 +3168,8 @@ describe("HasManyAssociationsTest", () => {
     await DelPkPost.create({ author_id: author1.id, title: "A1", body: "body" });
     await DelPkPost.create({ author_id: author2.id, title: "A2", body: "body" });
     await author1.destroy();
-    const remaining1 = await findHasManyTarget(author1, "del_pk_posts", {
-      className: "DelPkPost",
-      foreignKey: "author_id",
-    });
-    const remaining2 = await findHasManyTarget(author2, "del_pk_posts", {
-      className: "DelPkPost",
-      foreignKey: "author_id",
-    });
+    const remaining1 = await findHasManyTarget(author1, "del_pk_posts");
+    const remaining2 = await findHasManyTarget(author2, "del_pk_posts");
     expect(remaining1.length).toBe(0);
     expect(remaining2.length).toBe(1);
   });
@@ -3300,10 +3205,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearNoAccessPost.create({ author_id: author.id, title: "B", body: "body" });
     // Clear without having loaded the association first
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "clear_no_access_posts", {
-      className: "ClearNoAccessPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "clear_no_access_posts");
     expect(remaining.length).toBe(0);
   });
   it("deleting a item which is not in the collection", async () => {
@@ -3312,10 +3214,7 @@ describe("HasManyAssociationsTest", () => {
     const otherPost = await HmPost.create({ author_id: 9999, title: "Other", body: "body" });
     // Deleting something not in the collection shouldn't affect it
     await otherPost.destroy();
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(1);
   });
 
@@ -3323,10 +3222,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.destroy(String(post.id) as any);
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(0);
   });
 
@@ -3369,10 +3265,7 @@ describe("HasManyAssociationsTest", () => {
     await DestroyAllScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "destroy_all_scope_posts", {
-      className: "DestroyAllScopePost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "destroy_all_scope_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -3383,6 +3276,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("destroy_scope_posts", {
+          className: "DestroyScopePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class DestroyScopePost extends Base {
@@ -3400,10 +3297,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DestroyScopeAuthor.create({ name: "Alice" });
     const post = await DestroyScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await post.destroy();
-    const remaining = await findHasManyTarget(author, "destroy_scope_posts", {
-      className: "DestroyScopePost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "destroy_scope_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -3414,6 +3308,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("delete_scope_posts", {
+          className: "DeleteScopePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class DeleteScopePost extends Base {
@@ -3431,10 +3329,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DeleteScopeAuthor.create({ name: "Alice" });
     const post = await DeleteScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await DeleteScopePost.destroy(post.id!);
-    const remaining = await findHasManyTarget(author, "delete_scope_posts", {
-      className: "DeleteScopePost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "delete_scope_posts");
     expect(remaining.length).toBe(0);
   });
   it("dependence for associations with hash condition", async () => {
@@ -3545,10 +3440,7 @@ describe("HasManyAssociationsTest", () => {
     await DepTxPost.create({ author_id: author.id, title: "A", body: "body" });
     // Even if transaction semantics aren't fully implemented, destroy should work
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "dep_tx_posts", {
-      className: "DepTxPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "dep_tx_posts");
     expect(remaining.length).toBe(0);
   });
 
@@ -3617,6 +3509,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("arr_posts", {
+          className: "ArrPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ArrPost extends Base {
@@ -3635,10 +3531,7 @@ describe("HasManyAssociationsTest", () => {
     await ArrPost.create({ author_id: author.id, title: "A", body: "body" });
     await ArrPost.create({ author_id: author.id, title: "B", body: "body" });
     await ArrPost.create({ author_id: author.id, title: "C", body: "body" });
-    const loaded = await findHasManyTarget(author, "arr_posts", {
-      className: "ArrPost",
-      foreignKey: "author_id",
-    });
+    const loaded = await findHasManyTarget(author, "arr_posts");
     expect(loaded.length).toBe(3);
   });
   it("replace failure", async () => {
@@ -3648,6 +3541,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("repl_fail_posts", {
+          className: "ReplFailPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ReplFailPost extends Base {
@@ -3667,10 +3564,7 @@ describe("HasManyAssociationsTest", () => {
     // Replacing FK with invalid value
     post.author_id = 999999;
     await post.save();
-    const posts = await findHasManyTarget(author, "repl_fail_posts", {
-      className: "ReplFailPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "repl_fail_posts");
     expect(posts.length).toBe(0);
   });
   it("get ids for unloaded associations does not load them", async () => {
@@ -3680,6 +3574,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("unloaded_posts", {
+          className: "UnloadedPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class UnloadedPost extends Base {
@@ -3698,10 +3596,7 @@ describe("HasManyAssociationsTest", () => {
     const p1 = await UnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await UnloadedPost.create({ author_id: author.id, title: "B", body: "body" });
     // Getting IDs directly via loadHasMany
-    const posts = await findHasManyTarget(author, "unloaded_posts", {
-      className: "UnloadedPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "unloaded_posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids.length).toBe(2);
     expect(ids).toContain(p1.id);
@@ -3714,6 +3609,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("dirty_id_posts", {
+          className: "DirtyIdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class DirtyIdPost extends Base {
@@ -3730,17 +3629,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DirtyIdPost);
     const author = await DirtyIdAuthor.create({ name: "Writer" });
     await DirtyIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await findHasManyTarget(author, "dirty_id_posts", {
-      className: "DirtyIdPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "dirty_id_posts");
     expect(posts).toHaveLength(1);
     // Add another post
     await DirtyIdPost.create({ author_id: author.id, title: "P2", body: "body" });
-    const posts2 = await findHasManyTarget(author, "dirty_id_posts", {
-      className: "DirtyIdPost",
-      foreignKey: "author_id",
-    });
+    await author.reload();
+    const posts2 = await findHasManyTarget(author, "dirty_id_posts");
     expect(posts2).toHaveLength(2);
   });
   it("ids reader cache should be cleared when collection is deleted", async () => {
@@ -3750,6 +3644,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("clr_id_posts", {
+          className: "ClrIdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ClrIdPost extends Base {
@@ -3766,16 +3664,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ClrIdPost);
     const author = await ClrIdAuthor.create({ name: "Writer" });
     const post = await ClrIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    let posts = await findHasManyTarget(author, "clr_id_posts", {
-      className: "ClrIdPost",
-      foreignKey: "author_id",
-    });
+    let posts = await findHasManyTarget(author, "clr_id_posts");
     expect(posts).toHaveLength(1);
     await post.destroy();
-    posts = await findHasManyTarget(author, "clr_id_posts", {
-      className: "ClrIdPost",
-      foreignKey: "author_id",
-    });
+    await author.reload();
+    posts = await findHasManyTarget(author, "clr_id_posts");
     expect(posts).toHaveLength(0);
   });
   it("get ids ignores include option", async () => {
@@ -3785,6 +3678,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("gii_posts", {
+          className: "GiiPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class GiiPost extends Base {
@@ -3801,10 +3698,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(GiiPost);
     const author = await GiiAuthor.create({ name: "Writer" });
     const p = await GiiPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await findHasManyTarget(author, "gii_posts", {
-      className: "GiiPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "gii_posts");
     const ids = posts.map((post: any) => post.id);
     expect(ids).toContain(p.id);
   });
@@ -3815,6 +3709,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("ord_id_posts", {
+          className: "OrdIdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OrdIdPost extends Base {
@@ -3832,10 +3730,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OrdIdAuthor.create({ name: "Alice" });
     const p1 = await OrdIdPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await OrdIdPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "ord_id_posts", {
-      className: "OrdIdPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "ord_id_posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -3847,6 +3742,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("set_id_posts", {
+          className: "SetIdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class SetIdPost extends Base {
@@ -3864,10 +3763,7 @@ describe("HasManyAssociationsTest", () => {
     const author = new SetIdAuthor({ name: "Alice" });
     await author.save();
     const post = await SetIdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "set_id_posts", {
-      className: "SetIdPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "set_id_posts");
     expect(posts.length).toBe(1);
     expect(posts[0].id).toBe(post.id);
   });
@@ -3878,6 +3774,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("blank_id_posts", {
+          className: "BlankIdPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class BlankIdPost extends Base {
@@ -3895,10 +3795,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await BlankIdAuthor.create({ name: "Alice" });
     const p1 = await BlankIdPost.create({ author_id: author.id, title: "A", body: "body" });
     // Blank/null IDs should be ignored
-    const posts = await findHasManyTarget(author, "blank_id_posts", {
-      className: "BlankIdPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "blank_id_posts");
     const ids = posts.map((p: any) => p.id).filter((id: any) => id != null && id !== "");
     expect(ids.length).toBe(1);
     expect(ids).toContain(p1.id);
@@ -3954,11 +3851,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ThrIdAuthor.create({ name: "Alice" });
     const post = await ThrIdPost.create({ author_id: author.id, title: "P", body: "body" });
     const comment = await ThrIdComment.create({ post_id: post.id, body: "C" });
-    const comments = await findHasManyThroughTarget(author, "thr_id_comments", {
-      through: "thr_id_posts",
-      className: "ThrIdComment",
-      source: "thr_id_comments",
-    });
+    const comments = await findHasManyThroughTarget(author, "thr_id_comments");
     const ids = comments.map((c: any) => c.id);
     expect(ids).toContain(comment.id);
   });
@@ -3999,6 +3892,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("ord_thr_posts", {
+          className: "OrdThrPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OrdThrPost extends Base {
@@ -4016,10 +3913,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OrdThrAuthor.create({ name: "Alice" });
     await OrdThrPost.create({ author_id: author.id, title: "B", body: "body" });
     await OrdThrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "ord_thr_posts", {
-      className: "OrdThrPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "ord_thr_posts");
     expect(posts.length).toBe(2);
   });
   it("dynamic find should respect association order for through", async () => {
@@ -4029,6 +3923,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("dyn_thr_posts", {
+          className: "DynThrPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class DynThrPost extends Base {
@@ -4046,10 +3944,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DynThrAuthor.create({ name: "Alice" });
     await DynThrPost.create({ author_id: author.id, title: "First", body: "body" });
     await DynThrPost.create({ author_id: author.id, title: "Second", body: "body" });
-    const posts = await findHasManyTarget(author, "dyn_thr_posts", {
-      className: "DynThrPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "dyn_thr_posts");
     expect(posts.length).toBe(2);
   });
   it("has many through respects hash conditions", async () => {
@@ -4111,16 +4006,7 @@ describe("HasManyAssociationsTest", () => {
     await HcComment.create({ post_id: post.id, body: "hello" });
     await HcComment.create({ post_id: post.id, body: "goodbye" });
 
-    const comments = await findHasManyTarget(
-      author,
-      "helloPostComments",
-      (rel: any) => rel.where({ body: "hello" }),
-      {
-        className: "HcComment",
-        through: "hcPosts",
-        source: "hcComments",
-      },
-    );
+    const comments = await findHasManyTarget(author, "helloPostComments");
     expect(comments.length).toBe(1);
     expect(comments[0].body).toBe("hello");
   });
@@ -4198,6 +4084,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("fnl_posts", {
+          className: "FnlPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FnlPost extends Base {
@@ -4215,10 +4105,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await FnlAuthor.create({ name: "Alice" });
     await FnlPost.create({ author_id: author.id, title: "A", body: "body" });
     await FnlPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "fnl_posts", {
-      className: "FnlPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "fnl_posts");
     expect(posts[0]).toBeDefined();
     expect(posts[posts.length - 1]).toBeDefined();
   });
@@ -4229,6 +4116,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("fl_load_posts", {
+          className: "FlLoadPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FlLoadPost extends Base {
@@ -4246,10 +4137,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await FlLoadAuthor.create({ name: "Alice" });
     await FlLoadPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlLoadPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "fl_load_posts", {
-      className: "FlLoadPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "fl_load_posts");
     // Once loaded, first and last are just array access
     expect(posts[0]).toBeDefined();
     expect(posts[posts.length - 1]).toBeDefined();
@@ -4261,6 +4149,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("fnl_build_posts", {
+          className: "FnlBuildPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FnlBuildPost extends Base {
@@ -4280,10 +4172,7 @@ describe("HasManyAssociationsTest", () => {
     // Build a new one (not saved)
     FnlBuildPost.new({ author_id: author.id, title: "B" });
     // Loading the association should get only persisted records
-    const posts = await findHasManyTarget(author, "fnl_build_posts", {
-      className: "FnlBuildPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "fnl_build_posts");
     expect(posts[0]).toBeDefined();
     expect(posts.length).toBe(1);
   });
@@ -4294,6 +4183,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("fnl_create_posts", {
+          className: "FnlCreatePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FnlCreatePost extends Base {
@@ -4310,10 +4203,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlCreatePost);
     const author = await FnlCreateAuthor.create({ name: "Alice" });
     await FnlCreatePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "fnl_create_posts", {
-      className: "FnlCreatePost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "fnl_create_posts");
     expect(posts[0]).toBeDefined();
     expect(posts.length).toBe(1);
   });
@@ -4324,6 +4214,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("fnl_new_posts", {
+          className: "FnlNewPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FnlNewPost extends Base {
@@ -4340,10 +4234,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlNewPost);
     const author = FnlNewAuthor.new({ name: "Unsaved" });
     // New record has no id, so loading association returns empty
-    const posts = await findHasManyTarget(author, "fnl_new_posts", {
-      className: "FnlNewPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "fnl_new_posts");
     expect(posts.length).toBe(0);
   });
   it("calling first or last with integer on association should not load association", async () => {
@@ -4353,6 +4244,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("fl_int_posts", {
+          className: "FlIntPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FlIntPost extends Base {
@@ -4371,10 +4266,7 @@ describe("HasManyAssociationsTest", () => {
     await FlIntPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "B", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "C", body: "body" });
-    const posts = await findHasManyTarget(author, "fl_int_posts", {
-      className: "FlIntPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "fl_int_posts");
     // first(2) equivalent
     const firstTwo = posts.slice(0, 2);
     expect(firstTwo.length).toBe(2);
@@ -4650,6 +4542,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("one_count_posts", {
+          className: "OneCountPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OneCountPost extends Base {
@@ -4666,10 +4562,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneCountPost);
     const author = await OneCountAuthor.create({ name: "Alice" });
     await OneCountPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "one_count_posts", {
-      className: "OneCountPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "one_count_posts");
     expect(posts.length === 1).toBe(true);
   });
   it("calling one on loaded association should not use query", async () => {
@@ -4679,6 +4572,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("one_load_posts", {
+          className: "OneLoadPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OneLoadPost extends Base {
@@ -4695,10 +4592,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneLoadPost);
     const author = await OneLoadAuthor.create({ name: "Alice" });
     await OneLoadPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "one_load_posts", {
-      className: "OneLoadPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "one_load_posts");
     expect(posts.length === 1).toBe(true);
   });
   it("subsequent calls to one should use query", async () => {
@@ -4708,6 +4602,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("one_sub_posts", {
+          className: "OneSubPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OneSubPost extends Base {
@@ -4724,16 +4622,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneSubPost);
     const author = await OneSubAuthor.create({ name: "Alice" });
     await OneSubPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await findHasManyTarget(author, "one_sub_posts", {
-      className: "OneSubPost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "one_sub_posts");
     expect(posts1.length === 1).toBe(true);
     await OneSubPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts2 = await findHasManyTarget(author, "one_sub_posts", {
-      className: "OneSubPost",
-      foreignKey: "author_id",
-    });
+    await author.reload();
+    const posts2 = await findHasManyTarget(author, "one_sub_posts");
     expect(posts2.length === 1).toBe(false);
   });
   it("calling one should defer to collection if using a block", async () => {
@@ -4743,6 +4636,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("one_blk_posts", {
+          className: "OneBlkPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OneBlkPost extends Base {
@@ -4760,10 +4657,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneBlkAuthor.create({ name: "Alice" });
     await OneBlkPost.create({ author_id: author.id, title: "A", body: "body" });
     await OneBlkPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "one_blk_posts", {
-      className: "OneBlkPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "one_blk_posts");
     const filtered = posts.filter((p: any) => p.title === "A");
     expect(filtered.length === 1).toBe(true);
   });
@@ -4774,6 +4668,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("one_zero_posts", {
+          className: "OneZeroPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OneZeroPost extends Base {
@@ -4789,10 +4687,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneZeroAuthor);
     registerModel(OneZeroPost);
     const author = await OneZeroAuthor.create({ name: "Alice" });
-    const posts = await findHasManyTarget(author, "one_zero_posts", {
-      className: "OneZeroPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "one_zero_posts");
     expect(posts.length).toBe(0);
     // "one?" returns false when zero records
     expect(posts.length === 1).toBe(false);
@@ -4804,6 +4699,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("one_multi_posts", {
+          className: "OneMultiPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OneMultiPost extends Base {
@@ -4821,10 +4720,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneMultiAuthor.create({ name: "Alice" });
     await OneMultiPost.create({ author_id: author.id, title: "A", body: "body" });
     await OneMultiPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "one_multi_posts", {
-      className: "OneMultiPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "one_multi_posts");
     expect(posts.length).toBe(2);
     // "one?" returns false when more than one record
     expect(posts.length === 1).toBe(false);
@@ -4888,6 +4784,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("pk_posts", {
+          className: "PkPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class PkPost extends Base {
@@ -4906,10 +4806,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await PkPost.create({ author_id: author.id, title: "PK Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
     expect((post as any).author_id).toBe(Number(author.id));
-    const posts = await findHasManyTarget(author, "pk_posts", {
-      className: "PkPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "pk_posts");
     expect(posts.length).toBe(1);
   });
   it("defining has many association with delete all dependency lazily evaluates target class", async () => {
@@ -4943,10 +4840,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await LazyDelAuthor.create({ name: "Alice" });
     await LazyDelPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "lazy_del_posts", {
-      className: "LazyDelPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "lazy_del_posts");
     expect(remaining.length).toBe(0);
   });
   it("defining has many association with nullify dependency lazily evaluates target class", async () => {
@@ -5027,6 +4921,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("prot_posts", {
+          className: "ProtPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ProtPost extends Base {
@@ -5043,10 +4941,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ProtPost);
     const author = await ProtAuthor.create({ name: "Alice" });
     await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "prot_posts", {
-      className: "ProtPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "prot_posts");
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
   });
@@ -5146,6 +5041,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("kernel_posts", {
+          className: "KernelPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class KernelPost extends Base {
@@ -5162,10 +5061,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(KernelPost);
     const author = await KernelAuthor.create({ name: "Alice" });
     await KernelPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "kernel_posts", {
-      className: "KernelPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "kernel_posts");
     expect(posts.length).toBe(1);
   });
   it("association with or doesnt set inverse instance key", async () => {
@@ -5175,6 +5071,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("or_posts", {
+          className: "OrPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class OrPost extends Base {
@@ -5191,10 +5091,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OrPost);
     const author = await OrAuthor.create({ name: "Alice" });
     await OrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "or_posts", {
-      className: "OrPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "or_posts");
     expect(posts.length).toBe(1);
   });
   it("association with rewhere doesnt set inverse instance key", async () => {
@@ -5204,6 +5101,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("rewhere_posts", {
+          className: "RewherePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class RewherePost extends Base {
@@ -5220,10 +5121,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(RewherePost);
     const author = await RewhereAuthor.create({ name: "Alice" });
     await RewherePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "rewhere_posts", {
-      className: "RewherePost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "rewhere_posts");
     expect(posts.length).toBe(1);
   });
   it("first_or_initialize adds the record to the association", async () => {
@@ -5233,6 +5131,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("foi_posts", {
+          className: "FoiPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FoiPost extends Base {
@@ -5249,10 +5151,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FoiPost);
     const author = await FoiAuthor.create({ name: "Alice" });
     // No posts exist yet, so first_or_initialize creates a new (unsaved) record
-    const posts = await findHasManyTarget(author, "foi_posts", {
-      className: "FoiPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "foi_posts");
     expect(posts.length).toBe(0);
     const post = FoiPost.new({ author_id: author.id, title: "Initialized" });
     expect(post.isNewRecord()).toBe(true);
@@ -5265,6 +5164,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("foc_posts", {
+          className: "FocPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FocPost extends Base {
@@ -5281,17 +5184,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocPost);
     const author = await FocAuthor.create({ name: "Alice" });
     // No posts exist, so first_or_create creates and saves
-    const posts1 = await findHasManyTarget(author, "foc_posts", {
-      className: "FocPost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "foc_posts");
     expect(posts1.length).toBe(0);
     const post = await FocPost.create({ author_id: author.id, title: "Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
-    const posts2 = await findHasManyTarget(author, "foc_posts", {
-      className: "FocPost",
-      foreignKey: "author_id",
-    });
+    await author.reload();
+    const posts2 = await findHasManyTarget(author, "foc_posts");
     expect(posts2.length).toBe(1);
   });
   it("first_or_create! adds the record to the association", async () => {
@@ -5301,6 +5199,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("foc_bang_posts", {
+          className: "FocBangPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class FocBangPost extends Base {
@@ -5316,10 +5218,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocBangAuthor);
     registerModel(FocBangPost);
     const author = await FocBangAuthor.create({ name: "Alice" });
-    const posts1 = await findHasManyTarget(author, "foc_bang_posts", {
-      className: "FocBangPost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "foc_bang_posts");
     expect(posts1.length).toBe(0);
     const post = await FocBangPost.create({
       author_id: author.id,
@@ -5327,10 +5226,8 @@ describe("HasManyAssociationsTest", () => {
       body: "body",
     });
     expect(post.isNewRecord()).toBe(false);
-    const posts2 = await findHasManyTarget(author, "foc_bang_posts", {
-      className: "FocBangPost",
-      foreignKey: "author_id",
-    });
+    await author.reload();
+    const posts2 = await findHasManyTarget(author, "foc_bang_posts");
     expect(posts2.length).toBe(1);
   });
   it("delete_all, when not loaded, doesn't load the records", async () => {
@@ -5365,10 +5262,7 @@ describe("HasManyAssociationsTest", () => {
     await NoLoadDelPost.create({ author_id: author.id, title: "B", body: "body" });
     // Delete without loading first
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "no_load_del_posts", {
-      className: "NoLoadDelPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "no_load_del_posts");
     expect(remaining.length).toBe(0);
   });
   it("association with extend option with multiple extensions", async () => {
@@ -5399,10 +5293,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ExtPost);
     const author = await ExtAuthor.create({ name: "Alice" });
     await ExtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "ext_posts", {
-      className: "ExtPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "ext_posts");
     expect(posts.length).toBe(1);
   });
   it("extend option affects per association", async () => {
@@ -5433,10 +5324,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ExtPerPost);
     const author = await ExtPerAuthor.create({ name: "Alice" });
     await ExtPerPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "ext_per_posts", {
-      className: "ExtPerPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "ext_per_posts");
     expect(posts.length).toBe(1);
   });
   it("delete record with complex joins", async () => {
@@ -5446,6 +5334,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("cj_posts", {
+          className: "CjPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class CjPost extends Base {
@@ -5463,10 +5355,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await CjAuthor.create({ name: "Alice" });
     const post = await CjPost.create({ author_id: author.id, title: "A", body: "body" });
     await post.destroy();
-    const posts = await findHasManyTarget(author, "cj_posts", {
-      className: "CjPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "cj_posts");
     expect(posts.length).toBe(0);
   });
   it("unscopes the default scope of associated model when used with include", async () => {
@@ -5476,6 +5365,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("us_incl_posts", {
+          className: "UsInclPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class UsInclPost extends Base {
@@ -5492,10 +5385,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UsInclPost);
     const author = await UsInclAuthor.create({ name: "Alice" });
     await UsInclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "us_incl_posts", {
-      className: "UsInclPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "us_incl_posts");
     expect(posts.length).toBe(1);
   });
   it("raises RecordNotDestroyed when replaced child can't be destroyed", async () => {
@@ -5544,6 +5434,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("inst_scope_posts", {
+          className: "InstScopePost",
+          foreignKey: "author_id",
+        });
       }
     }
     class InstScopePost extends Base {
@@ -5560,10 +5454,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InstScopePost);
     const author = await InstScopeAuthor.create({ name: "Alice" });
     await InstScopePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "inst_scope_posts", {
-      className: "InstScopePost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "inst_scope_posts");
     expect(posts.length).toBe(1);
   });
   it("associations replace in memory when records have the same id", async () => {
@@ -5573,6 +5464,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("repl_mem_posts", {
+          className: "ReplMemPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ReplMemPost extends Base {
@@ -5594,20 +5489,15 @@ describe("HasManyAssociationsTest", () => {
       body: "body",
     });
     // Load once
-    const posts1 = await findHasManyTarget(author, "repl_mem_posts", {
-      className: "ReplMemPost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "repl_mem_posts");
     expect(posts1.length).toBe(1);
     expect((posts1[0] as any).title).toBe("Original");
     // Update the post
     post.title = "Updated";
     await post.save();
     // Reload - should get updated version
-    const posts2 = await findHasManyTarget(author, "repl_mem_posts", {
-      className: "ReplMemPost",
-      foreignKey: "author_id",
-    });
+    await author.reload();
+    const posts2 = await findHasManyTarget(author, "repl_mem_posts");
     expect(posts2.length).toBe(1);
     expect((posts2[0] as any).title).toBe("Updated");
   });
@@ -5697,6 +5587,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("reattach_posts", {
+          className: "ReattachPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class ReattachPost extends Base {
@@ -5718,14 +5612,8 @@ describe("HasManyAssociationsTest", () => {
     await post.save();
     const reloaded = await ReattachPost.find(post.id!);
     expect((reloaded as any).author_id).toBe(Number(author2.id));
-    const oldPosts = await findHasManyTarget(author1, "reattach_posts", {
-      className: "ReattachPost",
-      foreignKey: "author_id",
-    });
-    const newPosts = await findHasManyTarget(author2, "reattach_posts", {
-      className: "ReattachPost",
-      foreignKey: "author_id",
-    });
+    const oldPosts = await findHasManyTarget(author1, "reattach_posts");
+    const newPosts = await findHasManyTarget(author2, "reattach_posts");
     expect(oldPosts.length).toBe(0);
     expect(newPosts.length).toBe(1);
   });
@@ -5796,6 +5684,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("memo_posts", {
+          className: "MemoPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class MemoPost extends Base {
@@ -5813,15 +5705,9 @@ describe("HasManyAssociationsTest", () => {
     const author = await MemoAuthor.create({ name: "Alice" });
     await MemoPost.create({ author_id: author.id, title: "A", body: "body" });
     await MemoPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await findHasManyTarget(author, "memo_posts", {
-      className: "MemoPost",
-      foreignKey: "author_id",
-    });
+    const posts1 = await findHasManyTarget(author, "memo_posts");
     const ids1 = posts1.map((p: any) => p.id);
-    const posts2 = await findHasManyTarget(author, "memo_posts", {
-      className: "MemoPost",
-      foreignKey: "author_id",
-    });
+    const posts2 = await findHasManyTarget(author, "memo_posts");
     const ids2 = posts2.map((p: any) => p.id);
     expect(ids1).toEqual(ids2);
   });
@@ -5832,6 +5718,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("load_val_posts", {
+          className: "LoadValPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class LoadValPost extends Base {
@@ -5849,10 +5739,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await LoadValAuthor.create({ name: "Alice" });
     const post = await LoadValPost.create({ author_id: author.id, title: "A", body: "body" });
     // Loading association during validation shouldn't prevent persistence
-    const posts = await findHasManyTarget(author, "load_val_posts", {
-      className: "LoadValPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "load_val_posts");
     expect(posts.length).toBe(1);
     expect(post.isPersisted()).toBe(true);
   });
@@ -5863,6 +5750,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("rollback_posts", {
+          className: "RollbackPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class RollbackPost extends Base {
@@ -5881,19 +5772,13 @@ describe("HasManyAssociationsTest", () => {
     const post = await RollbackPost.create({ author_id: author.id, title: "A", body: "body" });
     expect(post.isPersisted()).toBe(true);
     // Verify the child exists
-    const posts = await findHasManyTarget(author, "rollback_posts", {
-      className: "RollbackPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "rollback_posts");
     expect(posts.length).toBe(1);
   });
   it("has many with out of range value", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: 999999999, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(0);
   });
   it("has many association with same foreign key name", async () => {
@@ -5924,14 +5809,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(SameFkPost);
     const author = await SameFkAuthor.create({ name: "Alice" });
     await SameFkPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "SameFkPost",
-      foreignKey: "author_id",
-    });
-    const pubPosts = await findHasManyTarget(author, "published_posts", {
-      className: "SameFkPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
+    const pubPosts = await findHasManyTarget(author, "published_posts");
     expect(posts.length).toBe(1);
     expect(pubPosts.length).toBe(1);
   });
@@ -5964,10 +5843,7 @@ describe("HasManyAssociationsTest", () => {
     // Association without dependent option
     const author = await KeyValAuthor.create({ name: "Alice" });
     await KeyValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "key_val_posts", {
-      className: "KeyValPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "key_val_posts");
     expect(posts.length).toBe(1);
   });
   it("invalid key raises with message including all default options", async () => {
@@ -6018,10 +5894,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await AsyncDepAuthor.create({ name: "Alice" });
     await AsyncDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "async_dep_posts", {
-      className: "AsyncDepPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "async_dep_posts");
     expect(remaining.length).toBe(0);
   });
   it("composite primary key malformed association class", () => {
@@ -6059,6 +5932,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("pre_cpk_posts", {
+          className: "PreCpkPost",
+          foreignKey: "author_id",
+        });
       }
     }
     class PreCpkPost extends Base {
@@ -6076,10 +5953,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await PreCpkAuthor.create({ name: "Alice" });
     const p1 = await PreCpkPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await PreCpkPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "pre_cpk_posts", {
-      className: "PreCpkPost",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "pre_cpk_posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -6115,10 +5989,7 @@ describe("HasManyAssociationsTest", () => {
     await DelAllOptPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllOptPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "del_all_opt_posts", {
-      className: "DelAllOptPost",
-      foreignKey: "author_id",
-    });
+    const remaining = await findHasManyTarget(author, "del_all_opt_posts");
     expect(remaining.length).toBe(0);
   });
 });
@@ -6175,10 +6046,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await HmPost.create({ title: "New", body: "body" });
     post.author_id = author.id as number;
     await post.save();
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.some((p: any) => p.id === post.id)).toBe(true);
   });
 
@@ -6190,20 +6058,14 @@ describe("HasManyAssociationsTest", () => {
       p.author_id = author.id as number;
       await p.save();
     }
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(2);
   });
 
   it("adding using create", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Created");
   });
@@ -6230,10 +6092,7 @@ describe("HasManyAssociationsTest", () => {
   it("collection not empty after building", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
+    const posts = await findHasManyTarget(author, "posts");
     expect(posts.length > 0).toBe(true);
   });
 

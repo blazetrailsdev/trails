@@ -84,7 +84,7 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(AssociationScope, "scope");
     const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
-    const records = await findHasManyTarget(author, "noJoinsComments", reflection.options);
+    const records = await findHasManyTarget(author, "noJoinsComments");
     expect(records.length).toBeGreaterThan(0);
     // JOIN-based AssociationScope was never invoked — DJAS handled it.
     expect(spy).not.toHaveBeenCalled();
@@ -100,16 +100,15 @@ describe("Association scope cache", () => {
     const author = await Author.find(authors("david").id);
 
     const spy = vi.spyOn(AssociationScope, "scope");
-    const opts = { className: "Post", foreignKey: "author_id" };
 
     // First loader call populates the Association-instance cache.
-    await findHasManyTarget(author, "posts", opts);
+    await findHasManyTarget(author, "posts");
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBeGreaterThan(0);
 
     // Second loader call — different caches would rebuild the scope.
     // With our cache, AssociationScope.scope count is unchanged.
-    await findHasManyTarget(author, "posts", opts);
+    await findHasManyTarget(author, "posts");
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
 

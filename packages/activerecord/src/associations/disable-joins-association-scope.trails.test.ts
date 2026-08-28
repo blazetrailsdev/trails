@@ -155,7 +155,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: post.id, body: "hi" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsComments");
-    const comments = await findTarget(author, "djsComments", reflection.options);
+    const comments = await findTarget(author, "djsComments");
     expect(comments.map((c: any) => c.body)).toEqual(["hi"]);
   });
 

@@ -712,10 +712,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.driver?.isOpen() ?? false;
   }
 
-  get inTransaction(): boolean {
-    return this._inTransaction;
-  }
-
   async exec(sql: string): Promise<void> {
     await this.ensureConnected();
     await this.driver.exec(sql);

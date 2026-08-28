@@ -149,13 +149,9 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    await expect(
-      findTarget(author(), "originFromComments", {
-        className: "StvMember",
-        through: "stvComments",
-        source: "origin",
-      }),
-    ).rejects.toThrow(/polymorphic association 'origin'/);
+    await expect(findTarget(author(), "originFromComments")).rejects.toThrow(
+      /polymorphic association 'origin'/,
+    );
   });
 
   it("raises HasManyThroughSourceAssociationNotFoundError for an unresolvable source", () => {

@@ -852,10 +852,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  get inTransaction(): boolean {
-    return this._inTransaction;
-  }
-
   override emptyInsertStatementValue(): string {
     return "VALUES ()";
   }
