@@ -651,10 +651,7 @@ export class PostgreSQLAdapter
                   binds ?? [],
                   bindArray,
                   {
-                    prepare:
-                      options?.prepare === false
-                        ? false
-                        : this.preparedStatements && bindArray.length > 0,
+                    prepare: options?.prepare ?? false,
                     notificationPayload: payload,
                     rowMode: "array",
                   },
@@ -861,7 +858,7 @@ export class PostgreSQLAdapter
           return await this.withRawConnection({ allowRetry }, async (conn) => {
             const client = conn as unknown as pg.Client;
             const result = await this._performQuery(client, rewritten, binds, bindArray, {
-              prepare: this.preparedStatements && bindArray.length > 0,
+              prepare: false,
               notificationPayload: payload,
             });
             return result?.rows ?? [];
@@ -885,7 +882,7 @@ export class PostgreSQLAdapter
     sql: string,
     binds: unknown[],
     typeCastedBinds: unknown[],
-    options: { prepare?: boolean; notificationPayload?: Record<string, unknown> },
+    options: { prepare: boolean; notificationPayload?: Record<string, unknown> },
   ) => Promise<pg.QueryResult>;
 
   /** @internal */
@@ -926,7 +923,7 @@ export class PostgreSQLAdapter
                 await client.query(`SAVEPOINT "${spName}"`);
               }
               const result = await this._performQuery(client, withReturning, originalBinds, binds, {
-                prepare: this.preparedStatements && binds.length > 0,
+                prepare: false,
                 notificationPayload: payload,
               });
               if (useSavepoint) {
@@ -952,7 +949,7 @@ export class PostgreSQLAdapter
               }
               payload.sql = pgSql;
               const result = await this._performQuery(client, pgSql, originalBinds, binds, {
-                prepare: this.preparedStatements && binds.length > 0,
+                prepare: false,
                 notificationPayload: payload,
               });
               const affected = this.affectedRows(result);
@@ -963,7 +960,7 @@ export class PostgreSQLAdapter
 
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
             const result = await this._performQuery(client, pgSql, originalBinds, binds, {
-              prepare: this.preparedStatements && binds.length > 0,
+              prepare: false,
               notificationPayload: payload,
             });
             const affected = this.affectedRows(result);
@@ -975,7 +972,7 @@ export class PostgreSQLAdapter
           }
 
           const result = await this._performQuery(client, pgSql, originalBinds, binds, {
-            prepare: this.preparedStatements && binds.length > 0,
+            prepare: false,
             notificationPayload: payload,
           });
           const affected = this.affectedRows(result);
@@ -1248,7 +1245,7 @@ export class PostgreSQLAdapter
     {
       materializeTransactions = true,
       allowRetry = false,
-      prepare,
+      prepare = false,
     }: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
@@ -1265,7 +1262,7 @@ export class PostgreSQLAdapter
         this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
           const runResult = await this._performQuery(client, runSql, binds, bindArray, {
-            prepare: prepare === false ? false : this.preparedStatements && bindArray.length > 0,
+            prepare,
             notificationPayload: payload,
             rowMode: "array",
           });
@@ -2966,7 +2963,7 @@ PostgreSQLAdapter.prototype.performQuery = function (
   options,
 ) {
   return pgPerformQuery.call(this as never, rawConnection, sql, binds, typeCastedBinds, {
-    prepare: options.prepare ?? false,
+    prepare: options.prepare,
     notificationPayload: options.notificationPayload ?? {},
     rowMode: "array",
   });

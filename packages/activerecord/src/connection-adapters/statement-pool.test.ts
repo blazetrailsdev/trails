@@ -126,10 +126,18 @@ describe("SQLite3 StatementPool integration", () => {
       await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["a"]);
       await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["b"]);
 
-      // Same SQL executed twice — db.prepare called once, cached for second
+      // Same SQL executed twice — db.prepare called once, cached for second.
+      // Driven through `internal_exec_query` with an explicit `prepare:`, the
+      // only path Rails prepares on: `raw_execute` defaults `prepare: false`
+      // (abstract/database_statements.rb:552) and so takes sqlite3's "Don't
+      // cache statements if they are not prepared" arm (rb:93-94).
       const selectSql = 'SELECT * FROM "test_pool" WHERE "name" = ?';
-      const rows1 = await adapter.execute(selectSql, ["a"]);
-      const rows2 = await adapter.execute(selectSql, ["b"]);
+      const rows1 = (
+        await adapter.internalExecQuery(selectSql, "SQL", ["a"], { prepare: true })
+      ).toArray();
+      const rows2 = (
+        await adapter.internalExecQuery(selectSql, "SQL", ["b"], { prepare: true })
+      ).toArray();
       expect(rows1).toHaveLength(1);
       expect(rows1[0].name).toBe("a");
       expect(rows2).toHaveLength(1);

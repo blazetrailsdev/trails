@@ -472,7 +472,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::integer AS n", [1]);
+        await adapter.internalExecQuery("SELECT $1::integer AS n", "SQL", [1], { prepare: true });
         const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
         expect(rows.length).toBeGreaterThan(0);
       } finally {
@@ -483,7 +483,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::integer + $2::integer AS n", [1, 2]);
+        await adapter.internalExecQuery("SELECT $1::integer + $2::integer AS n", "SQL", [1, 2], {
+          prepare: true,
+        });
         const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
         expect(rows.length).toBeGreaterThan(0);
       } finally {

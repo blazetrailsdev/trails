@@ -10,6 +10,7 @@
 
 import {
   sql as arelSql,
+  arelNode,
   Nodes,
   Visitors,
   Collectors,
@@ -197,8 +198,7 @@ export function toSqlAndBinds(
   }
 
   if (
-    (arelOrSqlString instanceof Nodes.Node ||
-      (arelOrSqlString && typeof (arelOrSqlString as any).toSql === "function")) &&
+    arelNode(arelOrSqlString) &&
     typeof arelOrSqlString !== "string" &&
     !(arelOrSqlString instanceof Nodes.SqlLiteral)
   ) {
@@ -210,10 +210,7 @@ export function toSqlAndBinds(
     }
 
     const host = this as DatabaseStatementsHost | undefined;
-    const visitor = (host as any)?.visitor as Visitors.ToSql | undefined;
-    if (!visitor || !(arelOrSqlString instanceof Nodes.Node)) {
-      return [(arelOrSqlString as any).toSql(), [], preparable, allowRetry];
-    }
+    const visitor = (host as any)?.visitor as Visitors.ToSql;
 
     const collector = host!.collector!() as unknown as Collectors.Composite;
     collector.retryable = true;
@@ -221,14 +218,17 @@ export function toSqlAndBinds(
     let sql: string;
     if (host!.preparedStatements) {
       collector.preparable = true;
-      [sql, binds] = visitor.compile(arelOrSqlString, collector) as unknown as [string, unknown[]];
+      [sql, binds] = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as [
+        string,
+        unknown[],
+      ];
 
       if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
         return unpreparedStatement(host!, () => toSqlAndBinds.call(host, arelOrSqlString));
       }
       preparable = collector.preparable ?? null;
     } else {
-      sql = visitor.compile(arelOrSqlString, collector) as unknown as string;
+      sql = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as string;
     }
     allowRetry = collector.retryable;
     return [sql, binds, preparable, allowRetry];
@@ -238,11 +238,7 @@ export function toSqlAndBinds(
     return [arelOrSqlString.value, binds, preparable, allowRetry];
   }
 
-  if (typeof arelOrSqlString === "string") {
-    return [arelOrSqlString, binds, preparable, allowRetry];
-  }
-
-  throw new TypeError("Cannot convert to SQL");
+  return [arelOrSqlString as string, binds, preparable, allowRetry];
 }
 
 /**
@@ -1171,7 +1167,11 @@ export function performQuery(
   _sql: string,
   _binds: unknown[],
   _typeCastedBinds: unknown[],
-  _options?: { prepare?: boolean; notificationPayload?: unknown; batch?: boolean },
+  _options: {
+    prepare: boolean;
+    notificationPayload?: unknown;
+    batch?: boolean;
+  },
 ): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:561
   throw new NotImplementedError(

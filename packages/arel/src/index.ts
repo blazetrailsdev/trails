@@ -10,7 +10,7 @@ import { TreeManager } from "./tree-manager.js";
 export { TreeManager };
 export type { ArelEngine } from "./nodes/node.js";
 export { ArelError, EmptyJoinError, BindError } from "./errors.js";
-export { sql, star, fetchAttribute } from "./arel.js";
+export { sql, star, arelNode, fetchAttribute } from "./arel.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import "./nodes/unary.js";

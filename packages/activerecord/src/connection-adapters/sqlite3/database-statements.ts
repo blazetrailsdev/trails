@@ -194,14 +194,18 @@ export async function performQuery(
   sql: string,
   binds: unknown[],
   typeCastedBinds: SqliteBinds,
-  options: {
-    prepare?: boolean;
+  {
+    prepare,
+    notificationPayload,
+    batch = false,
+    counters,
+  }: {
+    prepare: boolean;
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
     counters?: { affectedRows: number; insertRowid: number | bigint };
-  } = {},
+  },
 ): Promise<Result> {
-  const { prepare = false, notificationPayload, batch = false, counters } = options;
   const acquired = acquireStatementLock(this);
   const release = typeof acquired === "function" ? acquired : await acquired;
   let stmt: SqliteStatement | null = null;
