@@ -2928,17 +2928,24 @@ describe("ownerRecordsNothing", () => {
     ["dirty.ts", new Map([["forgetAttributeAssignments", new Map([["", [["map"]]]])]])],
   ]);
   const owners = new Set(["", "Dirty"]);
+  const bodyless = new Set(["Dirty"]);
 
-  it("compares a bodyless declaration against the file's one bodied owner", () => {
+  it("compares a bodyless declaration against the file's top-level body", () => {
     expect(
-      ownerRecordsNothing(mixinShape, "dirty.ts", "forgetAttributeAssignments", "Dirty", owners),
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "Dirty",
+        owners,
+        bodyless,
+      ),
     ).toBe(false);
   });
 
   it("records nothing when a sibling CLASS carries the file's only body", () => {
-    // `relation.ts` declares `first` on both `ExplainProxy` and `Relation`;
-    // neither body may stand in for the other, and a third bodyless declaration
-    // resolves to neither.
+    // `relation.ts` declares `first` on the `Relation` interface that types its
+    // mixins and on `ExplainProxy`, whose one-line body is the file's only one.
     const ambiguous = new Map([
       ["relation.ts", new Map([["first", new Map([["ExplainProxy", [["execExplain"]]]])]])],
     ]);
@@ -2949,13 +2956,34 @@ describe("ownerRecordsNothing", () => {
         "first",
         "Relation",
         new Set(["ExplainProxy", "Relation"]),
+        new Set(["Relation"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("records nothing for an owner the maps merely failed to key", () => {
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "Dirty",
+        owners,
+        new Set(),
       ),
     ).toBe(true);
   });
 
   it("compares an owner that records its own body", () => {
     expect(
-      ownerRecordsNothing(mixinShape, "dirty.ts", "forgetAttributeAssignments", "", owners),
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "",
+        owners,
+        bodyless,
+      ),
     ).toBe(false);
   });
 
@@ -2967,10 +2995,18 @@ describe("ownerRecordsNothing", () => {
         "forgetAttributeAssignments",
         "Dirty",
         new Set([""]),
+        bodyless,
       ),
     ).toBe(false);
     expect(
-      ownerRecordsNothing(mixinShape, "dirty.ts", "forgetAttributeAssignments", undefined, owners),
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        undefined,
+        owners,
+        bodyless,
+      ),
     ).toBe(false);
   });
 });
