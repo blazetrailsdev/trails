@@ -43,8 +43,8 @@ import {
   type AttributeOptions,
   type CallbackConditions,
   type CallbackObject,
+  ValidationsCallbacks,
 } from "@blazetrails/activemodel";
-import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -828,11 +828,7 @@ export class Base extends Model {
    */
   declare static includeRootInJson: boolean | string;
 
-  /**
-   * `include ActiveModel::Validations::Callbacks` (callbacks.rb:413) — the
-   * mixin installs these at runtime through `Callbacks.[included]`; TS
-   * static-side inheritance needs the slots declared.
-   */
+  /** `include ActiveModel::Validations::Callbacks` (callbacks.rb:413). */
   declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
   declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 

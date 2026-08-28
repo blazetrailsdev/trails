@@ -35,7 +35,7 @@ type ModelCtor = typeof Base;
  */
 export const InstanceMethods = {
   [included](base: ModelCtor): void {
-    include(base as never, ValidationsCallbacks);
+    include(base, ValidationsCallbacks);
 
     base.defineModelCallbacks("initialize", "find", "touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");

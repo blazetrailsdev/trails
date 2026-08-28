@@ -23,10 +23,7 @@ class Dog extends Model {
 interface Dog extends Attributes {}
 
 class DogValidatorWithOnCondition extends Dog {
-  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
   static {
-    include(this, ValidationsCallbacks);
     this.beforeValidation(
       (d: DogValidatorWithOnCondition) => {
         d.history.push("before_validation_marker");
@@ -43,10 +40,7 @@ class DogValidatorWithOnCondition extends Dog {
 }
 
 class DogValidatorWithOnMultipleCondition extends Dog {
-  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
   static {
-    include(this, ValidationsCallbacks);
     this.beforeValidation(
       (d: DogValidatorWithOnMultipleCondition) => {
         d.history.push("before_validation_marker on context_a");
@@ -286,10 +280,7 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation does not mutate the if options array", () => {
     const opts: Array<(r: any) => boolean> = [];
     class CreateDog extends Dog {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       static {
-        include(this, ValidationsCallbacks);
         this.beforeValidation(() => {}, { if: opts, on: "create" });
       }
     }
@@ -300,10 +291,7 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("after validation does not mutate the if options array", () => {
     const opts: Array<(r: any) => boolean> = [];
     class CreateDog extends Dog {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       static {
-        include(this, ValidationsCallbacks);
         this.afterValidation(() => {}, { if: opts, on: "create" });
       }
     }

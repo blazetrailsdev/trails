@@ -509,16 +509,17 @@ export const InstanceMethods = {
 export const AttributeMethods = {
   ClassMethods,
   InstanceMethods,
-  [included](base: object): void {
-    include(base as never, InstanceMethods);
-    extend(base as never, ClassMethods);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
+    include(base, InstanceMethods);
+    extend(base, ClassMethods);
 
     classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
     classAttribute.call(base, "attributeMethodPatterns", {
       instanceWriter: false,
       default: [new AttributeMethodPattern()],
     });
-    prepend((base as { prototype: object }).prototype, { initInternals });
+    prepend(base.prototype, { initInternals });
   },
 };
 

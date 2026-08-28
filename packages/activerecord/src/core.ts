@@ -875,10 +875,6 @@ export function initInternals(
   super_: () => void,
 ): void {
   this._newRecord = true;
-  // core.rb:474 — `@attributes = self.class._default_attributes.deep_dup`.
-  // ActiveRecord does not include `ActiveModel::Attributes` (base.rb:311 takes
-  // only `AttributeRegistration`), so the attribute bag is seeded in the body
-  // that stands in for `Core#initialize`.
   this._attributes = (
     this.constructor as unknown as {
       _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
