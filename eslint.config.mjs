@@ -42,6 +42,7 @@ import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import noFreeformComments from "./eslint/no-freeform-comments.mjs";
+import { sweptFilesInsideUnsweptTrees } from "./eslint/no-freeform-comments-scope.mjs";
 import { readFileSync } from "node:fs";
 
 // See the rails-file-structure-method-order block below: without real order
@@ -815,17 +816,18 @@ export default defineConfig(
   //    trees whose backlog is not swept yet, measured by running the rule in
   //    report mode
   //    (`--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'`)
-  //    over the repo on 2026-08-28: 3793 files scanned, 2423 with violations,
-  //    24203 violations. Each row names the story that burns it down.
+  //    over the repo on 2026-08-28: 3790 files scanned, 2421 with violations,
+  //    24185 violations. Each row names the story that burns it down.
   //
   //    The list is ONLY-SHRINK, on the same discipline as every other ratchet
   //    here: a row is deleted when its tree is swept, never added, never
   //    widened, and never extended to cover new work. Landing a new file under
   //    an excluded tree does not earn it a pass — write it without prose.
-  //    Rows are trees rather than files because the backlog is 2423 files
-  //    deep; a tree stops being excluded the moment its story lands, and the
-  //    already-swept trees are re-enrolled by the blocks below, which come
-  //    after this one and win.
+  //    Rows are trees rather than files because the backlog is 2421 files
+  //    deep; a tree stops being excluded the moment its story lands. Nothing
+  //    that lints clean today rides on a row: the already-swept trees are
+  //    re-enrolled by the block below, and so is every individually-clean file
+  //    inside an excluded tree (`sweptFilesInsideUnsweptTrees`).
   {
     files: ["**/*.ts", "**/*.mts", "**/*.mjs", "**/*.js"],
     ignores: [
@@ -946,6 +948,19 @@ export default defineConfig(
   {
     files: ["packages/activerecord/src/associations/**/*.ts"],
     ignores: ["packages/activerecord/src/associations/**/*.test.ts"],
+    rules: {
+      "blazetrails/no-freeform-comments": "error",
+    },
+  },
+
+  // ── no-freeform-comments, individually-clean files inside an excluded tree.
+  //    An exclusion row above is a tree, so it would otherwise hand a pass to
+  //    the files under it that carry no comment today. These 476 do, measured
+  //    with the rest of the list, and they are re-enrolled here so the flip
+  //    costs no coverage. The list shrinks with its exclusion row; a file is
+  //    never removed from it to turn a run green. ──
+  {
+    files: sweptFilesInsideUnsweptTrees,
     rules: {
       "blazetrails/no-freeform-comments": "error",
     },
