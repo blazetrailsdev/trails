@@ -22,15 +22,3 @@ export function indexNameLength(this: DatabaseLimitsHost): number {
 export function bindParamsLength(): number {
   return 65535;
 }
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE
- */
-export function exceedsBindParamsLimit(
-  conn: { preparedStatements?: boolean; bindParamsLength?(): number } | null | undefined,
-  bindCount: number,
-): boolean {
-  if (!conn?.preparedStatements || typeof conn.bindParamsLength !== "function") return false;
-  return bindCount > conn.bindParamsLength();
-}

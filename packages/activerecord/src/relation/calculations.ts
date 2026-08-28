@@ -1,10 +1,9 @@
-import { Collectors, Nodes, Table, SelectManager } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
-import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, Result, type ColumnType } from "../result.js";
 import { EnumType } from "../enum.js";
@@ -215,24 +214,11 @@ function typeCastCalcBind(b: unknown): unknown {
 }
 
 function compileManagerWithBinds(rel: CalculationRelation, manager: any): [string, unknown[]] {
-  const conn = rel._conn() as {
-    visitor?: { compile(ast: unknown, collector: unknown): [string, unknown[]] };
-    toSql(m: unknown): string;
-    preparedStatements?: boolean;
-    bindParamsLength?(): number;
+  const conn = rel._conn() as unknown as {
+    toSqlAndBinds(arel: unknown): [string, unknown[], boolean | null, boolean];
   };
-  const visitor = conn.visitor;
-  if (conn.preparedStatements === false) return [conn.toSql(manager), []];
-  if (visitor?.compile) {
-    const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
-    const [sql, rawBinds] = visitor.compile(manager.ast, collector);
-    const binds = rawBinds.map(typeCastCalcBind);
-    if (exceedsBindParamsLimit(conn, binds.length)) {
-      return [conn.toSql(manager), []];
-    }
-    return [sql, binds];
-  }
-  return [conn.toSql(manager), []];
+  const [sql, binds] = conn.toSqlAndBinds(manager);
+  return [sql, binds.map(typeCastCalcBind)];
 }
 
 function isBigintColumn(

@@ -543,9 +543,9 @@ export interface AbstractAdapter {
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral | string;
   cacheableQuery(
     klass: {
-      query?(sql: string): unknown;
-      partialQuery?(parts: unknown): unknown;
-      partialQueryCollector?(): unknown;
+      query(sql: string): unknown;
+      partialQuery(parts: unknown): unknown;
+      partialQueryCollector(): unknown;
     },
     arel: unknown,
   ): [unknown, unknown[]];

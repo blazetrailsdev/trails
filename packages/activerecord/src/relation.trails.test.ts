@@ -612,10 +612,23 @@ describe("Relation#arel build_arel convergence", () => {
     }
   }
 
-  // `connection.toSql(rel.arel())` and `rel.toSql()` both compile through the
-  // adapter visitor with binds inlined, so they yield identical SQL when arel
-  // encodes the whole query (joins/HAVING/FROM/LOCK/CTEs).
-  const arelSql = (rel: any) => Widget.connection.toSql(rel.arel().ast);
+  // Rails' `Relation#to_sql` renders inside `unprepared_statement`
+  // (relation.rb:1217-1219), while `connection.to_sql` honours
+  // `prepared_statements` and emits placeholders
+  // (database_statements.rb:32-42; bind_parameter_test.rb:205-211). These cases
+  // are about what arel CARRIES (joins/HAVING/FROM/LOCK/CTEs), so both sides
+  // render with binds inlined — the flag is saved and restored around the
+  // render, as `Relation#toSql` (relation.ts:1901) does for the same reason.
+  const arelSql = (rel: any) => {
+    const conn = Widget.connection as any;
+    const wasPreparedStatements = conn.preparedStatements;
+    conn.preparedStatements = false;
+    try {
+      return conn.toSql(rel.arel().ast);
+    } finally {
+      conn.preparedStatements = wasPreparedStatements;
+    }
+  };
   const placeholderSql = (rel: any) => rel.toSql();
 
   it("arel carries joins, group, and having", () => {

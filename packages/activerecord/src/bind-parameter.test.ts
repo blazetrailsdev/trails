@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
-import { Nodes, Collectors } from "@blazetrails/arel";
+import { Nodes } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base, RecordNotFound } from "./index.js";
@@ -97,16 +97,16 @@ describe("BindParameterTest", () => {
     // Rails' `@statements` (abstract_adapter.rb:156), on every adapter.
     return conn._statements.keys;
   }
-  // Deliberate deviation: trails' `to_sql` inlines bind values (see the
-  // `bindParams` note below), so an arel can't be recompiled into the
-  // placeholder SQL the prepared-statement pool is keyed by. Instead we capture
-  // the SQL the connection actually executes — and therefore keys its pool by —
-  // from the `sql.active_record` payload, then run it through `sql_key`. That is
-  // exactly the string the pool stores (SQLite keys by the raw SQL, PG prefixes
-  // the schema search path), so `assert_includes`/`assert_not_includes` observe
-  // the real invariant Rails asserts: preparable SELECTs (find/find_by/where on a
-  // scalar — placeholder SQL + binds) populate the pool, while inlined queries
-  // (IN-clause arrays, SQL string literals — no binds) do not.
+  // Deliberate deviation from Rails' `to_sql_key` (bind_parameter_test.rb:261):
+  // instead of recompiling the arel, we capture the SQL the connection actually
+  // executes — and therefore keys its pool by — from the `sql.active_record`
+  // payload, then run it through `sql_key`. That is exactly the string the pool
+  // stores (SQLite keys by the raw SQL, PG prefixes the schema search path), so
+  // `assert_includes`/`assert_not_includes` observe the real invariant Rails
+  // asserts: preparable SELECTs (find/find_by/where on a scalar — placeholder
+  // SQL + binds) populate the pool, while inlined queries (IN-clause arrays, SQL
+  // string literals — no binds) do not. Tracked by
+  // `bind-parameter-to-sql-key-converge`.
   // `stop()` freezes the capture before each test's assertions; the suite-level
   // `afterEach(() => Notifications.unsubscribeAll())` above is the teardown safety
   // net, so a query that throws before `stop()` can't leak this subscriber into
@@ -388,17 +388,14 @@ describe("BindParameterTest", () => {
   // Mirrors Rails' `bind_params(ids)` helper (bind_parameter_test.rb:254): build
   // a list of BindParam nodes and compile them through a single shared collector
   // (`@connection.send(:collector)` + `visitor.compile(bind_params, collector)`).
-  // Deliberate deviation: trails' `to_sql` always inlines bind values (it mirrors
-  // Rails' *unprepared* `to_sql` even when prepared_statements is on — see
-  // database-statements.ts), so we drive an inlining SubstituteBinds collector
-  // here regardless of mode. That renders the IN-list the same way `to_sql` does,
-  // on every adapter and in both modes.
   function bindParams(conn: any, ids: (number | string)[]): string {
-    const collector = new Collectors.SubstituteBinds(conn, new Collectors.SQLString());
-    return conn.visitor.compile(
+    const collector = conn.collector();
+    const compiled = conn.visitor.compile(
       ids.map((i) => new Nodes.BindParam(i)),
       collector,
     );
+    const [sql] = Array.isArray(compiled) ? compiled : [compiled];
+    return sql;
   }
 
   async function assertBindParamsToSql(conn: any): Promise<void> {

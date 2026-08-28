@@ -30,7 +30,6 @@ import type { ConnectionPool, NullPool } from "./connection-pool.js";
 import { CURRENT_TRANSACTION_KEY, Transaction, TransactionManager } from "./transaction.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { exceedsBindParamsLimit } from "./database-limits.js";
 import { Result } from "../../result.js";
 import {
   FutureResult,
@@ -171,40 +170,11 @@ export class DatabaseStatementsBase {
   }
 }
 
-function compileInlined(
-  visitor: Visitors.ToSql,
-  node: Nodes.Node,
-  host: unknown,
-): [string, boolean] {
-  const collector = new Collectors.SubstituteBinds(
-    host as { quote(value: unknown): string },
-    new Collectors.SQLString(),
-  );
-  const sql = visitor.compile(node, collector);
-  return [sql, collector.retryable];
-}
-
 export function toSql(
   this: DatabaseStatementsHost | void,
   arel: unknown,
   binds: unknown[] = [],
 ): string {
-  if (typeof arel === "string") return arel;
-
-  let node = arel;
-  if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
-    node = (node as any).ast;
-  }
-
-  const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
-  if (visitor && node instanceof Nodes.Node) {
-    const [inlinedSql] = compileInlined(visitor, node, this);
-    return inlinedSql;
-  }
-  if (node && typeof (node as any).toSql === "function") {
-    return (node as any).toSql();
-  }
-
   const [sql] = toSqlAndBinds.call(this, arel, binds);
   return sql;
 }
@@ -217,97 +187,114 @@ export function toSqlAndBinds(
   preparable: boolean | null = null,
   allowRetry = false,
 ): [string, unknown[], boolean | null, boolean] {
-  if (typeof arel === "string") {
-    return [arel, binds, preparable, allowRetry];
+  let arelOrSqlString = arel;
+  if (
+    arelOrSqlString &&
+    (arelOrSqlString as any).ast != null &&
+    typeof (arelOrSqlString as any).ast === "object"
+  ) {
+    arelOrSqlString = (arelOrSqlString as any).ast;
   }
 
-  let node = arel;
-  if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
-    node = (node as any).ast;
-  }
-
-  if (node instanceof Nodes.Node || (node && typeof (node as any).toSql === "function")) {
+  if (
+    (arelOrSqlString instanceof Nodes.Node ||
+      (arelOrSqlString && typeof (arelOrSqlString as any).toSql === "function")) &&
+    typeof arelOrSqlString !== "string" &&
+    !(arelOrSqlString instanceof Nodes.SqlLiteral)
+  ) {
     if (binds.length > 0) {
       throw new Error(
         "Passing bind parameters with an arel AST is forbidden. " +
           "The values must be stored on the AST directly",
       );
     }
-    const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
-    if (visitor && node instanceof Nodes.Node) {
-      if ((this as { preparedStatements?: boolean } | undefined)?.preparedStatements === false) {
-        const [inlinedSql, inlinedRetryable] = compileInlined(visitor, node, this);
-        return [inlinedSql, [], preparable, inlinedRetryable];
-      }
-      const collector = (this as DatabaseStatementsHost).collector!() as Collectors.Composite;
-      collector.retryable = true;
-      collector.preparable = true;
-      const [sql, extractedBinds] = visitor.compile(node, collector) as [string, unknown[]];
-      const compiledAllowRetry = collector.retryable;
-      const compiledPreparable = collector.preparable;
-      if (
-        exceedsBindParamsLimit(
-          this as { preparedStatements?: boolean; bindParamsLength?(): number },
-          extractedBinds.length,
-        )
-      ) {
-        const [overLimitSql, overLimitRetryable] = compileInlined(visitor, node, this);
-        return [overLimitSql, [], false, overLimitRetryable];
-      }
-      return [sql, extractedBinds, compiledPreparable, compiledAllowRetry];
+
+    const host = this as DatabaseStatementsHost | undefined;
+    const visitor = (host as any)?.visitor as Visitors.ToSql | undefined;
+    if (!visitor || !(arelOrSqlString instanceof Nodes.Node)) {
+      return [(arelOrSqlString as any).toSql(), [], preparable, allowRetry];
     }
-    const sql = (node as any).toSql();
-    return [sql, [], preparable, allowRetry];
+
+    const collector = host!.collector!() as unknown as Collectors.Composite;
+    collector.retryable = true;
+
+    let sql: string;
+    if (host!.preparedStatements) {
+      collector.preparable = true;
+      [sql, binds] = visitor.compile(arelOrSqlString, collector) as unknown as [string, unknown[]];
+
+      if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
+        return unpreparedStatement(host!, () => toSqlAndBinds.call(host, arelOrSqlString));
+      }
+      preparable = collector.preparable ?? null;
+    } else {
+      sql = visitor.compile(arelOrSqlString, collector) as unknown as string;
+    }
+    allowRetry = collector.retryable;
+    return [sql, binds, preparable, allowRetry];
+  }
+
+  if (arelOrSqlString instanceof Nodes.SqlLiteral) {
+    return [arelOrSqlString.value, binds, preparable, allowRetry];
+  }
+
+  if (typeof arelOrSqlString === "string") {
+    return [arelOrSqlString, binds, preparable, allowRetry];
   }
 
   throw new TypeError("Cannot convert to SQL");
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function unpreparedStatement<T>(host: DatabaseStatementsHost, block: () => T): T {
+  const wasPreparedStatements = (host as { preparedStatements?: boolean }).preparedStatements;
+  (host as { preparedStatements?: boolean }).preparedStatements = false;
+  try {
+    return block();
+  } finally {
+    (host as { preparedStatements?: boolean }).preparedStatements = wasPreparedStatements;
+  }
+}
+
 export function cacheableQuery(
   this: DatabaseStatementsHost | void,
   klass: {
-    query?(sql: string): unknown;
-    partialQuery?(parts: unknown): unknown;
-    partialQueryCollector?(): unknown;
+    query(sql: string): unknown;
+    partialQuery(parts: unknown): unknown;
+    partialQueryCollector(): unknown;
   },
   arel: unknown,
 ): [unknown, unknown[]] {
   const host = this as DatabaseStatementsHost;
-  const visitor = (host as any)?.visitor as Visitors.ToSql | undefined;
+  const visitor = (host as any).visitor as Visitors.ToSql;
 
-  let node = arel;
-  if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
-    node = (node as any).ast;
+  let ast = arel;
+  if (ast && (ast as any).ast != null && typeof (ast as any).ast === "object") {
+    ast = (ast as any).ast;
   }
 
-  if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const [sql, binds] = visitor.compile(node, host.collector!() as Collectors.Composite) as [
-      string,
+  let query: unknown;
+  let binds: unknown[];
+  if (host.preparedStatements) {
+    const [sql, compiledBinds] = visitor.compile(
+      ast as Nodes.Node,
+      host.collector!() as Collectors.Composite,
+    ) as unknown as [string, unknown[]];
+    binds = compiledBinds;
+    query = klass.query(sql);
+  } else {
+    const collector = klass.partialQueryCollector() as Collectors.Composite;
+    const [parts, compiledBinds] = visitor.compile(ast as Nodes.Node, collector) as unknown as [
+      unknown,
       unknown[],
     ];
-    return [klass.query(sql), binds];
+    binds = compiledBinds;
+    query = klass.partialQuery(parts);
   }
-
-  if (klass.partialQueryCollector && klass.partialQuery && visitor && node instanceof Nodes.Node) {
-    const collector = klass.partialQueryCollector() as { value: [unknown[], unknown[]] };
-    const [parts, collectedBinds] = visitor.compile(node, collector);
-    return [klass.partialQuery(parts), collectedBinds];
-  }
-
-  let sql: string;
-  if (typeof arel === "string") {
-    sql = arel;
-  } else if (visitor && node instanceof Nodes.Node) {
-    [sql] = compileInlined(visitor, node, host);
-  } else {
-    sql = (node as any).toSql?.() ?? String(node);
-  }
-
-  if (klass.partialQuery) {
-    return [klass.partialQuery([sql]), []];
-  }
-  const queryObj = klass.query ? klass.query(sql) : sql;
-  return [queryObj, []];
+  return [query, binds];
 }
 
 export function queryValue(
