@@ -1,9 +1,9 @@
-import { Node } from "./node.js";
 import { Function } from "./function.js";
+import type { NodeOrValue } from "./binary.js";
 
 export class Count extends Function {
-  constructor(expr: Node | Node[], distinct: boolean | null = false, aliaz: string | null = null) {
-    super(Array.isArray(expr) ? expr : [expr], aliaz);
+  constructor(expr: NodeOrValue[], distinct: boolean | null = false, aliaz: string | null = null) {
+    super(expr, aliaz);
     this.distinct = distinct;
   }
 }
