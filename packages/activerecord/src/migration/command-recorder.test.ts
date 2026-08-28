@@ -12,9 +12,9 @@ const abstractDelegate = {
 describe("Migration", () => {
   describe("CommandRecorderTest", () => {
     let recorder: CommandRecorder & {
-      createTable(...args: unknown[]): void;
-      execute(sql: string): void;
-      transaction(fn: () => Promise<void>): void;
+      createTable(...args: unknown[]): Promise<void>;
+      execute(sql: string): Promise<void>;
+      transaction(fn: () => Promise<void>): Promise<void>;
       nonExistingMethod(name: string): void;
     };
 
@@ -86,18 +86,18 @@ describe("Migration", () => {
     it("revert order", async () => {
       const block = (t: Table) => t.string("name");
       /* eslint-disable blazetrails/require-table-teardown */
-      recorder.createTable("apples", block);
+      await recorder.createTable("apples", block);
       await recorder.revert(async () => {
-        recorder.createTable("bananas", block);
+        await recorder.createTable("bananas", block);
         await recorder.revert(async () => {
-          recorder.createTable("clementines", block);
-          recorder.createTable("dates");
+          await recorder.createTable("clementines", block);
+          await recorder.createTable("dates");
         });
-        recorder.createTable("elderberries");
+        await recorder.createTable("elderberries");
       });
       await recorder.revert(async () => {
-        recorder.createTable("figs", block);
-        recorder.createTable("grapes");
+        await recorder.createTable("figs", block);
+        await recorder.createTable("grapes");
       });
       /* eslint-enable blazetrails/require-table-teardown */
       expect(recorder.commands).toEqual([
