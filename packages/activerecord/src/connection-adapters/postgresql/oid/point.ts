@@ -90,12 +90,12 @@ export class Point extends ValueType<PointValue> {
 }
 
 /** @internal */
-function numberForPoint(n: number): string {
-  const s = String(n);
+function numberForPoint(number: number): string {
+  const s = String(number);
   return s.endsWith(".0") ? s.slice(0, -2) : s;
 }
 
 /** @internal */
-function valuesArrayFromHash(hash: Record<string, unknown>): [unknown, unknown] {
-  return [hash.x ?? hash["x"], hash.y ?? hash["y"]];
+function valuesArrayFromHash(value: Record<string, unknown>): [unknown, unknown] {
+  return [value.x ?? value["x"], value.y ?? value["y"]];
 }

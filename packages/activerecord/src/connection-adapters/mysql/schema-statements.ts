@@ -152,20 +152,19 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   }
 
   override async createTable(
-    name: string,
-    optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
+    tableName: string,
+    options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<void> {
-    const definer = typeof optionsOrFn === "function" ? optionsOrFn : fn;
-    const options: CreateTableOptions =
-      typeof optionsOrFn === "function" || !optionsOrFn ? {} : optionsOrFn;
-    if (options.options === undefined) {
+    const definer = typeof options === "function" ? options : fn;
+    const kwargs: CreateTableOptions = typeof options === "function" || !options ? {} : options;
+    if (kwargs.options === undefined) {
       const rowFormat = await defaultRowFormat.call(this as unknown as RowFormatHost);
       if (rowFormat != null) {
-        return super.createTable(name, { ...options, options: rowFormat }, definer);
+        return super.createTable(tableName, { ...kwargs, options: rowFormat }, definer);
       }
     }
-    return super.createTable(name, options, definer);
+    return super.createTable(tableName, kwargs, definer);
   }
 
   override async removeColumn(
@@ -407,9 +406,9 @@ export function quotedScope(
 
 /** @internal */
 export function extractSchemaQualifiedName(
-  str: string | null | undefined,
+  string: string | null | undefined,
 ): [string | null, string | null] {
-  const parts = (str ?? "").match(/[^`.\s]+|`[^`]*`/g) ?? [];
+  const parts = (string ?? "").match(/[^`.\s]+|`[^`]*`/g) ?? [];
   if (parts.length >= 2) {
     return [parts[0]!.replace(/^`|`$/g, ""), parts[1].replace(/^`|`$/g, "")];
   }

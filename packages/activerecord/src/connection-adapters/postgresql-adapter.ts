@@ -1291,11 +1291,11 @@ export class PostgreSQLAdapter
   }
 
   async explain(
-    sql: string,
+    arel: string,
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(sql, binds);
+    const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
     const result = await this.internalExecQuery(explainSql, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
     return printer.pp(result);
@@ -1422,8 +1422,8 @@ export class PostgreSQLAdapter
     return pgReturningColumnValues(result);
   }
 
-  static async newClient(config: pg.ClientConfig): Promise<pg.Client> {
-    const client = new pg.Client(config);
+  static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
+    const client = new pg.Client(connParams);
     const { database, user, host } = client;
     try {
       await client.connect();
@@ -2018,7 +2018,7 @@ export class PostgreSQLAdapter
 
   async addIndex(
     tableName: string,
-    columns: string | string[],
+    columnName: string | string[],
     options: {
       name?: string;
       unique?: boolean;
@@ -2033,7 +2033,7 @@ export class PostgreSQLAdapter
       comment?: string;
     } = {},
   ): Promise<void> {
-    const createIndex = (await this.buildCreateIndexDefinition(tableName, columns, options))!;
+    const createIndex = (await this.buildCreateIndexDefinition(tableName, columnName, options))!;
     await this.execute(await this.schemaCreation.accept(createIndex));
 
     const index = createIndex.index;
@@ -2046,7 +2046,7 @@ export class PostgreSQLAdapter
 
   async removeIndex(
     tableName: string,
-    columnOrOptions?:
+    columnName?:
       | string
       | string[]
       | { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
@@ -2057,12 +2057,12 @@ export class PostgreSQLAdapter
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    let columnName: string | string[] | undefined;
-    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
-      columnName = columnOrOptions;
+    let column: string | string[] | undefined;
+    if (typeof columnName === "string" || Array.isArray(columnName)) {
+      column = columnName;
     } else {
-      columnName = undefined;
-      options = columnOrOptions ?? {};
+      column = undefined;
+      options = columnName ?? {};
     }
 
     let table = Utils.extractSchemaQualifiedName(tableName);
@@ -2078,13 +2078,13 @@ export class PostgreSQLAdapter
       }
     }
 
-    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) {
+    if (options.ifExists && !(await this.indexExists(tableName, column, options))) {
       return;
     }
 
     const indexToRemove = new Name(
       table.schema,
-      await this.indexNameForRemove(table.toString(), columnName, options),
+      await this.indexNameForRemove(table.toString(), column, options),
     ).toString();
 
     await this.execute(
@@ -2552,9 +2552,12 @@ export interface PostgreSQLAdapter {
 
   schemaNames(): Promise<string[]>;
 
-  createSchema(name: string, options?: { force?: boolean; ifNotExists?: boolean }): Promise<void>;
+  createSchema(
+    schemaName: string,
+    options?: { force?: boolean; ifNotExists?: boolean },
+  ): Promise<void>;
 
-  dropSchema(name: string, options?: { ifExists?: boolean }): Promise<void>;
+  dropSchema(schemaName: string, options?: { ifExists?: boolean }): Promise<void>;
 
   schemaExists(name: string): Promise<boolean>;
 
@@ -2568,7 +2571,7 @@ export interface PostgreSQLAdapter {
 
   primaryKey(tableName: string): Promise<string | string[] | null>;
 
-  pkAndSequenceFor(tableName: string): Promise<[string, Name | null] | null>;
+  pkAndSequenceFor(table: string): Promise<[string, Name | null] | null>;
 
   columns(tableName: string): Promise<Column[]>;
 
@@ -2630,7 +2633,7 @@ export interface PostgreSQLAdapter {
 
   validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string; expression?: string },
+    options: string | { name: string; expression?: string },
   ): Promise<void>;
 
   validateForeignKey(
@@ -2742,17 +2745,13 @@ export interface PostgreSQLAdapter {
 
   tableOptions(tableName: string): Promise<Record<string, unknown>>;
 
-  serialSequence(tableName: string, column: string): Promise<string | null>;
+  serialSequence(table: string, column: string): Promise<string | null>;
 
   defaultSequenceName(tableName: string, pk?: string | string[]): Promise<string | null>;
 
-  setPkSequenceBang(tableName: string, value: number): Promise<void>;
+  setPkSequenceBang(table: string, value: number): Promise<void>;
 
-  resetPkSequenceBang(
-    tableName: string,
-    pk?: string | null,
-    sequence?: string | null,
-  ): Promise<void>;
+  resetPkSequenceBang(table: string, pk?: string | null, sequence?: string | null): Promise<void>;
 
   primaryKeys(tableName: string): Promise<string[]>;
 
@@ -2772,7 +2771,7 @@ export interface PostgreSQLAdapter {
 
   removeExclusionConstraint(
     tableName: string,
-    expressionOrOptions?: string | Record<string, unknown> | null,
+    expression?: string | Record<string, unknown> | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
 
@@ -2790,7 +2789,7 @@ export interface PostgreSQLAdapter {
 
   removeUniqueConstraint(
     tableName: string,
-    columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
+    columnName?: string | string[] | Record<string, unknown> | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
 
@@ -2869,10 +2868,10 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     return `a${++this._counter}`;
   }
 
-  protected override dealloc(stmt: PreparedStatement): void | Promise<void> {
+  protected override dealloc(key: PreparedStatement): void | Promise<void> {
     const client = this._connection._rawConnection as (pg.Client & PgClientLiveness) | null;
     if (!client || client._ending === true || client._ended === true) return;
-    const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
+    const deallocSql = `DEALLOCATE ${pgQuoteColumnName(key.name)}`;
     this._deallocating = this._deallocating
       .then(() => {
         if (this._connection._rawConnection === client) this._connection._commandSettled = false;

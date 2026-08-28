@@ -620,11 +620,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async explain(
-    sql: string,
+    arel: string,
     binds: unknown[] = [],
     _options: ExplainOption[] = [],
   ): Promise<string> {
-    const result = await this.internalExecQuery(`EXPLAIN QUERY PLAN ${sql}`, "EXPLAIN", binds);
+    const result = await this.internalExecQuery(`EXPLAIN QUERY PLAN ${arel}`, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
     return printer.pp(result);
   }
@@ -984,23 +984,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async removeIndex(
     tableName: string,
-    columnOrOptions?:
+    columnName?:
       | string
       | string[]
       | { name?: string; column?: string | string[]; ifExists?: boolean },
     options: { name?: string; column?: string | string[]; ifExists?: boolean } = {},
   ): Promise<void> {
-    let columnName: string | string[] | undefined;
-    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
-      columnName = columnOrOptions;
+    let column: string | string[] | undefined;
+    if (typeof columnName === "string" || Array.isArray(columnName)) {
+      column = columnName;
     } else {
-      columnName = undefined;
-      options = { ...columnOrOptions, ...options };
+      column = undefined;
+      options = { ...columnName, ...options };
     }
 
-    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
+    if (options.ifExists && !(await this.indexExists(tableName, column, options))) return;
 
-    const indexName = await this.indexNameForRemove(tableName, columnName, options);
+    const indexName = await this.indexNameForRemove(tableName, column, options);
 
     await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
@@ -1030,20 +1030,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override async createVirtualTable(
     tableName: string,
-    optionsOrModuleName?: unknown,
+    moduleName?: unknown,
     values?: unknown,
   ): Promise<void> {
     const opts =
-      optionsOrModuleName !== null &&
-      typeof optionsOrModuleName === "object" &&
-      !Array.isArray(optionsOrModuleName)
-        ? (optionsOrModuleName as Record<string, unknown>)
+      moduleName !== null && typeof moduleName === "object" && !Array.isArray(moduleName)
+        ? (moduleName as Record<string, unknown>)
         : undefined;
 
-    const moduleName = opts?.moduleName ?? (opts ? undefined : optionsOrModuleName);
+    const modName = opts?.moduleName ?? (opts ? undefined : moduleName);
     const virtualValues = opts?.values ?? values;
 
-    const mod = String(moduleName ?? "");
+    const mod = String(modName ?? "");
     const safeIdent = /^[A-Za-z_][A-Za-z0-9_]*$/;
     if (!safeIdent.test(mod)) {
       throw new Error("moduleName must be a valid SQLite identifier");
@@ -1431,20 +1429,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    toTable?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    let toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
+    let to = typeof toTable === "string" ? toTable : undefined;
     const opts: RemoveForeignKeyOptions =
-      typeof toTableOrOptions === "object" && toTableOrOptions !== null
-        ? { ...toTableOrOptions, ...options }
-        : { ...options };
+      typeof toTable === "object" && toTable !== null ? { ...toTable, ...options } : { ...options };
     const ifExists = opts.ifExists === true;
     delete opts.ifExists;
 
-    if (ifExists && !(await this.foreignKeyExists(fromTable, toTable))) return;
+    if (ifExists && !(await this.foreignKeyExists(fromTable, to))) return;
 
-    toTable ??= opts.toTable;
+    to ??= opts.toTable;
     const matchOptions: ForeignKeyLookupOptions = { ...opts };
     delete matchOptions.name;
     delete matchOptions.toTable;
@@ -1454,7 +1450,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const fkey = foreignKeys.find((fk) => {
       const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
       const table = this.stripTableNamePrefixAndSuffix(
-        toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
+        to ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
       );
       return (
         this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions)
@@ -1463,7 +1459,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     if (!fkey) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${toTable ?? JSON.stringify(matchOptions)}`,
+        `Table '${fromTable}' has no foreign key for ${to ?? JSON.stringify(matchOptions)}`,
       );
     }
 
@@ -1483,29 +1479,27 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?:
+    expression?:
       | string
       | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    trailingOptions: {
+    options: {
       name?: string;
       expression?: string;
       validate?: boolean;
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    const expression = typeof expressionOrOptions === "string" ? expressionOrOptions : undefined;
-    const options =
-      typeof expressionOrOptions === "object"
-        ? { ...(expressionOrOptions ?? {}), ...trailingOptions }
-        : { ...trailingOptions };
+    const expr = typeof expression === "string" ? expression : undefined;
+    const opts =
+      typeof expression === "object" ? { ...(expression ?? {}), ...options } : { ...options };
 
-    const { ifExists, ...lookupOptions } = options;
+    const { ifExists, ...lookupOptions } = opts;
 
     if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
 
     let checkConstraints = await this.checkConstraints(tableName);
     const chkNameToDelete = (
-      await this.checkConstraintForBang(tableName, { expression, ...lookupOptions })
+      await this.checkConstraintForBang(tableName, { expression: expr, ...lookupOptions })
     ).name;
     checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
     await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
@@ -1513,8 +1507,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private async alterTable(
     tableName: string,
-    overrideForeignKeys?: ForeignKeyDefinition[],
-    overrideCheckConstraints?: CheckConstraintDefinition[],
+    foreignKeys?: ForeignKeyDefinition[],
+    checkConstraints?: CheckConstraintDefinition[],
     options: { rename?: Record<string, string> } = {},
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
@@ -1523,8 +1517,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     const alteredTableName = `a${tableName}`;
 
-    const fks = overrideForeignKeys ?? (await this.foreignKeys(tableName));
-    const checks = overrideCheckConstraints ?? (await this.checkConstraints(tableName));
+    const fks = foreignKeys ?? (await this.foreignKeys(tableName));
+    const checks = checkConstraints ?? (await this.checkConstraints(tableName));
 
     const caller = (definition: SQLite3TableDefinition): void => {
       for (const fk of fks) {
