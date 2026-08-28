@@ -1,4 +1,6 @@
 import type { Database } from "sql.js";
+import type { ConnectionPool } from "@blazetrails/activerecord";
+import { Collectors, Visitors } from "@blazetrails/arel";
 
 // Standalone in-browser sql.js contract — NOT an ActiveRecord adapter. It
 // duck-types only the handful of methods the website sandbox needs and is
@@ -7,6 +9,14 @@ import type { Database } from "sql.js";
 export class SqlJsAdapter {
   readonly adapterName = "SQLite";
   readonly typeRegistryKey = "sqlite" as const;
+
+  /**
+   * The `@pool` the CLI hands to `SchemaMigration` / `InternalMetadata`. The
+   * browser sandbox owns exactly one sql.js connection, so checking one out is
+   * handing back this adapter; without it both collaborators held `undefined`
+   * and every `db:*` command that reached AR died on `.withConnection`.
+   */
+  readonly pool = new SqlJsConnectionPool(this) as unknown as ConnectionPool;
 
   constructor(private db: Database) {}
 
@@ -75,6 +85,27 @@ export class SqlJsAdapter {
     );
   }
 
+  /**
+   * `ActiveRecord::ConnectionAdapters::DatabaseStatements#select_values`
+   * (abstract/database_statements.rb) over the sandbox's single sql.js handle —
+   * the one read `SchemaMigration#versions` / `#count`
+   * (schema_migration.rb:115-149) make through the pool.
+   */
+  async selectValues(arel: unknown, _name: string | null = null): Promise<unknown[]> {
+    const ast = (arel as { ast?: unknown }).ast ?? arel;
+    const sql = new Visitors.SQLite(this as never).compile(
+      ast as never,
+      new Collectors.SQLString(),
+    ) as unknown as string;
+    const rows = await this.execute(sql);
+    return rows.map((row) => Object.values(row)[0]);
+  }
+
+  /** `data_source_exists?` — `SchemaMigration#table_exists?` (schema_migration.rb:152). */
+  async dataSourceExists(name: string): Promise<boolean> {
+    return this.getTables().includes(name);
+  }
+
   async explain(sql: string): Promise<string> {
     const results = this.db.exec(`EXPLAIN QUERY PLAN ${sql}`);
     return results[0]?.values.map((r: any[]) => r.join("|")).join("\n") ?? "";
@@ -110,5 +141,24 @@ export class SqlJsAdapter {
 
   runSql(sql: string, params: unknown[] = []): void {
     this.db.run(sql, params as any[]);
+  }
+}
+
+/**
+ * The minimal `@pool` surface `SchemaMigration` and `InternalMetadata` reach:
+ * `@pool.with_connection` (schema_migration.rb:22-24,
+ * internal_metadata.rb:41-45), `@pool.db_config.use_metadata_table?`
+ * (internal_metadata.rb:35-36) and `@pool.schema_cache`
+ * (internal_metadata.rb:108-110). Standalone like `SqlJsAdapter` itself — it
+ * is not an `ActiveRecord::ConnectionAdapters::ConnectionPool`.
+ */
+export class SqlJsConnectionPool {
+  readonly dbConfig = { useMetadataTable: true };
+  readonly schemaCache = null;
+
+  constructor(private readonly adapter: SqlJsAdapter) {}
+
+  async withConnection<T>(fn: (connection: SqlJsAdapter) => T | Promise<T>): Promise<T> {
+    return await fn(this.adapter);
   }
 }

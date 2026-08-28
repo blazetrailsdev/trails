@@ -3,11 +3,9 @@ import type {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
 } from "./schema-definitions.js";
-import type { ColumnInfo, IndexInfo } from "../../schema-dumper.js";
+import type { ColumnInfo } from "../../schema-dumper.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
-  private _cachedExclConstraints: ExclusionConstraintDefinition[] | undefined;
-  private _cachedUniqConstraints: UniqueConstraintDefinition[] | undefined;
   /** @internal */
   protected override resolvePrimaryKeyColumns(
     tableName: string,
@@ -157,29 +155,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream.push("");
   }
 
-  /** @internal */
-  protected override async filterIndexesForDump(
-    tableName: string,
-    indexes: IndexInfo[],
-  ): Promise<IndexInfo[]> {
-    const adapter = this.pgAdapter();
-    const excl: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
-      ? await adapter.exclusionConstraints(tableName)
-      : [];
-    const uniq: UniqueConstraintDefinition[] = adapter?.uniqueConstraints
-      ? await adapter.uniqueConstraints(tableName)
-      : [];
-    this._cachedExclConstraints = excl;
-    this._cachedUniqConstraints = uniq;
-
-    const exclNames = new Set(excl.map((ec) => ec.name).filter(Boolean));
-    const uniqNames = new Set(uniq.map((uc) => uc.name).filter(Boolean));
-    if (exclNames.size === 0 && uniqNames.size === 0) return indexes;
-    return indexes.filter(
-      (idx) => (!idx.name || !exclNames.has(idx.name)) && (!idx.name || !uniqNames.has(idx.name)),
-    );
-  }
-
   /**
    * @internal
    * @missingRailsCall any? — PERMANENT
@@ -189,10 +164,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream: string[],
   ): Promise<void> {
     const adapter = this.pgAdapter();
-    const constraints: ExclusionConstraintDefinition[] =
-      this._cachedExclConstraints ??
-      (adapter?.exclusionConstraints ? await adapter.exclusionConstraints(table) : []);
-    this._cachedExclConstraints = undefined;
+    const constraints: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
+      ? await adapter.exclusionConstraints(table)
+      : [];
     if (constraints.length === 0) return;
     const stmts = constraints.map((ec) => {
       const opts: string[] = [];
@@ -215,10 +189,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream: string[],
   ): Promise<void> {
     const adapter = this.pgAdapter();
-    const constraints: UniqueConstraintDefinition[] =
-      this._cachedUniqConstraints ??
-      (adapter?.uniqueConstraints ? await adapter.uniqueConstraints(table) : []);
-    this._cachedUniqConstraints = undefined;
+    const constraints: UniqueConstraintDefinition[] = adapter?.uniqueConstraints
+      ? await adapter.uniqueConstraints(table)
+      : [];
     if (constraints.length === 0) return;
     const stmts = constraints.map((uc) => {
       const opts: string[] = [];

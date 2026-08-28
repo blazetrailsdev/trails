@@ -208,11 +208,10 @@ export interface AbstractAdapter {
   ): Promise<void>;
   dropTable(
     ...args:
-      | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" } | undefined]
-      | [string, ...string[], ((t: TableDefinition) => void) | undefined]
+      | string[]
+      | [...string[], { ifExists?: boolean; force?: boolean | "cascade" } | undefined]
+      | [...string[], ((t: TableDefinition) => void) | undefined]
       | [
-          string,
           ...string[],
           { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
           ((t: TableDefinition) => void) | undefined,

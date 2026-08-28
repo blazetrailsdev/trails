@@ -273,6 +273,12 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
 
       "db:migrate:status": async () => {
         await withMigrationContext(async (migrationContext) => {
+          // Rails' `DatabaseTasks.migrate_status` (database_tasks.rb:302-305)
+          // aborts before reading migrations_status when the table is absent.
+          if (!(await migrationContext.schemaMigration.tableExists())) {
+            log("Schema migrations table does not exist yet.");
+            return;
+          }
           const statuses = await migrationContext.migrationsStatus();
           log("");
           log(" Status   Migration ID    Migration Name");

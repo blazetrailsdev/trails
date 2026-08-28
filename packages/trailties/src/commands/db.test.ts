@@ -2737,4 +2737,27 @@ export class CreateThings extends Migration {
     expect(process.exitCode).toBe(1);
     expect(errs.some((e) => e.includes("No schema file found"))).toBe(true);
   });
+
+  it("db schema:load --format=sql refuses an in-memory database instead of reporting success", async () => {
+    // The sqlite3 child process opens its own throwaway :memory: database, so
+    // the load reaches nothing; the CLI must not print "Schema loaded.".
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: ":memory:" },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "structure.sql"),
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY);\n",
+    );
+
+    await runDb(["schema:load", "--format=sql"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(errs.some((e) => e.includes("not meaningful for an in-memory database"))).toBe(true);
+    expect(logs.some((l) => l.includes("Schema loaded."))).toBe(false);
+  });
 });

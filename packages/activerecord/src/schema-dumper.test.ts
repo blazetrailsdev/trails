@@ -235,8 +235,8 @@ describe("SchemaDumperTest", () => {
     // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
     // unsupported backends emit a plain index with no `nullsNotDistinct:`.
     const expected = adapterSupports("nulls_not_distinct")
-      ? 't.index("firm_id", { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
-      : 't.index("firm_id", { name: "company_nulls_not_distinct" });';
+      ? 't.index(["firm_id"], { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
+      : 't.index(["firm_id"], { name: "company_nulls_not_distinct" });';
     expect(line).toBe(expected);
   });
 
@@ -571,9 +571,9 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "key_tests");
     expect(output).toContain(
-      't.index("awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
+      't.index(["awesome"], { name: "index_key_tests_on_awesome", type: "fulltext" })',
     );
-    expect(output).toContain('t.index("pizza", { name: "index_key_tests_on_pizza" })');
+    expect(output).toContain('t.index(["pizza"], { name: "index_key_tests_on_pizza" })');
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes bigint default", async () => {

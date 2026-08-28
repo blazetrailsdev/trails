@@ -747,11 +747,6 @@ export abstract class SchemaDumper {
    * in-create index/constraint calls.
    *
    * @internal
-   *
-   * @missingRailsArgs indexes_in_create — PERMANENT: `indexes_in_create` reads
-   *   `@connection.indexes(table)` itself (schema_dumper.rb:245); that read is
-   *   async in trails while `indexesInCreate` is sync, so the list is awaited
-   *   here and passed as a third argument.
    */
   async table(table: string, stream: string[]): Promise<void> {
     // Rails reads `@connection.supports_virtual_columns?` and
@@ -844,8 +839,7 @@ export abstract class SchemaDumper {
         }
       }
 
-      const indexes = await this.filterIndexesForDump(table, await this._source.indexes(table));
-      this.indexesInCreate(table, tbl, indexes);
+      await this.indexesInCreate(table, tbl);
 
       const remaining = await this.checkConstraintsInCreate(table, tbl);
 
@@ -932,19 +926,6 @@ export abstract class SchemaDumper {
       return [addCheckConstraintStatements.sort().join("\n")];
     }
     return undefined;
-  }
-
-  /**
-   * Hook for adapter subclasses to strip indexes that are already represented
-   * by a constraint (e.g. PG unique/exclusion constraints create backing indexes
-   * that must not also appear as `addIndex` calls). Default: identity.
-   * @internal
-   */
-  protected async filterIndexesForDump(
-    _tableName: string,
-    indexes: IndexInfo[],
-  ): Promise<IndexInfo[]> {
-    return indexes;
   }
 
   /**
@@ -1086,14 +1067,12 @@ export abstract class SchemaDumper {
   /** @internal */
   indexParts(index: IndexInfo): string[] {
     // Expression indexes carry the raw expression as a string and dump verbatim
-    // (Rails `index.columns.inspect`); column lists dump as an array, with the
-    // single-column shorthand.
+    // (Rails reaches the same place because `index.columns` is a String there and
+    // `String#inspect` quotes it); column lists always dump as an array.
     const cols =
       typeof index.columns === "string"
         ? JSON.stringify(index.columns)
-        : index.columns.length === 1
-          ? JSON.stringify(index.columns[0])
-          : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
+        : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
     const parts: string[] = [cols];
     if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
@@ -1116,32 +1095,42 @@ export abstract class SchemaDumper {
   }
 
   /**
+   * Mirrors `def indexes_in_create(table, stream)` (schema_dumper.rb:244-263).
    * @internal
    *
    * @missingRailsCall any? — PERMANENT: Ruby's block-less `any?`
    *   (schema_dumper.rb:245,246,252) is an emptiness test on the fetched array;
    *   the port spells it `.length > 0`, which records no callee.
-   * @missingRailsCall exclusion_constraints — PERMANENT:
-   *   `@connection.exclusion_constraints(table)` (schema_dumper.rb:245-252) is
-   *   an async read in trails, and `indexesInCreate` is synchronous: its caller
-   *   awaits the list and passes it in (schema-dumper.ts:995).
-   * @missingRailsCall indexes — PERMANENT: `@connection.indexes(table)`
-   *   (schema_dumper.rb:245-252) is an async read in trails, and
-   *   `indexesInCreate` is synchronous: its caller awaits the list and passes it
-   *   in (schema-dumper.ts:995).
-   * @missingRailsCall unique_constraints — PERMANENT:
-   *   `@connection.unique_constraints(table)` (schema_dumper.rb:245-252) is an
-   *   async read in trails, and `indexesInCreate` is synchronous: its caller
-   *   awaits the list and passes it in (schema-dumper.ts:995).
    */
-  indexesInCreate(table: string, stream: string[], indexes: IndexInfo[] = []): void {
-    if (indexes.length === 0) return;
-    const indexStatements = indexes.map((index) => {
-      const [cols, ...opts] = this.indexParts(index);
-      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      return `    t.index(${cols}${optStr});`;
-    });
-    stream.push(indexStatements.sort().join("\n"));
+  async indexesInCreate(table: string, stream: string[]): Promise<void> {
+    let indexes = await this._source.indexes(table);
+    if (indexes.length > 0) {
+      const adapter = this._adapter();
+      let exclusionConstraints: { name?: string }[];
+      if (
+        adapter?.supportsExclusionConstraints?.() &&
+        (exclusionConstraints = await adapter.exclusionConstraints(table)).length > 0
+      ) {
+        const exclusionConstraintNames = exclusionConstraints.map((ec) => ec.name);
+        indexes = indexes.filter((index) => !exclusionConstraintNames.includes(index.name));
+      }
+
+      let uniqueConstraints: { name?: string }[];
+      if (
+        adapter?.supportsUniqueConstraints?.() &&
+        (uniqueConstraints = await adapter.uniqueConstraints(table)).length > 0
+      ) {
+        const uniqueConstraintNames = uniqueConstraints.map((uc) => uc.name);
+        indexes = indexes.filter((index) => !uniqueConstraintNames.includes(index.name));
+      }
+
+      const indexStatements = indexes.map((index) => {
+        const [cols, ...opts] = this.indexParts(index);
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `    t.index(${cols}${optStr});`;
+      });
+      stream.push(indexStatements.sort().join("\n"));
+    }
   }
 
   /**

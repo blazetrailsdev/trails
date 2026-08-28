@@ -98,9 +98,8 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
 
   it("dropTable with no table names is a no-op, with or without options", async () => {
     const sqlite = new SqliteCapturingAdapter();
-    const dropTable = sqlite.dropTable.bind(sqlite) as (...args: unknown[]) => Promise<void>;
-    await dropTable();
-    await dropTable({ ifExists: true });
+    await sqlite.dropTable();
+    await sqlite.dropTable({ ifExists: true });
     expect(sqlite.allSql).toEqual([]);
   });
 

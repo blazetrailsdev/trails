@@ -144,6 +144,32 @@ describe("exec: db:migrate (not yet supported)", () => {
   });
 });
 
+describe("exec: db:migrate:status", () => {
+  it("reports migration status with no eval context available", async () => {
+    // Rails' MigrationContext#migrations_status (migration.rb:1316-1330) only
+    // parses filenames, so it never reaches MigrationProxy#migration — it is
+    // the one db:* command that runs without a way to evaluate a migration.
+    await runtime.exec("generate model User name:string email:string");
+    runtime.adapter.execRaw(
+      "CREATE TABLE schema_migrations (version varchar NOT NULL PRIMARY KEY)",
+    );
+
+    const result = await runtime.exec("db:migrate:status");
+    expect(result.success).toBe(true);
+    const output = result.output.join("\n");
+    expect(output).toContain("Status   Migration ID    Migration Name");
+    expect(output).toMatch(/down\s+\d+\s+Create users/);
+  });
+
+  it("says the schema migrations table does not exist yet when it is absent", async () => {
+    // Mirrors DatabaseTasks.migrate_status (database_tasks.rb:302-305).
+    await runtime.exec("generate model User name:string email:string");
+    const result = await runtime.exec("db:migrate:status");
+    expect(result.success).toBe(true);
+    expect(result.output.join("\n")).toContain("Schema migrations table does not exist yet.");
+  });
+});
+
 describe("exec: db:drop", () => {
   it("drops all tables", async () => {
     runtime.adapter.execRaw("CREATE TABLE users (id INTEGER PRIMARY KEY)");
