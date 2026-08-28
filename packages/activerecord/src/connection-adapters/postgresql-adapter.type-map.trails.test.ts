@@ -99,12 +99,19 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
   });
 
   it("strips the type modifier regtype ignores", () => {
-    adapter.typeMap.registerType(1043, new StringType());
+    adapter.typeMap.registerType(1043, { serialize: () => "varchar" } as never);
     adapter.typeMap.aliasType("character varying", 1043);
+    adapter.typeMap.registerType(1114, { serialize: () => "timestamp" } as never);
+    adapter.typeMap.aliasType("timestamp without time zone", 1114);
 
     expect(adapter.quoteDefaultExpression("hi", { sqlType: "character varying(255)" })).toBe(
-      "'hi'",
+      "'varchar'",
     );
+    expect(
+      adapter.quoteDefaultExpression("2026-01-01", {
+        sqlType: "timestamp(6) without time zone",
+      }),
+    ).toBe("'timestamp'");
   });
 
   it("reads `array` from ColumnDefinition.options for DDL paths", async () => {
