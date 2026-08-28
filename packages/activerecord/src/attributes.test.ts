@@ -639,6 +639,19 @@ describe("DefaultAttributesTest", () => {
     expect(defaults.getAttribute("score").type.name).toBe("string");
   });
 
+  it("resetDefaultAttributes reloads the schema from cache", () => {
+    class Post extends Base {}
+    (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
+      score: { name: "score", default: 5 },
+    };
+    (Post as unknown as { _schemaLoaded?: boolean })._schemaLoaded = true;
+
+    Post.resetDefaultAttributes();
+
+    expect((Post as unknown as { _columnsHash?: unknown })._columnsHash).toBeUndefined();
+    expect((Post as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(false);
+  });
+
   it("attribute() overriding only type preserves the schema default", () => {
     class Post extends Base {}
     Post.attribute("score", "string");
