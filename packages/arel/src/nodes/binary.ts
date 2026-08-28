@@ -82,8 +82,6 @@ export class Binary extends NodeExpression {
   }
 }
 
-export class Assignment extends Binary {}
-
 export class As extends Binary {
   toCte(): Cte {
     return new _Cte!((this.left as { name: string | SqlLiteral }).name, this.right as Node);
@@ -91,12 +89,6 @@ export class As extends Binary {
 }
 
 export class Between extends Binary {}
-
-export class NotEqual extends Binary {
-  invert(): Node {
-    return new _Equality!(this.left, this.right);
-  }
-}
 
 export class GreaterThan extends Binary {
   invert(): Node {
@@ -134,11 +126,19 @@ export class IsNotDistinctFrom extends Binary {
   }
 }
 
+export class NotEqual extends Binary {
+  invert(): Node {
+    return new _Equality!(this.left, this.right);
+  }
+}
+
 export class NotIn extends Binary {
   invert(): Node {
     return new _In!(this.left, this.right);
   }
 }
+
+export class Assignment extends Binary {}
 
 export abstract class Join extends Binary {
   declare left: Node | Table;
