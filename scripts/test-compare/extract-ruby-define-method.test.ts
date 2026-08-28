@@ -12,13 +12,19 @@ interface Extracted {
   unexpandedLoops: string[];
 }
 
-function extract(body: string): Extracted {
+const BARE_CLASS: [string, string] = ["class FooTest < ActiveSupport::TestCase", "end"];
+const NAMESPACED: [string, string] = [
+  "module Arel\n  module Visitors\n    class TestDot < Arel::Test",
+  "    end\n  end\nend",
+];
+
+function extract(body: string, wrap: [string, string] = BARE_CLASS): Extracted {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "define-method-rb-"));
   try {
     const rel = "cases/foo_test.rb";
     const p = path.join(dir, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, `class FooTest < ActiveSupport::TestCase\n${body}\nend\n`);
+    fs.writeFileSync(p, `${wrap[0]}\n${body}\n${wrap[1]}\n`);
     const driver = `
       require_relative ${JSON.stringify(RUBY_SCRIPT)}
       require "json"
@@ -36,19 +42,33 @@ function extract(body: string): Extracted {
 
 describe("Ruby extractor define_method loop expansion", () => {
   it("expands a constant array whose name interpolates klass.name.gsub", () => {
-    const { cases, unexpandedLoops } = extract(`
-  [
-    Nodes::Sum,
-    Arel::Nodes::Exists,
-  ].each do |klass|
+    const { cases, unexpandedLoops } = extract(
+      `
+      [
+        Nodes::Sum,
+        Arel::Nodes::Exists,
+      ].each do |klass|
+        define_method("test_#{klass.name.gsub('::', '_')}") do
+          assert_equal 1, 1
+        end
+      end
+`,
+      NAMESPACED,
+    );
+    expect(cases.map((c) => c.description)).toEqual(["Arel Nodes Sum", "Arel Nodes Exists"]);
+    expect(cases.every((c) => c.style === "define_method")).toBe(true);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("takes a constant path as written when no namespace encloses the test class", () => {
+    const { cases } = extract(`
+  [Nodes::Sum, ::Top::Level].each do |klass|
     define_method("test_#{klass.name.gsub('::', '_')}") do
       assert_equal 1, 1
     end
   end
 `);
-    expect(cases.map((c) => c.description)).toEqual(["Nodes Sum", "Arel Nodes Exists"]);
-    expect(cases.every((c) => c.style === "define_method")).toBe(true);
-    expect(unexpandedLoops).toEqual([]);
+    expect(cases.map((c) => c.description)).toEqual(["Nodes Sum", "Top Level"]);
   });
 
   it("expands %w and %i word arrays, including the paren-less define_method form", () => {

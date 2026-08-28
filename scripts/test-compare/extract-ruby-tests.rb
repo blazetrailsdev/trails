@@ -675,7 +675,7 @@ class TestExtractor
     case node[0]
     when :var_ref, :const_ref, :const_path_ref, :top_const_ref, :@const
       path = const_path(node)
-      path && path[:segments].join("::")
+      path && qualified_const_name(path)
     when :symbol_literal
       ident_name(node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1])
     when :dyna_symbol, :string_literal
@@ -684,6 +684,23 @@ class TestExtractor
       # `%w(a b)` / `%i(a b)` elements, which Ripper emits bare.
       node[1]
     end
+  end
+
+  # `Module#name` (and `"#{klass}"`) is the constant's FULLY QUALIFIED name, not
+  # the path the source wrote: inside `module Arel; module Visitors; class TestDot`,
+  # `Nodes::Sum.name` is "Arel::Nodes::Sum", so dot_test.rb:18-30 generates
+  # `test_Arel_Nodes_Sum`, not `test_Nodes_Sum`. Ruby's lookup walks the lexical
+  # nesting innermost-first, which isn't decidable from the source, but every
+  # constant Rails names this way lives directly under the gem's top-level module
+  # — so qualify with the outermost enclosing namespace unless the path already
+  # starts there. A rooted `::Foo` and a file with no namespace above the test
+  # class are taken as written.
+  def qualified_const_name(path)
+    name = path[:segments].join("::")
+    return name if path[:rooted] || @class_stack.length < 2
+
+    outermost = @class_stack.first
+    path[:segments].first == outermost ? name : "#{outermost}::#{name}"
   end
 
   # The name `define_method` receives with the block variable bound to `value`,
