@@ -403,6 +403,48 @@ describe("extend", () => {
     (User as any).tableName = "people";
     expect(seen).toEqual(["people"]);
   });
+
+  it("replaces an earlier module getter while keeping the class-body setter", () => {
+    const seen: unknown[] = [];
+    class User {
+      static set tableName(value: string) {
+        seen.push(value);
+      }
+    }
+    class First {
+      static get tableName() {
+        return "first";
+      }
+    }
+    class Second {
+      static get tableName() {
+        return "second";
+      }
+    }
+    extend(User, First);
+    extend(User, Second);
+    expect((User as any).tableName).toBe("second");
+    (User as any).tableName = "people";
+    expect(seen).toEqual(["people"]);
+  });
+
+  it("leaves a class-body getter alone while taking the module setter", () => {
+    const seen: unknown[] = [];
+    class User {
+      static get tableName() {
+        return "class body";
+      }
+    }
+    class Naming {
+      static set tableName(value: string) {
+        seen.push(value);
+      }
+    }
+    extend(User, Naming);
+    expect((User as any).tableName).toBe("class body");
+    (User as any).tableName = "people";
+    expect(seen).toEqual(["people"]);
+  });
 });
 
 describe("isModuleIncluded", () => {

@@ -438,32 +438,38 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
     // Ruby's extend copies only methods — skip non-functions and constants.
     if (!modDesc.get && !modDesc.set && typeof modDesc.value !== "function") continue;
     const existing = Object.getOwnPropertyDescriptor(klass, key);
-    const existingIsMixin = installed.has(key);
+    // Ruby names the two accessor halves `key` and `key=` and resolves each on
+    // its own, so each half is tracked under the name Ruby gives it.
+    const writer = `${key}=`;
+    const getterIsMixin = installed.has(key);
+    const setterIsMixin = installed.has(writer);
+    const modIsAccessor = modDesc.get != null || modDesc.set != null;
     // Copy accessors as accessors: reading `mod[key]` would invoke the getter
     // with the module as receiver instead of the extending class.
-    const descriptor: PropertyDescriptor =
-      modDesc.get || modDesc.set
-        ? { get: modDesc.get, set: modDesc.set, configurable: true, enumerable: false }
-        : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
+    const descriptor: PropertyDescriptor = modIsAccessor
+      ? { get: modDesc.get, set: modDesc.set, configurable: true, enumerable: false }
+      : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
     if (!existing) {
       Object.defineProperty(klass, key, descriptor);
-      installed.add(key);
+      if (!modIsAccessor || modDesc.get != null) installed.add(key);
+      if (modDesc.set != null) installed.add(writer);
       continue;
     }
-    const isAccessorPair =
-      ("get" in modDesc || "set" in modDesc) && ("get" in existing || "set" in existing);
-    if (isAccessorPair) {
-      const higher = existingIsMixin ? modDesc : existing;
-      const lower = existingIsMixin ? existing : modDesc;
+    const existingIsAccessor = existing.get != null || existing.set != null;
+    if (modIsAccessor && existingIsAccessor) {
+      const takeGetter = modDesc.get != null && (existing.get == null || getterIsMixin);
+      const takeSetter = modDesc.set != null && (existing.set == null || setterIsMixin);
       Object.defineProperty(klass, key, {
-        get: higher.get ?? lower.get,
-        set: higher.set ?? lower.set,
+        get: takeGetter ? modDesc.get : existing.get,
+        set: takeSetter ? modDesc.set : existing.set,
         configurable: true,
         enumerable: false,
       });
-      if (existingIsMixin) installed.add(key);
-    } else if (existingIsMixin) {
+      if (takeGetter) installed.add(key);
+      if (takeSetter) installed.add(writer);
+    } else if (getterIsMixin && (!existingIsAccessor || existing.set == null || setterIsMixin)) {
       Object.defineProperty(klass, key, descriptor);
+      if (modDesc.set != null) installed.add(writer);
     }
   }
 
