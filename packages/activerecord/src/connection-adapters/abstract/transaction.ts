@@ -217,7 +217,7 @@ export class NullTransaction {
     return false;
   }
 
-  addRecord(_record: unknown, _ensureFinalize = true): void {}
+  addRecord(_record: unknown, _ = true): void {}
 
   beforeCommit(fn?: () => void | Promise<void>): void | Promise<void> {
     if (fn) return fn();

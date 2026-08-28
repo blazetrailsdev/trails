@@ -5,12 +5,21 @@ import {
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
-  override references(name: string, options: Record<string, unknown> = {}): this {
-    return super.references(name, { type: "integer", ...options } as any);
+  override references(...args: unknown[]): this {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as Record<
+      string,
+      unknown
+    >;
+    return (super.references as (...a: unknown[]) => this)(...rest, {
+      type: "integer",
+      ...options,
+    });
   }
 
-  belongsTo(name: string, options: Record<string, unknown> = {}): this {
-    return this.references(name, options);
+  override belongsTo(...args: unknown[]): this {
+    return (this.references as (...a: unknown[]) => this)(...args);
   }
 
   changeColumn(columnName: string, type: ColumnType, options: ColumnOptions = {}): void {

@@ -626,6 +626,13 @@ export interface ReferenceDefinitionConnection {
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
 }
 
+type ReferenceColumnOptions = Omit<ColumnOptions, "index"> & {
+  polymorphic?: boolean | Record<string, unknown>;
+  foreignKey?: boolean | ReferenceForeignKeyOptions;
+  index?: boolean | AddIndexOptions;
+  type?: ColumnType;
+};
+
 export class ReferenceDefinition {
   readonly name: string;
   /** @internal */
@@ -816,12 +823,12 @@ export class AlterTable {
     this.checkConstraintAdds.push(this._td.newCheckConstraintDefinition(expression, options));
   }
 
-  dropCheckConstraint(name: string): void {
-    this.checkConstraintDrops.push(name);
+  dropCheckConstraint(constraintName: string): void {
+    this.checkConstraintDrops.push(constraintName);
   }
 
-  dropConstraint(name: string): void {
-    this.constraintDrops.push(name);
+  dropConstraint(constraintName: string): void {
+    this.constraintDrops.push(constraintName);
   }
 }
 
@@ -1189,29 +1196,24 @@ export class TableDefinition {
     return this;
   }
 
-  references(
-    name: string,
-    options: Omit<ColumnOptions, "index"> & {
-      polymorphic?: boolean | Record<string, unknown>;
-      foreignKey?: boolean | ReferenceForeignKeyOptions;
-      index?: boolean | AddIndexOptions;
-      type?: ColumnType;
-    } = {},
-  ): this {
-    new ReferenceDefinition(name, options).addTo(this);
+  references(...args: string[]): this;
+  references(...args: [...names: string[], options: ReferenceColumnOptions]): this;
+  references(...args: unknown[]): this {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (
+      typeof last === "object" && last !== null ? rest.pop() : {}
+    ) as ReferenceColumnOptions;
+    for (const col of rest as string[]) {
+      new ReferenceDefinition(col, options).addTo(this);
+    }
     return this;
   }
 
-  belongsTo(
-    name: string,
-    options: Omit<ColumnOptions, "index"> & {
-      polymorphic?: boolean | Record<string, unknown>;
-      foreignKey?: boolean | ReferenceForeignKeyOptions;
-      index?: boolean | AddIndexOptions;
-      type?: ColumnType;
-    } = {},
-  ): this {
-    return this.references(name, options);
+  belongsTo(...args: string[]): this;
+  belongsTo(...args: [...names: string[], options: ReferenceColumnOptions]): this;
+  belongsTo(...args: unknown[]): this {
+    return (this.references as (...a: unknown[]) => this)(...args);
   }
 
   index(columnName: string | string[], options: AddIndexOptions = {}): this {
@@ -1318,11 +1320,15 @@ export class Table {
   async char(...args: unknown[]): Promise<void> {
     await this.definedColumn("char", args);
   }
+  async virtual(...names: string[]): Promise<void>;
   async virtual(
-    name: string,
-    options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean } = {},
-  ): Promise<void> {
-    await this.column(name, "virtual" as ColumnType, options);
+    ...args: [
+      ...names: string[],
+      options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
+    ]
+  ): Promise<void>;
+  async virtual(...args: unknown[]): Promise<void> {
+    await this.definedColumn("virtual" as ColumnType, args);
   }
   async array(name: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     await this.column(name, type, { ...options, array: true });
@@ -1352,17 +1358,17 @@ export class Table {
     }
   }
   async removeIndex(
-    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
+    columnName: string | string[] | { column?: string | string[]; name?: string } = {},
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
-    const isColumn = typeof columnOrOptions === "string" || Array.isArray(columnOrOptions);
-    const columnName = isColumn ? columnOrOptions : undefined;
-    options = isColumn ? options : { ...columnOrOptions, ...options };
+    const isColumn = typeof columnName === "string" || Array.isArray(columnName);
+    const column = isColumn ? columnName : undefined;
+    options = isColumn ? options : { ...columnName, ...options };
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     if (Object.keys(options).length === 0) {
-      await this._schema.removeIndex(this.name, columnName);
+      await this._schema.removeIndex(this.name, column);
     } else {
-      await this._schema.removeIndex(this.name, columnName, options);
+      await this._schema.removeIndex(this.name, column, options);
     }
   }
   async references(...refNames: string[]): Promise<void>;
@@ -1512,16 +1518,16 @@ export class Table {
   }
 
   async foreignKeyExists(
-    toTableOrOptions?: string | Record<string, unknown>,
+    args?: string | Record<string, unknown>,
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    if (typeof toTableOrOptions === "string") {
+    if (typeof args === "string") {
       if (Object.keys(options).length === 0) {
-        return this._schema.foreignKeyExists(this.name, toTableOrOptions);
+        return this._schema.foreignKeyExists(this.name, args);
       }
-      return this._schema.foreignKeyExists(this.name, toTableOrOptions, options);
+      return this._schema.foreignKeyExists(this.name, args, options);
     }
-    const opts = { ...toTableOrOptions, ...options };
+    const opts = { ...args, ...options };
     if (Object.keys(opts).length === 0) {
       return this._schema.foreignKeyExists(this.name);
     }
@@ -1536,29 +1542,37 @@ export class Table {
   }
 
   async removeCheckConstraint(
-    expressionOrOptions?: string | { name?: string },
+    args?: string | { name?: string },
     options: { name?: string } = {},
   ): Promise<void> {
-    if (typeof expressionOrOptions === "string") {
+    if (typeof args === "string") {
       if (Object.keys(options).length === 0) {
-        return this._schema.removeCheckConstraint(this.name, expressionOrOptions);
+        return this._schema.removeCheckConstraint(this.name, args);
       }
-      return this._schema.removeCheckConstraint(this.name, expressionOrOptions, options);
+      return this._schema.removeCheckConstraint(this.name, args, options);
     }
-    const opts = { ...expressionOrOptions, ...options };
+    const opts = { ...args, ...options };
     if (Object.keys(opts).length === 0) {
       return this._schema.removeCheckConstraint(this.name);
     }
     return this._schema.removeCheckConstraint(this.name, opts);
   }
 
+  async checkConstraintExists(...args: []): Promise<boolean>;
   async checkConstraintExists(
-    options: { name?: string; expression?: string } = {},
-  ): Promise<boolean> {
+    ...args: [...unknown[], { name?: string; expression?: string }]
+  ): Promise<boolean>;
+  async checkConstraintExists(...args: unknown[]): Promise<boolean> {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
+      name?: string;
+      expression?: string;
+    };
     if (Object.keys(options).length === 0) {
-      return this._schema.checkConstraintExists(this.name);
+      return this._schema.checkConstraintExists(this.name, ...(rest as []));
     }
-    return this._schema.checkConstraintExists(this.name, options);
+    return this._schema.checkConstraintExists(this.name, ...(rest as []), options);
   }
 
   async primaryKey(

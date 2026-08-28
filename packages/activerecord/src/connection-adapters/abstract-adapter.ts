@@ -186,7 +186,7 @@ export class Version {
 export interface AbstractAdapter {
   createTable(
     tableName: string,
-    kwargsOrFn?:
+    options?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
@@ -224,7 +224,7 @@ export interface AbstractAdapter {
     type: ColumnType,
     options?: ColumnOptions & { ifNotExists?: boolean },
   ): Promise<void>;
-  renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
+  renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void>;
   /** @internal */
   renameColumnSql(tableName: string, columnName: string, newColumnName: string): string;
   changeColumn(
@@ -255,7 +255,11 @@ export interface AbstractAdapter {
     options?: { ifExists?: boolean },
   ): Promise<void>;
   removeColumns(tableName: string, ...columns: string[]): Promise<void>;
-  addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
+  addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options?: AddIndexOptions,
+  ): Promise<void>;
   addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -317,7 +321,7 @@ export interface AbstractAdapter {
   ): Promise<Map<string, string>>;
   removeIndex(
     tableName: string,
-    columnOrOptions?:
+    columnName?:
       | string
       | string[]
       | { column?: string | string[]; name?: string; ifExists?: boolean },
@@ -391,7 +395,7 @@ export interface AbstractAdapter {
   useForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    toTable?: string | RemoveForeignKeyOptions,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
@@ -431,7 +435,7 @@ export interface AbstractAdapter {
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?:
+    expression?:
       | string
       | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
     options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
@@ -444,7 +448,7 @@ export interface AbstractAdapter {
   createJoinTable(
     table1: string,
     table2: string,
-    kwargsOrFn?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
+    options?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
     fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void>;
   dropJoinTable(
@@ -736,20 +740,20 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
-  static quoteColumnName(name: unknown): string {
-    return abstractQuoteColumnName(name);
+  static quoteColumnName(columnName: unknown): string {
+    return abstractQuoteColumnName(columnName);
   }
 
-  static quoteTableName(name: unknown): string {
-    return abstractQuoteTableName.call(this, name);
+  static quoteTableName(tableName: unknown): string {
+    return abstractQuoteTableName.call(this, tableName);
   }
 
-  quoteTableName(name: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteTableName(name);
+  quoteTableName(tableName: unknown): string {
+    return (this.constructor as typeof AbstractAdapter).quoteTableName(tableName);
   }
 
-  quoteColumnName(name: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteColumnName(name);
+  quoteColumnName(columnName: unknown): string {
+    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {
@@ -1966,7 +1970,7 @@ export class AbstractAdapter implements Quoting {
     name: string | null = "SQL",
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
-    isAsync = false,
+    async = false,
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     try {
@@ -1979,7 +1983,7 @@ export class AbstractAdapter implements Quoting {
           name,
           binds,
           type_casted_binds: typeCastedBinds,
-          async: isAsync,
+          async,
           connection: this,
           transaction: presentTx,
           row_count: 0,

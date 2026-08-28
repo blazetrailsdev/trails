@@ -69,7 +69,7 @@ export interface DatabaseStatementsHost {
     name: string | null | undefined,
     binds: unknown[],
     typeCastedBinds: unknown[],
-    isAsync: boolean,
+    async: boolean,
     block: (payload: Record<string, unknown>) => Promise<T>,
   ): Promise<T>;
   execute?(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
@@ -105,7 +105,7 @@ export interface DatabaseStatementsHost {
     name?: string | null,
     binds?: unknown[],
     prepare?: boolean,
-    isAsync?: boolean,
+    async?: boolean,
     allowRetry?: boolean,
     materializeTransactions?: boolean,
     batch?: boolean,
@@ -173,22 +173,21 @@ export class DatabaseStatementsBase {
 
 export function toSql(
   this: DatabaseStatementsHost | void,
-  arel: unknown,
+  arelOrSqlString: unknown,
   binds: unknown[] = [],
 ): string {
-  const [sql] = toSqlAndBinds.call(this, arel, binds);
+  const [sql] = toSqlAndBinds.call(this, arelOrSqlString, binds);
   return sql;
 }
 
 /** @internal */
 export function toSqlAndBinds(
   this: DatabaseStatementsHost | void,
-  arel: unknown,
+  arelOrSqlString: unknown,
   binds: unknown[] = [],
   preparable: boolean | null = null,
   allowRetry = false,
 ): [string, unknown[], boolean | null, boolean] {
-  let arelOrSqlString = arel;
   if (
     arelOrSqlString &&
     (arelOrSqlString as any).ast != null &&
@@ -1143,13 +1142,13 @@ export async function rawExecute(
   name: string | null = null,
   binds?: unknown[],
   prepare = false,
-  isAsync = false,
+  async = false,
   allowRetry = false,
   materializeTransactions = true,
   batch = false,
 ): Promise<unknown> {
   const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
-  return this.log!(sql, name, binds ?? [], typeCastedBinds, isAsync, (notificationPayload) =>
+  return this.log!(sql, name, binds ?? [], typeCastedBinds, async, (notificationPayload) =>
     (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
       (this as any).performQuery(conn, sql, binds ?? [], typeCastedBinds, {
         prepare,

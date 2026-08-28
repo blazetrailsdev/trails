@@ -399,9 +399,9 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected addTableOptionsBang(sql: string, o: TableDefinition): string {
-    if (o.options) sql += ` ${o.options}`;
-    return sql;
+  protected addTableOptionsBang(createSql: string, o: TableDefinition): string {
+    if (o.options) createSql += ` ${o.options}`;
+    return createSql;
   }
 
   /**

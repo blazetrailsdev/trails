@@ -175,16 +175,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   override async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    toTable?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    const optionsForm = typeof toTableOrOptions === "object" && toTableOrOptions !== null;
-    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTableOrOptions : options) };
+    const optionsForm = typeof toTable === "object" && toTable !== null;
+    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTable : options) };
     if (opts.onUpdate === "restrict") delete opts.onUpdate;
     if (opts.onDelete === "restrict") delete opts.onDelete;
     return optionsForm
       ? super.removeForeignKey(fromTable, opts)
-      : super.removeForeignKey(fromTable, toTableOrOptions, opts);
+      : super.removeForeignKey(fromTable, toTable, opts);
   }
 
   /** @internal */
@@ -924,8 +924,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @missingRailsCall with_raw_connection — PERMANENT */
-  override quoteString(s: string): string {
-    return mysqlQuoteString(s);
+  override quoteString(string: string): string {
+    return mysqlQuoteString(string);
   }
 
   /** @missingRailsCall empty? — PERMANENT */
