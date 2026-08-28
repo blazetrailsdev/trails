@@ -7,7 +7,8 @@ import { Temporal } from "@blazetrails/date";
  *
  * The re-export below is kept for the packages that still reach for
  * `@blazetrails/activesupport/temporal`: actionpack (whose HTTP-header date
- * handling RFC 0023 owns and which is deliberately not converged here),
+ * handling the activesupport-surfaced-deviations bucket owns and which is
+ * deliberately not converged here),
  * globalid and trailties. It is a one-line pass-through, not a seam.
  */
 export { Temporal };

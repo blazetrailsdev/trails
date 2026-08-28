@@ -27,14 +27,16 @@ export class Connection {
     // without leasing a connection (connection_handling.rb:368-369). trails'
     // `Base.schemaCache()` is that pool handle, but every read on it is async and
     // this method is sync, so reach the raw cache the handle wraps
-    // (poolConfig.schemaCache) instead. Converging this waits on RFC 0023.
+    // (poolConfig.schemaCache) instead. Converging this waits on the
+    // activerecord-surfaced-deviations bucket.
     const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaCache;
     // Rails then gates on `schema_cache.data_source_exists?(table_name)` before
     // reading `columns_hash`. trails' `dataSourceExists` is async
     // (schema-cache.ts:211) and this method is sync, so the cached columns hash is
     // the gate instead: a warmed entry implies the data source exists, and
     // `getCachedColumnsHash` is a plain map read that never triggers the async
-    // cache-miss path. Converging the gate waits on RFC 0023.
+    // cache-miss path. Converging the gate waits on the
+    // activerecord-surfaced-deviations bucket.
     const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
     const column = columnsHash?.[toS(attrName)];
     // Rails scopes the lookup to a leased connection —
@@ -42,7 +44,7 @@ export class Connection {
     // (type_caster/connection.rb:21). trails' `withConnection` returns a Promise
     // (connection-handling.ts:366) and this method is sync, so it reads the
     // adapter directly, taking a permanent checkout where Rails scopes a lease.
-    // Same RFC 0023 async/sync constraint as the `data_source_exists?` gate above.
+    // Same async/sync constraint as the `data_source_exists?` gate above.
     const type = column
       ? (this._klass?.connection?.lookupCastTypeFromColumn(column) as Type | undefined)
       : undefined;

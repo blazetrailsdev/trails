@@ -11,9 +11,8 @@
  * The `cover` string enum, the `boolean_status` boolean enum, and the
  * `last_read` `forgotten: nil` value are wired on the canonical `Book` model
  * (EnumType supports string/boolean/nil values). Remaining sub-assertion gaps
- * on the canonical `Book` surface are tracked under RFC
- * 0023-surfaced-deviations (enum-canonical-book-gaps) via inline pending
- * comments below.
+ * on the canonical `Book` surface were scoped by `enum-canonical-book-gaps`
+ * (RFC 0050, landed) and are marked by the inline comments below.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
@@ -81,8 +80,8 @@ describe("EnumTest", () => {
     expect((book as any).illustrator_visibility).toBe("visible");
     expect((book as any).difficulty).toBe("medium");
     // Rails also asserts `@book.cover == "soft"` as an enum reader; `cover` is a
-    // raw string column on canonical Book (no enum), so the assertion is pending
-    // (0023-surfaced-deviations/enum-canonical-book-gaps) to avoid false fidelity.
+    // raw string column on canonical Book (no enum), so the assertion is omitted
+    // to avoid false fidelity (`enum-canonical-book-gaps`, RFC 0050).
   });
 
   it("find via scope", async () => {
@@ -189,7 +188,7 @@ describe("EnumTest", () => {
     expect((Book as any).written().build().isProposed()).toBe(false);
     // Rails also asserts `PublishedBook.hard.build.hard?` /  `.soft?` — canonical
     // PublishedBook omits the `cover` enum (`enum :cover, { hard: "0", soft: "1" }`),
-    // so that half is pending (0023-surfaced-deviations/enum-canonical-book-gaps).
+    // so that half is omitted (`enum-canonical-book-gaps`, RFC 0050).
   });
 
   it("build from where", () => {

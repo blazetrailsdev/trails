@@ -2731,7 +2731,8 @@ export class CheckPending {
    *   675-680); trails registers migrations programmatically and has no
    *   watcher to build, so `call` checks the migrator directly. Convergence is
    *   RFC 0051 story `check-pending-has-no-file-update-checker-watcher` (which
-   *   depends on RFC 0023 `port-activesupport-file-update-checker`).
+   *   depends on `port-activesupport-file-update-checker`, in the
+   *   activesupport-surfaced-deviations bucket).
    * @missingRailsCall execute — CONVERGEABLE: `@watcher.execute`
    *   (migration.rb:664) is the same `FileUpdateChecker` hop, absent for the
    *   same reason and converging with the same story.

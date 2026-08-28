@@ -775,8 +775,8 @@ export async function establishConnection(
  * caller applies the validated value to that singleton on success — giving the
  * same observable result for the single-connection case the tests exercise.
  * The multi-connection divergence (last establish_connection wins for all
- * subsequent casts) is a tracked fidelity deviation, not yet converged; see
- * RFC 0023 (surfaced-deviations).
+ * subsequent casts) is a tracked fidelity deviation, not yet converged; see the
+ * activerecord-surfaced-deviations bucket.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter.validate_default_timezone
  */

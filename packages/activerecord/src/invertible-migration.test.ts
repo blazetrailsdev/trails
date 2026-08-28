@@ -305,7 +305,7 @@ describe("InvertibleMigrationTest", () => {
 
   // trails' changeTable `removeIndex` records no `column` info, so the migrate
   // reverse path throws "Cannot reverse removeIndex without column info".
-  // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
+  // Tracked-pending-convergence in the activerecord-surfaced-deviations bucket.
   it("exception on removing index without column option", async () => {
     const indexDefinition: [string, string[]] = ["horses", ["name", "color"]];
     const migration1 = new RemoveIndexMigration1();
@@ -336,7 +336,8 @@ describe("InvertibleMigrationTest", () => {
   // trails' `revert(fn)` always reverses the recorded ops regardless of the
   // migration's own direction, so a migration reverting a `revert` block (and
   // its `dropTable` reverse) is not yet direction-aware. Tracked-pending-
-  // convergence under RFC 0023-surfaced-deviations (revert-direction semantics).
+  // convergence in the activerecord-surfaced-deviations bucket
+  // (revert-direction semantics).
   it("migrate revert", async () => {
     const migration = new InvertibleMigration();
     const revert = new InvertibleRevertMigration();
@@ -565,7 +566,7 @@ describe("InvertibleMigrationTest", () => {
   // Reverting `change_table { t.references }` records addReference, but trails'
   // CommandRecorder change_table proxy has no `references`, and SQLite's
   // removeColumn rebuild can't drop a column an index still references.
-  // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
+  // Tracked-pending-convergence in the activerecord-surfaced-deviations bucket.
   it("migrations can handle foreign keys to specific tables", async () => {
     const migration = new RevertCustomForeignKeyTable();
     await new InvertibleMigration().migrate("up");
@@ -636,8 +637,8 @@ describe("InvertibleMigrationTest", () => {
   // trails diverges on every adapter: SQLite emits `ALTER TABLE ... ADD
   // CONSTRAINT` (rejected; needs table recreation), and on PG/MariaDB the
   // reverse names the constraint `fk_horses_parent_id`, which doesn't match the
-  // hashed name addForeignKey created. Tracked-pending-convergence under
-  // RFC 0023-surfaced-deviations.
+  // hashed name addForeignKey created. Tracked-pending-convergence in the
+  // activerecord-surfaced-deviations bucket.
   it("migrate revert add foreign key with invalid option", async () => {
     await new InvertibleMigration().migrate("up");
     await new RevertForeignKeyWithInvalidOption().migrate("up");

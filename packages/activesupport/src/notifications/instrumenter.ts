@@ -297,7 +297,7 @@ export class Instrumenter {
    * Instrumenter is built on the instrumentation path itself, before any host
    * gets that chance. Web Crypto is the fallback for exactly that window; the
    * seam gap itself is tracked by
-   * `0023-surfaced-deviations/get-crypto-sync-auto-registration-has-no-esm-arm`,
+   * `0113-branch-and-guard-parity/get-crypto-sync-auto-registration-has-no-esm-arm`,
    * which retires this fallback.
    */
   private uniqueId(): string {

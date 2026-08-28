@@ -11,7 +11,8 @@
  * closed over — a zero-parameter block cannot reach the merger at all. So
  * implicit-receiver `with_options` (`option_merger_test.rb:101-107`) has no
  * form here; callers take the merger as the block's parameter. Tracked as
- * `with-options-implicit-receiver-instance-eval-arm` under RFC 0023.
+ * `with-options-implicit-receiver-instance-eval-arm`, in the
+ * activesupport-surfaced-deviations bucket.
  */
 
 import { OptionMerger } from "../../option-merger.js";
