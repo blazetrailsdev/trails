@@ -244,7 +244,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._strict;
   }
 
-  /** @missingRailsCall merge — CONVERGEABLE */
+  /** @missingRailsCall merge — CONVERGEABLE retire-sqlite3-positional-constructor-overload */
   constructor(config: SQLite3Config);
   /** @deprecated */
   constructor(filename?: string | ":memory:", options?: SQLite3AdapterOptions);
@@ -962,7 +962,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
-  /** @missingRailsCall include? — CONVERGEABLE */
+  /** @missingRailsCall include? — CONVERGEABLE retire-sqlite3-positional-constructor-overload */
   static newClient(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     config: { database?: string; readonly?: boolean },

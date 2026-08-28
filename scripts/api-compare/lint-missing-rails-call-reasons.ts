@@ -38,7 +38,8 @@ export async function listSourceFiles(packagesDir: string): Promise<string[]> {
  *  `CONVERGEABLE` one names the story that converges it — the story IS the
  *  reason, so a bare `CONVERGEABLE` carries none (RFC 0124). */
 const RECEIPT_TAGS = ["@noRailsEquivalent", "@missingRailsCall", "@missingRailsArgs"];
-const BARE_CONVERGEABLE_RE = /CONVERGEABLE\s*(?=$|\n)/;
+/** A tail carrying no word character — `""`, `"."`, `")"` — is no story id. */
+const NAMES_A_STORY_RE = /[A-Za-z0-9]/;
 
 /** Reject a `CONVERGEABLE` receipt that names no story. The line's tail is the
  *  whole receipt, so "bare" is "nothing follows the token on its line". */
@@ -51,7 +52,8 @@ export function lintBareConvergeable(fileName: string, text: string): string[] {
     comment.split("\n").forEach((line, i) => {
       const body = line.replace(/^\s*\*?\s?/, "").trimEnd();
       if (!RECEIPT_TAGS.some((tag) => body.includes(tag))) return;
-      if (!BARE_CONVERGEABLE_RE.test(body)) return;
+      const tail = body.split("CONVERGEABLE").at(-1) ?? "";
+      if (body === tail || NAMES_A_STORY_RE.test(tail)) return;
       errors.push(
         `bare CONVERGEABLE receipt: ${fileName}:${startLine + i} — a CONVERGEABLE ` +
           "receipt names the story that converges it (the story IS the reason). Add the " +

@@ -34,6 +34,11 @@ describe("lintBareConvergeable", () => {
     expect(lintBareConvergeable("a.ts", text)).toHaveLength(1);
   });
 
+  it("rejects a tail that carries punctuation but no story id", () => {
+    const text = ["/**", " * @noRailsEquivalent CONVERGEABLE.", " */"].join("\n");
+    expect(lintBareConvergeable("a.ts", text)).toHaveLength(1);
+  });
+
   it("ignores comments with no receipt tag", () => {
     expect(lintBareConvergeable("a.ts", "/** CONVERGEABLE */")).toEqual([]);
   });

@@ -74,7 +74,7 @@ export function quoteColumnName(name: unknown): string {
   return quoted;
 }
 
-/** @missingRailsCall with_raw_connection — CONVERGEABLE */
+/** @missingRailsCall with_raw_connection — CONVERGEABLE pg-quote-string-escapes-without-with-raw-connection */
 export function quoteString(value: string): string {
   return value.replace(/'/g, "''");
 }

@@ -1657,7 +1657,7 @@ export class PostgreSQLAdapter
     return parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
   }
 
-  /** @missingRailsCall with_raw_connection — CONVERGEABLE */
+  /** @missingRailsCall with_raw_connection — CONVERGEABLE arm-permanent-connection-checkout-disallowed */
   async getDatabaseVersion(): Promise<number> {
     const conn = this._rawConnection ?? (await this._acquireFreshClient());
     let version: number;
