@@ -40,6 +40,8 @@
     "parity:api:calls:unreviewed": "pnpm tsx scripts/api-compare/lint-call-mismatches.ts --unreviewed",
     "parity:api:calls:reseed": "API_COMPARE_FORCE=1 pnpm parity:api --calls && pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write --no-regen",
     "parity:api:calls:tighten": "pnpm tsx scripts/api-compare/lint-call-mismatches.ts --tighten",
+    "parity:api:params": "pnpm tsx scripts/api-compare/lint-param-names.ts",
+    "parity:api:params:tighten": "pnpm tsx scripts/api-compare/lint-param-names.ts --tighten",
     "parity:api:arity": "pnpm tsx scripts/api-compare/lint-arity-excludes.ts",
     "parity:api:inheritance": "pnpm tsx scripts/api-compare/lint-inheritance-excludes.ts",
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",

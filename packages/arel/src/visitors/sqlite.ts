@@ -4,7 +4,7 @@ import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
 export class SQLite extends ToSql {
-  protected override visitArelNodesLock(_node: Nodes.Lock, collector: SQLString): SQLString {
+  protected override visitArelNodesLock(_o: Nodes.Lock, collector: SQLString): SQLString {
     return collector;
   }
 
@@ -16,12 +16,12 @@ export class SQLite extends ToSql {
     return super.visitArelNodesSelectStatement(o, collector);
   }
 
-  protected override visitArelNodesTrue(_node: Nodes.True, collector: SQLString): SQLString {
+  protected override visitArelNodesTrue(_o: Nodes.True, collector: SQLString): SQLString {
     collector.append("1");
     return collector;
   }
 
-  protected override visitArelNodesFalse(_node: Nodes.False, collector: SQLString): SQLString {
+  protected override visitArelNodesFalse(_o: Nodes.False, collector: SQLString): SQLString {
     collector.append("0");
     return collector;
   }

@@ -416,7 +416,21 @@ write.
    claiming neither is an error, not an assumed PERMANENT, and a bare
    `CONVERGEABLE` with no story id is only half a receipt.
 
-3. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
+3. **Did you touch a signature?** Parameter NAMES are gated too (RFC 0126) —
+   `parity:api` prints a `params N/M` figure beside `arity`, `--params` lists
+   every differing position, and
+
+   ```bash
+   pnpm parity:api:params   # the parameter-name ratchet
+   ```
+
+   fails on any increase over the committed per-package/per-file mark. arel is
+   enrolled (at 0); other packages are measured and reported and join by their
+   own story. A parameter keeps the Rails identifier, camelCased — so the fix is
+   the rename, never the mark. Converged one? `pnpm parity:api:params:tighten`
+   writes the mark DOWN; there is no reseed.
+
+4. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a
    Rails-matched file with no Ruby counterpart. Anything you added and can't
    trace to a Ruby method is invented surface: delete it, fold it into the
@@ -441,7 +455,7 @@ write.
    widening `GATED_PACKAGES` is a separate decision with its own burndown, not a
    mechanical step.
 
-4. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
+5. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
    it holds a member out of the generated API reference — but it also drops the
    member from the measured surface entirely, so an `@internal` with nothing
    behind it hides extra surface for free. Two rules police the pair, both over
@@ -465,12 +479,12 @@ write.
    are burnt down (one story per package under RFC 0121), and no package is ever
    removed to turn a red run green.
 
-5. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
+6. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
    `blazetrails/rails-file-structure-method-order` enforces Rails source order
    for class members and top-level functions and is autofixable, but it needs
    the manifest `pnpm parity:api` builds. Without a compare run it silently
    passes everything, then fails in the `Rails API/Test Comparison` CI job.
-6. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
+7. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
