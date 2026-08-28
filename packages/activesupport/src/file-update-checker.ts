@@ -27,11 +27,21 @@ class ArgumentError extends Error {
  * Mirrors: `ActiveSupport::FileUpdateChecker`
  * (`activesupport/lib/active_support/file_update_checker.rb:34-163`).
  *
+ * Two deviations, both forced:
+ *
  * Ruby's `execute` yields to a synchronous block; trails' consumers
  * (`ActiveRecord::Migration::CheckPending`) hand it an async one, because the
  * work it wraps — `Migration.check_pending_migrations` — reaches the database.
  * So `execute` / `executeIfUpdated` answer a Promise; `updated` stays
  * synchronous exactly as Ruby's `updated?` is.
+ *
+ * And Ruby's `Dir[@glob]` (`:104`) has no JS counterpart, so the private
+ * `dirGlob` expands the `{dir/**\/*.{ext,ext},…}` shape `compileGlob` itself
+ * emits with the same sync directory walk
+ * `ActiveRecord::MigrationContext#migration_files` already does by hand.
+ * Ruby's `@watched` / `@updated_at` memos are spelled `watchedMemo` /
+ * `updatedAtMemo` only because a JS class cannot carry a field and a method of
+ * the same name.
  */
 export class FileUpdateChecker {
   private files: string[];
@@ -181,10 +191,6 @@ export class FileUpdateChecker {
     return `.{${array.join(",")}}`;
   }
 
-  // Ruby's `Dir[@glob]` (`:104`). JS has no `Dir[]`, and the sync directory
-  // walk it needs is the one `MigrationContext#migration_files` already does
-  // by hand, so this expands the `{dir/**/*.{ext,ext},…}` shape `compileGlob`
-  // itself emits rather than pulling in a glob engine.
   private dirGlob(glob: string): string[] {
     const { readdirSync, existsSync } = getFs();
     const { join } = getPath();

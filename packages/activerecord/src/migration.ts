@@ -2744,13 +2744,14 @@ export class CheckPending {
    * Mirrors: `build_watcher` (`migration.rb:675-680`). Rails watches `["rb"]`
    * under each migrations path; trails' migrations end in `.ts`/`.js`
    * (`MigrationFilenameRegexp`, `migration.rb:637`).
+   *
+   * Rails opens with `ConnectionHandling::DEFAULT_ENV.call` (`:676`).
+   * `DEFAULT_ENV` lives in connection-handling.ts, whose module graph reaches
+   * back into this file through connection-pool.ts, so the port reads
+   * `DatabaseConfigurations.defaultEnv` — the value that Proc returns
+   * (connection-handling.ts:707) — and takes no new import edge.
    */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
-    // Rails is `ConnectionHandling::DEFAULT_ENV.call` (`migration.rb:676`).
-    // `DEFAULT_ENV` lives in connection-handling.ts, whose module graph reaches
-    // back into this file through connection-pool.ts; `DatabaseConfigurations
-    // .defaultEnv` is the value it returns (connection-handling.ts:707) and
-    // takes no new import edge.
     const currentEnvironment = DatabaseConfigurations.defaultEnv;
     const allConfigs = migrationArConfig()!.configurations().configsFor({
       envName: currentEnvironment,
