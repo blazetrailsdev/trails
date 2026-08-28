@@ -315,12 +315,12 @@ describe("StoreTest", () => {
   it("stored_attributes are tracked per class", () => {
     class FirstModel extends Base {
       static {
-        this.storeAccessor("data", { accessors: ["color"] });
+        this.storeAccessor("data", "color");
       }
     }
     class SecondModel extends Base {
       static {
-        this.storeAccessor("data", { accessors: ["width", "height"] });
+        this.storeAccessor("data", "width", "height");
       }
     }
 
@@ -331,17 +331,17 @@ describe("StoreTest", () => {
   it("stored_attributes are tracked per subclass", () => {
     class FirstModel extends Base {
       static {
-        this.storeAccessor("data", { accessors: ["color"] });
+        this.storeAccessor("data", "color");
       }
     }
     class SecondModel extends FirstModel {
       static {
-        this.storeAccessor("data", { accessors: ["width", "height"] });
+        this.storeAccessor("data", "width", "height");
       }
     }
     class ThirdModel extends FirstModel {
       static {
-        this.storeAccessor("data", { accessors: ["area", "volume"] });
+        this.storeAccessor("data", "area", "volume");
       }
     }
 
@@ -409,7 +409,7 @@ describe("StoreTest", () => {
   it("store_accessor raises an exception if the column is not either serializable or a structured type", () => {
     class StoreTestSubclass extends AdminUser {
       static {
-        this.storeAccessor("name", { accessors: ["color"] });
+        this.storeAccessor("name", "color");
       }
     }
     const user = new StoreTestSubclass();

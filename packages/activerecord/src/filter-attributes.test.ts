@@ -8,7 +8,7 @@ import { pp } from "./pretty-print.js";
 
 // Rails: `fixtures :"admin/users", :"admin/accounts"` + `Admin::User`, `Admin::Account`,
 // `User`. With the YAML store coder implemented, `Admin::User` (which declares
-// `store("params", { coder: "YAML" })`) now loads and the `admin/users` fixture set is
+// `store("params", { coder: YAMLColumn })`) now loads and the `admin/users` fixture set is
 // registry-resident, so the Admin::User-backed assertions run on the real model.
 
 // admin/accounts listed first: admin/users rows ref() admin_accounts ids.

@@ -27,13 +27,13 @@ export class AdminUserJson extends Base {
 
     this.store("params", { accessors: ["token"], coder: JSON });
     this.store("settings", { accessors: ["color", "homepage"], coder: new Coder() });
-    this.storeAccessor("settings", { accessors: ["favoriteFood"] });
+    this.storeAccessor("settings", "favoriteFood");
     this.store("parent", { accessors: ["birthday", "name"], prefix: true, coder: new Coder() });
     this.store("spouse", { accessors: ["birthday"], prefix: "partner", coder: new Coder() });
-    this.storeAccessor("spouse", { accessors: ["name"], prefix: "partner" });
+    this.storeAccessor("spouse", "name", { prefix: "partner" });
     this.store("configs", { accessors: ["secretQuestion"], coder: new Coder() });
     this.store("configs", { accessors: ["twoFactorAuth"], suffix: true, coder: new Coder() });
-    this.storeAccessor("configs", { accessors: ["loginRetry"], suffix: "config" });
+    this.storeAccessor("configs", "loginRetry", { suffix: "config" });
     this.store("preferences", { accessors: ["rememberLogin"], coder: new Coder() });
     this.store("jsonData", { accessors: ["height", "weight"], coder: new Coder() });
     this.store("jsonDataEmpty", { accessors: ["isAGoodGuy"], coder: new Coder() });

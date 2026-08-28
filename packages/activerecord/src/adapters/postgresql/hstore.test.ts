@@ -22,7 +22,7 @@ class Hstore extends Base {
   static {
     this.tableName = "hstores";
     this.attribute("id", "integer");
-    this.storeAccessor("settings", { accessors: ["language", "timezone"] });
+    this.storeAccessor("settings", "language", "timezone");
   }
 }
 

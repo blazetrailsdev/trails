@@ -895,7 +895,7 @@ describe("PersistenceTest", () => {
   it("becomes errors base", () => {
     class ChildUser extends AdminUser {
       static {
-        this.storeAccessor("settings", { accessors: ["foo"] });
+        this.storeAccessor("settings", "foo");
       }
     }
     const admin = new AdminUser();

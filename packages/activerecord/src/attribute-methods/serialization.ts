@@ -141,10 +141,9 @@ export function buildColumnSerializer(
   // using the #as_json hook.
   if (coder === globalThis.JSON) coder = CodersJSON;
 
-  // Mirrors Rails' `coder == ::YAML || coder == Coders::YAMLColumn`. The string
-  // "YAML" is the trails analog of Ruby's `::YAML` module constant. Rails forwards
-  // `**(yaml || {})` (permitted_classes/unsafe_load) into the YAMLColumn ctor.
-  if (coder === "YAML" || coder === YAMLColumn) {
+  // serialization.rb:213 — `coder == ::YAML || coder == Coders::YAMLColumn`. Rails
+  // forwards `**(yaml || {})` (permitted_classes/unsafe_load) into the YAMLColumn ctor.
+  if (coder === YAMLColumn) {
     return new YAMLColumn(attrName, type as new (...args: unknown[]) => unknown, yaml ?? {});
   }
 

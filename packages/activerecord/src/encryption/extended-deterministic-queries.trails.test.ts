@@ -11,6 +11,7 @@ import {
   EncryptedUniquenessValidator,
 } from "./extended-deterministic-uniqueness-validator.js";
 import { UniquenessValidator } from "../validations.js";
+import { YAMLColumn } from "../coders/yaml-column.js";
 import { encryptedTypeOf } from "./encryptable-record.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
@@ -93,7 +94,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
 
     EncryptedSerializedBook = buildSerializedBook();
     PreviousSchemeSerializedBook = buildSerializedBook({ previousSchemes: true });
-    PreviousSchemeYamlBook = buildSerializedBook({ previousSchemes: true, coder: "YAML" });
+    PreviousSchemeYamlBook = buildSerializedBook({ previousSchemes: true, coder: YAMLColumn });
     // Warm the books table once so the first create doesn't race the
     // test-adapter's schema-recovery path (see the port suite's note).
     await EncryptedSerializedBook.where("1=1");

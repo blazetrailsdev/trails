@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/admin/user.rb
 import { Base } from "../../../base.js";
+import { YAMLColumn } from "../../../coders/yaml-column.js";
 
 class Coder {
   #default: Record<string, unknown>;
@@ -26,19 +27,19 @@ export class AdminUser extends Base {
   static {
     this.belongsTo("account", { className: "AdminAccount" });
 
-    this.store("params", { accessors: ["token"], coder: "YAML" });
+    this.store("params", { accessors: ["token"], coder: YAMLColumn });
     this.store("settings", { accessors: ["color", "homepage"] });
-    this.storeAccessor("settings", { accessors: ["favoriteFood"] });
+    this.storeAccessor("settings", "favoriteFood");
     this.store("parent", { accessors: ["birthday", "name"], prefix: true });
     this.store("spouse", { accessors: ["birthday"], prefix: "partner" });
-    this.storeAccessor("spouse", { accessors: ["name"], prefix: "partner" });
+    this.storeAccessor("spouse", "name", { prefix: "partner" });
     this.store("configs", { accessors: ["secretQuestion"] });
     this.store("configs", { accessors: ["twoFactorAuth"], suffix: true });
-    this.storeAccessor("configs", { accessors: ["loginRetry"], suffix: "config" });
+    this.storeAccessor("configs", "loginRetry", { suffix: "config" });
     this.store("preferences", { accessors: ["rememberLogin"] });
     this.store("json_data", { accessors: ["height", "weight"], coder: new Coder() });
     this.store("json_data_empty", { accessors: ["isAGoodGuy"], coder: new Coder() });
-    this.storeAccessor("json_options", { accessors: ["enableFriendRequests"] });
+    this.storeAccessor("json_options", "enableFriendRequests");
   }
 
   get color(): unknown {

@@ -134,7 +134,6 @@ export { LockingType } from "./locking/optimistic.js";
 // signatures are only callable on a Base subclass.
 export {
   storedAttributes,
-  localStoredAttributes,
   HashAccessor,
   IndifferentHashAccessor,
   StringKeyedHashAccessor,
