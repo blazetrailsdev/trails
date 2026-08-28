@@ -144,6 +144,29 @@ describe("exec: db:migrate (not yet supported)", () => {
   });
 });
 
+describe("exec: db:migrate:status", () => {
+  it("reports migration status with no eval context available", async () => {
+    await runtime.exec("generate model User name:string email:string");
+    runtime.adapter.execRaw(
+      "CREATE TABLE schema_migrations (version varchar NOT NULL PRIMARY KEY)",
+    );
+
+    const result = await runtime.exec("db:migrate:status");
+    expect(result.success).toBe(true);
+    const output = result.output.join("\n");
+    expect(output).toContain("Status   Migration ID    Migration Name");
+    expect(output).toMatch(/down\s+\d+\s+Create users/);
+  });
+
+  it("says the schema migrations table does not exist yet when it is absent", async () => {
+    await runtime.exec("generate model User name:string email:string");
+    const result = await runtime.exec("db:migrate:status");
+    expect(result.success).toBe(false);
+    expect(result.exitCode).toBe(1);
+    expect(result.output.join("\n")).toContain("Schema migrations table does not exist yet.");
+  });
+});
+
 describe("exec: db:drop", () => {
   it("drops all tables", async () => {
     runtime.adapter.execRaw("CREATE TABLE users (id INTEGER PRIMARY KEY)");

@@ -193,19 +193,15 @@ describe("MySQL::SchemaDumper", () => {
   });
 
   describe("tableOptions", () => {
-    it("populates tableCollationCache when collation is present", async () => {
+    it("returns the adapter's options and writes no collation cache", async () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
       };
-      await (d as any).tableOptions("users");
-      expect(d.tableCollationCache["users"]).toBe("utf8mb4_bin");
-    });
-
-    it("does not populate tableCollationCache when no collation in options", async () => {
-      const d = make();
-      d.connection = { tableOptions: async () => ({ charset: "utf8mb4" }) };
-      await (d as any).tableOptions("users");
+      expect(await (d as any).tableOptions("users")).toEqual({
+        charset: "utf8mb4",
+        collation: "utf8mb4_bin",
+      });
       expect(Object.hasOwn(d.tableCollationCache, "users")).toBe(false);
     });
 
@@ -213,15 +209,17 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       expect(await (d as any).tableOptions("users")).toEqual({});
     });
+  });
 
-    it("falls back to SHOW TABLE STATUS for collation when not in options", async () => {
+  describe("populateTableCollationFromStatus", () => {
+    it("reads the collation from SHOW TABLE STATUS", async () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({ charset: "utf8mb4" }),
         internalExecQuery: async () => Result.fromRowHashes([{ Collation: "utf8mb4_general_ci" }]),
         quote: (v) => `'${String(v)}'`,
       };
-      await (d as any).tableOptions("users");
+      await (d as any).populateTableCollationFromStatus("users");
       expect(d.tableCollationCache["users"]).toBe("utf8mb4_general_ci");
     });
   });

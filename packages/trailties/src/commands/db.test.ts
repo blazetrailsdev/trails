@@ -2737,4 +2737,53 @@ export class CreateThings extends Migration {
     expect(process.exitCode).toBe(1);
     expect(errs.some((e) => e.includes("No schema file found"))).toBe(true);
   });
+
+  it("db test:prepare refuses an in-memory database when schemaFormat is sql", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: ":memory:" },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "structure.sql"),
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY);\n",
+    );
+
+    const { DatabaseTasks } = await import("@blazetrails/activerecord");
+    const previousFormat = DatabaseTasks.schemaFormat;
+    DatabaseTasks.schemaFormat = "sql";
+    try {
+      await runDb(["test:prepare"]);
+    } finally {
+      DatabaseTasks.schemaFormat = previousFormat;
+    }
+
+    expect(process.exitCode).toBe(1);
+    expect(errs.some((e) => e.includes("not meaningful for an in-memory database"))).toBe(true);
+    expect(logs.some((l) => l.includes("Test database prepared"))).toBe(false);
+  });
+
+  it("db schema:load --format=sql refuses an in-memory database instead of reporting success", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: ":memory:" },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "structure.sql"),
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY);\n",
+    );
+
+    await runDb(["schema:load", "--format=sql"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(errs.some((e) => e.includes("not meaningful for an in-memory database"))).toBe(true);
+    expect(logs.some((l) => l.includes("Schema loaded."))).toBe(false);
+  });
 });

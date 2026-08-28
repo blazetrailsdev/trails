@@ -1167,15 +1167,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   override async dropTable(
     ...args:
-      | [string, ...string[]]
+      | string[]
       | [
-          string,
           ...string[],
           { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
         ]
-      | [string, ...string[], ((t: MysqlTableDefinition) => void) | undefined]
+      | [...string[], ((t: MysqlTableDefinition) => void) | undefined]
       | [
-          string,
           ...string[],
           { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
           ((t: MysqlTableDefinition) => void) | undefined,

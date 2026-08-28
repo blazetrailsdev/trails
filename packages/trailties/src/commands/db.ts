@@ -460,11 +460,39 @@ async function runTestLoadSchema(options: {
     setExitCode(1);
     return;
   }
+  if (DatabaseTasks.schemaFormat === "sql" && !(await structureLoadReachesDatabase(config))) {
+    console.error(
+      `Loading a structure.sql is not meaningful for an in-memory database: ` +
+        `the sqlite3 child process loads it into its own throwaway database. ` +
+        `Use --format ts/js, or point the config at a file.`,
+    );
+    setExitCode(1);
+    return;
+  }
   await DatabaseTasks.purge(config);
   await DatabaseTasks.withTemporaryPool(config, async () => {
     await DatabaseTasks.loadSchema(config);
   });
   console.log(options.successMessage(displayNameFor(config, raw), filename));
+}
+
+/**
+ * True when a `--format=sql` load would actually reach the database this
+ * config names. Rails' `SQLiteDatabaseTasks#structure_load`
+ * (activerecord/lib/active_record/tasks/sqlite_database_tasks.rb:60-63) shells
+ * out to `sqlite3 <database> < dump.sql`; for an in-memory database the child
+ * opens its own throwaway database and exits, so the load reaches nothing.
+ * `supports_concurrent_connections?` is the connection's own answer to
+ * "can another process see this database" — SQLite3Adapter returns
+ * `!@memory_database` (sqlite3_adapter.rb) — so it is the seam the CLI asks
+ * rather than re-deriving the in-memory predicate here.
+ */
+async function structureLoadReachesDatabase(
+  config: Parameters<typeof DatabaseTasks.withTemporaryConnection>[0],
+): Promise<boolean> {
+  return DatabaseTasks.withTemporaryConnection(config, async (adapter) =>
+    adapter.supportsConcurrentConnections(),
+  );
 }
 
 let _seedImportCounter = 0;
@@ -1135,6 +1163,18 @@ export function dbCommand(): Command {
           const filename = DatabaseTasks.schemaDumpPath(config);
           if (!filename || !(await fs.exists(filename))) {
             console.error(`${prefix}No schema file found at ${filename ?? "(none)"}`);
+            setExitCode(1);
+            return;
+          }
+          if (
+            DatabaseTasks.schemaFormat === "sql" &&
+            !(await structureLoadReachesDatabase(config))
+          ) {
+            console.error(
+              `${prefix}Loading a structure.sql is not meaningful for an in-memory database: ` +
+                `the sqlite3 child process loads it into its own throwaway database. ` +
+                `Use --format ts/js, or point the config at a file.`,
+            );
             setExitCode(1);
             return;
           }
