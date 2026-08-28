@@ -15,8 +15,6 @@ import { stdout } from "@blazetrails/activesupport";
 import {
   MigrationContext,
   Migrator,
-  CheckPending,
-  PendingMigrationError,
   ConcurrentMigrationError,
   UnknownMigrationVersionError,
   Migration,
@@ -269,20 +267,6 @@ describe("Migrator trails extensions", () => {
     );
     await migrator.migrate();
     expect(await new InternalMetadata(adapter.pool).get("environment")).toBeNull();
-  });
-
-  it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
-    await schemaMigration.dropTable();
-    const migrator = new Migrator(
-      "up",
-      [makeMigration(1, "M1")],
-      schemaMigration,
-      internalMetadata,
-    );
-    const check = new CheckPending(async () => "ok", { migrator });
-
-    await expect(check.call({})).rejects.toThrow(PendingMigrationError);
-    expect(await schemaMigration.tableExists()).toBe(true);
   });
 
   it("Migration.version returns Current for the current version", () => {

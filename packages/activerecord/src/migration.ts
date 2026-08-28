@@ -9,6 +9,8 @@ import {
   isPlainObject,
   extractOptionsBang,
   stdout,
+  FileUpdateChecker,
+  Monitor,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rubyInspect } from "./relation/ruby-inspect.js";
@@ -2697,69 +2699,76 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
 registerVersion(CURRENT_VERSION, Current);
 
 /**
- * Mirrors: ActiveRecord::Migration::CheckPending
+ * This class is used to verify that all migrations have been run before
+ * loading a web page if `config.active_record.migration_error` is set to
+ * `:page_load`.
  *
- * Middleware that raises PendingMigrationError if migrations are pending.
+ * Mirrors: `ActiveRecord::Migration::CheckPending` (`migration.rb:648-681`).
  */
 export class CheckPending {
-  private _app: (env: Record<string, unknown>) => Promise<unknown>;
-  private _migrator?: Migrator;
-  private _migrations: MigrationProxy[];
+  private app: (env: Record<string, unknown>) => Promise<unknown>;
+  private needsCheck: boolean;
+  private mutex: Monitor;
+  private fileWatcher: typeof FileUpdateChecker;
+  private watcher?: FileUpdateChecker;
 
   constructor(
     app: (env: Record<string, unknown>) => Promise<unknown>,
-    options: {
-      migrator?: Migrator;
-      migrations?: MigrationProxy[];
-    } = {},
+    { fileWatcher = FileUpdateChecker }: { fileWatcher?: typeof FileUpdateChecker } = {},
   ) {
-    this._app = app;
-    this._migrator = options.migrator;
-    this._migrations = options.migrations ?? [];
+    this.app = app;
+    this.needsCheck = true;
+    this.mutex = new Monitor();
+    this.fileWatcher = fileWatcher;
+  }
+
+  async call(env: Record<string, unknown>): Promise<unknown> {
+    await this.mutex.synchronize(async () => {
+      this.watcher ??= this.buildWatcher(async () => {
+        this.needsCheck = true;
+        await Migration.checkPendingMigrations();
+        this.needsCheck = false;
+      });
+
+      if (this.needsCheck) {
+        await this.watcher.execute();
+      } else {
+        await this.watcher.executeIfUpdated();
+      }
+    });
+
+    return this.app(env);
   }
 
   /**
-   * Mirrors: ActiveRecord::Migration::CheckPending#call (migration.rb:656-672).
-   *
-   * Rails' `@mutex.synchronize` (migration.rb:657) guards the
-   * `@watcher ||= build_watcher` memo and the `@needs_check` flag. trails
-   * registers migrations programmatically, so it has neither, and nothing else
-   * on `this` is written across the awaits below — no critical section to hold.
-   *
-   * @missingRailsCall build_watcher — CONVERGEABLE: Rails memoizes a
-   *   `FileUpdateChecker` over the migration paths (migration.rb:658,
-   *   675-680); trails registers migrations programmatically and has no
-   *   watcher to build, so `call` checks the migrator directly. Convergence is
-   *   RFC 0051 story `check-pending-has-no-file-update-checker-watcher` (which
-   *   depends on `port-activesupport-file-update-checker`, in the
-   *   activesupport-surfaced-deviations bucket).
-   * @missingRailsCall execute — CONVERGEABLE: `@watcher.execute`
-   *   (migration.rb:664) is the same `FileUpdateChecker` hop, absent for the
-   *   same reason and converging with the same story.
+   * Mirrors: `build_watcher` (`migration.rb:675-680`). Rails watches `["rb"]`
+   * under each migrations path; trails' migrations end in `.ts`/`.js`
+   * (`MigrationFilenameRegexp`, `migration.rb:637`).
    */
-  async call(env: Record<string, unknown>): Promise<unknown> {
-    if (this._migrator) {
-      await this._migrator.loadMigrated();
-      const pending = await this._migrator.pendingMigrations();
-      this._throwIfPending(pending.length);
-    }
-    return this._app(env);
-  }
-
-  private _throwIfPending(count: number): void {
-    if (count > 0) {
-      throw new PendingMigrationError(
-        `Migrations are pending. To resolve this issue, run:\n\n  migrate\n\n` +
-          `You have ${count} pending migration(s).`,
-      );
-    }
-  }
-
-  /** @internal */
-  buildWatcher(_paths?: string[]): null {
-    // In Rails this creates a filesystem watcher for migration files.
-    // In TS migrations are registered programmatically, not watched.
-    return null;
+  private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
+    // Rails is `ConnectionHandling::DEFAULT_ENV.call` (`migration.rb:676`).
+    // `DEFAULT_ENV` lives in connection-handling.ts, whose module graph reaches
+    // back into this file through connection-pool.ts; `DatabaseConfigurations
+    // .defaultEnv` is the value it returns (connection-handling.ts:707) and
+    // takes no new import edge.
+    const currentEnvironment = DatabaseConfigurations.defaultEnv;
+    const allConfigs = migrationArConfig()!.configurations().configsFor({
+      envName: currentEnvironment,
+    });
+    const paths = [
+      ...new Set(
+        allConfigs.flatMap((config) => {
+          const migrationsPaths = config.migrationsPaths;
+          if (migrationsPaths == null) return Migrator.migrationsPaths;
+          return Array.isArray(migrationsPaths) ? migrationsPaths : [migrationsPaths];
+        }),
+      ),
+    ];
+    return new this.fileWatcher(
+      [],
+      Object.fromEntries(paths.map((path) => [path, ["ts", "js"]])),
+      block,
+    );
   }
 }
 

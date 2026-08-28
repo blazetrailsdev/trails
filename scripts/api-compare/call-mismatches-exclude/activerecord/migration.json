@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "build_watcher",
+    "call": "call",
+    "reason": "`ActiveRecord::ConnectionHandling::DEFAULT_ENV.call` (`migration.rb:676`) — `DEFAULT_ENV` is an unported Proc constant, so there is no receiver to send `call` to; the port reads `DatabaseConfigurations.defaultEnv`, the value it returns. Same site as the `default_env` row in `activerecord/database-configurations.json`; porting it is filed as `converge-establish-connection-default-env-funnel`."
+  }
+]

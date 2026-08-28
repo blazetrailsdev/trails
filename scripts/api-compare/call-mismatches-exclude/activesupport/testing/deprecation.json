@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "testing/deprecation.ts",
+    "rubyName": "assert_deprecated",
+    "call": "escape",
+    "reason": "Ruby's `Regexp.escape` is a core-library call with no JS counterpart; each port spells the same escaping through a file-local helper (`regexpEscape`, `escapeRegExp`) or an inline character-class replace, so the call is made under a different name. Pre-existing divergence, newly VISIBLE to the gate: `escape` only entered the ported-call population when `ActiveSupport::FileUpdateChecker#escape` (file_update_checker.rb:146-148) was ported."
+  }
+]

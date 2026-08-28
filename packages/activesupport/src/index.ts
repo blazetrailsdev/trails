@@ -8,6 +8,7 @@ export {
   getPathAsync,
   fsAdapterConfig,
 } from "./fs-adapter.js";
+export { FileUpdateChecker } from "./file-update-checker.js";
 export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "./fs-adapter.js";
 
 export { trailsRoot, setTrailsRoot } from "./trails-root.js";
