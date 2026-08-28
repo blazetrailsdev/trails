@@ -13,6 +13,20 @@ interface QueryHost {
 }
 
 /**
+ * `ActiveRecord::AttributeMethods::Query` — the module `attribute_methods.rb:16`
+ * includes. Its instance methods are the `this`-typed functions below
+ * (CLAUDE.md, "Module mixins"), gathered here so the seat can take a real
+ * `include()` call.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Query (query.rb:6-46)
+ */
+export const Query = {
+  queryAttribute,
+  _queryAttribute,
+  queryCastAttribute,
+};
+
+/**
  * Query whether an attribute value is truthy.
  *
  * Calls the getter method by name (like Rails' public_send), so overridden
