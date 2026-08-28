@@ -57,17 +57,13 @@ export class AliasTracker {
     joins: any[],
     aliases?: Map<string, number>,
   ): AliasTracker {
-    const tal = pool?.tableAliasLength;
-    const tableAliasLength =
-      typeof tal === "function"
-        ? tal.call(pool)
-        : typeof tal === "number"
-          ? tal
-          : DEFAULT_TABLE_ALIAS_LENGTH;
+    const connection =
+      typeof pool?.tableAliasLength === "function" ? pool : (pool?.activeConnection ?? undefined);
+    const tableAliasLength = connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH;
 
     const map = aliases ? new Map(aliases) : new Map<string, number>();
     map.set(initialTable, 1);
-    return new AliasTracker(tableAliasLength, map, joins);
+    return new AliasTracker(tableAliasLength, map, joins, connection);
   }
 
   /** @missingRailsCall size — PERMANENT */
