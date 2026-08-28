@@ -134,14 +134,31 @@ export const extended = Symbol.for("@blazetrails/activesupport:extended");
  */
 const includedKeys = Symbol.for("@blazetrails/activesupport:includedKeys");
 
+/**
+ * The singleton-side twin of {@link includedKeys}: the static keys a previous
+ * `extend()` installed on a class.
+ *
+ * Ruby's `include SomeModule` puts `SomeModule::ClassMethods` on the includer's
+ * singleton ancestry BELOW the class body (concern.rb:135-138 — `base.extend
+ * const_get(:ClassMethods)`), so a `def self.x` written in the class body wins
+ * over the module's `x`, while a later `extend` wins over an earlier one.
+ */
+const extendedKeys = Symbol.for("@blazetrails/activesupport:extendedKeys");
+
+/**
+ * Per-prototype registry of the modules a prototype has been given by
+ * `include()` — the ancestry Ruby's `Module#<` asks about.
+ */
+const includedModules = Symbol.for("@blazetrails/activesupport:includedModules");
+
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
-function trackedKeys(proto: object): Set<string> {
-  let set = (proto as any)[includedKeys] as Set<string> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, includedKeys)) {
+function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string> {
+  let set = (proto as any)[registry] as Set<string> | undefined;
+  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
     // Own the set per prototype so subclasses don't share a parent's registry.
     set = new Set<string>();
-    Object.defineProperty(proto, includedKeys, {
+    Object.defineProperty(proto, registry, {
       value: set,
       writable: true,
       configurable: true,
@@ -149,6 +166,52 @@ function trackedKeys(proto: object): Set<string> {
     });
   }
   return set!;
+}
+
+/**
+ * Record `mod` in the prototype's own included-module registry, so
+ * {@link isModuleIncluded} can answer Ruby's `Module#<` for it.
+ */
+function trackIncludedModule(proto: object, mod: unknown): void {
+  let set = (proto as any)[includedModules] as Set<unknown> | undefined;
+  if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) {
+    set = new Set<unknown>();
+    Object.defineProperty(proto, includedModules, {
+      value: set,
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  }
+  set!.add(mod);
+}
+
+/**
+ * Ruby's `Module#<` — is `mod` in `klass`'s ancestry?
+ *
+ * `ActiveRecord::AttributeMethods::Dirty`'s `included do` block asks exactly
+ * this (`activerecord/lib/active_record/attribute_methods/dirty.rb:44-47`,
+ * `if self < ::ActiveRecord::Timestamp`), and there is no other way to ask it
+ * here: JavaScript keeps no ancestry record of a mixin, since `include()`
+ * copies a module's members onto the prototype rather than splicing a link for
+ * it. The registry `include()` keeps is that record.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby spells this `<`, an operator TypeScript
+ * cannot define; the predicate carries the same question at a callable name.
+ */
+export function isModuleIncluded(
+  klass: { prototype: object },
+  mod: ModuleObject | AnyClass | Module,
+): boolean {
+  for (
+    let proto: object | null = klass.prototype;
+    proto;
+    proto = Object.getPrototypeOf(proto) as object | null
+  ) {
+    if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) continue;
+    if (((proto as any)[includedModules] as Set<unknown>).has(mod)) return true;
+  }
+  return false;
 }
 
 /**
@@ -200,6 +263,7 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
 export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) return appendFeatures(klass);
+  trackIncludedModule(klass.prototype, mod);
   if (mod instanceof Module) {
     const proto = klass.prototype as object;
     const carrier = Object.create(Object.getPrototypeOf(proto)) as Record<string, unknown>;
@@ -342,6 +406,14 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  * object itself (not its prototype). When used on a class, this makes
  * the methods available as class-level (static) methods.
  *
+ * Precedence follows Ruby's singleton ancestry, the way `include()`'s does on
+ * the instance side: `include SomeModule` puts `SomeModule::ClassMethods`
+ * BELOW the class body (concern.rb:135-138), so a class-body `static` wins over
+ * the module's member of that name, while a later `extend()` wins over an
+ * earlier one. Accessor halves are resolved independently, since Ruby reads a
+ * getter (`key`) and a setter (`key=`) as two methods where TypeScript shares
+ * one property name between them.
+ *
  * Mirrors: Ruby's Object#extend (core language feature)
  *
  * Usage:
@@ -358,29 +430,47 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
   const keys = isClassModule
     ? Object.getOwnPropertyNames(mod).filter((k) => !STATIC_CLASS_KEYS.has(k))
     : Object.keys(mod);
+  const installed = trackedKeys(klass, extendedKeys);
 
   for (const key of keys) {
-    const descriptor = Object.getOwnPropertyDescriptor(mod, key);
-    if (!descriptor || /^[A-Z]/.test(key)) continue;
+    const modDesc = Object.getOwnPropertyDescriptor(mod, key);
+    if (!modDesc || /^[A-Z]/.test(key)) continue;
+    // Ruby's extend copies only methods — skip non-functions and constants.
+    if (!modDesc.get && !modDesc.set && typeof modDesc.value !== "function") continue;
+    const existing = Object.getOwnPropertyDescriptor(klass, key);
+    // Ruby names the two accessor halves `key` and `key=` and resolves each on
+    // its own, so each half is tracked under the name Ruby gives it.
+    const writer = `${key}=`;
+    const getterIsMixin = installed.has(key);
+    const setterIsMixin = installed.has(writer);
+    const modIsAccessor = modDesc.get != null || modDesc.set != null;
     // Copy accessors as accessors: reading `mod[key]` would invoke the getter
     // with the module as receiver instead of the extending class.
-    if (descriptor.get || descriptor.set) {
+    const descriptor: PropertyDescriptor = modIsAccessor
+      ? { get: modDesc.get, set: modDesc.set, configurable: true, enumerable: false }
+      : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
+    if (!existing) {
+      Object.defineProperty(klass, key, descriptor);
+      if (!modIsAccessor || modDesc.get != null) installed.add(key);
+      if (modDesc.set != null) installed.add(writer);
+      continue;
+    }
+    const existingIsAccessor = existing.get != null || existing.set != null;
+    if (modIsAccessor && existingIsAccessor) {
+      const takeGetter = modDesc.get != null && (existing.get == null || getterIsMixin);
+      const takeSetter = modDesc.set != null && (existing.set == null || setterIsMixin);
       Object.defineProperty(klass, key, {
-        get: descriptor.get,
-        set: descriptor.set,
+        get: takeGetter ? modDesc.get : existing.get,
+        set: takeSetter ? modDesc.set : existing.set,
         configurable: true,
         enumerable: false,
       });
-      continue;
+      if (takeGetter) installed.add(key);
+      if (takeSetter) installed.add(writer);
+    } else if (getterIsMixin && (!existingIsAccessor || existing.set == null || setterIsMixin)) {
+      Object.defineProperty(klass, key, descriptor);
+      if (modDesc.set != null) installed.add(writer);
     }
-    // Ruby's extend copies only methods — skip non-functions and constants.
-    if (typeof descriptor.value !== "function") continue;
-    Object.defineProperty(klass, key, {
-      value: descriptor.value,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
   }
 
   // Ruby's Module#extended(base) — fires after methods are copied

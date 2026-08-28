@@ -7,13 +7,25 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
-import { classAttribute, included } from "@blazetrails/activesupport";
+import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import type {
   AttributeMutationTracker,
   DirtyOptions,
   NullMutationTracker,
 } from "@blazetrails/activemodel";
+import * as Timestamp from "../timestamp.js";
+
+/**
+ * Mirror of Ruby's `RuntimeError` — the class dirty.rb:45's bare
+ * `raise "You cannot include Dirty after Timestamp"` builds.
+ */
+class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
+  }
+}
 
 interface DirtyRecord {
   mutationsFromDatabase: AttributeMutationTracker;
@@ -109,6 +121,7 @@ export function attributeInDatabase(record: DirtyRecord, attr: string): unknown 
  * already carries `ActiveModel::Dirty`, which dirty.rb:42 includes.
  */
 interface DirtyIncludeHost {
+  prototype: object;
   attributeMethodPrefix(...prefixes: Array<string | { parameters?: string | null | false }>): void;
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
   attributeMethodAffix(
@@ -137,8 +150,17 @@ export class Dirty {
    * distinction, so it goes in the pattern's own prefix and the derived
    * `${prefix}Attribute${suffix}` proxy target (attribute_methods.rb:481)
    * lands on `isSavedChangeToAttribute` unchanged.
+   *
+   * The opening guard is dirty.rb:44-47's `if self < ::ActiveRecord::Timestamp`
+   * — Timestamp's `_create_record` / `_update_record` wrappers must sit above
+   * Dirty's `changes_applied` links, so including Dirty second silently breaks
+   * dirty tracking on save and the raise makes that loud.
    */
   static [included](base: DirtyIncludeHost): void {
+    if (isModuleIncluded(base, Timestamp.InstanceMethods)) {
+      throw new RuntimeError("You cannot include Dirty after Timestamp");
+    }
+
     classAttribute.call(base, "partialUpdates", { instanceWriter: false, default: true });
     classAttribute.call(base, "partialInserts", { instanceWriter: false, default: true });
 

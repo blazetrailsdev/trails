@@ -1,4 +1,4 @@
-import { extend as extendModule } from "./include.js";
+import { extend as extendModule, extended } from "./include.js";
 
 export class MultipleIncludedBlocks extends Error {
   constructor() {
@@ -84,10 +84,20 @@ export namespace Concern {
         prependMethods(klass, def.instanceMethods);
       } else {
         // Concerns overwrite existing methods (TS has no MRO, so this is the
-        // only way to simulate Ruby's ancestor chain insertion). Use
-        // extendModule on the prototype — extend() always overwrites and
-        // fires the extended hook, matching the "methods added" semantic.
-        extendModule(klass.prototype, def.instanceMethods);
+        // only way to simulate Ruby's ancestor chain insertion). `extend()`
+        // honours Ruby's class-body-over-module precedence, so the copy is
+        // spelled out here rather than routed through it.
+        for (const [name, method] of Object.entries(def.instanceMethods)) {
+          Object.defineProperty(klass.prototype, name, {
+            value: method,
+            writable: true,
+            configurable: true,
+            enumerable: false,
+          });
+        }
+        if (typeof (def.instanceMethods as any)[extended] === "function") {
+          (def.instanceMethods as any)[extended](klass.prototype);
+        }
       }
     }
 
