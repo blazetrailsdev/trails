@@ -194,6 +194,7 @@ const JSON_INNER: InnerCoder = {
  * array" via `instanceof` and default to `{}` via `new`.
  *
  * @internal
+ * @noRailsEquivalent PERMANENT
  */
 export class HashObject {
   constructor() {
