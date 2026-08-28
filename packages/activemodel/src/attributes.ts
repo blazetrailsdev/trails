@@ -154,14 +154,7 @@ export class Attributes {
     base.attributeMethodSuffix("=", { parameters: "value" });
   }
 
-  _attributes: AttributeSet;
-
-  constructor(..._args: unknown[]) {
-    const ctor = this.constructor as { _defaultAttributes?(): AttributeSet };
-    this._attributes = ctor._defaultAttributes
-      ? ctor._defaultAttributes().deepDup()
-      : new AttributeSet();
-  }
+  declare _attributes: AttributeSet;
 
   attribute(attrName: string): unknown {
     return this._attributes.fetchValue(attrName) ?? null;
