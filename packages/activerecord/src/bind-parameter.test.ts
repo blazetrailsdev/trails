@@ -102,6 +102,16 @@ describe("BindParameterTest", () => {
     const sql = conn.toSql(arel);
     return typeof conn.sqlKey === "function" ? conn.sqlKey(sql) : sql;
   }
+  // cached_statement(klass, key) → bind_parameter_test.rb:266-271. Rails keys
+  // the find-by cache on the column-name array itself; cachedFindBy serializes
+  // that array (core.ts, `JSON.stringify(keys)`), so the key is serialized here
+  // too.
+  function cachedStatement(conn: any, klass: any, key: string[]): string {
+    const cache = klass.cachedFindByStatement(conn, JSON.stringify(key), () => {
+      throw new Error(`${klass.name} has no cached statement by ${JSON.stringify(key)}`);
+    });
+    return cache._queryBuilder._sql;
+  }
 
   it("statement cache", async (ctx) => {
     // Rails wraps the whole BindParameterTest in `if prepared_statements`
@@ -145,13 +155,8 @@ describe("BindParameterTest", () => {
     conn.clearCache();
 
     expect(Number((await Topic.find(1)).id)).toBe(1);
-    // Rails asserts the cached find statement is keyed into the connection pool;
-    // it reads that SQL back out with `cached_statement(Topic, [Topic.primary_key])`
-    // and then, at the end of the same test, re-derives the identical key from a
-    // relation's arel (`to_sql_key(replies.arel)`, bind_parameter_test.rb:72). Use
-    // the arel form for both, since it is the same key by construction.
-    const topics = Topic.where({ id: 1 }).limit(1);
-    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topics.arel()));
+    const topicSql = cachedStatement(conn, Topic, [Topic.primaryKey as string]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
     // Rails then runs `assert_raises(RecordNotFound) { SillyReply.find(2) }` and
     // asserts the *raising* model's statement is still cached — proving the
@@ -160,6 +165,9 @@ describe("BindParameterTest", () => {
     // canonical schema, so use Author (a distinct model/table this suite already
     // loads) to cover both invariants.
     await expect(Author.find(999999)).rejects.toBeInstanceOf(RecordNotFound);
+    const authorSql = cachedStatement(conn, Author, [Author.primaryKey as string]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
+
     const authors = Author.where({ id: 999999 }).limit(1);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authors.arel()));
   });
@@ -170,8 +178,8 @@ describe("BindParameterTest", () => {
     conn.clearCache();
 
     expect(Number((await Topic.findBy({ id: 1 }))!.id)).toBe(1);
-    const topics = Topic.where({ id: 1 }).limit(1);
-    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topics.arel()));
+    const topicSql = cachedStatement(conn, Topic, ["id"]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
     // Rails: `assert_raises(RecordNotFound) { SillyReply.find_by!(id: 2) }`, then
     // asserts the raising model's statement is still cached. SillyReply isn't in
@@ -179,6 +187,9 @@ describe("BindParameterTest", () => {
     // the RecordNotFound-still-cached and second-pool-entry invariants for
     // find_by! the same way the find test does for find.
     await expect(Author.findByBang({ id: 999999 })).rejects.toBeInstanceOf(RecordNotFound);
+    const authorSql = cachedStatement(conn, Author, ["id"]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
+
     const authors = Author.where({ id: 999999 }).limit(1);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authors.arel()));
   });
