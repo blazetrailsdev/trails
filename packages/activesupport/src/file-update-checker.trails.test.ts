@@ -61,9 +61,8 @@ describe("FileUpdateChecker", () => {
     expect(await checker.executeIfUpdated()).toBe(false);
     expect(calls).toBe(0);
 
-    // A bare write races `max_mtime`'s future-mtime skip (`:119`): the kernel's
-    // mtime clock can read a hair ahead of `Date.now()`, and such a file is
-    // ignored, so the offset keeps the new mtime newer than the old and past.
+    // A bare write races `max_mtime`'s future-mtime skip (`file_update_checker.rb:118-124`):
+    // a kernel mtime can read a hair ahead of `Date.now()` and be ignored.
     touch(file, -1);
 
     expect(await checker.executeIfUpdated()).toBe(true);
