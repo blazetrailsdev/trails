@@ -50,10 +50,7 @@ export class AliasTracker {
     this._connection = connection;
   }
 
-  /**
-   * @missingRailsCall initial_count_for — PERMANENT
-   * @missingRailsCall with_connection — PERMANENT
-   */
+  /** @missingRailsCall initial_count_for — PERMANENT */
   static create(
     pool: any,
     initialTable: string,

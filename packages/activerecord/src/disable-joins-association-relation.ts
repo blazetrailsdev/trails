@@ -126,18 +126,12 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   // Typed overloads keep `key`/`ids` correlated at the call site so
   // `new DJAR(..., "id", [[1, 2]])` (string key + tuple ids) or
   // `new DJAR(..., ["a", "b"], [1, 2])` (tuple key + scalar ids) are
-  // rejected at compile time. The broad `DjarKey`/`DjarIds` union stays off
-  // them. Runtime guards in the body still cover dynamic callers that erase
-  // through `unknown` / `any`.
+  // rejected at compile time. The broad `DjarKey`/`DjarIds` union, and the
+  // `TrustedClonePayload<T>` only `clone` can forge, stay on the third overload
+  // — reachable through `deferred` and `clone` alone. Runtime guards in the
+  // body still cover dynamic callers that erase through `unknown` / `any`.
   constructor(klass: typeof Base, key: string, ids: unknown[]);
   constructor(klass: typeof Base, key: string[], ids: unknown[][]);
-  // Rails' `initialize(klass, key, ids)` is the whole public shape
-  // (disable_joins_association_relation.rb:7), so the two overloads above carry
-  // exactly it. The deferred-chain walker and the fast-clone payload ride a
-  // fourth slot Rails has no counterpart for; it is reachable only through
-  // `deferred` and `clone` below, which is why it is declared here rather than
-  // beside the correlated public forms. External callers can't forge a trusted
-  // payload without a reference to the module-private symbol.
   constructor(
     klass: typeof Base,
     key: DjarKey,

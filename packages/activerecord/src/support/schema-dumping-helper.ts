@@ -19,7 +19,7 @@ export async function dumpTableSchema(pool: SchemaSource, ...tables: string[]): 
 
 export async function dumpAllTableSchema(
   ignoreTables: (string | RegExp)[] = [],
-  pool: SchemaSource = Base.connection as unknown as SchemaSource,
+  pool: Parameters<typeof SchemaDumper.dump>[0] = Base.connectionPool(),
 ): Promise<string> {
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;
