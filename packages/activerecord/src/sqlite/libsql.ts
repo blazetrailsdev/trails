@@ -1,10 +1,10 @@
 /**
  * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver
- * (`gem "sqlite3"`, sqlite3_adapter.rb:14) and the sqlite3 gem's C extension,
+ * (`gem "sqlite3"`, use-site:sqlite3_adapter.rb:14) and the sqlite3 gem's C extension,
  * not Rails, owns the handle protocol: `SQLite3Adapter` calls
- * `::SQLite3::Database.new` (sqlite3_adapter.rb:34-35) and then `prepare`,
+ * `::SQLite3::Database.new` (use-site:sqlite3_adapter.rb:34-35) and then `prepare`,
  * `close`, `closed?` on an object Rails does not define
- * (sqlite3_adapter.rb:98, 207, 224). trails has to write
+ * (use-site:sqlite3_adapter.rb:98, 207, 224). trails has to write
  * that layer in TS, so this file is the `libsql` npm client's binding — the
  * driver object literals and the connection/statement handles behind them —
  * and no name it declares has a Rails method to converge onto. Its sibling

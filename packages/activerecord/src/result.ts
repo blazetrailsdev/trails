@@ -127,7 +127,7 @@ export class Result {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/result.rb:37, :128`
+   * @noRailsEquivalent PERMANENT (`use-site:vendor/rails/activerecord/lib/active_record/result.rb:37, :128`
    *   — `include Enumerable` plus `def each`).
    * JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */

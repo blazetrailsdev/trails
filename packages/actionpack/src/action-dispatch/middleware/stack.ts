@@ -163,7 +163,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
 
   /**
    * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/actionpack/lib/action_dispatch/middleware/stack.rb:72, :81` — `include
+   *   (`use-site:vendor/rails/actionpack/lib/action_dispatch/middleware/stack.rb:72, :81` — `include
    *   Enumerable` plus `def each`).
    * JS iteration protocol — Ruby reaches iteration through Enumerable#each
    */

@@ -1180,7 +1180,7 @@ export class Relation<T extends Base> {
    * @missingRailsCall empty? — PERMANENT: Ruby's `!(references_values -
    *   joined_tables).empty?` is Array#- followed by Array#empty?; TS has
    *   neither, so the identical set difference is spelled `.some(ref =>
-   *   !joined.includes(ref))` (relation.rb:1488).
+   *   !joined.includes(ref))` (use-site:relation.rb:1488).
    */
   private referencesEagerLoadedTables(): boolean {
     // relation.rb:1475 `build_joins([])`. Rails' `build_joins` appends to the

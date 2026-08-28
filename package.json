@@ -31,6 +31,8 @@
     "parity:api:extra:gate": "pnpm tsx scripts/api-compare/lint-extra-surface-ratchet.ts",
     "parity:api:extra:tighten": "pnpm tsx scripts/api-compare/lint-extra-surface-ratchet.ts --tighten",
     "parity:api:reasons": "pnpm tsx scripts/api-compare/lint-missing-rails-call-reasons.ts",
+    "parity:api:cites": "pnpm tsx scripts/api-compare/lint-cites.ts",
+    "parity:api:cites:tighten": "pnpm tsx scripts/api-compare/lint-cites.ts --tighten",
     "parity:api:detached": "pnpm tsx scripts/api-compare/lint-detached-jsdoc-tags.ts",
     "parity:api:calls": "pnpm tsx scripts/api-compare/lint-call-mismatches.ts",
     "parity:api:calls:report": "pnpm tsx scripts/api-compare/lint-call-mismatches.ts --report",
