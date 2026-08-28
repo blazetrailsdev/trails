@@ -1,0 +1,37 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "association_valid?",
+    "call": "append",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "association_valid?",
+    "call": "order:add,any",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "nested_records_changed_for_autosave?",
+    "call": "wrap",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_belongs_to_association",
+    "call": "map",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_collection_association",
+    "call": "add",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  }
+]

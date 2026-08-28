@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  ownerRecordsNothing,
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
@@ -2916,5 +2917,60 @@ describe("suppressedCallClaims", () => {
       () => ["methodDefined"],
     );
     expect([...claimed]).toEqual([]);
+  });
+});
+
+describe("ownerRecordsNothing", () => {
+  // `dirty.ts` declares `forgetAttributeAssignments` twice: the top-level
+  // function that holds the body (owner "") and the `Dirty` interface member
+  // that types it for the host. Only the body records calls.
+  const mixinShape = new Map([
+    ["dirty.ts", new Map([["forgetAttributeAssignments", new Map([["", [["map"]]]])]])],
+  ]);
+  const owners = new Set(["", "Dirty"]);
+
+  it("compares a bodyless declaration against the file's one bodied owner", () => {
+    expect(
+      ownerRecordsNothing(mixinShape, "dirty.ts", "forgetAttributeAssignments", "Dirty", owners),
+    ).toBe(false);
+  });
+
+  it("records nothing when a sibling CLASS carries the file's only body", () => {
+    // `relation.ts` declares `first` on both `ExplainProxy` and `Relation`;
+    // neither body may stand in for the other, and a third bodyless declaration
+    // resolves to neither.
+    const ambiguous = new Map([
+      ["relation.ts", new Map([["first", new Map([["ExplainProxy", [["execExplain"]]]])]])],
+    ]);
+    expect(
+      ownerRecordsNothing(
+        ambiguous,
+        "relation.ts",
+        "first",
+        "Relation",
+        new Set(["ExplainProxy", "Relation"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("compares an owner that records its own body", () => {
+    expect(
+      ownerRecordsNothing(mixinShape, "dirty.ts", "forgetAttributeAssignments", "", owners),
+    ).toBe(false);
+  });
+
+  it("stays inert for a single-owner file and for an unresolved owner", () => {
+    expect(
+      ownerRecordsNothing(
+        mixinShape,
+        "dirty.ts",
+        "forgetAttributeAssignments",
+        "Dirty",
+        new Set([""]),
+      ),
+    ).toBe(false);
+    expect(
+      ownerRecordsNothing(mixinShape, "dirty.ts", "forgetAttributeAssignments", undefined, owners),
+    ).toBe(false);
   });
 });

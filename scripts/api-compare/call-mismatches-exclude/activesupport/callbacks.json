@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
+    "rubyName": "set_callback",
+    "call": "build",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
+    "rubyName": "set_callback",
+    "call": "normalize_callback_params",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  }
+]

@@ -1203,9 +1203,36 @@ export function tsOwnerSeat(
   return isStatic ? "class" : "instance";
 }
 
-/** True when a file declares `tsName` on several owners and the one this pair
- *  resolved to records nothing in `byFileNameOwner` — its own copy is the
- *  counterpart, so a same-named sibling's body must not stand in for it. */
+/**
+ * True when a file declares `tsName` on several owners and the one this pair
+ * resolved to has no body to compare AND some same-named sibling might wrongly
+ * stand in for it.
+ *
+ * The extractor records a call set for every member that HAS a body, empty
+ * bodies included (`extractCalls` returns `undefined` only for a missing body
+ * node — an interface member, an ambient `declare`, an abstract signature). So
+ * a missing entry means "this owner is a bodyless DECLARATION", never "this
+ * owner's body makes no calls".
+ *
+ * A bodyless declaration beside the body is the settled trails mixin shape
+ * (CLAUDE.md "Module mixins"): `export function forgetAttributeAssignments()`
+ * at top level, re-declared on `interface Dirty` so the host types it. The
+ * guard's original reading — "the resolved owner records nothing, so compare
+ * nothing" — dropped every such pair, 68 of them measured across the compared
+ * packages (`activemodel dirty.ts forget_attribute_assignments`,
+ * `activerecord relation.ts exec_explain`, `activesupport callbacks.ts
+ * run_callbacks`, …). None was visible to either call gate and none was
+ * represented by a baseline row.
+ *
+ * What the guard is actually for is the AMBIGUOUS case: `relation.ts` declares
+ * `first` on both `ExplainProxy` and `Relation`, and holding `FinderMethods#first`
+ * to the proxy's one-line body reports `find_nth` / `find_nth_with_limit`
+ * missing. A CLASS body is a sibling that can stand in wrongly like that, so
+ * several owners are not the test — the mixin shape is. The relaxation is
+ * therefore exactly it: the file's only recorded body is the TOP-LEVEL function
+ * (owner `""`), which is not any class's own copy but the one body every
+ * declaration in the file re-declares (RFC 0126).
+ */
 export function ownerRecordsNothing(
   byFileNameOwner: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<string, unknown[]>>>,
   tsFile: string,
@@ -1214,7 +1241,9 @@ export function ownerRecordsNothing(
   owners: ReadonlySet<string> | undefined,
 ): boolean {
   if (tsClass === undefined || (owners?.size ?? 0) <= 1) return false;
-  return byFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) === undefined;
+  const byOwner = byFileNameOwner.get(tsFile)?.get(tsName);
+  if (byOwner?.get(tsClass) !== undefined) return false;
+  return !(byOwner?.size === 1 && byOwner.has(""));
 }
 
 /**

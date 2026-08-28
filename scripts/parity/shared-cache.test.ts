@@ -10,6 +10,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  foreignAbsolutePath,
   sharedCacheDir,
   contentFingerprint,
   hashParts,
@@ -416,5 +417,40 @@ describe("resolutionShape", () => {
     writeDist(packagesDir, "activesupport", { "index.d.ts": "" });
     const shape = await resolutionShape(packagesDir);
     expect(shape.keyFor("arel")).toBe(shape.keyFor("activesupport"));
+  });
+});
+
+describe("foreignAbsolutePath", () => {
+  const root = "/mnt/theta/trails/worktrees/mine";
+
+  it("returns null for a worktree-independent payload", () => {
+    const body = JSON.stringify({
+      classes: { "base.ts:Base": { extends: ["Querying"], file: "base.ts" } },
+      inputs: { "packages/activerecord/src/base.ts": "abc" },
+    });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+
+  it("flags a path belonging to another worktree", () => {
+    const body = JSON.stringify({
+      classes: {
+        "base.ts:Base": {
+          extends: ['"/mnt/theta/trails/worktrees/other/packages/activerecord/src/querying"'],
+        },
+      },
+    });
+    expect(foreignAbsolutePath(body, root)).toBe(
+      "/mnt/theta/trails/worktrees/other/packages/activerecord/src/querying",
+    );
+  });
+
+  it("accepts an absolute path inside the invoking worktree", () => {
+    const body = JSON.stringify({ note: `${root}/packages/arel/src/crud.ts` });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+
+  it("ignores an absolute-looking token in prose", () => {
+    const body = JSON.stringify({ doc: "See //guides.rubyonrails.org/routing.html." });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
   });
 });

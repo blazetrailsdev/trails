@@ -57,6 +57,7 @@ import {
   contentFingerprint,
   readShared,
   writeShared,
+  foreignAbsolutePath,
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
@@ -204,6 +205,26 @@ if (!isMainThread && parentPort) {
 // when it loads, the `!isMainThread` guard at the top dispatches into
 // extractPackage and posts the result back.
 const WORKER_BOOTSTRAP = path.join(SCRIPT_DIR, "extract-ts-api-worker.mjs");
+
+/**
+ * The name to record on `host.extends` for an `include()`/`extend()` module
+ * argument.
+ *
+ * Following the import alias to the original symbol is deliberate — `import
+ * { Math as MathMixin }` must still record `Math`. But a NAMESPACE import
+ * (`import * as Querying from "./querying.js"`) aliases to the MODULE symbol,
+ * whose `name` is TypeScript's quoted absolute path for the module
+ * (`"/mnt/.../packages/activerecord/src/querying"`). That is not a name, it is
+ * a machine-local path: it never resolves in `tsByShort`, and — because the
+ * extracted manifest is published to the cross-worktree shared cache — it
+ * leaks one worktree's absolute paths into every sibling worktree's run
+ * (RFC 0126). The local binding is the name to use.
+ */
+export function extendsModuleName(sym: ts.Symbol | undefined, modArg: ts.Identifier): string {
+  const name = sym?.name;
+  if (name === undefined || name.startsWith('"') || name.startsWith("'")) return modArg.text;
+  return name;
+}
 
 /**
  * Record where an `include()`/`extend()` edge's module was declared, so a
@@ -380,7 +401,10 @@ export async function main() {
       const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
       const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey, depKey])}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
-      if (body) {
+      // A payload naming a path outside THIS worktree was produced somewhere
+      // else and is not worktree-independent; serving it replays another
+      // checkout's measurements (see foreignAbsolutePath). Treat it as a miss.
+      if (body && foreignAbsolutePath(body, ROOT_DIR) === null) {
         try {
           const cached = JSON.parse(body) as CacheEntry;
           if (cached.inputs && (await readSetMatches(cached.inputs, ROOT_DIR, inputHashes))) {
@@ -437,7 +461,12 @@ export async function main() {
           inputs: readSet,
           package: data,
         };
-        await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, JSON.stringify(shared), sharedTag);
+        const payload = JSON.stringify(shared);
+        // Never publish a payload carrying this worktree's absolute paths:
+        // every linked worktree reads these entries.
+        if (foreignAbsolutePath(payload, ROOT_DIR) === null) {
+          await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, payload, sharedTag);
+        }
       }
       return [p.pkg, data] as const;
     });
@@ -471,7 +500,21 @@ export async function main() {
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const outputPath = path.join(OUTPUT_DIR, "ts-api.json");
-  fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2));
+  const serialized = JSON.stringify(manifest, null, 2);
+  // A manifest naming a path outside this worktree describes a tree that is
+  // not the one being measured — the failure mode RFC 0126 was filed for,
+  // where a replayed extraction reported another branch's ratchet numbers
+  // with no error at all. Refuse the run rather than let a gate read it.
+  const foreign = foreignAbsolutePath(serialized, ROOT_DIR);
+  if (foreign !== null) {
+    throw new Error(
+      `extract-ts-api: refusing to write ${outputPath} — the extracted manifest names ` +
+        `${foreign}, which is outside this worktree (${ROOT_DIR}).\n` +
+        "Its measurements describe another checkout, so any gate verdict off it is " +
+        "meaningless. Re-run with API_COMPARE_FORCE=1 to discard cached extractions.",
+    );
+  }
+  fs.writeFileSync(outputPath, serialized);
   console.log(`Written to ${outputPath}`);
 }
 
@@ -1247,7 +1290,7 @@ export function extractFromProgram(
         }
 
         // (a): class / interface / module — push name for later resolution.
-        const modName = sym?.name ?? modArg.text;
+        const modName = extendsModuleName(sym, modArg);
         if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
         recordExtendsFile(hostInfo, modName, sym, srcDir);
       }
@@ -1363,7 +1406,7 @@ export function extractFromProgram(
           }
         }
 
-        const modName = sym?.name ?? modArg.text;
+        const modName = extendsModuleName(sym, modArg);
         if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
         recordExtendsFile(hostInfo, modName, sym, srcDir);
       }

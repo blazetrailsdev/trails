@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "attributes.ts",
+    "rubyName": "_default_attributes",
+    "call": "order:constructor,typeForColumn",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attributes.ts",
+    "rubyName": "_default_attributes",
+    "call": "with_connection",
+    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+  }
+]

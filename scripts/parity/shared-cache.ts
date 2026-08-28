@@ -364,6 +364,46 @@ function hashOf(file: string, cache?: Map<string, Promise<string | null>>): Prom
   return pending;
 }
 
+/**
+ * The first absolute filesystem path in `body` that lies OUTSIDE `rootDir`, or
+ * null when there is none.
+ *
+ * The shared cache is anchored at the git COMMON dir, so every linked worktree
+ * reads and writes the same entries. A payload is therefore only servable if it
+ * is worktree-INDEPENDENT. One that carries an absolute path is not: measured on
+ * PR #6964, `extract-ts-api.ts` recorded a namespace import's module symbol —
+ * whose TypeScript `name` is the quoted absolute path of the module — onto
+ * `ClassInfo.extends`, so a sibling worktree's run was served entries naming
+ * `/mnt/.../worktrees/<since-deleted>/packages/activerecord/src/querying`. The
+ * name resolved to nothing, whole mixins dropped out of the compared surface,
+ * and the ratchet reported another branch's numbers (1488 baselined vs this
+ * branch's true 417) with no error and no warning.
+ *
+ * `extendsModuleName` fixed that producer; this is the layer that keeps the
+ * class of bug from ever crossing a worktree boundary again — a poisoned entry
+ * is neither published nor served, so a replay cannot be mistaken for a verdict
+ * (RFC 0126).
+ */
+export function foreignAbsolutePath(body: string, rootDir: string): string | null {
+  const prefix = rootDir.endsWith(path.sep) ? rootDir : rootDir + path.sep;
+  const ABSOLUTE_PATH = /(?:^|[^A-Za-z0-9._@+:/\\-])(\/(?:[A-Za-z0-9._@+-]+\/)+[A-Za-z0-9._@+-]+)/g;
+  for (const match of body.matchAll(ABSOLUTE_PATH)) {
+    const candidate = match[1];
+    if (!SOURCE_PATH.test(candidate)) continue;
+    if (!candidate.startsWith(prefix)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * The shape a leaked path takes: a checkout path, which always names a
+ * `packages/` or `src/` segment or a module file. Prose in an extracted doc
+ * comment can spell an absolute-looking token too (`//guides.rubyonrails.org/
+ * routing.html`), and that is not a path — flagging it would refuse a run over
+ * a correct manifest.
+ */
+const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
+
 function entryPath(dir: string, name: string, key: string): string {
   return path.join(dir, `${name}-${key}.json`);
 }
