@@ -27,13 +27,7 @@ export {
   ForcedMutationTracker,
   NullMutationTracker,
 } from "./attribute-mutation-tracker.js";
-export {
-  AttributeRegistration,
-  applyPendingAttributeModifications,
-  PendingDefault,
-  PendingType,
-  resetDefaultAttributes,
-} from "./attribute-registration.js";
+export { AttributeRegistration, PendingDefault, PendingType } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
 export type {
   AttributeOptions,

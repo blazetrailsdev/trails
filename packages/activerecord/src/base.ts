@@ -4667,6 +4667,9 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
+// attribute_methods.rb:13 — `include Read`. Its members reach `Base` through
+// the prototype object literal below rather than an `include()` call, so this
+// is the seat the ordering leaves for it.
 // attribute_methods.rb:14 — `include Write`, whose `included do` block declares
 // the `=` writer pattern (write.rb:9-11). `ActiveModel::Model` does NOT carry it
 // (model.rb:42-45), so this include is where `Base` gets it, ahead of the
@@ -4676,6 +4679,19 @@ include(Base, _Write);
 // `included do` patterns (before_type_cast.rb:32-33) precede both halves of
 // Dirty's in `attributeMethodPatterns`.
 include(Base, _BeforeTypeCast);
+// attribute_methods.rb:16 — `include Query`. Its members reach `Base` through
+// the prototype object literal below rather than an `include()` call, so this
+// is the seat the ordering leaves for it.
+// attribute_methods.rb:17 — `include PrimaryKey`, ahead of TimeZoneConversion
+// and Dirty.
+include(Base, _PrimaryKey);
+// Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
+// Array (primary_key.rb:132); each of its bodies opens with the
+// `composite_primary_key?` guard, so mixing it in once above PrimaryKey is the
+// same behaviour for a scalar-keyed model.
+include(Base, _CompositePrimaryKey);
+// attribute_methods.rb:18 — `include TimeZoneConversion`, whose members reach
+// `Base` by other routes; it holds this seat in the ordering.
 // `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
 // `ActiveRecord::AttributeMethods::Dirty` builds on, and which
 // `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
@@ -4688,12 +4704,6 @@ include(Base, AMDirty);
 // The accessor-property half of AttributeMethods::Dirty. A class module, so
 // `include()` copies the getter descriptors rather than flattening them.
 include(Base, _Dirty);
-include(Base, _PrimaryKey);
-// Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
-// Array (primary_key.rb:132); each of its bodies opens with the
-// `composite_primary_key?` guard, so mixing it in once above PrimaryKey is the
-// same behaviour for a scalar-keyed model.
-include(Base, _CompositePrimaryKey);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
