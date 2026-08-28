@@ -81,6 +81,22 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     expect(store.lookup(1231)).toBeInstanceOf(OidArray);
   });
 
+  it("aliases each type's format_type spelling onto its OID", () => {
+    const store = new HashLookupTypeMap();
+    store.registerType("int4", integerSubtype);
+    store.registerType("varchar", integerSubtype);
+
+    new TypeMapInitializer(store).run([
+      row({ oid: 23, typname: "int4", formatType: "integer" }),
+      row({ oid: 1043, typname: "varchar", formatType: "character varying" }),
+      row({ oid: 25, typname: "text", formatType: "text" }),
+    ]);
+
+    expect(store.lookup("integer")).toBe(integerSubtype);
+    expect(store.lookup("character varying")).toBe(integerSubtype);
+    expect(store.isKey("text")).toBe(false);
+  });
+
   it("builds query condition fragments", () => {
     const store = new HashLookupTypeMap();
     store.registerType("int4", integerSubtype);

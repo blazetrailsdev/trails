@@ -135,7 +135,7 @@ export function castBoundValue(value: unknown): unknown {
 
 export interface QuotingHost {
   /** @internal */
-  lookupCastType(sqlType: string | null): unknown;
+  lookupCastType(sqlType: string | number | null): unknown;
 }
 
 export function lookupCastTypeFromColumn(
@@ -161,14 +161,11 @@ export function quoteDefaultExpression(
   this: QuotingDispatchHost & QuotingHost,
   value: unknown,
   column: { sqlType?: string | null },
-): string | Promise<string> {
+): string {
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
   }
-  const castType = this.lookupCastType(column.sqlType ?? null) as Type | Promise<Type>;
-  if (castType instanceof Promise) {
-    return castType.then((type) => this.quote(type.serialize(value)));
-  }
+  const castType = this.lookupCastType(column.sqlType ?? null) as Type;
   return this.quote(castType.serialize(value));
 }
 
@@ -298,8 +295,8 @@ function typeCastedBinds(
 }
 
 /** @internal */
-export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | null): Type {
-  return this.typeMap.lookup(sqlType);
+export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | number | null): Type {
+  return this.typeMap.lookup(sqlType as string | null);
 }
 
 /** @internal */
@@ -314,7 +311,7 @@ export interface Quoting {
 
   quoteTableNameForAssignment(table: string, attr: string): string;
 
-  quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string>;
+  quoteDefaultExpression(value: unknown, column: unknown): string;
 
   quotedTrue(): string;
 

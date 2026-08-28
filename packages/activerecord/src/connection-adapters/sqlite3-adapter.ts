@@ -649,7 +649,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteQuoteTableNameForAssignment(table, attr);
   }
 
-  override quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
+  override quoteDefaultExpression(value: unknown, column: unknown): string {
     if (typeof value === "function") {
       const result = (value as () => unknown)() as string;
       return /^\w+\(.*\)$/.test(result) ? `(${result})` : result;
@@ -723,7 +723,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
-    const castType = this.lookupCastType(raw) as import("@blazetrails/activemodel").Type;
+    const castType = this.lookupCastType(raw);
     return new SqlTypeMetadata({
       sqlType: raw,
       type: castType.type(),

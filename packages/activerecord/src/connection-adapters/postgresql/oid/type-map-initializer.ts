@@ -9,6 +9,7 @@ import { Vector } from "./vector.js";
 export interface PgTypeRow {
   oid: number | string;
   typname: string;
+  formatType?: string | null;
   typelem: number | string;
   typdelim: string;
   typtype: string;
@@ -40,6 +41,8 @@ export class TypeMapInitializer {
     arrays.forEach((row) => this.registerArrayType(row));
     ranges.forEach((row) => this.registerRangeType(row));
     composites.forEach((row) => this.registerCompositeType(row));
+
+    records.forEach((row) => this.registerSqlTypeName(row));
   }
 
   runInitializer(records: PgTypeRow[]): void {
@@ -59,6 +62,14 @@ export class TypeMapInitializer {
     const knownTypeOids = this.store.keys().filter((key) => typeof key !== "string");
     if (knownTypeOids.length === 0) return "WHERE\n  1=0\n";
     return `WHERE\n  t.typelem IN (${knownTypeOids.join(", ")})\n`;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  private registerSqlTypeName(row: PgTypeRow): void {
+    const name = row.formatType;
+    const oid = toInt(row.oid);
+    if (name == null || this.store.isKey(name) || !this.store.isKey(oid)) return;
+    this.store.aliasType(name, oid);
   }
 
   private registerMappedType(row: PgTypeRow): void {

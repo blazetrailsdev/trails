@@ -718,6 +718,7 @@ export class PostgreSQLAdapter
   ): AsyncGenerator<string, void, void> {
     const baseQuery = [
       "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput,",
+      '       format_type(t.oid, NULL) AS "formatType",',
       "       r.rngsubtype, t.typtype, t.typbasetype",
       "FROM pg_type as t",
       "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
@@ -1845,12 +1846,17 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  async lookupCastType(sqlType: string | null): Promise<Type> {
-    const oid = await this.queryValue(`SELECT ${this.quote(sqlType)}::regtype::oid`, "SCHEMA");
-    return this.typeMap.lookup(Number(oid));
+  override lookupCastType(sqlType: string | number | null): Type {
+    if (typeof sqlType === "string") {
+      sqlType = sqlType
+        .replace(/\([^)]*\)/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    return super.lookupCastType(sqlType);
   }
 
-  override quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
+  override quoteDefaultExpression(value: unknown, column: unknown): string {
     return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn);
   }
 

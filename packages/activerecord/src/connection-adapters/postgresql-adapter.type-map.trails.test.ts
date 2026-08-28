@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
-import { Result } from "../result.js";
 
 describe("PostgreSQLAdapter#typeMap", () => {
   let adapter: PostgreSQLAdapter;
@@ -85,25 +84,43 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
     await adapter.close().catch(() => undefined);
   });
 
-  function stubRegtypeLookup(): void {
+  function warmIntegerArrayType(): void {
     adapter.typeMap.registerType(1007, new OidArray(new IntegerType()) as never);
-    vi.spyOn(adapter, "internalExecQuery").mockResolvedValue(Result.fromRowHashes([{ oid: 1007 }]));
+    adapter.typeMap.aliasType("integer[]", 1007);
   }
 
+  it("resolves a bare sqlType off the warmed type map instead of querying regtype", () => {
+    adapter.typeMap.registerType(23, new IntegerType());
+    adapter.typeMap.aliasType("integer", 23);
+    const execQuery = vi.spyOn(adapter, "internalExecQuery");
+
+    expect(adapter.quoteDefaultExpression(42.7, { sqlType: "integer" })).toBe("42");
+    expect(execQuery).not.toHaveBeenCalled();
+  });
+
+  it("strips the type modifier regtype ignores", () => {
+    adapter.typeMap.registerType(1043, new StringType());
+    adapter.typeMap.aliasType("character varying", 1043);
+
+    expect(adapter.quoteDefaultExpression("hi", { sqlType: "character varying(255)" })).toBe(
+      "'hi'",
+    );
+  });
+
   it("reads `array` from ColumnDefinition.options for DDL paths", async () => {
-    stubRegtypeLookup();
+    warmIntegerArrayType();
     const columnDef = { sqlType: "integer[]", options: { array: true } };
     expect(await adapter.quoteDefaultExpression([1, 2, 3], columnDef)).toBe("'{1,2,3}'");
   });
 
   it("reads `array` from a live Column instance", async () => {
-    stubRegtypeLookup();
+    warmIntegerArrayType();
     const column = { oid: 1007, fmod: -1, sqlType: "integer[]", array: true };
     expect(await adapter.quoteDefaultExpression([4, 5, 6], column)).toBe("'{4,5,6}'");
   });
 
   it("normalizes `integer[]` sqlType so the integer subtype resolves", async () => {
-    stubRegtypeLookup();
+    warmIntegerArrayType();
     const columnDef = { sqlType: "integer[]", options: { array: true } };
     expect(await adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe("'{1,2}'");
   });
