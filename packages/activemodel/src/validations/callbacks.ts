@@ -6,10 +6,9 @@ import {
   included,
 } from "@blazetrails/activesupport";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
-import type { Model } from "../model.js";
 
 export const ClassMethods = {
-  beforeValidation<T extends typeof Model>(
+  beforeValidation<T extends ValidationCallbacksHost>(
     this: T,
     fn: ValidationCallbackFilter<T>,
     options: ValidationCallbackOptions = {},
@@ -19,7 +18,7 @@ export const ClassMethods = {
     this.setCallback("validation", "before", fn, options as CallbackConditions);
   },
 
-  afterValidation<T extends typeof Model>(
+  afterValidation<T extends ValidationCallbacksHost>(
     this: T,
     fn: ValidationCallbackFilter<T>,
     options: ValidationCallbackOptions = {},
@@ -33,8 +32,15 @@ export const ClassMethods = {
   },
 };
 
-export type ValidationCallbackFilter<T extends typeof Model> =
-  | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+/** @internal */
+export interface ValidationCallbacksHost {
+  prototype: object;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors ASCallbacks.ClassMethods#setCallback's filter splat.
+  setCallback(name: string, ...filterList: any[]): void;
+}
+
+export type ValidationCallbackFilter<T extends ValidationCallbacksHost> =
+  | ((record: T["prototype"]) => void | boolean | Promise<void | boolean>)
   | CallbackObject
   | string;
 

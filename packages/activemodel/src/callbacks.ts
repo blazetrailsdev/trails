@@ -20,8 +20,8 @@ type AnyClass = new (...args: never[]) => object;
 
 export class Callbacks {
   static [extended](base: AnyClass): void {
-    extend(base, ASCallbacks.ClassMethods);
     include(base, ASCallbacks.InstanceMethods);
+    extend(base, ASCallbacks.ClassMethods);
   }
 
   static defineModelCallbacks = defineModelCallbacks;

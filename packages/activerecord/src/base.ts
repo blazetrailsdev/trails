@@ -109,6 +109,7 @@ import {
   defineAttribute as _defineAttribute,
   _defaultAttributes as _arDefaultAttributes,
   resolveTypeName as _resolveTypeName,
+  resetDefaultAttributes as _resetDefaultAttributes,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
@@ -183,6 +184,7 @@ import {
   type PrependMethod,
   singularize as _singularize,
   type Included,
+  type Extended,
   type ParameterFilter,
   peekCallbackChain,
   runCallbacks,
@@ -829,8 +831,12 @@ export class Base extends Model {
   declare static includeRootInJson: boolean | string;
 
   /** `include ActiveModel::Validations::Callbacks` (callbacks.rb:413). */
-  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
+  declare static beforeValidation: Extended<
+    typeof ValidationsCallbacks.ClassMethods
+  >["beforeValidation"];
+  declare static afterValidation: Extended<
+    typeof ValidationsCallbacks.ClassMethods
+  >["afterValidation"];
 
   // --- Translation mixin (wired via extend() after class) ---
   // Normalization
@@ -1512,6 +1518,8 @@ export class Base extends Model {
   declare static _defaultAttributes: typeof _arDefaultAttributes;
   /** @internal */
   declare static resolveTypeName: typeof _resolveTypeName;
+  /** @internal */
+  declare static resetDefaultAttributes: typeof _resetDefaultAttributes;
 
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   declare static columnNames: typeof ModelSchema.columnNames;
@@ -4552,6 +4560,9 @@ extend(Base, {
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
   _defaultAttributes: _arDefaultAttributes,
   resolveTypeName: _resolveTypeName,
+  // attributes.rb:293-295 — ActiveRecord's override of
+  // AttributeRegistration::ClassMethods#reset_default_attributes.
+  resetDefaultAttributes: _resetDefaultAttributes,
 });
 // AttributeMethods class method — gates association/attribute names that would
 // clash with an Active Record instance method (Rails: dangerous_attribute_method?).
