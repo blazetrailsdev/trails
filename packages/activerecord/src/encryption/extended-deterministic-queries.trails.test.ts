@@ -34,7 +34,7 @@ const PREVIOUS_KEY = Buffer.alloc(32, "y").toString("base64");
  * EncryptedAttributeType, or the expansion ciphertext diverges from the
  * write path and the lookup silently misses.
  */
-function buildSerializedBook({ previousSchemes = false, coder = "json" } = {}) {
+function buildSerializedBook({ previousSchemes = false, coder = JSON as unknown } = {}) {
   class EncryptedSerializedBook extends Base {
     static {
       this._tableName = "books";

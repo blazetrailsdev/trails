@@ -287,7 +287,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     // Rails: Class.new(klass) { serialize :payload, coder: JSON }
     class NewKlass extends klass() {}
     // Rails: `coder: JSON` — trails names the same built-in coder `"json"`.
-    NewKlass.serialize("payload", { coder: "json" });
+    NewKlass.serialize("payload", { coder: JSON });
     expect(() => new NewKlass()).toThrow(ColumnNotSerializableError);
   });
 

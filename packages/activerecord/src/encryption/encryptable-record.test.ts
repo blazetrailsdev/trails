@@ -408,8 +408,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
         this.encrypts("state"); // declared BEFORE the serialized type
-        this.serialize("state", { type: "Array" });
-        this.serialize("long_state", { type: "Array" });
+        this.serialize("state", { type: Array });
+        this.serialize("long_state", { type: Array });
       }
     } as any;
     new EncryptedFirstTrafficLight();
