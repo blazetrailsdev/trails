@@ -4656,9 +4656,10 @@ include(Base, _Write);
 // `included do` patterns (before_type_cast.rb:32-33) precede both halves of
 // Dirty's in `attributeMethodPatterns`.
 include(Base, _BeforeTypeCast);
-// attribute_methods.rb:16 — `include Query`. The module's `included do` block
-// (query.rb:9-11) declares the `?` suffix pattern; trails does not register it
-// yet — see the `register-the-query-suffix-pattern-at-its-included-do` story.
+// attribute_methods.rb:16 — `include Query`, whose `included do` block
+// (query.rb:9-11) declares the `?` pattern. It lands after BeforeTypeCast's
+// suffixes and before PrimaryKey's, which is the order Rails builds
+// `attributeMethodPatterns` in.
 include(Base, _Query);
 // attribute_methods.rb:17 — `include PrimaryKey`, ahead of TimeZoneConversion
 // and Dirty.

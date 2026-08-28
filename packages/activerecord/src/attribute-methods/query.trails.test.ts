@@ -102,4 +102,18 @@ describe("QueryTest", () => {
     expect(p.queryAttribute("views")).toBe(true);
     expect(p._queryAttribute("views")).toBe(false);
   });
+  it("the ? suffix pattern generates a reader proxying to attribute?", () => {
+    class Post extends Base {
+      static {
+        this.attribute("published", "boolean");
+      }
+    }
+    Post.defineAttributeMethods();
+    const p = new Post({}) as Post & Record<string, unknown>;
+    expect(p["published?"]).toBe(false);
+    p.published = true;
+    expect(p["published?"]).toBe(true);
+    p.published = false;
+    expect(p["published?"]).toBe(false);
+  });
 });

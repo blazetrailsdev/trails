@@ -4,8 +4,13 @@
  * Mirrors: ActiveRecord::AttributeMethods::Query
  */
 
-import { isBlank } from "@blazetrails/activesupport";
+import { included, isBlank } from "@blazetrails/activesupport";
 import { BooleanType, type Type } from "@blazetrails/activemodel";
+
+/** The host `include ActiveRecord::AttributeMethods::Query` needs. */
+interface QueryIncludeHost {
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+}
 
 interface QueryHost {
   _readAttribute(name: string): unknown;
@@ -15,14 +20,21 @@ interface QueryHost {
 /**
  * `ActiveRecord::AttributeMethods::Query` — the module `attribute_methods.rb:16`
  * includes. Its instance methods are the `this`-typed functions below
- * (CLAUDE.md, "Module mixins"), gathered here so the seat can take a real
- * `include()` call.
+ * (CLAUDE.md, "Module mixins"), so the module object carries them plus its
+ * `included do` block (query.rb:9-11), which declares the `?` suffix pattern.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Query (query.rb:6-48)
  */
 export const Query = {
+  [included](base: QueryIncludeHost): void {
+    base.attributeMethodSuffix("?", { parameters: false });
+  },
   queryAttribute,
   _queryAttribute,
+  // query.rb:25 — `alias :attribute? :query_attribute`. The `?` pattern the
+  // hook above declares proxies to this name, the way the `=` pattern proxies
+  // to Write's `attribute=` (write.rb:45).
+  "attribute?": queryAttribute,
   queryCastAttribute,
 };
 
