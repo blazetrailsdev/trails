@@ -63,6 +63,20 @@ describe("cites", () => {
     ]);
   });
 
+  it("parses a `, :35` continuation as a further citation in the same file", () => {
+    expect(parseCites("use-site:routes.rb:10, :35, :40-42")).toEqual([
+      {
+        raw: "use-site:routes.rb:10",
+        file: "routes.rb",
+        startLine: 10,
+        endLine: 10,
+        useSite: true,
+      },
+      { raw: "routes.rb:35", file: "routes.rb", startLine: 35, endLine: 35, useSite: true },
+      { raw: "routes.rb:40-42", file: "routes.rb", startLine: 40, endLine: 42, useSite: true },
+    ]);
+  });
+
   it("reads the Ruby method a reason names, operators included", () => {
     expect(namedMethods("`AssociationReflection#klass` and `Arel::Nodes::Node#==`")).toEqual([
       "klass",

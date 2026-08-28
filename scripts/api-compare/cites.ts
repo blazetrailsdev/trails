@@ -74,6 +74,10 @@ export interface RubyMethodSpan {
 }
 
 const CITE_RE = /(use-site:)?([\w./-]+\.rb):(\d+)(?:-(\d+))?/g;
+/** A `, :35` riding behind a citation: a further line in the SAME file, the
+ *  shape a receipt naming two sites in one `.rb` is written in
+ *  (`routes.rb:10, :35`). Each one is checked like a citation of its own. */
+const CONTINUATION_RE = /^\s*,\s*:(\d+)(?:-(\d+))?/;
 /** `Klass#meth` / `Klass.meth`, the two spellings a reason names a method in.
  *  The method half takes operators too, so `Arel::Nodes::Node#==` parses. */
 const NAMED_METHOD_RE = /\b[A-Z]\w*(?:::\w+)*[#.]([a-z_][\w]*[?!=]?|[^\s`,)]+)/g;
@@ -83,13 +87,26 @@ export function parseCites(reason: string): Cite[] {
   const out: Cite[] = [];
   for (const m of reason.matchAll(CITE_RE)) {
     const startLine = Number(m[3]);
+    const useSite = m[1] !== undefined;
     out.push({
       raw: m[0],
       file: m[2],
       startLine,
       endLine: m[4] === undefined ? startLine : Number(m[4]),
-      useSite: m[1] !== undefined,
+      useSite,
     });
+    let rest = reason.slice((m.index ?? 0) + m[0].length);
+    for (let c = CONTINUATION_RE.exec(rest); c !== null; c = CONTINUATION_RE.exec(rest)) {
+      const line = Number(c[1]);
+      out.push({
+        raw: `${m[2]}:${c[1]}${c[2] === undefined ? "" : `-${c[2]}`}`,
+        file: m[2],
+        startLine: line,
+        endLine: c[2] === undefined ? line : Number(c[2]),
+        useSite,
+      });
+      rest = rest.slice(c[0].length);
+    }
   }
   return out;
 }
@@ -103,7 +120,9 @@ export function namedMethods(reason: string): string[] {
  * Every `def` in a Ruby source, with the span it covers. The end is the `end`
  * at the `def`'s own indentation — the same rule MRI's own indentation
  * conventions make readable, and enough to answer "is line N inside this
- * method". A `def` never closed at its indentation runs to EOF.
+ * method". A `def` never closed at its indentation runs to EOF, and a one-line
+ * `def name; @name; end` closes on its own line, where the start-anchored `end`
+ * match cannot see it.
  */
 export function rubyMethodSpans(text: string): RubyMethodSpan[] {
   const lines = text.split("\n");
@@ -113,8 +132,6 @@ export function rubyMethodSpans(text: string): RubyMethodSpan[] {
     const line = lines[i];
     const def = /^(\s*)def\s+(?:self\.)?(\S+?)(?:\(|;|\s|$)/.exec(line);
     if (def) {
-      // `def name; @name; end` closes on its own line, where the `end` regex
-      // below — anchored at the start of a line — cannot see it.
       if (/;\s*end\s*$/.test(line)) out.push({ name: def[2], startLine: i + 1, endLine: i + 1 });
       else open.push({ name: def[2], indent: def[1].length, startLine: i + 1 });
       continue;
