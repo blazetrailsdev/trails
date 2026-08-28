@@ -1558,15 +1558,21 @@ export class Table {
     return this._schema.removeCheckConstraint(this.name, opts);
   }
 
+  async checkConstraintExists(...args: []): Promise<boolean>;
   async checkConstraintExists(
-    args?: { name?: string; expression?: string },
-    options: { name?: string; expression?: string } = {},
-  ): Promise<boolean> {
-    const opts = { ...args, ...options };
-    if (Object.keys(opts).length === 0) {
-      return this._schema.checkConstraintExists(this.name);
+    ...args: [...unknown[], { name?: string; expression?: string }]
+  ): Promise<boolean>;
+  async checkConstraintExists(...args: unknown[]): Promise<boolean> {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
+      name?: string;
+      expression?: string;
+    };
+    if (Object.keys(options).length === 0) {
+      return this._schema.checkConstraintExists(this.name, ...(rest as []));
     }
-    return this._schema.checkConstraintExists(this.name, opts);
+    return this._schema.checkConstraintExists(this.name, ...(rest as []), options);
   }
 
   async primaryKey(

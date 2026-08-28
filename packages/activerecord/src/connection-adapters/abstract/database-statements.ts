@@ -69,7 +69,7 @@ export interface DatabaseStatementsHost {
     name: string | null | undefined,
     binds: unknown[],
     typeCastedBinds: unknown[],
-    isAsync: boolean,
+    async: boolean,
     block: (payload: Record<string, unknown>) => Promise<T>,
   ): Promise<T>;
   execute?(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
