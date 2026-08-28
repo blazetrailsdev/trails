@@ -97,30 +97,20 @@ describe("BindParameterTest", () => {
     // Rails' `@statements` (abstract_adapter.rb:156), on every adapter.
     return conn._statements.keys;
   }
-  // Deliberate deviation from Rails' `to_sql_key` (bind_parameter_test.rb:261):
-  // instead of recompiling the arel, we capture the SQL the connection actually
-  // executes — and therefore keys its pool by — from the `sql.active_record`
-  // payload, then run it through `sql_key`. That is exactly the string the pool
-  // stores (SQLite keys by the raw SQL, PG prefixes the schema search path), so
-  // `assert_includes`/`assert_not_includes` observe the real invariant Rails
-  // asserts: preparable SELECTs (find/find_by/where on a scalar — placeholder
-  // SQL + binds) populate the pool, while inlined queries (IN-clause arrays, SQL
-  // string literals — no binds) do not. Tracked by
-  // `bind-parameter-to-sql-key-converge`.
-  // `stop()` freezes the capture before each test's assertions; the suite-level
-  // `afterEach(() => Notifications.unsubscribeAll())` above is the teardown safety
-  // net, so a query that throws before `stop()` can't leak this subscriber into
-  // later tests.
-  function captureSelectSql(table = "topics"): { sqls: string[]; stop: () => void } {
-    const sqls: string[] = [];
-    const tableRe = new RegExp(`\\b${table}\\b`);
-    const isTableSelect = (sql: unknown): sql is string =>
-      typeof sql === "string" && /^\s*SELECT\b/i.test(sql) && tableRe.test(sql);
-    const sub = Notifications.subscribe("sql.active_record", (e: Event) => {
-      const sql = e.payload.sql;
-      if (isTableSelect(sql)) sqls.push(sql);
+  // to_sql_key(arel) → bind_parameter_test.rb:261-264.
+  function toSqlKey(conn: any, arel: unknown): string {
+    const sql = conn.toSql(arel);
+    return typeof conn.sqlKey === "function" ? conn.sqlKey(sql) : sql;
+  }
+  // cached_statement(klass, key) → bind_parameter_test.rb:266-271. Rails keys
+  // the find-by cache on the column-name array itself; cachedFindBy serializes
+  // that array (core.ts, `JSON.stringify(keys)`), so the key is serialized here
+  // too.
+  function cachedStatement(conn: any, klass: any, key: string[]): string {
+    const cache = klass.cachedFindByStatement(conn, JSON.stringify(key), () => {
+      throw new Error(`${klass.name} has no cached statement by ${JSON.stringify(key)}`);
     });
-    return { sqls, stop: () => Notifications.unsubscribe(sub) };
+    return cache._queryBuilder._sql;
   }
 
   it("statement cache", async (ctx) => {
@@ -132,12 +122,10 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql();
     const topics = Topic.where({ id: 1 });
     expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
-    cap.stop();
 
-    const key = conn.sqlKey(cap.sqls.at(-1));
+    const key = toSqlKey(conn, topics.arel());
     expect(statementCacheKeys(conn)).toContain(key);
 
     // Rails' second half (bind_parameter_test.rb): a fresh `clear_cache!` evicts
@@ -152,12 +140,10 @@ describe("BindParameterTest", () => {
     conn.enableQueryCacheBang();
     conn.clearCache();
     try {
-      const cap = captureSelectSql();
       const topics = Topic.where({ id: 1 });
       expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
-      cap.stop();
 
-      expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
+      expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topics.arel()));
     } finally {
       conn.disableQueryCacheBang();
     }
@@ -168,12 +154,9 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql("topics");
     expect(Number((await Topic.find(1)).id)).toBe(1);
-    cap.stop();
-    // Rails asserts the cached find statement is keyed into the connection pool.
-    const topicSql = cap.sqls.find((s) => /LIMIT/.test(s))!;
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
+    const topicSql = cachedStatement(conn, Topic, [Topic.primaryKey as string]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
     // Rails then runs `assert_raises(RecordNotFound) { SillyReply.find(2) }` and
     // asserts the *raising* model's statement is still cached — proving the
@@ -181,11 +164,12 @@ describe("BindParameterTest", () => {
     // a second, distinct model gets its own pool entry. SillyReply isn't in the
     // canonical schema, so use Author (a distinct model/table this suite already
     // loads) to cover both invariants.
-    const authorCap = captureSelectSql("authors");
     await expect(Author.find(999999)).rejects.toBeInstanceOf(RecordNotFound);
-    authorCap.stop();
-    const authorSql = authorCap.sqls.find((s) => /LIMIT/.test(s))!;
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(authorSql));
+    const authorSql = cachedStatement(conn, Author, [Author.primaryKey as string]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
+
+    const authors = Author.where({ id: 999999 }).limit(1);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authors.arel()));
   });
 
   it("statement cache with find by", async (ctx) => {
@@ -193,22 +177,21 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql("topics");
     expect(Number((await Topic.findBy({ id: 1 }))!.id)).toBe(1);
-    cap.stop();
-    const topicSql = cap.sqls.find((s) => /LIMIT/.test(s))!;
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
+    const topicSql = cachedStatement(conn, Topic, ["id"]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
     // Rails: `assert_raises(RecordNotFound) { SillyReply.find_by!(id: 2) }`, then
     // asserts the raising model's statement is still cached. SillyReply isn't in
     // the canonical schema, so use Author (a distinct loaded model) to cover both
     // the RecordNotFound-still-cached and second-pool-entry invariants for
     // find_by! the same way the find test does for find.
-    const authorCap = captureSelectSql("authors");
     await expect(Author.findByBang({ id: 999999 })).rejects.toBeInstanceOf(RecordNotFound);
-    authorCap.stop();
-    const authorSql = authorCap.sqls.find((s) => /LIMIT/.test(s))!;
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(authorSql));
+    const authorSql = cachedStatement(conn, Author, ["id"]);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
+
+    const authors = Author.where({ id: 999999 }).limit(1);
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authors.arel()));
   });
 
   it("statement cache with in clause", async (ctx) => {
@@ -216,18 +199,16 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql();
     const topics = Topic.where({ id: [1, 3] });
     expect(
       (await topics).map((t: any) => Number(t.id)).sort((a: number, b: number) => a - b),
     ).toEqual([1, 3]);
-    cap.stop();
 
     // An IN-clause array is not preparable: trails inlines it (no binds), so the
     // query runs on a fresh statement and never enters the pool. assert_not_includes
     // passes for the right reason — the inlined SQL key is genuinely absent, not
     // because the pool is empty (the prior tests prove it populates).
-    expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
+    expect(statementCacheKeys(conn)).not.toContain(toSqlKey(conn, topics.arel()));
   });
 
   it("statement cache with sql string literal", async (ctx) => {
@@ -235,15 +216,13 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    const cap = captureSelectSql();
     // Rails: `Topic.where("topics.id = ?", 1)` — the `?` fragment routes through
     // BoundSqlLiteral (preparable), so the statement IS pooled (assert_includes,
     // bind_parameter_test.rb:100-107).
     const topics = Topic.where("topics.id = ?", 1);
     expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
-    cap.stop();
 
-    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
+    expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topics.arel()));
   });
 
   it("too many binds", async () => {

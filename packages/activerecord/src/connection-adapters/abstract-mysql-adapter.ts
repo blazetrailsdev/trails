@@ -561,8 +561,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition> {
     const column = await this.columnFor(tableName, columnName);
-    let default_ = this.extractNewDefaultValue(defaultOrChanges);
-    if (default_ === undefined) default_ = null;
+    const default_ = this.extractNewDefaultValue(defaultOrChanges);
     return new ChangeColumnDefaultDefinition(column, default_);
   }
 
@@ -711,11 +710,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlColumnNameWithOrderMatcher();
   }
 
-  static quoteColumnName(name: string): string {
+  static quoteColumnName(name: unknown): string {
     return mysqlQuoteColumnName(name);
   }
 
-  static quoteTableName(name: string): string {
+  static quoteTableName(name: unknown): string {
     return mysqlQuoteTableName(name);
   }
 

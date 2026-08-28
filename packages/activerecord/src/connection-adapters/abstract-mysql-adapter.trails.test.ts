@@ -454,11 +454,6 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
     expect(cd.default).toBe("new");
   });
 
-  it("normalizes undefined → null when {from, to: undefined} (JS-only defense)", async () => {
-    const cd = await build(makeChangeColumnTextColumn(), { from: "x", to: undefined });
-    expect(cd.default).toBeNull();
-  });
-
   it("preserves explicit null default", async () => {
     const cd = await build(makeChangeColumnTextColumn(), null);
     expect(cd.default).toBeNull();
@@ -497,18 +492,6 @@ describeIfMysqlAdapter("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#
   it("emits SET DEFAULT <literal> for a non-null default", async () => {
     const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), "world");
     expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT 'world'");
-  });
-
-  it("undefined → null normalization yields SET DEFAULT NULL, not a bare SET", async () => {
-    // Without the undefined→null normalization, quoteDefaultExpression(undefined)
-    // returns "" and the fragment would be the malformed `ALTER COLUMN ... SET`.
-    const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), {
-      from: "a",
-      to: undefined,
-    });
-    const sql = await visit(cd);
-    expect(sql).toBe("ALTER COLUMN `body` SET DEFAULT NULL");
-    expect(sql.endsWith(" SET")).toBe(false);
   });
 });
 

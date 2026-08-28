@@ -130,16 +130,9 @@ export async function quoteDefaultExpression(
   column: DefaultExpressionColumn,
   castTypeLookup?: CastTypeLookup | null,
 ): Promise<string> {
-  if (value === undefined) return "";
   if (typeof value === "function") {
-    const result = (value as () => unknown)();
-    if (typeof result === "string") return result;
-    if (isSqlLiteral(result)) return result.value;
-    throw new TypeError(
-      "quoteDefaultExpression expected function default to return a string or SqlLiteral",
-    );
+    return (value as () => unknown)() as string;
   }
-  if (isSqlLiteral(value)) return value.value;
   if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {
     return value;
   }
@@ -290,15 +283,6 @@ export function encodeRange(this: QuotingDispatchHost, range: Range): string {
   const begin = rangeBoundLiteral(typeCastRangeValue.call(this, range.begin));
   const end = rangeBoundLiteral(typeCastRangeValue.call(this, range.end));
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
-}
-
-function isSqlLiteral(value: unknown): value is { value: string } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    value.constructor?.name === "SqlLiteral" &&
-    typeof (value as any).value === "string"
-  );
 }
 
 /** @internal */

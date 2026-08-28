@@ -6,7 +6,7 @@ export interface ReferentialIntegrity {
 }
 
 interface ReferentialIntegrityHost {
-  quoteTableName(name: string): string;
+  quoteTableName(name: unknown): string;
   execute(sql: string): Promise<unknown>;
   tables(): Promise<string[]>;
   transaction(fn: () => Promise<void>, options: { requiresNew: boolean }): Promise<unknown>;

@@ -28,7 +28,7 @@ import {
 import { Value as TimeValue } from "../../type/time.js";
 
 export interface QuotingClassMethods {
-  quoteColumnName(name: string): string;
+  quoteColumnName(name: unknown): string;
 }
 
 export interface QuotingDispatchHost {
@@ -37,8 +37,8 @@ export interface QuotingDispatchHost {
   quotedTime(value: QuotedTimeValue): string;
   quotedBinary(value: unknown): string;
   quoteString(s: string): string;
-  quoteColumnName(name: string): string;
-  quoteTableName(name: string): string;
+  quoteColumnName(name: unknown): string;
+  quoteTableName(name: unknown): string;
   quotedTrue(): string;
   quotedFalse(): string;
   unquotedTrue(): boolean | number;
@@ -55,12 +55,12 @@ export type TemporalDateLike =
   | Temporal.PlainDate
   | Temporal.PlainTime;
 
-export function quoteColumnName(_columnName: string): string {
+export function quoteColumnName(_columnName: unknown): string {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
   throw new NotImplementedError();
 }
 
-export function quoteTableName(this: QuotingClassMethods, name: string): string {
+export function quoteTableName(this: QuotingClassMethods, name: unknown): string {
   return this.quoteColumnName(name);
 }
 
@@ -162,22 +162,11 @@ export function quoteDefaultExpression(
   value: unknown,
   column: { sqlType?: string | null },
 ): string {
-  if (value === undefined) return "";
   if (typeof value === "function") {
-    const result = (value as () => unknown)();
-    if (typeof result === "string") return result;
-    if (isSqlLiteral(result)) return result.value;
-    throw new TypeError(
-      "quoteDefaultExpression expected function default to return a string or SqlLiteral",
-    );
+    return (value as () => unknown)() as string;
   }
-  if (isSqlLiteral(value)) return value.value;
-  const castType = this.lookupCastType(column.sqlType ?? null) as {
-    serialize?(v: unknown): unknown;
-  } | null;
-  const serialized: unknown =
-    castType && typeof castType.serialize === "function" ? castType.serialize(value) : value;
-  return this.quote(serialized);
+  value = (this.lookupCastType(column.sqlType ?? null) as Type).serialize(value);
+  return this.quote(value);
 }
 
 export function quotedTrue(): string {
@@ -316,9 +305,9 @@ export interface Quoting {
 
   quoteString(s: string): string;
 
-  quoteTableName(name: string): string;
+  quoteTableName(name: unknown): string;
 
-  quoteColumnName(name: string): string;
+  quoteColumnName(name: unknown): string;
 
   quoteTableNameForAssignment(table: string, attr: string): string;
 
