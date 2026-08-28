@@ -29,19 +29,12 @@ export class Unary extends NodeExpression {
   }
 }
 
-export class Offset extends Unary {}
-export class Limit extends Unary {}
-export class Lock extends Unary {}
-export class DistinctOn extends Unary {}
 export class Bin extends Unary {}
-export class On extends Unary {}
-
-export class Not extends Unary {
-  declare expr: Node;
-  constructor(expr: Node) {
-    super(expr);
-  }
-}
+export class Cube extends Unary {}
+export class DistinctOn extends Unary {}
+export class Group extends Unary {}
+export class GroupingElement extends Unary {}
+export class GroupingSet extends Unary {}
 
 export class Lateral extends Unary {
   declare expr: Node;
@@ -50,15 +43,22 @@ export class Lateral extends Unary {
   }
 }
 
-export class GroupingElement extends Unary {}
-export class Cube extends Unary {}
-export class RollUp extends Unary {}
-export class GroupingSet extends Unary {}
+export class Limit extends Unary {}
 
-export class Group extends Unary {}
+export class Lock extends Unary {}
+export class Not extends Unary {
+  declare expr: Node;
+  constructor(expr: Node) {
+    super(expr);
+  }
+}
+export class Offset extends Unary {}
+export class On extends Unary {}
+
 export class OptimizerHints extends Unary {
   declare expr: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;
 }
+export class RollUp extends Unary {}
 
 _setNot(Not);
 

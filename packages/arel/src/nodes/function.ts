@@ -45,13 +45,13 @@ export class Function extends NodeExpression {
   }
 }
 
+export class Sum extends Function {}
+
 export class Exists extends Function {
   constructor(expression: Node, aliasNode: Node | null = null) {
     super([expression], aliasNode);
   }
 }
-
-export class Sum extends Function {}
 export class Max extends Function {}
 export class Min extends Function {}
 export class Avg extends Function {}

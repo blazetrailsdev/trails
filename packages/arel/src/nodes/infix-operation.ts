@@ -21,6 +21,48 @@ export class InfixOperation extends Binary {
   }
 }
 
+export class Multiplication extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("*", left, right);
+  }
+}
+
+export class Division extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("/", left, right);
+  }
+}
+
+export class Addition extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("+", left, right);
+  }
+}
+
+export class Subtraction extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("-", left, right);
+  }
+}
+
+export class Concat extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("||", left, right);
+  }
+}
+
+export class Contains extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("@>", left, right);
+  }
+}
+
+export class Overlaps extends InfixOperation {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
+    super("&&", left, right);
+  }
+}
+
 export class BitwiseAnd extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super("&", left, right);
@@ -48,48 +90,6 @@ export class BitwiseShiftLeft extends InfixOperation {
 export class BitwiseShiftRight extends InfixOperation {
   constructor(left: NodeOrValue, right: NodeOrValue) {
     super(">>", left, right);
-  }
-}
-
-export class Addition extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("+", left, right);
-  }
-}
-
-export class Subtraction extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("-", left, right);
-  }
-}
-
-export class Multiplication extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("*", left, right);
-  }
-}
-
-export class Division extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("/", left, right);
-  }
-}
-
-export class Concat extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("||", left, right);
-  }
-}
-
-export class Contains extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("@>", left, right);
-  }
-}
-
-export class Overlaps extends InfixOperation {
-  constructor(left: NodeOrValue, right: NodeOrValue) {
-    super("&&", left, right);
   }
 }
 
