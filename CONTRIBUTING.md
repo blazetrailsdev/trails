@@ -298,12 +298,13 @@ pnpm parity:test:assertions:reseed   # lower the mark after convergence
 The high-water mark is `scripts/test-compare/assertion-mismatch-mark.json`: one
 entry per package, three counters each. **A `0` there means converged only
 because every package is measured.** While the counters were scoped to a subset,
-the eleven unmeasured packages carried a 0/0/0 mark that read as convergence and
-was really "never measured" — and because `--write` only lowers, reseeding could
-not correct it: those six remaining marks
-(abstractcontroller, actioncontroller, actiondispatch, actionview, rack,
-trailties) had to be written up to their first real measurement by hand, once,
-when the scoping set was removed. CI runs the gate in the
+a package outside it carried a 0/0/0 mark that read as convergence and was
+really "never measured": its three counters had a single increment site each,
+all behind the scoping guard, so the zero was produced by construction. RFC 0105
+left six packages in that state — abstractcontroller, actioncontroller,
+actiondispatch, actionview, rack and trailties — and because `--write` only
+lowers, reseeding could not correct them; the six marks had to be written up to
+their first real measurement by hand, once, when the scoping set was removed. CI runs the gate in the
 `rails-comparison` job ("Assertion-mismatch ratchet"). Like the call-mismatch
 unreviewed counter, the arm is **aggregate** — the guarantee is "assertion-level
 debt never grows", not that every remaining mismatch has been reviewed.
