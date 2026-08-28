@@ -300,18 +300,6 @@ export function resolveCompositeRefColumn(
   return compositeIdentify(fixtureName, targetPkCols)[targetColumn] ?? fixtureId(fixtureName);
 }
 
-/**
- * Returns the adapter's normalized name (`"postgres"` / `"mysql2"` / `"sqlite"`).
- * Lets ERB-style adapter-conditional fixture data translate to TS:
- *
- * ```ts
- * { data: typeRegistryKey(adapter) === "postgres" ? a : b }
- * ```
- */
-export function typeRegistryKey(adapter: DatabaseAdapter): "postgres" | "mysql2" | "sqlite" {
-  return adapter.typeRegistryKey;
-}
-
 // --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---
 
 // WeakMap prevents cross-file leakage: each adapter object gets its own registry that
