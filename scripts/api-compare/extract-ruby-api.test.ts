@@ -100,6 +100,51 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
   });
 
+  it("reads a named capture bound by `=~` as a local, not a call", () => {
+    const fixtures = {
+      "foo.rb": `
+        class Foo
+          def prepare_column_options(column)
+            spec = super
+            if /\\A(?<size>tiny|medium|long)(?:text|blob)/ =~ column.sql_type
+              spec = { size: size.to_sym.inspect }.merge!(spec)
+            end
+            spec
+          end
+        end
+      `,
+    };
+    expect(rubyCalls(fixtures)["Foo#prepare_column_options"]).toEqual([
+      "super",
+      "sql_type",
+      "to_sym",
+      "inspect",
+      "merge!",
+    ]);
+    expect(rubySkeletons(fixtures)["Foo#prepare_column_options"]).toEqual([
+      "ref:super",
+      "if",
+      "ref:sql_type",
+      "ref:to_sym",
+      "ref:inspect",
+      "ref:merge!",
+    ]);
+  });
+
+  it("still reads a bare name as a call when the regexp is on the right of `=~`", () => {
+    const c = rubyCalls({
+      "foo.rb": `
+        class Foo
+          def check(s)
+            s =~ /(?<size>tiny)/
+            size
+          end
+        end
+      `,
+    });
+    expect(c["Foo#check"]).toEqual(["size"]);
+  });
+
   it("emits a chained call's refs in evaluation order, receiver first", () => {
     const s = rubySkeletons({
       "foo.rb": `
