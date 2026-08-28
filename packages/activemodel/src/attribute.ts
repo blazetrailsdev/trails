@@ -27,7 +27,11 @@ export function _registerUserProvidedDefault(ctor: new (...args: any[]) => Attri
   _UserProvidedDefaultCtor = ctor;
 }
 
+const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
+
 export abstract class Attribute {
+  static readonly [rubyNamespace]: string = "ActiveModel";
+
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
   readonly type: Type;
@@ -275,6 +279,7 @@ export abstract class Attribute {
 }
 
 export class FromDatabase extends Attribute {
+  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type.deserialize(value);
   }
@@ -291,6 +296,7 @@ export class FromDatabase extends Attribute {
 }
 
 export class FromUser extends Attribute {
+  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type.cast(value);
   }
@@ -310,6 +316,7 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
+  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return value;
   }
@@ -320,6 +327,7 @@ export class WithCastValue extends Attribute {
 }
 
 export class Null extends Attribute {
+  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string) {
     super(name, null, defaultValue());
   }
@@ -342,6 +350,7 @@ export class Null extends Attribute {
 }
 
 export class Uninitialized extends Attribute {
+  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string, type: Type) {
     super(name, null, type);
   }

@@ -397,6 +397,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -524,7 +525,7 @@ export default defineConfig(
   ...(railsTestNamesManifestReady
     ? [
         {
-          files: ["packages/arel/src/**/*.test.ts"],
+          files: ["packages/arel/src/**/*.test.ts", "packages/date/src/**/*.test.ts"],
           rules: {
             "blazetrails/rails-test-name-parity": "error",
           },

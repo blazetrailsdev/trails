@@ -9,6 +9,7 @@ import { Predications, type PredicationsModule, type RangeLike } from "../predic
 import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
 import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
 import { Math as MathMixin, type MathModule } from "../math.js";
+import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface RelationLike {
   name: string | Node;
@@ -94,3 +95,4 @@ include(Attribute, OrderPredications);
 include(Attribute, MathMixin);
 
 _setAttribute(Attribute);
+setRubyNamespace(Attribute, "Arel::Attributes");

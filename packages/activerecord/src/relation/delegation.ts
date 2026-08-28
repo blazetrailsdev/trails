@@ -188,8 +188,8 @@ export function relationDelegateClass(klass: typeof Base): typeof Base {
 }
 
 /**
- * @missingRailsCall include — CONVERGEABLE
- * @missingRailsCall include_relation_methods — CONVERGEABLE
+ * @missingRailsCall include — CONVERGEABLE delegation-relation-delegate-cache-builds-lazily
+ * @missingRailsCall include_relation_methods — CONVERGEABLE delegation-relation-delegate-cache-builds-lazily
  */
 export function initializeRelationDelegateCache(): void {
   for (const klass of _delegatedClasses) {

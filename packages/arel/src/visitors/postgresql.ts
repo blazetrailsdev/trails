@@ -114,13 +114,4 @@ export class PostgreSQL extends ToSql {
     }
     return collector;
   }
-
-  /** @internal */
-  static registerDispatch(): void {
-    PostgreSQL.dispatchCache().set(Nodes.Lateral, "visitArelNodesLateral");
-    PostgreSQL.dispatchCache().set(Nodes.GroupingElement, "visitArelNodesGroupingElement");
-    PostgreSQL.dispatchCache().set(Nodes.Cube, "visitArelNodesCube");
-    PostgreSQL.dispatchCache().set(Nodes.RollUp, "visitArelNodesRollUp");
-    PostgreSQL.dispatchCache().set(Nodes.GroupingSet, "visitArelNodesGroupingSet");
-  }
 }

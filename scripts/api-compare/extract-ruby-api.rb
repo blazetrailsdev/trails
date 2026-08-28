@@ -317,7 +317,12 @@ DEPENDENCY_PATTERNS = {
 # and its siblings are autoload manifests whose only method bodies are
 # `def self.` boot helpers no trails file ports, and walking them attributes
 # those to the umbrella module's junk-drawer entity file as false-missing.
-UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n].to_set
+#
+# `activerecord/lib/arel.rb` is the same shape as i18n's: `Arel.sql`,
+# `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute` are defined there
+# and ported in `packages/arel/src/arel.ts`, so the config-only scan leaves
+# arel.ts scored as having no Rails counterpart at all.
+UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n arel].to_set
 
 # ---- AST walker ----
 

@@ -55,7 +55,7 @@ describe("Visitor dispatch", () => {
   it("throws TypeError for nodes with no handler", () => {
     const v = new TestVisitor();
     expect(() => v.accept(new C())).toThrow(TypeError);
-    expect(() => v.accept(new C())).toThrow(/Cannot visit C/);
+    expect(() => v.accept(new C())).toThrow(/Cannot visit Arel::Nodes::C/);
     expect(() => v.accept(new C())).not.toThrow(UnsupportedVisitError);
   });
 

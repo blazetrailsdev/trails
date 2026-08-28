@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
 // Kept in sync with the rule's enrollment block in eslint.config.mjs.
-const ENROLLED = ["packages/arel/src/**/*.test.ts"];
+const ENROLLED = ["packages/arel/src/**/*.test.ts", "packages/date/src/**/*.test.ts"];
 
 async function currentMarks(): Promise<Record<string, number>> {
   try {

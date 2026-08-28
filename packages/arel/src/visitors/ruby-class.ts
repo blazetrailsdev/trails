@@ -1,6 +1,23 @@
 /** @noRailsEquivalent PERMANENT */
 import { temporalClassName, temporalTag } from "../temporal-tag.js";
 
+const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
+
+/** @noRailsEquivalent PERMANENT */
+export function setRubyNamespace(ctor: object, nesting: string): void {
+  Object.defineProperty(ctor, rubyNamespace, { value: nesting });
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function rubyConstantName(ctor: object): string | null {
+  const { name, [rubyNamespace]: nesting } = ctor as {
+    name?: string;
+    [rubyNamespace]?: string;
+  };
+  if (!name) return null;
+  return typeof nesting === "string" ? `${nesting}::${name}` : name;
+}
+
 export function rubyClassName(v: unknown): string | null {
   if (v !== null && typeof v === "object" && "ast" in v && "toSql" in v) {
     return "ArelSelectManager";

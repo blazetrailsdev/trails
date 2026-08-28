@@ -46,7 +46,6 @@ export class SelectManager extends TreeManager {
     this.take(value);
   }
 
-  /** @internal */
   get taken(): Limit["expr"] | null {
     return this.limit;
   }

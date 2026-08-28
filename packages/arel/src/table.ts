@@ -10,6 +10,7 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
+import { setRubyNamespace } from "./visitors/ruby-class.js";
 
 export interface TableKlass {
   readonly attributeAliases?: Record<string, string>;
@@ -144,3 +145,4 @@ type _AliasPredication = import("./alias-predication.js").AliasPredicationModule
 export interface Table extends _FactoryMethodsModule, _AliasPredication {}
 
 _setTable(Table);
+setRubyNamespace(Table, "Arel");

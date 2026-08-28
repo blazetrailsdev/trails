@@ -29,6 +29,7 @@ const ROOT = path.resolve(__dirname, "..");
 // rule's enrollment globs in eslint.config.mjs.
 const PACKAGE_DIRS: Record<string, string> = {
   arel: "packages/arel/src",
+  date: "packages/date/src",
 };
 
 const IN = path.join(ROOT, "scripts/test-compare/output/rails-tests.json");

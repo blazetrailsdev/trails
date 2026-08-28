@@ -338,7 +338,10 @@ export function rubyFileToTs(rubyFile: string, pkg?: string): string {
   const aliasedBase = PATH_SEGMENT_ALIASES[base] ?? base;
   const kebab = aliasedBase.replace(/_/g, "-");
   const tsFile = applyFileTokenRenames(kebab) + ".ts";
-  if (dir === ".") return tsFile;
+  // A gem's umbrella file sits one level above its lib path, so the extractor
+  // records it as `../<gem>.rb`; it ports to the package's src root, not to a
+  // sibling of the package.
+  if (dir === "." || dir === "..") return tsFile;
   const tsDir = dir
     .split("/")
     .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
