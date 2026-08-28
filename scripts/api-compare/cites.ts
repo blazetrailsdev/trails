@@ -74,10 +74,16 @@ export interface RubyMethodSpan {
 }
 
 const CITE_RE = /(use-site:)?([\w./-]+\.rb):(\d+)(?:-(\d+))?/g;
-/** A `, :35` riding behind a citation: a further line in the SAME file, the
- *  shape a receipt naming two sites in one `.rb` is written in
- *  (`routes.rb:10, :35`). Each one is checked like a citation of its own. */
-const CONTINUATION_RE = /^\s*,\s*:(\d+)(?:-(\d+))?/;
+/** A `, :35` — or a bare `, 207` — riding behind a citation: a further line in
+ *  the SAME file, the two shapes a receipt naming several sites in one `.rb` is
+ *  written in (`routes.rb:10, :35`, `sqlite3_adapter.rb:98, 207, 224`). Each one
+ *  is checked like a citation of its own, so neither shape escapes verification.
+ *  The bare form is taken only when a delimiter closes it, so a number that is
+ *  prose rather than a line (`quoting.rb:12, 3 callers`) stays out. */
+const CONTINUATION_RES = [
+  /^\s*,\s*:(\d+)(?:-(\d+))?/,
+  /^\s*,\s*(\d+)(?:-(\d+))?(?=\s*(?:[,)\]`]|$))/,
+];
 /** `Klass#meth` / `Klass.meth`, the two spellings a reason names a method in.
  *  The method half takes operators too, so `Arel::Nodes::Node#==` parses. */
 const NAMED_METHOD_RE = /\b[A-Z]\w*(?:::\w+)*[#.]([a-z_][\w]*[?!=]?|[^\s`,)]+)/g;
@@ -96,7 +102,9 @@ export function parseCites(reason: string): Cite[] {
       useSite,
     });
     let rest = reason.slice((m.index ?? 0) + m[0].length);
-    for (let c = CONTINUATION_RE.exec(rest); c !== null; c = CONTINUATION_RE.exec(rest)) {
+    for (;;) {
+      const c = CONTINUATION_RES.map((re) => re.exec(rest)).find((hit) => hit !== null);
+      if (c === undefined || c === null) break;
       const line = Number(c[1]);
       out.push({
         raw: `${m[2]}:${c[1]}${c[2] === undefined ? "" : `-${c[2]}`}`,

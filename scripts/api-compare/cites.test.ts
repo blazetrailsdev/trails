@@ -77,6 +77,15 @@ describe("cites", () => {
     ]);
   });
 
+  it("parses a bare `, 207` continuation, and leaves a prose number alone", () => {
+    expect(parseCites("(use-site:sqlite3_adapter.rb:98, 207, 224)").map((c) => c.raw)).toEqual([
+      "use-site:sqlite3_adapter.rb:98",
+      "sqlite3_adapter.rb:207",
+      "sqlite3_adapter.rb:224",
+    ]);
+    expect(parseCites("quoting.rb:12, 3 callers").map((c) => c.raw)).toEqual(["quoting.rb:12"]);
+  });
+
   it("reads the Ruby method a reason names, operators included", () => {
     expect(namedMethods("`AssociationReflection#klass` and `Arel::Nodes::Node#==`")).toEqual([
       "klass",
