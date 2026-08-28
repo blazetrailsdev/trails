@@ -2189,6 +2189,47 @@ class ApiExtractor
          .map(&:first)
   end
 
+  # `/…(?<name>…)/ =~ expr` ASSIGNS each named capture to a local variable, and
+  # only in that order — a regexp literal on the LEFT (ruby/re.c, documented at
+  # doc/regexp.rdoc "Named Captures"). Ripper does not track that binding, so a
+  # later bare `size` parses as a `:vcall` and would read as a receiverless
+  # call, manufacturing a call-set row no faithful port can ever satisfy: the
+  # port of a capture local IS a local
+  # (activerecord/lib/active_record/connection_adapters/mysql/schema_dumper.rb:13-14).
+  def named_capture_locals(node, names = Set.new)
+    return names unless node.is_a?(Array)
+
+    if node[0] == :binary && node[2] == :=~ && node[1].is_a?(Array) &&
+       node[1][0] == :regexp_literal
+      regexp_literal_source(node[1]).scan(/\(\?<([a-zA-Z_]\w*)>/) { |(name)| names << name }
+    end
+    node.each { |child| named_capture_locals(child, names) if child.is_a?(Array) }
+    names
+  end
+
+  # The static text of a `:regexp_literal` — interpolated parts carry no
+  # capture name we could read, so they are simply skipped.
+  def regexp_literal_source(node)
+    parts = node[1]
+    return "" unless parts.is_a?(Array)
+
+    parts.filter_map { |part| part[1] if part.is_a?(Array) && part[0] == :@tstring_content }
+         .join
+  end
+
+  def with_capture_locals(body_node)
+    outer = @capture_locals
+    @capture_locals = named_capture_locals(body_node)
+    yield
+  ensure
+    @capture_locals = outer
+  end
+
+  # A bare `:vcall` naming a capture local is a variable READ, not a call.
+  def capture_local?(name)
+    @capture_locals.include?(name)
+  end
+
   # Returns [calls, weak_calls]: the de-duplicated call names, and the subset
   # whose EVERY occurrence had an inert receiver (see walk_for_calls).
   def collect_method_calls(body_node)
@@ -2231,47 +2272,6 @@ class ApiExtractor
     tokens = []
     with_capture_locals(body_node) { walk_for_skeleton(body_node, tokens) }
     tokens
-  end
-
-  # `/…(?<name>…)/ =~ expr` ASSIGNS each named capture to a local variable, and
-  # only in that order — a regexp literal on the LEFT (ruby/re.c, documented at
-  # doc/regexp.rdoc "Named Captures"). Ripper does not track that binding, so a
-  # later bare `size` parses as a `:vcall` and would read as a receiverless
-  # call, manufacturing a call-set row no faithful port can ever satisfy: the
-  # port of a capture local IS a local
-  # (activerecord/lib/active_record/connection_adapters/mysql/schema_dumper.rb:13-14).
-  def named_capture_locals(node, names = Set.new)
-    return names unless node.is_a?(Array)
-
-    if node[0] == :binary && node[2] == :=~ && node[1].is_a?(Array) &&
-       node[1][0] == :regexp_literal
-      regexp_literal_source(node[1]).scan(/\(\?<([a-zA-Z_]\w*)>/) { |(name)| names << name }
-    end
-    node.each { |child| named_capture_locals(child, names) if child.is_a?(Array) }
-    names
-  end
-
-  # The static text of a `:regexp_literal` — interpolated parts carry no
-  # capture name we could read, so they are simply skipped.
-  def regexp_literal_source(node)
-    parts = node[1]
-    return "" unless parts.is_a?(Array)
-
-    parts.filter_map { |part| part[1] if part.is_a?(Array) && part[0] == :@tstring_content }
-         .join
-  end
-
-  def with_capture_locals(body_node)
-    outer = @capture_locals
-    @capture_locals = named_capture_locals(body_node)
-    yield
-  ensure
-    @capture_locals = outer
-  end
-
-  # A bare `:vcall` naming a capture local is a variable READ, not a call.
-  def capture_local?(name)
-    @capture_locals.include?(name)
   end
 
   def walk_for_skeleton(node, tokens)
