@@ -1731,6 +1731,31 @@ describe(
       ]);
     });
 
+    it("unrolls a constant-array class_eval loop that has no case name mapping", () => {
+      const m = metaMethods(`
+      module ActiveRecord
+        class Migration
+          class CommandRecorder
+            ReversibleAndIrreversibleMethods = [:create_table, :add_column]
+
+            ReversibleAndIrreversibleMethods.each do |method|
+              class_eval <<-EOV, __FILE__, __LINE__ + 1
+                def #{method}(*args, &block)
+                  record(:"#{method}", args, &block)
+                end
+              EOV
+              ruby2_keywords(method)
+            end
+          end
+        end
+      end
+    `);
+      expect(m["ActiveRecord::Migration::CommandRecorder"].map((x) => x.name)).toEqual([
+        "create_table",
+        "add_column",
+      ]);
+    });
+
     it("unrolls a constant-array each loop whose template is a define_method", () => {
       const m = metaMethods(`
       module Sample
