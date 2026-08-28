@@ -660,6 +660,7 @@ class ApiExtractor
         file: @current_file,
         line: @current_line,
         reader: true,
+        notes: "struct",
       }
       target[:instanceMethods] << {
         name: "#{name}=",
@@ -667,6 +668,7 @@ class ApiExtractor
         params: [{ name: "value", kind: "required" }],
         file: @current_file,
         line: @current_line,
+        notes: "struct",
       }
     end
     # Both arms are optional: `Struct.new(:a, :b).new` and its keyword_init
@@ -678,6 +680,7 @@ class ApiExtractor
       params: names.map { |name| { name: name, kind: kind, default: "..." } },
       file: @current_file,
       line: @current_line,
+      notes: "struct",
     }
   end
 
@@ -1249,8 +1252,19 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
-  # Drop a `define_method` entry when a literal `def` of the same name already
-  # occupies the same bucket. Ruby source can define a method both ways in
+  # Resolve the two ways one bucket can end up holding the same name twice.
+  #
+  # A `Struct.new(...)` accessor lives on the anonymous struct SUPERCLASS, so
+  # anything the class body defines under that name overrides it —
+  # `Rfc4646 < Struct.new(*RFC4646_SUBTAGS)` (i18n rfc4646.rb:14) inherits a
+  # plain `language` reader and then replaces four of the seven with
+  # `define_method(name) { self[name].send(format) }` (rfc4646.rb:32-34). The
+  # body's definition wins, and the struct accessor is dropped: keeping the
+  # inherited no-body reader instead would tell the call gate those four
+  # accessors make no calls, when Rails' make a format-dependent `send`.
+  #
+  # Then drop a `define_method` entry when a literal `def` of the same name
+  # already occupies the bucket. Ruby source can define a method both ways in
   # mutually exclusive branches the extractor walks unconditionally — rack's
   # `utils.rb:183` picks `define_method(:escape_html, ERB…)` or `def
   # escape_html` off an `if defined?(ERB::Escape)` — and only one of the two is
@@ -1259,6 +1273,12 @@ class ApiExtractor
   public def dedupe_define_methods!
     (@classes.to_a + @modules.to_a).each do |_fqn, info|
       [:instanceMethods, :classMethods].each do |bucket|
+        if info[bucket].any? { |m| m[:notes] == "struct" }
+          defined_in_body = info[bucket].each_with_object(Set.new) do |m, acc|
+            acc << m[:name] unless m[:notes] == "struct"
+          end
+          info[bucket].reject! { |m| m[:notes] == "struct" && defined_in_body.include?(m[:name]) }
+        end
         next unless info[bucket].any? { |m| m[:notes] == "define_method" }
         literal = info[bucket].each_with_object(Set.new) do |m, acc|
           acc << m[:name] unless m[:notes]

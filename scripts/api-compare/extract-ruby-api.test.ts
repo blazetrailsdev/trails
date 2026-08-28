@@ -1654,6 +1654,38 @@ describe(
       ]);
     });
 
+    it("lets a class-body definition override the Struct accessor it shadows", () => {
+      const m = metaMethods(`
+      module I18n
+        module Locale
+          module Tag
+            RFC4646_SUBTAGS = [ :language, :region, :variant ]
+            RFC4646_FORMATS = { :language => :downcase, :region => :upcase }
+
+            class Rfc4646 < Struct.new(*RFC4646_SUBTAGS)
+              RFC4646_FORMATS.each do |name, format|
+                define_method(name) { self[name].send(format) unless self[name].nil? }
+              end
+
+              def variant
+                self[:variant]
+              end
+            end
+          end
+        end
+      end
+    `);
+      const byName = new Map(m["I18n::Locale::Tag::Rfc4646"].map((x) => [x.name, x]));
+      expect(byName.get("language")!.notes).toBe("define_method");
+      expect(byName.get("region")!.notes).toBe("define_method");
+      expect(byName.get("variant")!.notes).toBeUndefined();
+      // The writers the struct generates have nothing shadowing them.
+      expect(byName.get("language=")!.notes).toBe("struct");
+      // One entry per name — the shadowed struct accessors are gone, not
+      // duplicated alongside the definitions that override them.
+      expect(m["I18n::Locale::Tag::Rfc4646"].filter((x) => x.name === "language")).toHaveLength(1);
+    });
+
     it("unrolls a literal-array each loop whose template is a class_eval def", () => {
       const m = metaMethods(`
       module ActiveSupport
