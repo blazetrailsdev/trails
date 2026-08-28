@@ -93,13 +93,13 @@ describe("CommandRecorder", () => {
 
   it("invertCreateTable strips ifNotExists even when fn is last arg", () => {
     const fn = () => {};
-    const [cmd, args] = new CommandRecorder().invertCreateTable([
-      "users",
-      { ifNotExists: true },
+    const [cmd, args, block] = new CommandRecorder().invertCreateTable(
+      ["users", { ifNotExists: true }],
       fn,
-    ]);
+    );
     expect(cmd).toBe("dropTable");
     expect((args[1] as Record<string, unknown>)["ifNotExists"]).toBeUndefined();
+    expect(block).toBe(fn);
   });
 
   it("invertRemoveIndex handles array column list without treating it as options", () => {

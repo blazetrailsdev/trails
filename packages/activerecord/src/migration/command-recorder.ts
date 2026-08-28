@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Migration::CommandRecorder
  */
 
-import { methodMissingProxy } from "@blazetrails/activesupport";
+import { extractOptionsBang, isPlainObject, methodMissingProxy } from "@blazetrails/activesupport";
 
 import { IrreversibleMigration } from "../migration.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
@@ -224,69 +224,34 @@ export class CommandRecorder {
    *   `delete` OPERATOR (command-recorder.ts:192), which records no callee.
    */
   invertCreateTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    // createTable may be recorded as [name, options, fn] — find the trailing options hash
-    let optsIdx = -1;
-    for (let i = a.length - 1; i >= 0; i--) {
-      const el = a[i];
-      if (typeof el === "object" && el !== null && !Array.isArray(el)) {
-        optsIdx = i;
-        break;
-      }
+    const last = args[args.length - 1];
+    if (isPlainObject(last)) {
+      delete (last as Record<string, unknown>)["ifNotExists"];
     }
-    if (optsIdx !== -1) {
-      const opts = { ...(a[optsIdx] as Record<string, unknown>) };
-      delete opts["ifNotExists"];
-      a[optsIdx] = opts;
-    }
-    return ["dropTable", a, block];
+    return ["dropTable", args, block];
   }
 
-  /**
-   * @internal
-   *
-   * TS has no block syntax, so a recordable method's trailing callback rides
-   * inside `args` where Ruby carries it in the block seat (the `revert order`
-   * test's `create_table("bananas", &block)`); either position is Rails'
-   * `block` for the reversibility check (command_recorder.rb:214).
-   */
+  /** @internal */
   invertDropTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    let argsBlock: unknown;
-    if (a.length > 0 && typeof a[a.length - 1] === "function") {
-      argsBlock = a.pop();
-    }
-    let options: Record<string, unknown> = {};
-    if (
-      a.length > 0 &&
-      typeof a[a.length - 1] === "object" &&
-      a[a.length - 1] !== null &&
-      !Array.isArray(a[a.length - 1])
-    ) {
-      options = { ...(a.pop() as Record<string, unknown>) };
-    }
+    const [rest, options] = extractOptionsBang(args);
+    args = rest;
     delete options["ifExists"];
 
-    if (a.length > 1) {
+    if (args.length > 1) {
       throw new IrreversibleMigration(
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     }
-    if (
-      a.length === 1 &&
-      Object.keys(options).length === 0 &&
-      block === undefined &&
-      argsBlock === undefined
-    ) {
+
+    if (args.length === 1 && Object.keys(options).length === 0 && block == null) {
       throw new IrreversibleMigration(
         "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
       );
     }
 
-    const result = [...a];
-    if (Object.keys(options).length > 0) result.push(options);
-    if (argsBlock !== undefined) result.push(argsBlock);
-    return ["createTable", result, block];
+    if (Object.keys(options).length > 0) args = [...args, options];
+
+    return ["createTable", args, block];
   }
 
   /**
@@ -836,15 +801,6 @@ const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "dropVirtualTable",
 ] as const;
 
-(CommandRecorder.prototype as unknown as Record<string, unknown>)["transaction"] = async function (
-  this: CommandRecorder,
-  ...args: unknown[]
-): Promise<void> {
-  const block =
-    typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
-  await this.record("transaction", args, block);
-};
-
 for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
   if (method in CommandRecorder.prototype) continue;
   (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
@@ -852,10 +808,16 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
     ...args: unknown[]
   ): Promise<void> {
     // Ruby's `*args` carries only the arguments actually passed
-    // (command_recorder.rb:125-132); a TS method with optional parameters
-    // materializes trailing `undefined`s, which would otherwise be recorded and
-    // replayed as real arguments.
+    // (command_recorder.rb:125-132); a TS caller that forwards optional
+    // parameters positionally materializes trailing `undefined`s where Ruby's
+    // `**options, &block` pass nothing — `Migration#createTable`
+    // (migration.ts:554) hands on `(tname, optionsOrFn, fn)` for a call that
+    // gave only a block — so they are dropped before the block is taken.
     while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
-    return this.record(method, args);
+    // Ruby's `&block` takes the trailing block out of `*args`; TS has no block
+    // syntax, so the trailing function argument is moved into the block seat.
+    const block =
+      typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
+    return this.record(method, args, block);
   };
 }
