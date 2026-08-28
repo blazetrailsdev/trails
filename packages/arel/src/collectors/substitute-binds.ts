@@ -1,8 +1,8 @@
 export class SubstituteBinds {
   private quoter: { quote(value: unknown): string };
   private delegate: { append(str: string): unknown; value: string };
-  preparable = false;
-  retryable = true;
+  preparable?: boolean;
+  retryable?: boolean;
 
   constructor(
     quoter: { quote(value: unknown): string },
@@ -12,7 +12,7 @@ export class SubstituteBinds {
     this.delegate = delegateCollector;
   }
 
-  addBind(bind: unknown): this {
+  addBind(bind: unknown, _block: (index: number) => string): this {
     if (bind != null && typeof bind === "object" && "valueForDatabase" in bind) {
       const valueForDatabase = (bind as Record<string, unknown>).valueForDatabase;
       bind =
@@ -23,7 +23,11 @@ export class SubstituteBinds {
     return this.append(this.quoter.quote(bind));
   }
 
-  addBinds(binds: unknown[], _procForBinds?: ((v: unknown) => unknown) | null): this {
+  addBinds(
+    binds: unknown[],
+    _procForBinds: ((v: unknown) => unknown) | null | undefined,
+    _block: (index: number) => string,
+  ): this {
     this.append(binds.map((bind) => this.quoter.quote(bind)).join(", "));
     return this;
   }
