@@ -321,29 +321,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
   }
 
-  build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
+  build(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
   build(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     const association = this._record.association(
       this._assocName,
     ) as unknown as CollectionAssociation;
     return (
-      Array.isArray(attrs)
-        ? association.build(attrs, block as (record: Base) => void)
-        : association.build(attrs, block as (record: Base) => void)
+      Array.isArray(attributes)
+        ? association.build(attributes, block as (record: Base) => void)
+        : association.build(attributes, block as (record: Base) => void)
     ) as T | T[];
   }
 
-  new(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
-  new(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
+  new(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
   new(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    return Array.isArray(attrs) ? this.build(attrs, block) : this.build(attrs, block);
+    return Array.isArray(attributes)
+      ? this.build(attributes, block)
+      : this.build(attributes, block);
   }
 
   /**
@@ -354,14 +356,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._association.addToTarget(record, { skipCallbacks: true });
   }
 
-  async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async create(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async create(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     return (await this._association.create(
-      attrs,
+      attributes,
       block as ((record: Base) => void) | undefined,
     )) as T | T[];
   }
@@ -432,17 +434,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   override last(): Promise<T | null>;
-  override last(n: number): Promise<T[]>;
-  override async last(n?: number): Promise<T | T[] | null> {
+  override last(limit: number): Promise<T[]>;
+  override async last(limit?: number): Promise<T | T[] | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return FinderMethods.last.call(this as any, n);
+    return FinderMethods.last.call(this as any, limit);
   }
 
   override take(): Promise<T | null>;
   override take(limit: number): Promise<T[]>;
-  override async take(n?: number): Promise<T | T[] | null> {
+  override async take(limit?: number): Promise<T | T[] | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return super.take(n as number);
+    return super.take(limit as number);
   }
 
   /** @internal */
@@ -554,14 +556,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     await pp.pp(entries);
   }
 
-  async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async createBang(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async createBang(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     return (await this._association.createBang(
-      attrs,
+      attributes,
       block as ((record: Base) => void) | undefined,
     )) as T | T[];
   }

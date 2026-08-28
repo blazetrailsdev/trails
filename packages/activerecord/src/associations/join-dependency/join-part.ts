@@ -85,10 +85,13 @@ export abstract class JoinPart {
     }
   }
 
-  extractRecord(row: Record<string, unknown>, aliases: string): Record<string, unknown> {
+  extractRecord(
+    row: Record<string, unknown>,
+    columnNamesWithAlias: string,
+  ): Record<string, unknown> {
     const record: Record<string, unknown> = {};
 
-    const indexMatch = aliases.match(/^t(\d+)$/);
+    const indexMatch = columnNamesWithAlias.match(/^t(\d+)$/);
     if (indexMatch) {
       const pattern = new RegExp(`^t${indexMatch[1]}_r(\\d+)$`);
       const baseColumns = this.baseKlass.columnNames();
@@ -107,7 +110,7 @@ export abstract class JoinPart {
       if (matched) return record;
     }
 
-    const prefix = `${aliases}_`;
+    const prefix = `${columnNamesWithAlias}_`;
     for (const [key, value] of Object.entries(row)) {
       if (key.startsWith(prefix)) {
         record[key.slice(prefix.length)] = value;

@@ -242,11 +242,11 @@ export class Association {
     }
   }
 
-  private deriveKey(record: Base, key: string | string[]): unknown {
+  private deriveKey(owner: Base, key: string | string[]): unknown {
     if (Array.isArray(key)) {
-      return JSON.stringify(key.map((k) => this.convertKey((record as any)._readAttribute(k))));
+      return JSON.stringify(key.map((k) => this.convertKey((owner as any)._readAttribute(k))));
     }
-    return this.convertKey((record as any)._readAttribute(key));
+    return this.convertKey((owner as any)._readAttribute(key));
   }
 
   private convertKey(key: unknown): unknown {

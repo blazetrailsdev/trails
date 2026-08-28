@@ -133,21 +133,17 @@ export class BelongsToAssociation extends SingularAssociation {
     }
   }
 
-  private async updateCountersViaScope(
-    klass: any,
-    foreignKeyValues: any[],
-    by: number,
-  ): Promise<void> {
+  private async updateCountersViaScope(klass: any, foreignKey: any[], by: number): Promise<void> {
     const counterCol = this.counterCacheColumn();
     if (!counterCol) return;
     if (typeof klass.unscoped !== "function") return;
 
     const pks = this.associationPrimaryKeys(klass);
-    if (pks.length !== foreignKeyValues.length) return;
+    if (pks.length !== foreignKey.length) return;
     const conditions: Record<string, unknown> = {};
     for (let i = 0; i < pks.length; i++) {
-      if (foreignKeyValues[i] == null) return;
-      conditions[pks[i]] = foreignKeyValues[i];
+      if (foreignKey[i] == null) return;
+      conditions[pks[i]] = foreignKey[i];
     }
 
     const scope = klass.unscoped().whereBang(conditions);

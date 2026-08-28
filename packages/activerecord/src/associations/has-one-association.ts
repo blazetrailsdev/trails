@@ -214,14 +214,14 @@ export class HasOneAssociation extends SingularAssociation {
 
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    raise = false,
+    raiseError = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
     }
     const loadError = await this.loadDisplacedTargetForCreate();
-    const record = await super._createRecord(attributes, raise, block);
+    const record = await super._createRecord(attributes, raiseError, block);
     if (loadError) throw loadError;
     return record;
   }
@@ -401,10 +401,10 @@ async function preloadDestroyInverseBelongsTo(
 /** @internal */
 function transactionIf(
   assoc: HasOneAssociation,
-  condition: boolean,
+  value: boolean,
   block: () => Promise<void>,
 ): Promise<void> {
-  if (condition) {
+  if (value) {
     const klass = assoc.klass;
     if (klass && typeof (klass as any).transaction === "function") {
       return (klass as any).transaction(block);
