@@ -56,6 +56,7 @@ import {
   tagsForOwner,
   recordTaggedCalls,
   declarationOnlyInFile,
+  misplacedClusterVerdict,
   rubyMethodToTsForFqn,
 } from "./compare.js";
 import { rubyMethodToTs } from "@blazetrails/parity/conventions";
@@ -3101,5 +3102,59 @@ describe("rubyMethodToTsForFqn", () => {
     expect(rubyMethodToTsForFqn("Arel::Math", "compile_insert")).toEqual(
       rubyMethodToTs("compile_insert"),
     );
+  });
+});
+
+describe("misplacedClusterVerdict", () => {
+  const bodyless = new Map([
+    ["cluster.ts", new Map([["compileInsert", new Set(["Crud"])]])],
+    ["other.ts", new Map([["createInsert", new Set(["Crud"])]])],
+  ]);
+  const bodied = new Map([["other.ts", new Map([["compileInsert", new Set(["Host"])]])]]);
+
+  it("scores declaration-only when every candidate in the cluster is bodyless", () => {
+    expect(
+      misplacedClusterVerdict(
+        ["compileInsert"],
+        new Set(["compileInsert"]),
+        "cluster.ts",
+        bodyless,
+        bodied,
+      ),
+    ).toEqual({ kind: "declaration-only", tsName: "compileInsert" });
+  });
+
+  it("credits the first candidate the cluster declares with a body", () => {
+    expect(
+      misplacedClusterVerdict(
+        ["compileInsert"],
+        new Set(["compileInsert"]),
+        "other.ts",
+        bodyless,
+        bodied,
+      ),
+    ).toEqual({ kind: "match", tsName: "compileInsert" });
+  });
+
+  it("prefers a bodied candidate over a bodyless one", () => {
+    // `other.ts` declares createInsert bodyless and compileInsert bodied; the
+    // bodied one is the port, whatever the candidate order.
+    expect(
+      misplacedClusterVerdict(
+        ["createInsert", "compileInsert"],
+        new Set(["createInsert", "compileInsert"]),
+        "other.ts",
+        bodyless,
+        bodied,
+      ),
+    ).toEqual({ kind: "match", tsName: "compileInsert" });
+  });
+
+  it("is absent, not declaration-only, when the cluster declares no candidate", () => {
+    // An ordinary miss: the cluster says nothing about the name, so there is no
+    // signature to report in the declaration-only column.
+    expect(
+      misplacedClusterVerdict(["nope"], new Set(["compileInsert"]), "cluster.ts", bodyless, bodied),
+    ).toEqual({ kind: "absent" });
   });
 });

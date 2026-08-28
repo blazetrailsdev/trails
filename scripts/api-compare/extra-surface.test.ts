@@ -3474,6 +3474,37 @@ describe("inlinedModuleMembers", () => {
     expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
   });
 
+  it("resolves an operator through its pinned TS spelling", () => {
+    // arel/math.rb:5-41 is a mixin of operators; `rubyMethodCandidates` refuses
+    // every one of them, so the pinned table is the only way to reach `add`.
+    const mathClasses = {
+      "Arel::Nodes::InfixOperation": rubyClass({
+        name: "InfixOperation",
+        file: "nodes/infix_operation.rb",
+        includes: ["Math"],
+      }),
+    };
+    const mathModules = {
+      "Arel::Math": rubyClass({ name: "Math", file: "math.rb", instance: [method("+")] }),
+    };
+    expect(
+      inlinedModuleMembers(
+        "arel",
+        mathClasses,
+        mathModules,
+        new Map([["Math", ["Arel::Math"]]]),
+        new Map([["nodes/infix-operation.ts", new Set(["add"])]]),
+      ),
+    ).toEqual([
+      {
+        tsFile: "nodes/infix-operation.ts",
+        tsName: "add",
+        moduleRubyFile: "math.rb",
+        rubyName: "+",
+      },
+    ]);
+  });
+
   it("reports nothing when the includer's file declares no body for the name", () => {
     const bodied = new Map([["select-manager.ts", new Set(["project"])]]);
     expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);

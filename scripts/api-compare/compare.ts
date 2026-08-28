@@ -1303,6 +1303,42 @@ export function ownerRecordsNothing(
  * declaration of the name is a signature — the body inlined onto some other
  * class — comes back true.
  */
+/**
+ * How the misplaced-file cluster answers for a Ruby method (RFC 0126).
+ *
+ * The cross-file fallback credits a method to the sibling file its Ruby file's
+ * members cluster at when the conventional path does not exist. That credit has
+ * to make the same body/signature distinction the expected file's direct-match
+ * arm makes, or a cluster whose only declaration of the name is a bodyless
+ * signature scores as a port — the very hole {@link declarationOnlyInFile}
+ * closes on the conventional path.
+ *
+ * `"declaration-only"` is returned only when the cluster DOES declare a
+ * candidate and every one of them is bodyless; a cluster that declares none is
+ * `"absent"`, an ordinary miss.
+ */
+export type MisplacedClusterVerdict =
+  | { kind: "match"; tsName: string }
+  | { kind: "declaration-only"; tsName: string }
+  | { kind: "absent" };
+
+export function misplacedClusterVerdict(
+  tsCandidates: readonly string[],
+  actualMethods: ReadonlySet<string>,
+  misplacedFile: string,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+): MisplacedClusterVerdict {
+  const inCluster = tsCandidates.filter((c) => actualMethods.has(c));
+  if (inCluster.length === 0) return { kind: "absent" };
+  const tsName = inCluster.find(
+    (c) => !declarationOnlyInFile(misplacedFile, c, bodylessOwnersByFile, bodiedOwnersByFile),
+  );
+  return tsName === undefined
+    ? { kind: "declaration-only", tsName: inCluster[0] }
+    : { kind: "match", tsName };
+}
+
 export function declarationOnlyInFile(
   tsFile: string,
   name: string,
@@ -3914,6 +3950,10 @@ export function main() {
             tsBodylessOwnersByFileName,
             tsBodiedOwnersByFileName,
           );
+        // The bodyless name to report, which for the misplaced-cluster arm
+        // below is not `directMatch` (that arm runs because the expected file
+        // does not exist at all).
+        let declOnlyTsName = declOnly ? directMatch : undefined;
         if (directMatch && !declOnly) {
           fileMatched++;
           // A method Ruby flattened onto this host through `include` is ported
@@ -4032,19 +4072,18 @@ export function main() {
         // Cross-file misplaced fallback: method exists in the cluster
         // file we identified above.
         if (actualMethods) {
-          const inCluster = tsCandidates.filter((c) => actualMethods.has(c));
-          const misplacedMatch = inCluster.find(
-            (c) =>
-              !declarationOnlyInFile(
-                misplacedActualFile!,
-                c,
-                tsBodylessOwnersByFileName,
-                tsBodiedOwnersByFileName,
-              ),
+          const verdict = misplacedClusterVerdict(
+            tsCandidates,
+            actualMethods,
+            misplacedActualFile!,
+            tsBodylessOwnersByFileName,
+            tsBodiedOwnersByFileName,
           );
-          // The cluster declares the name, but only as a signature — the same
-          // verdict the expected file gets, reported in the same column.
-          if (misplacedMatch === undefined && inCluster.length > 0) declOnly = true;
+          if (verdict.kind === "declaration-only") {
+            declOnly = true;
+            declOnlyTsName = verdict.tsName;
+          }
+          const misplacedMatch = verdict.kind === "match" ? verdict.tsName : undefined;
           if (misplacedMatch) {
             fileMatched++;
             checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule);
@@ -4127,7 +4166,11 @@ export function main() {
         }
 
         fileMissing++;
-        const missed = { rubyName, tsName: directMatch ?? tsCandidates[0], rubyModule };
+        const missed = {
+          rubyName,
+          tsName: declOnlyTsName ?? directMatch ?? tsCandidates[0],
+          rubyModule,
+        };
         missingMethods.push(missed);
         if (declOnly) declarationOnly.push(missed);
       }
