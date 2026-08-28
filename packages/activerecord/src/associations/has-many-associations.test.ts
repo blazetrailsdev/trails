@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import {
   findCollectionTarget as findHasManyTarget,
   findCollectionTarget as findHasManyThroughTarget,
@@ -22,10 +18,6 @@ import {
 } from "../index.js";
 import {
   Company,
-  // `Firm` is aliased to `HmFirm` as a defensive convention: bespoke
-  // `class Firm extends Base` declarations in still-unconverted describes would
-  // otherwise be renamed by esbuild (→ `Firm2`, table `firm2s`). No such
-  // bespoke `Firm` remains today, but the alias keeps future conversions safe.
   Firm as HmFirm,
   Client,
   NamespacedFirm,
@@ -45,13 +37,6 @@ import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions
 
 import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
-// Imported under HM-prefixed local aliases so the top-level bindings don't
-// collide with the bespoke `class Author` / `class Post` declarations in the
-// still-unconverted describes below. Without the alias, esbuild renames those
-// in-function classes (e.g. `Author` -> `Author2`) to avoid shadowing the
-// import, which silently changes their inferred table name to `author2s` and
-// breaks every test in those describes. The class identities (and therefore
-// `.name` / inferred table names) are unchanged — only the binding names differ.
 import {
   Author as HmAuthor,
   AuthorAddress as HmAuthorAddress,
@@ -214,9 +199,6 @@ describe("HasManyAssociationsTest", () => {
       if (!(e instanceof Client.RaisedOnDestroy)) throw e;
     }
 
-    // clientsOfFirm carries an order("id") scope and `good` is saved before
-    // `bad`, so Rails' `assert_equal [good, bad], ...reload` is an ordered
-    // assertion — preserve the order rather than sorting.
     const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
     expect(reloaded.map((c) => c.id)).toEqual([good.id, bad.id]);
   });
@@ -254,12 +236,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("adding buffers a record whose save fails into the target", async () => {
-    // Rails' `replace_on_target` adds the record to the in-memory target and
-    // fires after_add regardless of the insert result — only a `before_add`
-    // throw :abort skips it (collection_association.rb:457-483). A `before_save`
-    // throw :abort makes `save` return false without raising, so the record is
-    // still buffered; the failed insert is undone by the surrounding
-    // transaction's `raise Rollback unless result`.
     const bad = Client.new({ name: "Bad" }) as any;
     bad.throwOnSave = true;
 
@@ -273,16 +249,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("creating a record whose save fails buffers it into the target", async () => {
-    // `_create_record` wraps the insert in a transaction and buffers the record
-    // into the target regardless of the save result (collection_association.rb:363-371).
-    // A `before_save` throw :abort makes `save` return false without raising, so
-    // the record stays in the in-memory target while the insert is rolled back.
     const firstFirm = companies("first_firm") as any;
     await firstFirm.clientsOfFirm.load();
 
-    // The `create` block is yielded from the constructor (association.rb:383-388),
-    // before JS class-field initializers run, so `throwOnSave = false` would
-    // reset a flag set there. Fail at `insert_record`'s `record.save` instead.
     const saveSpy = vi.spyOn(Client.prototype as any, "save").mockResolvedValue(false);
     let bad: any;
     try {
@@ -346,7 +315,6 @@ describe("HasManyAssociationsTest", () => {
 
     const before = (await Client.count()) as number;
     const first = await firstFirm.clientsOfFirm.first();
-    // Rails coerces a bare Integer id to the record via the scoped `find`.
     await firstFirm.clientsOfFirm.destroy(first.id);
     expect(await Client.count()).toBe(before - 1);
 
@@ -363,7 +331,6 @@ describe("HasManyAssociationsTest", () => {
 
     const before = (await Client.count()) as number;
     const first = await firstFirm.clientsOfFirm.first();
-    // Rails coerces a bare String id to the record via the scoped `find`.
     await firstFirm.clientsOfFirm.destroy(String(first.id));
     expect(await Client.count()).toBe(before - 1);
 
@@ -383,8 +350,6 @@ describe("HasManyAssociationsTest", () => {
 
     const all = (await firstFirm.clientsOfFirm.load()) as any[];
     const before = (await Client.count()) as number;
-    // Rails passes the records nested in an array — a single Array arg, not
-    // bare ids — so id-coercion is skipped and the array is flattened.
     await firstFirm.clientsOfFirm.destroy([all[0], all[1]]);
     expect(await Client.count()).toBe(before - 2);
 
@@ -395,9 +360,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("destroy returns the removed records", async () => {
-    // Rails CollectionProxy#destroy returns `@association.destroy(*records)`,
-    // i.e. the removed records (collection_association.rb:385-396). An aborted
-    // before_remove returns none.
     const firstFirm = companies("first_firm") as any;
     const first = await firstFirm.clientsOfFirm.first();
     const removed = await firstFirm.clientsOfFirm.destroy(first);
@@ -517,7 +479,6 @@ describe("HasManyAssociationsTest", () => {
 
     await post.reload();
     expect((post as any).taggings_with_delete_all_count).toBe(startCount - 1);
-    // dependent: :delete_all DELETEs the row — it must not survive with a null FK.
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
 
@@ -530,19 +491,10 @@ describe("HasManyAssociationsTest", () => {
     await post.taggingsWithDestroy.delete(first);
 
     await post.reload();
-    // The has_many counter (taggings_with_destroy_count) differs from the
-    // belongs_to inverse's (tags_count), so inverse_updates_counter_cache? is
-    // false and the destroy must still decrement it.
     expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
-    // dependent: :destroy removes the row.
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
 
-  // Same Rails behavior as the test above, but routed through the OO
-  // CollectionAssociation#delete → HasManyAssociation#delete_records path
-  // (`association(...).delete`) rather than the CollectionProxy fast-path, to
-  // cover the `unless reflection.inverse_updates_counter_cache?` guard there.
-  // Verbatim Rails name (one Rails test, two trails code paths).
   it("deleting updates counter cache with dependent destroy", async () => {
     const post = posts("welcome");
     const startCount = (post as any).tags_count as number;
@@ -552,18 +504,10 @@ describe("HasManyAssociationsTest", () => {
     await (post as any).association("taggingsWithDestroy").delete(first);
 
     await post.reload();
-    // The has_many counter (taggings_with_destroy_count) differs from the
-    // belongs_to inverse's (tags_count), so inverse_updates_counter_cache? is
-    // false and the destroy must still decrement it.
     expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
 
-  // Same Rails behavior again, routed through CollectionProxy#destroy
-  // (`proxy.destroy(record)`) rather than `delete`. Rails' destroy calls
-  // delete_or_destroy(records, :destroy), sharing remove_records with delete, so
-  // the counter-cache decrement (gated on inverse_updates_counter_cache?) fires
-  // here too. Verbatim Rails name (one Rails test, three trails code paths).
   it("deleting updates counter cache with dependent destroy", async () => {
     const post = posts("welcome");
     const startCount = (post as any).tags_count as number;
@@ -663,8 +607,6 @@ describe("HasManyAssociationsTest", () => {
   registerSubclass(HmFirm);
   registerSubclass(Client);
 
-  // -- Counting --
-
   it("counting", async () => {
     const firm = (await HmFirm.first()) as any;
     expect(await firm.plainClients.count()).toBe(3);
@@ -691,8 +633,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.limitedClients.size()).toBe(len);
     expect(await firm.limitedClients.count()).toBe(len);
   });
-
-  // -- Finding --
 
   it("finding", async () => {
     const firm = (await HmFirm.first()) as any;
@@ -862,8 +802,6 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
-  // -- Deleting --
-
   it("deleting", async () => {
     const firm = companies("first_firm") as any;
     await firm.clientsOfFirm;
@@ -910,12 +848,6 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
-  // -- Destroying --
-  // `test_destroying`, `test_destroying_by_integer_id`,
-  // `test_destroying_by_string_id`, and `test_destroying_a_collection` live in
-  // the companies-fixture `HasManyAssociationsTest` describe above, where they
-  // exercise `clients_of_firm.destroy(...)` on the CollectionProxy exactly as
-  // Rails does (id-coercion + raise_on_type_mismatch! on the non-through path).
 
   it("destroy all", async () => {
     class DestroyAllAuthor extends Base {
@@ -981,7 +913,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DeleteAllUnloadedPost);
     const author = await DeleteAllUnloadedAuthor.create({ name: "Alice" });
     await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
-    // delete all without pre-loading the collection
     await author.destroy();
     const remaining = await findHasManyTarget(author, "delete_all_unloaded_posts");
     expect(remaining.length).toBe(0);
@@ -1022,8 +953,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it.skip("depends and nullify with composite foreign key nulls every FK column", async () => {
-    // Regression guard: the pre-ForeignAssociation.nullifiedOwnerAttributes
-    // path only nulled the first FK column when `foreignKey` was an array.
     class NullifyCompositeAuthor extends Base {
       declare name: string | null;
       declare cpk_posts: AssociationProxy<NullifyCompositePost>;
@@ -1065,10 +994,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("isAssociationCached reflects built Association instances", async () => {
-    // Rails' `association_cached?` checks @association_cache — which
-    // stores Association wrapper instances populated by .association(name),
-    // not targets. Our equivalents are _associationInstances (singular)
-    // and _collectionProxies (collection).
     class CacheAuthor extends Base {
       declare name: string | null;
       declare cache_posts: AssociationProxy<CachePost>;
@@ -1096,16 +1021,10 @@ describe("HasManyAssociationsTest", () => {
 
     expect(isAssociationCached(author, "cache_posts")).toBe(false);
 
-    // Building the proxy via `association(record, name)` is what Rails'
-    // `record.association(name)` does — populates the cache.
     association(author, "cache_posts");
     expect(isAssociationCached(author, "cache_posts")).toBe(true);
     expect(isAssociationCached(author, "other")).toBe(false);
   });
-
-  // -- Dependence --
-
-  // -- Get/Set IDs --
 
   it("get ids", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -1128,11 +1047,8 @@ describe("HasManyAssociationsTest", () => {
   it("get ids for association on new record does not try to find records", async () => {
     const author = HmAuthor.new({ name: "New" });
     expect(author.isNewRecord()).toBe(true);
-    // A new record shouldn't have any associated IDs
     expect(author.id == null).toBe(true);
   });
-
-  // -- Included in collection --
 
   it("included in collection", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -1145,12 +1061,9 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const newPost = HmPost.new({ author_id: author.id, title: "New" });
     expect(newPost.isNewRecord()).toBe(true);
-    // Not in DB yet
     const posts = await findHasManyTarget(author, "posts");
     expect(posts.some((p: any) => p.id === newPost.id)).toBe(false);
   });
-
-  // -- Clearing --
 
   it("clearing an association collection", async () => {
     class ClearAuthor extends Base {
@@ -1221,16 +1134,9 @@ describe("HasManyAssociationsTest", () => {
     expect(remaining.length).toBe(0);
   });
 
-  // -- Counter cache --
-  // Migrated to a dedicated `HasManyAssociationsTest` describe at end of file
-  // (B1966c — boot-laid canonical schema + withTransactionalFixtures).
-
-  // -- Has many on new record --
-
   it("has many associations on new records use null relations", async () => {
     const author = HmAuthor.new({ name: "New" });
     expect(author.isNewRecord()).toBe(true);
-    // New records have no id; any query would return 0 results
     expect(author.id == null).toBe(true);
   });
 });
@@ -1238,22 +1144,12 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
-    // A sibling test file may have warmed the shared schema cache for `bulbs`
-    // with a default lowercase `id` PK (e.g. base.test.ts / reflection.test.ts
-    // declare `bulbs: { car_id }`). Canonical `bulbs` uses `primary_key: "ID"`,
-    // so reset the memoized column/PK information before reflecting the
-    // canonical table — otherwise the ids_reader plucks a non-existent `id`
-    // column on PG.
     void Car.resetColumnInformation();
     void Bulb.resetColumnInformation();
     void Company.resetColumnInformation();
     await Car.loadSchema();
     await Bulb.loadSchema();
     await Company.loadSchema();
-    // Anchor the canonical `bulbs` primary key explicitly (path-1 `_primaryKey`)
-    // so `Bulb.primaryKey` cannot fall through to the shared schema cache — which
-    // a concurrent sibling worker's `defineSchema` on `bulbs` could invalidate
-    // mid-suite — and silently default to `"id"`, breaking the ids_reader on PG.
     Bulb.primaryKey = "ID";
   });
   registerModel(Car);
@@ -1264,7 +1160,6 @@ describe("HasManyAssociationsTest", () => {
   Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
-  // -- Calling size/empty --
 
   it("calling size on an association that has not been loaded performs a query", async () => {
     const car = (await Car.create({})) as any;
@@ -1367,8 +1262,6 @@ describe("HasManyAssociationsTest", () => {
   registerSubclass(HmFirm);
   registerSubclass(Client);
 
-  // -- Association definition --
-
   it("dangerous association name raises ArgumentError", () => {
     for (const name of ["errors", "save"]) {
       expect(() => {
@@ -1377,8 +1270,6 @@ describe("HasManyAssociationsTest", () => {
             this.hasMany(name);
           }
         }
-        // Reference Anon so the class definition (and its static block) is not
-        // elided as dead code.
         void Anon;
       }).toThrow(ArgumentError);
     }
@@ -1429,8 +1320,6 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
-
-  // -- Scoped queries --
 
   it("select query method", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -1513,7 +1402,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const posts = await findHasManyTarget(author, "posts");
-    // Should only have one instance
     const unique = new Set(posts.map((p: any) => p.id));
     expect(unique.size).toBe(posts.length);
   });
@@ -1748,7 +1636,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InvPost);
     const author = await InvAuthor.create({ name: "Alice" });
     const post = InvPost.new({ author_id: author.id, title: "Built" });
-    // The FK should be set, establishing the inverse link
     expect((post as any).author_id).toBe(Number(author.id));
     expect(post.isNewRecord()).toBe(true);
   });
@@ -1822,7 +1709,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with implicit sti base class", () => {
-    // DependentFirm has_many :companies; Company has STI with type column
     class StiCompany extends Base {
       declare name: string | null;
       declare "type": string | null;
@@ -2104,12 +1990,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ProtPost);
     const author = await ProtAuthor.create({ name: "Alice" });
     const post = await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
-    // FK should be set correctly
     expect((post as any).author_id).toBe(Number(author.id));
   });
   it("association enum works properly", async () => {
-    // Rails (has_many_associations_test.rb:480-489): test-local SpecialAuthor /
-    // SpecialBook classes over the canonical authors/books tables.
     class SpecialAuthor extends Base {
       static _tableName = "authors";
 
@@ -2184,11 +2067,8 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
     const posts = await findHasManyTarget(author, "posts");
-    // Array-like access
     expect(Array.isArray(posts)).toBe(true);
     expect(posts.length).toBe(2);
-    // Rails: Firm.order(:id).find { |f| f.id > 0 } — Enumerable#find/detect
-    // block-find over the loaded relation, distinct from the AR PK finder.
     const found = await HmAuthor.order("id").detect((a: any) => a.id > 0);
     expect((found as any).id).toBe(author.id);
   });
@@ -2350,15 +2230,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(RoPost);
     const author = await RoAuthor.create({ name: "Writer" });
     const post = await RoPost.create({ author_id: author.id, title: "P", body: "body" });
-    // Mark as readonly
     (post as any)._readonly = true;
     expect(() => {
       post.title = "Modified";
     }).not.toThrow();
-    // Readonly records can't be saved
     try {
       await post.save();
-      // If save doesn't throw, that's also acceptable behavior
     } catch (e: any) {
       expect(e.message).toMatch(/readonly/i);
     }
@@ -2454,7 +2331,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UpdAllFkPost);
     const author = await UpdAllFkAuthor.create({ name: "Alice" });
     const post = await UpdAllFkPost.create({ author_id: author.id, title: "Old", body: "body" });
-    // Update via explicit FK
     post.title = "Updated";
     await post.save();
     const posts = await findHasManyTarget(author, "upd_all_fk_posts");
@@ -2592,10 +2468,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ReloadPost);
     const author = await ReloadAuthor.create({ name: "Alice" });
     await ReloadPost.create({ author_id: author.id, title: "First", body: "body" });
-    // Load once
     const posts1 = await findHasManyTarget(author, "reload_posts");
     expect(posts1[0]).toBeDefined();
-    // Load again (simulating reload)
     const posts2 = await findHasManyTarget(author, "reload_posts");
     expect(posts2[0]).toBeDefined();
     expect((posts2[0] as any).title).toBe("First");
@@ -2632,9 +2506,7 @@ describe("HasManyAssociationsTest", () => {
     await proxy.load();
     expect(proxy.loaded).toBe(true);
     expect(proxy.target.length).toBe(1);
-    // Insert a new record behind the proxy's back
     await ReloadQcPost.create({ author_id: author.id, title: "B", body: "body" });
-    // reload clears the cache and fetches fresh data
     await proxy.reload();
     expect(proxy.loaded).toBe(true);
     expect(proxy.target.length).toBe(2);
@@ -2669,15 +2541,12 @@ describe("HasManyAssociationsTest", () => {
     await ReloadUlPost.create({ author_id: author.id, title: "A", body: "body" });
     const proxy = association(author, "reloadUlPosts");
     expect(proxy.loaded).toBe(false);
-    // reload on an unloaded proxy still loads and returns the correct data
     await proxy.reload();
     expect(proxy.loaded).toBe(true);
     expect(proxy.target.length).toBe(1);
     expect(proxy.target[0].title).toBe("A");
   });
   it("find all with include and conditions", async () => {
-    // Rails: Developer.all.merge!(joins: :audit_logs, where: { "audit_logs.message" => nil, :name => "Smith" }).to_a
-    // assert_nothing_raised — just verifies the join+where doesn't error
     registerModel(Developer);
     registerModel(AuditLog);
     await Developer.create({ name: "Smith" });
@@ -2694,7 +2563,6 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
     const posts = await findHasManyTarget(author, "posts");
-    // Group by title manually
     const groups: Record<string, any[]> = {};
     for (const p of posts) {
       const title = (p as any).title;
@@ -2718,7 +2586,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const posts = await findHasManyTarget(author, "posts");
-    // Default select should return all attributes
     expect((posts[0] as any).title).toBe("A");
   });
   it("select with block and dirty target", async () => {
@@ -2739,7 +2606,6 @@ describe("HasManyAssociationsTest", () => {
   it("regular create on has many when parent is new raises", async () => {
     const author = HmAuthor.new({ name: "Unsaved" });
     expect(author.isNewRecord()).toBe(true);
-    // Creating a child with null FK since parent isn't persisted
     const post = HmPost.new({ author_id: author.id, title: "Test" });
     expect(post.isNewRecord()).toBe(true);
     expect((post as any).author_id).toBeNull();
@@ -2747,7 +2613,6 @@ describe("HasManyAssociationsTest", () => {
   it("create with bang on has many raises when record not saved", async () => {
     const author = HmAuthor.new({ name: "Unsaved" });
     expect(author.isNewRecord()).toBe(true);
-    // Parent is unsaved, so FK will be null
     const post = HmPost.new({ author_id: author.id, title: "Test" });
     expect((post as any).author_id).toBeNull();
   });
@@ -2765,7 +2630,6 @@ describe("HasManyAssociationsTest", () => {
   });
   it("adding a mismatch class", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
-    // Creating a post with a valid FK still works regardless of "mismatch"
     const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     expect(post.isNewRecord()).toBe(false);
   });
@@ -3060,7 +2924,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(DcFirm);
     registerModel(DcClient);
-    // Only clients named "BigShot Inc." are in the scoped association
     const firm = await DcFirm.create({ name: "Odegy" });
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
@@ -3203,7 +3066,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await ClearNoAccessAuthor.create({ name: "Alice" });
     await ClearNoAccessPost.create({ author_id: author.id, title: "A", body: "body" });
     await ClearNoAccessPost.create({ author_id: author.id, title: "B", body: "body" });
-    // Clear without having loaded the association first
     await author.destroy();
     const remaining = await findHasManyTarget(author, "clear_no_access_posts");
     expect(remaining.length).toBe(0);
@@ -3212,7 +3074,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const otherPost = await HmPost.create({ author_id: 9999, title: "Other", body: "body" });
-    // Deleting something not in the collection shouldn't affect it
     await otherPost.destroy();
     const posts = await findHasManyTarget(author, "posts");
     expect(posts.length).toBe(1);
@@ -3229,7 +3090,6 @@ describe("HasManyAssociationsTest", () => {
   it("deleting self type mismatch", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Destroying the author should not fail even if posts exist
     await author.destroy();
     expect(author.isDestroyed()).toBe(true);
   });
@@ -3438,7 +3298,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepTxPost);
     const author = await DepTxAuthor.create({ name: "Alice" });
     await DepTxPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Even if transaction semantics aren't fully implemented, destroy should work
     await author.destroy();
     const remaining = await findHasManyTarget(author, "dep_tx_posts");
     expect(remaining.length).toBe(0);
@@ -3473,10 +3332,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ReLocalePost);
     const author = await ReLocaleAuthor.create({ name: "Writer" });
     await ReLocalePost.create({ author_id: author.id, title: "P", body: "body" });
-    // With restrict_with_error, destroy aborts (returns false) and populates
-    // errors[:base]. The :base message is built from the humanized association
-    // name; a locale override on that attribute would change the interpolated
-    // record name — here no translation is stored, so the default is used.
     expect(await author.destroy()).toBe(false);
     expect(author.errors.where("base")).toHaveLength(1);
     expect(author.errors.messagesFor("base")[0]).toBe(
@@ -3486,8 +3341,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await ReLocalePost.all().count()).toBe(1);
   });
   it("included in collection for composite keys", async () => {
-    // `cpk_books.id` is not auto-increment under its composite PK, so the id
-    // part is assigned explicitly — MariaDB rejects the insert otherwise.
     const greatAuthor = await CpkAuthor.create({ name: "Alice" });
     await CpkBook.create({
       id: [greatAuthor.id as number, 1],
@@ -3495,9 +3348,6 @@ describe("HasManyAssociationsTest", () => {
       revision: 1,
     });
 
-    // Rails reads `great_author.books.first`, which does NOT mark the
-    // association loaded, so `include?` takes the `scope.exists?(record_id)`
-    // branch — the one that needs the composite key as a column=>value hash.
     const book = await (await CpkAuthor.find(greatAuthor.id)).books.first();
 
     expect(await greatAuthor.books.isInclude(book!)).toBe(true);
@@ -3561,7 +3411,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ReplFailPost);
     const author = await ReplFailAuthor.create({ name: "Alice" });
     const post = await ReplFailPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Replacing FK with invalid value
     post.author_id = 999999;
     await post.save();
     const posts = await findHasManyTarget(author, "repl_fail_posts");
@@ -3595,7 +3444,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await UnloadedAuthor.create({ name: "Alice" });
     const p1 = await UnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await UnloadedPost.create({ author_id: author.id, title: "B", body: "body" });
-    // Getting IDs directly via loadHasMany
     const posts = await findHasManyTarget(author, "unloaded_posts");
     const ids = posts.map((p: any) => p.id);
     expect(ids.length).toBe(2);
@@ -3631,7 +3479,6 @@ describe("HasManyAssociationsTest", () => {
     await DirtyIdPost.create({ author_id: author.id, title: "P1", body: "body" });
     const posts = await findHasManyTarget(author, "dirty_id_posts");
     expect(posts).toHaveLength(1);
-    // Add another post
     await DirtyIdPost.create({ author_id: author.id, title: "P2", body: "body" });
     await author.reload();
     const posts2 = await findHasManyTarget(author, "dirty_id_posts");
@@ -3794,7 +3641,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(BlankIdPost);
     const author = await BlankIdAuthor.create({ name: "Alice" });
     const p1 = await BlankIdPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Blank/null IDs should be ignored
     const posts = await findHasManyTarget(author, "blank_id_posts");
     const ids = posts.map((p: any) => p.id).filter((id: any) => id != null && id !== "");
     expect(ids.length).toBe(1);
@@ -3856,7 +3702,6 @@ describe("HasManyAssociationsTest", () => {
     expect(ids).toContain(comment.id);
   });
   it("modifying a through a has many should raise", async () => {
-    // Through associations are read-only; modifying them directly should not be allowed
     class ThrModAuthor extends Base {
       declare name: string | null;
 
@@ -3879,7 +3724,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ThrModPost);
     const author = await ThrModAuthor.create({ name: "Alice" });
     const post = await ThrModPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Direct modification of the through record is fine
     post.title = "Modified";
     await post.save();
     const reloaded = await ThrModPost.find(post.id!);
@@ -3995,7 +3839,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HcAuthor);
     registerModel(HcPost);
     registerModel(HcComment);
-    // Through association with scope condition
 
     const author = await HcAuthor.create({ name: "David" });
     const post = await HcPost.create({
@@ -4038,10 +3881,8 @@ describe("HasManyAssociationsTest", () => {
     const author = await InclAuthor.create({ name: "Alice" });
     const post = await InclPost.create({ author_id: author.id, title: "A", body: "body" });
     const proxy = association(author, "inclPosts");
-    // target not loaded — isInclude must query the DB
     expect(proxy.loaded).toBe(false);
     expect(await proxy.isInclude(post as any)).toBe(true);
-    // include? via EXISTS does not load the target (Rails: assert_not loaded?)
     expect(proxy.loaded).toBe(false);
   });
   it("include returns false for non matching record to verify scoping", async () => {
@@ -4074,7 +3915,6 @@ describe("HasManyAssociationsTest", () => {
     const author2 = await InclScopeAuthor.create({ name: "Bob" });
     const post = await InclScopePost.create({ author_id: author2.id, title: "B", body: "body" });
     const proxy = association(author1, "inclScopePosts");
-    // record belongs to author2, not author1 — scope prevents match
     expect(await proxy.isInclude(post as any)).toBe(false);
   });
   it("calling first nth or last on association should not load association", async () => {
@@ -4138,7 +3978,6 @@ describe("HasManyAssociationsTest", () => {
     await FlLoadPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlLoadPost.create({ author_id: author.id, title: "B", body: "body" });
     const posts = await findHasManyTarget(author, "fl_load_posts");
-    // Once loaded, first and last are just array access
     expect(posts[0]).toBeDefined();
     expect(posts[posts.length - 1]).toBeDefined();
   });
@@ -4169,9 +4008,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlBuildPost);
     const author = await FnlBuildAuthor.create({ name: "Alice" });
     await FnlBuildPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Build a new one (not saved)
     FnlBuildPost.new({ author_id: author.id, title: "B" });
-    // Loading the association should get only persisted records
     const posts = await findHasManyTarget(author, "fnl_build_posts");
     expect(posts[0]).toBeDefined();
     expect(posts.length).toBe(1);
@@ -4233,7 +4070,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlNewAuthor);
     registerModel(FnlNewPost);
     const author = FnlNewAuthor.new({ name: "Unsaved" });
-    // New record has no id, so loading association returns empty
     const posts = await findHasManyTarget(author, "fnl_new_posts");
     expect(posts.length).toBe(0);
   });
@@ -4267,7 +4103,6 @@ describe("HasManyAssociationsTest", () => {
     await FlIntPost.create({ author_id: author.id, title: "B", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "C", body: "body" });
     const posts = await findHasManyTarget(author, "fl_int_posts");
-    // first(2) equivalent
     const firstTwo = posts.slice(0, 2);
     expect(firstTwo.length).toBe(2);
   });
@@ -4303,7 +4138,6 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(author, "manyCountPosts");
     expect(proxy.loaded).toBe(false);
     expect(await proxy.isMany()).toBe(true);
-    // many() uses COUNT — must NOT have loaded the target
     expect(proxy.loaded).toBe(false);
   });
   it("calling many on loaded association should not use query", async () => {
@@ -4338,7 +4172,6 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(author, "manyLoadPosts");
     await proxy.load();
     expect(proxy.loaded).toBe(true);
-    // many() on a loaded proxy reads target.length — no extra query
     const sqlQueries: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e: any) => {
       if (e?.payload?.sql) sqlQueries.push(e.payload.sql);
@@ -4380,10 +4213,8 @@ describe("HasManyAssociationsTest", () => {
     const author = await ManySubAuthor.create({ name: "Alice" });
     await ManySubPost.create({ author_id: author.id, title: "A", body: "body" });
     const proxy = association(author, "manySubPosts");
-    // 1 post → not many
     expect(await proxy.isMany()).toBe(false);
     expect(proxy.loaded).toBe(false);
-    // second call still issues a COUNT (not cached)
     await ManySubPost.create({ author_id: author.id, title: "B", body: "body" });
     expect(await proxy.isMany()).toBe(true);
   });
@@ -4417,11 +4248,8 @@ describe("HasManyAssociationsTest", () => {
     await ManyBlkPost.create({ author_id: author.id, title: "A", body: "body" });
     await ManyBlkPost.create({ author_id: author.id, title: "B", body: "body" });
     const proxy = association(author, "manyBlkPosts");
-    // predicate form: loads target, filters, checks count > 1
     expect(await proxy.isMany((p: any) => p.title === "A")).toBe(false);
-    // predicate matched all → many
     expect(await proxy.isMany((_p: any) => true)).toBe(true);
-    // loading side-effect: target should now be loaded
     expect(proxy.loaded).toBe(true);
   });
   it("calling none should count instead of loading association", async () => {
@@ -4454,7 +4282,6 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(author, "noneCountPosts");
     expect(proxy.loaded).toBe(false);
     expect(await proxy.isNone()).toBe(true);
-    // isNone() uses COUNT — must NOT have loaded the target
     expect(proxy.loaded).toBe(false);
   });
   it("calling none on loaded association should not use query", async () => {
@@ -4488,7 +4315,6 @@ describe("HasManyAssociationsTest", () => {
     const proxy = association(author, "noneLoadPosts");
     await proxy.load();
     expect(proxy.loaded).toBe(true);
-    // loaded → isNone reads target.length, no extra query
     const sqlQueries: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e: any) => {
       if (e?.payload?.sql) sqlQueries.push(e.payload.sql);
@@ -4529,9 +4355,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await NoneBlkAuthor.create({ name: "Alice" });
     await NoneBlkPost.create({ author_id: author.id, title: "A", body: "body" });
     const proxy = association(author, "noneBlkPosts");
-    // predicate matches nothing → none
     expect(await proxy.isNone((p) => (p as any).title === "Z")).toBe(true);
-    // predicate matched some → not none
     expect(await proxy.isNone((_p) => true)).toBe(false);
     expect(proxy.loaded).toBe(true);
   });
@@ -4689,7 +4513,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneZeroAuthor.create({ name: "Alice" });
     const posts = await findHasManyTarget(author, "one_zero_posts");
     expect(posts.length).toBe(0);
-    // "one?" returns false when zero records
     expect(posts.length === 1).toBe(false);
   });
   it("calling one should return false if more than one", async () => {
@@ -4722,13 +4545,9 @@ describe("HasManyAssociationsTest", () => {
     await OneMultiPost.create({ author_id: author.id, title: "B", body: "body" });
     const posts = await findHasManyTarget(author, "one_multi_posts");
     expect(posts.length).toBe(2);
-    // "one?" returns false when more than one record
     expect(posts.length === 1).toBe(false);
   });
   it("joins with namespaced model should use correct type", async () => {
-    // With storeFullStiClass on, the join to :clients must scope by the full STI
-    // name (type = 'Namespaced::Client'); if it demodulized to 'Client' the join
-    // would match no rows and num_clients would come back 0 instead of 1.
     const old = Base.storeFullStiClass;
     Base.storeFullStiClass = true;
     try {
@@ -4834,7 +4653,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Define association before registering the target model
     registerModel(LazyDelAuthor);
     registerModel(LazyDelPost);
     const author = await LazyDelAuthor.create({ name: "Alice" });
@@ -4995,7 +4813,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(NoDblPost);
     const author = await NoDblAuthor.create({ name: "Alice" });
     const post = await NoDblPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Saving again should work without issues
     await post.save();
     const reloaded = await NoDblPost.find(post.id!);
     expect((reloaded as any).title).toBe("A");
@@ -5023,7 +4840,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InitAttrPost);
     const author = await InitAttrAuthor.create({ name: "Alice" });
     const post = InitAttrPost.new({ author_id: author.id, title: "Init" });
-    // Association attributes should be available immediately after initialization
     expect((post as any).author_id).toBe(Number(author.id));
     expect((post as any).title).toBe("Init");
   });
@@ -5150,7 +4966,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FoiAuthor);
     registerModel(FoiPost);
     const author = await FoiAuthor.create({ name: "Alice" });
-    // No posts exist yet, so first_or_initialize creates a new (unsaved) record
     const posts = await findHasManyTarget(author, "foi_posts");
     expect(posts.length).toBe(0);
     const post = FoiPost.new({ author_id: author.id, title: "Initialized" });
@@ -5183,7 +4998,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocAuthor);
     registerModel(FocPost);
     const author = await FocAuthor.create({ name: "Alice" });
-    // No posts exist, so first_or_create creates and saves
     const posts1 = await findHasManyTarget(author, "foc_posts");
     expect(posts1.length).toBe(0);
     const post = await FocPost.create({ author_id: author.id, title: "Created", body: "body" });
@@ -5260,7 +5074,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await NoLoadDelAuthor.create({ name: "Alice" });
     await NoLoadDelPost.create({ author_id: author.id, title: "A", body: "body" });
     await NoLoadDelPost.create({ author_id: author.id, title: "B", body: "body" });
-    // Delete without loading first
     await author.destroy();
     const remaining = await findHasManyTarget(author, "no_load_del_posts");
     expect(remaining.length).toBe(0);
@@ -5411,7 +5224,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(RndPost);
     const author = await RndAuthor.create({ name: "Alice" });
     const post = await RndPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Verify post exists, then destroy it
     expect(post.isPersisted()).toBe(true);
     await post.destroy();
     expect(post.isDestroyed()).toBe(true);
@@ -5488,14 +5300,11 @@ describe("HasManyAssociationsTest", () => {
       title: "Original",
       body: "body",
     });
-    // Load once
     const posts1 = await findHasManyTarget(author, "repl_mem_posts");
     expect(posts1.length).toBe(1);
     expect((posts1[0] as any).title).toBe("Original");
-    // Update the post
     post.title = "Updated";
     await post.save();
-    // Reload - should get updated version
     await author.reload();
     const posts2 = await findHasManyTarget(author, "repl_mem_posts");
     expect(posts2.length).toBe(1);
@@ -5524,7 +5333,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InMemPost);
     const author = await InMemAuthor.create({ name: "Alice" });
     const post = InMemPost.new({ author_id: author.id, title: "A" });
-    // In-memory: changing FK doesn't require DB query
     post.author_id = null as any;
     expect((post as any).author_id).toBeNull();
   });
@@ -5641,7 +5449,6 @@ describe("HasManyAssociationsTest", () => {
     let saveCount = 0;
     const author = await DblFireAuthor.create({ name: "Alice" });
     const post = new DblFirePost({ author_id: author.id, title: "A", body: "body" });
-    // Track saves
     const origSave = post.save.bind(post);
     post.save = async function () {
       saveCount++;
@@ -5738,7 +5545,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(LoadValPost);
     const author = await LoadValAuthor.create({ name: "Alice" });
     const post = await LoadValPost.create({ author_id: author.id, title: "A", body: "body" });
-    // Loading association during validation shouldn't prevent persistence
     const posts = await findHasManyTarget(author, "load_val_posts");
     expect(posts.length).toBe(1);
     expect(post.isPersisted()).toBe(true);
@@ -5771,7 +5577,6 @@ describe("HasManyAssociationsTest", () => {
     const author = await RollbackAuthor.create({ name: "Alice" });
     const post = await RollbackPost.create({ author_id: author.id, title: "A", body: "body" });
     expect(post.isPersisted()).toBe(true);
-    // Verify the child exists
     const posts = await findHasManyTarget(author, "rollback_posts");
     expect(posts.length).toBe(1);
   });
@@ -5782,7 +5587,6 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length).toBe(0);
   });
   it("has many association with same foreign key name", async () => {
-    // Two hasMany associations with the same FK should both work
     class SameFkAuthor extends Base {
       declare name: string | null;
       declare posts: AssociationProxy<SameFkPost>;
@@ -5840,7 +5644,6 @@ describe("HasManyAssociationsTest", () => {
     }
     registerModel(KeyValAuthor);
     registerModel(KeyValPost);
-    // Association without dependent option
     const author = await KeyValAuthor.create({ name: "Alice" });
     await KeyValPost.create({ author_id: author.id, title: "A", body: "body" });
     const posts = await findHasManyTarget(author, "key_val_posts");
@@ -5856,13 +5659,12 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     registerModel(InvKeyAuthor);
-    // Trying to find a non-existent model should throw
     expect(() => {
       Associations.hasMany.call(InvKeyAuthor, "nonexistent_posts", {
         className: "NonExistentModel",
         foreignKey: "author_id",
       });
-    }).not.toThrow(); // Declaration doesn't throw; resolution is lazy
+    }).not.toThrow();
   });
   it("key ensuring owner was is valid when dependent option is destroy async", async () => {
     class AsyncDepAuthor extends Base {
@@ -6023,13 +5825,6 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-// Building cluster (adding `<<`, build, create, replace `=`) migrated to a
-// shared describe-level adapter riding the boot-laid canonical schema +
-// withTransactionalFixtures (Batch B1966e). Tests previously defined Author
-// and Post inside each `it()` block against an inline `freshAdapter()` from
-// the parent describe's `beforeEach`. Hoisting the classes to `beforeAll`
-// means each test runs inside BEGIN/ROLLBACK against the ambient canonical
-// tables rather than rebuilding them.
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
 
@@ -6039,7 +5834,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmCar);
     registerModel(HmBulb);
   });
-  // -- Adding --
 
   it("adding", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -6069,8 +5863,6 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Created");
   });
-
-  // -- Build --
 
   it("build", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -6110,8 +5902,6 @@ describe("HasManyAssociationsTest", () => {
     expect(post.isNewRecord()).toBe(true);
   });
 
-  // -- Create --
-
   it("create", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
@@ -6147,10 +5937,6 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-// Mirrors Rails Bulb (`default_scope { where(name: "defaulty") }`) and
-// the Car associations that exercise scope chaining: `:bulbs` (default
-// scope applies), `:all_bulbs` (unscope where:name), `:other_bulbs`
-// (unscope + rewrite), `:old_bulbs` (rewhere).
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
   beforeAll(async () => {
@@ -6161,7 +5947,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can unscope the default scope of the associated model", async () => {
-    // Rails: car.bulbs => [defaulty]; car.all_bulbs.sort_by(&:id) => [bulb1, bulb2]
     const car = await HmCar.create({});
     const bulb1 = await HmBulb.create({ name: "defaulty", car_id: car.id });
     const bulb2 = await HmBulb.create({ name: "other", car_id: car.id });
@@ -6186,7 +5971,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can unscope and where the default scope of the associated model", async () => {
-    // Rails: car.bulbs => [defaulty]; car.other_bulbs => [other]
     const car = await HmCar.create({});
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     await HmBulb.create({ name: "other", car_id: car.id });
@@ -6199,7 +5983,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can rewhere the default scope of the associated model", async () => {
-    // Rails: car.bulbs => [defaulty]; car.old_bulbs => [old]
     const car = await HmCar.create({});
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     await HmBulb.create({ name: "old", car_id: car.id });
@@ -6234,8 +6017,6 @@ describe("HasManyAssociationsTest", () => {
     const post = (await HmPost.first())!;
 
     expect(await (person as any).readers.toArray()).toEqual([]);
-    // Rails: person.readers.find_by_post_id(post.id) — dynamic finders are
-    // Ruby method_missing sugar; findBy carries the same query.
     expect(await (person as any).readers.findBy({ post_id: post.id })).toBeNull();
 
     await (person as any).readers.create({ post_id: post.id });
@@ -6255,12 +6036,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("collection proxy respects default scope", async () => {
-    // Rails (has_many_associations_test.rb:2773-2776):
-    //   author = authors(:mary)
-    //   assert_not_predicate author.first_posts, :exists?
-    // `Author#first_posts` resolves to the `FirstPost` model, whose
-    // `default_scope { where(id: 1) }` restricts the collection to post id 1.
-    // Mary (author 2) owns no post with id 1, so the proxy is empty.
     const author = await HmAuthor.find(authors("mary").id);
     const exists = await author.firstPosts.exists();
     expect(exists).toBe(false);
@@ -6281,11 +6056,6 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("has many custom primary key", async () => {
-    // Rails (has_many_associations_test.rb:84-87):
-    //   david = authors(:david)
-    //   assert_equal Essay.where(writer_id: "David"), david.essays
-    // `Author#essays` uses primary_key :name (as: :writer), so David's
-    // essays are exactly those with writer_id == "David".
     const david = authors("david");
     const expected = (await HmEssay.where({ writer_id: "David" })).map((e) => e.id).sort();
     const actual = (await association(david, "essays")).map((e) => e.id).sort();
@@ -6293,12 +6063,6 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("has many assignment with custom primary key", async () => {
-    // Rails (has_many_associations_test.rb:100-106):
-    //   david = people(:david)
-    //   assert_equal ["A Modest Proposal"], david.essays.map(&:name)
-    //   david.essays = [Essay.create!(name: "Remote Work")]
-    //   assert_equal ["Remote Work"], david.essays.map(&:name)
-    // `Person#essays` uses primary_key :first_name, foreign_key :writer_id.
     const david = people("david");
     const names = (await association(david, "essays")).map((e) => e.name);
     expect(names).toEqual(["A Modest Proposal"]);
@@ -6567,18 +6331,12 @@ describe("HasManyAssociationsTest", () => {
     } catch (e) {
       if (e instanceof RND) error = e;
     }
-    // Rails: assert_instance_of PostWithErrorDestroying, error.record
     expect(error).toBeDefined();
     expect((error as any).record).toBeInstanceOf(PostWithErrorDestroying2);
-    // Suppress unused-variable warning; post was created to trigger the association destroy.
     void post;
   });
 
   it("collection destroy uses destroy bang and rolls back the batch on failure", async () => {
-    // Rails CollectionProxy#destroy runs `records.each(&:destroy!)` inside
-    // delete_or_destroy's transaction, so a child that can't be destroyed raises
-    // RecordNotDestroyed and rolls back the whole batch — an earlier, already
-    // destroyed sibling is restored.
     class HaltingComment extends Base {
       declare body: string | null;
 
@@ -6615,7 +6373,6 @@ describe("HasManyAssociationsTest", () => {
     const { RecordNotDestroyed: RND } = await import("../index.js");
     await expect((post as any).haltingComments.destroy(first, second)).rejects.toBeInstanceOf(RND);
 
-    // Rolled back: the removable sibling destroyed before the halt is restored.
     expect(await HaltingComment.exists(first.id)).toBe(true);
     expect(await HaltingComment.exists(second.id)).toBe(true);
   });
@@ -6646,9 +6403,6 @@ describe("AsyncHasManyAssociationsTest", () => {
   });
 
   it("async load has many", async () => {
-    // Rails has_many_associations_test.rb:3261 test_async_load_has_many:
-    //   firm.association(:clients).async_load_target; then clients.size == 3
-    //   and clients[2] is reachable with no further queries.
     const firm = companies("first_firm") as any;
 
     await firm.association("clients").asyncLoadTarget();
@@ -6782,7 +6536,6 @@ describe("HasManyAssociationsTest", () => {
     const assoc = (HmShip as any)._reflectOnAssociation("treasures");
     expect(assoc).toBeDefined();
     expect(assoc.options.counterCache).toBeUndefined();
-    // Count comes from SQL, not the cached attribute
     expect(await ship.treasures.size()).toBe(0);
     const countBefore = (await HmShip.find(ship.id)).treasures_count;
     await ship.treasures.create({ name: "Gold" });
@@ -6853,9 +6606,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling empty with counter cache", async () => {
-    // Post.comments derives counter column `comments_count`, aliased to the
-    // canonical `legacy_comments_count` — hasCachedCounter? resolves the alias
-    // so isEmpty() reads the cache instead of querying (reflection.ts).
     const post = posts("welcome") as any;
     await assertNoQueries(false, async () => {
       expect(await post.comments.isEmpty()).toBe(false);
@@ -6866,15 +6616,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
 
-  // Regression for HasManyAssociation#deleteRecords (the association-layer
-  // `delete`, reached only via `record.association(name)` for a non-through
-  // has_many; the CollectionProxy intercepts the proxy-level delete). It must
-  // scope to the given records by tuple, not by a per-column cartesian AND.
-  // CpkBook's composite PK [author_id, id] varies in BOTH columns across one
-  // order's books (the FK is [shop_id, order_id], not author_id), so a
-  // cartesian `author_id IN (1,2) AND id IN (10,20)` would also match the
-  // diagonal rows (1,20)/(2,10) and nullify them. Mirrors Rails
-  // has_many_association.rb:132-135.
   it("deleting composite-key records scopes by tuple, not cartesian product", async () => {
     registerModel([CpkOrder, CpkBook]);
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
@@ -6889,12 +6630,11 @@ describe("HasManyAssociationsTest", () => {
       });
     const b1 = await mk(1, 10);
     const b2 = await mk(2, 20);
-    await mk(1, 20); // diagonal — must survive
-    await mk(2, 10); // diagonal — must survive
+    await mk(1, 20);
+    await mk(2, 10);
 
     await (order as any).association("books").delete(b1, b2);
 
-    // Only the two requested books are nullified; the diagonal rows survive.
     const survivor1 = await CpkBook.findBy({ author_id: 1, id: 20 });
     const survivor2 = await CpkBook.findBy({ author_id: 2, id: 10 });
     expect((survivor1 as any).order_id).toBe(Number(orderId));
@@ -6915,11 +6655,6 @@ describe("HasManyAssociationsTest", () => {
     "shardedComments",
   ]);
 
-  // fixtures loads the fixture rows but does not register the models
-  // under the class names the associations resolve by (`CpkBook`,
-  // `ShardedComment`), so register them here (dynamic import keeps these out of
-  // the file's top-level scope, where bespoke same-named classes in
-  // still-unconverted describes would otherwise be renamed by esbuild).
   beforeAll(async () => {
     const cpk = await import("../test-helpers/models/cpk.js");
     registerModel("CpkAuthor", cpk.CpkAuthor);
@@ -6930,11 +6665,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel("ShardedComment", sharded.ShardedComment);
   });
 
-  // Rails has_many_associations_test.rb:1294 test_deleting_models_with_composite_keys.
-  // cpk_great_author has 2 books (cpk_books.yml); delete one, reload, assert 1
-  // remains. CpkAuthor#books is `dependent: :delete_all`, so the proxy delete
-  // DELETEs the book row — its author_id is part of the composite PK and cannot
-  // be nullified.
   it("deleting models with composite keys", async () => {
     const greatAuthor = cpkAuthors("cpk_great_author") as any;
     const books = await greatAuthor.books;
@@ -6947,11 +6677,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await greatAuthor.books.size()).toBe(1);
   });
 
-  // Rails has_many_associations_test.rb:1306 test_sharded_deleting_models.
-  // great_post_blog_one has 3 comments (sharded_comments.yml); delete two and
-  // assert the generated DELETE scopes by an OR-of-AND composite-key tuple form,
-  // then check the reloaded size. delete_comments is `dependent: :delete_all`, so
-  // the proxy delete DELETEs the rows rather than nullifying the composite FK.
   it("sharded deleting models", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
     const comments = await blogPost.deleteComments;
@@ -6964,12 +6689,6 @@ describe("HasManyAssociationsTest", () => {
       await blogPost.deleteComments.delete(commentsToDelete);
     });
 
-    // Mirror Rails' OR-of-AND tuple-form assertion (adapter-agnostic on the
-    // identifier quoting): each deleted row is scoped by its full composite key
-    // `blog_id = .. AND id = ..`, the two joined by OR inside ONE pair of
-    // parens. That single outer Grouping is `grouping_queries`' shape
-    // (predicate_builder.rb:154-161) — Rails' own `query_constraints` regex has
-    // no per-tuple parens.
     const col = (name: string) => `["\`]?sharded_comments["\`]?\\.["\`]?${name}["\`]?`;
     const queryConstraints = `${col("blog_id")} = .* AND ${col("id")} = .*`;
     const expectation = new RegExp(

@@ -950,10 +950,24 @@ export default defineConfig(
   //    time. The implementation files are done; the test files under the same
   //    tree are still outstanding (story
   //    strip-freeform-comments-ar-associations-tests), so they are ignored here
-  //    rather than holding the rule off the whole tree until they land. ──
+  //    rather than holding the rule off the whole tree until they land. The
+  //    block below re-enables the rule for the test files already swept; each
+  //    slice appends to that list until it covers the tree and both blocks
+  //    collapse back into one. ──
   {
     files: ["packages/activerecord/src/associations/**/*.ts"],
     ignores: ["packages/activerecord/src/associations/**/*.test.ts"],
+    rules: {
+      "blazetrails/no-freeform-comments": "error",
+    },
+  },
+  {
+    files: [
+      "packages/activerecord/src/associations/eager.test.ts",
+      "packages/activerecord/src/associations/has-many-associations.test.ts",
+      "packages/activerecord/src/associations/has-one-associations.test.ts",
+      "packages/activerecord/src/associations/join-model.test.ts",
+    ],
     rules: {
       "blazetrails/no-freeform-comments": "error",
     },
