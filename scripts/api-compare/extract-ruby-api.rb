@@ -2196,15 +2196,15 @@ class ApiExtractor
   # call, manufacturing a call-set row no faithful port can ever satisfy: the
   # port of a capture local IS a local
   # (activerecord/lib/active_record/connection_adapters/mysql/schema_dumper.rb:13-14).
-  def named_capture_locals(node, names = Set.new)
-    return names unless node.is_a?(Array)
+  #
+  # Recorded as the walk REACHES the `=~`, never precomputed over the body: the
+  # binding only reaches the rest of the method, so a bare `size` written BEFORE
+  # it is still the receiverless call Ripper parsed.
+  def note_capture_locals(node)
+    return unless node[0] == :binary && node[2] == :=~ && node[1].is_a?(Array) &&
+                  node[1][0] == :regexp_literal
 
-    if node[0] == :binary && node[2] == :=~ && node[1].is_a?(Array) &&
-       node[1][0] == :regexp_literal
-      regexp_literal_source(node[1]).scan(/\(\?<([a-zA-Z_]\w*)>/) { |(name)| names << name }
-    end
-    node.each { |child| named_capture_locals(child, names) if child.is_a?(Array) }
-    names
+    regexp_literal_source(node[1]).scan(/\(\?<([a-zA-Z_]\w*)>/) { |(name)| @capture_locals << name }
   end
 
   # The static text of a `:regexp_literal` — interpolated parts carry no
@@ -2217,9 +2217,9 @@ class ApiExtractor
          .join
   end
 
-  def with_capture_locals(body_node)
+  def with_capture_locals
     outer = @capture_locals
-    @capture_locals = named_capture_locals(body_node)
+    @capture_locals = Set.new
     yield
   ensure
     @capture_locals = outer
@@ -2235,7 +2235,7 @@ class ApiExtractor
   def collect_method_calls(body_node)
     calls = []
     weak = []
-    with_capture_locals(body_node) { walk_for_calls(body_node, calls, weak) }
+    with_capture_locals { walk_for_calls(body_node, calls, weak) }
     calls = drop_raised_new(calls)
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
@@ -2248,7 +2248,7 @@ class ApiExtractor
   # repeats and the zero-argument sites the argument comparator has to see.
   def collect_call_args(body_node)
     sites = []
-    with_capture_locals(body_node) { walk_for_call_args(body_node, sites) }
+    with_capture_locals { walk_for_call_args(body_node, sites) }
     sites
   end
 
@@ -2270,7 +2270,7 @@ class ApiExtractor
   # `throw new X(...)` — a ThrowStatement on the TS side, never a call.
   def collect_method_skeleton(body_node)
     tokens = []
-    with_capture_locals(body_node) { walk_for_skeleton(body_node, tokens) }
+    with_capture_locals { walk_for_skeleton(body_node, tokens) }
     tokens
   end
 
@@ -2313,6 +2313,7 @@ class ApiExtractor
     end
 
     node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
+    note_capture_locals(node)
   end
 
   # Ripper wraps an op-assign operator in an `:op` node on newer parsers and
@@ -2662,6 +2663,7 @@ class ApiExtractor
     end
 
     node.each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+    note_capture_locals(node)
   end
 
   # Decompose a call-ish Ripper node into [callee_node, argument_nodes] — the
@@ -2859,6 +2861,7 @@ class ApiExtractor
       record_call_site(node, sites, [])
     else
       node.each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
+      note_capture_locals(node)
     end
   end
 

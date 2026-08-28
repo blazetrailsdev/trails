@@ -131,6 +131,24 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     ]);
   });
 
+  it("only binds the capture for the rest of the method, not the lines before it", () => {
+    // The skeleton keeps duplicates, so it distinguishes the pre-binding read
+    // (still a call) from the post-binding one (a local) where the uniq'd
+    // call-set cannot.
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def check(str)
+            size
+            /(?<size>tiny)/ =~ str
+            size
+          end
+        end
+      `,
+    });
+    expect(s["Foo#check"]).toEqual(["ref:size"]);
+  });
+
   it("still reads a bare name as a call when the regexp is on the right of `=~`", () => {
     const c = rubyCalls({
       "foo.rb": `
