@@ -245,6 +245,9 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       // filled as the walker descends each file), which is Rails source order
       // within a file. Methods are bucketed by their own `file` because Rails
       // reopens classes across files; a declaration has exactly one site.
+      // Noting the class HERE and not only per-method is what lets a
+      // last-segment collision involving a method-less class be seen at all.
+      noteClass(host.file, className, host.fqn);
       declarationsFor(host.file).push(className);
       // Order by source line rather than appending classMethods after
       // instanceMethods — see mergeBySourceLine for why. Tag each method with
