@@ -171,7 +171,7 @@ function fixerInsertInternal(fixer, node, sourceCode, jsdocComment) {
  * top-level declaration. The manifest's `entities` map is keyed by exactly this
  * name (the last segment of the contributing Ruby entity's FQN).
  */
-function enclosingEntityName(node) {
+export function enclosingEntityName(node) {
   for (let cur = node.parent; cur; cur = cur.parent) {
     if (cur.type === "ClassDeclaration" || cur.type === "ClassExpression") {
       return cur.id?.name ?? null;
@@ -191,19 +191,35 @@ function enclosingEntityName(node) {
  * protocol whose `unlock` mirrors the PUBLIC stdlib `Mutex#unlock` — and its
  * members are not gated by a name some other entity in the file made private.
  *
- * A declaration that IS a known entity still reads the file-wide union: Rails
- * routinely splits one class across sibling modules in one file (`Rack::Request`
- * and `Rack::Request::Helpers`) that the port folds into a single TS class, so
- * narrowing to one entity's own names there would drop real gating.
+ * An INSTANCE member also reads `instanceFiles`, the same fold run over the
+ * file's instance halves alone: one `.rb` can declare the same name at two
+ * visibilities on the two halves of one Concern — `attribute` is public on
+ * `ActiveModel::Attributes::ClassMethods` (attributes.rb:59) and private on the
+ * instance half (attributes.rb:161) — and the file-wide fold publishes the
+ * private one.
  *
- * A top-level declaration has no enclosing entity to resolve — the module-mixin
- * idiom puts a module's methods there as `this`-typed functions — so it reads
- * the union too.
+ * A static member or a top-level declaration (the module-mixin idiom puts a
+ * module's methods there as `this`-typed functions) reads the file-wide union
+ * alone, since its Ruby counterpart is on the class-method half the instance
+ * fold excludes.
  */
-function manifestTags(manifest, rel, entity, name) {
+export function manifestTags(manifest, rel, entity, name, instanceMember) {
   const entities = manifest.entities?.[rel];
   if (entity !== null && entities && !entities.includes(entity)) return false;
-  return (manifest.files?.[rel] ?? []).includes(name);
+  if ((manifest.files?.[rel] ?? []).includes(name)) return true;
+  return instanceMember && (manifest.instanceFiles?.[rel] ?? []).includes(name);
+}
+
+/**
+ * Whether `node` is an instance-side declaration — a non-static class member or
+ * an interface member. A static member mirrors a Ruby class method, whose
+ * visibility is tracked on the other half of the Concern.
+ */
+export function isInstanceMember(node) {
+  if (node.type === "MethodDefinition" || node.type === "PropertyDefinition") {
+    return node.static !== true;
+  }
+  return node.type === "TSMethodSignature" || node.type === "TSPropertySignature";
 }
 
 function check(context, node, name) {
@@ -216,7 +232,7 @@ function check(context, node, name) {
   if (!filename) return;
   const rel = relFromRepoRoot(filename);
   const manifest = loadManifest();
-  if (!manifestTags(manifest, rel, enclosingEntityName(node), name)) return;
+  if (!manifestTags(manifest, rel, enclosingEntityName(node), name, isInstanceMember(node))) return;
 
   const sourceCode = context.sourceCode ?? context.getSourceCode();
   const { tag, comment } = jsdocHasInternal(target, sourceCode);

@@ -59,7 +59,6 @@ export class BoundedIO {
     private contentLength: number,
   ) {}
 
-  /** @internal */
   read(size: number, outbuf?: string): string | null {
     if (this.cursor >= this.contentLength) return null;
 
@@ -151,13 +150,10 @@ export abstract class MimePart {
     public name: string,
   ) {}
 
-  /** @internal */
   abstract isFile(): boolean;
 
-  /** @internal */
   abstract close(): void;
 
-  /** @internal */
   getData(cb: (data: any) => void): void {
     let data: any = this.body;
     if (this.filename === "") {
@@ -187,21 +183,17 @@ export abstract class MimePart {
 
 /** @internal */
 export class BufferPart extends MimePart {
-  /** @internal */
   isFile(): boolean {
     return false;
   }
-  /** @internal */
   close(): void {}
 }
 
 /** @internal */
 export class TempfilePart extends MimePart {
-  /** @internal */
   isFile(): boolean {
     return true;
   }
-  /** @internal */
   close(): void {
     this.body.close();
   }
@@ -213,17 +205,14 @@ export class Collector {
   private openFiles = 0;
   constructor(private tempfile: ((filename: string, contentType: string) => any) | null) {}
 
-  /** @internal */
   each(cb: (part: MimePart) => void) {
     this.mimeParts.forEach((part) => cb(part));
   }
 
-  /** @internal */
   findAll(predicate: (part: MimePart) => boolean): MimePart[] {
     return this.mimeParts.filter((part) => predicate(part));
   }
 
-  /** @internal */
   onMimeHead(
     mimeIndex: number,
     head: string,
@@ -248,14 +237,12 @@ export class Collector {
     this.checkPartLimits();
   }
 
-  /** @internal */
   onMimeBody(mimeIndex: number, content: string) {
     const part = this.mimeParts[mimeIndex];
     if (typeof part.body === "string") part.body += content;
     else if (typeof part.body?.write === "function") part.body.write(content);
   }
 
-  /** @internal */
   onMimeFinish(_mimeIndex: number) {}
 
   /** @internal */
