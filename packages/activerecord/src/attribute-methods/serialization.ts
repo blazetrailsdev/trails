@@ -7,6 +7,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Serialization
  */
 
+import { classAttribute, included } from "@blazetrails/activesupport";
 import { JSON as CodersJSON } from "../coders/json.js";
 import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
 import { YAMLColumn, type YamlColumnOptions } from "../coders/yaml-column.js";
@@ -14,6 +15,29 @@ import { YAMLColumn, type YamlColumnOptions } from "../coders/yaml-column.js";
 export interface Serialization {
   serialize(attribute: string, options?: { coder?: unknown }): void;
 }
+
+/** The host `include ActiveRecord::AttributeMethods::Serialization` needs. */
+interface SerializationIncludeHost {
+  name: string;
+}
+
+/**
+ * `ActiveRecord::AttributeMethods::Serialization` — the module
+ * `attribute_methods.rb:20` includes. It defines no instance methods; the
+ * module object carries its `included do` block (serialization.rb:19-21), which
+ * is what declares the `default_column_serializer` class attribute `serialize`
+ * falls back on (`coder ||= default_column_serializer`, serialization.rb:184).
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Serialization (serialization.rb:6-230)
+ */
+export const Serialization = {
+  [included](base: SerializationIncludeHost): void {
+    classAttribute.call(base, "defaultColumnSerializer", {
+      instanceAccessor: false,
+      default: YAMLColumn,
+    });
+  },
+};
 
 /**
  * Raised when attempting to serialize a column that doesn't support it.

@@ -167,7 +167,10 @@ import { registerTableNameOptions } from "./connection-adapters/abstract/table-n
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
-import { hookAttributeType as tzHookAttributeType } from "./attribute-methods/time-zone-conversion.js";
+import {
+  hookAttributeType as tzHookAttributeType,
+  TimeZoneConversion as _TimeZoneConversion,
+} from "./attribute-methods/time-zone-conversion.js";
 import * as Translation from "./translation.js";
 import * as Sanitization from "./sanitization.js";
 import * as Serialization from "./serialization.js";
@@ -216,7 +219,6 @@ import {
   attributesForDatabase as _attributesForDatabase,
   attributeBeforeTypeCast as _attributeBeforeTypeCast,
   attributeForDatabase as _attributeForDatabase,
-  queryCastAttribute as _queryCastAttribute,
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   savedChangeToAttribute as _savedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,
@@ -244,9 +246,8 @@ import {
 } from "./attribute-methods/primary-key.js";
 import { CompositePrimaryKey as _CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
 import {
-  readAttribute as _readAttribute,
-  _readAttribute as _readAttributeFn,
   defineMethodAttribute as _defineMethodAttribute,
+  Read as _Read,
 } from "./attribute-methods/read.js";
 import {
   setDefineMethodAttribute as _setDefineMethodAttribute,
@@ -258,10 +259,8 @@ import {
   BeforeTypeCast as _BeforeTypeCast,
   attributeCameFromUser as _attributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
-import {
-  queryAttribute as _queryAttribute,
-  _queryAttribute as _queryAttributeFn,
-} from "./attribute-methods/query.js";
+import { Query as _Query } from "./attribute-methods/query.js";
+import { Serialization as _AttrSerialization } from "./attribute-methods/serialization.js";
 import {
   toParam as _toParam,
   toParamClass as _toParamClass,
@@ -377,7 +376,6 @@ import {
 } from "./store.js";
 import { serialize as _serializeAttribute } from "./serialize.js";
 import { respondToMissing } from "./dynamic-matchers.js";
-import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
 _registerSerializeFn(_serializeAttribute as any);
@@ -926,7 +924,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_attributes
    */
-  static timeZoneAwareAttributes: boolean = false;
+  declare static timeZoneAwareAttributes: boolean;
 
   /**
    * Attribute names exempt from time-zone conversion.
@@ -1963,23 +1961,15 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for! (token_for.rb:108). */
   static findByTokenForBang = _findByTokenForBang;
 
-  // The fallback coder used by `serialize` when no explicit coder is given
-  // (`coder ||= default_column_serializer`). Subclasses inherit via JS
-  // prototype lookup and may override per-class.
-  //
-  // Mirrors: ActiveRecord::AttributeMethods::Serialization — `class_attribute
-  // :default_column_serializer, instance_accessor: false, default:
-  // Coders::YAMLColumn` (serialization.rb:19-20).
-  static _defaultColumnSerializer: unknown = _YAMLColumn;
-
-  /** Mirrors: ActiveRecord::Base.default_column_serializer */
-  static get defaultColumnSerializer(): unknown {
-    return this._defaultColumnSerializer;
-  }
-
-  static set defaultColumnSerializer(value: unknown) {
-    this._defaultColumnSerializer = value;
-  }
+  /**
+   * The fallback coder `serialize` uses when no explicit coder is given
+   * (`coder ||= default_column_serializer`, serialization.rb:184). Declared by
+   * `AttributeMethods::Serialization`'s `included do` block at its
+   * attribute_methods.rb:20 seat below.
+   *
+   * Mirrors: ActiveRecord::AttributeMethods::Serialization.default_column_serializer
+   */
+  declare static defaultColumnSerializer: unknown;
 
   /**
    * Declare that an attribute should be serialized using the given coder.
@@ -4486,14 +4476,6 @@ classAttribute.call(Base, "defaultScopeOverride", {
   instancePredicate: false,
   default: null,
 });
-classAttribute.call(Base, "skipTimeZoneConversionForAttributes", {
-  instanceWriter: false,
-  default: [],
-});
-classAttribute.call(Base, "timeZoneAwareTypes", {
-  instanceWriter: false,
-  default: ["datetime", "time"],
-});
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
 // Mirrors token_for.rb:10-11.
@@ -4649,16 +4631,12 @@ include(Base, {
   // Serialization
   serializableHash: Serialization.serializableHash,
   // AttributeMethods
-  readAttribute: _readAttribute,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
-  queryAttribute: _queryAttribute,
   get: _get,
   set: _set,
-  _queryAttribute: _queryAttributeFn,
-  _readAttribute: _readAttributeFn,
   _writeAttribute: _writeAttributeLowLevel,
   // write.rb:45 — `alias :attribute= :_write_attribute`. Ruby's `alias` captures
   // the method as it stands in `Write`, so the `=` pattern's proxy target keeps
@@ -4673,9 +4651,8 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
-// attribute_methods.rb:13 — `include Read`. Its members reach `Base` through
-// the prototype object literal below rather than an `include()` call, so this
-// is the seat the ordering leaves for it.
+// attribute_methods.rb:13 — `include Read`.
+include(Base, _Read);
 // attribute_methods.rb:14 — `include Write`, whose `included do` block declares
 // the `=` writer pattern (write.rb:9-11). `ActiveModel::Model` does NOT carry it
 // (model.rb:42-45), so this include is where `Base` gets it, ahead of the
@@ -4685,9 +4662,11 @@ include(Base, _Write);
 // `included do` patterns (before_type_cast.rb:32-33) precede both halves of
 // Dirty's in `attributeMethodPatterns`.
 include(Base, _BeforeTypeCast);
-// attribute_methods.rb:16 — `include Query`. Its members reach `Base` through
-// the prototype object literal below rather than an `include()` call, so this
-// is the seat the ordering leaves for it.
+// attribute_methods.rb:16 — `include Query`, whose `included do` block
+// (query.rb:9-11) declares the `?` pattern. It lands after BeforeTypeCast's
+// suffixes and before PrimaryKey's, which is the order Rails builds
+// `attributeMethodPatterns` in.
+include(Base, _Query);
 // attribute_methods.rb:17 — `include PrimaryKey`, ahead of TimeZoneConversion
 // and Dirty.
 include(Base, _PrimaryKey);
@@ -4696,8 +4675,12 @@ include(Base, _PrimaryKey);
 // `composite_primary_key?` guard, so mixing it in once above PrimaryKey is the
 // same behaviour for a scalar-keyed model.
 include(Base, _CompositePrimaryKey);
-// attribute_methods.rb:18 — `include TimeZoneConversion`, whose members reach
-// `Base` by other routes; it holds this seat in the ordering.
+// attribute_methods.rb:18 — `include TimeZoneConversion`. It defines no
+// instance methods; the include is what issues its `included do` class
+// attributes (time_zone_conversion.rb:59-63), and its private
+// `ClassMethods#hook_attribute_type` reaches `Base` through the class-body
+// `hookAttributeType` above.
+include(Base, _TimeZoneConversion);
 // `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
 // `ActiveRecord::AttributeMethods::Dirty` builds on, and which
 // `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
@@ -4710,6 +4693,16 @@ include(Base, AMDirty);
 // The accessor-property half of AttributeMethods::Dirty. A class module, so
 // `include()` copies the getter descriptors rather than flattening them.
 include(Base, _Dirty);
+// attribute_methods.rb:20 — `include Serialization`. It defines no instance
+// methods, so the include's payload is its `included do` block
+// (serialization.rb:19-21) declaring `default_column_serializer`. Its
+// `ClassMethods#serialize` (serialization.rb:183-205) still reaches `Base` as
+// the class-body `static serialize` above rather than an `extend()` here: the
+// body lives in `serialize.ts`, which imports this module's
+// `isTypeIncompatibleWithSerialize` and `ColumnNotSerializableError`, so
+// re-homing the class method onto the Rails file first has to untangle that
+// cycle — see the `rehome-serialize-onto-attribute-methods-serialization` story.
+include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
@@ -4828,7 +4821,6 @@ include(Base, {
   attributeBeforeTypeCast: _attributeBeforeTypeCast,
   attributeForDatabase: _attributeForDatabase,
   attributeCameFromUser: _attributeCameFromUser,
-  queryCastAttribute: _queryCastAttribute,
   // `primary_key_values_present?` and the ID_ATTRIBUTE_METHODS readers arrive
   // with `include(Base, _PrimaryKey)` / `include(Base, _CompositePrimaryKey)`
   // above: the readers are accessor properties, and only those calls copy

@@ -23,6 +23,19 @@ interface AttributeHolder {
 }
 
 /**
+ * `ActiveRecord::AttributeMethods::Read` — the module `attribute_methods.rb:13`
+ * includes. Its instance methods are the `this`-typed functions below
+ * (CLAUDE.md, "Module mixins"), gathered here so the seat can take a real
+ * `include()` call.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Read (read.rb:6-44)
+ */
+export const Read = {
+  readAttribute,
+  _readAttribute,
+};
+
+/**
  * Returns the value of the attribute identified by `attrName` after it has
  * been type cast.
  *

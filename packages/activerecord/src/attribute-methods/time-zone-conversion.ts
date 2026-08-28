@@ -5,6 +5,7 @@ import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
+import { classAttribute, included } from "@blazetrails/activesupport";
 import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
@@ -21,6 +22,37 @@ export interface TimeZoneConversion {
   skipTimeZoneConversionForAttributes: string[];
   timeZoneAwareTypes: string[];
 }
+
+/** The host `include ActiveRecord::AttributeMethods::TimeZoneConversion` needs. */
+interface TimeZoneConversionIncludeHost {
+  name: string;
+}
+
+/**
+ * `ActiveRecord::AttributeMethods::TimeZoneConversion` — the module
+ * `attribute_methods.rb:18` includes. It defines no instance methods; the
+ * module object carries its `included do` block (time_zone_conversion.rb:59-63),
+ * and its private `ClassMethods#hook_attribute_type` is the `this`-typed
+ * {@link hookAttributeType} below (CLAUDE.md, "Module mixins").
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion (time_zone_conversion.rb:7-82)
+ */
+export const TimeZoneConversion = {
+  [included](base: TimeZoneConversionIncludeHost): void {
+    classAttribute.call(base, "timeZoneAwareAttributes", {
+      instanceWriter: false,
+      default: false,
+    });
+    classAttribute.call(base, "skipTimeZoneConversionForAttributes", {
+      instanceWriter: false,
+      default: [],
+    });
+    classAttribute.call(base, "timeZoneAwareTypes", {
+      instanceWriter: false,
+      default: ["datetime", "time"],
+    });
+  },
+};
 
 /**
  * Time zone converter type — wraps a time type to apply zone conversion.
