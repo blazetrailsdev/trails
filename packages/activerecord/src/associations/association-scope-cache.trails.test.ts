@@ -100,7 +100,6 @@ describe("Association scope cache", () => {
     const author = await Author.find(authors("david").id);
 
     const spy = vi.spyOn(AssociationScope, "scope");
-    const opts = { className: "Post", foreignKey: "author_id" };
 
     // First loader call populates the Association-instance cache.
     await findHasManyTarget(author, "posts");
