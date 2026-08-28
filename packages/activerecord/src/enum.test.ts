@@ -11,8 +11,8 @@
  * The `cover` string enum, the `boolean_status` boolean enum, and the
  * `last_read` `forgotten: nil` value are wired on the canonical `Book` model
  * (EnumType supports string/boolean/nil values). Remaining sub-assertion gaps
- * on the canonical `Book` surface are tracked under RFC
- * activerecord-surfaced-deviations (enum-canonical-book-gaps) via inline pending
+ * on the canonical `Book` surface are tracked in the
+ * activerecord-surfaced-deviations bucket (enum-canonical-book-gaps) via inline pending
  * comments below.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";

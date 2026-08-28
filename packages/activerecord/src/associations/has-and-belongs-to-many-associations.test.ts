@@ -1000,8 +1000,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await (developer as any).projects.first()).id).toBe(project.id);
   });
 
-  // the activerecord-surfaced-deviations bucket: a HABTM proxy whose owner was NEW when a
-  // finder relation was spawned off it (`project.developers.where(...)`) seeds
+  // Tracked in the activerecord-surfaced-deviations bucket: a HABTM proxy whose
+  // owner was NEW when a finder relation was spawned off it (`project.developers.where(...)`) seeds
   // the `1=0` NullRelation. After `save`, the mutated finder must rebase onto
   // the resolved join scope so it picks up the persisted FK rather than the
   // stale seed — mirroring Rails' CollectionProxy delegating to

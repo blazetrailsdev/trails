@@ -395,7 +395,8 @@ describe("HasOneAssociationsTest", () => {
   // it records the id. trails' async belongs_to reader cannot be awaited inside
   // a sync callback, so the direct-destroy path materializes the record's
   // belongs_to before the callback chain runs. Story
-  // belongs-to-sync-read-direct-destroy-callback (the activerecord-surfaced-deviations bucket).
+  // belongs-to-sync-read-direct-destroy-callback, in the
+  // activerecord-surfaced-deviations bucket.
   it("direct destroy records destroyed account id via unloaded belongs_to", async () => {
     const account = (await Account.find(1)) as any;
     expect(account.association("firm").isLoaded()).toBe(false);

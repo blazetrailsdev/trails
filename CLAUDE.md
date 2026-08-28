@@ -66,8 +66,8 @@ not in the PR body.
 Convergence is the goal. Every deviation register in this repo — the
 `call-mismatches-exclude` baselines, `arity-exclude.json`, `@noRailsEquivalent`,
 `@missingRailsCall`, `SKIP_GROUPS`, and every story in a
-`<package>-surfaced-deviations` bucket — is a **burndown ledger**, not a settled decision. A
-row in one of them says "we know this is wrong and haven't fixed it yet." It is
+`<package>-surfaced-deviations` bucket — is a **burndown ledger**, not a settled
+decision. A row in one of them says "we know this is wrong and haven't fixed it yet." It is
 never a licence to leave it, to copy the pattern into new code, or to add a
 sibling row next to it.
 
@@ -128,9 +128,10 @@ port a body:
 
 If you find a new instance, file it against the best-fit active RFC, else the
 `<package>-surfaced-deviations` bucket for the package it is about — one exists
-per package (`pnpm tasks list | grep surfaced-deviations`), and `0023-surfaced-deviations`
-is retired as the catch-all, so do not file there. RFC `0082-ruby-ts-idiom-conversion-classes` in the
-tasks repo enumerates these as convergence classes.
+per package (`pnpm tasks list | grep surfaced-deviations`), and
+`0023-surfaced-deviations` is retired as the catch-all, so do not file there.
+RFC `0082-ruby-ts-idiom-conversion-classes` in the tasks repo enumerates these
+as convergence classes.
 
 ## Working in this repo
 

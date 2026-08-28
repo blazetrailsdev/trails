@@ -1764,7 +1764,8 @@ describe("FinderTest", () => {
 // ==========================================================================
 // FinderTest — faithful port of the finder_test.rb hash-condition / range /
 // time-interpolation cluster onto canonical Topic + Comment + Company/Firm +
-// Post models and their real fixtures (ported under the activerecord-surfaced-deviations bucket).
+// Post models and their real fixtures (ported under the
+// activerecord-surfaced-deviations bucket).
 //
 // The array-conditions form (`where(["name = ?", x])`) is disambiguated from
 // the composite-key `where(cols, tuples)` extension by argument count: a single
