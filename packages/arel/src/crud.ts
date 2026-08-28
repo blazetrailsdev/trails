@@ -4,18 +4,9 @@ import type { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 import { InsertManager } from "./insert-manager.js";
 import { UpdateManager } from "./update-manager.js";
 import { DeleteManager } from "./delete-manager.js";
-import type { JoinSource } from "./nodes/join-source.js";
+import type { SelectManager } from "./select-manager.js";
 
 export type UpdateValues = [Node, unknown][] | string | SqlLiteral | BoundSqlLiteral;
-
-/** @noRailsEquivalent PERMANENT */
-export interface CrudHost {
-  readonly source: JoinSource;
-  readonly limit: unknown;
-  readonly offset: unknown;
-  readonly orders: Node[];
-  readonly constraints: Node[];
-}
 
 export interface Crud {
   compileInsert(values: [Node, unknown][]): InsertManager;
@@ -34,7 +25,7 @@ export interface Crud {
 }
 
 export const Crud: Crud = {
-  compileInsert(this: CrudHost & Crud, values: [Node, unknown][]): InsertManager {
+  compileInsert(this: SelectManager, values: [Node, unknown][]): InsertManager {
     const im = this.createInsert();
     im.insert(values);
     return im;
@@ -45,7 +36,7 @@ export const Crud: Crud = {
   },
 
   compileUpdate(
-    this: CrudHost,
+    this: SelectManager,
     values: UpdateValues,
     key: Node | Node[] | null = null,
     havingClause: Node | null = null,
@@ -65,7 +56,7 @@ export const Crud: Crud = {
   },
 
   compileDelete(
-    this: CrudHost,
+    this: SelectManager,
     key: Node | Node[] | null = null,
     havingClause: Node | null = null,
     groupValuesColumns: Node[] = [],
