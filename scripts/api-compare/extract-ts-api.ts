@@ -401,9 +401,6 @@ export async function main() {
       const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
       const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey, depKey])}`;
       const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
-      // A payload naming a path outside THIS worktree was produced somewhere
-      // else and is not worktree-independent; serving it replays another
-      // checkout's measurements (see foreignAbsolutePath). Treat it as a miss.
       if (body && foreignAbsolutePath(body, ROOT_DIR) === null) {
         try {
           const cached = JSON.parse(body) as CacheEntry;
@@ -462,8 +459,6 @@ export async function main() {
           package: data,
         };
         const payload = JSON.stringify(shared);
-        // Never publish a payload carrying this worktree's absolute paths:
-        // every linked worktree reads these entries.
         if (foreignAbsolutePath(payload, ROOT_DIR) === null) {
           await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, payload, sharedTag);
         }
@@ -501,10 +496,6 @@ export async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const outputPath = path.join(OUTPUT_DIR, "ts-api.json");
   const serialized = JSON.stringify(manifest, null, 2);
-  // A manifest naming a path outside this worktree describes a tree that is
-  // not the one being measured — the failure mode RFC 0126 was filed for,
-  // where a replayed extraction reported another branch's ratchet numbers
-  // with no error at all. Refuse the run rather than let a gate read it.
   const foreign = foreignAbsolutePath(serialized, ROOT_DIR);
   if (foreign !== null) {
     throw new Error(

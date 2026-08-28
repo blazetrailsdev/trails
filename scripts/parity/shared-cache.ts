@@ -365,6 +365,15 @@ function hashOf(file: string, cache?: Map<string, Promise<string | null>>): Prom
 }
 
 /**
+ * The shape a leaked path takes: a checkout path, which always names a
+ * `packages/` or `src/` segment or a module file. Prose in an extracted doc
+ * comment can spell an absolute-looking token too (`//guides.rubyonrails.org/
+ * routing.html`), and that is not a path — flagging it would refuse a run over
+ * a correct manifest.
+ */
+const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
+
+/**
  * The first absolute filesystem path in `body` that lies OUTSIDE `rootDir`, or
  * null when there is none.
  *
@@ -394,15 +403,6 @@ export function foreignAbsolutePath(body: string, rootDir: string): string | nul
   }
   return null;
 }
-
-/**
- * The shape a leaked path takes: a checkout path, which always names a
- * `packages/` or `src/` segment or a module file. Prose in an extracted doc
- * comment can spell an absolute-looking token too (`//guides.rubyonrails.org/
- * routing.html`), and that is not a path — flagging it would refuse a run over
- * a correct manifest.
- */
-const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
 
 function entryPath(dir: string, name: string, key: string): string {
   return path.join(dir, `${name}-${key}.json`);
