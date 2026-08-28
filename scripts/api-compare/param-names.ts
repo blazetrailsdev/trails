@@ -22,11 +22,11 @@ import { isReceiverParam, stripThis } from "./arity.js";
  *  arity.ts strips, kept in step with it (see TRAILING_CALLBACK_NAMES there). */
 const TRAILING_CALLBACK_NAMES = new Set(["fn", "cb", "callback", "block", "blk", "compute"]);
 
-/** Ruby parameter names whose camelCased spelling TypeScript cannot use
- *  verbatim: a reserved word is a syntax error in a parameter position, so the
- *  rename is not drift. Rails' own `aliaz` (`arel/nodes/count.rb:7`) is the
- *  same workaround one language earlier — Ruby spells it `aliaz` because
- *  `alias` is a Ruby keyword — which is why that pair never reaches this set. */
+/** Ruby parameter names TypeScript cannot use verbatim. Rails' own `aliaz`
+ *  (`arel/nodes/count.rb:7`) is the same workaround one language earlier — Ruby
+ *  spells it `aliaz` because `alias` is a Ruby keyword — which is why that pair
+ *  never reaches this set. See {@link isReservedWordWorkaround} for what the TS
+ *  side has to do to earn the exemption. */
 const RESERVED_RUBY_PARAM_NAMES = new Set([
   // ECMAScript reserved words, which are not valid binding identifiers.
   ...`break case catch class const continue debugger default delete do else enum
@@ -65,6 +65,22 @@ export function bareIdentifier(name: string): string {
   return name.replace(/^_+/, "");
 }
 
+/** Settled TS spellings for a reserved Ruby name that no suffix/prefix of the
+ *  word itself produces. `klass` is Rails' own workaround for the same clash one
+ *  language earlier (`class` is a Ruby keyword too), so the port inherits it. */
+const RESERVED_WORD_SUBSTITUTES: Record<string, string> = { class: "klass" };
+
+/** Is the TS name a workaround for a Ruby name TypeScript reserves, rather than
+ *  a free rename? A reserved word is a syntax error in a parameter position, so
+ *  the port has no choice — but it still has to name the SAME thing, which means
+ *  keeping the word (`null` → `null_`, `default` → `defaultValue`) or using the
+ *  settled substitute. A `default` ported as `foo` is a rename like any other. */
+function isReservedWordWorkaround(rubyName: string, tsName: string): boolean {
+  if (!RESERVED_RUBY_PARAM_NAMES.has(rubyName)) return false;
+  if (tsName.toLowerCase().includes(rubyName.toLowerCase())) return true;
+  return RESERVED_WORD_SUBSTITUTES[rubyName] === tsName;
+}
+
 /** Does this side carry an actual identifier to compare? A Ruby anonymous
  *  splat (`def validate_constraint(**)`) is recorded under the sigil itself, and
  *  a TS destructured parameter (`{ prepare = false }`) is a pattern rather than
@@ -76,7 +92,9 @@ function isIdentifier(name: string): boolean {
 /** Is this position's difference one of the recognised legitimate ones? */
 function isLegitimateDifference(ruby: ParamInfo, ts: ParamInfo): boolean {
   if (!isIdentifier(ruby.name) || !isIdentifier(bareIdentifier(ts.name))) return true;
-  if (RESERVED_RUBY_PARAM_NAMES.has(bareIdentifier(snakeToCamel(ruby.name)))) return true;
+  if (isReservedWordWorkaround(bareIdentifier(snakeToCamel(ruby.name)), bareIdentifier(ts.name))) {
+    return true;
+  }
   const isGroup = ruby.kind === "rest" || ruby.kind === "keyword" || ruby.kind === "keyword_rest";
   return isGroup && COLLAPSED_GROUP_NAMES.has(bareIdentifier(ts.name));
 }

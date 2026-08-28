@@ -32,6 +32,16 @@ describe("compareParamNames", () => {
     // schema_definitions.rb `column(name, type, index: nil, **options)` — `null`
     // is not a valid binding identifier, so the port spells it `null_`.
     expect(compareParamNames([req("null")], [req("null_")])).toEqual([]);
+    // …and `klass`, the substitute Rails itself uses for the same clash.
+    expect(compareParamNames([req("class")], [req("klass")])).toEqual([]);
+  });
+
+  it("still flags a reserved Ruby name ported as a free rename", () => {
+    // The exemption is for a workaround, not a licence: the TS name has to keep
+    // the word it cannot spell, or be the settled substitute for it.
+    expect(compareParamNames([req("default")], [req("fallback")])).toEqual([
+      { position: 0, ruby: "default", ts: "fallback" },
+    ]);
   });
 
   it("does not flag a splat collapsed into an options object", () => {
