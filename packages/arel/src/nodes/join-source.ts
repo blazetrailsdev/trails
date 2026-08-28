@@ -6,10 +6,10 @@ export class JoinSource extends Binary {
   declare left: Node | Table | null;
   declare right: Node[];
 
-  constructor(left: Node | Table | null, right: Node[] = []) {
-    super(left, right);
-    this.left = left;
-    this.right = right;
+  constructor(singleSource: Node | Table | null, joinop: Node[] = []) {
+    super(singleSource, joinop);
+    this.left = singleSource;
+    this.right = joinop;
   }
 
   isEmpty(): boolean {

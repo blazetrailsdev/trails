@@ -56,8 +56,7 @@ describe("Exists node", () => {
   it("wraps expression in array", () => {
     const inner = users.project(users.get("id")).ast;
     const node = new Nodes.Exists(inner);
-    expect(Array.isArray(node.expressions)).toBe(true);
-    expect(node.expressions[0]).toBe(inner);
+    expect(node.expressions).toBe(inner);
   });
 
   it("renders EXISTS(subquery) correctly", () => {

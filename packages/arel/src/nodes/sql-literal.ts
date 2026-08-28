@@ -9,9 +9,9 @@ export class SqlLiteral extends Node {
   readonly value: string;
   readonly retryable: boolean;
 
-  constructor(value: string | SqlLiteral, options?: { retryable?: boolean }) {
+  constructor(string: string | SqlLiteral, options?: { retryable?: boolean }) {
     super();
-    this.value = value instanceof SqlLiteral ? value.value : value;
+    this.value = string instanceof SqlLiteral ? string.value : string;
     this.retryable = options?.retryable ?? false;
   }
 

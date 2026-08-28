@@ -1,4 +1,5 @@
 import type { Attribute } from "./attributes/attribute.js";
+import type { Cte } from "./nodes/cte.js";
 import type { buildQuoted } from "./nodes/casted.js";
 import type { Equality } from "./nodes/equality.js";
 import type { Grouping } from "./nodes/grouping.js";
@@ -76,4 +77,11 @@ export let _Table: typeof Table | undefined;
 /** @internal */
 export function _setTable(ctor: typeof Table): void {
   _Table = ctor;
+}
+
+/** @internal */
+export let _Cte: typeof Cte | undefined;
+/** @internal */
+export function _setCte(ctor: typeof Cte): void {
+  _Cte = ctor;
 }

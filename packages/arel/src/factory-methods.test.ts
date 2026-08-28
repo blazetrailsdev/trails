@@ -55,7 +55,9 @@ describe("TestFactoryMethods", () => {
     const lower = factory.lower("one");
     expect(lower).toBeInstanceOf(Nodes.NamedFunction);
     expect(lower.name).toBe("LOWER");
-    expect(lower.expressions.map((e) => (e as Nodes.Quoted).expr)).toEqual(["one"]);
+    expect((lower.expressions as Nodes.NodeOrValue[]).map((e) => (e as Nodes.Quoted).expr)).toEqual(
+      ["one"],
+    );
   });
 
   it("coalesce", () => {
@@ -73,7 +75,7 @@ describe("TestFactoryMethods", () => {
     const cast = factory.cast(fieldNode, "boolean");
     expect(cast).toBeInstanceOf(Nodes.NamedFunction);
     expect(cast.name).toBe("CAST");
-    const asNode = cast.expressions[0];
+    const asNode = (cast.expressions as Nodes.NodeOrValue[])[0];
     expect(asNode).toBeInstanceOf(Nodes.As);
     expect((asNode as Nodes.As).left).toBe(fieldNode);
     expect(String((asNode as Nodes.As).right)).toBe("boolean");

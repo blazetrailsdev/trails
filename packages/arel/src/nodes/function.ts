@@ -6,7 +6,7 @@ import { SqlLiteral } from "./sql-literal.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
-  expressions: NodeOrValue[];
+  expressions: NodeOrValue[] | NodeOrValue;
   distinct: boolean | null;
   private _alias: Node | null;
 
@@ -18,7 +18,7 @@ export class Function extends NodeExpression {
     this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
   }
 
-  constructor(expr: NodeOrValue[], aliaz: Node | string | null = null) {
+  constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: Node | string | null = null) {
     super();
     this.expressions = expr;
     this._alias = typeof aliaz === "string" ? new SqlLiteral(aliaz) : aliaz;
@@ -47,11 +47,8 @@ export class Function extends NodeExpression {
 
 export class Sum extends Function {}
 
-export class Exists extends Function {
-  constructor(expression: Node, aliasNode: Node | null = null) {
-    super([expression], aliasNode);
-  }
-}
+export class Exists extends Function {}
+
 export class Max extends Function {}
 export class Min extends Function {}
 export class Avg extends Function {}

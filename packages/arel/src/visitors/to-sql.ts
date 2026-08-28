@@ -5,7 +5,6 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { ArelError } from "../errors.js";
 
 export class UnsupportedVisitError extends Error {
   constructor(object: unknown) {
@@ -119,7 +118,7 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesExists(o: Nodes.Exists, collector: SQLString): SQLString {
     collector.append("EXISTS (");
-    this.visit(o.expressions[0], collector);
+    this.visit(o.expressions, collector);
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
@@ -472,7 +471,7 @@ export class ToSql extends Visitor {
     collector.append(o.name);
     collector.append("(");
     if (o.distinct) collector.append("DISTINCT ");
-    this.injectJoin(o.expressions, collector, ", ");
+    this.injectJoin(o.expressions as Nodes.NodeOrValue[], collector, ", ");
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
@@ -1210,7 +1209,7 @@ export class ToSql extends Visitor {
     collector.retryable = false;
     collector.append(`${name}(`);
     if (o.distinct) collector.append("DISTINCT ");
-    this.injectJoin(o.expressions, collector, ", ");
+    this.injectJoin(o.expressions as Nodes.NodeOrValue[], collector, ", ");
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
@@ -1250,12 +1249,7 @@ export class ToSql extends Visitor {
   /** @internal */
   static registerDispatch(): void {
     const d = ToSql.dispatchCache();
-    const reg = (ctor: NodeCtor, m: string) => {
-      if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
-        throw new ArelError(`ToSql dispatch: method '${m}' is not defined on the prototype`);
-      }
-      d.set(ctor, m);
-    };
+    const reg = (ctor: NodeCtor, m: string) => d.set(ctor, m);
     reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
     reg(Nodes.SelectCore, "visitArelNodesSelectCore");
     reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");

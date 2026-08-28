@@ -28,7 +28,7 @@ export interface FactoryMethodsModule {
   grouping(expr: Node): Grouping;
   lower(column: unknown): NamedFunction;
   coalesce(...exprs: NodeOrValue[]): NamedFunction;
-  cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction;
+  cast(name: Node & { as: (type: string) => Node }, type: string): NamedFunction;
 }
 
 export const FactoryMethods: FactoryMethodsModule = {
@@ -77,7 +77,7 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new NamedFunction("COALESCE", exprs);
   },
 
-  cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction {
-    return new NamedFunction("CAST", [expr.as(type)]);
+  cast(name: Node & { as: (type: string) => Node }, type: string): NamedFunction {
+    return new NamedFunction("CAST", [name.as(type)]);
   },
 };

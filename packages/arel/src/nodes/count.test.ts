@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "../index.js";
-import type { Node } from "./node.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { uniq } from "../test-helpers/uniq.js";
 
@@ -29,18 +28,12 @@ describe("Arel::Nodes::CountTest", () => {
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const array = [
-        new Nodes.Count("foo" as unknown as Node),
-        new Nodes.Count("foo" as unknown as Node),
-      ];
+      const array = [new Nodes.Count("foo"), new Nodes.Count("foo")];
       expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const array = [
-        new Nodes.Count("foo" as unknown as Node),
-        new Nodes.Count("foo!" as unknown as Node),
-      ];
+      const array = [new Nodes.Count("foo"), new Nodes.Count("foo!")];
       expect(uniq(array).length).toBe(2);
     });
   });

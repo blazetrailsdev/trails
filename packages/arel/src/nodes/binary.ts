@@ -2,7 +2,7 @@ import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
-import { _Attribute, _Equality, _In } from "../node-slots.js";
+import { _Attribute, _Cte, _Equality, _In } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -12,7 +12,6 @@ import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 import type { SelectManager } from "../select-manager.js";
 import type { Table } from "../table.js";
-import { ArelError } from "../errors.js";
 
 export type NodeOrValue =
   | Node
@@ -83,37 +82,13 @@ export class Binary extends NodeExpression {
   }
 }
 
-export class Assignment extends Binary {}
-
-let cteFactory: ((name: string | SqlLiteral, relation: Node) => Cte) | null = null;
-export function _registerCteFactory(fn: (name: string | SqlLiteral, relation: Node) => Cte): void {
-  cteFactory = fn;
-}
-
 export class As extends Binary {
   toCte(): Cte {
-    if (!cteFactory) {
-      throw new ArelError(
-        'As.toCte() requires the Cte factory registry. Import from "@blazetrails/arel" instead of deep-importing node classes.',
-      );
-    }
-    const name = (this.left as { name: string | SqlLiteral }).name;
-    return cteFactory(name, this.right as Node);
+    return new _Cte!((this.left as { name: string | SqlLiteral }).name, this.right as Node);
   }
 }
 
 export class Between extends Binary {}
-
-export class NotEqual extends Binary {
-  invert(): Node {
-    if (!_Equality) {
-      throw new ArelError(
-        'NotEqual.invert() requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.',
-      );
-    }
-    return new _Equality(this.left, this.right);
-  }
-}
 
 export class GreaterThan extends Binary {
   invert(): Node {
@@ -151,16 +126,19 @@ export class IsNotDistinctFrom extends Binary {
   }
 }
 
-export class NotIn extends Binary {
+export class NotEqual extends Binary {
   invert(): Node {
-    if (!_In) {
-      throw new ArelError(
-        'NotIn.invert() requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.',
-      );
-    }
-    return new _In(this.left, this.right);
+    return new _Equality!(this.left, this.right);
   }
 }
+
+export class NotIn extends Binary {
+  invert(): Node {
+    return new _In!(this.left, this.right);
+  }
+}
+
+export class Assignment extends Binary {}
 
 export abstract class Join extends Binary {
   declare left: Node | Table;

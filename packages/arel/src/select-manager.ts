@@ -17,14 +17,12 @@ import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
-import { UpdateManager } from "./update-manager.js";
-import { DeleteManager } from "./delete-manager.js";
-import type { UpdateValues } from "./crud.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";
 import { JoinSource } from "./nodes/join-source.js";
-import { InsertManager } from "./insert-manager.js";
+import { Crud } from "./crud.js";
+import { include } from "@blazetrails/activesupport";
 
 const UNION_NODE_CLASSES: Record<
   string,
@@ -291,54 +289,11 @@ export class SelectManager extends TreeManager {
     this.ast.with = new WithRecursive(ctes);
     return this;
   }
-
-  compileInsert(values: [Node, unknown][]): InsertManager {
-    const im = new InsertManager();
-    im.insert(values);
-    return im;
-  }
-
-  createInsert(): InsertManager {
-    return new InsertManager();
-  }
-
-  compileUpdate(
-    values: UpdateValues,
-    key: Node | Node[] | null = null,
-    havingClause: Node | null = null,
-    groupValuesColumns: Node[] = [],
-  ): UpdateManager {
-    const um = new UpdateManager(this.source);
-    um.set(values);
-    um.take((this.ast.limit as Limit | null)?.expr ?? null);
-    um.offset((this.ast.offset as Offset | null)?.expr ?? null);
-    um.order(...this.orders);
-    um.wheres = this.constraints;
-    um.key = key;
-    if (groupValuesColumns.length > 0) um.group(groupValuesColumns);
-    if (havingClause !== null) um.having(havingClause);
-    return um;
-  }
-
-  compileDelete(
-    key: Node | Node[] | null = null,
-    havingClause: Node | null = null,
-    groupValuesColumns: Node[] = [],
-  ): DeleteManager {
-    const dm = new DeleteManager(this.source);
-    dm.take((this.ast.limit as Limit | null)?.expr ?? null);
-    dm.offset((this.ast.offset as Offset | null)?.expr ?? null);
-    dm.order(...this.orders);
-    dm.wheres = this.constraints;
-    dm.key = key;
-    if (groupValuesColumns.length > 0) dm.group(groupValuesColumns);
-    if (havingClause !== null) dm.having(havingClause);
-    return dm;
-  }
 }
 
 type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
-export interface SelectManager extends _FactoryMethodsModule {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface SelectManager extends _FactoryMethodsModule, Crud {}
+
+include(SelectManager, Crud);
