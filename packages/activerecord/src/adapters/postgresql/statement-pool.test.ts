@@ -16,13 +16,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("statement pool", async () => {
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::int", [1]);
-        await adapter.execute("SELECT $1::int", [2]);
+        await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
+        await adapter.internalExecQuery("SELECT $1::int", "SQL", [2], { prepare: true });
         const pool = adapter._statements;
         expect(pool).toBeDefined();
         expect(pool.length).toBe(1);
 
-        await adapter.execute("SELECT $1::text", ["a"]);
+        await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         expect(pool.length).toBe(2);
       } finally {
         await adapter.rollback();
@@ -33,8 +33,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const limited = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: 1 });
       await limited.beginDbTransaction();
       try {
-        await limited.execute("SELECT $1::int", [1]);
-        await limited.execute("SELECT $1::text", ["a"]);
+        await limited.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
+        await limited.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         expect(limited._statements.length).toBe(1);
       } finally {
         await limited.rollback();
@@ -48,8 +48,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await adapter.beginDbTransaction();
       try {
-        await adapter.executeMutation(`INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`, ["a"]);
-        await adapter.executeMutation(`INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`, ["b"]);
+        await adapter.internalExecQuery(
+          `INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`,
+          "SQL",
+          ["a"],
+          {
+            prepare: true,
+          },
+        );
+        await adapter.internalExecQuery(
+          `INSERT INTO "sp_exec_mut" ("name") VALUES ($1)`,
+          "SQL",
+          ["b"],
+          {
+            prepare: true,
+          },
+        );
         const pool = adapter._statements;
         expect(pool.length).toBe(1);
       } finally {
@@ -61,8 +75,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("statement pool clear", async () => {
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::int", [1]);
-        await adapter.execute("SELECT $1::text", ["a"]);
+        await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
+        await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         const pool = adapter._statements;
         expect(pool.length).toBe(2);
         await pool.clear();
@@ -74,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("dealloc does not raise on inactive connection", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("SELECT $1::int", [1]);
+      await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
       const pool = adapter._statements;
       await adapter.rollback();
       await adapter.close();
@@ -82,8 +96,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("prepared statements do not get stuck on query interruption", async () => {
-      await expect(adapter.execute("SELECT 1 / $1::int", [0])).rejects.toThrow();
-      const rows = await adapter.execute("SELECT 1 / $1::int", [1]);
+      await expect(
+        adapter.internalExecQuery("SELECT 1 / $1::int", "SQL", [0], { prepare: true }),
+      ).rejects.toThrow();
+      const rows = (
+        await adapter.internalExecQuery("SELECT 1 / $1::int", "SQL", [1], { prepare: true })
+      ).toArray();
       expect(rows[0]).toBeDefined();
     });
 
@@ -97,7 +115,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         connectionString: PG_TEST_URL,
         statementLimit: 7,
       });
-      await configured.execute("SELECT $1::int", [1]);
+      await configured.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
       const pool = configured._statements;
       expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
       await configured.close();
@@ -144,8 +162,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("clearCacheBang drops cached plans on the active connection", async () => {
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::int", [1]);
-        await adapter.execute("SELECT $1::text", ["a"]);
+        await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
+        await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         const pool = adapter._statements;
         expect(pool.length).toBe(2);
         await adapter.clearCacheBang();
@@ -158,8 +176,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("clearCacheBang clears the just-released txn pool when called post-rollback", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("SELECT $1::int", [1]);
-      await adapter.execute("SELECT $1::text", ["a"]);
+      await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
+      await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
       const pool = adapter._statements;
       expect(pool.length).toBe(2);
       await adapter.rollback();
@@ -170,13 +188,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
       await adapter.beginDbTransaction();
-      await adapter.execute("SELECT $1::int", [1]);
+      await adapter.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
       const failedPool = adapter._statements;
       expect(failedPool.length).toBe(1);
       await adapter.rollback();
       await adapter.beginDbTransaction();
       try {
-        await adapter.execute("SELECT $1::int", [2]);
+        await adapter.internalExecQuery("SELECT $1::int", "SQL", [2], { prepare: true });
         const newTxnPool = adapter._statements;
         expect(newTxnPool).toBe(failedPool);
         expect(newTxnPool.length).toBeGreaterThan(0);
