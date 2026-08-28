@@ -78,14 +78,16 @@ export class NamedWindow extends Window {
   }
 }
 
-export class Preceding extends Unary {
-  constructor(expr: unknown = null) {
+export class Rows extends Unary {
+  declare expr: Node | null;
+  constructor(expr: Node | null = null) {
     super(expr);
   }
 }
 
-export class Following extends Unary {
-  constructor(expr: unknown = null) {
+export class Range extends Unary {
+  declare expr: Node | null;
+  constructor(expr: Node | null = null) {
     super(expr);
   }
 }
@@ -100,16 +102,14 @@ export class CurrentRow extends Node {
   }
 }
 
-export class Rows extends Unary {
-  declare expr: Node | null;
-  constructor(expr: Node | null = null) {
+export class Preceding extends Unary {
+  constructor(expr: unknown = null) {
     super(expr);
   }
 }
 
-export class Range extends Unary {
-  declare expr: Node | null;
-  constructor(expr: Node | null = null) {
+export class Following extends Unary {
+  constructor(expr: unknown = null) {
     super(expr);
   }
 }

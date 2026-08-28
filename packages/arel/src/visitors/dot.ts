@@ -16,29 +16,6 @@ function isAppendableCollector(c: unknown): c is AppendableCollector {
   return typeof obj.append === "function" && typeof obj.value === "string";
 }
 
-export class Node {
-  readonly name: string;
-  readonly id: number;
-  readonly fields: string[];
-
-  constructor(name: string, id: number, fields: string[] = []) {
-    this.name = name;
-    this.id = id;
-    this.fields = fields;
-  }
-}
-
-export class Edge {
-  readonly name: string;
-  readonly from: Node;
-  to?: Node;
-
-  constructor(name: string, from: Node) {
-    this.name = name;
-    this.from = from;
-  }
-}
-
 export class Dot extends Visitor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
@@ -498,6 +475,29 @@ export class Dot extends Visitor {
     reg(Nodes.False, "visitNoEdges");
     reg(Nodes.BoundSqlLiteral, "visitNoEdges");
     reg(Nodes.Fragments, "visitNoEdges");
+  }
+}
+
+export class Node {
+  readonly name: string;
+  readonly id: number;
+  readonly fields: string[];
+
+  constructor(name: string, id: number, fields: string[] = []) {
+    this.name = name;
+    this.id = id;
+    this.fields = fields;
+  }
+}
+
+export class Edge {
+  readonly name: string;
+  readonly from: Node;
+  to?: Node;
+
+  constructor(name: string, from: Node) {
+    this.name = name;
+    this.from = from;
   }
 }
 

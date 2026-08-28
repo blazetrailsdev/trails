@@ -105,6 +105,15 @@ const fixture = {
       classes: { B2: ["static first", "constructor", "first"] },
       functions: [],
     },
+    // Top-level SIBLING order: the Ruby file declares three classes, and the
+    // TS file must declare them in that order (`nodes/window.rb` declares
+    // Rows/Range/CurrentRow/Preceding/Following where window.ts had
+    // Preceding/Following/CurrentRow/Rows/Range).
+    "packages/arel/src/fixture-decls.ts": {
+      classes: {},
+      functions: [],
+      declarations: ["Alpha", "Beta", "Gamma"],
+    },
   },
 };
 function restoreManifest() {
@@ -132,6 +141,7 @@ const ctorFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ctor.ts");
 const staticFile = path.join(REPO_ROOT, "packages/arel/src/fixture-static.ts");
 const flipFile = path.join(REPO_ROOT, "packages/arel/src/fixture-flip.ts");
 const bothFile = path.join(REPO_ROOT, "packages/arel/src/fixture-both.ts");
+const declsFile = path.join(REPO_ROOT, "packages/arel/src/fixture-decls.ts");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -144,6 +154,28 @@ const tester = new RuleTester({
 try {
   tester.run("rails-file-structure-method-order", rule, {
     valid: [
+      // Top-level declarations already in Rails order.
+      {
+        filename: declsFile,
+        code: `export class Alpha {}\nexport class Beta {}\nexport class Gamma {}\n`,
+      },
+      // A single mapped declaration has no sibling to order against.
+      {
+        filename: declsFile,
+        code: `export class Zeta {}\nexport class Gamma {}\n`,
+      },
+      // `extends` names a sibling that would end up AFTER it — class
+      // declarations are not hoisted, so the reorder is skipped.
+      {
+        filename: declsFile,
+        code: `export class Gamma {}\nexport class Alpha extends Gamma {}\n`,
+      },
+      // A non-class statement sits between the declarations being permuted;
+      // moving a class across it would change evaluation order.
+      {
+        filename: declsFile,
+        code: `export class Gamma {}\n_setGamma(Gamma);\nexport class Alpha {}\n`,
+      },
       // File not in manifest.
       {
         filename: unlistedFile,
@@ -596,6 +628,21 @@ try {
         output: `class X {\n  first() {}\n\n  second() {}\n}\n`,
       },
       // JSDoc travels with the method on reorder.
+      // Top-level declarations in reverse Rails order.
+      {
+        filename: declsFile,
+        code: `export class Gamma {}\nexport class Beta {}\nexport class Alpha {}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `export class Alpha {}\nexport class Beta {}\nexport class Gamma {}\n`,
+      },
+      // A declaration with no Rails counterpart is IGNORED, not ordered: it
+      // keeps its slot while the mapped siblings permute around it.
+      {
+        filename: declsFile,
+        code: `export class Gamma {}\nexport class Helper {}\nexport class Alpha {}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `export class Alpha {}\nexport class Helper {}\nexport class Gamma {}\n`,
+      },
       {
         filename: classFile,
         code:

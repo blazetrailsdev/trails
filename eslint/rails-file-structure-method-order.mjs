@@ -11,6 +11,8 @@
  * Scope per file:
  *   - Class instance + static methods (one container per ClassBody).
  *   - Top-level FunctionDeclaration (incl. `export function …`).
+ *   - Top-level CLASS DECLARATIONS against each other (a file holding
+ *     several Rails classes must declare them in the Ruby file's order).
  *   - Top-level mixin object literals (`export const Math = { add(…) {} }`),
  *     the CLAUDE.md port shape for a Ruby module of methods.
  *
@@ -384,6 +386,115 @@ function computeTargetOrder(currentNodes, expectedOrder, declaredKeys) {
   return target;
 }
 
+// Top-level class declarations, in program order, as movable units. Handles
+// `class Foo {}` / `export class Foo {}`; `export default class Foo {}` is
+// excluded — a default export is one per file, so it never has a sibling to
+// order against, and moving it would drag the export with it.
+function collectDeclarationUnits(programNode) {
+  const units = [];
+  for (const stmt of programNode.body) {
+    const decl =
+      stmt.type === "ClassDeclaration"
+        ? stmt
+        : stmt.type === "ExportNamedDeclaration" && stmt.declaration?.type === "ClassDeclaration"
+          ? stmt.declaration
+          : null;
+    if (!decl?.id?.type || decl.id.type !== "Identifier") continue;
+    units.push({ name: decl.id.name, node: decl, stmt, members: [stmt] });
+  }
+  return units;
+}
+
+/**
+ * Reorder ONLY the declarations the manifest names, each into the Rails slot
+ * its name owns, and leave every other declaration pinned where it is.
+ *
+ * This differs from member ordering, which pushes unmapped members into a tail
+ * block. A top-level declaration with no Rails counterpart (a TS-only helper
+ * class) has no Rails position to derive, and moving it would be an invented
+ * one — so the mapped declarations permute among the positions they already
+ * occupy and nothing else shifts.
+ */
+function computeTargetDeclarationOrder(units, expectedOrder) {
+  const rank = new Map();
+  expectedOrder.forEach((name, i) => {
+    if (!rank.has(name)) rank.set(name, i);
+  });
+  const slots = [];
+  for (let i = 0; i < units.length; i++) if (rank.has(units[i].name)) slots.push(i);
+  if (slots.length < 2) return units;
+  const sorted = slots.map((i) => units[i]).sort((a, b) => rank.get(a.name) - rank.get(b.name));
+  const target = units.slice();
+  slots.forEach((slot, k) => (target[slot] = sorted[k]));
+  return target;
+}
+
+/**
+ * Class declarations are NOT hoisted, so unlike class members and function
+ * declarations a reorder can break evaluation order. Two things make a move
+ * unsafe, and either one skips the whole file:
+ *
+ *   - A sibling named in a position the class body evaluates at DEFINITION
+ *     time — the `extends` clause, a static property initializer, a static
+ *     block, a computed key, a decorator. `class NamedWindow extends Window`
+ *     must stay after `Window`.
+ *   - A non-class statement sitting between the declarations being permuted
+ *     (a `_setX()` slot call, a module-level `const`), which the reorder would
+ *     silently cross.
+ */
+function declarationReorderIsSafe(units, target, sourceCode) {
+  const first = units[0].stmt.range[0];
+  const last = units[units.length - 1].stmt.range[1];
+  for (const stmt of units[0].stmt.parent.body) {
+    if (stmt.range[0] < first || stmt.range[1] > last) continue;
+    if (!units.some((u) => u.stmt === stmt)) return false;
+  }
+  const position = new Map(target.map((u, i) => [u.name, i]));
+  for (let i = 0; i < target.length; i++) {
+    for (const name of evalTimeReferences(target[i].node, sourceCode)) {
+      const referenced = position.get(name);
+      if (referenced !== undefined && referenced >= i) return false;
+    }
+  }
+  return true;
+}
+
+// Identifier names the class evaluates while the declaration itself is being
+// evaluated: its heritage clause, decorators, and any static member's key or
+// initializer. Anything inside an instance member or a method body runs later,
+// so it cannot constrain declaration order.
+function evalTimeReferences(classNode, sourceCode) {
+  const names = new Set();
+  const collect = (node) => {
+    if (!node || typeof node.type !== "string") return;
+    for (const id of identifiersIn(node, sourceCode)) names.add(id);
+  };
+  collect(classNode.superClass);
+  for (const d of classNode.decorators ?? []) collect(d);
+  for (const m of classNode.body?.body ?? []) {
+    if (m.static !== true) continue;
+    if (m.computed) collect(m.key);
+    if (m.type === "PropertyDefinition") collect(m.value);
+    if (m.type === "StaticBlock") collect(m);
+  }
+  return names;
+}
+
+function identifiersIn(node, sourceCode) {
+  const out = [];
+  const visit = (n) => {
+    if (!n || typeof n.type !== "string") return;
+    if (n.type === "Identifier") out.push(n.name);
+    for (const key of sourceCode.visitorKeys[n.type] ?? Object.keys(n)) {
+      const child = n[key];
+      if (Array.isArray(child)) child.forEach(visit);
+      else if (child && typeof child.type === "string") visit(child);
+    }
+  };
+  visit(node);
+  return out;
+}
+
 function ordersDiffer(a, b) {
   if (a.length !== b.length) return true;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return true;
@@ -412,8 +523,11 @@ const rule = {
     if (!fileOrder) return {};
     const classOrders = fileOrder.classes ?? {};
     const functionOrder = fileOrder.functions ?? [];
+    const declarationOrder = fileOrder.declarations ?? [];
     const hasAnyOrder =
-      functionOrder.length > 0 || Object.values(classOrders).some((a) => a.length > 0);
+      functionOrder.length > 0 ||
+      declarationOrder.length > 0 ||
+      Object.values(classOrders).some((a) => a.length > 0);
     if (!hasAnyOrder) return {};
 
     const sourceCode = context.sourceCode ?? context.getSourceCode();
@@ -590,16 +704,34 @@ const rule = {
           }
         }
 
+        if (declarationOrder.length > 0) {
+          const declUnits = collectDeclarationUnits(programNode);
+          if (declUnits.length >= 2) {
+            const declTarget = computeTargetDeclarationOrder(declUnits, declarationOrder);
+            if (
+              ordersDiffer(declUnits, declTarget) &&
+              declarationReorderIsSafe(declUnits, declTarget, sourceCode)
+            ) {
+              containers.push({ units: declUnits, target: declTarget });
+            }
+          }
+        }
+
         const fixes = [];
         let firstMismatch = null; // { node, expectedName, beforeName }
         let mismatchCount = 0;
 
-        for (const { members, expectedOrder, declaredKeys } of containers) {
+        for (const container of containers) {
           // Collapse consecutive same-named members into units before
           // reorder, so TS overload groups (and class accessor pairs
           // where the pair is already adjacent) move as a single block.
-          const units = groupUnits(members);
-          const target = computeTargetOrder(units, expectedOrder, declaredKeys);
+          // The top-level-declaration container arrives with its units and
+          // target already resolved: a declaration is one node (never an
+          // overload group) and its ordering rule differs — see
+          // computeTargetDeclarationOrder.
+          const { members, expectedOrder, declaredKeys } = container;
+          const units = container.units ?? groupUnits(members);
+          const target = container.target ?? computeTargetOrder(units, expectedOrder, declaredKeys);
           if (!ordersDiffer(units, target)) continue;
 
           // Each unit's slot spans from the first member's extended

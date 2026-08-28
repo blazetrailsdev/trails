@@ -100,6 +100,13 @@ const railsApi = JSON.parse(fs.readFileSync(RAILS_API_PATH, "utf8"));
 interface FileOrder {
   classes: Record<string, string[]>;
   functions: string[];
+  // Top-level declaration order: the Ruby file's classes in source order, by
+  // the name their TS port carries (the fqn's last segment). `classes` orders
+  // the MEMBERS inside one class; this orders the classes against each other,
+  // which a file holding several Rails classes (`nodes/window.rb` declares
+  // Window, NamedWindow, Rows, Range, CurrentRow, Preceding, Following) can
+  // otherwise get wrong while staying green.
+  declarations: string[];
 }
 interface Manifest {
   files: Record<string, FileOrder>;
@@ -202,6 +209,14 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   // (bucketFile, last-segment); a colliding bucket is DROPPED (not emitted) and
   // warned — enforcing a blended order would be worse than no order at all.
   // (Repo-wide this is currently vanishingly rare.)
+  // (rubyFile) → class names in Rails declaration order.
+  const declarationsByFile = new Map<string, string[]>();
+  const declarationsFor = (rubyFile: string): string[] => {
+    let list = declarationsByFile.get(rubyFile);
+    if (!list) declarationsByFile.set(rubyFile, (list = []));
+    return list;
+  };
+
   const classFqnsByKey = new Map<string, Set<string>>();
   const noteClass = (bucketFile: string, className: string, fqn: string) => {
     const collKey = `${bucketFile}\0${className}`;
@@ -225,6 +240,12 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
       const className = host.fqn.split("::").pop() ?? host.fqn;
+      // Declaration order comes from the ENTITY's own file and the order the
+      // Ruby extractor encountered it in (`@classes` is a Hash keyed by fqn,
+      // filled as the walker descends each file), which is Rails source order
+      // within a file. Methods are bucketed by their own `file` because Rails
+      // reopens classes across files; a declaration has exactly one site.
+      declarationsFor(host.file).push(className);
       // Order by source line rather than appending classMethods after
       // instanceMethods — see mergeBySourceLine for why. Tag each method with
       // `isStatic` BEFORE merging so the interleaved order keeps the class-vs-
@@ -300,13 +321,30 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     }
   }
 
-  for (const [rubyFile, byKey] of byFile) {
+  const orderFor = (rubyFile: string): FileOrder => {
     const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
     let order = manifest.files[tsRel];
     if (!order) {
-      order = { classes: {}, functions: [] };
+      order = { classes: {}, functions: [], declarations: [] };
       manifest.files[tsRel] = order;
     }
+    return order;
+  };
+
+  for (const [rubyFile, names] of declarationsByFile) {
+    const order = orderFor(rubyFile);
+    const have = new Set(order.declarations);
+    for (const n of names) {
+      // A last-segment collision is dropped here too: two Ruby classes sharing
+      // a TS name give the rule no way to tell which declaration is which.
+      if (collided.has(`${rubyFile}\0${n}`) || have.has(n)) continue;
+      have.add(n);
+      order.declarations.push(n);
+    }
+  }
+
+  for (const [rubyFile, byKey] of byFile) {
+    const order = orderFor(rubyFile);
     for (const [key, bucket] of byKey) {
       // A colliding class bucket is dropped so the lint step never enforces a
       // blended order (see the warning above).
@@ -331,8 +369,10 @@ for (const k of Object.keys(manifest.files).sort()) {
     if (order.classes[cn].length > 0) classes[cn] = order.classes[cn];
   }
   const hasFns = order.functions.length > 0;
-  if (Object.keys(classes).length === 0 && !hasFns) continue;
-  const out: FileOrder = { classes, functions: order.functions };
+  // A single declaration orders nothing.
+  const declarations = order.declarations.length > 1 ? order.declarations : [];
+  if (Object.keys(classes).length === 0 && !hasFns && declarations.length === 0) continue;
+  const out: FileOrder = { classes, functions: order.functions, declarations };
   sortedFiles[k] = out;
 }
 const final: Manifest = { files: sortedFiles };
@@ -340,7 +380,11 @@ const final: Manifest = { files: sortedFiles };
 writeJsonManifest(OUT, final);
 const fileCount = Object.keys(final.files).length;
 const nameCount = Object.values(final.files).reduce(
-  (n, o) => n + o.functions.length + Object.values(o.classes).reduce((m, a) => m + a.length, 0),
+  (n, o) =>
+    n +
+    o.functions.length +
+    o.declarations.length +
+    Object.values(o.classes).reduce((m, a) => m + a.length, 0),
   0,
 );
 console.log(`Wrote ${OUT} — ${fileCount} files (${nameCount} ordered names)`);
