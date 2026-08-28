@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
-import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
+import { Base, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
@@ -61,7 +61,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrayNotSerializable.loadSchema();
       expect(() => {
-        serialize(PgArrayNotSerializable, "tags", { type: Array });
+        PgArrayNotSerializable.serialize("tags", { type: Array });
         new PgArrayNotSerializable();
       }).toThrow(ColumnNotSerializableError);
     });
@@ -87,7 +87,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await PgArraySerialized.loadSchema();
-      serialize(PgArraySerialized, "tags", { coder: MyTags });
+      PgArraySerialized.serialize("tags", { coder: MyTags });
 
       await PgArraySerialized.create({ tags: new MyTags(["one", "two"]) } as any);
       const record = (await PgArraySerialized.first())!;

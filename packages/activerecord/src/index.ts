@@ -281,7 +281,6 @@ export {
 // (secure_token.rb:11 `include SecureToken`); MinimumLengthError is exported
 // from the @blazetrails/activerecord/secure-token subpath.
 export { composedOf } from "./aggregations.js";
-export { serialize } from "./serialize.js";
 export { ColumnNotSerializableError } from "./attribute-methods/serialization.js";
 // Encryption is server-only. Import `@blazetrails/activerecord/encryption` BEFORE
 // calling Base.encrypts() — omitting it throws at declaration time.

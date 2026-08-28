@@ -12,7 +12,6 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 import { Base } from "../base.js";
-import { serialize } from "../serialize.js";
 import { ColumnNotSerializableError } from "../attribute-methods/serialization.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import { pp } from "../pretty-print.js";
@@ -288,7 +287,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     // Rails: Class.new(klass) { serialize :payload, coder: JSON }
     class NewKlass extends klass() {}
     // Rails: `coder: JSON` — trails names the same built-in coder `"json"`.
-    serialize(NewKlass, "payload", { coder: "json" });
+    NewKlass.serialize("payload", { coder: "json" });
     expect(() => new NewKlass()).toThrow(ColumnNotSerializableError);
   });
 
@@ -308,7 +307,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   it("test_json_with_serialized_attributes", async () => {
     // Rails: Class.new(klass) { serialize :settings, coder: MySettings }
     class NewKlass extends klass() {}
-    serialize(NewKlass, "settings", { coder: MySettings });
+    NewKlass.serialize("settings", { coder: MySettings });
     await NewKlass.loadSchema();
 
     await NewKlass.createBang({ settings: new MySettings({ one: "two" }) });

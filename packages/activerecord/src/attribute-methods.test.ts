@@ -30,16 +30,6 @@ describe("AttributeMethodsTest", () => {
     expect(attrs).toBeDefined();
   });
 
-  it("boolean attributes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("published", "boolean");
-      }
-    }
-    const p = Post.new({ published: true }) as any;
-    expect(p.published).toBe(true);
-  });
-
   it("integers as nil", async () => {
     class Post extends Base {
       static {
@@ -814,32 +804,12 @@ describe("AttributeMethodsTest", () => {
     expect(t.get("title")).toBe("Don't change the topic");
   });
 
-  it("read_attribute when false", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ approved: false });
-    expect(t.readAttribute("approved")).toBe(false);
-  });
-
-  it("read_attribute when true", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ approved: true });
-    expect(t.readAttribute("approved")).toBe(true);
-  });
-
   it("string attribute predicate", async () => {
     const Topic = makeTopic();
     const t = new Topic({ title: "Hello" });
     expect(t.attributePresent("title")).toBe(true);
     const empty = new Topic({ title: "" });
     expect(empty.attributePresent("title")).toBe(false);
-  });
-
-  it("boolean attribute predicate", async () => {
-    const Topic = makeTopic();
-    const t = new Topic({ approved: true });
-    expect(t.approved).toBe(true);
-    const f = new Topic({ approved: false });
-    expect(f.approved).toBe(false);
   });
 
   it("converted values are returned after assignment", async () => {
@@ -857,15 +827,6 @@ describe("AttributeMethodsTest", () => {
     const t = new Topic({ bonus_time: Temporal.Now.instant() });
     t.bonus_time = null;
     expect(t.bonus_time).toBeNull();
-  });
-
-  it("boolean attributes writing and reading", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ approved: false });
-    t.approved = true;
-    await t.save();
-    const found = await Topic.find(t.id);
-    expect(found.approved).toBe(true);
   });
 
   it("read overridden attribute", async () => {
@@ -1370,5 +1331,52 @@ describe("initialize_generated_modules", () => {
     }
     Topic.initializeGeneratedModules();
     expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Set);
+  });
+});
+
+describe("AttributeMethodsTest", () => {
+  const { topics } = fixtures(["topics"]);
+
+  it("boolean attributes", async () => {
+    expect(((await CanonicalTopic.find(1)) as any)["approved?"]).toBe(false);
+    expect(((await CanonicalTopic.find(2)) as any)["approved?"]).toBe(true);
+  });
+
+  it("read_attribute when false", async () => {
+    const topic = topics("first") as any;
+    topic.approved = false;
+    expect(topic["approved?"]).toBe(false);
+    topic.approved = "false";
+    expect(topic["approved?"]).toBe(false);
+  });
+
+  it("read_attribute when true", async () => {
+    const topic = topics("first") as any;
+    topic.approved = true;
+    expect(topic["approved?"]).toBe(true);
+    topic.approved = "true";
+    expect(topic["approved?"]).toBe(true);
+  });
+
+  it("boolean attribute predicate", async () => {
+    const t = new CanonicalTopic({ approved: true }) as any;
+    expect(t["approved?"]).toBe(true);
+    const f = new CanonicalTopic({ approved: false }) as any;
+    expect(f["approved?"]).toBe(false);
+  });
+
+  it("boolean attributes writing and reading", async () => {
+    const topic = new CanonicalTopic({}) as any;
+    topic.approved = "false";
+    expect(topic["approved?"]).toBe(false);
+
+    topic.approved = "false";
+    expect(topic["approved?"]).toBe(false);
+
+    topic.approved = "true";
+    expect(topic["approved?"]).toBe(true);
+
+    topic.approved = "true";
+    expect(topic["approved?"]).toBe(true);
   });
 });

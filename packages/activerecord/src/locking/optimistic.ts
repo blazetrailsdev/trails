@@ -8,7 +8,6 @@ import {
   _updateRecord as persistenceUpdateRecord,
 } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
-import { reloadSchemaFromCache } from "../model-schema.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 
 /**
@@ -145,7 +144,7 @@ export class ClassMethods {
   }
 
   static set lockingColumn(column: string) {
-    reloadSchemaFromCache.call(this as any);
+    (this as any).reloadSchemaFromCache();
     // Rails stores `value.to_s`, and every call site assigns a Symbol
     // (`self.locking_column = :version`). `nil.to_s` is "", not "null".
     (this as any)._lockingColumn = column == null ? "" : String(column);

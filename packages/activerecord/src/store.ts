@@ -5,21 +5,6 @@ import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import type { YamlColumnOptions } from "./coders/yaml-column.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 
-// Injected by base.ts to break the store→serialize→json→store circular dep.
-// Bound to `serialize` so store() reads as Rails' `serialize store_attribute,
-// coder: IndifferentCoder.new(...)` (store.rb:108).
-let serialize: ((klass: typeof Base, attr: string, opts: { coder: unknown }) => void) | null = null;
-
-/**
- * @internal Called once by base.ts during module init.
- * @noRailsEquivalent PERMANENT Ruby names `serialize` at call time from the `store` macro body (store.rb:108); a TS import would close a module cycle.
- */
-export function registerSerializeFn(
-  fn: (klass: typeof Base, attr: string, opts: { coder: unknown }) => void,
-): void {
-  serialize = fn;
-}
-
 interface CoderLike {
   dump(v: unknown): unknown;
   load(v: unknown): unknown;
@@ -435,13 +420,8 @@ export function store(
         `but got ${typeof coder}.`,
     );
   }
-  if (!serialize) {
-    throw new ConfigurationError(
-      `store() requires serialize() to be registered before use. ` +
-        `Ensure base.ts (or the activerecord index) is imported before calling store().`,
-    );
-  }
-  serialize(modelClass, storeAttribute, {
+  // store.rb:108 — `serialize store_attribute, coder: IndifferentCoder.new(store_attribute, coder)`.
+  modelClass.serialize(storeAttribute, {
     coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
   });
 
