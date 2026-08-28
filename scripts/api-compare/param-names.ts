@@ -28,18 +28,12 @@ const TRAILING_CALLBACK_NAMES = new Set(["fn", "cb", "callback", "block", "blk",
  *  same workaround one language earlier — Ruby spells it `aliaz` because
  *  `alias` is a Ruby keyword — which is why that pair never reaches this set. */
 const RESERVED_RUBY_PARAM_NAMES = new Set([
-  "class",
-  "default",
-  "function",
-  "in",
-  "new",
-  "return",
-  "super",
-  "this",
-  "typeof",
-  "var",
-  "void",
-  "with",
+  // ECMAScript reserved words, which are not valid binding identifiers.
+  ...`break case catch class const continue debugger default delete do else enum
+      export extends false finally for function if import in instanceof new null
+      return super switch this throw true try typeof var void while with`.split(/\s+/),
+  // Reserved only in strict mode — which every module is.
+  ...`implements interface let package private protected public static yield`.split(/\s+/),
 ]);
 
 /** TS names a Ruby splat/kwarg group is conventionally collapsed into. The port
@@ -53,7 +47,7 @@ export interface ParamNameMismatch {
   position: number;
   /** The Ruby parameter name, camelCased — what the TS name should be. */
   ruby: string;
-  /** The TS parameter identifier as declared (minus a leading `_`). */
+  /** The TS parameter identifier, minus a leading `_`. */
   ts: string;
 }
 
@@ -63,10 +57,12 @@ function rubyPositional(params: ParamInfo[]): ParamInfo[] {
   return params.filter((p) => p.kind !== "block");
 }
 
-/** The TS identifier to compare: a leading `_` is the "intentionally unused"
- *  convention, not part of the name. */
-export function tsParamIdentifier(p: ParamInfo): string {
-  return p.name.replace(/^_+/, "");
+/** The identifier to compare: a leading `_` is the "intentionally unused"
+ *  convention on both sides — Ruby's `_new_value_before_type_cast`
+ *  (`attribute_methods/dirty.rb`) and TS's `_value` mean the same thing — so it
+ *  is not part of the name on either. */
+export function bareIdentifier(name: string): string {
+  return name.replace(/^_+/, "");
 }
 
 /** Does this side carry an actual identifier to compare? A Ruby anonymous
@@ -79,11 +75,10 @@ function isIdentifier(name: string): boolean {
 
 /** Is this position's difference one of the recognised legitimate ones? */
 function isLegitimateDifference(ruby: ParamInfo, ts: ParamInfo): boolean {
-  if (!isIdentifier(ruby.name) || !isIdentifier(tsParamIdentifier(ts))) return true;
-  const rubyName = snakeToCamel(ruby.name);
-  if (RESERVED_RUBY_PARAM_NAMES.has(rubyName)) return true;
+  if (!isIdentifier(ruby.name) || !isIdentifier(bareIdentifier(ts.name))) return true;
+  if (RESERVED_RUBY_PARAM_NAMES.has(bareIdentifier(snakeToCamel(ruby.name)))) return true;
   const isGroup = ruby.kind === "rest" || ruby.kind === "keyword" || ruby.kind === "keyword_rest";
-  return isGroup && COLLAPSED_GROUP_NAMES.has(tsParamIdentifier(ts));
+  return isGroup && COLLAPSED_GROUP_NAMES.has(bareIdentifier(ts.name));
 }
 
 /** Every TS candidate form that lines up with `rubyList` position-for-position.
@@ -123,8 +118,8 @@ export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamName
     for (let position = 0; position < rubyList.length; position++) {
       const rubyParam = rubyList[position];
       const tsParam = form[position];
-      const expected = snakeToCamel(rubyParam.name);
-      const actual = tsParamIdentifier(tsParam);
+      const expected = bareIdentifier(snakeToCamel(rubyParam.name));
+      const actual = bareIdentifier(tsParam.name);
       if (expected === actual) continue;
       if (isLegitimateDifference(rubyParam, tsParam)) continue;
       mismatches.push({ position, ruby: expected, ts: actual });

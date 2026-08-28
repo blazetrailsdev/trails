@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareParamNames, matchParamNamesAgainst, tsParamIdentifier } from "./param-names.js";
+import { bareIdentifier, compareParamNames, matchParamNamesAgainst } from "./param-names.js";
 import type { ParamInfo } from "@blazetrails/parity/types";
 
 const req = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
@@ -29,6 +29,9 @@ describe("compareParamNames", () => {
 
   it("does not flag a Ruby name TypeScript reserves", () => {
     expect(compareParamNames([req("default")], [req("defaultValue")])).toEqual([]);
+    // schema_definitions.rb `column(name, type, index: nil, **options)` — `null`
+    // is not a valid binding identifier, so the port spells it `null_`.
+    expect(compareParamNames([req("null")], [req("null_")])).toEqual([]);
   });
 
   it("does not flag a splat collapsed into an options object", () => {
@@ -76,10 +79,12 @@ describe("compareParamNames", () => {
   });
 });
 
-describe("tsParamIdentifier", () => {
-  it("strips the intentionally-unused underscore prefix", () => {
-    expect(tsParamIdentifier(req("__value"))).toBe("value");
+describe("bareIdentifier", () => {
+  it("strips the intentionally-unused underscore prefix on either side", () => {
+    expect(bareIdentifier("__value")).toBe("value");
     expect(compareParamNames([req("value")], [req("_value")])).toEqual([]);
+    // dirty.rb spells the Ruby param `_new_value_before_type_cast`.
+    expect(compareParamNames([req("_new_value")], [req("newValue")])).toEqual([]);
   });
 });
 
