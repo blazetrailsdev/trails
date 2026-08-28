@@ -1686,6 +1686,39 @@ describe(
       expect(m["I18n::Locale::Tag::Rfc4646"].filter((x) => x.name === "language")).toHaveLength(1);
     });
 
+    it("lets a literal def in the struct block override the synthesized initialize", () => {
+      const m = metaMethods(`
+      module ActiveRecord
+        MigrationProxy = Struct.new(:name, :version, :filename, :scope) do
+          def initialize(name, version, filename, scope)
+            super
+            @migration = nil
+          end
+
+          def basename
+            File.basename(filename)
+          end
+        end
+      end
+    `);
+      const inits = m["ActiveRecord::MigrationProxy"].filter((x) => x.name === "initialize");
+      // One entry, and it is the body's own def: the struct's synthesized
+      // initialize takes the members as optional positionals, the real one
+      // takes them as required.
+      expect(inits).toHaveLength(1);
+      expect(inits[0].notes).toBeUndefined();
+      expect(inits[0].params).toEqual([
+        { name: "name", kind: "required" },
+        { name: "version", kind: "required" },
+        { name: "filename", kind: "required" },
+        { name: "scope", kind: "required" },
+      ]);
+      // The accessors nothing overrides are untouched.
+      expect(m["ActiveRecord::MigrationProxy"].find((x) => x.name === "version")!.notes).toBe(
+        "struct",
+      );
+    });
+
     it("unrolls a literal-array each loop whose template is a class_eval def", () => {
       const m = metaMethods(`
       module ActiveSupport
