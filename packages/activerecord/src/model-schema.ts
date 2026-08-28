@@ -425,6 +425,8 @@ export interface SchemaHost {
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
   hookAttributeType?(name: string, type: Type): Type;
+  /** @internal Rails-protected (model_schema.rb:553). */
+  reloadSchemaFromCache(): void;
 }
 
 /**
@@ -766,7 +768,7 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
   // reloadSchemaFromCache — Rails' protected reload_schema_from_cache nils
   // class-level schema ivars without touching the schema cache.
   clearAdapterDataSourceCache(this);
-  reloadSchemaFromCache.call(this);
+  this.reloadSchemaFromCache();
   return rewarmDataSourceCache(this);
 }
 
@@ -777,16 +779,12 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._returningColumnsForInsertCache = undefined;
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
-  // Rails puts this bang only in ActiveRecord::Attributes' override of
-  // `reload_schema_from_cache` (attributes.rb:268-271), which every Ruby caller
-  // reaches by sending `self`. trails' callers still reach this half by static
-  // import, so the bang is folded in here until they dispatch —
-  // dispatch-reload-schema-from-cache-through-the-ar-override.
-  (this as SchemaHost & { resetDefaultAttributesBang(): void }).resetDefaultAttributesBang();
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   clearAttributeNamesMemo(this);
   for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
-    reloadSchemaFromCache.call(sub);
+    // `descendant.send(:reload_schema_from_cache)` (:566-568) — a send, so an
+    // AR descendant runs the Attributes override (attributes.rb:268-271).
+    sub.reloadSchemaFromCache();
   }
 }
 
@@ -808,7 +806,7 @@ export function loadSchema(this: SchemaHost): void {
   } catch (error) {
     // `rescue; reload_schema_from_cache; raise` (:541-544) — a load that failed
     // half way through must not leave its partial state behind.
-    reloadSchemaFromCache.call(this);
+    this.reloadSchemaFromCache();
     throw error;
   }
   if (!ownSchemaMemo(this, "_schemaLoaded")) {
@@ -1257,7 +1255,7 @@ export function sequenceName(this: SchemaHost, value?: string | null): string | 
 
 export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
   if (value !== undefined) {
-    reloadSchemaFromCache.call(this);
+    this.reloadSchemaFromCache();
     this._ignoredColumns = value.map(String);
   }
   return this._ignoredColumns ?? [];

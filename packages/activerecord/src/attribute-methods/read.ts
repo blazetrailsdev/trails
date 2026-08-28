@@ -16,6 +16,8 @@ import type { CodeGenerator } from "@blazetrails/activesupport";
 export interface Read {
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
+  /** @internal Rails-private (`private :attribute`, read.rb:42). */
+  attribute(name: string): unknown;
 }
 
 interface AttributeHolder {
@@ -33,6 +35,11 @@ interface AttributeHolder {
 export const Read = {
   readAttribute,
   _readAttribute,
+  // read.rb:41-42 — `alias :attribute :_read_attribute` / `private :attribute`.
+  // The bare (empty-suffix) attribute-method pattern proxies to this name, the
+  // way the `=` pattern proxies to Write's `attribute=` (write.rb:45) and the
+  // `?` pattern to Query's `attribute?` (query.rb:25).
+  attribute: _readAttribute,
 };
 
 /**

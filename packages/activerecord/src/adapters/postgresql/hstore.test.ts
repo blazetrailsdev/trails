@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
-import { Base, serialize, Migration } from "../../index.js";
+import { Base, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
 class TagCollection {
@@ -27,7 +27,7 @@ class Hstore extends Base {
 }
 
 class HstoreWithSerialize extends Hstore {}
-serialize(HstoreWithSerialize, "tags", { coder: TagCollection });
+HstoreWithSerialize.serialize("tags", { coder: TagCollection });
 
 describeIfPg("PostgreSQLAdapter", () => {
   fixtures({}, { useTransactionalTests: false });

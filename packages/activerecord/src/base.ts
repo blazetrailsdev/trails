@@ -110,6 +110,7 @@ import {
   _defaultAttributes as _arDefaultAttributes,
   resolveTypeName as _resolveTypeName,
   resetDefaultAttributes as _resetDefaultAttributes,
+  reloadSchemaFromCache as _reloadSchemaFromCache,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
@@ -367,18 +368,14 @@ import { authenticateBy as _authenticateBy } from "./secure-password.js";
 import {
   store as _storeFunction,
   storeAccessor as _storeAccessorFunction,
-  registerSerializeFn as _registerSerializeFn,
   localStoredAttributesMethod as _localStoredAttributesMethod,
   storedAttributes as _storedAttributes,
   readStoreAttribute as _readStoreAttribute,
   writeStoreAttribute as _writeStoreAttribute,
   storeAccessorFor as _storeAccessorFor,
 } from "./store.js";
-import { serialize as _serializeAttribute } from "./serialize.js";
 import { respondToMissing } from "./dynamic-matchers.js";
 
-// Break store→serialize→json→store circular dep by injecting serialize into store at init.
-_registerSerializeFn(_serializeAttribute as any);
 import { extractMultiparameterCallstack } from "./multiparameter-attribute-assignment.js";
 
 /**
@@ -1513,6 +1510,13 @@ export class Base extends Model {
   declare static resolveTypeName: typeof _resolveTypeName;
   /** @internal */
   declare static resetDefaultAttributes: typeof _resetDefaultAttributes;
+  /**
+   * Mirrors: ActiveRecord::Attributes::ClassMethods#reload_schema_from_cache
+   * (attributes.rb:268-271).
+   *
+   * @internal Rails-protected.
+   */
+  declare static reloadSchemaFromCache: () => void;
 
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   declare static columnNames: typeof ModelSchema.columnNames;
@@ -1973,15 +1977,18 @@ export class Base extends Model {
 
   /**
    * Declare that an attribute should be serialized using the given coder.
+   * Arrives from `AttributeMethods::Serialization::ClassMethods` at the
+   * attribute_methods.rb:20 seat below.
    *
-   * Mirrors: ActiveRecord::Base.serialize
+   * Mirrors: ActiveRecord::AttributeMethods::Serialization::ClassMethods#serialize
    */
-  static serialize(
+  declare static serialize: (
     attribute: string,
-    options?: { coder?: unknown; type?: "Array" | "Hash" | (new (...args: any[]) => any) },
-  ): void {
-    _serializeAttribute(this, attribute, options as any);
-  }
+    options?: AttributeOptions & {
+      coder?: unknown;
+      type?: "Array" | "Hash" | (new (...args: any[]) => any);
+    },
+  ) => void;
 
   /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
   declare static localStoredAttributes: typeof _localStoredAttributesMethod;
@@ -4541,6 +4548,9 @@ extend(Base, {
   // attributes.rb:293-295 — ActiveRecord's override of
   // AttributeRegistration::ClassMethods#reset_default_attributes.
   resetDefaultAttributes: _resetDefaultAttributes,
+  // attributes.rb:268-271 — ActiveRecord's override of ModelSchema's
+  // `reload_schema_from_cache`; every caller sends it, so this is the seat.
+  reloadSchemaFromCache: _reloadSchemaFromCache,
 });
 // AttributeMethods class method — gates association/attribute names that would
 // clash with an Active Record instance method (Rails: dangerous_attribute_method?).
@@ -4695,13 +4705,9 @@ include(Base, AMDirty);
 include(Base, _Dirty);
 // attribute_methods.rb:20 — `include Serialization`. It defines no instance
 // methods, so the include's payload is its `included do` block
-// (serialization.rb:19-21) declaring `default_column_serializer`. Its
-// `ClassMethods#serialize` (serialization.rb:183-205) still reaches `Base` as
-// the class-body `static serialize` above rather than an `extend()` here: the
-// body lives in `serialize.ts`, which imports this module's
-// `isTypeIncompatibleWithSerialize` and `ColumnNotSerializableError`, so
-// re-homing the class method onto the Rails file first has to untangle that
-// cycle — see the `rehome-serialize-onto-attribute-methods-serialization` story.
+// (serialization.rb:19-21) declaring `default_column_serializer`, plus the
+// `extend ClassMethods` its Concern does — which is what carries `serialize`
+// (serialization.rb:183-205).
 include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);

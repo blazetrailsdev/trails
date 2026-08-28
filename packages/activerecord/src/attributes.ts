@@ -101,7 +101,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 }
 
 /** @internal */
-function reloadSchemaFromCache(this: AnyClass): void {
+export function reloadSchemaFromCache(this: AnyClass): void {
   this.resetDefaultAttributesBang();
   modelSchemaReloadSchemaFromCache.call(this);
 }
