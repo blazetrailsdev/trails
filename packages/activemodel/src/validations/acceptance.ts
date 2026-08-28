@@ -12,8 +12,9 @@ export class LazilyDefineAttributes {
     this.attributes = Object.freeze([...attributes]);
   }
 
-  matches(methodName: string): string | null {
-    return this.include(methodName) ? methodName : null;
+  matches(methodName: string): boolean {
+    const attrName = methodName.replace(/=$/, "");
+    return this.attributes.some((name) => name === attrName);
   }
 
   include(attribute: string): boolean {
