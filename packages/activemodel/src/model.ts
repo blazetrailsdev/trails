@@ -59,9 +59,7 @@ export class Model {
     typeof ValidationsClassMethods
   >["clearValidatorsBang"];
 
-  static isAttributeMethod(attribute: string): boolean {
-    return attribute in this.prototype;
-  }
+  declare static isAttributeMethod: Extended<typeof ValidationsClassMethods>["isAttributeMethod"];
 
   declare static validate: <T extends ValidatableRecord = ValidatableRecord>(
     methodOrFn: string | ((record: T) => unknown),

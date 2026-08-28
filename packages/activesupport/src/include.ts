@@ -209,7 +209,16 @@ export function isModuleIncluded(
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
     if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) continue;
-    if (((proto as any)[includedModules] as Set<unknown>).has(mod)) return true;
+    const mods = (proto as any)[includedModules] as Set<unknown>;
+    if (mods.has(mod)) return true;
+    // Ruby asks this through `included_modules.include?`, and `Array#include?`
+    // compares with `==` — which a module may define by value
+    // (`AcceptanceValidator::LazilyDefineAttributes#==`, acceptance.rb:71-73).
+    // `Set#has` is identity only, so consult the module's own `equals` too.
+    const eq = (mod as { equals?: (other: unknown) => boolean }).equals;
+    if (typeof eq === "function") {
+      for (const m of mods) if (eq.call(mod, m)) return true;
+    }
   }
   return false;
 }

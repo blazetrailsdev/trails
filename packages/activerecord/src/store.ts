@@ -287,11 +287,12 @@ export interface StoreOptions {
  *
  * Mirrors: ActiveRecord::Store::ClassMethods#store_accessor
  */
-export function storeAccessor(
-  modelClass: typeof Base,
+function storeAccessor(
+  this: typeof Base,
   storeAttribute: string,
-  options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
+  options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string } = {},
 ): void {
+  const modelClass = this;
   const { accessors: keys = [], prefix = null, suffix = null } = options;
 
   const accessorPrefix =
@@ -402,11 +403,8 @@ function dig(obj: unknown, key: string): unknown {
  *   store(User, 'settings', { accessors: ['theme'], prefix: true })
  *   store(User, 'settings', { accessors: ['theme'], coder: JSON })
  */
-export function store(
-  modelClass: typeof Base,
-  storeAttribute: string,
-  options: StoreOptions,
-): void {
+function store(this: typeof Base, storeAttribute: string, options: StoreOptions = {}): void {
+  const modelClass = this;
   // Mirror Rails three-step: build_column_serializer → IndifferentCoder → serialize
   const coder = buildColumnSerializer(storeAttribute, options.coder, Object, options.yaml);
   // Validate: if a coder was resolved, it must implement dump/load. Strings, numbers,
@@ -426,13 +424,21 @@ export function store(
   });
 
   if (options.accessors !== undefined) {
-    storeAccessor(modelClass, storeAttribute, {
+    modelClass.storeAccessor(storeAttribute, {
       accessors: options.accessors,
       prefix: options.prefix,
       suffix: options.suffix,
     });
   }
 }
+
+/**
+ * Mirrors: ActiveRecord::Store::ClassMethods
+ */
+export const ClassMethods = {
+  store,
+  storeAccessor,
+};
 
 /**
  * Returns the HashAccessor class for a given store attribute column.
