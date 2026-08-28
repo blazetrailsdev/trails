@@ -967,7 +967,8 @@ describe("ReflectionTest", () => {
     // adapter maps `int8` onto Type::Integer with `limit: 8` rather than a
     // distinct type. trails names it `big_integer`, so a bigserial/bigint PK
     // reports differently per adapter — tracked debt, not ratified here:
-    // story pg-bigserial-pk-reflects-as-big-integer-not-integer (RFC 0023).
+    // story pg-bigserial-pk-reflects-as-big-integer-not-integer, in the
+    // activerecord-surfaced-deviations bucket.
     expect(["integer", "big_integer"]).toContain(
       (CanonicalTopic as any).columnForAttribute("id").type,
     );

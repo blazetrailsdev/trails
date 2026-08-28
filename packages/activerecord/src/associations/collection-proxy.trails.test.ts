@@ -714,8 +714,9 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
 });
 
 // Tracked in the activerecord-surfaced-deviations bucket: a CollectionProxy's
-// relation clauses are seeded ONCE at construction. When the owner is a NEW record then, its FK is
-// unresolvable and the seed collapses to the `1=0` NullRelation. A relation
+// relation clauses are seeded ONCE at construction. When the owner is a NEW
+// record then, its FK is unresolvable and the seed collapses to the `1=0`
+// NullRelation. A relation
 // spawned off that stale seed (`owner.things.where(...)`) — or the proxy itself
 // once a bang has diverged it — must pick up the persisted FK once the owner is
 // saved, mirroring Rails' CollectionProxy delegating every query to the live

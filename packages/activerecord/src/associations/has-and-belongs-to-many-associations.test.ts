@@ -1001,10 +1001,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   // Tracked in the activerecord-surfaced-deviations bucket: a HABTM proxy whose
-  // owner was NEW when a finder relation was spawned off it (`project.developers.where(...)`) seeds
-  // the `1=0` NullRelation. After `save`, the mutated finder must rebase onto
-  // the resolved join scope so it picks up the persisted FK rather than the
-  // stale seed — mirroring Rails' CollectionProxy delegating to
+  // owner was NEW when a finder relation was spawned off it
+  // (`project.developers.where(...)`) seeds the `1=0` NullRelation. After
+  // `save`, the mutated finder must rebase onto the resolved join scope so it
+  // picks up the persisted FK rather than the stale seed — mirroring Rails'
+  // CollectionProxy delegating to
   // `association.scope`.
   it("mutated finder on new-owner seed resolves the join after save", async () => {
     const developer = await Developer.create({ name: "Zed" });

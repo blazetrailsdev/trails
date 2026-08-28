@@ -471,7 +471,7 @@ describe("FinderTest", () => {
 // fixtures) for the composite-primary-key find cluster. The aggregate-attribute
 // find_by ports (Customer composed_of — find_by_address / find_by_balance...)
 // are deferred pending composed_of hash-condition expansion in the predicate
-// builder; tracked under RFC 0023.
+// builder; tracked in the activerecord-surfaced-deviations bucket.
 // ==========================================================================
 describe("FinderTest", () => {
   const { topics, cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"]);
@@ -2321,7 +2321,8 @@ describe("FinderTest", () => {
 // FinderTest — faithful port of the finder_test.rb `test_exists*` cluster,
 // riding canonical models (Topic/Author/Post/Comment/Subscriber/Customer/
 // Developer) + the real fixtures. Replaces the earlier synthetic `exists`
-// coverage (RFC 0023). Test names match Rails verbatim.
+// coverage (the activerecord-surfaced-deviations bucket). Test names match
+// Rails verbatim.
 // ==========================================================================
 describe("FinderTest", () => {
   const { topics, authors, developers } = fixtures([
