@@ -52,6 +52,7 @@ export const Callbacks = {
     extend(base, ClassMethods);
 
     include(base, ASCallbacks.InstanceMethods);
+    extend(base, ASCallbacks.ClassMethods);
     defineCallbacks(base.prototype, "validation", {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],
