@@ -7,6 +7,7 @@ import { Binary, type NodeOrValue } from "./binary.js";
 import { Unary } from "./unary.js";
 import { ArelError } from "../errors.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Case extends NodeExpression {
   case: Node | null;
   conditions: When[];
@@ -69,3 +70,7 @@ export class Case extends NodeExpression {
 
 export class When extends Binary {}
 export class Else extends Unary {}
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Case extends _AliasPredication {}

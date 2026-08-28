@@ -3,7 +3,7 @@ import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 import { SqlLiteral } from "./sql-literal.js";
 
-describe("Arel::Nodes::FunctionTest", () => {
+describe("Function alias slot", () => {
   describe("alias= setter wraps strings in SqlLiteral", () => {
     it("wraps a string via the setter", () => {
       const fn = new Nodes.NamedFunction("COUNT", []);
@@ -27,14 +27,14 @@ describe("Arel::Nodes::FunctionTest", () => {
   });
 });
 
-describe("Arel::Nodes::RollUpTest", () => {
+describe("RollUp node", () => {
   it("RollUp is the canonical class name", () => {
     expect(Nodes.RollUp).toBeDefined();
     expect(new Nodes.RollUp([]) instanceof Nodes.RollUp).toBe(true);
   });
 });
 
-describe("Arel::Nodes::WithTest", () => {
+describe("With node children", () => {
   it("children getter returns expr slot", () => {
     const users = new Table("users");
     const cte = new Nodes.Cte("t", users.project(new SqlLiteral("1")));
@@ -44,7 +44,7 @@ describe("Arel::Nodes::WithTest", () => {
   });
 });
 
-describe("Arel::Nodes::ExistsTest", () => {
+describe("Exists node", () => {
   const users = new Table("users");
 
   it("is a Function subclass", () => {

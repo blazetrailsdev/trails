@@ -3,6 +3,7 @@ import { _setNot } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Unary extends NodeExpression {
   expr: unknown;
 
@@ -60,3 +61,7 @@ export class OptimizerHints extends Unary {
 }
 
 _setNot(Not);
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Unary extends _AliasPredication {}

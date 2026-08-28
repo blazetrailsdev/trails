@@ -25,7 +25,7 @@ describe("TableTest (trails)", () => {
   });
 
   it("as returns an AliasPredication As node, not a TableAlias", () => {
-    const aliased = users.as("u") as Nodes.As;
+    const aliased = users.as("u");
     expect(aliased).toBeInstanceOf(Nodes.As);
     expect(aliased.left).toBe(users);
     expect(aliased.right).toBeInstanceOf(Nodes.SqlLiteral);

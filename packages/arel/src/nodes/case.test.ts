@@ -84,7 +84,7 @@ describe("NodesTest", () => {
     describe("#as", () => {
       it("allows aliasing", () => {
         const node = new Nodes.Case("foo" as unknown as Nodes.Node);
-        const as = node.as("bar") as Nodes.As;
+        const as = node.as("bar");
 
         expect(as.left).toEqual(node);
         expect(as.right).toBeInstanceOf(Nodes.SqlLiteral);

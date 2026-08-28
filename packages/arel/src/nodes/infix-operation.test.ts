@@ -13,7 +13,7 @@ describe("TestInfixOperation", () => {
 
   it("operation alias", () => {
     const operation = new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node);
-    const aliaz = operation.as("zomg") as Nodes.As;
+    const aliaz = operation.as("zomg");
     expect(aliaz).toBeInstanceOf(Nodes.As);
     expect(aliaz.left).toBe(operation);
     expect(String(aliaz.right)).toBe("zomg");

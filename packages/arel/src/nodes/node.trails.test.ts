@@ -5,8 +5,8 @@ import { Table, Nodes, Visitors } from "../index.js";
 describe("TestNode", () => {
   const users = new Table("users");
   it("is equal with equal ivars (checks left/right)", () => {
-    const a = users.get("name").as("n") as Nodes.As;
-    const b = users.get("name").as("n") as Nodes.As;
+    const a = users.get("name").as("n");
+    const b = users.get("name").as("n");
     expect((a.right as Nodes.SqlLiteral).value).toBe((b.right as Nodes.SqlLiteral).value);
   });
 

@@ -81,8 +81,11 @@ describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
 });
 
 describe("Per-class `as(name)` marks the alias SqlLiteral as retryable", () => {
-  const collectorIsRetryableAfter = (n: Nodes.Node): boolean =>
-    new Visitors.ToSql(fakeRecordConnection).accept(n, new Collectors.SQLString()).retryable;
+  const collectorIsRetryableAfter = (n: Nodes.Node): boolean | undefined => {
+    const collector = new Collectors.SQLString();
+    collector.retryable = true;
+    return new Visitors.ToSql(fakeRecordConnection).accept(n, collector).retryable;
+  };
 
   it("Attribute#as keeps the collector retryable", () => {
     expect(collectorIsRetryableAfter(users.get("id").as("aliased"))).toBe(true);

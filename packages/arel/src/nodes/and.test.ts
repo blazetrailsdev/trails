@@ -24,7 +24,7 @@ describe("And", () => {
 
   describe("functions as node expression", () => {
     it("allows aliasing", () => {
-      const aliased = new Nodes.And(["foo", "bar"] as unknown as Node[]).as("baz") as Nodes.As;
+      const aliased = new Nodes.And(["foo", "bar"] as unknown as Node[]).as("baz");
 
       expect(aliased).toBeInstanceOf(Nodes.As);
       expect(aliased.right).toBeInstanceOf(Nodes.SqlLiteral);

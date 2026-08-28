@@ -5,6 +5,7 @@ import type { Table } from "../table.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectStatement extends NodeExpression {
   cores: SelectCore[];
   orders: Node[];
@@ -47,3 +48,7 @@ export class SelectStatement extends NodeExpression {
     return copy;
   }
 }
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface SelectStatement extends _AliasPredication {}

@@ -1,8 +1,8 @@
 import { PlainString } from "./plain-string.js";
 
 export class SQLString extends PlainString {
-  preparable = false;
-  retryable = true;
+  preparable?: boolean;
+  retryable?: boolean;
   private bindIndex = 1;
 
   constructor() {

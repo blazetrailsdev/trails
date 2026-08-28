@@ -1,6 +1,7 @@
 import { rbHash } from "@blazetrails/activesupport";
 import { NodeExpression } from "./node-expression.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class True extends NodeExpression {
   hash(): number {
     return rbHash(this.constructor);
@@ -10,3 +11,7 @@ export class True extends NodeExpression {
     return other instanceof True && this.constructor === other.constructor;
   }
 }
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface True extends _AliasPredication {}

@@ -634,11 +634,9 @@ describe("the to_sql visitor", () => {
   const posts = new Table("posts");
   it("should mark collector as non-retryable if SQL literal is marked as retryable", () => {
     const lit = new Nodes.SqlLiteral("1", { retryable: true });
-    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
-      lit,
-      new Collectors.SQLString(),
-    );
-    expect(collector.retryable).toBe(true);
+    const collector = new Collectors.SQLString();
+    collector.retryable = true;
+    expect(new Visitors.ToSql(fakeRecordConnection).accept(lit, collector).retryable).toBe(true);
   });
 
   describe("Nodes::DeleteStatement", () => {
