@@ -30,6 +30,12 @@ export interface AttributeHostInternals {
   attributeTypes(): Record<string, Type>;
   /** @internal */
   pendingAttributeModifications(): PendingModification[];
+  /** @internal */
+  applyPendingAttributeModifications(attributeSet: AttributeSet): void;
+  /** @internal */
+  resetDefaultAttributes(): void;
+  /** @internal */
+  resetDefaultAttributesBang(): void;
 }
 
 export type AttributeDecorator = (name: string, type: Type) => Type | null | undefined;
@@ -108,7 +114,7 @@ export function attribute(
     this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));
   }
 
-  resetDefaultAttributes(this);
+  this.resetDefaultAttributes();
 }
 
 export function decorateAttributes(
@@ -120,14 +126,14 @@ export function decorateAttributes(
 
   this.pendingAttributeModifications().push(new PendingDecorator(names, decorator));
 
-  resetDefaultAttributes(this);
+  this.resetDefaultAttributes();
 }
 
 export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
   if (!this._cachedDefaultAttributes) {
     registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
     const attributeSet = new AttributeSet(new Map<string, Attribute>());
-    applyPendingAttributeModifications(this, attributeSet);
+    this.applyPendingAttributeModifications(attributeSet);
     this._cachedDefaultAttributes = attributeSet;
   }
   return this._cachedDefaultAttributes;
@@ -196,26 +202,26 @@ export function pendingAttributeModifications(this: AttributeHostInternals): Pen
 
 /** @internal */
 export function applyPendingAttributeModifications(
-  cls: AttributeHostInternals,
+  this: AttributeHostInternals,
   attributeSet: AttributeSet,
 ): void {
-  const superclass = Object.getPrototypeOf(cls) as
-    | (AttributeHostInternals & { _defaultAttributes?: unknown })
+  const superclass = Object.getPrototypeOf(this) as
+    | (AttributeHostInternals & { applyPendingAttributeModifications?: unknown })
     | null;
-  if (superclass && typeof superclass._defaultAttributes === "function") {
-    applyPendingAttributeModifications(superclass, attributeSet);
+  if (superclass && typeof superclass.applyPendingAttributeModifications === "function") {
+    superclass.applyPendingAttributeModifications(attributeSet);
   }
 
-  for (const modification of pendingAttributeModifications.call(cls)) {
+  for (const modification of this.pendingAttributeModifications()) {
     modification.applyTo(attributeSet);
   }
 }
 
 /** @internal */
-export function resetDefaultAttributes(cls: AttributeHostInternals): void {
-  resetDefaultAttributesBang.call(cls);
-  for (const sub of DescendantsTracker.subclasses(cls as unknown as HostAsClass)) {
-    resetDefaultAttributes(sub as unknown as AttributeHostInternals);
+export function resetDefaultAttributes(this: AttributeHostInternals): void {
+  this.resetDefaultAttributesBang();
+  for (const sub of DescendantsTracker.subclasses(this as unknown as HostAsClass)) {
+    (sub as unknown as AttributeHostInternals).resetDefaultAttributes();
   }
 }
 
@@ -256,6 +262,8 @@ export const ClassMethods = {
   attributeTypes,
   typeForAttribute,
   pendingAttributeModifications,
+  applyPendingAttributeModifications,
+  resetDefaultAttributes,
   resetDefaultAttributesBang,
   resolveAttributeName,
   resolveTypeName,

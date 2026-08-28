@@ -86,7 +86,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     }
 
     const attributeSet = new AttributeSet(attributesHash);
-    applyPendingAttributeModifications(cacheHost, attributeSet);
+    applyPendingAttributeModifications.call(cacheHost, attributeSet);
 
     cacheHost._cachedDefaultAttributes = attributeSet;
   }
@@ -96,7 +96,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 
 /** @internal */
 function reloadSchemaFromCache(this: AnyClass): void {
-  amResetDefaultAttributes(this);
+  amResetDefaultAttributes.call(this);
 }
 
 const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
