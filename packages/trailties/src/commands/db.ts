@@ -488,10 +488,9 @@ async function runTestLoadSchema(options: {
  * rather than re-deriving the in-memory predicate here.
  */
 async function structureLoadReachesDatabase(
-  config: Parameters<typeof DatabaseTasks.withTemporaryPool>[0],
+  config: Parameters<typeof DatabaseTasks.withTemporaryConnection>[0],
 ): Promise<boolean> {
-  return DatabaseTasks.withTemporaryPool(config, async (pool) => {
-    const adapter = await pool.leaseConnection();
+  return DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
     const supports = (adapter as unknown as { supportsConcurrentConnections?: () => boolean })
       .supportsConcurrentConnections;
     return typeof supports === "function" ? supports.call(adapter) : true;

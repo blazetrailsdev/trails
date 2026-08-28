@@ -274,8 +274,7 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
       "db:migrate:status": async () => {
         await withMigrationContext(async (migrationContext) => {
           if (!(await migrationContext.schemaMigration.tableExists())) {
-            log("Schema migrations table does not exist yet.");
-            return;
+            throw new Error("Schema migrations table does not exist yet.");
           }
           const statuses = await migrationContext.migrationsStatus();
           log("");

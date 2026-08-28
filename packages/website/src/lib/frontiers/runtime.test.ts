@@ -161,7 +161,8 @@ describe("exec: db:migrate:status", () => {
   it("says the schema migrations table does not exist yet when it is absent", async () => {
     await runtime.exec("generate model User name:string email:string");
     const result = await runtime.exec("db:migrate:status");
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.exitCode).toBe(1);
     expect(result.output.join("\n")).toContain("Schema migrations table does not exist yet.");
   });
 });
