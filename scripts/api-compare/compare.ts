@@ -13,7 +13,7 @@
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts \
  *     [--package activerecord] [--missing] [--files] [--incomplete] [--closure] \
- *     [--inheritance] [--arity] [--public-only | --privates-only] [--calls]
+ *     [--inheritance] [--arity] [--params] [--public-only | --privates-only] [--calls]
  *
  * `--closure` scopes the per-file detail table to the AR/AM require closure
  * (ar-closure.ts, RFC 0092) and prints its own totals line under the table, so
@@ -31,6 +31,14 @@
  * per-method breakdown. A justified deviation can be suppressed with a
  * reasoned arity-exclude.json entry (arity-exclude.ts); lint-arity-excludes.ts
  * then fails that entry once it goes stale.
+ *
+ * The advisory parameter-NAME check (RFC 0126, param-names.ts) runs beside it on
+ * the same pairs: where arity asks how many args a method takes, this asks what
+ * they are CALLED, since CLAUDE.md makes the camelCased Rails identifier the
+ * required spelling. A `params N/M` figure prints next to `arity` and
+ * output/param-name-mismatches.json is always written; `--params` adds the
+ * per-position breakdown. lint-param-names.ts gates it against an only-shrink
+ * per-package/per-file mark (param-name-mark.json).
  *
  * Three further advisory checks run on the same name-matched pairs, each
  * one-line-summarized and always written to its own artifact, none affecting
@@ -105,6 +113,7 @@ import {
   stripThis,
   type ArityRange,
 } from "./arity.js";
+import { matchParamNamesAgainst } from "./param-names.js";
 import {
   ARITY_EXCLUDE_PATH,
   arityExcludeKeyOf,
@@ -956,6 +965,7 @@ interface PackageResult {
   files: FileResult[];
   inheritance: InheritanceResult;
   arity: ArityResult;
+  paramNames: ParamNameResult;
   optionKeys: OptionKeyResult;
   literals: LiteralResult;
   calls: CallResult;
@@ -1623,6 +1633,27 @@ interface ArityMismatch {
   tsSig: string;
   rubyRange: ArityRange;
   tsRange: ArityRange;
+}
+
+// Advisory parameter-NAME comparison: for a name-matched pair whose signatures
+// line up positionally but whose parameters are spelled differently. One row per
+// differing POSITION. Never affects the parity %.
+interface ParamNameMismatch {
+  rubyFile: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  position: number;
+  rubyParam: string;
+  tsParam: string;
+}
+
+interface ParamNameResult {
+  /** Pairs whose parameter names were actually compared (i.e. aligned). */
+  compared: number;
+  /** Pairs with at least one differing position. */
+  mismatchedPairs: number;
+  mismatches: ParamNameMismatch[];
 }
 
 interface ArityResult {
@@ -2645,6 +2676,7 @@ export function main() {
   const showInheritance = args.includes("--inheritance");
   // Arity is always computed (summary + artifact); --arity adds the breakdown.
   const showArity = args.includes("--arity");
+  const showParams = args.includes("--params");
   // Comparison bucket:
   //   default        → public + private combined (full surface)
   //   --public-only  → public API only (historical default; matches
@@ -3236,6 +3268,8 @@ export function main() {
     let totalFiles = 0;
     let filesExist = 0;
     let totalMisplaced = 0;
+    let paramNamesCompared = 0;
+    const paramNameMismatches: ParamNameMismatch[] = [];
     let arityCompared = 0;
     let arityForwardingSkipped = 0;
     let arityExcluded = 0;
@@ -3770,6 +3804,34 @@ export function main() {
         // overlaps ANY (see tsParamsByName above for why this is global).
         const candidates = tsParamsByName.get(tsName) ?? [];
         if (candidates.length === 0) return;
+        // Parameter NAMES (param-names.ts) — a separate finding from arity, and
+        // measured on the same matched pairs: a port that keeps Ruby's arg count
+        // and renames every arg is 100% on arity and 0% here. Only pairs that
+        // line up positionally are compared, so a length disagreement stays
+        // arity's row rather than being charged twice.
+        if (!rubyForwardingNames.has(rubyName)) {
+          // Scoped per-FILE, unlike arity's global pool: a name is only weak
+          // evidence of identity for parameter SPELLINGS. `initialize` pools
+          // every constructor in the package, so `Table#initialize(name, as:,
+          // klass:, type_caster:)` would align against an unrelated 4-arg
+          // constructor and report three renames that exist nowhere.
+          const fileCandidates = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
+          const verdict = matchParamNamesAgainst(rubyParams, fileCandidates);
+          if (verdict.aligned) {
+            paramNamesCompared++;
+            for (const row of verdict.rows) {
+              paramNameMismatches.push({
+                rubyFile,
+                tsFile,
+                rubyName,
+                tsName,
+                position: row.position,
+                rubyParam: row.ruby,
+                tsParam: row.ts,
+              });
+            }
+          }
+        }
         // A `delegate`/unresolved-`alias` entry carries a placeholder `[0-0]`, not a
         // signature — comparing it against the real TS arity is noise, so it is
         // skipped before `arityCompared` counts it. Placed AFTER the no-candidate
@@ -4230,6 +4292,12 @@ export function main() {
         excluded: arityExcluded,
         mismatches: arityMismatches,
       },
+      paramNames: {
+        compared: paramNamesCompared,
+        mismatchedPairs: new Set(paramNameMismatches.map((m) => `${m.rubyFile} ${m.rubyName}`))
+          .size,
+        mismatches: paramNameMismatches,
+      },
       optionKeys: {
         compared: optionKeysCompared,
         mismatched: optionKeyMismatches.length,
@@ -4311,6 +4379,28 @@ export function main() {
         // The gate treats every committed exclude absent from this list as stale.
         appliedExcludes: [...appliedArityExcludes].sort(),
         mismatches: arityFlat,
+      },
+      null,
+      2,
+    ),
+  );
+
+  // Advisory parameter-name artifact — always written; flat across packages;
+  // same header shape as arity-mismatches.json. This is what the RFC 0126 mark
+  // gate (lint-param-names.ts) measures.
+  const paramNamesPath = path.join(OUTPUT_DIR, `param-name-mismatches${modeSuffix}.json`);
+  const paramNamesFlat = results.flatMap((r) =>
+    r.paramNames.mismatches.map((m) => ({ package: r.package, ...m })),
+  );
+  fs.writeFileSync(
+    paramNamesPath,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        packages: results.map((r) => r.package).sort(),
+        compared: results.reduce((n, r) => n + r.paramNames.compared, 0),
+        mismatched: paramNamesFlat.length,
+        mismatches: paramNamesFlat,
       },
       null,
       2,
@@ -4493,6 +4583,7 @@ export function main() {
     showIncomplete,
     showInheritance,
     showArity,
+    showParams,
     mode,
     showClosureOnly,
   );
@@ -4528,6 +4619,7 @@ function printReport(
   showIncomplete = false,
   showInheritance = false,
   showArity = false,
+  showParams = false,
   mode: CompareMode = "public",
   showClosureOnly = false,
 ) {
@@ -4559,6 +4651,8 @@ function printReport(
   let grandCallsMismatched = 0;
   let grandCallArgsCompared = 0;
   let grandCallArgsMismatched = 0;
+  let grandParamNamesCompared = 0;
+  let grandParamNamesMismatched = 0;
 
   // Source-hash pinning (RFC 0025): the set of pinned (package, rubyFile,
   // rubyName) keys, read from the committed manifest so the summary can report
@@ -4584,6 +4678,8 @@ function printReport(
     grandCallsMismatched += pkg.calls.mismatched;
     grandCallArgsCompared += pkg.callArgs.compared;
     grandCallArgsMismatched += pkg.callArgs.mismatched;
+    grandParamNamesCompared += pkg.paramNames.compared;
+    grandParamNamesMismatched += pkg.paramNames.mismatchedPairs;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -4602,6 +4698,10 @@ function printReport(
     const arExcludedNote = ar.excluded > 0 ? `, ${ar.excluded} excluded` : "";
     const arityNote =
       ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%${arExcludedNote})` : "";
+    const pn = pkg.paramNames;
+    const pnOk = pn.compared - pn.mismatchedPairs;
+    const pnPct = pn.compared > 0 ? Math.round((pnOk / pn.compared) * 1000) / 10 : 0;
+    const paramsNote = pn.compared > 0 ? `  |  params: ${pnOk}/${pn.compared} (${pnPct}%)` : "";
     const bodyTotal = pkg.bodyHashes.length;
     const bodyPinned = pkg.bodyHashes.filter((b) =>
       pinnedKeys.has(`${pkg.package} ${b.rubyFile} ${b.rubyName}`),
@@ -4611,7 +4711,7 @@ function printReport(
         ? `  |  pins: ${bodyPinned}/${bodyTotal} (${bodyTotal - bodyPinned} unpinned)`
         : "";
     console.log(
-      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${arityNote}${pinsNote}${excludedNote}`,
+      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${arityNote}${paramsNote}${pinsNote}${excludedNote}`,
     );
     console.log(`${"=".repeat(100)}`);
 
@@ -4619,6 +4719,15 @@ function printReport(
       console.log(`\n  Arity mismatches (advisory — does not affect parity):`);
       for (const m of ar.mismatches) {
         console.log(`    ${m.tsFile}:${m.tsName}  ruby${m.rubySig}  ts${m.tsSig}`);
+      }
+    }
+
+    if (showParams && pn.mismatches.length > 0) {
+      console.log(`\n  Parameter-name mismatches (advisory — does not affect parity):`);
+      for (const m of pn.mismatches) {
+        console.log(
+          `    ${m.tsFile}:${m.tsName}  @${m.position}  ruby \`${m.rubyParam}\`  ts \`${m.tsParam}\``,
+        );
       }
     }
 
@@ -4751,6 +4860,14 @@ function printReport(
   console.log(
     `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}${aritySummary}`,
   );
+  if (grandParamNamesCompared > 0) {
+    const pnOk = grandParamNamesCompared - grandParamNamesMismatched;
+    const pnPct = Math.round((pnOk / grandParamNamesCompared) * 1000) / 10;
+    console.log(
+      `  Parameter names (advisory): ${pnOk}/${grandParamNamesCompared} pairs (${pnPct}%) spell ` +
+        `Rails' identifiers${showParams ? "" : " — rerun with --params for the breakdown, or see output/param-name-mismatches.json"}`,
+    );
+  }
   if (grandArityMismatched > 0 && !showArity) {
     console.log(
       `  (${grandArityMismatched} arity mismatches — rerun with --arity for the breakdown, or see output/arity-mismatches.json)`,
