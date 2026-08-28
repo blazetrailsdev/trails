@@ -17,13 +17,15 @@ const row = (pkg: string, rubyFile: string) => ({ package: pkg, rubyFile });
 describe("measure", () => {
   it("counts rows per gated package and per file", () => {
     expect(measure([row("arel", "a.rb"), row("arel", "a.rb"), row("arel", "b.rb")])).toEqual({
+      activemodel: { total: 0, byFile: {} },
       arel: { total: 3, byFile: { "a.rb": 2, "b.rb": 1 } },
     });
   });
 
   it("ignores rows from an ungated package, and reports zero with none", () => {
-    expect(measure([])).toEqual({ arel: { total: 0, byFile: {} } });
-    expect(measure([row("activerecord", "a.rb")])).toEqual({ arel: { total: 0, byFile: {} } });
+    const empty = { activemodel: { total: 0, byFile: {} }, arel: { total: 0, byFile: {} } };
+    expect(measure([])).toEqual(empty);
+    expect(measure([row("activerecord", "a.rb")])).toEqual(empty);
   });
 });
 

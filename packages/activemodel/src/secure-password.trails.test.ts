@@ -36,7 +36,7 @@ describe("SecurePasswordTrailsTest", () => {
 
     interface User extends Attributes {}
 
-    hasSecurePassword(User, "password", {});
+    hasSecurePassword.call(User, "password", {});
 
     class OverridingUser extends User {}
     Object.defineProperty(OverridingUser.prototype, "password_digest", {
@@ -70,7 +70,7 @@ describe("SecurePasswordTrailsTest", () => {
     }
     interface User extends Attributes {}
 
-    hasSecurePassword(User, "password", {});
+    hasSecurePassword.call(User, "password", {});
 
     expect(User._defaultAttributes().isKey("passwordConfirmation")).toBe(false);
 

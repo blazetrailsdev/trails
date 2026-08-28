@@ -37,14 +37,14 @@ export class TypeRegistry {
     this.register("time", (_name, options) => new TimeType(options));
   }
 
-  register(name: string, factory: TypeFactory): void {
-    this.registrations.set(name, factory);
+  register(typeName: string, klass: TypeFactory): void {
+    this.registrations.set(typeName, klass);
   }
 
-  lookup(name: string, options?: TypeOptions): Type {
-    const factory = this.registrations.get(name);
-    if (!factory) throw new ArgumentError(`Unknown type :${name}`);
-    return factory(name, options);
+  lookup(symbol: string, options?: TypeOptions): Type {
+    const registration = this.registrations.get(symbol);
+    if (!registration) throw new ArgumentError(`Unknown type :${symbol}`);
+    return registration(symbol, options);
   }
 
   /** @internal */

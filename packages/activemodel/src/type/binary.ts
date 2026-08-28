@@ -29,17 +29,17 @@ export class BinaryType extends ValueType<unknown> {
     return new Data(super.serialize(value));
   }
 
-  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    const old = this.deserialize(rawOldValue);
-    const cur = this.cast(newValue);
-    if (old instanceof Uint8Array && cur instanceof Uint8Array) {
-      if (old.length !== cur.length) return true;
-      for (let i = 0; i < old.length; i++) {
-        if (old[i] !== cur[i]) return true;
+  isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
+    const oldValue = this.deserialize(rawOldValue);
+    const cur = this.cast(value);
+    if (oldValue instanceof Uint8Array && cur instanceof Uint8Array) {
+      if (oldValue.length !== cur.length) return true;
+      for (let i = 0; i < oldValue.length; i++) {
+        if (oldValue[i] !== cur[i]) return true;
       }
       return false;
     }
-    return old !== cur;
+    return oldValue !== cur;
   }
 }
 

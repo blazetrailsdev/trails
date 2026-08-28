@@ -1,4 +1,8 @@
 {
+  "activemodel": {
+    "total": 0,
+    "byFile": {}
+  },
   "arel": {
     "total": 0,
     "byFile": {}

@@ -225,8 +225,8 @@ export const ClassMethods = {
     });
   },
 
-  isAttributeAlias(this: ClassMethodsHost, name: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.attributeAliases, name);
+  isAttributeAlias(this: ClassMethodsHost, newName: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.attributeAliases, newName);
   },
 
   attributeAlias(this: ClassMethodsHost, name: string): string | undefined {

@@ -29,7 +29,7 @@ import { serializeBaseline } from "./baseline-json.js";
 export const MARK_PATH = path.join(SCRIPT_DIR, "param-name-mark.json");
 
 /** The packages this gate covers — see the module comment. */
-export const GATED_PACKAGES = ["arel"] as const;
+export const GATED_PACKAGES = ["activemodel", "arel"] as const;
 
 export interface PackageMark {
   /** Every param-name row in the package. */

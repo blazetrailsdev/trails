@@ -113,9 +113,12 @@ export function newTime(
 }
 
 /** @internal */
-export function fastStringToTime(this: TimezoneAware | void, s: string): Temporal.Instant | null {
-  if (!s.includes("-")) return null;
-  const normalized = s
+export function fastStringToTime(
+  this: TimezoneAware | void,
+  string: string,
+): Temporal.Instant | null {
+  if (!string.includes("-")) return null;
+  const normalized = string
     .replace(" ", "T")
     .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
   const datetimeString = /^\d{4}-\d{2}-\d{2}$/.test(normalized)

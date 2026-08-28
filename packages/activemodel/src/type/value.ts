@@ -24,7 +24,7 @@ export abstract class Type<T = unknown> {
     return this.#limit;
   }
 
-  isSerializable(_value: unknown, _block?: (castValue: unknown) => void): boolean {
+  isSerializable(value: unknown, _block?: (castValue: unknown) => void): boolean {
     return true;
   }
 
@@ -74,7 +74,7 @@ export abstract class Type<T = unknown> {
     return value;
   }
 
-  assertValidValue(_value: unknown): void {}
+  assertValidValue(_: unknown): void {}
 
   isSerialized(): boolean {
     return false;

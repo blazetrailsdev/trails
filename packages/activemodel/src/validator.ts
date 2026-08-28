@@ -69,7 +69,7 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
   protected prepareValueForValidation(
     value: unknown,
     _record: ValidatableRecord<TBase>,
-    _attribute: string,
+    _attrName: string,
   ): unknown {
     return value;
   }

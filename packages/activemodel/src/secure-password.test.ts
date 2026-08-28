@@ -33,7 +33,7 @@ function createUserClass(opts: { validations?: boolean } = {}) {
     }
   }
   interface User extends Attributes, Dirty {}
-  hasSecurePassword(User, "password", opts);
+  hasSecurePassword.call(User, "password", opts);
   return User;
 }
 
@@ -292,7 +292,7 @@ describe("SecurePasswordTest", () => {
       }
     }
     interface User extends Attributes, Dirty {}
-    hasSecurePassword(User, "token");
+    hasSecurePassword.call(User, "token");
     const u = new User({ name: "test" });
     (u as any).token = "mytoken";
     expect(u._readAttribute("token_digest")).not.toBe(null);

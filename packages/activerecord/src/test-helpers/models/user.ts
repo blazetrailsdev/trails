@@ -50,8 +50,8 @@ export class User extends Base {
   }
 }
 
-hasSecurePassword(User, "password", { validations: false });
-hasSecurePassword(User, "recovery_password", { validations: false });
+hasSecurePassword.call(User, "password", { validations: false });
+hasSecurePassword.call(User, "recovery_password", { validations: false });
 User.hasSecureToken();
 User.hasSecureToken("auth_token", { length: 36 });
 

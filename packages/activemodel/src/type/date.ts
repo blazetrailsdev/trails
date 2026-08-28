@@ -65,18 +65,18 @@ export class DateType extends ValueType<DateCastResult> {
   }
 
   /** @internal */
-  protected fastStringToDate(s: string): Temporal.PlainDate | null {
-    if (s.includes("\n")) return null;
-    const m = ISO_DATE.exec(s);
+  protected fastStringToDate(string: string): Temporal.PlainDate | null {
+    if (string.includes("\n")) return null;
+    const m = ISO_DATE.exec(string);
     if (!m) return null;
     return this.newDate(parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10));
   }
 
   /** @internal */
-  protected fallbackStringToDate(s: string): Temporal.PlainDate | null {
+  protected fallbackStringToDate(string: string): Temporal.PlainDate | null {
     let parts: DateParts | undefined;
     try {
-      parts = RubyDate._parse(s, false);
+      parts = RubyDate._parse(string, false);
     } catch (error) {
       if (!(error instanceof RubyArgumentError)) throw error;
     }

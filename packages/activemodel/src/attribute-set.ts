@@ -138,9 +138,9 @@ export class AttributeSet {
     return new AttributeSet(newAttributes);
   }
 
-  reverseMergeBang(target: AttributeSet): this {
+  reverseMergeBang(targetAttributes: AttributeSet): this {
     this.assertNotFrozen();
-    for (const [name, attr] of target.attributes()) {
+    for (const [name, attr] of targetAttributes.attributes()) {
       if (!this._attributes.has(name)) {
         this._attributes.set(name, attr);
       }
