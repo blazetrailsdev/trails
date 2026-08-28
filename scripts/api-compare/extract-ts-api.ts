@@ -55,10 +55,9 @@ import {
 import {
   sharedCacheDir,
   contentFingerprint,
-  readShared,
-  writeShared,
+  readSharedFor,
+  publishShared,
   foreignAbsolutePath,
-  absoluteSourcePath,
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
@@ -424,8 +423,8 @@ export async function main() {
     if (sharedDir) {
       const ownContent = await contentFingerprint(fingerprintInputs, pkgRoot);
       const contentKey = `${SCHEMA_VERSION}-${hashParts([ownContent, shapeKey, depKey])}`;
-      const body = await readShared(sharedDir, `ts-${pkg}`, contentKey);
-      if (body && foreignAbsolutePath(body, ROOT_DIR) === null) {
+      const body = await readSharedFor(sharedDir, `ts-${pkg}`, contentKey, ROOT_DIR);
+      if (body) {
         try {
           const cached = JSON.parse(body) as CacheEntry;
           if (cached.inputs && (await readSetMatches(cached.inputs, ROOT_DIR, inputHashes))) {
@@ -482,10 +481,13 @@ export async function main() {
           inputs: readSet,
           package: data,
         };
-        const payload = JSON.stringify(shared);
-        if (absoluteSourcePath(payload) === null) {
-          await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, payload, sharedTag);
-        }
+        await publishShared(
+          sharedDir,
+          `ts-${p.pkg}`,
+          p.sharedKey,
+          JSON.stringify(shared),
+          sharedTag,
+        );
       }
       return [p.pkg, data] as const;
     });

@@ -423,6 +423,46 @@ export function foreignAbsolutePath(body: string, rootDir: string): string | nul
   return null;
 }
 
+/**
+ * Read a shared entry ON BEHALF OF the worktree at `rootDir`: {@link readShared},
+ * except that a payload naming a path outside `rootDir` is a MISS.
+ *
+ * The gate belongs to the cache contract, not to one caller's policy — the
+ * entries are reachable from every linked worktree, so any consumer that serves
+ * one unchecked can be handed another checkout's measurements. Pair with
+ * {@link publishShared}.
+ */
+export async function readSharedFor(
+  dir: string,
+  name: string,
+  key: string,
+  rootDir: string,
+): Promise<string | null> {
+  const body = await readShared(dir, name, key);
+  if (body === null) return null;
+  return foreignAbsolutePath(body, rootDir) === null ? body : null;
+}
+
+/**
+ * Publish a shared entry, unless it names an absolute path at all. Returns
+ * whether it was published.
+ *
+ * The writer's test is strictly stronger than {@link readSharedFor}'s, and has
+ * to be: the publisher's OWN path is not foreign to the publisher, yet it is
+ * exactly as poisonous to every other worktree that reads the entry.
+ */
+export async function publishShared(
+  dir: string,
+  name: string,
+  key: string,
+  body: string,
+  tag: string,
+): Promise<boolean> {
+  if (absoluteSourcePath(body) !== null) return false;
+  await writeShared(dir, name, key, body, tag);
+  return true;
+}
+
 function entryPath(dir: string, name: string, key: string): string {
   return path.join(dir, `${name}-${key}.json`);
 }
