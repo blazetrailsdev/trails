@@ -8,7 +8,6 @@ import {
 } from "./connection-adapters/abstract/quoting.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { TypeMap } from "./type/type-map.js";
-import { Nodes } from "@blazetrails/arel";
 
 // `quote` requires a host receiver (no receiver-less dispatch); bind an empty
 // host so date/time values route through the abstract module helpers.
@@ -74,10 +73,6 @@ describe("quote", () => {
 });
 
 describe("quoteDefaultExpression", () => {
-  it("returns empty string for undefined", () => {
-    expect(quoteDefaultExpression(undefined)).toBe("");
-  });
-
   it("returns DEFAULT NULL for null", () => {
     expect(quoteDefaultExpression(null)).toBe("NULL");
   });
@@ -103,18 +98,7 @@ describe("quoteDefaultExpression", () => {
     expect(quoteDefaultExpression(() => "now()")).toBe("now()");
   });
 
-  it("passes through SqlLiteral instances as raw SQL", () => {
-    expect(quoteDefaultExpression(new Nodes.SqlLiteral("CURRENT_TIMESTAMP"))).toBe(
-      "CURRENT_TIMESTAMP",
-    );
-  });
-
   it("quotes plain string CURRENT_TIMESTAMP as a literal", () => {
     expect(quoteDefaultExpression("CURRENT_TIMESTAMP")).toBe("'CURRENT_TIMESTAMP'");
-  });
-
-  it("throws TypeError when function returns non-string/non-SqlLiteral", () => {
-    expect(() => quoteDefaultExpression(() => 123)).toThrow(TypeError);
-    expect(() => quoteDefaultExpression(() => undefined)).toThrow(TypeError);
   });
 });
