@@ -1,12 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
- *
- * Wave 1 of the canonical-schema conversion (RFC 0019): the read-only
- * has_many :through / polymorphic-through tests that drive the canonical
- * Tag / Tagging / Post / Author / Category / Categorization join models on
- * the canonical fixtures. Remaining waves (mutating, eager-load, STI, and
- * self-referential groups) are tracked as sibling stories.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
@@ -44,10 +35,6 @@ import { Engine } from "../test-helpers/models/engine.js";
 import { Car } from "../test-helpers/models/car.js";
 import { CpkOrder } from "../test-helpers/models/cpk.js";
 
-// Mirrors the dynamic subclasses built by Rails' `find_post_with_dependency`
-// helper: `Class.new(ActiveRecord::Base)` on the `posts` table carrying a
-// `has_many`/`has_one :as => :taggable` with the requested `:dependent`. Each
-// is its own base class, so its polymorphic_name is the class name itself.
 class PostWithHasManyDeleteAll extends Base {
   static {
     this._tableName = "posts";
@@ -79,15 +66,6 @@ class PostWithHasOneNullify extends Base {
   }
 }
 
-// A Tagging whose polymorphic `taggable` belongsTo SOURCE carries its own
-// `-> { where(...) }` scope, and a Tag reaching Posts through it with
-// `source_type: 'Post'`. Rails' add_constraints folds the source reflection's
-// constraints into the through query even for source_type associations
-// (chain.reverse_each over source_reflection.constraints); this exercises that
-// the polymorphic-belongsTo source's OWN scope is applied — resolved via the
-// source_type target (Post) since the polymorphic `klass` is uncomputable.
-// Standalone base classes on the canonical `taggings` / `tags` tables (own base
-// class → no STI `type` filter), mirroring the `PostWithHasMany*` pattern above.
 class WelcomeOnlyTagging extends Base {
   static {
     this._tableName = "taggings";
@@ -159,8 +137,6 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(WelcomeOnlyTagging);
   registerModel(ScopedSourceTag);
 
-  // Mirrors Rails' `find_post_with_dependency(post_id, ...)`: set the post's
-  // `type` to the dependent-variant class name, then reload through it.
   async function findPostWithDependency(postId: number, klass: typeof Base): Promise<Base> {
     const post = await Post.find(postId);
     await (post as any).updateColumns({ type: klass.name });
@@ -234,12 +210,6 @@ describe("AssociationsJoinModelTest", () => {
 
   it("has many array methods called by method missing", async () => {
     const david = await Author.find(authors("david").id);
-    // Rails routes Array methods (`any?`, `sort`) through the collection
-    // proxy's method_missing → `records` (delegation.rb `delegate ... to:
-    // :records`). `any(fn)` drives CollectionProxy#any; `sort` is delegated
-    // to the loaded target. JS has no blocking IO, so we hydrate the proxy's
-    // target via `load()` (Rails' `any?`-with-block loads it implicitly)
-    // before the synchronous `sort`.
     const categories = (david as any).categories;
     expect(await categories.isAny((category: Base) => (category as any).name === "General")).toBe(
       true,
@@ -430,17 +400,12 @@ describe("AssociationsJoinModelTest", () => {
   it("has many with piggyback", async () => {
     const stiTest = await Category.find(categories("sti_test").id);
     const first = (await (stiTest as any).authorsWithSelect.first()) as Base;
-    // Rails surfaces the piggybacked `categorizations.post_id` select column via
-    // method_missing as `first.post_id`; Author declares no such attribute, so
-    // read it through `readAttribute` (the canonical-fixture id replaces the
-    // Rails literal 2).
     expect(String((first as any).readAttribute("post_id"))).toBe(String(posts("thinking").id));
   });
 
   it("create through has many with piggyback", async () => {
     const category = await Category.find(categories("sti_test").id);
     const ernie = await (category as any).authorsWithSelect.create({ name: "Ernie" });
-    // assert_nothing_raised { ... category.authors_with_select.detect { |a| a.name == "Ernie" } }
     const detected = (await (category as any).authorsWithSelect.toArray()).find(
       (a: Base) => (a as any).name === "Ernie",
     );
@@ -593,28 +558,18 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("has many polymorphic associations merges through scope", async () => {
-    // Rails defines null_taggings / null_tagged_posts inline here; the canonical
-    // Tag model carries them so we needn't mutate the shared class at runtime.
     const general = await Tag.find(tags("general").id);
     expect((await (general as any).nullTaggedPosts.toArray()) as Base[]).toEqual([]);
     expect(((await (general as any).taggedPosts.toArray()) as Base[]).length).not.toBe(0);
   });
 
   it("has many polymorphic with source type merges source reflection scope", async () => {
-    // The general tag tags both the welcome and thinking posts; the scope on the
-    // polymorphic `taggable` source (`title = "Welcome to the weblog"`) must
-    // restrict the through query to the welcome post alone. Without merging the
-    // source reflection's scope the query would return both posts.
     const general = await ScopedSourceTag.find(tags("general").id);
     const scoped = (await (general as any).welcomeTaggedPosts.toArray()) as Base[];
     expect(scoped.map((p) => p.id)).toEqual([posts("welcome").id]);
   });
 
   it("eager has many polymorphic with source type merges source reflection scope", async () => {
-    // Eager-load counterpart of "has many polymorphic with source type merges
-    // source reflection scope". The preloader path must fold in the polymorphic
-    // `taggable` source's own `-> { where(...) }` scope just like the direct
-    // query, restricting the eager-loaded through target to the welcome post.
     const general = await ScopedSourceTag.all()
       .includes(":welcomeTaggedPosts")
       .find(tags("general").id);
@@ -676,7 +631,6 @@ describe("AssociationsJoinModelTest", () => {
   it("has many through polymorphic has one", async () => {
     const david = await Author.find(authors("david").id);
     const taggings2 = (await (david as any).taggings_2.toArray()) as Base[];
-    // Rails: Tagging.find(1, 2).sort_by(&:id) — welcome_general + thinking_general.
     expect(taggings2.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
       [taggings("welcome_general").id, taggings("thinking_general").id].sort(
         (a: any, b: any) => Number(a) - Number(b),
@@ -720,15 +674,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("eager has many through uses conditions specified on the has many association", async () => {
-    // Eager-load counterpart of the direct test above. The plain (non-polymorphic)
-    // source reflection `nonexistentComments` on Post carries `where("comments.id < 0")`;
-    // the preloader must fold that source scope just like the direct query, leaving
-    // the eager-loaded through target empty.
     const author = (await Author.all().includes(":nonexistentComments").first()) as any;
-    // Assert the association was actually preloaded — a fresh collection proxy's
-    // `target` is `[]`, so an empty target alone can't distinguish a preloaded
-    // empty result from one that never loaded. With it loaded, read through the
-    // public reader under assertNoQueries (mirrors Rails' eager tests).
     expect(author.association("nonexistentComments").loaded).toBe(true);
     await assertNoQueries(false, async () => {
       expect(((await author.nonexistentComments.toArray()) as Base[]).length).toBe(0);
@@ -791,7 +737,6 @@ describe("AssociationsJoinModelTest", () => {
     await (postThinking as any).tags.reload();
     expect(await (postThinking as any).tags.size()).toBe(count + 4);
 
-    // Raises if the wrong reflection name is used to set the Edge belongs_to
     const vertex1 = await Vertex.find(vertices("vertex_1").id);
     const vertex5 = await Vertex.find(vertices("vertex_5").id);
     await (vertex1 as any).sinks.push(vertex5);
@@ -961,9 +906,6 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("preload polymorph many types", async () => {
-    // Rails relies on implicit fixture-insertion order so taggings[0]/[1] are
-    // the two Post taggables; pin `taggings.id` so first/second resolve to
-    // non-nil taggables on PG/MySQL too (heap order isn't guaranteed there).
     const taggingList = (await Tagging.where("taggable_type != ?", "FakeModel")
       .includes(":taggable")
       .order("taggings.id")) as Base[];
@@ -1050,10 +992,6 @@ describe("AssociationsJoinModelTest", () => {
     ]);
   });
 
-  // Convergence test: a composite-PK owner (CpkOrder, PK = [shop_id, id]) can own
-  // a polymorphic-through association using the scalar taggings.taggable_id column
-  // without requiring an explicit `primaryKey:` option. The "id" component of the
-  // CPK is derived automatically (matching Rails' join_id_for behaviour).
   it("polymorphic has many through with composite owner primary key", async () => {
     class CpkOrderWithTaggings extends CpkOrder {
       static {
@@ -1069,13 +1007,6 @@ describe("AssociationsJoinModelTest", () => {
 
     const order = await CpkOrderWithTaggings.createBang({ shop_id: 42, status: "paid" });
     const tag = await Tag.createBang({ name: "rails-faithful" });
-    // The join row is inserted directly rather than through
-    // `orderTaggings.createBang`: Rails' Tagging declares
-    // `belongs_to :taggable, polymorphic: true, counter_cache: :tags_count`
-    // (tagging.rb:14), and `cpk_orders` has no `tags_count` column in Rails'
-    // schema.rb, so the model create path would (in Rails too) fail on the
-    // counter update. `insert_all` skips callbacks, which is what this test
-    // needs — the assertion is about the through-read, not the write.
     await Tagging.insertAll([
       {
         tag_id: (tag as any).id,
@@ -1106,9 +1037,6 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("polymorphic has many going through join model", async () => {
-    // Rails uses lazy load (posts(:welcome).tags.first); trails' lazy-load path does not
-    // cache the join record on the tag, so includes() is used to exercise the same
-    // no-query guarantee via the eager-load path.
     const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
     expect(tag.id).toBe(tags("general").id);
@@ -1118,8 +1046,6 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("polymorphic has many going through join model with find", async () => {
-    // Rails (line 70) is identical to line 58 — same lazy-load + no-query assertion.
-    // Same includes() substitution applies; see comment above.
     const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
     expect(tag.id).toBe(tags("general").id);
@@ -1255,8 +1181,6 @@ describe("AssociationsJoinModelTest", () => {
     const thinking = await Post.find(posts("thinking").id);
     const tagsProxy = (thinking as any).tags;
     const general = await Tag.find(tags("general").id);
-    // Rails: `assert_equal tags, posts(:thinking).tags.push(tags(:general))`
-    // (join_model_test.rb:555) — record equality, not identity.
     const pushed = await tagsProxy.push(general);
     expect(await pushed.toArray()).toEqual(await tagsProxy.toArray());
   });
@@ -1320,9 +1244,6 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("through association with scope with string joins", async () => {
-    // The intermediate (`through`) reflection scope carries a raw-string join
-    // (`JOIN posts AS p2 ...`). It must be emitted, attached to its own chain
-    // step, so the alias `p2` is in scope for the scope's `whereNot` predicate.
     const sql = Post.joins(":ratingsViaStringJoinComments").toSql();
     expect(sql).toContain("JOIN posts AS p2 ON comments.post_id = p2.id");
     await expect(Post.joins(":ratingsViaStringJoinComments").first()).resolves.not.toThrow();

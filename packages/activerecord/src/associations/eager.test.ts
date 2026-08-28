@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/eager_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   Base,
@@ -66,16 +63,12 @@ import { Matey } from "../test-helpers/models/matey.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { CpkOrder, CpkBook, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 
-// Mirrors eager_test.rb's `find_all_ordered` helper.
 async function findAllOrdered(klass: any, include: unknown = null): Promise<any[]> {
   let relation = klass.order(`${klass.tableName}.${klass.primaryKey}`);
   if (include) relation = relation.includes(include);
   return relation.toArray();
 }
 
-// ==========================================================================
-// EagerAssociationTest — targets associations/eager_test.rb
-// ==========================================================================
 describe("EagerAssociationTest", () => {
   const {
     authors,
@@ -137,10 +130,6 @@ describe("EagerAssociationTest", () => {
     "taggings",
   ]);
   beforeAll(async () => {
-    // Models with a requested fixture set auto-register on its resolution
-    // (#4348), so only models WITHOUT a fixture set need explicit registration
-    // here: the CPK/scope-only models, STI subclasses (Firm/Client on companies,
-    // SpecialPost/StiPost/…), and the default-scope Developer variants.
     registerModel("PostWithDefaultScope", PostWithDefaultScope);
     registerModel(CpkOrder);
     registerModel(CpkBook);
@@ -570,7 +559,6 @@ describe("EagerAssociationTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded.name).toBe(david.name);
 
-    // Association proxy wired during hydration (read off the holder, not lazy-synced)
     const btProxy = (posts2[0] as any)._associationInstances.get("author");
     expect(btProxy).toBeDefined();
     expect(btProxy.loaded).toBe(true);
@@ -585,7 +573,6 @@ describe("EagerAssociationTest", () => {
     const profile = (users[0] as any).association("post").target;
     expect(profile).not.toBeNull();
 
-    // Association proxy wired during hydration (read off the holder, not lazy-synced)
     const hoProxy = (users[0] as any)._associationInstances.get("post");
     expect(hoProxy).toBeDefined();
     expect(hoProxy.loaded).toBe(true);
@@ -745,8 +732,6 @@ describe("EagerAssociationTest", () => {
     for (let i = 0; i < d1.length; i++) {
       expect(d2[i].id).toBe(d1[i].id);
       for (const type of firmTypes) {
-        // Ruby reads the Symbol back as a reader name (`public_send(type)`); the
-        // colon is the Symbol, so drop it for the accessor.
         const name = type.slice(1);
         const expected = await d1[i].loadBelongsTo(name);
         const actual = d2[i].association(name).target ?? null;
@@ -785,7 +770,6 @@ describe("EagerAssociationTest", () => {
 
   it("load with sti sharing association", async () => {
     await assertQueriesCount(2, false, async () => {
-      // should not do 1 query per subclass
       await Comment.all().includes(":post");
     });
   });
@@ -867,8 +851,6 @@ describe("EagerAssociationTest", () => {
     await assertQueriesCount(2, false, async () => {
       tagging = await Tagging.preload(":taggable").find(t.id);
     });
-    // Rails: assert_no_queries { assert_nil tagging.taggable } — exercise the
-    // reader so a preloaded-but-re-querying bug would be caught.
     await assertNoQueries(false, async () => {
       expect(await (tagging as any).taggable).toBeNull();
     });
@@ -887,14 +869,11 @@ describe("EagerAssociationTest", () => {
     }
 
     const author = await TempAuthor.first();
-    // PRECONDITION: make sure ordering results in different results
     const post = await (author as any).loadHasOne("post");
     const reorderedPost = await (author as any).loadHasOne("reorderedPost");
     expect(Number(post.id)).not.toBe(Number(reorderedPost.id));
 
     const preloaded = await TempAuthor.preload(":reorderedPost").first();
-    // Rails: klass.preload(:reordered_post).first.reordered_post — go through the
-    // reader so a preloaded-but-re-querying bug would be caught.
     const preloadedReorderedPost = await (preloaded as any).reorderedPost;
     expect(Number(preloadedReorderedPost.id)).toBe(Number(reorderedPost.id));
     const topByTitleDesc = await Post.order({ title: "desc" }).first();
@@ -923,9 +902,6 @@ describe("EagerAssociationTest", () => {
     const project = await Project.create({ name: "VNGRS", mentor_id: mentor.id });
     await (project as any).developers.concat(developer);
 
-    // Rails: Project.references(:mentors).includes(mentor: { developers: :contracts },
-    //        developers: :contracts). The eager-load JOINs the mentor's developers and
-    //        the project's HABTM developers, both down to contracts.
     const projects = await (Project as any)
       .all()
       .references("mentors")
@@ -936,7 +912,6 @@ describe("EagerAssociationTest", () => {
       .order("projects.id")
       .toArray();
 
-    // Rails: projects.last.mentor.developers.first.contracts == projects.last.developers.last.contracts
     const last = projects[projects.length - 1];
     const mentorDevContracts = last
       .association("mentor")
@@ -949,15 +924,9 @@ describe("EagerAssociationTest", () => {
     expect(directDevContracts).toHaveLength(1);
     expect(Number(mentorDevContracts![0].id)).toBe(Number(contract.id));
     expect(Number(directDevContracts![0].id)).toBe(Number(contract.id));
-    // Rails: assert_equal — AR `==` is class+id equality; both branches JOIN the
-    // same contract row.
     expect(Number(mentorDevContracts![0].id)).toBe(Number(directDevContracts![0].id));
   });
   it("scoping with a circular preload", async () => {
-    // Rails: Comment.preload(post: :comments).scoping { Comment.find(1) }
-    // The pushed scope carries the preload values, so `find` inside the block
-    // runs the circular preload (comment -> post -> comments). It must not loop
-    // or error, and `find` must still return the matching record.
     const post = await Post.create({ title: "P", body: "b" });
     const c1 = await Comment.create({ post_id: post.id, body: "c1" });
 
@@ -966,17 +935,12 @@ describe("EagerAssociationTest", () => {
       return await (Comment as any).find(c1.id);
     });
     expect(found.id).toBe(c1.id);
-    // The current scope's preload values are applied by `find`, so the circular
-    // preload actually traverses post -> comments (the original loop hazard).
     const loadedPost = found.association("post").target;
     expect(loadedPost.id).toBe(post.id);
     expect(loadedPost.association("comments").target.map((c: any) => c.id)).toContain(c1.id);
   });
 
   it("circular preload does not modify unscoped", async () => {
-    // Rails: FirstPost.preload(comments: :first_post).find(1) must not let
-    // FirstPost's default scope (where id: 1) leak into a later unscoped lookup.
-    // Uses fixture post id=1 (welcome) as the FirstPost target; creates a fresh post2.
     registerModel("FirstPost", FirstPost);
     const post2 = await Post.create({ title: "P2", body: "b" });
     await Comment.create({ post_id: 1, body: "c1" });
@@ -1000,57 +964,46 @@ describe("EagerAssociationTest", () => {
     });
   });
   it("preloading readonly association", async () => {
-    // has-one
     const firm = await (Firm as any).where({ id: 1 }).preload(":readonlyAccount").firstBang();
     expect((await firm.readonlyAccount).isReadonly()).toBe(true);
 
-    // has_and_belongs_to_many
     const project = await (Project as any)
       .where({ id: 2 })
       .preload(":readonlyDevelopers")
       .firstBang();
     expect((await project.readonlyDevelopers.first()).isReadonly()).toBe(true);
 
-    // has-many :through
     const david = await (Author as any).where({ id: 1 }).preload(":readonlyComments").firstBang();
     expect((await david.readonlyComments.first()).isReadonly()).toBe(true);
   });
 
   it("eager-loading non-readonly association", async () => {
-    // has_one
     const firm = await (Firm as any).where({ id: 1 }).eagerLoad(":account").firstBang();
     expect((await firm.account).isReadonly()).toBe(false);
 
-    // has_and_belongs_to_many
     const project = await (Project as any).where({ id: 2 }).eagerLoad(":developers").firstBang();
     expect((await project.developers.first()).isReadonly()).toBe(false);
 
-    // has_many :through
     const david = await (Author as any).where({ id: 1 }).eagerLoad(":comments").firstBang();
     expect((await david.comments.first()).isReadonly()).toBe(false);
 
-    // belongs_to
     const post = await (Post as any).where({ id: 1 }).eagerLoad(":author").firstBang();
     expect((await post.author).isReadonly()).toBe(false);
   });
 
   it("eager-loading readonly association", async () => {
-    // has-one
     const firm = await (Firm as any).where({ id: 1 }).eagerLoad(":readonlyAccount").firstBang();
     expect((await firm.readonlyAccount).isReadonly()).toBe(true);
 
-    // has_and_belongs_to_many
     const project = await (Project as any)
       .where({ id: 2 })
       .eagerLoad(":readonlyDevelopers")
       .firstBang();
     expect((await project.readonlyDevelopers.first()).isReadonly()).toBe(true);
 
-    // has-many :through
     const david = await (Author as any).where({ id: 1 }).eagerLoad(":readonlyComments").firstBang();
     expect((await david.readonlyComments.first()).isReadonly()).toBe(true);
 
-    // belongs_to
     const post = await (Post as any).where({ id: 1 }).eagerLoad(":readonlyAuthor").firstBang();
     expect((await post.readonlyAuthor).isReadonly()).toBe(true);
   });
@@ -1062,8 +1015,6 @@ describe("EagerAssociationTest", () => {
     await expect(essays.eagerLoad(":writer").toArray()).rejects.toThrow(EagerLoadPolymorphicError);
     await expect(essays.eagerLoad(":writer").count()).rejects.toThrow(EagerLoadPolymorphicError);
     await expect(essays.eagerLoad(":writer").exists()).rejects.toThrow(EagerLoadPolymorphicError);
-    // Rails routes every calculation through apply_join_dependency when eager
-    // loading, so sum/minimum (single aggregate) and grouped aggregates raise too.
     await expect(essays.eagerLoad(":writer").sum("writer_id")).rejects.toThrow(
       EagerLoadPolymorphicError,
     );
@@ -1073,38 +1024,21 @@ describe("EagerAssociationTest", () => {
     await expect(essays.eagerLoad(":writer").group("writer_type").sum("writer_id")).rejects.toThrow(
       EagerLoadPolymorphicError,
     );
-    // Rails `exists?` short-circuits on a falsey condition before the
-    // eager_loading? raise (finder_methods.rb:367-369).
     expect(await essays.eagerLoad(":writer").exists(false)).toBe(false);
-    // Misspelled eager-load names raise on the calculation path too — Rails
-    // construct_join_dependency → find_reflection (join_dependency.rb), so count
-    // doesn't silently ignore an unknown association.
     await expect(essays.eagerLoad(":nope").count()).rejects.toThrow(/misspelled it/);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
-    // Rails: assert_not_called_on_instance_of(HasManyAssociation, :reader) { Author.preload(:readonly_comments).first! }
-    // — CollectionProxy#reader is expensive, so the preloader populates the
-    // target directly rather than going through the association reader. trails'
-    // `reader` getter lives on CollectionAssociation, the superclass of
-    // HasManyThroughAssociation; spy there so any through-instance access is
-    // caught.
     let author: any;
     await assertNotCalledOnInstanceOf(HasManyThroughAssociation, "reader", async () => {
       author = await Author.preload(":readonlyComments").first();
     });
     expect(author).toBeTruthy();
     expect(author.association("readonlyComments").isLoaded()).toBe(true);
-    // The preloader populated the through target directly, so reading it must
-    // not fire a query (it never goes through the expensive reader path).
     await assertNoQueries(false, async () => {
       await author.readonlyComments.toArray();
     });
   });
   it("preloading through a polymorphic association doesn't require the association to exist", async () => {
-    // Rails: Sponsor.where(sponsorable_id: 1).preload(sponsorable: [:post, :membership]).
-    // sponsorable_id 1 matches the Member (groucho) and Author (david) sponsors; the
-    // polymorphic preload applies :post only to Author and :membership only to Member
-    // — neither must exist on the other type.
     const sponsorRecords = await (Sponsor as any)
       .where({ sponsorable_id: 1 })
       .preload({ ":sponsorable": [":post", ":membership"] })
@@ -1116,8 +1050,6 @@ describe("EagerAssociationTest", () => {
     expect(member.association("membership").isLoaded()).toBe(true);
   });
   it("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", async () => {
-    // Rails: preload(sponsorable: [{ post: :first_comment }, :membership]). The Author's
-    // post (and its first_comment) must be preloaded; the Member type silently skips :post.
     const sponsorRecords = await (Sponsor as any)
       .where({ sponsorable_id: 1 })
       .preload({ ":sponsorable": [{ ":post": ":firstComment" }, ":membership"] })
@@ -1130,7 +1062,6 @@ describe("EagerAssociationTest", () => {
     expect(post.association("firstComment").isLoaded()).toBe(true);
   });
   it("preloading a regular association with a typo through a polymorphic association still raises", async () => {
-    // Rails: an intentional typo of first -> fist must raise AssociationNotFoundError.
     await expect(
       (Sponsor as any)
         .where({ sponsorable_id: 1 })
@@ -1139,8 +1070,6 @@ describe("EagerAssociationTest", () => {
     ).rejects.toThrow(AssociationNotFoundError);
   });
   it("preloading belongs_to with cpk", async () => {
-    // CpkOrder's PK is composite (["shop_id", "id"]), so `order.id` is the
-    // `[shop_id, id]` array; the `order_id` FK column wants the scalar `id`.
     const order = await CpkOrder.create({ id: [2, 2] });
     const orderId = (order as any).id[1];
     const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
@@ -1182,8 +1111,6 @@ describe("EagerAssociationTest", () => {
   });
 
   it("including duplicate objects from has many", async () => {
-    // Rails: car_post belongs to 2 categories via habtm; includes(posts: :comments) on
-    // categories should yield the SAME comment object for each category's posts[0].
     const carPost = await Post.create({ title: "foo", body: "I like cars!" });
     await (carPost as any).categories.concat(categories("general"), categories("technology"));
     const comment = await (carPost as any).comments.create({ body: "hmm" });
@@ -1201,8 +1128,6 @@ describe("EagerAssociationTest", () => {
     }
   });
   it("associations loaded for all records", async () => {
-    // Rails: categories with includes(posts: :special_comments) — each post's
-    // special_comments association is loaded for all category records.
     const post = await Post.create({ title: "foo", body: "I like cars!" });
     await SpecialComment.create({ body: "Come on!", post_id: post.id });
     const firstCategory = await Category.create({ name: "First!" });
@@ -1237,8 +1162,6 @@ describe("EagerAssociationTest", () => {
     const people = await (Person as any).males().includes(":primaryContact").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
-      // Rails: assert_no_queries { assert_not_nil person.primary_contact } — the
-      // reader must serve the preloaded target without firing a query.
       let contact: any;
       await assertNoQueries(false, async () => {
         contact = await person.primaryContact;
@@ -1275,7 +1198,6 @@ describe("EagerAssociationTest", () => {
     expect(Number(client.client_of)).toBe(clientOf);
   });
   it("deep preload", async () => {
-    // Rails: Post.preload(author: :posts, comments: :post).first
     const post = await (Post as any)
       .all()
       .preload({ ":author": ":posts", ":comments": ":post" })
@@ -1304,10 +1226,6 @@ describe("EagerAssociationTest", () => {
   });
 
   it("has and belongs to many should not instantiate same records multiple times", async () => {
-    // Rails (eager_test.rb): eager-loading `welcome` through two different HABTM
-    // owners (general.posts and technology.posts) must reuse one instance
-    // (`assert_same post1, post2`). categories_posts seeds both general_welcome
-    // and technology_welcome, so welcome is genuinely reachable via two owners.
     const welcome = posts("welcome");
     const loaded = await Category.all().includes(":posts");
 
@@ -1324,26 +1242,14 @@ describe("EagerAssociationTest", () => {
   });
 
   it("deep including through habtm", async () => {
-    // Rails (eager_test.rb): `includes(categories: :categorizations)` preloads
-    // two levels — Post HABTM categories, each Category has_many categorizations
-    // — so the nested reads fire no further queries (Rails wraps each in
-    // `assert_no_queries`).
     const loaded = await Post.all()
       .includes({ ":categories": ":categorizations" })
       .order("posts.id");
     await assertNoQueries(false, async () => {
-      // Posts are positional (explicitly `order("posts.id")`); categories are
-      // looked up by fixture identity rather than position — the HABTM preload
-      // query carries no ORDER BY (preloader/association.ts:470; the through
-      // preloader only sorts when the association scope has `orderValues`,
-      // through-association.ts:91-94), so `WHERE id IN (...)` row order isn't
-      // guaranteed cross-adapter. Rails relies on the same implicit order via
-      // `categories[0]`/`[1]`; we assert the same counts without depending on it.
       const categoryOf = (post: Base, categoryId: unknown): Base =>
         (post.association("categories").target as Base[]).find((c) => c.id === categoryId)!;
       const categorizationCount = (c: Base): Promise<number> => (c as any).categorizations.length();
 
-      // welcome → general (2 categorizations) + technology (1); thinking → general (2).
       expect(await categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
       expect(await categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
       expect(await categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
@@ -1351,9 +1257,6 @@ describe("EagerAssociationTest", () => {
   });
 
   it("conditions on join table with include and limit", async () => {
-    // Rails (eager_test.rb): three developers (david, jamis, poor_jamis) have a
-    // developers_projects row with the default access_level of 1; limit 5 doesn't
-    // trim the set, so the eager + join-condition query returns 3 distinct rows.
     const developers = await Developer.all()
       .includes(":projects")
       .where({ "developers_projects.access_level": 1 })
@@ -1361,8 +1264,6 @@ describe("EagerAssociationTest", () => {
     expect(developers).toHaveLength(3);
   });
 
-  // Rails (eager_test.rb): mirrors the `messages_for` helper — subscribe to a
-  // notification, run the block, collect the events, then unsubscribe.
   async function messagesFor(
     name: string,
     fn: () => Promise<void>,
@@ -1395,7 +1296,6 @@ describe("EagerAssociationTest", () => {
         .limit(5)
     ).length;
 
-    // eagerloaded row count should be greater than just developer count
     expect(payload.record_count as number).toBeGreaterThan(count);
     expect(payload.class_name).toBe(Developer.name);
   });
@@ -1420,9 +1320,6 @@ describe("EagerAssociationTest", () => {
   });
 
   it("order on join table with include and limit", async () => {
-    // Rails (eager_test.rb): Developer.includes("projects") ordered by the join
-    // table column `developers_projects.joined_on DESC` with limit 5 returns 5
-    // developers.
     const developers = await Developer.all()
       .includes(":projects")
       .references("developers_projects")
@@ -1484,7 +1381,6 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager with default scope as block", async () => {
-    // warm up the habtm cache
     await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
     const developer = await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
@@ -1657,11 +1553,6 @@ describe("EagerAssociationTest", () => {
     });
   });
 
-  // trails-only regression: extends Rails' single-include
-  // test_joins_with_includes_should_preload_via_joins (eager_test.rb:1373) to the
-  // multi-include fan-out branch — `comments` collapses onto the INNER join from
-  // joins(...) while the non-intersecting `author` is join-loaded as a deduped
-  // OUTER join, all in one query. No upstream Rails test exercises this path.
   it("joins with multiple includes should preload via joins", async () => {
     let post: Post | undefined;
     await assertQueriesCount(1, false, async () => {
@@ -1897,7 +1788,6 @@ describe("EagerAssociationTest", () => {
 
   it("eager with floating point numbers", async () => {
     await assertQueriesCount(2, false, async () => {
-      // Before changes, the floating-point numbers will be interpreted as table names and will cause this to run in one query
       await Comment.all().where("123.456 = 123.456").includes(":post");
     });
   });
@@ -2121,8 +2011,6 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager association loading with explicit join habtm", async () => {
-    // Proves the JOIN path is taken (not the preload fallback): the eager-load
-    // SQL must reference both the HABTM join table and the target table.
     const rel = Post.all().eagerLoad(":categories").order("posts.id");
     const sql = rel.toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*categories_posts/);
@@ -2406,9 +2294,6 @@ describe("EagerAssociationTest", () => {
     const commentA = await SpecialComment.create({ post_id: postA.id, body: "TEST" });
     const commentB = await SpecialComment.create({ post_id: postB.id, body: "TEST" });
 
-    // Mirrors Rails `reset_callbacks(StiPost, :initialize) do ... end`: register a
-    // temporary after_initialize that references the `author` association, then
-    // remove it so the global StiPost model is left untouched for other tests.
     const referenceAuthor = function (this: Base): void {
       this.association("author");
     };
@@ -2643,9 +2528,6 @@ describe("EagerAssociationTest", () => {
   it("preloading a through association twice does not reset it", async () => {
     const members = await Member.includes({ ":currentMembership": ":club" }).includes(":club");
     await assertNoQueries(false, () => {
-      // Rails: members.map(&:current_membership).map(&:club).size — a nil
-      // current_membership would raise NoMethodError, so do NOT null-guard;
-      // a missing preloaded target must throw (Rails-faithful failure mode).
       const clubs = members
         .map((m) => m.association("currentMembership").target as Base)
         .map((cm) => cm.association("club").target as Base);
@@ -2742,22 +2624,13 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
-  // Opt out of transactional fixtures: the 65536-row seed below is committed
-  // once in `beforeAll` (via chunked insertAll) and torn down manually in
-  // `afterAll`, rather than reseeded/rolled back per test.
   fixtures({}, { useTransactionalTests: false });
-  // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
-  // The point of these tests is that preload/eager_load split an IN clause whose
-  // id list exceeds the adapter's bind-parameter limit, so the row count must be
-  // the real fixture size. The per-row reload in fixtures is too slow
-  // at this scale, so seed via chunked insertAll (no reload) and clean up after.
   const TOTAL = 65536;
   beforeAll(async () => {
     registerModel(Citation);
     registerModel(Book);
     const rows: { id: number; book2_id: number }[] = [];
     for (let i = 0; i < TOTAL; i++) rows.push({ id: i, book2_id: i * i });
-    // 2-column rows → ≤ 65535 placeholders/insert on MySQL/MariaDB at this chunk.
     for (let i = 0; i < rows.length; i += 10_000) {
       await Citation.insertAll(rows.slice(i, i + 10_000));
     }
@@ -2767,20 +2640,10 @@ describe("EagerLoadingTooManyIdsTest", () => {
     await Base.connection.executeMutation("DELETE FROM citations");
   }, 60_000);
 
-  // Generous timeout: building the IN-split preload over the full 65536-row set
-  // is slow on the MySQL-family lanes, well past the 5s default. The fixture
-  // size is the point — it must exceed the adapter's bind-parameter limit to
-  // force IN-splitting.
   it("preloading too many ids", async () => {
     expect((await Citation.preload(":referenceOf")).length).toBe(await Citation.count());
   }, 120_000);
 
-  // `eager_load(:citations)` is a 65536-row self-LEFT-JOIN on `citation_id`.
-  // Rails' `t.references :citation` indexes that column, so the join is an
-  // indexed lookup rather than the O(n²) nested-loop scan it degrades to on the
-  // MySQL-family lanes without the index (that scan was >360s and poisoned the
-  // shared connection). With the canonical `citations` schema now carrying the
-  // Rails-faithful `index_citations_on_citation_id`, the join runs within budget.
   it("eager loading too many ids", async () => {
     expect(await Citation.all().eagerLoad(":citations").offset(0).size()).toBe(
       await Citation.count(),
@@ -2800,8 +2663,6 @@ describe("EagerAssociationTest", () => {
 
     const sqls = await captureSql(async () => {
       const loaded = (await posts) as Base[];
-      // Exercise the public reader (Rails: `posts.map(&:comments)`); the size
-      // is the post count (3), populated from the preload, not a fresh query.
       const commentsCollection = await Promise.all(
         loaded.map((p) => (p as any).comments.toArray() as Promise<Base[]>),
       );
@@ -2810,9 +2671,6 @@ describe("EagerAssociationTest", () => {
     });
     const sql = sqls[sqls.length - 1];
 
-    // Rails (eager_test.rb:1698-1700) builds the pattern from `quote_table_name`,
-    // which is adapter-specific (double-quotes on sqlite/pg, backticks on mysql),
-    // so derive the quoting from the live adapter rather than hardcoding it.
     const conn = Base.connection;
     const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const quotedBlogId = escape(conn.quoteTableName("sharded_comments.blog_id"));
@@ -2832,9 +2690,6 @@ describe("EagerAssociationTest", () => {
     "shardedBlogPostsTags",
   ]);
 
-  // fixtures loads the rows but does not register the models under the
-  // class names the associations resolve by; register them here (dynamic import
-  // keeps these out of the file's top-level scope).
   beforeAll(async () => {
     const sharded = await import("../test-helpers/models/sharded.js");
     registerModel("ShardedBlog", sharded.ShardedBlog);

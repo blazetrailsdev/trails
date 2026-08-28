@@ -1,11 +1,3 @@
-/**
- * Mirrors vendor/rails/activerecord/test/cases/associations/has_one_associations_test.rb
- *
- * Canonical conversion (RFC 0019 canonical-schema-burndown): the bespoke
- * `firms`/`accounts`/`companies` tables and bespoke `Firm`/`Account` classes
- * have been replaced with the real Rails `Company`/`Firm`/`DependentFirm`/
- * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
- */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
@@ -33,8 +25,6 @@ import {
 } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Car } from "../test-helpers/models/car.js";
-// Rails: `require "models/person"` (has_one_associations_test.rb:10) — Car
-// belongs_to :person with a counter cache, so creating a Car resolves Person.
 import "../test-helpers/models/person.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Club } from "../test-helpers/models/club.js";
@@ -71,7 +61,6 @@ import {
   assertNoQueriesMatch,
 } from "../testing/query-assertions.js";
 
-/** Load and return a singular association's target (Rails sync reader). */
 async function readHasOne(owner: any, name: string): Promise<any> {
   return await owner.association(name).loadTarget();
 }
@@ -94,9 +83,6 @@ function registerCompanyModels(): void {
   registerSubclass(Client);
 }
 
-// Mirrors the SpecialBook/SpecialAuthor/SpecialSubscription models defined
-// inline in has_one_associations_test.rb — a has_one over an enum-carrying
-// child.
 class SpecialBook extends Base {
   static {
     this._tableName = "books";
@@ -121,10 +107,6 @@ class SpecialSubscription extends Base {
   }
 }
 
-// Mirrors the SpecialCar/SpecialBulb models defined inline in
-// has_one_associations_test.rb (:929) — a has_one whose child belongs_to the
-// owner with `touch: true`, used to prove that building a nonpersisted child
-// does not touch the parent.
 class SpecialCar extends Base {
   static {
     this._tableName = "cars";
@@ -143,9 +125,6 @@ class SpecialBulb extends Base {
   }
 }
 
-// ==========================================================================
-// HasOneAssociationsTest — mirrors has_one_associations_test.rb
-// ==========================================================================
 describe("HasOneAssociationsTest", () => {
   const { companies, accounts, pirates, ships } = fixtures([
     "companies",
@@ -256,9 +235,7 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);
   });
 
-  it.skip("can marshal has one association with nil target", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
-  });
+  it.skip("can marshal has one association with nil target", () => {});
 
   it("proxy assignment", async () => {
     const company = companies("first_firm") as any;
@@ -286,24 +263,13 @@ describe("HasOneAssociationsTest", () => {
     await firm.setAccount(null);
     await firm.save();
     expect(await readHasOne(firm, "account")).toBeNull();
-    // account is dependent, therefore is destroyed when reference to owner is lost
     await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
   });
 
   it("nullification on association change", async () => {
-    // rails_core is a DependentFirm, whose `account` has_one overrides
-    // Company's with `dependent: :nullify`. This asserts the displaced account
-    // is *nullified* (firm_id → null) rather than destroyed, which only holds
-    // if association resolution picks DependentFirm's override over the
-    // inherited Company#account (the slice().reverse().find() most-derived-wins
-    // fix in associations.ts / instance-methods.ts).
     const firm = companies("rails_core") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
-    // Rails persists the replacement inline at assignment; the awaitable setter
-    // is the faithful surface (the native `=` setter throws on a persisted
-    // owner — RFC 0068), nullifying the displaced account immediately.
     await firm.setAccount(new Account({ credit_limit: 5 }));
-    // account is dependent with nullify, therefore its firm_id should be nil
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
   });
 
@@ -335,9 +301,6 @@ describe("HasOneAssociationsTest", () => {
     const otherBook = await CpkBook.create({ id: [3, 4] });
     const order = await CpkOrderWithNullifiedBook.create({ book });
 
-    // Rails persists the replacement inline at assignment; the awaitable setter
-    // is the faithful surface (RFC 0068), nullifying the displaced book's
-    // composite foreign key immediately.
     await (order as any).setBook(otherBook);
 
     expect(book.order_id).toBeNull();
@@ -356,15 +319,12 @@ describe("HasOneAssociationsTest", () => {
 
   it("association change calls delete", async () => {
     const firm = companies("first_firm") as any;
-    // dependent: :delete skips callbacks, so destroyed_account_ids stays empty.
     await firm.setDeletableAccount(new Account({ credit_limit: 5 }));
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
 
   it("association change calls destroy", async () => {
     const firm = companies("first_firm") as any;
-    // The awaitable setter loads the existing DB account and runs the
-    // dependent: :destroy remove against it, inline at assignment (RFC 0068).
     await firm.setAccount(new Account({ credit_limit: 5 }));
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([firm.id]);
   });
@@ -390,27 +350,15 @@ describe("HasOneAssociationsTest", () => {
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([accountId]);
   });
 
-  // Trails deviation guard (no Rails counterpart): Rails' Account#before_destroy
-  // issues a lazy synchronous query for `account.firm` on a direct destroy, so
-  // it records the id. trails' async belongs_to reader cannot be awaited inside
-  // a sync callback, so the direct-destroy path materializes the record's
-  // belongs_to before the callback chain runs. Story
-  // belongs-to-sync-read-direct-destroy-callback (RFC 0023-surfaced-deviations).
   it("direct destroy records destroyed account id via unloaded belongs_to", async () => {
     const account = (await Account.find(1)) as any;
     expect(account.association("firm").isLoaded()).toBe(false);
-    // Key by the firm record's id (not account.firm_id) so the lookup type
-    // matches what the callback stores; on PG firm.id is a BigInt.
     const firm = (await Company.find(account.firm_id)) as any;
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
     await account.destroy();
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([account.id]);
   });
 
-  // trails-only: the destroy `belongs_to` preload mirrors Rails' lazy load by
-  // materializing only the association the callback names. Account#before_destroy
-  // reads `firm` but never `unautosavedFirm` (its same-`firm_id` sibling), so a
-  // single owner SELECT fires, not one per belongs_to. No Rails counterpart.
   it("direct destroy only preloads the belongs_to the callback references", async () => {
     const account = (await Account.find(1)) as any;
     expect(account.association("firm").isLoaded()).toBe(false);
@@ -542,14 +490,6 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
-  // Trails deviation guard (no Rails counterpart, RFC 0005-activerecord-gaps
-  // story has-one-loaded-target-create-missing-remove-target): Rails runs
-  // `remove_target!` inside `HasOneAssociation#replace` (has_one_association.rb:69)
-  // whenever another record is assigned — including the `create#{name}` path via
-  // `set_new_record`. Our sync `replace`/`setNewRecord` cannot `await` that
-  // removal, so `_createRecord` runs it. Load the target explicitly first (no
-  // property-setter assignment, so no displacement flag is set) and assert the
-  // prior row is detached the moment `createAccount` returns.
   it("create over a loaded target nullifies the prior account", async () => {
     const company = (await Company.create({ name: "NewCo" })) as any;
     const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
@@ -569,10 +509,6 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(created.id);
   });
 
-  // Trails deviation guard (no Rails counterpart, RFC 0068 story
-  // has-one-create-record-unloaded-target-not-removed): Rails' `replace` opens
-  // with `load_target` (has_one_association.rb:59), so `remove_target!` detaches
-  // a row that was only ever in the DB — never loaded through the association.
   it("create over an unloaded target nullifies the prior account", async () => {
     const company = (await Company.create({ name: "UnloadedCo" })) as any;
     const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
@@ -591,15 +527,6 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(created.id);
   });
 
-  // Trails deviation guard (no Rails counterpart, RFC 0068 story
-  // has-one-create-deferred-load-error-reraise-untested): the displaced-target
-  // load has to run BEFORE `super._createRecord` (it must precede the new
-  // record's FK write), but Rails reaches `load_target` only from
-  // `set_new_record`, i.e. *after* `build_record` (singular_association.rb:63-68).
-  // So `_createRecord` defers the load error and re-raises it once the build has
-  // succeeded. A build-time failure hides it (covered by "create with inexistent
-  // foreign key failing"); this pins the other branch — build succeeds, load
-  // error still propagates out of `create#{name}`.
   it("create re-raises a deferred target-load error after a successful build", async () => {
     const company = (await Company.create({ name: "DeferredLoadCo" })) as any;
     const found = (await Company.find(company.id)) as any;
@@ -612,11 +539,6 @@ describe("HasOneAssociationsTest", () => {
     expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
   });
 
-  // Same root cause on the build path: `set_new_record` → `replace(record, false)`
-  // still runs `remove_target!` on the loaded target (has_one_association.rb:69),
-  // whose else-branch nullifies+saves the old row even though the new record is
-  // unsaved. Our sync `build` can't await, so the `build#{name}` accessor returns
-  // a Promise for the loaded-target case and detaches the prior row.
   it("build over a loaded target nullifies the prior account", async () => {
     const company = (await Company.create({ name: "BuildCo" })) as any;
     const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
@@ -703,19 +625,15 @@ describe("HasOneAssociationsTest", () => {
     connection.enableQueryCacheBang();
     connection.clearQueryCache();
     try {
-      // Populate the cache with a query
       const odegy = (await Company.find(odegyId)) as any;
-      // Populate the cache with a second query
       await readHasOne(odegy, "account");
 
       expect(connection.queryCache!.size).toBe(2);
 
-      // Clear the cache and fetch the account again, populating the cache with a query
       await assertQueriesCount(1, false, async () => {
         await odegy.reloadAccount();
       });
 
-      // This query is not cached anymore, so it should make a real SQL query
       await assertQueriesCount(1, false, async () => {
         await Company.find(odegyId);
       });
@@ -791,12 +709,6 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("assignment before child saved", async () => {
-    // Rails persists the child synchronously on `firm.account = a`. The JS
-    // property setter cannot `await`, so the Rails-faithful immediate-persist
-    // path is reached through the awaitable writer
-    // (`association(name).writer(value)` → `replace`); the bare `=`
-    // setter defers to the owner's next save. Assigning through the writer
-    // therefore stands in for `firm.account = a` here.
     const firm = (await Firm.find(1)) as any;
     const a = new Account({ credit_limit: 1000 });
     await firm.association("account").writer(a);
@@ -819,13 +731,9 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "readonlyAccount")).isReadonly()).toBe(true);
   });
 
-  it.skip("has one proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: Ruby private-method visibility has no TypeScript equivalent.
-  });
+  it.skip("has one proxy should not respond to private methods", () => {});
 
-  it.skip("has one proxy should respond to private methods via send", () => {
-    // PERMANENT-SKIP: Ruby `send` private dispatch has no TypeScript equivalent.
-  });
+  it.skip("has one proxy should respond to private methods via send", () => {});
 
   it("save of record with loaded has one", async () => {
     const firm = companies("first_firm") as any;
@@ -867,7 +775,7 @@ describe("HasOneAssociationsTest", () => {
     expect(newShip.isNewRecord()).toBe(true);
     expect(await newShip.isInvalid()).toBe(true);
     expect(origShip.pirate_id).toBeNull();
-    expect(origShip.isChanged).toBe(false); // check it was saved
+    expect(origShip.isChanged).toBe(false);
   });
 
   it("creation failure replaces existing with dependent option", async () => {
@@ -884,9 +792,6 @@ describe("HasOneAssociationsTest", () => {
     const pirate = pirates("redbeard") as any;
     const newShip = new Ship();
 
-    // Rails: `pirate.ship = new_ship`. The JS property setter cannot `await` a
-    // persist, so the Rails-faithful immediate-persist path is reached through
-    // the awaitable writer (see "assignment before child saved").
     let error: any;
     try {
       await pirate.association("ship").writer(newShip);
@@ -1007,27 +912,17 @@ describe("HasOneAssociationsTest", () => {
   it("has one transaction", async () => {
     const company = companies("first_firm") as any;
     const account = await Account.find(1);
-    await readHasOne(company, "account"); // force loading
+    await readHasOne(company, "account");
     await assertNoQueries(false, async () => {
-      // Re-assigning the already-loaded record is a `sameRecord` no-op — the
-      // awaitable setter changes nothing, so no queries fire.
       await company.setAccount(account);
     });
 
-    // Rails persists `company.account = nil` immediately (destroying the
-    // dependent account); the awaitable setter is the faithful surface.
     await company.association("account").writer(null);
     await assertNoQueries(false, async () => {
       await company.setAccount(null);
     });
 
     const account2 = await Account.find(2);
-    // Rails counts the writes synchronously on the bare assignment
-    // (`assert_queries_count(3) { company.account = account }`). The JS property
-    // setter (`company.account = account2`) cannot persist synchronously without
-    // a floating promise, so it defers to save(); to count the assignment's own
-    // queries here we drive the Rails-faithful awaitable writer, which persists
-    // immediately (savepoint + FK update + release = 3).
     await assertQueriesCount(3, false, async () => {
       await company.association("account").writer(account2);
     });
@@ -1045,7 +940,6 @@ describe("HasOneAssociationsTest", () => {
     ship.name = "new name";
     expect(ship.isChanged).toBe(true);
     await assertQueriesCount(3, false, async () => {
-      // One query for updating name, not triggering query for updating pirate_id
       await (pirate as any).setShip(ship);
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
@@ -1058,7 +952,6 @@ describe("HasOneAssociationsTest", () => {
 
     const newShip = await Ship.create({ name: "new name" });
     await assertQueriesCount(4, false, async () => {
-      // One query to nullify the old ship, one query to update the new ship
       await (pirate as any).setShip(newShip);
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
@@ -1172,11 +1065,6 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one with touch option on nonpersisted built associations doesnt update parent", async () => {
     const car = await (SpecialCar as any).create({ name: "honda" });
-    // Rails' synchronous `build_special_bulb` runs one `load_target` SELECT
-    // inside `replace`; the JS accessor can't await, so the awaitable
-    // has_one build path is driven directly. The second build sees the loaded
-    // target and issues no query — 1 query total, and the built (nonpersisted)
-    // child never fires the `touch: true` callback, so the parent is untouched.
     await assertQueriesCount(1, false, async () => {
       await car.buildSpecialBulb();
       await car.buildSpecialBulb();
@@ -1204,9 +1092,6 @@ describe("HasOneAssociationsTest", () => {
   it("association enum works properly", async () => {
     const author = await (SpecialAuthor as any).createBang({ name: "Test" });
     const book = await (SpecialBook as any).createBang({ status: "published" });
-    // Rails' `author.book = book` persists the FK synchronously (has_one
-    // replace saves the child); the awaitable setter is the faithful surface
-    // (the native `=` setter throws on a persisted owner — RFC 0068).
     await author.setBook(book);
 
     expect(book.status).toBe("published");
@@ -1224,14 +1109,6 @@ describe("HasOneAssociationsTest", () => {
     await author.setBook(book);
 
     const whereClause = { books: { subscriptions: { subscriber_id: null } } };
-    // Rails' assert_nothing_raised wraps only relation *construction*
-    // (`joins(book: :subscription).where.not(...)` builds the Arel that would
-    // raise on a bad join/enum reference). In trails, that resolution is
-    // deferred to SQL generation, so `toSql()` — not execution — is the
-    // faithful analog. We must NOT execute here: `subscriptions.subscriber_id`
-    // is a string column (schema.rb:1178-1181) while `books.id` is bigint, so
-    // the has_one join renders `varchar = bigint`, which PostgreSQL rejects at
-    // query time. Rails never runs into that because the test only builds.
     const relation = (SpecialAuthor as any)
       .joins({ ":book": ":subscription" })
       .where()
@@ -1239,8 +1116,6 @@ describe("HasOneAssociationsTest", () => {
     expect(typeof relation.toSql()).toBe("string");
   });
 
-  // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
-  // its own destroy UNLESS destroyed_by_association is set.
   it("destroyed_by_association set in child destroy callback on parent destroy", async () => {
     class DestroyByParentBook extends Base {
       static {
@@ -1359,9 +1234,6 @@ describe("HasOneAssociationsTest", () => {
   });
 });
 
-// ==========================================================================
-// AsyncHasOneAssociationsTest — mirrors AsyncHasOneAssociationsTest
-// ==========================================================================
 describe("AsyncHasOneAssociationsTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
 
