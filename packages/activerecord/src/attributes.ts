@@ -7,7 +7,11 @@ import {
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
-import { cachedColumnsHash, isSchemaLoaded } from "./model-schema.js";
+import {
+  cachedColumnsHash,
+  isSchemaLoaded,
+  reloadSchemaFromCache as modelSchemaReloadSchemaFromCache,
+} from "./model-schema.js";
 import { connectionPool, threadedConnectionFor } from "./connection-handling.js";
 
 type AnyClass = any;
@@ -98,7 +102,8 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 
 /** @internal */
 function reloadSchemaFromCache(this: AnyClass): void {
-  AttributeRegistration.ClassMethods.resetDefaultAttributes.call(this);
+  this.resetDefaultAttributesBang();
+  modelSchemaReloadSchemaFromCache.call(this);
 }
 
 const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
@@ -128,7 +133,7 @@ function defineDefaultAttribute(
 }
 
 /** @internal */
-function resetDefaultAttributes(this: AnyClass): void {
+export function resetDefaultAttributes(this: AnyClass): void {
   reloadSchemaFromCache.call(this);
 }
 

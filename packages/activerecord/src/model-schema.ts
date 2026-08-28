@@ -777,11 +777,11 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._returningColumnsForInsertCache = undefined;
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
-  // ActiveRecord::Attributes overrides `reload_schema_from_cache` to call
-  // `reset_default_attributes!` before `super` (attributes.rb:268-271), which
-  // nils `@attribute_types` as well as `@default_attributes`
-  // (attribute_registration.rb:96-99). Sent to `this`, the way Ruby sends an
-  // inherited private method — ActiveModel's `Model` defines the static.
+  // Rails puts this bang only in ActiveRecord::Attributes' override of
+  // `reload_schema_from_cache` (attributes.rb:268-271), which every Ruby caller
+  // reaches by sending `self`. trails' callers still reach this half by static
+  // import, so the bang is folded in here until they dispatch —
+  // dispatch-reload-schema-from-cache-through-the-ar-override.
   (this as SchemaHost & { resetDefaultAttributesBang(): void }).resetDefaultAttributesBang();
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   clearAttributeNamesMemo(this);

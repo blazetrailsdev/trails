@@ -618,10 +618,10 @@ describe("DefaultAttributesTest", () => {
 
   it("_defaultAttributes seeds schema columns via fromDatabase then replays user pending queue", () => {
     class Post extends Base {}
+    Post.attribute("title", "string", { default: "untitled" });
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       views: { name: "views", default: 0 },
     };
-    Post.attribute("title", "string", { default: "untitled" });
 
     const defaults = Post._defaultAttributes();
     expect(defaults.getAttribute("views").value).toBe(0);
@@ -630,21 +630,34 @@ describe("DefaultAttributesTest", () => {
 
   it("user attribute() declaration overrides schema column type via pending queue", () => {
     class Post extends Base {}
+    Post.attribute("score", "string");
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       score: { name: "score", default: 0 },
     };
-    Post.attribute("score", "string");
 
     const defaults = Post._defaultAttributes();
     expect(defaults.getAttribute("score").type.name).toBe("string");
   });
 
-  it("attribute() overriding only type preserves the schema default", () => {
+  it("resetDefaultAttributes reloads the schema from cache", () => {
     class Post extends Base {}
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       score: { name: "score", default: 5 },
     };
+    (Post as unknown as { _schemaLoaded?: boolean })._schemaLoaded = true;
+
+    Post.resetDefaultAttributes();
+
+    expect((Post as unknown as { _columnsHash?: unknown })._columnsHash).toBeUndefined();
+    expect((Post as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(false);
+  });
+
+  it("attribute() overriding only type preserves the schema default", () => {
+    class Post extends Base {}
     Post.attribute("score", "string");
+    (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
+      score: { name: "score", default: 5 },
+    };
 
     const defaults = Post._defaultAttributes();
     expect(defaults.getAttribute("score").type.name).toBe("string");
