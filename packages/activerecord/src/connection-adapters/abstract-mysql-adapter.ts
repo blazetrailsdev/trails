@@ -929,19 +929,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlQuoteString(string, this._escapeState);
   }
 
-  protected _escapeState: EscapeState = { noBackslashEscapes: false, charset: null };
+  protected _escapeState: EscapeState = { noBackslashEscapes: false };
 
   protected async loadEscapeState(): Promise<void> {
-    const row = await this.selectOne(
-      "SELECT @@SESSION.sql_mode AS sql_mode, @@SESSION.character_set_connection AS charset",
-      "SCHEMA",
-    );
-    const sqlMode = row?.["sql_mode"];
-    const charset = row?.["charset"];
+    const sqlMode = await this.selectValue("SELECT @@SESSION.sql_mode", "SCHEMA");
     this._escapeState = {
       noBackslashEscapes:
         typeof sqlMode === "string" && sqlMode.split(",").includes("NO_BACKSLASH_ESCAPES"),
-      charset: typeof charset === "string" ? charset.toLowerCase() : null,
     };
   }
 
