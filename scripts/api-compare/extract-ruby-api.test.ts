@@ -1693,6 +1693,231 @@ describe(
       ]);
     });
 
+    it("synthesizes the accessors a `Struct.new(*CONST)` superclass generates", () => {
+      const m = metaMethods(`
+      module I18n
+        module Locale
+          module Tag
+            RFC4646_SUBTAGS = [ :language, :script, :region ]
+
+            class Rfc4646 < Struct.new(*RFC4646_SUBTAGS)
+            end
+          end
+        end
+      end
+    `);
+      expect(m["I18n::Locale::Tag::Rfc4646"].map((x) => x.name).sort()).toEqual([
+        "initialize",
+        "language",
+        "language=",
+        "region",
+        "region=",
+        "script",
+        "script=",
+      ]);
+    });
+
+    it("lets a class-body definition override the Struct accessor it shadows", () => {
+      const m = metaMethods(`
+      module I18n
+        module Locale
+          module Tag
+            RFC4646_SUBTAGS = [ :language, :region, :variant ]
+            RFC4646_FORMATS = { :language => :downcase, :region => :upcase }
+
+            class Rfc4646 < Struct.new(*RFC4646_SUBTAGS)
+              RFC4646_FORMATS.each do |name, format|
+                define_method(name) { self[name].send(format) unless self[name].nil? }
+              end
+
+              def variant
+                self[:variant]
+              end
+            end
+          end
+        end
+      end
+    `);
+      const byName = new Map(m["I18n::Locale::Tag::Rfc4646"].map((x) => [x.name, x]));
+      expect(byName.get("language")!.notes).toBe("define_method");
+      expect(byName.get("region")!.notes).toBe("define_method");
+      expect(byName.get("variant")!.notes).toBeUndefined();
+      // The writers the struct generates have nothing shadowing them.
+      expect(byName.get("language=")!.notes).toBe("struct");
+      // One entry per name — the shadowed struct accessors are gone, not
+      // duplicated alongside the definitions that override them.
+      expect(m["I18n::Locale::Tag::Rfc4646"].filter((x) => x.name === "language")).toHaveLength(1);
+    });
+
+    it("lets a literal def in the struct block override the synthesized initialize", () => {
+      const m = metaMethods(`
+      module ActiveRecord
+        MigrationProxy = Struct.new(:name, :version, :filename, :scope) do
+          def initialize(name, version, filename, scope)
+            super
+            @migration = nil
+          end
+
+          def basename
+            File.basename(filename)
+          end
+        end
+      end
+    `);
+      const inits = m["ActiveRecord::MigrationProxy"].filter((x) => x.name === "initialize");
+      // One entry, and it is the body's own def: the struct's synthesized
+      // initialize takes the members as optional positionals, the real one
+      // takes them as required.
+      expect(inits).toHaveLength(1);
+      expect(inits[0].notes).toBeUndefined();
+      expect(inits[0].params).toEqual([
+        { name: "name", kind: "required" },
+        { name: "version", kind: "required" },
+        { name: "filename", kind: "required" },
+        { name: "scope", kind: "required" },
+      ]);
+      // The accessors nothing overrides are untouched.
+      expect(m["ActiveRecord::MigrationProxy"].find((x) => x.name === "version")!.notes).toBe(
+        "struct",
+      );
+    });
+
+    it("unrolls a literal-array each loop whose template is a class_eval def", () => {
+      const m = metaMethods(`
+      module ActiveSupport
+        class TimeWithZone
+          %w(year mon wday).each do |method_name|
+            class_eval <<-EOV, __FILE__, __LINE__ + 1
+              def #{method_name}
+                time.#{method_name}
+              end
+            EOV
+          end
+        end
+      end
+    `);
+      expect(m["ActiveSupport::TimeWithZone"].map((x) => x.name)).toEqual(["year", "mon", "wday"]);
+    });
+
+    it("keeps the literal suffix a class_eval def name carries after the loop variable", () => {
+      const m = metaMethods(`
+      module ActionDispatch
+        module Routing
+          module PolymorphicRoutes
+            %w(edit new).each do |action|
+              module_eval <<-EOT, __FILE__, __LINE__ + 1
+                def #{action}_polymorphic_url(record_or_hash, options = {})
+                  nil
+                end
+
+                def #{action}_polymorphic_path(record_or_hash, options = {})
+                  nil
+                end
+              EOT
+            end
+          end
+        end
+      end
+    `);
+      expect(m["ActionDispatch::Routing::PolymorphicRoutes"].map((x) => x.name)).toEqual([
+        "edit_polymorphic_url",
+        "edit_polymorphic_path",
+        "new_polymorphic_url",
+        "new_polymorphic_path",
+      ]);
+    });
+
+    it("unrolls a constant-array class_eval loop that has no case name mapping", () => {
+      const m = metaMethods(`
+      module ActiveRecord
+        class Migration
+          class CommandRecorder
+            ReversibleAndIrreversibleMethods = [:create_table, :add_column]
+
+            ReversibleAndIrreversibleMethods.each do |method|
+              class_eval <<-EOV, __FILE__, __LINE__ + 1
+                def #{method}(*args, &block)
+                  record(:"#{method}", args, &block)
+                end
+              EOV
+              ruby2_keywords(method)
+            end
+          end
+        end
+      end
+    `);
+      expect(m["ActiveRecord::Migration::CommandRecorder"].map((x) => x.name)).toEqual([
+        "create_table",
+        "add_column",
+      ]);
+    });
+
+    it("unrolls a constant-array each loop whose template is a define_method", () => {
+      const m = metaMethods(`
+      module Sample
+        NAMES = [:alpha, :beta]
+
+        NAMES.each do |name|
+          define_method(name) { nil }
+        end
+      end
+    `);
+      expect(m["Sample"].map((x) => x.name)).toEqual(["alpha", "beta"]);
+    });
+
+    it("unrolls a constant-hash each loop over the hash's keys", () => {
+      const m = metaMethods(`
+      module I18n
+        module Locale
+          module Tag
+            RFC4646_FORMATS = { :language => :downcase, :region => :upcase }
+
+            class Rfc4646
+              RFC4646_FORMATS.each do |name, format|
+                define_method(name) { self[name].send(format) unless self[name].nil? }
+              end
+            end
+          end
+        end
+      end
+    `);
+      expect(m["I18n::Locale::Tag::Rfc4646"].map((x) => x.name)).toEqual(["language", "region"]);
+    });
+
+    it("takes a label-spelled hash constant's keys, and rejects a hash with a non-symbol key", () => {
+      const m = metaMethods(`
+      module Sample
+        FORMATS = { language: :downcase, region: :upcase }
+        MIXED = { language: :downcase, "region" => :upcase }
+
+        FORMATS.each { |name, format| define_method(name) { nil } }
+        MIXED.each { |name, format| define_method("mixed_#{name}") { nil } }
+      end
+    `);
+      expect(m["Sample"].map((x) => x.name)).toEqual(["language", "region"]);
+    });
+
+    it("leaves a define_method loop whose name source does not resolve unrecorded", () => {
+      const m = metaMethods(`
+      module Sample
+        UNKNOWN = compute_list
+        UNKNOWN.each do |name|
+          define_method(name) { nil }
+        end
+
+        MIXED = [:alpha, SOME_CONST]
+        MIXED.each do |name|
+          define_method(name) { nil }
+        end
+
+        def kept
+          nil
+        end
+      end
+    `);
+      expect(m["Sample"].map((x) => x.name)).toEqual(["kept"]);
+    });
+
     it("unrolls a literal-array each loop that interpolates the loop variable", () => {
       const m = metaMethods(`
       module ClassMethods
