@@ -2,8 +2,22 @@
   {
     "package": "actiondispatch",
     "tsFile": "journey/path/pattern.ts",
+    "rubyName": "captures",
+    "call": "new",
+    "reason": "Pre-existing divergence in `MatchData`, a class nested inside a same-file parent (journey/path/pattern.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "journey/path/pattern.ts",
     "rubyName": "requirements_for_missing_keys_check",
     "call": "transform_values",
     "reason": "Verified per-site (RFC 0106): `requirements.transform_values { … }` (pattern.rb:178-180) over a Ruby Hash; the TS counterpart is a plain object rebuilt by an `Object.entries` loop — `Hash#transform_values` has no JS call form (RFC 0092 positional-idiom-analogues)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "journey/path/pattern.ts",
+    "rubyName": "visit_LITERAL",
+    "call": "escape",
+    "reason": "Pre-existing divergence in `AnchoredRegexp`, a class nested inside a same-file parent (journey/path/pattern.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
   }
 ]

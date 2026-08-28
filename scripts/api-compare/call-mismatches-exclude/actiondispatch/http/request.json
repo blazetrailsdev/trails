@@ -37,6 +37,27 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
+    "rubyName": "call",
+    "call": "header_name",
+    "reason": "Pre-existing divergence in `PassNotFound`, a class nested inside a same-file parent (http/content_security_policy.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/request.ts",
+    "rubyName": "call",
+    "call": "new",
+    "reason": "Pre-existing divergence in `PassNotFound`, a class nested inside a same-file parent (http/content_security_policy.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/request.ts",
+    "rubyName": "call",
+    "call": "policy_present?",
+    "reason": "Pre-existing divergence in `PassNotFound`, a class nested inside a same-file parent (http/content_security_policy.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/request.ts",
     "rubyName": "initialize",
     "call": "new",
     "reason": "Missing construction, not a constructor idiom: Rails' `initialize` (actionpack/lib/action_dispatch/http/request.rb:64-75) builds `@rack_request = Rack::Request.new(env)` and exposes it via `attr_reader :rack_request` (:77). The port (http/request.ts:148-158) copies `env` and fills in Rack defaults Rails does not set; the wrapper is built lazily by an invented `get rackRequest()` that caches it in `env[\"action_dispatch.rack_request\"]` (http/request.ts:925-931), so the constructor never constructs one. Not tracked by a story: actionpack is outside the project's stated focus (activerecord and its dependencies), which is why the convergence story filed for this row was closed as out of scope."

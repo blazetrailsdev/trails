@@ -4,6 +4,7 @@ import {
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
+  collectRubyEntities,
   resolveTsClassForRuby,
   methodInMode,
   tsShouldIncludeInIndex,
@@ -815,6 +816,61 @@ describe("nameMatches", () => {
   });
 });
 
+describe("collectRubyEntities", () => {
+  const meth = (name: string): MethodInfo => ({ name, visibility: "public", params: [] });
+  const cls = (file: string, methods: string[] = []): ClassInfo => ({
+    name: "x",
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods: methods.map(meth),
+    classMethods: [],
+  });
+
+  it("keeps a class nested in a same-file parent in the population", () => {
+    const pkg: PackageInfo = {
+      classes: {
+        "ActiveRecord::Associations::Preloader::Association": cls("preloader/association.rb", [
+          "records_for",
+        ]),
+        "ActiveRecord::Associations::Preloader::Association::LoaderQuery": cls(
+          "preloader/association.rb",
+          ["load_records_for_keys"],
+        ),
+      },
+      modules: {},
+    };
+    expect(collectRubyEntities(pkg).map((e) => e.fqn)).toEqual([
+      "ActiveRecord::Associations::Preloader::Association",
+      "ActiveRecord::Associations::Preloader::Association::LoaderQuery",
+    ]);
+  });
+
+  it("folds a ClassMethods submodule into its parent and drops it", () => {
+    const parent: ClassInfo = { ...cls(""), file: "scoping.rb" };
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: {
+        "ActiveRecord::Scoping": parent,
+        "ActiveRecord::Scoping::ClassMethods": {
+          ...cls("scoping.rb"),
+          instanceMethods: [meth("current_scope")],
+        },
+      },
+    };
+    expect(collectRubyEntities(pkg).map((e) => e.fqn)).toEqual(["ActiveRecord::Scoping"]);
+    expect(parent.classMethods.map((m) => m.name)).toEqual(["current_scope"]);
+  });
+
+  it("drops a module that carries nothing", () => {
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: { "ActiveRecord::Empty": cls("empty.rb") },
+    };
+    expect(collectRubyEntities(pkg)).toEqual([]);
+  });
+});
+
 describe("primaryClassesPerFile", () => {
   const cls = (file: string): ClassInfo => ({
     name: "x",
@@ -825,17 +881,16 @@ describe("primaryClassesPerFile", () => {
     classMethods: [],
   });
 
-  it("picks the shortest fqn in the file for both selections", () => {
-    const { folding, inheritance } = primaryClassesPerFile({
+  it("picks the shortest fqn in the file", () => {
+    const inheritance = primaryClassesPerFile({
       "A::B": cls("a.rb"),
       "A::B::C": cls("a.rb"),
     });
-    expect(folding.get("a.rb")).toBe("A::B");
     expect(inheritance.get("a.rb")).toBe("A::B");
   });
 
   it("keeps a ruby-only class out of the inheritance selection", () => {
-    const { inheritance } = primaryClassesPerFile({
+    const inheritance = primaryClassesPerFile({
       "I18n::JSON": cls("backend/key_value.rb"),
       "I18n::Backend::KeyValue": cls("backend/key_value.rb"),
       "I18n::Backend::KeyValue::SubtreeProxy": cls("backend/key_value.rb"),
@@ -843,20 +898,10 @@ describe("primaryClassesPerFile", () => {
     expect(inheritance.get("backend/key_value.rb")).toBe("I18n::Backend::KeyValue");
   });
 
-  it("keeps the ruby-only class as the folding parent", () => {
-    const { folding } = primaryClassesPerFile({
-      "I18n::JSON": cls("backend/key_value.rb"),
-      "I18n::Backend::KeyValue": cls("backend/key_value.rb"),
-      "I18n::Backend::KeyValue::SubtreeProxy": cls("backend/key_value.rb"),
-    });
-    expect(folding.get("backend/key_value.rb")).toBe("I18n::JSON");
-  });
-
   it("ignores classes with no file", () => {
-    const { folding, inheritance } = primaryClassesPerFile({
+    const inheritance = primaryClassesPerFile({
       "A::B": { ...cls(""), file: undefined },
     });
-    expect(folding.size).toBe(0);
     expect(inheritance.size).toBe(0);
   });
 });

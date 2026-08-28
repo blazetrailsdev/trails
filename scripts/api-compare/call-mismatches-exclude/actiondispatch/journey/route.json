@@ -2,13 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "journey/route.ts",
-    "rubyName": "initialize",
-    "call": "root",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/route.ts",
     "rubyName": "required_defaults",
     "call": "delete_if",
     "reason": "Verified per-site (RFC 0106): `@defaults.dup.delete_if { … }` (route.rb:135-137) is spelled as an `Object.entries` loop that skips the rejected keys while building the copy; `Hash#delete_if` has no JS call form."

@@ -9,6 +9,20 @@
   {
     "package": "rack",
     "tsFile": "directory.ts",
+    "rubyName": "each",
+    "call": "call",
+    "reason": "Pre-existing divergence in `DirectoryBody`, a class nested inside a same-file parent (directory.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "rack",
+    "tsFile": "directory.ts",
+    "rubyName": "each",
+    "call": "escape_html",
+    "reason": "Pre-existing divergence in `DirectoryBody`, a class nested inside a same-file parent (directory.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "rack",
+    "tsFile": "directory.ts",
     "rubyName": "get",
     "call": "unescape_path",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

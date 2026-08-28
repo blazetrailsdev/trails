@@ -2,6 +2,18 @@
   {
     "package": "rack",
     "tsFile": "files.ts",
+    "rubyName": "each",
+    "call": "each_range_part",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:file",
+      "ref:range"
+    ],
+    "reason": "Pre-existing argument-shape divergence in `BaseIterator`, a class nested inside a same-file parent (files.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this call site was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
+  },
+  {
+    "package": "rack",
+    "tsFile": "files.ts",
     "rubyName": "filesize",
     "call": "read",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
