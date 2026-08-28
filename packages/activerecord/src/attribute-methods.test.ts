@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, zone } from "@blazetrails/activesupport";
 import { BooleanType } from "@blazetrails/activemodel";
 import { Base, DangerousAttributeError } from "./index.js";
 
@@ -17,7 +17,7 @@ import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/dev
 registerModel([Developer, AuditLog, AuditLogRequired]);
 
 describe("AttributeMethodsTest", () => {
-  const { topics } = fixtures(["topics", "developers", "computers", "companies"]);
+  const { topics } = fixtures(["topics", "developers", "companies", "computers"]);
 
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
@@ -780,10 +780,23 @@ describe("AttributeMethodsTest", () => {
 
   it("read attributes_before_type_cast on a datetime", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = new CanonicalTopic({}) as any;
+      class Target extends Base {
+        static {
+          this.tableName = "topics";
+        }
+      }
+      const record = new Target({}) as any;
+
+      record.written_on = "345643456";
+      expect(record.readAttributeBeforeTypeCast("written_on")).toBe("345643456");
+      expect(record.written_on).toBeNull();
 
       record.written_on = "2009-10-11 12:13:14";
       expect(record.readAttributeBeforeTypeCast("written_on")).toBe("2009-10-11 12:13:14");
+      expect(record.written_on.utc().toTime().epochNanoseconds).toBe(
+        zone()!.parse("2009-10-11 12:13:14")!.utc().toTime().epochNanoseconds,
+      );
+      expect(record.written_on.timeZone.name).toBe("Pacific Time (US & Canada)");
     });
   });
 
@@ -849,7 +862,7 @@ describe("AttributeMethodsTest", () => {
 
   it("non-attribute read and write", async () => {
     const topic = new CanonicalTopic({}) as any;
-    expect(topic.mumbo).toBeUndefined();
+    expect("mumbo" in topic).toBe(false);
   });
 
   it("attributes without primary key", async () => {
