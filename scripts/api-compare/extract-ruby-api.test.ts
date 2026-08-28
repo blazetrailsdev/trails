@@ -1731,6 +1731,19 @@ describe(
       expect(m["I18n::Locale::Tag::Rfc4646"].map((x) => x.name)).toEqual(["language", "region"]);
     });
 
+    it("takes a label-spelled hash constant's keys, and rejects a hash with a non-symbol key", () => {
+      const m = metaMethods(`
+      module Sample
+        FORMATS = { language: :downcase, region: :upcase }
+        MIXED = { language: :downcase, "region" => :upcase }
+
+        FORMATS.each { |name, format| define_method(name) { nil } }
+        MIXED.each { |name, format| define_method("mixed_#{name}") { nil } }
+      end
+    `);
+      expect(m["Sample"].map((x) => x.name)).toEqual(["language", "region"]);
+    });
+
     it("leaves a define_method loop whose name source does not resolve unrecorded", () => {
       const m = metaMethods(`
       module Sample

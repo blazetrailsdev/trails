@@ -1724,11 +1724,12 @@ class ApiExtractor
   #     alias_method :"append_#{callback}_action", :"#{callback}_action"
   #   end
   #
-  # Emits one entry per generated name (twelve, above). Only names that
-  # actually interpolate the loop variable are unrolled: a loop-invariant
-  # literal name would otherwise be recorded once per member, and it is already
-  # picked up by the plain define_method/alias_method recorders during the
-  # generic descent. Returns true when it emitted anything.
+  # Emits one entry per generated name (twelve, above). Only names that derive
+  # from the loop variable are unrolled — an interpolation of it, or the bare
+  # variable itself: a loop-invariant literal name would otherwise be recorded
+  # once per member, and it is already picked up by the plain
+  # define_method/alias_method recorders during the generic descent. Returns
+  # true when it emitted anything.
   def process_each_metaprogramming(node)
     return false if @scanning_umbrella
 
@@ -2425,11 +2426,19 @@ class ApiExtractor
     keys = []
     assocs.each do |assoc|
       return unless assoc.is_a?(Array) && assoc[0] == :assoc_new
-      key = symbol_name(assoc[1])
+      key = assoc_symbol_key(assoc[1])
       return unless key
       keys << key
     end
     (@const_symbol_hash_keys[current_fqn] ||= {})[name] = keys
+  end
+
+  # A Hash key that is a Ruby Symbol, in either spelling: `:language =>` parses
+  # as a `symbol_literal`, `language:` as a `@label` carrying its trailing colon.
+  def assoc_symbol_key(node)
+    return nil unless node.is_a?(Array)
+    return node[1].chomp(":") if node[0] == :@label
+    symbol_name(node)
   end
 
   # An Array/Hash literal RHS, recorded by SYNTACTIC kind rather than through
