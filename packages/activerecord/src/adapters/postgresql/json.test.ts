@@ -12,13 +12,13 @@ function insertStatementPerDatabase(values: string): string {
   return `insert into json_data_type (payload) VALUES ('${values}')`;
 }
 
-function postgresqlJsonSharedTestCases(columnType: string): void {
+function postgresqlJsonSetup(columnType: string): () => AbstractAdapter {
   let connection: AbstractAdapter;
 
   beforeEach(async () => {
     connection = await Base.leaseConnection();
     // eslint-disable-next-line blazetrails/require-table-teardown
-    await connection.createTable("json_data_type", {}, async (t: TableDefinition) => {
+    await connection.createTable("json_data_type", {}, (t: TableDefinition) => {
       const column = t as unknown as Record<
         string,
         (name: string, options?: Record<string, unknown>) => void
@@ -31,8 +31,16 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
 
   jsonSharedTestCases({ columnType, insertStatementPerDatabase });
 
-  it("test_default", async () => {
-    await connection.addColumn("json_data_type", "permissions", columnType, {
+  return () => connection;
+}
+
+describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
+  fixtures([]);
+  const columnType = "json";
+  const connection = postgresqlJsonSetup(columnType);
+
+  it("default", async () => {
+    await connection().addColumn("json_data_type", "permissions", columnType, {
       default: { users: "read", posts: ["read", "write"] },
     });
     await klass.resetColumnInformation();
@@ -45,7 +53,7 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
     expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
   });
 
-  it("test_deserialize_with_array", async () => {
+  it("deserialize with array", async () => {
     const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
     expect(x.objects).toEqual([{ foo: "bar" }]);
     await x.saveBang();
@@ -54,18 +62,42 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
     expect(x.objects).toEqual([{ foo: "bar" }]);
   });
 
-  it("test_noname_columns_of_different_types", async () => {
-    await connection.execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
+  it("noname columns of different types", async () => {
+    await connection().execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
     expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
   });
-}
-
-describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
-  fixtures([]);
-  postgresqlJsonSharedTestCases("json");
 });
 
 describeIfPostgresqlAdapter("PostgresqlJSONBTest", () => {
   fixtures([]);
-  postgresqlJsonSharedTestCases("jsonb");
+  const columnType = "jsonb";
+  const connection = postgresqlJsonSetup(columnType);
+
+  it("default", async () => {
+    await connection().addColumn("json_data_type", "permissions", columnType, {
+      default: { users: "read", posts: ["read", "write"] },
+    });
+    await klass.resetColumnInformation();
+    await klass.loadSchema();
+
+    expect(klass.columnDefaults["permissions"]).toEqual({
+      users: "read",
+      posts: ["read", "write"],
+    });
+    expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
+  });
+
+  it("deserialize with array", async () => {
+    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+    await x.saveBang();
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+    await x.reload();
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+  });
+
+  it("noname columns of different types", async () => {
+    await connection().execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
+    expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
+  });
 });
