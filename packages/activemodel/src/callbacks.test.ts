@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { runCallbacks, throwAbort, include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
+import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { type CallbackConditions } from "./callbacks.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
@@ -93,9 +94,12 @@ describe("CallbacksTest", () => {
   it("only selects which types of callbacks should be created from an array list", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
@@ -224,9 +228,12 @@ describe("CallbacksTest", () => {
   it("the callback chain is not halted when around or after callbacks return false", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation((_r: any) => {
@@ -248,9 +255,12 @@ describe("CallbacksTest", () => {
   it("the :if option array should not be mutated by an after callback", async () => {
     const conditions = { if: (_r: any) => true };
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation((_r: any) => {}, conditions);
@@ -266,9 +276,12 @@ describe("CallbacksTest", () => {
   it("the callback chain is not halted when a before callback returns false)", async () => {
     const log: string[] = [];
     class MyModel extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {

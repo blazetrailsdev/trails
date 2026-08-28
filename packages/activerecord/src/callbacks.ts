@@ -9,7 +9,8 @@
  */
 
 import type { Base } from "./base.js";
-import { included, type Callback } from "@blazetrails/activesupport";
+import { include, included, type Callback } from "@blazetrails/activesupport";
+import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { getCallbackChains, peekCallbackChain, runCallbacks } from "@blazetrails/activesupport";
 import { subclasses as _subclasses } from "./inheritance.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
@@ -34,6 +35,8 @@ type ModelCtor = typeof Base;
  */
 export const InstanceMethods = {
   [included](base: ModelCtor): void {
+    include(base, ValidationsCallbacks);
+
     base.defineModelCallbacks("initialize", "find", "touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },

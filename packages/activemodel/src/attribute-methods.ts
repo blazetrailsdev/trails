@@ -2,6 +2,7 @@ import {
   camelize,
   classAttribute,
   CodeGenerator,
+  extend,
   include,
   included,
   prepend,
@@ -438,15 +439,6 @@ export const ClassMethods = {
 };
 
 export const InstanceMethods = {
-  [included](base: object): void {
-    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
-    classAttribute.call(base, "attributeMethodPatterns", {
-      instanceWriter: false,
-      default: [new AttributeMethodPattern()],
-    });
-    prepend((base as { prototype: object }).prototype, { initInternals });
-  },
-
   attributeMissing(
     this: Record<string, unknown>,
     match: AttributeMethod,
@@ -511,6 +503,23 @@ export const InstanceMethods = {
       );
     }
     return (this as unknown as Record<string, unknown>)[attr];
+  },
+};
+
+export const AttributeMethods = {
+  ClassMethods,
+  InstanceMethods,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
+    include(base, InstanceMethods);
+    extend(base, ClassMethods);
+
+    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "attributeMethodPatterns", {
+      instanceWriter: false,
+      default: [new AttributeMethodPattern()],
+    });
+    prepend(base.prototype, { initInternals });
   },
 };
 

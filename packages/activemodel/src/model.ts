@@ -8,9 +8,7 @@ import {
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
   Callbacks as ASCallbacks,
-  defineCallbacks,
   runCallbacks,
-  extend,
   include,
   prepend,
   runLoadHooks,
@@ -24,11 +22,6 @@ import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions } from "./validations.js";
-import {
-  ClassMethods as ValidationsCallbacksClassMethods,
-  type ValidationCallbackFilter,
-  type ValidationCallbackOptions,
-} from "./validations/callbacks.js";
 import * as Validates from "./validations/validates.js";
 import { ClassMethods as WithClassMethods } from "./validations/with.js";
 import type { ClassMethods as ConversionClassMethods } from "./conversion.js";
@@ -41,8 +34,6 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model extends API, Access, Naming {
   freeze(): this;
-
-  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 
   /** @internal */
   initInternals(): void;
@@ -103,17 +94,6 @@ export class Model {
 
   /** @internal */
   declare static _mergeAttributes: Extended<typeof HelperMethods>["_mergeAttributes"];
-
-  declare static beforeValidation: <T extends typeof Model>(
-    this: T,
-    fn: ValidationCallbackFilter<T>,
-    options?: ValidationCallbackOptions,
-  ) => void;
-  declare static afterValidation: <T extends typeof Model>(
-    this: T,
-    fn: ValidationCallbackFilter<T>,
-    options?: ValidationCallbackOptions,
-  ) => void;
 
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
@@ -188,14 +168,7 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
-extend(Model, ValidationsCallbacksClassMethods);
-
 include(Model, API);
-
-defineCallbacks(Model.prototype, "validation", {
-  skipAfterCallbacksIfTerminated: true,
-  scope: ["kind", "name"],
-});
 
 include(Model, ToJsonWithActiveSupportEncoder);
 

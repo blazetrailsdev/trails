@@ -12,6 +12,7 @@ import {
   include,
 } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
+import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { Callbacks, type CallbackConditions, defineModelCallbacks } from "./callbacks.js";
 import { NoMethodError } from "./attribute-assignment.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
@@ -113,9 +114,12 @@ describe("define_model_callbacks only: and callback objects", () => {
       },
     };
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(auditor);
@@ -136,9 +140,12 @@ describe("define_model_callbacks only: and callback objects", () => {
       },
     };
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(auditor);
@@ -596,9 +603,12 @@ describe("unified sync/async runner", () => {
   it("an async before_validation callback that halts is awaited", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(async () => {
@@ -722,9 +732,12 @@ describe("Callbacks", () => {
 
   it("before_validation halting prevents validations from running", async () => {
     class NoValidate extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -767,9 +780,12 @@ describe("Callbacks (extended)", () => {
   it("afterValidation runs after validation", async () => {
     const order: string[] = [];
     class Validated extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -788,9 +804,12 @@ describe("Callbacks (extended)", () => {
   it("afterValidation runs even when invalid", async () => {
     const order: string[] = [];
     class Validated extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });

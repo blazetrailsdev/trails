@@ -6,12 +6,16 @@ import { describe, it, expect } from "vitest";
 import { throwAbort, include } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { Callbacks as ValidationsCallbacks } from "./callbacks.js";
 
 class Dog extends Model {
   declare static attribute: AttributesClassHalf["attribute"];
+  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 
   history: string[] = [];
   static {
+    include(this, ValidationsCallbacks);
     include(this, Attributes);
     this.attribute("name", "string");
   }
@@ -68,9 +72,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -95,9 +102,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called in declared order", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
@@ -125,9 +135,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("further callbacks should not be called if before validation throws abort", async () => {
     const order: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(() => {
@@ -217,9 +230,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("further callbacks should be called if before validation returns false", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation(() => {
@@ -237,9 +253,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("further callbacks should be called if after validation returns false", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.afterValidation(() => {
@@ -283,9 +302,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called with proc", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -308,9 +330,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("if condition is respected for before validation", async () => {
     const log: string[] = [];
     class Person extends Model {
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
+        include(this, ValidationsCallbacks);
         include(this, Attributes);
         this.attribute("name", "string");
         this.beforeValidation(
