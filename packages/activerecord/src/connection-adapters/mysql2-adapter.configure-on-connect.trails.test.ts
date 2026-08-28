@@ -38,7 +38,7 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     await adapter.configureConnection();
 
     expect(checkVersionSpy).toHaveBeenCalledTimes(1);
-    expect(timezoneSpy).toHaveBeenCalledTimes(2);
+    expect(timezoneSpy).toHaveBeenCalledTimes(3);
   });
 
   it("rejects the connect when the server version is below the 5.6.4 floor", async () => {
