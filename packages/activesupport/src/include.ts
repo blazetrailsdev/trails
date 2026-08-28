@@ -406,6 +406,14 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  * object itself (not its prototype). When used on a class, this makes
  * the methods available as class-level (static) methods.
  *
+ * Precedence follows Ruby's singleton ancestry, the way `include()`'s does on
+ * the instance side: `include SomeModule` puts `SomeModule::ClassMethods`
+ * BELOW the class body (concern.rb:135-138), so a class-body `static` wins over
+ * the module's member of that name, while a later `extend()` wins over an
+ * earlier one. Accessor halves are resolved independently, since Ruby reads a
+ * getter (`key`) and a setter (`key=`) as two methods where TypeScript shares
+ * one property name between them.
+ *
  * Mirrors: Ruby's Object#extend (core language feature)
  *
  * Usage:
@@ -442,10 +450,6 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
       installed.add(key);
       continue;
     }
-    // Accessor pairs: in TS `get`/`set` share one property name, but Ruby
-    // treats a getter (`key`) and setter (`key=`) as two independent methods,
-    // each resolved by ancestry on its own — so merge the pair, letting the
-    // half from whichever descriptor is higher in the singleton ancestry win.
     const isAccessorPair =
       ("get" in modDesc || "set" in modDesc) && ("get" in existing || "set" in existing);
     if (isAccessorPair) {
@@ -457,13 +461,8 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
         configurable: true,
         enumerable: false,
       });
-      // A half still owned by the class body keeps class-body precedence, so
-      // only track the key when both halves are mixin-supplied.
       if (existingIsMixin) installed.add(key);
     } else if (existingIsMixin) {
-      // A collision with an earlier `extend()` is replaced (Ruby's later extend
-      // sits higher in the singleton ancestry); a collision with a class-body
-      // static is left alone, since `ClassMethods` sits BELOW the class body.
       Object.defineProperty(klass, key, descriptor);
     }
   }

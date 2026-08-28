@@ -8,13 +8,13 @@
  */
 
 import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
-import * as Timestamp from "../timestamp.js";
 import { Temporal } from "@blazetrails/date";
 import type {
   AttributeMutationTracker,
   DirtyOptions,
   NullMutationTracker,
 } from "@blazetrails/activemodel";
+import * as Timestamp from "../timestamp.js";
 
 /**
  * Mirror of Ruby's `RuntimeError` — the class dirty.rb:45's bare
@@ -121,6 +121,7 @@ export function attributeInDatabase(record: DirtyRecord, attr: string): unknown 
  * already carries `ActiveModel::Dirty`, which dirty.rb:42 includes.
  */
 interface DirtyIncludeHost {
+  prototype: object;
   attributeMethodPrefix(...prefixes: Array<string | { parameters?: string | null | false }>): void;
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
   attributeMethodAffix(
@@ -149,13 +150,14 @@ export class Dirty {
    * distinction, so it goes in the pattern's own prefix and the derived
    * `${prefix}Attribute${suffix}` proxy target (attribute_methods.rb:481)
    * lands on `isSavedChangeToAttribute` unchanged.
+   *
+   * The opening guard is dirty.rb:44-47's `if self < ::ActiveRecord::Timestamp`
+   * — Timestamp's `_create_record` / `_update_record` wrappers must sit above
+   * Dirty's `changes_applied` links, so including Dirty second silently breaks
+   * dirty tracking on save and the raise makes that loud.
    */
   static [included](base: DirtyIncludeHost): void {
-    // dirty.rb:44-46 — `if self < ::ActiveRecord::Timestamp; raise ...`.
-    // Timestamp's `_create_record` / `_update_record` wrappers must sit ABOVE
-    // Dirty's `changes_applied` links, so including Dirty second silently
-    // breaks dirty tracking on save; the raise makes that loud.
-    if (isModuleIncluded(base as unknown as { prototype: object }, Timestamp.InstanceMethods)) {
+    if (isModuleIncluded(base, Timestamp.InstanceMethods)) {
       throw new RuntimeError("You cannot include Dirty after Timestamp");
     }
 
