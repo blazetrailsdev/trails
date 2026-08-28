@@ -3402,17 +3402,23 @@ export function main() {
       let fileMissing = 0;
       const declarationOnly: MethodResult[] = [];
 
-      // Collect all includer method sets for modules in this file,
-      // tracking which file each set came from (for move detection)
-      const allIncluderMethodSets: { file: string; methods: Set<string> }[] = [];
+      // Includer method sets per OWNING entity, tracking which file each set
+      // came from (for move detection). Keyed by owner rather than pooled per
+      // file: a Ruby file often holds several entities, and a method of one
+      // must not be credited to a TS file that includes a SIBLING. Rails'
+      // http/content_security_policy.rb holds both a `Request` module that
+      // ActionDispatch::Request includes and a `Middleware` class that nothing
+      // includes; pooled, `Middleware#call` was credited to http/request.ts,
+      // whose only `call` is `PASS_NOT_FOUND`'s (request.rb:82) — an unrelated
+      // body the call gates then compared against.
+      const includerMethodSetsByOwner = new Map<string, { file: string; methods: Set<string> }[]>();
       for (const item of items) {
-        const includerFiles = moduleIncluderFiles.get(item.fqn);
-        if (includerFiles) {
-          for (const f of includerFiles) {
-            const methods = tsMethodsByFile.get(f);
-            if (methods) allIncluderMethodSets.push({ file: f, methods });
-          }
+        const sets: { file: string; methods: Set<string> }[] = [];
+        for (const f of moduleIncluderFiles.get(item.fqn) ?? []) {
+          const methods = tsMethodsByFile.get(f);
+          if (methods) sets.push({ file: f, methods });
         }
+        if (sets.length > 0) includerMethodSetsByOwner.set(item.fqn, sets);
       }
 
       // Deduplicate: collect all unique Ruby methods expected from this
@@ -4065,7 +4071,7 @@ export function main() {
         let foundViaInclude: string | null = null;
         let matchedCandidate: string | null = null;
         for (const candidate of tsCandidates) {
-          for (const { file, methods } of allIncluderMethodSets) {
+          for (const { file, methods } of includerMethodSetsByOwner.get(rubyModule) ?? []) {
             if (methods.has(candidate)) {
               foundViaInclude = file;
               matchedCandidate = candidate;
