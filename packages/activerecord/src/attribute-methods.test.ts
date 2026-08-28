@@ -480,7 +480,7 @@ describe("AttributeMethodsTest", () => {
         this.tableName = "topics";
       }
       get title(): string {
-        return `${(super.title as string) ?? ""}!`;
+        return `${super.title as string}!`;
       }
     }
     const realTopic = topics("first") as any;
@@ -816,7 +816,8 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute", async () => {
-    const t = new CanonicalTopic({ title: "Don't change the topic" }) as any;
+    const t = new CanonicalTopic({}) as any;
+    t.title = "Don't change the topic";
     expect(t.readAttribute("title")).toBe("Don't change the topic");
     expect(t.get("title")).toBe("Don't change the topic");
 
