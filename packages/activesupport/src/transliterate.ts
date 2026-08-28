@@ -6,6 +6,7 @@
 
 import { ArgumentError } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
+import { regexpEscape } from "./core-ext/regexp.js";
 
 /** The class name Ruby's `string.class.name` reports for the offending value. */
 function rubyClassName(value: unknown): string {
@@ -84,12 +85,4 @@ export function parameterize(
 
   if (!preserveCase) parameterizedString = parameterizedString.toLowerCase();
   return parameterizedString;
-}
-
-/**
- * Ruby `Regexp.escape` (`re.c` `rb_reg_s_quote`), which escapes every character
- * `Regexp` gives a meaning to plus whitespace. JS has no `RegExp.escape`.
- */
-function regexpEscape(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
 }

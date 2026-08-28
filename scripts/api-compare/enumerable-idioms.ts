@@ -77,17 +77,17 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  * as ordinary functions, so neither derivation applies.
  *
  * `Regexp.escape` (`re.c` `rb_reg_s_quote`) escapes every character `Regexp`
- * gives a meaning to. JS has no `RegExp.escape`, so each port that needs it
- * carries a helper: `regexpEscape` (inflector.ts, transliterate.ts),
- * `escapeRegExp` (cache/store.ts, number-to-rounded-converter.ts,
- * testing/deprecation.ts), `escapeRegexp` (parameter-filter.ts). Those three
- * spellings are the whole call's analogue and cannot plausibly be the port of
- * any OTHER Ruby `escape` (`CGI.escape`, `Shellwords.escape`), so crediting
- * them cannot silence a dropped call of a different `escape`.
+ * gives a meaning to. JS has no `RegExp.escape`, so every port that needs it
+ * carries a file-local helper, and each one is named `regexpEscape` — receiver
+ * then method, the same spelling the naming conventions give any other
+ * `Klass.method` call. One name, not a list of the spellings that happened to
+ * be in the tree: an alias list would ratify the divergence this entry exists
+ * to make visible, and a body that escapes under some other name should still
+ * flag. `regexpEscape` cannot plausibly be the port of a different Ruby
+ * `escape` (`CGI.escape`, `Shellwords.escape`), so crediting it cannot silence
+ * a dropped call of one.
  */
-export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([
-  ["escape", ["regexpEscape", "escapeRegExp", "escapeRegexp"]],
-]);
+export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([["escape", ["regexpEscape"]]]);
 
 /** JS call names that count as making Ruby call `rubyCall`. */
 export function jsEnumerableAliases(rubyCall: string): string[] {

@@ -8,6 +8,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
+import { regexpEscape } from "@blazetrails/activesupport";
 import type { Logger } from "./debug-exceptions.js";
 
 /** @internal */
@@ -207,13 +208,9 @@ function sanitizeRegexp(host: RegExp): RegExp {
 /** @internal */
 function sanitizeString(host: string): RegExp {
   if (host.startsWith(".")) {
-    return new RegExp(`^${SUBDOMAIN_REGEX}?${escapeRegExp(host.slice(1))}${PORT_REGEX}?$`, "i");
+    return new RegExp(`^${SUBDOMAIN_REGEX}?${regexpEscape(host.slice(1))}${PORT_REGEX}?$`, "i");
   }
-  return new RegExp(`^${escapeRegExp(host)}${PORT_REGEX}?$`, "i");
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${regexpEscape(host)}${PORT_REGEX}?$`, "i");
 }
 
 /** @internal */

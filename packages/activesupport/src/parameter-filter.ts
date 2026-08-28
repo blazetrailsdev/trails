@@ -1,4 +1,5 @@
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import { regexpEscape } from "./core-ext/regexp.js";
 
 /**
  * = Active Support Parameter Filter
@@ -82,7 +83,7 @@ export class ParameterFilter {
         });
       } else {
         patterns.push({
-          source: `(?i:${escapeRegexp(String(filter))})`,
+          source: `(?i:${regexpEscape(String(filter))})`,
           unicode: false,
           unicodeSets: false,
         });
@@ -172,7 +173,7 @@ export class ParameterFilter {
           this.regexps.push(item);
         }
       } else {
-        const s = escapeRegexp(String(item));
+        const s = regexpEscape(String(item));
         if (s.includes("\\.")) {
           (deepStrings ??= []).push(s);
         } else {
@@ -252,14 +253,6 @@ export class ParameterFilter {
 function unicodeFlag(group: Array<{ unicode: boolean; unicodeSets: boolean }>): string {
   if (group.some((pattern) => pattern.unicodeSets)) return "v";
   return group.some((pattern) => pattern.unicode) ? "u" : "";
-}
-
-/** Mirrors Ruby's `Regexp.escape`, which JS has no built-in for. `-` is left
- *  alone: it is literal outside a character class in both languages, and `\-`
- *  is not a legal identity escape under a `u`-flagged JS Regexp, which
- *  {@link ParameterFilter.precompileFilters} can join an escaped string into. */
-function escapeRegexp(source: string): string {
-  return source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

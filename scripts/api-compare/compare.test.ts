@@ -729,19 +729,17 @@ describe("jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("exclude?")).toEqual(["includes", "has"]);
   });
 
-  it("does not flag a Regexp.escape call the TS body spells escapeRegExp", () => {
+  it("credits the regexpEscape helper for a Ruby Regexp.escape call", () => {
+    expect(jsEnumerableAliases("escape")).toEqual(["regexpEscape"]);
     expect(
-      significantMissingCalls("key_matcher", ["escape"], new Set(["escapeRegExp"]), () => true),
+      significantMissingCalls("key_matcher", ["escape"], new Set(["regexpEscape"]), () => true),
     ).toEqual([]);
-    expect(
-      significantMissingCalls("key_matcher", ["escape"], new Set(["other"]), () => true),
-    ).toEqual(["escape → escape|_escape"]);
   });
 
-  it("credits the Regexp.escape helper spellings for a Ruby escape call", () => {
-    // JS has no `RegExp.escape`, so every port carries a helper under one of
-    // these three names (CORE_LIBRARY_ALIASES).
-    expect(jsEnumerableAliases("escape")).toEqual(["regexpEscape", "escapeRegExp", "escapeRegexp"]);
+  it("still flags a Regexp.escape call the TS body escapes under another name", () => {
+    expect(
+      significantMissingCalls("key_matcher", ["escape"], new Set(["escapeRegExp"]), () => true),
+    ).toEqual(["escape → escape|_escape"]);
   });
 
   it("returns an empty list for a name with no JS analogue", () => {
