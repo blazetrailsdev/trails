@@ -274,6 +274,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           ? options.preparedStatements
           : this.defaultPreparedStatements(),
       );
+    this._defaultTimezone = SQLite3Adapter.validateDefaultTimezone(this._config.defaultTimezone);
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
       this._statements = this.buildStatementPool();

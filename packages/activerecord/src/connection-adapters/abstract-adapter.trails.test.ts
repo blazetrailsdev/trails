@@ -19,6 +19,8 @@ import { AbstractAdapter } from "./abstract-adapter.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Result } from "../result.js";
+import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { ActiveRecord } from "../ar-config.js";
 
 // All 5 methods are class-level in Rails (class << self private), so test via a subclass.
 class TestAdapter extends AbstractAdapter {
@@ -210,7 +212,7 @@ describe("AbstractAdapter.extendedTypeMap", () => {
 
   it("backs the typeMap of an adapter configured with a default timezone", () => {
     const adapter = new TestAdapter();
-    (adapter as any)._config = { defaultTimezone: "utc" };
+    (adapter as any)._defaultTimezone = "utc";
     expect(adapter.lookupCastType("datetime")).toMatchObject({ isUtc: true });
   });
 
@@ -220,7 +222,7 @@ describe("AbstractAdapter.extendedTypeMap", () => {
   // sharing visible rather than implying a per-class cache.
   it("is memoized per key in EXTENDED_TYPE_MAPS rather than rebuilt per read", () => {
     const adapter = new TestAdapter();
-    (adapter as any)._config = { defaultTimezone: "utc" };
+    (adapter as any)._defaultTimezone = "utc";
     expect(adapter.typeMap).toBe(adapter.typeMap);
     expect(AbstractAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
       adapter.typeMap,
@@ -379,5 +381,52 @@ describe("per-adapter visitor isolation", () => {
     new MysqlAdapter();
     expect(sqlite.visitor).toBe(visitorBefore);
     expect(sqlite.visitor).toBeInstanceOf(Visitors.SQLite);
+  });
+});
+
+describe("AbstractAdapter#defaultTimezone", () => {
+  it("falls back to ActiveRecord.defaultTimezone when the config sets none", () => {
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const previous = ActiveRecord.defaultTimezone;
+    try {
+      ActiveRecord.defaultTimezone = "local";
+      expect(adapter.defaultTimezone).toBe("local");
+      ActiveRecord.defaultTimezone = "utc";
+      expect(adapter.defaultTimezone).toBe("utc");
+    } finally {
+      ActiveRecord.defaultTimezone = previous;
+      adapter.disconnectBang();
+    }
+  });
+
+  it("prefers the configured default_timezone over the global one", () => {
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:", defaultTimezone: "local" });
+    const previous = ActiveRecord.defaultTimezone;
+    try {
+      ActiveRecord.defaultTimezone = "utc";
+      expect(adapter.defaultTimezone).toBe("local");
+    } finally {
+      ActiveRecord.defaultTimezone = previous;
+      adapter.disconnectBang();
+    }
+  });
+
+  it("raises when the configured default_timezone is neither utc nor local", () => {
+    expect(
+      () =>
+        new BetterSQLite3Adapter({
+          database: ":memory:",
+          defaultTimezone: "gmt" as "utc",
+        }),
+    ).toThrow("default_timezone must be either 'utc' or 'local'");
+  });
+
+  it("contributes no extended type map key when the config sets no default_timezone", () => {
+    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    try {
+      expect(adapter.extendedTypeMapKey()).toBeNull();
+    } finally {
+      adapter.disconnectBang();
+    }
   });
 });

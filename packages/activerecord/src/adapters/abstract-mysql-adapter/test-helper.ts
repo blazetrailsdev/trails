@@ -14,6 +14,7 @@ export {
   supportsExpressionIndex,
   supportsOptimizerHints,
   supportsRenameIndex,
+  supportsJson,
 } from "../../support/mysql-server-version.js";
 
 export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } = arunitDatabaseNames(

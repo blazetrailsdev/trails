@@ -210,6 +210,7 @@ export class PoolConfig {
 
 export interface TrailsAdapterOptions {
   statementLimit?: number;
+  defaultTimezone?: "utc" | "local";
   preparedStatements?: boolean;
   insertReturning?: boolean;
   advisoryLocks?: boolean | string;

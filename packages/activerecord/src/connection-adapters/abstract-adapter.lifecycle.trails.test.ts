@@ -46,7 +46,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   it("extendedTypeMapKey + typeMap default behavior", () => {
     const a = new AbstractAdapter();
     expect(a.extendedTypeMapKey()).toBeNull();
-    (a as any)._config.defaultTimezone = "utc";
+    (a as any)._defaultTimezone = "utc";
     expect(a.extendedTypeMapKey()).toEqual({ defaultTimezone: "utc" });
     expect(a.typeMap).toBeInstanceOf(TypeMap);
   });

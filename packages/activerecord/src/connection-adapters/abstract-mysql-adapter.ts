@@ -1155,9 +1155,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
-    const tz = this._config.defaultTimezone;
-    if (typeof tz === "string") {
-      return { defaultTimezone: tz, emulateBooleans: this._emulateBooleans };
+    if (this._defaultTimezone != null) {
+      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this._emulateBooleans };
     }
     if (this._emulateBooleans) return { emulateBooleans: true };
     return null;
