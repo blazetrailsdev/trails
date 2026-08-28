@@ -12,8 +12,8 @@
  * `last_read` `forgotten: nil` value are wired on the canonical `Book` model
  * (EnumType supports string/boolean/nil values). Remaining sub-assertion gaps
  * on the canonical `Book` surface are tracked in the
- * activerecord-surfaced-deviations bucket (enum-canonical-book-gaps) via inline pending
- * comments below.
+ * activerecord-surfaced-deviations bucket (enum-canonical-book-gaps) via inline
+ * pending comments below.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
@@ -82,7 +82,8 @@ describe("EnumTest", () => {
     expect((book as any).difficulty).toBe("medium");
     // Rails also asserts `@book.cover == "soft"` as an enum reader; `cover` is a
     // raw string column on canonical Book (no enum), so the assertion is pending
-    // (activerecord-surfaced-deviations/enum-canonical-book-gaps) to avoid false fidelity.
+    // in the activerecord-surfaced-deviations bucket (enum-canonical-book-gaps)
+    // to avoid false fidelity.
   });
 
   it("find via scope", async () => {
@@ -189,7 +190,8 @@ describe("EnumTest", () => {
     expect((Book as any).written().build().isProposed()).toBe(false);
     // Rails also asserts `PublishedBook.hard.build.hard?` /  `.soft?` — canonical
     // PublishedBook omits the `cover` enum (`enum :cover, { hard: "0", soft: "1" }`),
-    // so that half is pending (activerecord-surfaced-deviations/enum-canonical-book-gaps).
+    // so that half is pending in the activerecord-surfaced-deviations bucket
+    // (enum-canonical-book-gaps).
   });
 
   it("build from where", () => {

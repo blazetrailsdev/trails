@@ -853,10 +853,10 @@ export class TimeWithZone {
    * @missingRailsCall find_zone — CONVERGEABLE (story
    *   time-with-zone-advance-change-delegations, in the
    *   activesupport-surfaced-deviations bucket): Rails' change accepts `:zone`
-   *   and `:offset` and resolves them through `::Time.find_zone` (time_with_zone.rb:390-404);
-   *   trails' `ChangeOptions` carries no `zone`/`offset` key at all, so there is
-   *   no value to resolve. Converging means adding those two options, not adding
-   *   the call.
+   *   and `:offset` and resolves them through `::Time.find_zone`
+   *   (time_with_zone.rb:390-404); trails' `ChangeOptions` carries no
+   *   `zone`/`offset` key at all, so there is no value to resolve. Converging
+   *   means adding those two options, not adding the call.
    */
   change(options: ChangeOptions): TimeWithZone {
     const l = this._local();

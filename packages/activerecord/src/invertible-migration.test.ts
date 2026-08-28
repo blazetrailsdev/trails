@@ -336,8 +336,8 @@ describe("InvertibleMigrationTest", () => {
   // trails' `revert(fn)` always reverses the recorded ops regardless of the
   // migration's own direction, so a migration reverting a `revert` block (and
   // its `dropTable` reverse) is not yet direction-aware. Tracked-pending-
-  // convergence in the activerecord-surfaced-deviations bucket (revert-direction
-  // semantics).
+  // convergence in the activerecord-surfaced-deviations bucket
+  // (revert-direction semantics).
   it("migrate revert", async () => {
     const migration = new InvertibleMigration();
     const revert = new InvertibleRevertMigration();

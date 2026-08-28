@@ -2321,8 +2321,8 @@ describe("FinderTest", () => {
 // FinderTest — faithful port of the finder_test.rb `test_exists*` cluster,
 // riding canonical models (Topic/Author/Post/Comment/Subscriber/Customer/
 // Developer) + the real fixtures. Replaces the earlier synthetic `exists`
-// coverage (the activerecord-surfaced-deviations bucket). Test names match
-// Rails verbatim.
+// coverage (the activerecord-surfaced-deviations bucket). Test names match Rails
+// verbatim.
 // ==========================================================================
 describe("FinderTest", () => {
   const { topics, authors, developers } = fixtures([

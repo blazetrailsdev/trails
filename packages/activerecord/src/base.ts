@@ -3460,9 +3460,10 @@ export class Base extends Model {
    * NOT Rails: `find_global_id` exists nowhere in Rails or globalid — apps call
    * `GlobalID::Locator.locate` directly, and globalid's railtie injects only the
    * instance-side `GlobalID::Identification`. Left deliberately un-suppressed in
-   * `parity:api:extra` so it keeps reporting as extra surface until it is removed or a
-   * caller justifies it (tasks 0023 globalid-model-side-finders-are-uncalled-
-   * trails-invention).
+   * `parity:api:extra` so it keeps reporting as extra surface until it is
+   * removed or a caller justifies it (story
+   * globalid-model-side-finders-are-uncalled-trails-invention, in the
+   * globalid-surfaced-deviations bucket).
    */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
