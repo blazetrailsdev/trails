@@ -12,8 +12,8 @@ export class LazilyDefineAttributes {
     this.attributes = Object.freeze([...attributes]);
   }
 
-  matches(method: string): string | null {
-    return this.include(method) ? method : null;
+  matches(methodName: string): string | null {
+    return this.include(methodName) ? methodName : null;
   }
 
   include(attribute: string): boolean {
