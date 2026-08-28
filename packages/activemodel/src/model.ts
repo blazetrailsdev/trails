@@ -131,14 +131,14 @@ export class Model {
   /** @internal */
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
-  constructor(attrs: Record<string, unknown> = {}) {
+  constructor(attributes: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
 
     this.initInternals();
 
     this._initializingAttributes = true;
     try {
-      apiInitialize.call(this, attrs);
+      apiInitialize.call(this, attributes);
     } finally {
       this._initializingAttributes = false;
     }

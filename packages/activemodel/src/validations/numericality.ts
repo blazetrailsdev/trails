@@ -65,18 +65,18 @@ export class NumericalityValidator extends EachValidator {
   /** @missingRailsArgs merge! — PERMANENT */
   validateEach(
     record: ValidatableRecord,
-    attribute: string,
+    attrName: string,
     value: unknown,
     precision = 15,
     scale?: number,
   ): void {
     if (!this.isNumber(value, precision, scale)) {
-      record.errors.add(attribute, ":not_a_number", this.filteredOptions(value));
+      record.errors.add(attrName, ":not_a_number", this.filteredOptions(value));
       return;
     }
 
     if (this.isAllowOnlyInteger(record) && !this.isInteger(value)) {
-      record.errors.add(attribute, ":not_an_integer", this.filteredOptions(value));
+      record.errors.add(attrName, ":not_an_integer", this.filteredOptions(value));
       return;
     }
 
@@ -91,13 +91,13 @@ export class NumericalityValidator extends EachValidator {
       if (option in NUMBER_CHECKS) {
         const odd = typeof num === "bigint" ? num % 2n !== 0n : Math.trunc(num) % 2 !== 0;
         if (NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS] === ":odd?" ? !odd : odd) {
-          record.errors.add(attribute, `:${option}`, this.filteredOptions(value));
+          record.errors.add(attrName, `:${option}`, this.filteredOptions(value));
         }
       } else if (option in RANGE_CHECKS) {
         const range = optionValue as unknown as Range<number>;
         if (!range.isInclude(num as number)) {
           record.errors.add(
-            attribute,
+            attrName,
             `:${option}`,
             mergeBang(this.filteredOptions(value), { count: range.toS() }),
           );
@@ -107,7 +107,7 @@ export class NumericalityValidator extends EachValidator {
         if (optionValue === undefined) continue;
         if (!compareOperator(COMPARE_CHECKS[option as CompareKey], num, optionValue)) {
           record.errors.add(
-            attribute,
+            attrName,
             `:${underscore(option)}`,
             mergeBang(this.filteredOptions(value), { count: optionValue }),
           );
@@ -181,10 +181,10 @@ function isSymbol(value: unknown): boolean {
 }
 
 /** @internal */
-export function round(num: number, scale?: number): number {
-  if (scale === undefined || scale === null) return num;
-  if (!Number.isFinite(num)) return num;
-  return Number(new BigDecimal(String(num)).round(scale).toString("F"));
+export function round(rawValue: number, scale?: number): number {
+  if (scale === undefined || scale === null) return rawValue;
+  if (!Number.isFinite(rawValue)) return rawValue;
+  return Number(new BigDecimal(String(rawValue)).round(scale).toString("F"));
 }
 
 /** @internal */

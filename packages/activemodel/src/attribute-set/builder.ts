@@ -226,7 +226,7 @@ export class LazyAttributeHash {
   }
 
   static marshalLoad(
-    data: [
+    values: [
       Map<string, Type>,
       Record<string, unknown>,
       (Map<string, Type> | undefined)?,
@@ -234,7 +234,7 @@ export class LazyAttributeHash {
       (Map<string, Attribute> | undefined)?,
     ],
   ): LazyAttributeHash {
-    return new LazyAttributeHash(data[0], data[1], data[2], data[3], data[4]);
+    return new LazyAttributeHash(values[0], values[1], values[2], values[3], values[4]);
   }
 
   /** @internal */

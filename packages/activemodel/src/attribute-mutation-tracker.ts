@@ -2,7 +2,7 @@ import { Temporal } from "@blazetrails/date";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
-function cloneValue(value: unknown): unknown {
+function dupValue(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
   // boundary: Date is mutable — clone to protect dirty tracking when a legacy
   if (value instanceof Date) return new Date(value.getTime());
@@ -14,12 +14,12 @@ function cloneValue(value: unknown): unknown {
     value instanceof Temporal.ZonedDateTime
   )
     return value;
-  if (Array.isArray(value)) return value.map(cloneValue);
+  if (Array.isArray(value)) return value.map(dupValue);
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) return value;
   const result: Record<string, unknown> = proto === null ? Object.create(null) : {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    result[k] = cloneValue(v);
+    result[k] = dupValue(v);
   }
   return result;
 }
@@ -164,7 +164,7 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
 
   forceChange(attrName: string): unknown {
     if (this.attributeChanged(attrName)) return undefined;
-    const value = cloneValue(this.fetchValue(attrName));
+    const value = this.cloneValue(attrName);
     this.forcedChanges.set(attrName, value);
     return value;
   }
@@ -184,6 +184,11 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   /** @internal */
   protected override fetchValue(attrName: string): unknown {
     return (this.attributes as unknown as ForcedMutationTrackerHost)._readAttribute(attrName);
+  }
+
+  private cloneValue(attrName: string): unknown {
+    const value = this.fetchValue(attrName);
+    return dupValue(value);
   }
 
   /** @internal */

@@ -22,7 +22,7 @@ export namespace SecurePassword {
 }
 
 export function hasSecurePassword(
-  modelClass: typeof Model,
+  this: typeof Model,
   attribute: string = "password",
   options: { validations?: boolean; resetToken?: boolean } = {},
 ) {
@@ -32,16 +32,16 @@ export function hasSecurePassword(
   const challengeAttr = `${attribute}Challenge`;
 
   include(
-    modelClass as unknown as new (...args: unknown[]) => unknown,
+    this as unknown as new (...args: unknown[]) => unknown,
     new InstanceMethodsOnActivation(attribute, { resetToken }),
   );
 
   if (validations) {
-    modelClass.validate((record: Model) => {
+    this.validate((record: Model) => {
       if (isBlank(publicSend(record, digestAttr))) record.errors.add(attribute, ":blank");
     });
 
-    modelClass.validate((record: Model & { respondTo(method: string): boolean }) => {
+    this.validate((record: Model & { respondTo(method: string): boolean }) => {
       const challenge = publicSend(record, challengeAttr);
       if (challenge != null && challenge !== false) {
         const digestWas = record.respondTo(`${digestAttr}Was`)
@@ -53,7 +53,7 @@ export function hasSecurePassword(
       }
     });
 
-    modelClass.validate((record: Model) => {
+    this.validate((record: Model) => {
       const passwordValue = publicSend(record, attribute) as string | null;
       if (
         !isBlank(passwordValue) &&
@@ -63,10 +63,10 @@ export function hasSecurePassword(
       }
     });
 
-    modelClass.validatesConfirmationOf(attribute, { allowBlank: true });
+    this.validatesConfirmationOf(attribute, { allowBlank: true });
   }
 
-  const tokenHost = modelClass as unknown as TokenHost;
+  const tokenHost = this as unknown as TokenHost;
   if (resetToken && typeof tokenHost.generatesTokenFor === "function") {
     tokenHost.generatesTokenFor(`${attribute}_reset`, {
       expiresIn: 15 * 60,
@@ -77,14 +77,14 @@ export function hasSecurePassword(
     });
 
     const findByMethod = `findBy${camelize(attribute)}ResetToken`;
-    Object.defineProperty(modelClass, findByMethod, {
+    Object.defineProperty(this, findByMethod, {
       value: function (this: TokenHost, token: string) {
         return this.findByTokenFor!(`${attribute}_reset`, token);
       },
       writable: true,
       configurable: true,
     });
-    Object.defineProperty(modelClass, `${findByMethod}Bang`, {
+    Object.defineProperty(this, `${findByMethod}Bang`, {
       value: function (this: TokenHost, token: string) {
         return this.findByTokenForBang!(`${attribute}_reset`, token);
       },

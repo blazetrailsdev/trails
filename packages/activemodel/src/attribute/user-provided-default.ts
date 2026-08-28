@@ -31,8 +31,8 @@ export class UserProvidedDefault extends FromUser {
     return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
   }
 
-  static marshalLoad(data: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
-    return new UserProvidedDefault(data[0], data[1], data[2], data[3]);
+  static marshalLoad(values: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
+    return new UserProvidedDefault(values[0], values[1], values[2], values[3]);
   }
 }
 

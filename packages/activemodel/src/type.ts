@@ -7,8 +7,8 @@ export function registry(): TypeRegistry {
   return typeRegistry;
 }
 
-export function register(typeName: string, factory: TypeFactory): void {
-  typeRegistry.register(typeName, factory);
+export function register(typeName: string, klass: TypeFactory): void {
+  typeRegistry.register(typeName, klass);
 }
 
 export function lookup(name: string, options?: TypeOptions): Type {

@@ -14,11 +14,11 @@ export class NestedError extends ActiveModelError {
   constructor(
     base: object | null,
     innerError: ErrorLike,
-    options?: { attribute?: string; type?: string },
+    overrideOptions?: { attribute?: string; type?: string },
   ) {
-    const attribute = options?.attribute ?? innerError.attribute;
+    const attribute = overrideOptions?.attribute ?? innerError.attribute;
     const innerRawType = innerError.rawType ?? innerError.type;
-    const type = options?.type ?? innerError.type;
+    const type = overrideOptions?.type ?? innerError.type;
     super(base, attribute, type, innerError.options ?? {}, innerRawType);
     this.innerError = innerError;
   }

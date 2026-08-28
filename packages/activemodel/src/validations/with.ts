@@ -5,7 +5,7 @@ import type { ValidatableRecord } from "../validator.js";
 import { ArgumentError, NameError } from "../attribute-assignment.js";
 
 export class WithValidator extends EachValidator {
-  validateEach(record: ValidatableRecord, attribute: string, _value: unknown): void {
+  validateEach(record: ValidatableRecord, attr: string, _val: unknown): void {
     const methodName = this.options.with as string;
     const method = (record as unknown as Record<string, unknown>)[methodName];
     if (typeof method !== "function") {
@@ -14,7 +14,7 @@ export class WithValidator extends EachValidator {
     if (method.length === 0) {
       method.call(record);
     } else {
-      method.call(record, attribute);
+      method.call(record, attr);
     }
   }
 

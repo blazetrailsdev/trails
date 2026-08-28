@@ -62,10 +62,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   /** @internal */
-  protected fallbackStringToTime(s: string): Temporal.Instant | null {
+  protected fallbackStringToTime(string: string): Temporal.Instant | null {
     let timeHash: DateParts | undefined;
     try {
-      timeHash = RubyDate._parse(s);
+      timeHash = RubyDate._parse(string);
     } catch (error) {
       if (!(error instanceof RubyArgumentError)) throw error;
     }
@@ -87,12 +87,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected valueFromMultiparameterAssignment(
-    values: Record<string | number, unknown>,
+    valuesHash: Record<string | number, unknown>,
   ): DateTimeCastResult | null {
-    const missing = [1, 2, 3].filter((k) => !Object.hasOwn(values, k));
+    const missing = [1, 2, 3].filter((k) => !Object.hasOwn(valuesHash, k));
     if (missing.length > 0) {
       throw new ArgumentError(
-        `Provided hash ${toS(values)} doesn't contain necessary keys: ${toS(missing)}`,
+        `Provided hash ${toS(valuesHash)} doesn't contain necessary keys: ${toS(missing)}`,
       );
     }
     const time = (
@@ -100,7 +100,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         this: unknown,
         valuesHash: Record<string, unknown>,
       ) => RubyTime | null
-    ).call(this, values as Record<string, unknown>);
+    ).call(this, valuesHash as Record<string, unknown>);
     return time && time.toTime().toInstant();
   }
 

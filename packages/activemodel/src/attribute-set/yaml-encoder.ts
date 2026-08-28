@@ -57,8 +57,8 @@ export class YAMLEncoder {
     return this.codec.encode(envelope);
   }
 
-  decode(input: string): AttributeSet {
-    const envelope = this.codec.decode(input);
+  decode(coder: string): AttributeSet {
+    const envelope = this.codec.decode(coder);
 
     if (envelope.v !== 1) {
       throw new AttributeSetCodecError(`envelope version v=${envelope.v} not supported`);
