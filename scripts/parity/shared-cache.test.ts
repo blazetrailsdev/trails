@@ -9,8 +9,10 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { foreignManifestMessage } from "../api-compare/extract-ts-api.js";
 import {
   foreignAbsolutePath,
+  absoluteSourcePath,
   sharedCacheDir,
   contentFingerprint,
   hashParts,
@@ -452,5 +454,90 @@ describe("foreignAbsolutePath", () => {
   it("ignores an absolute-looking token in prose", () => {
     const body = JSON.stringify({ doc: "See //guides.rubyonrails.org/routing.html." });
     expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+});
+
+/**
+ * The cross-worktree replay itself (RFC 0126), at the grain the story asks for:
+ * prime the shared cache from worktree A, then run in worktree B and assert B's
+ * manifest is B's own — never A's, and never a refusal that names A.
+ *
+ * A and B are two linked worktrees of ONE repo, so `sharedCacheDir` resolves
+ * them to the same directory and A's entry is genuinely reachable from B. The
+ * payloads are the real shape the bug produced: a `ClassInfo.extends` entry
+ * carrying TypeScript's quoted absolute path for a namespace-imported module.
+ */
+describe("a cache entry cannot supply another worktree's paths", () => {
+  const KEY = "ts-activerecord-key";
+
+  function linkedWorktrees(): { repo: string; a: string; b: string } {
+    const repo = mkTmp();
+    const worktrees = ["a", "b"].map((name) => {
+      const gitdir = path.join(repo, ".git", "worktrees", name);
+      fs.mkdirSync(gitdir, { recursive: true });
+      const root = mkTmp();
+      fs.writeFileSync(path.join(root, ".git"), `gitdir: ${gitdir}\n`);
+      return root;
+    });
+    return { repo, a: worktrees[0], b: worktrees[1] };
+  }
+
+  const servableIn = (body: string, root: string) => foreignAbsolutePath(body, root) === null;
+  const publishable = (body: string) => absoluteSourcePath(body) === null;
+
+  const manifestOf = (root: string, extendsName: string) =>
+    JSON.stringify({
+      package: { classes: { "base.ts:Base": { file: "base.ts", extends: [extendsName] } } },
+      inputs: { [`${path.basename(root)}/packages/activerecord/src/base.ts`]: "abc" },
+    });
+
+  it("shares one cache directory between two linked worktrees", async () => {
+    const { a, b } = linkedWorktrees();
+    expect(await sharedCacheDir(a)).toBe(await sharedCacheDir(b));
+  });
+
+  it("declines in B an entry A published carrying A's absolute paths", async () => {
+    const { a, b } = linkedWorktrees();
+    const dir = (await sharedCacheDir(a))!;
+    const poisoned = manifestOf(a, `"${a}/packages/activerecord/src/querying"`);
+    await writeShared(dir, "ts-activerecord", KEY, poisoned, path.basename(a));
+
+    expect(await readShared((await sharedCacheDir(b))!, "ts-activerecord", KEY)).toBe(poisoned);
+    expect(servableIn(poisoned, b)).toBe(false);
+    expect(foreignAbsolutePath(poisoned, b)).toBe(
+      `${a}/packages/activerecord/src/querying`,
+    );
+  });
+
+  it("refuses to publish it from A, whose own path is not foreign to A", () => {
+    const { a } = linkedWorktrees();
+    const poisoned = manifestOf(a, `"${a}/packages/activerecord/src/querying"`);
+    expect(servableIn(poisoned, a)).toBe(true);
+    expect(publishable(poisoned)).toBe(false);
+  });
+
+  it("serves A's worktree-independent entry to B unchanged", async () => {
+    const { a, b } = linkedWorktrees();
+    const dir = (await sharedCacheDir(a))!;
+    const clean = manifestOf(a, "Querying");
+    await writeShared(dir, "ts-activerecord", KEY, clean, path.basename(a));
+
+    expect(publishable(clean)).toBe(true);
+    expect(servableIn(clean, a)).toBe(true);
+    const served = await readShared((await sharedCacheDir(b))!, "ts-activerecord", KEY);
+    expect(served).toBe(clean);
+    expect(servableIn(served!, b)).toBe(true);
+  });
+
+  it("B's refusal names B's own root, not A's", () => {
+    const { a, b } = linkedWorktrees();
+    const foreign = foreignAbsolutePath(
+      manifestOf(a, `"${a}/packages/activerecord/src/querying"`),
+      b,
+    )!;
+    const message = foreignManifestMessage(path.join(b, "output/ts-api.json"), foreign, b);
+    expect(message).toContain(`outside this worktree (${b})`);
+    expect(message).toContain(path.join(b, "output/ts-api.json"));
+    expect(message).toContain(foreign);
   });
 });

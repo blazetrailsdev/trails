@@ -373,14 +373,34 @@ function hashOf(file: string, cache?: Map<string, Promise<string | null>>): Prom
  */
 const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
 
+/** A `/`-rooted, multi-segment token, not preceded by a path or URL character. */
+const ABSOLUTE_PATH = /(?:^|[^A-Za-z0-9._@+:/\\-])(\/(?:[A-Za-z0-9._@+-]+\/)+[A-Za-z0-9._@+-]+)/g;
+
 /**
- * The first absolute filesystem path in `body` that lies OUTSIDE `rootDir`, or
- * null when there is none.
+ * The first checkout-shaped absolute path in `body`, whichever worktree it
+ * belongs to, or null when there is none.
  *
- * The shared cache is anchored at the git COMMON dir, so every linked worktree
- * reads and writes the same entries. A payload is therefore only servable if it
- * is worktree-INDEPENDENT. One that carries an absolute path is not: measured on
- * PR #6964, `extract-ts-api.ts` recorded a namespace import's module symbol —
+ * The invariant a shared-cache payload must satisfy, and the strictest of the
+ * pair: an entry is written once and read by every linked worktree, so a path
+ * that is merely LOCAL to the writer is exactly as poisonous as a foreign one —
+ * it is the reader for whom it is foreign. Publishing is therefore gated on
+ * this, not on {@link foreignAbsolutePath}.
+ */
+export function absoluteSourcePath(body: string): string | null {
+  for (const match of body.matchAll(ABSOLUTE_PATH)) {
+    if (SOURCE_PATH.test(match[1])) return match[1];
+  }
+  return null;
+}
+
+/**
+ * The first checkout-shaped absolute path in `body` that lies OUTSIDE
+ * `rootDir`, or null when there is none.
+ *
+ * The reader's half. The shared cache is anchored at the git COMMON dir, so
+ * every linked worktree reads and writes the same entries. A payload naming
+ * another checkout is not describing the tree being measured: measured on PR
+ * #6964, `extract-ts-api.ts` recorded a namespace import's module symbol —
  * whose TypeScript `name` is the quoted absolute path of the module — onto
  * `ClassInfo.extends`, so a sibling worktree's run was served entries naming
  * `/mnt/.../worktrees/<since-deleted>/packages/activerecord/src/querying`. The
@@ -388,14 +408,13 @@ const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
  * and the ratchet reported another branch's numbers (1488 baselined vs this
  * branch's true 417) with no error and no warning.
  *
- * `extendsModuleName` fixed that producer; this is the layer that keeps the
- * class of bug from ever crossing a worktree boundary again — a poisoned entry
+ * `extendsModuleName` fixed that producer; these two are the layers that keep
+ * the class of bug from crossing a worktree boundary again — a poisoned entry
  * is neither published nor served, so a replay cannot be mistaken for a verdict
  * (RFC 0126).
  */
 export function foreignAbsolutePath(body: string, rootDir: string): string | null {
   const prefix = rootDir.endsWith(path.sep) ? rootDir : rootDir + path.sep;
-  const ABSOLUTE_PATH = /(?:^|[^A-Za-z0-9._@+:/\\-])(\/(?:[A-Za-z0-9._@+-]+\/)+[A-Za-z0-9._@+-]+)/g;
   for (const match of body.matchAll(ABSOLUTE_PATH)) {
     const candidate = match[1];
     if (!SOURCE_PATH.test(candidate)) continue;

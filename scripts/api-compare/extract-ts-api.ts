@@ -58,6 +58,7 @@ import {
   readShared,
   writeShared,
   foreignAbsolutePath,
+  absoluteSourcePath,
   normalizeReadSet,
   hashReadSet,
   readSetMatches,
@@ -205,6 +206,29 @@ if (!isMainThread && parentPort) {
 // when it loads, the `!isMainThread` guard at the top dispatches into
 // extractPackage and posts the result back.
 const WORKER_BOOTSTRAP = path.join(SCRIPT_DIR, "extract-ts-api-worker.mjs");
+
+/**
+ * The operator-facing refusal text for a manifest that names a path outside the
+ * invoking worktree.
+ *
+ * Such a manifest describes a tree that is not the one being measured — the
+ * replay RFC 0126 was filed for, where an extraction served from the
+ * cross-worktree shared cache reported another branch's ratchet numbers with no
+ * error at all. Separate from the throw so the contract is testable, the way
+ * `staleBuildMessage` is for the build-freshness abort.
+ */
+export function foreignManifestMessage(
+  outputPath: string,
+  foreign: string,
+  rootDir: string,
+): string {
+  return (
+    `extract-ts-api: refusing to write ${outputPath} — the extracted manifest names ` +
+    `${foreign}, which is outside this worktree (${rootDir}).\n` +
+    "Its measurements describe another checkout, so any gate verdict off it is " +
+    "meaningless. Re-run with API_COMPARE_FORCE=1 to discard cached extractions."
+  );
+}
 
 /**
  * The name to record on `host.extends` for an `include()`/`extend()` module
@@ -459,7 +483,7 @@ export async function main() {
           package: data,
         };
         const payload = JSON.stringify(shared);
-        if (foreignAbsolutePath(payload, ROOT_DIR) === null) {
+        if (absoluteSourcePath(payload) === null) {
           await writeShared(sharedDir, `ts-${p.pkg}`, p.sharedKey, payload, sharedTag);
         }
       }
@@ -497,14 +521,7 @@ export async function main() {
   const outputPath = path.join(OUTPUT_DIR, "ts-api.json");
   const serialized = JSON.stringify(manifest, null, 2);
   const foreign = foreignAbsolutePath(serialized, ROOT_DIR);
-  if (foreign !== null) {
-    throw new Error(
-      `extract-ts-api: refusing to write ${outputPath} — the extracted manifest names ` +
-        `${foreign}, which is outside this worktree (${ROOT_DIR}).\n` +
-        "Its measurements describe another checkout, so any gate verdict off it is " +
-        "meaningless. Re-run with API_COMPARE_FORCE=1 to discard cached extractions.",
-    );
-  }
+  if (foreign !== null) throw new Error(foreignManifestMessage(outputPath, foreign, ROOT_DIR));
   fs.writeFileSync(outputPath, serialized);
   console.log(`Written to ${outputPath}`);
 }
