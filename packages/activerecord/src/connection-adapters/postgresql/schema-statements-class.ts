@@ -846,7 +846,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = this.createAlterTable(tableName) as PgAlterTable;
@@ -880,7 +880,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   assertValidDeferrable(deferrable: unknown): void {
     if (
@@ -897,7 +897,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   override extractForeignKeyAction(
     specifier: string,
@@ -916,7 +916,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   extractConstraintDeferrable(
     deferrable: boolean,
@@ -1098,7 +1098,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
@@ -1110,7 +1110,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   async exclusionConstraintFor(
     tableName: string,
@@ -1136,7 +1136,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   async exclusionConstraintForBang(
     tableName: string,
@@ -1244,7 +1244,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
@@ -1262,7 +1262,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   async uniqueConstraintFor(
     tableName: string,
@@ -1275,7 +1275,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   async uniqueConstraintForBang(
     tableName: string,
@@ -1599,7 +1599,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE pg-schema-statements-file-split-scores-misplaced
    */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxIdentifierLength = this.maxIdentifierLength();

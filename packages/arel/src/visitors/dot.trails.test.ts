@@ -242,7 +242,17 @@ describe("TestDot", () => {
       type Internals = { visitEdge(o: object, method: string): void };
       const tbl = new Table("users");
       expect(() => (v as unknown as Internals).visitEdge(tbl, "definitelyNotAField")).toThrow(
-        /undefined method 'definitelyNotAField' for Table/,
+        /undefined method 'definitelyNotAField' for Arel::Table/,
+      );
+    });
+
+    it("visitEdge names the receiver's Ruby constant, as NoMethodError does", () => {
+      const v = new Visitors.Dot();
+      v.compile(new Nodes.SqlLiteral("seed"));
+      type Internals = { visitEdge(o: object, method: string): void };
+      const grouping = new Nodes.Grouping(new Nodes.SqlLiteral("1"));
+      expect(() => (v as unknown as Internals).visitEdge(grouping, "definitelyNotAField")).toThrow(
+        "undefined method 'definitelyNotAField' for Arel::Nodes::Grouping",
       );
     });
 
@@ -305,7 +315,9 @@ describe("TestDot", () => {
 
     it("Extract walks expressions + alias, as Rails does", () => {
       const node = new Nodes.Extract(users.get("created_at"), "year");
-      expect(() => dot.compile(node)).toThrow(/undefined method 'expressions' for Extract/);
+      expect(() => dot.compile(node)).toThrow(
+        /undefined method 'expressions' for Arel::Nodes::Extract/,
+      );
     });
 
     it("Exists walks expressions + alias (no spurious distinct edge)", () => {

@@ -187,7 +187,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
    */
   override get typeRegistryKey(): AdapterName {
     return "postgres";
@@ -571,7 +571,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1493,7 +1493,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   override async verifyBang(): Promise<void> {
     if (this._pgClientOptions == null) {
@@ -1553,8 +1553,8 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @missingRailsCall internal_execute — CONVERGEABLE
-   * @missingRailsCall quote — CONVERGEABLE
+   * @missingRailsCall internal_execute — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
+   * @missingRailsCall quote — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    */
   async configureConnection(): Promise<void> {
     const conn = this._rawConnection;
@@ -1657,7 +1657,7 @@ export class PostgreSQLAdapter
     return parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
   }
 
-  /** @missingRailsCall with_raw_connection — CONVERGEABLE */
+  /** @missingRailsCall with_raw_connection — CONVERGEABLE arm-permanent-connection-checkout-disallowed */
   async getDatabaseVersion(): Promise<number> {
     const conn = this._rawConnection ?? (await this._acquireFreshClient());
     let version: number;
@@ -2522,7 +2522,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @missingRailsCall raw_execute — CONVERGEABLE
+   * @missingRailsCall raw_execute — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    */
   async reconfigureConnectionTimezone(): Promise<void> {
     const variables = fetch<SessionVariables>(this._config, "variables", {});

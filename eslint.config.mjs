@@ -525,7 +525,12 @@ export default defineConfig(
   ...(railsTestNamesManifestReady
     ? [
         {
-          files: ["packages/arel/src/**/*.test.ts", "packages/date/src/**/*.test.ts"],
+          files: [
+            "packages/arel/src/**/*.test.ts",
+            "packages/date/src/**/*.test.ts",
+            "packages/did-you-mean/src/**/*.test.ts",
+            "packages/i18n/src/**/*.test.ts",
+          ],
           rules: {
             "blazetrails/rails-test-name-parity": "error",
           },

@@ -128,7 +128,7 @@ export class AssociationCache {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function createAssociationCache(): AssociationCache {
   return new AssociationCache();

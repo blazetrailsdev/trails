@@ -81,6 +81,9 @@ import {
   suppressedArgReasonsIn,
 } from "./missing-rails-args-tags.js";
 
+/** Memo for `internalJsDocTagApplies`'s file-level receipt lookup. */
+const fileLevelReceipts = new WeakMap<ts.SourceFile, boolean>();
+
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
 // runs. Each package's PackageInfo is cached at
@@ -1827,9 +1830,24 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
  * dropping it unmeasured. Only the JSDoc tag yields — a real TS
  * `private`/`protected` modifier or a `#` identifier still confers `internal`
  * unconditionally, and every call site keeps that half of the disjunction.
+ *
+ * A FILE-level receipt wins the same way. It is the one receipt a file whose
+ * every name is extra can carry once (RFC 0072), and the only form that reaches
+ * the synthesized container name the extractor mints from the file path, so
+ * requiring a second per-declaration copy beside it is the duplication the
+ * file-level form exists to remove — the same reading
+ * `blazetrails/unbacked-internal-needs-receipt` already takes.
  */
 export function internalJsDocTagApplies(node: ts.Node): boolean {
-  return hasInternalJsDocTag(node) && noRailsEquivalentReason(node) === undefined;
+  if (!hasInternalJsDocTag(node)) return false;
+  if (noRailsEquivalentReason(node) !== undefined) return false;
+  const sourceFile = node.getSourceFile();
+  let fileReceipt = fileLevelReceipts.get(sourceFile);
+  if (fileReceipt === undefined) {
+    fileReceipt = fileLevelNoRailsEquivalentReason(sourceFile) !== undefined;
+    fileLevelReceipts.set(sourceFile, fileReceipt);
+  }
+  return !fileReceipt;
 }
 
 /**

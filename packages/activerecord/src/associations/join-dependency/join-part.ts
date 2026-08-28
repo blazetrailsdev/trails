@@ -9,7 +9,7 @@ export abstract class JoinPart {
   tableAlias = "";
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   arelTable: Table | Nodes.TableAlias | null = null;
   columns: string[] = [];
@@ -17,7 +17,7 @@ export abstract class JoinPart {
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   nodeReflection: any | null = null;
   immediateAssocName = "";

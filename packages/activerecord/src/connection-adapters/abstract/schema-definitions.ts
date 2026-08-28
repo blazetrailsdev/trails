@@ -12,7 +12,7 @@ import {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function splitColumnNames(
   args: unknown[],
@@ -157,7 +157,7 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function assertCompositeForeignKeyArity(
   toTable: string,
@@ -195,7 +195,7 @@ export type ForeignKeyStoredOptionKey =
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function foreignKeyOptionsStoredKeys(
   options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,

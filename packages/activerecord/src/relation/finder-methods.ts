@@ -25,7 +25,7 @@ export interface NormalizedFindIds {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function normalizeFindArgs(
   modelName: string,
@@ -90,7 +90,7 @@ export function normalizeFindArgs(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function raiseNotFoundAll(
   modelName: string,
@@ -141,7 +141,7 @@ function formatNotFoundAllMessage(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function raiseNotFoundSingle(
   modelName: string,

@@ -147,7 +147,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);

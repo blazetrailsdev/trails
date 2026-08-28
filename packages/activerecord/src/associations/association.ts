@@ -10,7 +10,7 @@ import { parkNestedReaderLoad } from "../nested-attributes.js";
 import { camelize, except, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
 
-/** @noRailsEquivalent CONVERGEABLE */
+/** @noRailsEquivalent CONVERGEABLE retire-ad-hoc-association-definition-holders */
 function _richReflectionFor(owner: Base, reflection: AssociationDefinition): AssociationDefinition {
   if (Object.getPrototypeOf(reflection) !== Object.prototype) return reflection;
   const rich = (owner.constructor as typeof Base)._reflectOnAssociation?.(reflection.name);

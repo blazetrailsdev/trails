@@ -532,7 +532,7 @@ interface ForeignKeysHost {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export async function foreignKeys(
   this: ForeignKeysHost,

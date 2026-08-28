@@ -242,7 +242,7 @@ export function autoloadModel(name: string): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function resolveAssocClass(
   recordOrClass: Base | typeof Base,
@@ -267,7 +267,7 @@ export function resolveAssocClass(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function validateInverseOf(
   owner: typeof Base,
@@ -678,7 +678,7 @@ export async function _loadSingularViaStatementCache(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
   const holder = record._associationInstances.get(assocName) as

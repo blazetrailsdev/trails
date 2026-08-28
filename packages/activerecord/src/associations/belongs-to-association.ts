@@ -343,7 +343,7 @@ export class BelongsToAssociation extends SingularAssociation {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function inferCompositePrimaryKey(pk: string | string[]): string[] {
   if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;

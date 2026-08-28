@@ -5,7 +5,7 @@ import type { Base } from "../base.js";
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,
@@ -29,7 +29,7 @@ export function ownerForeignKeyColumns(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function foreignKeyPresentFor(reflection: AssociationReflection, owner: Base): boolean {
   const klass = (reflection as { klass?: { primaryKey?: unknown } }).klass;

@@ -235,7 +235,7 @@ export class ConnectionPool implements ReapablePool {
   checkoutTimeout: number;
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   adapterReady: Promise<unknown> = Promise.resolve();
 
@@ -433,7 +433,7 @@ export class ConnectionPool implements ReapablePool {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   leaseConnectionSync(): DatabaseAdapter {
     const lease = this.connectionLease();
@@ -723,7 +723,7 @@ export class ConnectionPool implements ReapablePool {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();
@@ -837,7 +837,7 @@ export class ConnectionPool implements ReapablePool {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   async drainPendingCloses(): Promise<void> {
     await Promise.all(this._pendingCloseDrains);

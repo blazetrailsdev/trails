@@ -281,7 +281,7 @@ export function extractGeneratedType(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (dfltValue === null) return null;

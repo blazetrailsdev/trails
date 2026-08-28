@@ -34,6 +34,36 @@ export async function listSourceFiles(packagesDir: string): Promise<string[]> {
   return walkPackageTsFiles(packagesDir, COMMITTED_TS_FILES);
 }
 
+/** Every receipt tag whose reason opens with a permanence claim. A
+ *  `CONVERGEABLE` one names the story that converges it — the story IS the
+ *  reason, so a bare `CONVERGEABLE` carries none (RFC 0124). */
+const RECEIPT_TAGS = ["@noRailsEquivalent", "@missingRailsCall", "@missingRailsArgs"];
+/** A tail carrying no word character — `""`, `"."`, `")"` — is no story id. */
+const NAMES_A_STORY_RE = /[A-Za-z0-9]/;
+
+/** Reject a `CONVERGEABLE` receipt that names no story. The line's tail is the
+ *  whole receipt, so "bare" is "nothing follows the token on its line". */
+export function lintBareConvergeable(fileName: string, text: string): string[] {
+  const errors: string[] = [];
+  for (const match of text.matchAll(JSDOC_BLOCK)) {
+    const comment = match[0];
+    if (!RECEIPT_TAGS.some((tag) => comment.includes(tag))) continue;
+    const startLine = text.slice(0, match.index).split("\n").length;
+    comment.split("\n").forEach((line, i) => {
+      const body = line.replace(/^\s*\*?\s?/, "").trimEnd();
+      if (!RECEIPT_TAGS.some((tag) => body.includes(tag))) return;
+      const tail = body.split("CONVERGEABLE").at(-1) ?? "";
+      if (body === tail || NAMES_A_STORY_RE.test(tail)) return;
+      errors.push(
+        `bare CONVERGEABLE receipt: ${fileName}:${startLine + i} — a CONVERGEABLE ` +
+          "receipt names the story that converges it (the story IS the reason). Add the " +
+          "story id, or make the claim PERMANENT where a TypeScript shortcoming earns it.",
+      );
+    });
+  }
+  return errors;
+}
+
 /** Run `parseJsdoc`'s empty-reason check over one file's JSDoc blocks, and
  *  return the resulting error messages. Each block is parsed independently so
  *  one bare tag doesn't hide the rest of the file. */
@@ -59,7 +89,9 @@ export async function main(): Promise<number> {
   // risks EMFILE for no measurable win (the whole pass is ~1s).
   const errors: string[] = [];
   for (const abs of files) {
-    errors.push(...lintFileText(path.relative(ROOT_DIR, abs), await fs.readFile(abs, "utf-8")));
+    const rel = path.relative(ROOT_DIR, abs);
+    const text = await fs.readFile(abs, "utf-8");
+    errors.push(...lintFileText(rel, text), ...lintBareConvergeable(rel, text));
   }
   if (errors.length > 0) {
     for (const error of errors) console.error(`parity:api:reasons: ${error}`);
@@ -70,7 +102,8 @@ export async function main(): Promise<number> {
     return 1;
   }
   console.log(
-    `parity:api:reasons: ${files.length} file(s) checked, every ${TAG} carries a reason.`,
+    `parity:api:reasons: ${files.length} file(s) checked, every ${TAG} carries a reason ` +
+      "and every CONVERGEABLE receipt names a story.",
   );
   return 0;
 }

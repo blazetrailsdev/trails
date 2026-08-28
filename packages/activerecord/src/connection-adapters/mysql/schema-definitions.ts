@@ -261,7 +261,7 @@ export class TableDefinition extends AbstractTableDefinition {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent PERMANENT
    */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {

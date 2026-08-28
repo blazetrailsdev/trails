@@ -98,7 +98,7 @@ function removeIndexSpec(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
  */
 export function indexNameForRemoveFrom(
   generateIndexName: GenerateIndexName,
@@ -137,7 +137,7 @@ export function indexNameForRemoveFrom(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
  */
 export function indexExistsForRemoveFrom(
   generateIndexName: GenerateIndexName,
@@ -1497,7 +1497,7 @@ export class SchemaStatements {
   /**
    * @internal
    * @missingRailsCall first — PERMANENT
-   * @missingRailsCall limit — CONVERGEABLE
+   * @missingRailsCall limit — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    */
   generateIndexName(tableName: string, column: string | string[]): string {
     const cols = Array.isArray(column) ? column : [column];

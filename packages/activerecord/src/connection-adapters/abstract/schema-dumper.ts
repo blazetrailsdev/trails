@@ -2,7 +2,7 @@ import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { ColumnInfo, SchemaSource } from "../../schema-dumper.js";
 
-/** @noRailsEquivalent CONVERGEABLE */
+/** @noRailsEquivalent CONVERGEABLE converge-abstract-schema-dumper-column-onto-column-class */
 export interface Column extends ColumnInfo {
   bigint?: boolean;
   virtual?: boolean;

@@ -134,7 +134,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   readTargets(): T[] {
     return this._target;
@@ -142,7 +142,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   targetsByPrimaryKey(): Map<string, T> {
     const byKey = new Map<string, T>();
@@ -155,7 +155,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   get owner(): Base {
     return this._record;
@@ -163,7 +163,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   set owner(record: Base) {
     this._record = record;
@@ -171,7 +171,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   get reflection(): AssociationDefinition {
     const ctor = this._record.constructor as typeof Base;
@@ -190,7 +190,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   get associationName(): string {
     return this._assocName;
@@ -348,7 +348,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
    */
   addExistingRecord(record: T): void {
     this._association.addToTarget(record, { skipCallbacks: true });

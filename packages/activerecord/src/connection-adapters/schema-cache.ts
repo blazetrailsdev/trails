@@ -286,7 +286,7 @@ export class SchemaCache {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
@@ -294,7 +294,7 @@ export class SchemaCache {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   getCachedDataSourceExists(name: string): boolean | undefined {
     return this._dataSourceExists.get(name);
@@ -302,7 +302,7 @@ export class SchemaCache {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
     return this._primaryKeys.get(tableName);
@@ -361,7 +361,7 @@ export class SchemaCache {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   setColumns(tableName: string, cols: Column[]): void {
     this._columns.set(tableName, cols);
@@ -479,7 +479,7 @@ export class SchemaReflection {
   static checkSchemaCacheDumpVersion = true;
   static lazilyLoadSchemaCache = false;
 
-  /** @noRailsEquivalent CONVERGEABLE */
+  /** @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip */
   static eagerLoadSchemaCache = false;
 
   private _cache: SchemaCache | null;
@@ -507,7 +507,7 @@ export class SchemaReflection {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   async loadAllBang(pool: unknown): Promise<this> {
     const cache = await this.cache(pool);
@@ -517,7 +517,7 @@ export class SchemaReflection {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   get loadedCache(): SchemaCache | null {
     return this._cache;
@@ -525,7 +525,7 @@ export class SchemaReflection {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   set loadedCache(cache: SchemaCache | null) {
     this._cache = cache;
@@ -696,7 +696,7 @@ export class BoundSchemaReflection {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE retire-schema-cache-sync-readers-after-checkout-flip
    */
   async loadAllBang(): Promise<this> {
     await this._schemaReflection.loadAllBang(this._pool);

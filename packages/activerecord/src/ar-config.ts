@@ -11,7 +11,7 @@ type AnyClass = abstract new (...args: never[]) => object;
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
   for (const entry of ActiveRecord.schemaCacheIgnoredTables) {

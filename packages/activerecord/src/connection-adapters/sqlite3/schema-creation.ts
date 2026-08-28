@@ -19,7 +19,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
    */
   override addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;

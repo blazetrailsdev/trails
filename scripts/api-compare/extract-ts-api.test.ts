@@ -2100,6 +2100,31 @@ describe("extractFromProgram — @noRailsEquivalent beats @internal (RFC 0121)",
     }
   });
 
+  it("clears internal on every @internal declaration under a file-level receipt", () => {
+    const info = extractFromFiles("/p", {
+      "clone-support.ts": `/** @noRailsEquivalent PERMANENT */
+
+        /** @internal */
+        export function objectClone(): void {}
+        /** @internal */
+        export function cloneSlot(): void {}
+      `,
+    });
+    for (const fn of fileFunctionsOf(info, "clone-support.ts")) {
+      expect(fn.internal).toBeUndefined();
+    }
+  });
+
+  it("leaves internal alone where the file carries no file-level receipt", () => {
+    const info = extractFromFiles("/p", {
+      "plain.ts": `
+        /** @internal */
+        export function tagged(): void {}
+      `,
+    });
+    expect(fileFunctionsOf(info, "plain.ts").find((f) => f.name === "tagged")!.internal).toBe(true);
+  });
+
   it("clears internal on a receipted class member, static included", () => {
     const info = extractFromFiles("/p", {
       "select-core.ts": `
