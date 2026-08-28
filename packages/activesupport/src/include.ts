@@ -196,6 +196,11 @@ function trackIncludedModule(proto: object, mod: unknown): void {
  * copies a module's members onto the prototype rather than splicing a link for
  * it. The registry `include()` keeps is that record.
  *
+ * Ruby asks it through `included_modules.include?`, and `Array#include?`
+ * compares with `==`, which a module may define by value
+ * (`AcceptanceValidator::LazilyDefineAttributes#==`, acceptance.rb:71-73), so a
+ * module carrying an `equals` is asked that too and not identity alone.
+ *
  * @noRailsEquivalent PERMANENT — Ruby spells this `<`, an operator TypeScript
  * cannot define; the predicate carries the same question at a callable name.
  */
@@ -211,10 +216,6 @@ export function isModuleIncluded(
     if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) continue;
     const mods = (proto as any)[includedModules] as Set<unknown>;
     if (mods.has(mod)) return true;
-    // Ruby asks this through `included_modules.include?`, and `Array#include?`
-    // compares with `==` — which a module may define by value
-    // (`AcceptanceValidator::LazilyDefineAttributes#==`, acceptance.rb:71-73).
-    // `Set#has` is identity only, so consult the module's own `equals` too.
     const eq = (mod as { equals?: (other: unknown) => boolean }).equals;
     if (typeof eq === "function") {
       for (const m of mods) if (eq.call(mod, m)) return true;

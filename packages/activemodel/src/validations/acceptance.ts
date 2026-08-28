@@ -66,16 +66,14 @@ export class LazilyDefineAttributes extends Module {
         Object.defineProperty(mod, name, {
           configurable: true,
           get: attrReaders.includes(name)
-            ? (inherited.getter ??
-              function (this: Record<string, unknown>) {
+            ? function (this: Record<string, unknown>) {
                 return this[slot];
-              })
+              }
             : inherited.getter,
           set: attrWriters.includes(name)
-            ? (inherited.setter ??
-              function (this: Record<string, unknown>, value: unknown) {
+            ? function (this: Record<string, unknown>, value: unknown) {
                 this[slot] = value;
-              })
+              }
             : inherited.setter,
         });
       }
