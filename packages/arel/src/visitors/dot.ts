@@ -1,11 +1,12 @@
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
-import { Visitor, type NodeCtor } from "./visitor.js";
+import { Visitor } from "./visitor.js";
 import { _setDot } from "../node-slots.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
-import { isHashAnalogue } from "./ruby-class.js";
+import { isHashAnalogue, rubyConstantName } from "./ruby-class.js";
+import { underscore } from "@blazetrails/activesupport";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -316,7 +317,7 @@ export class Dot extends Visitor {
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`undefined method '${method}' for ${klass}`);
     }
-    this.edge(method, () => this.visit((o as Record<string, unknown>)[method]));
+    this.edge(underscore(method), () => this.visit((o as Record<string, unknown>)[method]));
   }
 
   protected override visit(object: unknown, _collector?: unknown): unknown {
@@ -417,58 +418,8 @@ export class Dot extends Visitor {
     if (temporalClass) return temporalClass;
     if (isHashAnalogue(o)) return "Hash";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
-    return ctor?.name ?? "Object";
-  }
-
-  /** @internal */
-  static registerDispatch(): void {
-    const reg = (ctor: NodeCtor, m: string) => Dot.dispatchCache().set(ctor, m);
-    reg(Nodes.Function, "visitArelNodesFunction");
-    reg(Nodes.Sum, "visitArelNodesFunction");
-    reg(Nodes.Max, "visitArelNodesFunction");
-    reg(Nodes.Min, "visitArelNodesFunction");
-    reg(Nodes.Avg, "visitArelNodesFunction");
-    reg(Nodes.Exists, "visitArelNodesExists");
-    reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
-    reg(Nodes.Count, "visitArelNodesCount");
-    reg(Nodes.Extract, "visitArelNodesExtract");
-    reg(Nodes.Unary, "visitArelNodesUnary");
-    reg(Nodes.Binary, "visitArelNodesBinary");
-    reg(Nodes.UnaryOperation, "visitArelNodesUnaryOperation");
-    reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
-    reg(Nodes.Regexp, "visitArelNodesRegexp");
-    reg(Nodes.NotRegexp, "visitArelNodesNotRegexp");
-    reg(Nodes.Ordering, "visitArelNodesOrdering");
-    reg(Nodes.TableAlias, "visitArelNodesTableAlias");
-    reg(Nodes.ValuesList, "visitArelNodesValuesList");
-    reg(Nodes.StringJoin, "visitArelNodesStringJoin");
-    reg(Nodes.Window, "visitArelNodesWindow");
-    reg(Nodes.NamedWindow, "visitArelNodesNamedWindow");
-    reg(Nodes.CurrentRow, "visitArelNodesCurrentRow");
-    reg(Nodes.Distinct, "visitArelNodesDistinct");
-    reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
-    reg(Nodes.SelectCore, "visitArelNodesSelectCore");
-    reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
-    reg(Nodes.UpdateStatement, "visitArelNodesUpdateStatement");
-    reg(Nodes.DeleteStatement, "visitArelNodesDeleteStatement");
-    reg(Nodes.Casted, "visitArelNodesCasted");
-    reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
-    reg(Nodes.Attribute, "visitArelAttributesAttribute");
-    reg(Nodes.And, "visitArelNodesAnd");
-    reg(Nodes.Or, "visitArelNodesOr");
-    reg(Nodes.With, "visitArelNodesWith");
-    reg(Nodes.WithRecursive, "visitArelNodesWith");
-    reg(Nodes.SqlLiteral, "visitArelNodesSqlLiteral");
-    reg(Nodes.BindParam, "visitArelNodesBindParam");
-    reg(Nodes.Comment, "visitArelNodesComment");
-    reg(Nodes.Case, "visitArelNodesCase");
-    reg(ModelAttribute, "visitActiveModelAttribute");
-    reg(Set, "visitSet");
-    reg(Nodes.Quoted, "visitNoEdges");
-    reg(Nodes.True, "visitNoEdges");
-    reg(Nodes.False, "visitNoEdges");
-    reg(Nodes.BoundSqlLiteral, "visitNoEdges");
-    reg(Nodes.Fragments, "visitNoEdges");
+    if (!ctor) return "Object";
+    return rubyConstantName(ctor) ?? ctor.name ?? "Object";
   }
 }
 

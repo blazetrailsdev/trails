@@ -48,7 +48,6 @@ export class SqlLiteral extends Node {
     return buildQuoted(other, this);
   }
 
-  /** @internal */
   plus(other: unknown): Fragments {
     if (!arelNode(other)) {
       throw new ArgumentError("Expected Arel node");

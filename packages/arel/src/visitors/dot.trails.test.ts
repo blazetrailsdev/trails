@@ -26,42 +26,42 @@ describe("Dot (trails-only)", () => {
 
   it("labels a NamedFunction node", () => {
     const node = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-    expect(dot.compile(node)).toMatch('[label="<f0>NamedFunction"]');
+    expect(dot.compile(node)).toMatch('[label="<f0>Arel::Nodes::NamedFunction"]');
   });
 
   it("walks a With node's Cte children", () => {
     const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
     const out = dot.compile(new SelectManager().with(cte).project("1").ast);
-    expect(out).toMatch('[label="<f0>With"]');
-    expect(out).toMatch('[label="<f0>Cte"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::With"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::Cte"]');
   });
 
   it("walks a projected SelectCore", () => {
     const stmt = users.project(star()).ast;
     const out = dot.compile(stmt.cores[0]);
-    expect(out).toMatch('[label="<f0>SelectCore"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::SelectCore"]');
     expect(out).toMatch(/->.*label="projections"/);
   });
 
   it("walks a manager-built InsertStatement's values", () => {
     const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
     const out = dot.compile(stmt);
-    expect(out).toMatch('[label="<f0>InsertStatement"]');
-    expect(out).toMatch('[label="<f0>ValuesList"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::InsertStatement"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::ValuesList"]');
   });
 
   it("walks a manager-built UpdateStatement's assignments", () => {
     const stmt = new UpdateManager().table(users).set([[users.get("name"), "sam"]]).ast;
     const out = dot.compile(stmt);
-    expect(out).toMatch('[label="<f0>UpdateStatement"]');
-    expect(out).toMatch('[label="<f0>Assignment"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::UpdateStatement"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::Assignment"]');
   });
 
   it("walks a manager-built DeleteStatement's relation", () => {
     const stmt = new DeleteManager().from(users).ast;
     const out = dot.compile(stmt);
-    expect(out).toMatch('[label="<f0>DeleteStatement"]');
-    expect(out).toMatch('[label="<f0>Table"]');
+    expect(out).toMatch('[label="<f0>Arel::Nodes::DeleteStatement"]');
+    expect(out).toMatch('[label="<f0>Arel::Table"]');
   });
 });
 
@@ -95,7 +95,7 @@ describe("TestDot", () => {
       expect(out).toMatch(/^digraph "Arel" \{\n/);
       expect(out).toContain("node [width=0.375,height=0.25,shape=record];");
       expect(out).toMatch(/\n\}$/);
-      expect(out).toMatch(/^\d+ \[label="<f0>Distinct"\];$/m);
+      expect(out).toMatch(/^\d+ \[label="<f0>Arel::Nodes::Distinct"\];$/m);
     });
 
     it("emits one edge per visit_edge declaration with the field name as label", () => {
@@ -297,7 +297,7 @@ describe("TestDot", () => {
       (v as unknown as Internals).visit(a);
       (v as unknown as Internals).visit(b);
       const out = (v as unknown as Internals).toDot();
-      const tableMatches = out.match(/<f0>Table"\];/g) ?? [];
+      const tableMatches = out.match(/<f0>Arel::Table"\];/g) ?? [];
       expect(tableMatches.length).toBe(2);
       const stringUsersMatches = out.match(/<f0>String\|<f1>users"\];/g) ?? [];
       expect(stringUsersMatches.length).toBe(2);
@@ -332,13 +332,13 @@ describe("TestDot", () => {
       const bind = new Nodes.BindParam(attribute);
       const out = dot.compile(bind);
       expect(out).toContain("BindParam");
-      expect(out).toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
+      expect(out).toMatch(/-> \d+ \[label="value_before_type_cast"\];/);
       expect(out).toContain("42");
     });
 
     it("a non-Attribute object with valueBeforeTypeCast is not visited as an Attribute", () => {
       const out = dot.compile(new Nodes.BindParam({ valueBeforeTypeCast: 42 }));
-      expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
+      expect(out).not.toMatch(/-> \d+ \[label="value_before_type_cast"\];/);
       expect(out).toContain('[label="pair_0"]');
       expect(out).toContain("42");
     });
@@ -397,7 +397,7 @@ describe("TestDot", () => {
       expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
       expect(out).toContain('[label="pair_0"]');
       expect(out).toContain("alpha");
-      expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
+      expect(out).not.toMatch(/-> \d+ \[label="value_before_type_cast"\];/);
     });
 
     it("a record inheriting a literal constructor key is a Hash", () => {

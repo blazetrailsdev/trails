@@ -683,10 +683,10 @@ export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
 
   /**
-   * @missingRailsCall build_statement_pool — CONVERGEABLE
-   * @missingRailsCall fetch — CONVERGEABLE
-   * @missingRailsCall type_cast_config_to_boolean — CONVERGEABLE
-   * @missingRailsCall validate_default_timezone — CONVERGEABLE
+   * @missingRailsCall build_statement_pool — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
+   * @missingRailsCall fetch — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
+   * @missingRailsCall type_cast_config_to_boolean — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
+   * @missingRailsCall validate_default_timezone — CONVERGEABLE abstract-adapter-constructor-drops-rails-config-arg
    */
   constructor() {
     ensureAbstractAdapterMixinsApplied();

@@ -36,8 +36,11 @@ Mirror, method by method and line by line:
 - **No extra abstraction.** Do not add a helper, wrapper, indirection layer, or
   "cleaner" rewrite that Rails does not have. Extra surface is measured —
   `pnpm parity:api:extra` reports every public TS name with no Ruby counterpart. If
-  you genuinely need one, declare it with a `@noRailsEquivalent <reason>` JSDoc
-  tag; that tag is the only sanctioned exception and the reason is reviewed.
+  you genuinely need one, declare it with a `@noRailsEquivalent` JSDoc tag; that
+  tag is the only sanctioned exception. A receipt has exactly two shapes and
+  carries no prose: `PERMANENT`, where the token is the whole receipt, and
+  `CONVERGEABLE <story-id>`, where the story IS the receipt and the tag only
+  points at it. `no-freeform-comments` strips anything else.
 - **Errors.** Same error class, same message string, same raise site.
 
 **Only a genuine TypeScript language shortcoming can justify a deviation** —
@@ -403,13 +406,15 @@ write.
    `shape` rows — count, order, literal values, kwarg keys; `naming` rows (a
    `ref:` identifier spelled differently) are report-only via
    `pnpm parity:api:calls:args:report`. New row? Pass what Rails passes;
-   baselining is the fallback and costs a reviewed one-line `reason`. A single
-   argument-shape deviation can instead carry a `@missingRailsArgs <ruby_call>
-— <reason>` JSDoc tag at the call site — the call-ARGUMENT twin of
+   baselining is the fallback and costs a one-line `reason` on the baseline row.
+   A single argument-shape deviation can instead carry a
+   `@missingRailsArgs <ruby_call> — PERMANENT|CONVERGEABLE <story-id>` JSDoc tag
+   at the call site — the call-ARGUMENT twin of
    `@missingRailsCall` — which suppresses the flag with no baseline row. Its
-   reason must open with `PERMANENT` or `CONVERGEABLE`, the same permanence
-   discipline `parity:api:extra` enforces on `@noRailsEquivalent`; a reason
-   claiming neither is an error, not an assumed PERMANENT.
+   tag must open with `PERMANENT` or `CONVERGEABLE`, the same permanence
+   discipline `parity:api:extra` enforces on `@noRailsEquivalent`; a tag
+   claiming neither is an error, not an assumed PERMANENT, and a bare
+   `CONVERGEABLE` with no story id is only half a receipt.
 
 3. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a
@@ -447,9 +452,10 @@ write.
    - `blazetrails/unbacked-internal-needs-receipt` (RFC 0121) is the reverse: a
      public declaration carrying `@internal` whose (file, name) is absent from
      the manifest must ALSO carry a `@noRailsEquivalent PERMANENT|CONVERGEABLE`
-     reason, which wins in the extractor so the member re-enters the measured
+     receipt, which wins in the extractor so the member re-enters the measured
      surface and is scored `Allowed` rather than vanishing. Not autofixable — the
-     remedies are a reviewed reason, or deleting a tag that was never earned.
+     remedies are a receipt in one of the two shapes above, or deleting a tag
+     that was never earned.
      (A real TS `private`/`protected`/`#` member still confers internal
      unconditionally; only the JSDoc tag yields.)
 

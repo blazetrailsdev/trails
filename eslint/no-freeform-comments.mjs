@@ -103,6 +103,14 @@ const INLINE_KEPT_TAG_RE = new RegExp(`@(${KEPT_TAG_NAMES})\\b`, "u");
  */
 const PERMANENCE_RE = /^\s*[—:-]?\s*(PERMANENT|CONVERGEABLE)\b/u;
 
+/**
+ * A story id, spelled as `scripts/stale-story-references.ts` spells it. A
+ * `CONVERGEABLE` receipt points at the story that converges it and the story
+ * IS the reason, so the id is data and survives; the stale-story-refs lint
+ * checks separately that the story exists.
+ */
+const STORY_ID_RE = /^[\s:—-]*\(?(?:story\s+)?([a-z0-9]+(?:-[a-z0-9]+){2,})\)?/u;
+
 /** Tags whose permanence claim the extractors switch on. */
 const REQUIRES_PERMANENCE = new Set(["noRailsEquivalent", "missingRailsCall", "missingRailsArgs"]);
 
@@ -221,7 +229,11 @@ function renderTag({ name, text }) {
   // tag is left exactly as written, for a human to classify.
   if (REQUIRES_PERMANENCE.has(name) && !permanence) return null;
   if (takesSubject && rubyCall === "") return null;
-  return [`@${name}`, rubyCall, rubyCall && permanence && "—", permanence?.[1]]
+  const story =
+    permanence?.[1] === "CONVERGEABLE"
+      ? STORY_ID_RE.exec((takesSubject ? rest : text).slice(permanence[0].length))?.[1]
+      : undefined;
+  return [`@${name}`, rubyCall, rubyCall && permanence && "—", permanence?.[1], story]
     .filter(Boolean)
     .join(" ");
 }

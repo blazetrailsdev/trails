@@ -1,5 +1,7 @@
 import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
 import { SQLString } from "../collectors/sql-string.js";
+import { ArelError } from "../errors.js";
+import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface ArelEngine {
   connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
@@ -62,3 +64,4 @@ type _FactoryMethodsModule = import("../factory-methods.js").FactoryMethodsModul
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
    @typescript-eslint/no-unsafe-declaration-merging */
 export interface Node extends _FactoryMethodsModule {}
+setRubyNamespace(Node, "Arel::Nodes");

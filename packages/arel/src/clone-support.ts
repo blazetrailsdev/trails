@@ -1,9 +1,17 @@
-/** @internal */
+/** @noRailsEquivalent PERMANENT */
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export function objectClone<T extends object>(self: T): T {
   return Object.assign(Object.create(Object.getPrototypeOf(self) as object) as T, self);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export function cloneSlot<T>(value: T): T {
   if (Array.isArray(value)) return [...value] as T;
   if (typeof value !== "object" || value === null) return value;

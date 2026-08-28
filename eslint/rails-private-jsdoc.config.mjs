@@ -69,6 +69,7 @@ export default [
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction

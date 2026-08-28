@@ -1,4 +1,4 @@
-import { isHashAnalogue, rubyClassName } from "./ruby-class.js";
+import { isHashAnalogue, rubyClassName, rubyConstantName } from "./ruby-class.js";
 
 function describeClass(object: unknown): string {
   const rubyClass = rubyClassName(object);
@@ -12,7 +12,7 @@ export type NodeCtor = abstract new (...args: never[]) => object;
  * @noRailsEquivalent TypeScript-only ctor type; Ruby dispatches on the class object directly.
  */
 type VisitorCtor = (abstract new (...args: never[]) => Visitor) &
-  Pick<typeof Visitor, "dispatchCache"> & { registerDispatch?: () => void };
+  Pick<typeof Visitor, "dispatchCache">;
 
 const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
 
@@ -40,7 +40,6 @@ export abstract class Visitor {
           : undefined;
       cache = new Map(inherited);
       PER_CLASS_CACHE.set(this, cache);
-      if (Object.hasOwn(this, "registerDispatch")) this.registerDispatch?.();
     }
     return cache;
   }
@@ -83,20 +82,23 @@ export abstract class Visitor {
   }
 
   private resolveDispatch(ctor: NodeCtor): string | undefined {
-    const direct = this.dispatch.get(ctor);
-    if (direct && this.respondsTo(direct)) return direct;
     let cur: NodeCtor | null = ctor;
     while (cur) {
-      const proto = Object.getPrototypeOf(cur.prototype) as object | null;
-      const parent = proto?.constructor as NodeCtor | undefined;
-      if (!parent || (parent as unknown) === Object) return undefined;
-      const found = this.dispatch.get(parent);
+      const found = this.dispatch.get(cur) ?? this.deriveDispatch(cur);
       if (found && this.respondsTo(found)) {
         this.dispatch.set(ctor, found);
         return found;
       }
-      cur = parent;
+      const proto = Object.getPrototypeOf(cur.prototype) as object | null;
+      const parent = proto?.constructor as NodeCtor | undefined;
+      cur = !parent || (parent as unknown) === Object ? null : parent;
     }
     return undefined;
+  }
+
+  private deriveDispatch(ctor: NodeCtor): string | undefined {
+    const klassName = rubyConstantName(ctor);
+    if (klassName === null) return undefined;
+    return `visit${klassName.replaceAll("::", "")}`;
   }
 }

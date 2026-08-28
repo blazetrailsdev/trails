@@ -1,1 +1,7 @@
-{}
+{
+  "packages/date/src/test-date-attr.test.ts": 1,
+  "packages/date/src/test-date-parse.test.ts": 1,
+  "packages/date/src/test-date-strftime.test.ts": 3,
+  "packages/date/src/test-date-strptime.test.ts": 1,
+  "packages/date/src/test-switch-hitter.test.ts": 1
+}

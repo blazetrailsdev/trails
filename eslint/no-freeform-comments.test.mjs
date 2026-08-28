@@ -147,6 +147,23 @@ tester.run("no-freeform-comments (tag documents keep data, not prose)", rule, {
       errors: prose,
       output: `/**\n * @internal\n * @noRailsEquivalent CONVERGEABLE\n */\nconst x = 1;\n`,
     },
+    // A `CONVERGEABLE` receipt's story id is the receipt: it survives, and the
+    // prose after it does not.
+    {
+      code: `/**\n * @noRailsEquivalent CONVERGEABLE some-story-slug: the reason.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent CONVERGEABLE some-story-slug */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * @missingRailsCall build! — CONVERGEABLE (story some-story-slug): the reason.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @missingRailsCall build! — CONVERGEABLE some-story-slug */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * @noRailsEquivalent PERMANENT some-story-slug: the reason.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n`,
+    },
     // `@param` / `@returns` / `@example` carry English by construction and
     // nothing reads them, so a block of them alone goes entirely.
     {

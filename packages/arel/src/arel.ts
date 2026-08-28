@@ -32,7 +32,6 @@ export function star(): SqlLiteral {
   return sql("*", { retryable: true });
 }
 
-/** @internal */
 export function arelNode(value: unknown): boolean {
   return (
     value instanceof Node ||
@@ -41,7 +40,6 @@ export function arelNode(value: unknown): boolean {
   );
 }
 
-/** @internal */
 export function fetchAttribute(value: unknown, block: (attr: Node) => unknown): unknown {
   if (typeof value !== "string") {
     return (value as Node).fetchAttribute(block);
