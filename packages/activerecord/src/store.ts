@@ -166,7 +166,6 @@ export class HashAccessor {
   static prepare(object: Base, attribute: string): void {
     const val = object.readAttribute(attribute);
     if (val === null || val === undefined) {
-      // store.rb:181 — `object.public_send :"#{attribute}=", {} unless object.send(attribute)`.
       object.writeAttribute(attribute, {});
     } else if (
       typeof val === "object" &&
@@ -241,7 +240,7 @@ export class StringKeyedHashAccessor extends HashAccessor {
   }
 }
 
-export interface StoreAccessorOptions {
+interface StoreAccessorOptions {
   prefix?: boolean | string;
   suffix?: boolean | string;
 }
@@ -250,7 +249,7 @@ export interface StoreAccessorOptions {
  * `store_accessor(store_attribute, *keys, prefix: nil, suffix: nil)`
  * (store.rb:117) — the keys are positional and the kwargs trail them.
  */
-export type StoreAccessorArgs =
+type StoreAccessorArgs =
   | Array<string | string[]>
   | [...keys: Array<string | string[]>, options: StoreAccessorOptions];
 
@@ -287,7 +286,6 @@ function storeAccessor(
     prefix = last.prefix ?? null;
     suffix = last.suffix ?? null;
   }
-  // store.rb:118 — `keys = keys.flatten`.
   const keys = (args as Array<string | string[]>).flat();
 
   const accessorPrefix =
@@ -417,13 +415,11 @@ function store(this: typeof Base, storeAttribute: string, options: StoreOptions 
     coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
   });
 
-  // store.rb:109 — `store_accessor(store_attribute, options[:accessors],
-  // **options.slice(:prefix, :suffix)) if options.has_key? :accessors`.
   if (options.accessors !== undefined) {
-    const sliced: StoreAccessorOptions = {};
-    if (options.prefix !== undefined) sliced.prefix = options.prefix;
-    if (options.suffix !== undefined) sliced.suffix = options.suffix;
-    this.storeAccessor(storeAttribute, options.accessors, sliced);
+    this.storeAccessor(storeAttribute, options.accessors, {
+      prefix: options.prefix,
+      suffix: options.suffix,
+    });
   }
 }
 
