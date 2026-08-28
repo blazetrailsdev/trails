@@ -35,7 +35,7 @@ interface TimeZoneConversionIncludeHost {
  * and its private `ClassMethods#hook_attribute_type` is the `this`-typed
  * {@link hookAttributeType} below (CLAUDE.md, "Module mixins").
  *
- * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion (time_zone_conversion.rb:7-84)
+ * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion (time_zone_conversion.rb:7-82)
  */
 export const TimeZoneConversion = {
   [included](base: TimeZoneConversionIncludeHost): void {

@@ -18,7 +18,7 @@ interface QueryHost {
  * (CLAUDE.md, "Module mixins"), gathered here so the seat can take a real
  * `include()` call.
  *
- * Mirrors: ActiveRecord::AttributeMethods::Query (query.rb:6-46)
+ * Mirrors: ActiveRecord::AttributeMethods::Query (query.rb:6-48)
  */
 export const Query = {
   queryAttribute,

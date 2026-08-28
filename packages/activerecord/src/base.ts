@@ -4682,10 +4682,6 @@ include(Base, _CompositePrimaryKey);
 // `ClassMethods#hook_attribute_type` reaches `Base` through the class-body
 // `hookAttributeType` above.
 include(Base, _TimeZoneConversion);
-// attribute_methods.rb:20 — `include Serialization`. It defines no instance
-// methods either (serialization.rb:6-232 is a `ClassMethods` module and the
-// `ColumnSerializer` class), and its one public class method reaches `Base` as
-// the class-body `static serialize` above, so this seat takes no `include()`.
 // `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
 // `ActiveRecord::AttributeMethods::Dirty` builds on, and which
 // `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
@@ -4698,6 +4694,10 @@ include(Base, AMDirty);
 // The accessor-property half of AttributeMethods::Dirty. A class module, so
 // `include()` copies the getter descriptors rather than flattening them.
 include(Base, _Dirty);
+// attribute_methods.rb:20 — `include Serialization`. It defines no instance
+// methods either (serialization.rb:6-230 is a `ClassMethods` module and the
+// `ColumnSerializer` class), and its one public class method reaches `Base` as
+// the class-body `static serialize` above, so this seat takes no `include()`.
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
