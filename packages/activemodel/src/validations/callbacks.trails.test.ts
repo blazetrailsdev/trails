@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { include, type Extended } from "@blazetrails/activesupport";
+import { Callbacks as ASCallbacks, include, type Extended } from "@blazetrails/activesupport";
 import { Callbacks as ValidationsCallbacks } from "./callbacks.js";
 
 describe("ValidationsCallbacksStandaloneTest", () => {
@@ -7,9 +7,8 @@ describe("ValidationsCallbacksStandaloneTest", () => {
     const history: string[] = [];
 
     class Dog {
-      declare static beforeValidation: Extended<
-        typeof ValidationsCallbacks.ClassMethods
-      >["beforeValidation"];
+      declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
     }
     include(Dog as never, ValidationsCallbacks);
 

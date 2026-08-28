@@ -184,7 +184,6 @@ import {
   type PrependMethod,
   singularize as _singularize,
   type Included,
-  type Extended,
   type ParameterFilter,
   peekCallbackChain,
   runCallbacks,
@@ -831,12 +830,8 @@ export class Base extends Model {
   declare static includeRootInJson: boolean | string;
 
   /** `include ActiveModel::Validations::Callbacks` (callbacks.rb:413). */
-  declare static beforeValidation: Extended<
-    typeof ValidationsCallbacks.ClassMethods
-  >["beforeValidation"];
-  declare static afterValidation: Extended<
-    typeof ValidationsCallbacks.ClassMethods
-  >["afterValidation"];
+  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
+  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 
   // --- Translation mixin (wired via extend() after class) ---
   // Normalization
