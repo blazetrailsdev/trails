@@ -1266,7 +1266,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     columnName: string | string[],
     options?: { unique?: boolean; name?: string; valid?: boolean },
   ): Promise<boolean> {
-    return this.connection.indexExists(this._pt(tableName), columnName, options);
+    if (options !== undefined) {
+      return this.connection.indexExists(this._pt(tableName), columnName, options);
+    }
+    return this.connection.indexExists(this._pt(tableName), columnName);
   }
 
   /**
