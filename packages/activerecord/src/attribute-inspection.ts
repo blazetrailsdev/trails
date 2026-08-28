@@ -1,4 +1,4 @@
-import { ParameterFilter } from "@blazetrails/activesupport";
+import { inspect, ParameterFilter } from "@blazetrails/activesupport";
 
 export class InspectionMask {
   private _value: string;
@@ -70,7 +70,7 @@ export function formatForInspect(this: any, name: string, value: unknown): strin
   if (filtered instanceof InspectionMask) return filtered.toString();
   if (filtered === null || filtered === undefined) return "nil";
   if (typeof filtered === "string") {
-    return filtered.length > 50 ? `"${filtered.substring(0, 50)}..."` : `"${filtered}"`;
+    return filtered.length > 50 ? inspect(`${filtered.substring(0, 50)}...`) : inspect(filtered);
   }
   // boundary: legacy custom-typed attributes may still be JS Date.
   if (filtered instanceof Date) {
