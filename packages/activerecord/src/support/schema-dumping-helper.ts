@@ -1,6 +1,7 @@
 import { SchemaDumper as BaseSchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
+import { Base } from "../base.js";
 
 export const FULL_DUMP_TIMEOUT_MS = 30_000;
 
@@ -17,8 +18,8 @@ export async function dumpTableSchema(pool: SchemaSource, ...tables: string[]): 
 }
 
 export async function dumpAllTableSchema(
-  pool: SchemaSource,
   ignoreTables: (string | RegExp)[] = [],
+  pool: Parameters<typeof SchemaDumper.dump>[0] = Base.connectionPool(),
 ): Promise<string> {
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;

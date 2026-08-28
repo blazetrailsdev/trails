@@ -1575,8 +1575,8 @@ async function instanceUpdateRecord(
  */
 export async function _createRecord(
   this: PersistenceInstanceChainHost,
-  block?: (record: any) => void,
   attributeNames?: string[],
+  block?: (record: any) => void,
 ): Promise<unknown> {
   const ctor = this.constructor;
   // Initialize the locking column from its schema default so a new record's

@@ -36,18 +36,18 @@ export class AliasTracker {
   readonly aliases: Map<string, number>;
   private _tableAliasLength: number;
   private _joins: any[];
-  private _quoter?: Quoting;
+  private _connection?: Quoting;
 
   constructor(
     tableAliasLength?: number,
     aliases?: Map<string, number>,
     joins?: any[],
-    quoter?: Quoting,
+    connection?: Quoting,
   ) {
     this._tableAliasLength = tableAliasLength ?? DEFAULT_TABLE_ALIAS_LENGTH;
     this.aliases = aliases ?? new Map();
     this._joins = joins ?? [];
-    this._quoter = quoter;
+    this._connection = connection;
   }
 
   /** @missingRailsCall initial_count_for — PERMANENT */
@@ -56,24 +56,21 @@ export class AliasTracker {
     initialTable: string,
     joins: any[],
     aliases?: Map<string, number>,
-    quoter?: Quoting,
   ): AliasTracker {
-    const tal = pool?.tableAliasLength;
-    const tableAliasLength =
-      typeof tal === "function"
-        ? tal.call(pool)
-        : typeof tal === "number"
-          ? tal
-          : DEFAULT_TABLE_ALIAS_LENGTH;
+    const connection =
+      typeof pool?.tableAliasLength === "function"
+        ? pool
+        : (pool?.activeConnection ?? pool?.leaseConnectionSync?.());
+    const tableAliasLength = connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH;
 
     const map = aliases ? new Map(aliases) : new Map<string, number>();
     map.set(initialTable, 1);
-    return new AliasTracker(tableAliasLength, map, joins, quoter);
+    return new AliasTracker(tableAliasLength, map, joins, connection);
   }
 
   /** @missingRailsCall size — PERMANENT */
-  static initialCountFor(quoter: Quoting | undefined, name: string, tableJoins: any[]): number {
-    const quotedName = quoter ? quoter.quoteTableName(name) : `"${name}"`;
+  static initialCountFor(connection: Quoting | undefined, name: string, tableJoins: any[]): number {
+    const quotedName = connection ? connection.quoteTableName(name) : `"${name}"`;
     const quotedNameEscaped = quotedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const nameEscaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(
@@ -100,7 +97,7 @@ export class AliasTracker {
   private _getCount(key: string): number {
     if (this.aliases.has(key)) return this.aliases.get(key)!;
     if (this._joins.length > 0) {
-      const count = AliasTracker.initialCountFor(this._quoter, key, this._joins);
+      const count = AliasTracker.initialCountFor(this._connection, key, this._joins);
       this.aliases.set(key, count);
       return count;
     }

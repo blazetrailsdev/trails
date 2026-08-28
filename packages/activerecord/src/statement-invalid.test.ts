@@ -39,7 +39,7 @@ describe("StatementInvalidTest", () => {
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
     const error = (await assertRaises([StatementInvalid], {}, () =>
       conn.log(sql, "Book", [], [], false, () =>
-        conn.withRawConnection(() => {
+        conn.withRawConnection({}, () => {
           throw mockDatabaseError();
         }),
       ),
@@ -53,7 +53,7 @@ describe("StatementInvalidTest", () => {
     const binds = [{}, {}];
     const error = (await assertRaises([StatementInvalid], {}, () =>
       conn.log(sql, "Book", binds, [], false, () =>
-        conn.withRawConnection(() => {
+        conn.withRawConnection({}, () => {
           throw mockDatabaseError();
         }),
       ),

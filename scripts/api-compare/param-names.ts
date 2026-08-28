@@ -99,6 +99,25 @@ function isLegitimateDifference(ruby: ParamInfo, ts: ParamInfo): boolean {
   return isGroup && COLLAPSED_GROUP_NAMES.has(bareIdentifier(ts.name));
 }
 
+/** The Ruby kwarg group collapsed into the single options slot the port bundles
+ *  it into — the same candidate form arity.ts builds
+ *  (`collapseKeywordsIntoOptionsObject`), so the two checks absorb the same
+ *  convention. Only with ≥2 keywords: one kwarg already maps 1:1 onto the slot
+ *  and is compared by name like any other parameter. Used solely as an extra
+ *  Ruby-side form, so it can only ever *gain* a match. */
+function collapseKeywordsIntoOptionsObject(params: ParamInfo[]): ParamInfo[] | null {
+  const isKeyword = (p: ParamInfo) => p.kind === "keyword" || p.kind === "keyword_rest";
+  if (params.filter(isKeyword).length < 2) return null;
+  return [...params.filter((p) => !isKeyword(p)), { name: "options", kind: "keyword" }];
+}
+
+/** The Ruby candidate forms, in the order arity.ts tries them. */
+function rubyForms(ruby: ParamInfo[]): ParamInfo[][] {
+  const positional = rubyPositional(ruby);
+  const collapsed = collapseKeywordsIntoOptionsObject(positional);
+  return collapsed ? [positional, collapsed] : [positional];
+}
+
 /** Every TS candidate form that lines up with `rubyList` position-for-position.
  *  Empty when none does — a length disagreement is arity's finding. */
 export function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): ParamInfo[][] {
@@ -124,26 +143,27 @@ function tsForms(ts: ParamInfo[]): ParamInfo[][] {
  * arity's finding, and reporting it twice would double-charge one divergence.
  */
 export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamNameMismatch[] {
-  const rubyList = rubyPositional(ruby);
   let best: ParamNameMismatch[] | null = null;
   // Several forms can align — `with_node(node)` against `withNode(node, block)`
   // lines up both as receiver-stripped `(block)` and as callback-stripped
   // `(node)`. The strips exist to ABSORB the port's conventions, so the reading
   // that absorbs the most is the honest one; taking the first would invent a
   // rename out of the very convention the strip is there to recognise.
-  for (const form of alignedTsForms(rubyList, ts)) {
-    const mismatches: ParamNameMismatch[] = [];
-    for (let position = 0; position < rubyList.length; position++) {
-      const rubyParam = rubyList[position];
-      const tsParam = form[position];
-      const expected = bareIdentifier(snakeToCamel(rubyParam.name));
-      const actual = bareIdentifier(tsParam.name);
-      if (expected === actual) continue;
-      if (isLegitimateDifference(rubyParam, tsParam)) continue;
-      mismatches.push({ position, ruby: expected, ts: actual });
+  for (const rubyList of rubyForms(ruby)) {
+    for (const form of alignedTsForms(rubyList, ts)) {
+      const mismatches: ParamNameMismatch[] = [];
+      for (let position = 0; position < rubyList.length; position++) {
+        const rubyParam = rubyList[position];
+        const tsParam = form[position];
+        const expected = bareIdentifier(snakeToCamel(rubyParam.name));
+        const actual = bareIdentifier(tsParam.name);
+        if (expected === actual) continue;
+        if (isLegitimateDifference(rubyParam, tsParam)) continue;
+        mismatches.push({ position, ruby: expected, ts: actual });
+      }
+      if (mismatches.length === 0) return [];
+      if (best === null || mismatches.length < best.length) best = mismatches;
     }
-    if (mismatches.length === 0) return [];
-    if (best === null || mismatches.length < best.length) best = mismatches;
   }
   return best ?? [];
 }
@@ -166,13 +186,13 @@ export function matchParamNamesAgainst(
   ruby: ParamInfo[],
   candidates: ParamInfo[][],
 ): ParamNameVerdict {
-  const rubyList = rubyPositional(ruby);
+  const forms = rubyForms(ruby);
   let best: ParamNameMismatch[] | null = null;
   for (const c of candidates) {
     // A candidate that lines up with NO form is not this method's signature at
     // all (a 0-arg re-export binding sharing the name); letting it count as
     // clean would clear a real rename on the implementation beside it.
-    if (alignedTsForms(rubyList, c).length === 0) continue;
+    if (forms.every((rl) => alignedTsForms(rl, c).length === 0)) continue;
     const rows = compareParamNames(ruby, c);
     if (rows.length === 0) return { aligned: true, rows: [] };
     if (best === null || rows.length < best.length) best = rows;

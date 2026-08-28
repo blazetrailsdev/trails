@@ -9,7 +9,7 @@ import type { AttributeOptions } from "./attributes.js";
 export interface AttributeRegistrationClassMethods {
   attribute(
     name: string,
-    typeName?: string | Type | AttributeOptions,
+    type?: string | Type | AttributeOptions,
     options?: AttributeOptions,
   ): void;
   _defaultAttributes(): AttributeSet;
@@ -107,33 +107,34 @@ export const ClassMethods = {
   attribute(
     this: AttributeRegistrationHost,
     name: string,
-    typeName?: string | Type | AttributeOptions,
+    type?: string | Type | AttributeOptions,
     options?: AttributeOptions,
   ): void {
     name = this.resolveAttributeName(name);
-    if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
-      options = typeName;
-      typeName = undefined;
+    if (type !== undefined && typeof type !== "string" && !(type instanceof Type)) {
+      options = type;
+      type = undefined;
     }
-    const typeProvided = typeName !== undefined;
+    const typeProvided = type !== undefined;
     const { default: _default, ...typeOptions } = options ?? {};
-    let type: Type | null = null;
     if (typeProvided) {
       type =
-        typeName instanceof Type
-          ? typeName
+        type instanceof Type
+          ? type
           : this.resolveTypeName(
-              typeName as string,
+              type as string,
               Object.keys(typeOptions).length > 0
                 ? (typeOptions as Record<string, unknown>)
                 : undefined,
             );
-      type = this.hookAttributeType(name, type);
+      type = this.hookAttributeType(name, type as Type);
     }
 
     const noDefault = options?.default === undefined;
     if (type != null || noDefault) {
-      this.pendingAttributeModifications().push(new PendingType(name, type));
+      this.pendingAttributeModifications().push(
+        new PendingType(name, typeProvided ? (type as Type) : null),
+      );
     }
     if (!noDefault) {
       this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));

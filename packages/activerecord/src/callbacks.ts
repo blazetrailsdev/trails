@@ -102,7 +102,11 @@ export function createOrUpdate(this: any, block?: (record: any) => void): Promis
 }
 
 /** @internal */
-export async function _createRecord(this: any, block?: (record: any) => void): Promise<boolean> {
+export async function _createRecord(
+  this: any,
+  attributeNames?: string[],
+  block?: (record: any) => void,
+): Promise<boolean> {
   // Rails: _run_create_callbacks { super }, whose value is the block's return
   // (run_callbacks returns env.value). Rails coerces one level up, in
   // create_or_update: `result != false` (persistence.rb:895) — so a nil/absent
@@ -116,7 +120,9 @@ export async function _createRecord(this: any, block?: (record: any) => void): P
   return (
     (await runCallbacks(this, "create", () =>
       dirtyCreateRecord.call(this, () =>
-        counterCacheCreateRecord.call(this, () => persistenceCreateRecord.call(this, block)),
+        counterCacheCreateRecord.call(this, () =>
+          persistenceCreateRecord.call(this, attributeNames, block),
+        ),
       ),
     )) !== false
   );

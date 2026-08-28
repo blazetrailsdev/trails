@@ -56,13 +56,13 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     const order: number[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const p1 = a.withRawConnection(async () => {
+    const p1 = a.withRawConnection({}, async () => {
       order.push(1);
       await gate;
       order.push(2);
       return "a";
     });
-    const p2 = a.withRawConnection(async () => {
+    const p2 = a.withRawConnection({}, async () => {
       order.push(3);
       return "b";
     });

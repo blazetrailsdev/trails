@@ -624,7 +624,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("dumping schemas", async () => {
-      const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/./]);
+      const output = await dumpAllTableSchema([/./], adapter as unknown as SchemaSource);
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);
