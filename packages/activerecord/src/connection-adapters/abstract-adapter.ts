@@ -2097,7 +2097,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  lookupCastType(sqlType: string | number | null): Type {
+  lookupCastType(sqlType: string | null): Type {
     return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
   }
 

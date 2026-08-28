@@ -135,7 +135,7 @@ export function castBoundValue(value: unknown): unknown {
 
 export interface QuotingHost {
   /** @internal */
-  lookupCastType(sqlType: string | number | null): unknown;
+  lookupCastType(sqlType: string | null): unknown;
 }
 
 export function lookupCastTypeFromColumn(
@@ -295,8 +295,8 @@ function typeCastedBinds(
 }
 
 /** @internal */
-export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | number | null): Type {
-  return this.typeMap.lookup(sqlType as string | null);
+export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | null): Type {
+  return this.typeMap.lookup(sqlType);
 }
 
 /** @internal */

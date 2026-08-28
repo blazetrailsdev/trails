@@ -1851,7 +1851,7 @@ export class PostgreSQLAdapter
    * @missingRailsCall quote — PERMANENT
    * @missingRailsCall to_i — PERMANENT
    */
-  override lookupCastType(sqlType: string | number | null): Type {
+  override lookupCastType(sqlType: string | null): Type {
     if (typeof sqlType === "string") {
       sqlType = sqlType
         .replace(/\([^)]*\)/, "")
