@@ -931,7 +931,7 @@ export class AbstractAdapter implements Quoting {
    * @noRailsEquivalent CONVERGEABLE
    */
   get typeRegistryKey(): AdapterName {
-    return adapterNameFromConfig(this._config.adapter as string | undefined);
+    return adapterNameFromConfig(this.pool.dbConfig.adapter ?? undefined);
   }
 
   isConnected(): boolean {
