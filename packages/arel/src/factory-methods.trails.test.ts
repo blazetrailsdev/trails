@@ -8,7 +8,7 @@ describe("TestFactoryMethods (trails)", () => {
 
   it("lower wraps non-Node arguments via buildQuoted", () => {
     const fn = users.lower("name");
-    expect(fn.expressions[0]).toBeInstanceOf(Nodes.Quoted);
+    expect((fn.expressions as Nodes.NodeOrValue[])[0]).toBeInstanceOf(Nodes.Quoted);
     expect(visitor.compile(fn)).toBe("LOWER('name')");
   });
 
@@ -24,7 +24,7 @@ describe("TestFactoryMethods (trails)", () => {
 
   it("cast delegates to .as(type) for a retryable alias", () => {
     const fn = users.cast(users.get("age"), "VARCHAR");
-    const asNode = fn.expressions[0] as Nodes.As;
+    const asNode = (fn.expressions as Nodes.NodeOrValue[])[0] as Nodes.As;
     expect(asNode).toBeInstanceOf(Nodes.As);
     const right = asNode.right as Nodes.SqlLiteral;
     expect(right).toBeInstanceOf(Nodes.SqlLiteral);

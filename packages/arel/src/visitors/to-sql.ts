@@ -118,7 +118,7 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesExists(o: Nodes.Exists, collector: SQLString): SQLString {
     collector.append("EXISTS (");
-    this.visit(o.expressions[0], collector);
+    this.visit(o.expressions, collector);
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
@@ -471,7 +471,7 @@ export class ToSql extends Visitor {
     collector.append(o.name);
     collector.append("(");
     if (o.distinct) collector.append("DISTINCT ");
-    this.injectJoin(o.expressions, collector, ", ");
+    this.injectJoin(o.expressions as Nodes.NodeOrValue[], collector, ", ");
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
@@ -1209,7 +1209,7 @@ export class ToSql extends Visitor {
     collector.retryable = false;
     collector.append(`${name}(`);
     if (o.distinct) collector.append("DISTINCT ");
-    this.injectJoin(o.expressions, collector, ", ");
+    this.injectJoin(o.expressions as Nodes.NodeOrValue[], collector, ", ");
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
