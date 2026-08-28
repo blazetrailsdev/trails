@@ -551,7 +551,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
     const tname = this._pt(name);
-    await this.connection.createTable(tname, optionsOrFn, fn);
+    if (fn !== undefined) {
+      await this.connection.createTable(tname, optionsOrFn, fn);
+    } else if (optionsOrFn !== undefined) {
+      await this.connection.createTable(tname, optionsOrFn);
+    } else {
+      await this.connection.createTable(tname);
+    }
   }
 
   /**
@@ -587,10 +593,14 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     // Ruby passes the block on its own channel (`&block`), which `drop_table`
     // ignores and the recorder keeps; TS has only a trailing argument, so the
     // adapter drops a trailing function the same way Ruby's signature does.
-    if (options !== undefined) {
+    if (options !== undefined && block !== undefined) {
       await this.connection.dropTable(...tnames, options, block);
-    } else {
+    } else if (options !== undefined) {
+      await this.connection.dropTable(...tnames, options);
+    } else if (block !== undefined) {
       await this.connection.dropTable(...tnames, block);
+    } else {
+      await this.connection.dropTable(...tnames);
     }
   }
 
@@ -669,7 +679,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     type?: string | null,
     options?: ColumnExistsOptions,
   ): Promise<boolean> {
-    return this.connection.columnExists(this._pt(tableName), columnName, type, options);
+    if (options !== undefined) {
+      return this.connection.columnExists(this._pt(tableName), columnName, type, options);
+    } else if (type !== undefined) {
+      return this.connection.columnExists(this._pt(tableName), columnName, type);
+    }
+    return this.connection.columnExists(this._pt(tableName), columnName);
   }
 
   async changeColumnDefault(
@@ -688,7 +703,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     defaultValue?: unknown,
   ): Promise<void> {
     tableName = this._pt(tableName);
-    await this.connection.changeColumnNull(tableName, columnName, allowNull, defaultValue);
+    if (defaultValue !== undefined) {
+      await this.connection.changeColumnNull(tableName, columnName, allowNull, defaultValue);
+    } else {
+      await this.connection.changeColumnNull(tableName, columnName, allowNull);
+    }
   }
 
   async addReference(
@@ -755,7 +774,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   ): Promise<void> {
     fromTable = this._pt(fromTable);
     if (typeof toTableOrOptions === "string") toTableOrOptions = this._pt(toTableOrOptions);
-    await this.connection.removeForeignKey(fromTable, toTableOrOptions, options);
+    if (options !== undefined) {
+      await this.connection.removeForeignKey(fromTable, toTableOrOptions, options);
+    } else if (toTableOrOptions !== undefined) {
+      await this.connection.removeForeignKey(fromTable, toTableOrOptions);
+    } else {
+      await this.connection.removeForeignKey(fromTable);
+    }
   }
 
   async addCheckConstraint(
@@ -780,7 +805,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     options?: { name?: string; ifExists?: boolean },
   ): Promise<void> {
     tableName = this._pt(tableName);
-    await this.connection.removeCheckConstraint(tableName, expressionOrOptions, options);
+    if (options !== undefined) {
+      await this.connection.removeCheckConstraint(tableName, expressionOrOptions, options);
+    } else if (expressionOrOptions !== undefined) {
+      await this.connection.removeCheckConstraint(tableName, expressionOrOptions);
+    } else {
+      await this.connection.removeCheckConstraint(tableName);
+    }
   }
 
   async validateCheckConstraint(
@@ -801,7 +832,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
       ValidateConstraintStatements;
-    await connection.validateForeignKey(this._pt(fromTable), toTable, opts);
+    if (opts !== undefined) {
+      await connection.validateForeignKey(this._pt(fromTable), toTable, opts);
+    } else if (toTable !== undefined) {
+      await connection.validateForeignKey(this._pt(fromTable), toTable);
+    } else {
+      await connection.validateForeignKey(this._pt(fromTable));
+    }
   }
 
   async changeColumnComment(
@@ -822,12 +859,20 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter & ExtensionStatements;
-    await connection.enableExtension(name, options);
+    if (options !== undefined) {
+      await connection.enableExtension(name, options);
+    } else {
+      await connection.enableExtension(name);
+    }
   }
 
   async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter & ExtensionStatements;
-    await connection.disableExtension(name, options);
+    if (options !== undefined) {
+      await connection.disableExtension(name, options);
+    } else {
+      await connection.disableExtension(name);
+    }
   }
 
   async createEnum(
@@ -836,7 +881,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     options?: Record<string, unknown>,
   ): Promise<void> {
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter & EnumStatements;
-    await connection.createEnum(name, values, options);
+    if (options !== undefined) {
+      await connection.createEnum(name, values, options);
+    } else {
+      await connection.createEnum(name, values);
+    }
   }
 
   async dropEnum(
@@ -853,7 +902,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const values = isOptsObj ? undefined : valuesOrOptions;
     const opts = isOptsObj ? valuesOrOptions : (options ?? undefined);
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter & EnumStatements;
-    await connection.dropEnum(name, values, opts);
+    if (opts !== undefined) {
+      await connection.dropEnum(name, values, opts);
+    } else if (values !== undefined) {
+      await connection.dropEnum(name, values);
+    } else {
+      await connection.dropEnum(name);
+    }
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
@@ -869,7 +924,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     tableName = this._pt(tableName);
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
       UniqueConstraintStatements;
-    await connection.addUniqueConstraint(tableName, columnName, options);
+    if (options !== undefined) {
+      await connection.addUniqueConstraint(tableName, columnName, options);
+    } else if (columnName !== undefined) {
+      await connection.addUniqueConstraint(tableName, columnName);
+    } else {
+      await connection.addUniqueConstraint(tableName);
+    }
   }
 
   async removeUniqueConstraint(
@@ -888,7 +949,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     tableName = this._pt(tableName);
     const connection = this.connection as DatabaseAdapter as DatabaseAdapter &
       UniqueConstraintStatements;
-    await connection.removeUniqueConstraint(tableName, columnName, opts);
+    if (opts !== undefined) {
+      await connection.removeUniqueConstraint(tableName, columnName, opts);
+    } else if (columnName !== undefined) {
+      await connection.removeUniqueConstraint(tableName, columnName);
+    } else {
+      await connection.removeUniqueConstraint(tableName);
+    }
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
@@ -921,7 +988,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
     table1 = this._pt(table1);
-    await this.connection.createJoinTable(table1, table2, options, fn);
+    if (fn !== undefined) {
+      await this.connection.createJoinTable(table1, table2, options, fn);
+    } else if (options !== undefined) {
+      await this.connection.createJoinTable(table1, table2, options);
+    } else {
+      await this.connection.createJoinTable(table1, table2);
+    }
   }
 
   async dropJoinTable(
@@ -930,7 +1003,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     options?: { tableName?: string },
   ): Promise<void> {
     table1 = this._pt(table1);
-    await this.connection.dropJoinTable(table1, table2, options);
+    if (options !== undefined) {
+      await this.connection.dropJoinTable(table1, table2, options);
+    } else {
+      await this.connection.dropJoinTable(table1, table2);
+    }
   }
 
   /**
@@ -948,7 +1025,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     fnOrOptions?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    await this.connection.changeTable(this._pt(tableName), fnOrOptions, fn);
+    if (fn !== undefined) {
+      await this.connection.changeTable(this._pt(tableName), fnOrOptions, fn);
+    } else if (fnOrOptions !== undefined) {
+      await this.connection.changeTable(this._pt(tableName), fnOrOptions);
+    } else {
+      await this.connection.changeTable(this._pt(tableName));
+    }
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -1183,7 +1266,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     columnName: string | string[],
     options?: { unique?: boolean; name?: string; valid?: boolean },
   ): Promise<boolean> {
-    return this.connection.indexExists(this._pt(tableName), columnName, options);
+    if (options !== undefined) {
+      return this.connection.indexExists(this._pt(tableName), columnName, options);
+    }
+    return this.connection.indexExists(this._pt(tableName), columnName);
   }
 
   /**

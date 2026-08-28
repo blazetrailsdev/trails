@@ -807,13 +807,6 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
     this: CommandRecorder,
     ...args: unknown[]
   ): Promise<void> {
-    // Ruby's `*args` carries only the arguments actually passed
-    // (command_recorder.rb:125-132); a TS caller that forwards optional
-    // parameters positionally materializes trailing `undefined`s where Ruby's
-    // `**options, &block` pass nothing — `Migration#createTable`
-    // (migration.ts:554) hands on `(tname, optionsOrFn, fn)` for a call that
-    // gave only a block — so they are dropped before the block is taken.
-    while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
     // Ruby's `&block` takes the trailing block out of `*args`; TS has no block
     // syntax, so the trailing function argument is moved into the block seat.
     const block =
