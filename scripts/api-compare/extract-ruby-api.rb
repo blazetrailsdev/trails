@@ -361,6 +361,7 @@ class ApiExtractor
     # `VALID_OPTIONS`-named symbol arrays per class FQN, expanded when a method
     # body passes the constant to `assert_valid_keys`. See collect_option_keys.
     @const_symbol_arrays = {}
+    @const_symbol_hash_keys = {}
     # `include`/`extend` statements grouped per statement, keyed [fqn, :includes]
     # / [fqn, :extends]. The flat `info[:includes]` the manifest emits loses
     # statement boundaries, but Ruby's ancestor order needs them: a LATER
@@ -648,7 +649,7 @@ class ApiExtractor
   def synthesize_struct_members(fqn, struct_new_node)
     target = @classes[fqn]
     return unless target
-    names = extract_symbol_args(struct_new_node)
+    names = struct_member_names(struct_new_node)
     return if names.empty?
 
     names.each do |name|
@@ -678,6 +679,33 @@ class ApiExtractor
       file: @current_file,
       line: @current_line,
     }
+  end
+
+  # The member names of a `Struct.new(...)` call. Inline symbols
+  # (`Struct.new :relation, :name`, arel/attributes/attribute.rb:5) are read
+  # straight off the args; `Struct.new(*RFC4646_SUBTAGS)`
+  # (i18n/locale/tag/rfc4646.rb:14) names them through a symbol-array constant
+  # instead, resolved the same way the codegen loops resolve theirs.
+  def struct_member_names(struct_new_node)
+    names = extract_symbol_args(struct_new_node)
+    return names unless names.empty?
+    splatted_const_members(struct_new_node) || names
+  end
+
+  # The members of the first `*CONST` splat under `node`, or nil when there is
+  # none or it does not resolve to a symbol array.
+  def splatted_const_members(node)
+    return nil unless node.is_a?(Array)
+    if node[0] == :args_add_star
+      members = resolve_const_symbol_array(const_name(node[2]))
+      return members if members
+    end
+    node.each do |child|
+      next unless child.is_a?(Array)
+      found = splatted_const_members(child)
+      return found if found
+    end
+    nil
   end
 
   # True for `Struct.new(:a, :b, keyword_init: true)`, whose generated
@@ -1707,7 +1735,7 @@ class ApiExtractor
     call = node[1]
     return false unless call.is_a?(Array) && call[0] == :call
     return false unless ident_name(call[3]) == "each"
-    members = literal_array_members(call[1])
+    members = each_loop_members(call[1])
     return false unless members && !members.empty?
 
     block = node[2]
@@ -1758,6 +1786,19 @@ class ApiExtractor
     target[on_class ? :classMethods : :instanceMethods] << entry
   end
 
+  # Members of an `.each` receiver, whichever way it is spelled: a literal
+  # `[:a, :b]` / `%w[a b]` array (time_with_zone.rb:440), a constant resolving
+  # to a symbol array (relation.rb's VALUE_METHODS), or a constant resolving to
+  # a symbol-keyed Hash, whose KEYS are the members (rfc4646.rb:32). Keeping
+  # receiver resolution here — rather than in each recorder — is what makes
+  # receiver kind and template kind (`define_method` vs `class_eval`)
+  # independent instead of a hard-wired pair.
+  def each_loop_members(node)
+    literal_array_members(node) ||
+      resolve_const_symbol_array(const_name(node)) ||
+      resolve_const_symbol_hash_keys(const_name(node))
+  end
+
   # Members of a literal `[:a, :b]` / `%w[a b]` receiver, as strings. Any
   # non-literal element (a constant, a splat, an interpolation) disqualifies the
   # whole array — an unrollable loop must be fully known.
@@ -1798,6 +1839,9 @@ class ApiExtractor
   # such interpolation must be present; anything else returns nil.
   def unrolled_name(node, loop_var, member)
     return nil unless node.is_a?(Array)
+    # `define_method(name)` passes the loop variable itself rather than
+    # interpolating it (rfc4646.rb:33), so the member IS the method name.
+    return member if node[0] == :var_ref && ident_name(node[1]) == loop_var
     return nil unless [:string_literal, :dyna_symbol].include?(node[0])
     content = node[1]
     return nil unless content.is_a?(Array) && content[0] == :string_content
@@ -1904,7 +1948,17 @@ class ApiExtractor
 
     # Local assigned from the `case` (the class_eval template interpolates it).
     name_local, suffix_map = codegen_name_mapping(body, loop_var)
-    return false unless name_local && !suffix_map.empty?
+    if name_local.nil? || suffix_map.empty?
+      # No intermediate `<local> = case …` mapping: the template interpolates
+      # the loop variable directly, so the receiver's own members are the
+      # method names and there is no suffix
+      # (`%w(year mon …).each { class_eval "def #{method_name}…" }`,
+      # time_with_zone.rb:440-448).
+      members = each_loop_members(call[1])
+      return false unless members && !members.empty?
+      name_local = loop_var
+      suffix_map = [[members, ""]]
+    end
 
     forms = codegen_def_forms(body, name_local)
     return false if forms.empty?
@@ -1916,8 +1970,9 @@ class ApiExtractor
     suffix_map.each do |members, suffix|
       members.each do |member|
         base = "#{member}#{suffix}"
-        forms.each do |form|
-          method_name = form == :writer ? "#{base}=" : base
+        forms.each do |suffix_in_def, form|
+          name = "#{base}#{suffix_in_def}"
+          method_name = form == :writer ? "#{name}=" : name
           target[:instanceMethods] << {
             name: method_name,
             visibility: "public",
@@ -2030,8 +2085,10 @@ class ApiExtractor
   end
 
   # Which `def` forms the class_eval/module_eval template defines relative to the
-  # interpolated `name_local`: `:reader` (`def #{name_local}`) and/or `:writer`
-  # (`def #{name_local}=`). Reconstructs the template, replacing each
+  # interpolated `name_local`, as [literal_suffix, :reader|:writer] pairs:
+  # `def #{name_local}` is ["", :reader], `def #{name_local}=` is ["", :writer]
+  # and `def #{name_local}_polymorphic_url` (polymorphic_routes.rb:158) is
+  # ["_polymorphic_url", :reader]. Reconstructs the template, replacing each
   # `#{name_local}` with a sentinel, then scans for `def <sentinel>` occurrences.
   # The sentinel is NUL (never present in Ruby source), so the `\s+` in the scan
   # can't ambiguously consume it the way a whitespace marker could.
@@ -2040,8 +2097,8 @@ class ApiExtractor
     template = codegen_template(body, name_local)
     return [] unless template
     forms = []
-    template.scan(/\bdef\s+#{SENTINEL}(=?)/) do |writer|
-      forms << (writer[0] == "=" ? :writer : :reader)
+    template.scan(/\bdef\s+#{SENTINEL}(\w*[?!]?)(=?)/) do |suffix, writer|
+      forms << [suffix, writer == "=" ? :writer : :reader]
     end
     forms.uniq
   end
@@ -2104,13 +2161,22 @@ class ApiExtractor
   # relative `end_with?` suffix match is skipped, honouring Ruby's rule that
   # `::Foo::KEYS` binds to top-level `Foo`, never a nested `X::Foo`.
   def resolve_const_symbol_array(name)
+    resolve_const_members(name, @const_symbol_arrays)
+  end
+
+  # The keys of a symbol-keyed Hash constant, resolved by the same rules.
+  def resolve_const_symbol_hash_keys(name)
+    resolve_const_members(name, @const_symbol_hash_keys)
+  end
+
+  def resolve_const_members(name, store)
     return nil unless name
     absolute = name.start_with?("::")
     name = name[2..-1] if absolute
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
-    @const_symbol_arrays.each do |fqn, consts|
+    store.each do |fqn, consts|
       next unless consts.key?(const)
       if absolute
         next unless container.empty? ? fqn.empty? : fqn == container
@@ -2339,9 +2405,31 @@ class ApiExtractor
     return unless const.is_a?(Array) && const[0] == :@const
     rhs = unwrap_freeze(rhs)
     maybe_record_collection_constant(const[1], rhs)
+    maybe_record_symbol_hash_keys(const[1], rhs)
     lit = literal_value(rhs)
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
+  end
+
+  # Record a Hash constant whose keys are all literal symbols, keyed the same
+  # way @const_symbol_arrays is, so an `each` loop over it resolves to its keys:
+  # `RFC4646_FORMATS.each do |name, format| define_method(name) …`
+  # (i18n/locale/tag/rfc4646.rb:32-34) installs one method per key. Kept
+  # separate from @const_symbol_arrays so a hash can't inject phantom
+  # `delegate(*CONST, to:)` targets.
+  def maybe_record_symbol_hash_keys(name, rhs)
+    return unless rhs.is_a?(Array) && rhs[0] == :hash
+    assocs = rhs[1]
+    assocs = assocs[1] if assocs.is_a?(Array) && assocs[0] == :assoclist_from_args
+    return unless assocs.is_a?(Array) && !assocs.empty?
+    keys = []
+    assocs.each do |assoc|
+      return unless assoc.is_a?(Array) && assoc[0] == :assoc_new
+      key = symbol_name(assoc[1])
+      return unless key
+      keys << key
+    end
+    (@const_symbol_hash_keys[current_fqn] ||= {})[name] = keys
   end
 
   # An Array/Hash literal RHS, recorded by SYNTACTIC kind rather than through

@@ -1630,6 +1630,128 @@ describe(
       ]);
     });
 
+    it("synthesizes the accessors a `Struct.new(*CONST)` superclass generates", () => {
+      const m = metaMethods(`
+      module I18n
+        module Locale
+          module Tag
+            RFC4646_SUBTAGS = [ :language, :script, :region ]
+
+            class Rfc4646 < Struct.new(*RFC4646_SUBTAGS)
+            end
+          end
+        end
+      end
+    `);
+      expect(m["I18n::Locale::Tag::Rfc4646"].map((x) => x.name).sort()).toEqual([
+        "initialize",
+        "language",
+        "language=",
+        "region",
+        "region=",
+        "script",
+        "script=",
+      ]);
+    });
+
+    it("unrolls a literal-array each loop whose template is a class_eval def", () => {
+      const m = metaMethods(`
+      module ActiveSupport
+        class TimeWithZone
+          %w(year mon wday).each do |method_name|
+            class_eval <<-EOV, __FILE__, __LINE__ + 1
+              def #{method_name}
+                time.#{method_name}
+              end
+            EOV
+          end
+        end
+      end
+    `);
+      expect(m["ActiveSupport::TimeWithZone"].map((x) => x.name)).toEqual(["year", "mon", "wday"]);
+    });
+
+    it("keeps the literal suffix a class_eval def name carries after the loop variable", () => {
+      const m = metaMethods(`
+      module ActionDispatch
+        module Routing
+          module PolymorphicRoutes
+            %w(edit new).each do |action|
+              module_eval <<-EOT, __FILE__, __LINE__ + 1
+                def #{action}_polymorphic_url(record_or_hash, options = {})
+                  nil
+                end
+
+                def #{action}_polymorphic_path(record_or_hash, options = {})
+                  nil
+                end
+              EOT
+            end
+          end
+        end
+      end
+    `);
+      expect(m["ActionDispatch::Routing::PolymorphicRoutes"].map((x) => x.name)).toEqual([
+        "edit_polymorphic_url",
+        "edit_polymorphic_path",
+        "new_polymorphic_url",
+        "new_polymorphic_path",
+      ]);
+    });
+
+    it("unrolls a constant-array each loop whose template is a define_method", () => {
+      const m = metaMethods(`
+      module Sample
+        NAMES = [:alpha, :beta]
+
+        NAMES.each do |name|
+          define_method(name) { nil }
+        end
+      end
+    `);
+      expect(m["Sample"].map((x) => x.name)).toEqual(["alpha", "beta"]);
+    });
+
+    it("unrolls a constant-hash each loop over the hash's keys", () => {
+      const m = metaMethods(`
+      module I18n
+        module Locale
+          module Tag
+            RFC4646_FORMATS = { :language => :downcase, :region => :upcase }
+
+            class Rfc4646
+              RFC4646_FORMATS.each do |name, format|
+                define_method(name) { self[name].send(format) unless self[name].nil? }
+              end
+            end
+          end
+        end
+      end
+    `);
+      expect(m["I18n::Locale::Tag::Rfc4646"].map((x) => x.name)).toEqual(["language", "region"]);
+    });
+
+    it("leaves a define_method loop whose name source does not resolve unrecorded", () => {
+      const m = metaMethods(`
+      module Sample
+        UNKNOWN = compute_list
+        UNKNOWN.each do |name|
+          define_method(name) { nil }
+        end
+
+        MIXED = [:alpha, SOME_CONST]
+        MIXED.each do |name|
+          define_method(name) { nil }
+        end
+
+        def kept
+          nil
+        end
+      end
+    `);
+      expect(m["Sample"].map((x) => x.name)).toEqual(["kept"]);
+    });
+
     it("unrolls a literal-array each loop that interpolates the loop variable", () => {
       const m = metaMethods(`
       module ClassMethods
