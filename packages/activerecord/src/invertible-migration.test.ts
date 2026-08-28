@@ -503,18 +503,18 @@ describe("InvertibleMigrationTest", () => {
   it("revert order", async () => {
     const block = (t: any) => t.string("name");
     const recorder = new CommandRecorder(await Base.leaseConnection());
-    recorder.record("createTable", ["apples", block]);
+    await recorder.record("createTable", ["apples", block]);
     await recorder.revert(async () => {
-      recorder.record("createTable", ["bananas", block]);
+      await recorder.record("createTable", ["bananas", block]);
       await recorder.revert(async () => {
-        recorder.record("createTable", ["clementines"]);
-        recorder.record("createTable", ["dates"]);
+        await recorder.record("createTable", ["clementines"]);
+        await recorder.record("createTable", ["dates"]);
       });
-      recorder.record("createTable", ["elderberries"]);
+      await recorder.record("createTable", ["elderberries"]);
     });
     await recorder.revert(async () => {
-      recorder.record("createTable", ["figs"]);
-      recorder.record("createTable", ["grapes"]);
+      await recorder.record("createTable", ["figs"]);
+      await recorder.record("createTable", ["grapes"]);
     });
     expect(recorder.commands).toEqual([
       ["createTable", ["apples", block], undefined],
