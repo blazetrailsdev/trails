@@ -4166,13 +4166,8 @@ export class Base extends Model {
   }
 }
 
-// `toJSON` is omitted from the merge: `Base` already inherits
-// `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43)
-// through `Model`, and re-declaring it here would put a second copy of the
-// name on base.ts's surface.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base
-  extends Included<typeof AutosaveAssociation>, Omit<JSONSerializer, "toJSON">, AMDirty {
+export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {
   /** Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26). */
   normalizeAttribute(name: string): void;
   /**
