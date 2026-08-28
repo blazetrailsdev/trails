@@ -335,3 +335,28 @@ tester.run("no-freeform-comments (drift-ok: is a directive)", rule, {
   ],
   invalid: [],
 });
+
+// `PERMANENT-SKIP:` / `BLOCKED:` are read by
+// `scripts/test-compare/normalize-skips.ts`, which string-matches them inside a
+// skip call's body to decide the skip is already annotated — deleting one makes
+// the skip look unannotated and the next run staples a fresh auto-categorized
+// annotation onto it.
+tester.run("no-freeform-comments (skip-annotation markers are directives)", rule, {
+  valid: [
+    {
+      code: `it.skip("x", () => {\n  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal\n});\n`,
+    },
+    {
+      code: `it.skip("x", () => {\n  // BLOCKED: needs the preloader\n});\n`,
+    },
+  ],
+  invalid: [
+    // The legacy bare `PERMANENT:` spelling is deliberately not a directive: it
+    // collides with a receipt's permanence token, whose prose still goes.
+    {
+      code: `/** @noRailsEquivalent PERMANENT: the reason. */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n`,
+    },
+  ],
+});

@@ -56,16 +56,23 @@
  * `buildCreateIndexDefinition` reds that check on every AR lane, and the
  * failure names a type mismatch rather than a missing comment (#7132).
  *
- * `PERMANENT-SKIP:` — and its legacy spellings `BLOCKED:` / `PERMANENT:` — are
- * read by `scripts/test-compare/normalize-skips.ts`, which string-matches all
- * three inside a skip call's body to decide the skip is already annotated.
- * Deleting one makes the skip look unannotated, so the next run staples a
- * fresh auto-categorized annotation onto it — re-adding prose this rule just
- * removed, and less specific than what was there. The marker's own reason text
- * is kept with it, as with `eslint-disable-next-line -- <reason>`.
+ * `PERMANENT-SKIP:` and `BLOCKED:` are read by
+ * `scripts/test-compare/normalize-skips.ts`, which string-matches them inside a
+ * skip call's body to decide the skip is already annotated. Deleting one makes
+ * the skip look unannotated, so the next run staples a fresh auto-categorized
+ * annotation onto it — re-adding prose this rule just removed, and less
+ * specific than what was there. The marker's own reason text is kept with it,
+ * as with `eslint-disable-next-line -- <reason>`.
+ *
+ * `normalize-skips.ts` also accepts a third, legacy spelling, a bare
+ * `PERMANENT:`, which is deliberately NOT listed here: it collides with the
+ * permanence token a `@noRailsEquivalent` / `@missingRailsCall` /
+ * `@missingRailsArgs` receipt carries (`— PERMANENT: <prose>`), whose prose
+ * this rule trims to the bare tag. Treating it as a directive would keep that
+ * prose instead. No skip in the repo uses the legacy form.
  */
 const DIRECTIVE_RE =
-  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:|\bPERMANENT-SKIP:|\bBLOCKED:|\bPERMANENT:/iu;
+  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:|\bPERMANENT-SKIP:|\bBLOCKED:/iu;
 
 /**
  * The repo's own JSDoc flags, the only tags that survive. Each is read by a
