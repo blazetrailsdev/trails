@@ -28,10 +28,7 @@ export type Visibility = "all-private" | "mixed";
  * retracts the reader's privacy on the strength of the writer's publicity.
  * Subtract only the spellings the writer does not share with the reader.
  */
-export function subtractedCandidates(
-  ruby: string,
-  names: Map<string, Visibility>,
-): readonly string[] {
+function subtractedCandidates(ruby: string, names: Map<string, Visibility>): readonly string[] {
   const candidates = rubyMethodToTs(ruby) ?? [];
   if (!ruby.endsWith("=")) return candidates;
   const stem = ruby.slice(0, -1);
