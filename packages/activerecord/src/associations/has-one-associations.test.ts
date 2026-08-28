@@ -235,7 +235,9 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);
   });
 
-  it.skip("can marshal has one association with nil target", () => {});
+  it.skip("can marshal has one association with nil target", () => {
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
+  });
 
   it("proxy assignment", async () => {
     const company = companies("first_firm") as any;
@@ -731,9 +733,13 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "readonlyAccount")).isReadonly()).toBe(true);
   });
 
-  it.skip("has one proxy should not respond to private methods", () => {});
+  it.skip("has one proxy should not respond to private methods", () => {
+    // PERMANENT-SKIP: Ruby private-method visibility has no TypeScript equivalent.
+  });
 
-  it.skip("has one proxy should respond to private methods via send", () => {});
+  it.skip("has one proxy should respond to private methods via send", () => {
+    // PERMANENT-SKIP: Ruby `send` private dispatch has no TypeScript equivalent.
+  });
 
   it("save of record with loaded has one", async () => {
     const firm = companies("first_firm") as any;

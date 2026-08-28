@@ -55,9 +55,17 @@
  * which waives a declared-vs-mixin signature difference. Deleting the one on
  * `buildCreateIndexDefinition` reds that check on every AR lane, and the
  * failure names a type mismatch rather than a missing comment (#7132).
+ *
+ * `PERMANENT-SKIP:` — and its legacy spellings `BLOCKED:` / `PERMANENT:` — are
+ * read by `scripts/test-compare/normalize-skips.ts`, which string-matches all
+ * three inside a skip call's body to decide the skip is already annotated.
+ * Deleting one makes the skip look unannotated, so the next run staples a
+ * fresh auto-categorized annotation onto it — re-adding prose this rule just
+ * removed, and less specific than what was there. The marker's own reason text
+ * is kept with it, as with `eslint-disable-next-line -- <reason>`.
  */
 const DIRECTIVE_RE =
-  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:/iu;
+  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:|\bPERMANENT-SKIP:|\bBLOCKED:|\bPERMANENT:/iu;
 
 /**
  * The repo's own JSDoc flags, the only tags that survive. Each is read by a
