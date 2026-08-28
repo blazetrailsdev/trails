@@ -170,6 +170,13 @@ try {
         filename: declsFile,
         code: `export class Gamma {}\nexport class Alpha extends Gamma {}\n`,
       },
+      // A computed key is evaluated when the class is DEFINED, so an instance
+      // member's key naming a later sibling blocks the reorder just as a
+      // static one does.
+      {
+        filename: declsFile,
+        code: `export class Gamma {}\nexport class Alpha {\n  [Gamma.foo]() {}\n}\n`,
+      },
       // A non-class statement sits between the declarations being permuted;
       // moving a class across it would change evaluation order.
       {

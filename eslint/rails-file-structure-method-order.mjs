@@ -463,9 +463,10 @@ function declarationReorderIsSafe(units, target, sourceCode) {
 
 /**
  * Identifier names the class evaluates while the declaration itself is being
- * evaluated: its heritage clause, decorators, and any static member's key or
- * initializer. Anything inside an instance member or a method body runs later,
- * so it cannot constrain declaration order.
+ * evaluated: its heritage clause, its own and its members' decorators, every
+ * member's computed key (static or not), and a static field's initializer or
+ * static block. A method BODY and an instance field's initializer run later,
+ * so they cannot constrain declaration order.
  */
 function evalTimeReferences(classNode, sourceCode) {
   const names = new Set();
@@ -476,8 +477,11 @@ function evalTimeReferences(classNode, sourceCode) {
   collect(classNode.superClass);
   for (const d of classNode.decorators ?? []) collect(d);
   for (const m of classNode.body?.body ?? []) {
-    if (m.static !== true) continue;
+    // A computed key is evaluated when the class is defined whether or not the
+    // member is static — `class Alpha { [Gamma.foo]() {} }` reads `Gamma` then.
     if (m.computed) collect(m.key);
+    for (const d of m.decorators ?? []) collect(d);
+    if (m.static !== true) continue;
     if (m.type === "PropertyDefinition") collect(m.value);
     if (m.type === "StaticBlock") collect(m);
   }
