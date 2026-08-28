@@ -165,7 +165,7 @@ export class HashAccessor {
 
   static prepare(object: Base, attribute: string): void {
     const val = object.readAttribute(attribute);
-    if (val === null || val === undefined) {
+    if (val === null || val === undefined || val === false) {
       object.writeAttribute(attribute, {});
     } else if (
       typeof val === "object" &&
@@ -286,7 +286,7 @@ function storeAccessor(
     prefix = last.prefix ?? null;
     suffix = last.suffix ?? null;
   }
-  const keys = (args as Array<string | string[]>).flat();
+  const keys = (args as Array<string | string[]>).flat(Infinity) as string[];
 
   const accessorPrefix =
     typeof prefix === "string" ? `${prefix}_` : prefix === true ? `${storeAttribute}_` : "";
