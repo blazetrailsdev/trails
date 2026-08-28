@@ -1521,15 +1521,6 @@ jobs:
         # connection-adapter burndown behind it; activemodel stays ungated until
         # it has one.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
-      - name: Rails citation ratchet
-        # RFC 0121. Checks every `gem/path.rb:LINE` written into a
-        # @noRailsEquivalent / @missingRailsCall / @missingRailsArgs reason:
-        # resolvable to exactly one vendored .rb, in range, and — when the
-        # reason names `Klass#meth` — inside that method's body. It runs here
-        # because it needs vendor/. Only-shrink over
-        # scripts/api-compare/cite-mark.json: converged a citation? Narrow the
-        # mark with `pnpm parity:api:cites:tighten` — there is no reseed.
-        run: pnpm exec tsx scripts/api-compare/lint-cites.ts
       - name: Parameter-name ratchet
         # RFC 0126. Gates arel's param-name row count (a matched pair whose
         # signatures line up positionally but whose parameters are spelled

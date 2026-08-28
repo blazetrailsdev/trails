@@ -805,16 +805,105 @@ export default defineConfig(
     },
   },
 
-  // ── no-freeform-comments: trails is a line-by-line Rails port, so a comment
-  //    that restates the TS competes with the Ruby for authority and rots
-  //    independently of both. The autofix DELETES; it keeps JSDoc, references
-  //    that point AT the Ruby, and tool directives. There is no opt-out marker:
-  //    a comment either earns one of those forms or goes.
-  //    Rails' OWN comments are NOT kept — the Ruby is vendored and cited, so
-  //    copying its annotations across just duplicates them somewhere that goes
-  //    stale on its own. Scoped to the packages whose backlog has been swept —
-  //    widen it a package at a time, after auditing that package's comments,
-  //    never ahead of the audit. ──
+  // ── no-freeform-comments, repo-wide default. trails is a line-by-line Rails
+  //    port, so a comment that restates the TS competes with the Ruby for
+  //    authority and rots independently of both. The autofix DELETES; it keeps
+  //    the repo's own JSDoc receipts and tool directives, and nothing else —
+  //    Rails' own comments and `.rb:LINE` citations included.
+  //
+  //    The rule is `error` everywhere. What follows is an EXCLUSION list of the
+  //    trees whose backlog is not swept yet, measured by running the rule in
+  //    report mode
+  //    (`--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'`)
+  //    over the repo on 2026-08-28: 3793 files scanned, 2423 with violations,
+  //    24203 violations. Each row names the story that burns it down.
+  //
+  //    The list is ONLY-SHRINK, on the same discipline as every other ratchet
+  //    here: a row is deleted when its tree is swept, never added, never
+  //    widened, and never extended to cover new work. Landing a new file under
+  //    an excluded tree does not earn it a pass — write it without prose.
+  //    Rows are trees rather than files because the backlog is 2423 files
+  //    deep; a tree stops being excluded the moment its story lands, and the
+  //    already-swept trees are re-enrolled by the blocks below, which come
+  //    after this one and win.
+  {
+    files: ["**/*.ts", "**/*.mts", "**/*.mjs", "**/*.js"],
+    ignores: [
+      // PERMANENT. scripts/test-compare/output/ is generator output — the
+      // missing-*-stubs.test.ts files hold Rails test names verbatim and are
+      // rewritten by `scripts/test-compare/generate-stubs.ts` on every run.
+      // This row never shrinks; there is nothing to sweep.
+      "scripts/test-compare/output/**",
+
+      // story strip-freeform-comments-ar-root-b — activerecord/src root files
+      // past the swept `a*.ts` slice.
+      "packages/activerecord/src/*.ts",
+      // story strip-freeform-comments-ar-associations-tests
+      "packages/activerecord/src/associations/**/*.test.ts",
+      // story strip-freeform-comments-ar-connection-adapters-toplevel-tests
+      "packages/activerecord/src/connection-adapters/**/*.test.ts",
+      // story strip-freeform-comments-ar-remaining-dirs
+      "packages/activerecord/src/assertions/**/*.ts",
+      "packages/activerecord/src/attribute-methods/**/*.ts",
+      "packages/activerecord/src/cases/**/*.ts",
+      "packages/activerecord/src/coders/**/*.ts",
+      "packages/activerecord/src/database-configurations/**/*.ts",
+      "packages/activerecord/src/encryption/**/*.ts",
+      "packages/activerecord/src/locale/**/*.ts",
+      "packages/activerecord/src/locking/**/*.ts",
+      "packages/activerecord/src/middleware/**/*.ts",
+      "packages/activerecord/src/migration/**/*.ts",
+      "packages/activerecord/src/persistence/**/*.ts",
+      "packages/activerecord/src/scoping/**/*.ts",
+      "packages/activerecord/src/sqlite/**/*.ts",
+      "packages/activerecord/src/tasks/**/*.ts",
+      "packages/activerecord/src/test-fixtures/**/*.ts",
+      "packages/activerecord/src/test-helpers/**",
+      "packages/activerecord/src/testing/**/*.ts",
+      "packages/activerecord/src/trailties/**/*.ts",
+      "packages/activerecord/src/type/**/*.ts",
+      "packages/activerecord/src/type-caster/**/*.ts",
+      "packages/activerecord/src/type-virtualization/**/*.ts",
+      "packages/activerecord/src/validations/**/*.ts",
+      "packages/activerecord/dx-tests/**",
+      "packages/activerecord/virtualized-dx-tests/**",
+      "packages/activerecord/scripts/**",
+
+      // story enroll-remaining-packages-in-no-freeform-comments — the packages
+      // and tooling trees with no sweep of their own yet.
+      "packages/actionpack/**",
+      "packages/actionview/**",
+      "packages/activerecord-cli/**",
+      "packages/activesupport/**",
+      "packages/date/**",
+      "packages/did-you-mean/**",
+      "packages/globalid/**",
+      "packages/html-sanitizer/**",
+      "packages/i18n/**",
+      "packages/nokogiri/**",
+      "packages/rack/**",
+      "packages/trails-tsc/**",
+      "packages/trailties/**",
+      "packages/tse-compiler/**",
+      "packages/website/**",
+      "examples/**",
+      "eslint/**",
+      "scripts/**",
+      "eslint.config.mjs",
+      "vitest.config.ts",
+      "vitest.dx-tests.config.ts",
+    ],
+    rules: {
+      "blazetrails/no-freeform-comments": "error",
+    },
+  },
+  // ── no-freeform-comments, swept trees. These were the enrollment allowlist
+  //    before the rule went repo-wide above; they are kept because several of
+  //    them sit inside an exclusion row (activerecord/src root files, the
+  //    connection-adapters and associations trees) and this block, coming
+  //    after that one, carves the swept half back in. A tree here lints clean
+  //    today — do not move one back into the exclusion list to turn a run
+  //    green. ──
   {
     files: [
       "packages/arel/src/**/*.ts",
