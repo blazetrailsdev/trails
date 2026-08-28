@@ -729,6 +729,19 @@ describe("jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("exclude?")).toEqual(["includes", "has"]);
   });
 
+  it("credits the regexpEscape helper for a Ruby Regexp.escape call", () => {
+    expect(jsEnumerableAliases("escape")).toEqual(["regexpEscape"]);
+    expect(
+      significantMissingCalls("key_matcher", ["escape"], new Set(["regexpEscape"]), () => true),
+    ).toEqual([]);
+  });
+
+  it("still flags a Regexp.escape call the TS body escapes under another name", () => {
+    expect(
+      significantMissingCalls("key_matcher", ["escape"], new Set(["escapeRegExp"]), () => true),
+    ).toEqual(["escape → escape|_escape"]);
+  });
+
   it("returns an empty list for a name with no JS analogue", () => {
     expect(jsEnumerableAliases("run_callbacks")).toEqual([]);
   });

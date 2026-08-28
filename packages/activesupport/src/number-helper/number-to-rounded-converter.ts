@@ -2,6 +2,7 @@ import { NumberConverter } from "./number-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
 import { NumberToDelimitedConverter } from "./number-to-delimited-converter.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { regexpEscape } from "../core-ext/regexp.js";
 import type { NumberToRoundedOptions } from "../number-helper.js";
 
 export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOptions> {
@@ -49,7 +50,7 @@ export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOpt
 
   private formatNumber(number: string): string {
     if (this.stripInsignificantZeros != null && this.stripInsignificantZeros !== false) {
-      const escapedSeparator = escapeRegExp(this.options.separator as string);
+      const escapedSeparator = regexpEscape(this.options.separator as string);
       return number
         .replace(new RegExp(`(${escapedSeparator})(\\d*[1-9])?0+$`), "$1$2")
         .replace(new RegExp(`${escapedSeparator}$`), "");
@@ -57,9 +58,4 @@ export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOpt
       return number;
     }
   }
-}
-
-/** Ruby `Regexp.escape` (number_to_rounded_converter.rb:44). */
-function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -7,6 +7,7 @@ import {
   truncate as stringTruncate,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
+import { regexpEscape } from "@blazetrails/activesupport";
 import { contentTag } from "./tag-helper.js";
 import { sanitize } from "./sanitize-helper.js";
 import { raw } from "./output-safety-helper.js";
@@ -135,7 +136,7 @@ export function highlight(
     return htmlSafe(working);
   }
 
-  const sources = phraseList.map((p) => (p instanceof RegExp ? p.source : escapeRegExp(String(p))));
+  const sources = phraseList.map((p) => (p instanceof RegExp ? p.source : regexpEscape(String(p))));
   const pattern = new RegExp(`(${sources.join("|")})`, "gi");
   const highlighter = options.highlighter ?? "<mark>\\1</mark>";
 
@@ -172,7 +173,7 @@ export function excerpt(
   if (text == null || phrase == null) return null;
 
   const separator = options.separator ?? "";
-  const regex = phrase instanceof RegExp ? phrase : new RegExp(escapeRegExp(String(phrase)), "i");
+  const regex = phrase instanceof RegExp ? phrase : new RegExp(regexpEscape(String(phrase)), "i");
 
   const match = text.match(regex);
   if (!match) return null;
@@ -225,11 +226,6 @@ function cutExcerptPart(
 
   const joined = separator !== "" ? sliced.join(separator) : sliced.join("");
   return [affix, joined];
-}
-
-/** @internal */
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export interface WordWrapOptions {

@@ -5,6 +5,7 @@
 
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
+import { regexpEscape } from "./core-ext/regexp.js";
 import { I18n } from "./i18n.js";
 
 /** @internal */
@@ -359,14 +360,6 @@ export function safeConstantize(camelCasedWord: string): unknown {
 
 export function foreignKey(className: string, separateWithUnderscore: boolean = true): string {
   return underscore(demodulize(className)) + (separateWithUnderscore ? "_id" : "id");
-}
-
-/**
- * Ruby `Regexp.escape` (`re.c` `rb_reg_s_quote`), which escapes every character
- * `Regexp` gives a meaning to plus whitespace. JS has no `RegExp.escape`.
- */
-function regexpEscape(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
 }
 
 /**

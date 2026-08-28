@@ -6,6 +6,7 @@
 
 import { ArgumentError } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
+import { regexpEscape } from "./core-ext/regexp.js";
 
 /** The class name Ruby's `string.class.name` reports for the offending value. */
 function rubyClassName(value: unknown): string {
@@ -72,7 +73,7 @@ export function parameterize(
       reDuplicateSeparator = /-{2,}/g;
       reLeadingTrailingSeparator = /^-|-$/gi;
     } else {
-      const reSep = separator.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
+      const reSep = regexpEscape(separator);
       reDuplicateSeparator = new RegExp(`${reSep}{2,}`, "g");
       reLeadingTrailingSeparator = new RegExp(`^${reSep}|${reSep}$`, "gi");
     }

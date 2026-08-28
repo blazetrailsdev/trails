@@ -1,5 +1,6 @@
 export { NameError } from "./core-ext/name-error.js";
 export { KeyError } from "./core-ext/key-error.js";
+export { regexpEscape } from "./core-ext/regexp.js";
 export {
   registerFsAdapter,
   getFs,

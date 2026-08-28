@@ -1,4 +1,5 @@
 import { Entry } from "./entry.js";
+import { regexpEscape } from "../core-ext/regexp.js";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
 import { getFormatVersion } from "./format-version-slot.js";
@@ -167,11 +168,6 @@ export interface CacheCoder {
   dump(entry: Entry): unknown;
   load(payload: unknown): unknown;
   dumpCompressed?(entry: Entry, threshold: number): unknown;
-}
-
-/** Mirrors Ruby `Regexp.escape`: escapes regex metacharacters in a literal. */
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -801,7 +797,7 @@ export abstract class Store {
     if (prefix) {
       let source = pattern.source;
       source = source.startsWith("^") ? source.slice(1) : `.*${source}`;
-      return new RegExp(`^${escapeRegExp(prefix)}:${source}`, pattern.flags);
+      return new RegExp(`^${regexpEscape(prefix)}:${source}`, pattern.flags);
     }
     return pattern;
   }

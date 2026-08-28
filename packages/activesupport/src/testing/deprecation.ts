@@ -1,4 +1,5 @@
 import { Deprecation } from "../deprecation.js";
+import { regexpEscape } from "../core-ext/regexp.js";
 import type { DeprecationBehaviorCallable } from "../deprecation.js";
 import { ArgumentError } from "../hash-utils.js";
 import { assert } from "./assertions.js";
@@ -34,7 +35,7 @@ export async function assertDeprecated<T>(
   const [result, warnings] = await collectDeprecations(deprecator, block!);
   assert(warnings.length > 0, "Expected a deprecation warning within the block but received none");
   if (match != null) {
-    const matcher = match instanceof RegExp ? match : new RegExp(escapeRegExp(match));
+    const matcher = match instanceof RegExp ? match : new RegExp(regexpEscape(match));
     assert(
       warnings.some((w) => matcher.test(w)),
       `No deprecation warning matched ${matcher}: ${warnings.join(", ")}`,
@@ -83,9 +84,4 @@ export async function collectDeprecations<T>(
   } finally {
     deprecator.behavior = oldBehavior;
   }
-}
-
-/** Mirrors Ruby `Regexp.escape`: escapes regex metacharacters in a literal. */
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
