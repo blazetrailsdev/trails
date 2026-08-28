@@ -43,7 +43,7 @@ const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function buildColumnTypes(
   fields: ReadonlyArray<Mysql2FieldDescriptor>,
@@ -156,7 +156,7 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function unwrapMultiResult(
   rawResult: unknown,

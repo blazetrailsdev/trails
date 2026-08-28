@@ -328,7 +328,7 @@ function unionReferences(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function referencesFromConditions(conditions: unknown): Nodes.SqlLiteral[] {
   if (!isPlainObject(conditions)) return [];
@@ -650,7 +650,7 @@ export type ExceptSkip = ExceptKey | (string & {});
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent PERMANENT
  */
 export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
   host._values = values;
@@ -1505,7 +1505,7 @@ export function buildCastValue(name: string, value: unknown): Attribute {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
@@ -2358,7 +2358,7 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function selectInnerNamedJoins(
   this: QueryMethodsHost,
@@ -2473,7 +2473,7 @@ export interface JoinEmissionPlan {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmissionPlan): void {
   if (plan.leadingJoins.length > 0) manager.joinSources().push(...plan.leadingJoins);

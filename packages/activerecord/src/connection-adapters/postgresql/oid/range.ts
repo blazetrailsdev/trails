@@ -19,7 +19,7 @@ export class Range {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function rangeBoundLiteral(value: unknown): string {
   return value == null || isInfinity(value) ? "" : String(value);

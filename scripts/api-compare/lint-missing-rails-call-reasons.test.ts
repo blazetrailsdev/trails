@@ -2,7 +2,42 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { lintFileText, listSourceFiles, main } from "./lint-missing-rails-call-reasons.js";
+import {
+  lintBareConvergeable,
+  lintFileText,
+  listSourceFiles,
+  main,
+} from "./lint-missing-rails-call-reasons.js";
+
+describe("lintBareConvergeable", () => {
+  it("rejects a CONVERGEABLE receipt that names no story", () => {
+    const text = ["/**", " * @noRailsEquivalent CONVERGEABLE", " */", "function f() {}"].join("\n");
+    expect(lintBareConvergeable("packages/x/src/a.ts", text)).toEqual([
+      "bare CONVERGEABLE receipt: packages/x/src/a.ts:2 — a CONVERGEABLE receipt names " +
+        "the story that converges it (the story IS the reason). Add the story id, or make " +
+        "the claim PERMANENT where a TypeScript shortcoming earns it.",
+    ]);
+  });
+
+  it("accepts a CONVERGEABLE receipt that names a story", () => {
+    const text = ["/**", " * @noRailsEquivalent CONVERGEABLE some-story-id", " */"].join("\n");
+    expect(lintBareConvergeable("a.ts", text)).toEqual([]);
+  });
+
+  it("accepts a PERMANENT receipt", () => {
+    const text = ["/**", " * @noRailsEquivalent PERMANENT", " */"].join("\n");
+    expect(lintBareConvergeable("a.ts", text)).toEqual([]);
+  });
+
+  it("rejects a bare CONVERGEABLE on a @missingRailsCall receipt too", () => {
+    const text = ["/**", " * @missingRailsCall save! — CONVERGEABLE", " */"].join("\n");
+    expect(lintBareConvergeable("a.ts", text)).toHaveLength(1);
+  });
+
+  it("ignores comments with no receipt tag", () => {
+    expect(lintBareConvergeable("a.ts", "/** CONVERGEABLE */")).toEqual([]);
+  });
+});
 
 describe("lintFileText", () => {
   it("accepts a tag that carries a reason", () => {

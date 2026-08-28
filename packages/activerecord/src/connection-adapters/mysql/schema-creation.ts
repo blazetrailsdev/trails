@@ -65,7 +65,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
    */
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     if (options.array && type !== "primary_key") {
@@ -180,7 +180,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
    */
   override accept(
     o:
@@ -253,7 +253,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
    */
   override async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const mo = options as MysqlColumnOptions;

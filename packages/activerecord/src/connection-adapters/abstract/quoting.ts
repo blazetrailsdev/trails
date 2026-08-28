@@ -187,7 +187,7 @@ export function unquotedFalse(): boolean {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function toBytes(value: unknown): Uint8Array | null {
   if (value instanceof BinaryData) return value.bytes;

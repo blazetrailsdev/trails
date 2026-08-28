@@ -277,7 +277,7 @@ export interface BuiltThroughInverse {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function buildThroughInverseFor(
   owner: Base,
@@ -497,7 +497,7 @@ function markOccurrence(distribution: Occurrences, record: Base): boolean {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function multisetDifference(a: Base[], b: Base[]): Base[] {
   const buckets = distribution(b);
@@ -506,7 +506,7 @@ export function multisetDifference(a: Base[], b: Base[]): Base[] {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function multisetIntersection(a: Base[], b: Base[]): Base[] {
   const buckets = distribution(b);

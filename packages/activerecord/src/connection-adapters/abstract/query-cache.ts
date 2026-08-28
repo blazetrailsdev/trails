@@ -201,7 +201,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   deleteStore(contextId: string): void {
     this._threadQueryCaches.deleteStore(contextId);
@@ -295,7 +295,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
    */
   incrementPinnedCount(): void {
     this._pinnedCount++;
@@ -303,7 +303,7 @@ export class ConnectionPoolConfiguration {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
    */
   decrementPinnedCount(): void {
     this._pinnedCount--;

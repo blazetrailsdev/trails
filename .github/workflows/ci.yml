@@ -1633,7 +1633,7 @@ jobs:
         # above, so like the file-structure rule this is the only job that can
         # enforce it. Tighten after moving tests out with
         # `pnpm parity:test:names:tighten`.
-        run: pnpm exec tsx scripts/build-rails-test-names-manifest.ts && pnpm exec eslint packages/arel/src packages/date/src --max-warnings 0
+        run: pnpm exec tsx scripts/build-rails-test-names-manifest.ts && pnpm exec eslint packages/arel/src packages/date/src packages/did-you-mean/src packages/i18n/src --max-warnings 0
       - name: Test comparison
         # --gates prints the adapter/feature gate-mismatch breakdown; --check
         # fails the step if activerecord's gate-mismatch count is non-zero

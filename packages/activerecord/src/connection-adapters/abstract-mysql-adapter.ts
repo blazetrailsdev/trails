@@ -192,7 +192,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
    */
   override get typeRegistryKey(): AdapterName {
     return "mysql2";
@@ -225,7 +225,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent PERMANENT
    */
   async fullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement fullVersion()`);
@@ -544,7 +544,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
    */
   async changeColumnDefaultForAlter(
     tableName: string,
@@ -679,7 +679,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   isTextType(type: string): boolean {
     const TYPE_MAP = (this.constructor as typeof AbstractMysqlAdapter).TYPE_MAP;
@@ -818,7 +818,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   override async caseInsensitiveComparison(
     attribute: Nodes.Attribute,
@@ -1016,7 +1016,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @missingRailsCall column_for — CONVERGEABLE
+   * @missingRailsCall column_for — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    */
   protected mismatchedForeignKeyDetails({
     message,
@@ -1280,7 +1280,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent PERMANENT
    */
   async getFullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement getFullVersion()`);

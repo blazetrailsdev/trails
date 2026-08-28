@@ -150,7 +150,7 @@ function toArray(value: unknown): unknown[] {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function throughBuildRecord(
   assoc: { owner: Base; reflection: any },

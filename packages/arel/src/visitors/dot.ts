@@ -313,7 +313,7 @@ export class Dot extends Visitor {
 
   protected visitEdge(o: object, method: string): void {
     if (!(method in o)) {
-      const klass = (o as { constructor?: { name?: string } }).constructor?.name ?? "Object";
+      const klass = rubyConstantName(o.constructor) ?? "Object";
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`undefined method '${method}' for ${klass}`);
     }

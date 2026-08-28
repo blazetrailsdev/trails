@@ -859,7 +859,7 @@ export class CollectionAssociation extends Association {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function concatRecordsLoop(
   records: Base[],

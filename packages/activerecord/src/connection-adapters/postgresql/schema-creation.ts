@@ -54,7 +54,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
    */
   override typeToSql(
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
@@ -157,7 +157,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
    */
   override accept(
     o:

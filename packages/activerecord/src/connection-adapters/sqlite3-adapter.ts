@@ -149,7 +149,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
    */
   override get typeRegistryKey(): AdapterName {
     return "sqlite";
@@ -209,7 +209,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   driver!: SqliteConnection;
   private _asyncConnectPending = false;
@@ -523,7 +523,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   override async rawExecute(
     sql: string,
@@ -1832,7 +1832,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /**
-   * @missingRailsCall new_client — CONVERGEABLE
+   * @missingRailsCall new_client — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    * @internal
    */
   private connect(): void {
@@ -1932,7 +1932,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
    */
   override async verifyBang(): Promise<void> {
     await this.completeAsyncConnect();

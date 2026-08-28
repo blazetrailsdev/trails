@@ -141,7 +141,7 @@ export type AdapterName = "sqlite" | "postgres" | "mysql2";
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
   switch (configAdapter?.toLowerCase()) {
@@ -928,7 +928,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
    */
   get typeRegistryKey(): AdapterName {
     return adapterNameFromConfig(this.pool.dbConfig.adapter ?? undefined);
@@ -1049,7 +1049,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent PERMANENT
    */
   sqlKey(sql: string): string {
     return sql;
@@ -1106,7 +1106,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   get internalSchemaCache(): SchemaCache {
     const reflection = this._poolSchemaReflection();
