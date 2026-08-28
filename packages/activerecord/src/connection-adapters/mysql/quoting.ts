@@ -64,7 +64,17 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
   "\x1a": "\\Z",
 };
 
-export function quoteString(value: string): string {
+export interface EscapeState {
+  noBackslashEscapes: boolean;
+}
+
+export function quoteString(
+  value: string,
+  state: EscapeState = { noBackslashEscapes: false },
+): string {
+  if (state.noBackslashEscapes) {
+    return value.replace(/'/g, "''");
+  }
   return value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
 }
 

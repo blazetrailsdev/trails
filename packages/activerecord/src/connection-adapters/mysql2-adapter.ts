@@ -878,6 +878,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._connectionConfigured || !this._client) return;
     this._connectionConfigured = true;
     await super.configureConnection();
+    await this.loadEscapeState();
   }
 
   /** @internal */

@@ -99,15 +99,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "to_sql_and_binds",
-    "call": "unprepared_statement",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0126): pre-existing call-ARGUMENT divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "truncate_tables",
     "call": "disable_referential_integrity",
     "kind": "args",

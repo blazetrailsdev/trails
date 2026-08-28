@@ -29,6 +29,7 @@ import {
   quoteString as pgQuoteString,
   quoteTableNameForAssignment as pgQuoteTableNameForAssignment,
   quoteDefaultExpression as pgQuoteDefaultExpression,
+  type DefaultExpressionColumn,
   quotedBinary as pgQuotedBinary,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
@@ -1849,49 +1850,8 @@ export class PostgreSQLAdapter
     return this.typeMap.lookup(Number(oid));
   }
 
-  override quoteDefaultExpression(value: unknown, column: unknown): Promise<string> {
-    const col = column as
-      | {
-          sqlType?: string | null;
-          type?: string;
-          array?: boolean;
-          oid?: number | null;
-          fmod?: number | null;
-          options?: { array?: boolean };
-        }
-      | undefined;
-    const isArray = col?.array === true || col?.options?.array === true;
-    const rawSqlType = col?.sqlType ?? col?.type ?? null;
-    const self = this;
-    const lookup = {
-      lookupCastTypeFromColumn(column: {
-        sqlType?: string | null;
-        oid?: number | null;
-        fmod?: number | null;
-      }):
-        | { serialize?(v: unknown): unknown }
-        | null
-        | Promise<{ serialize?(v: unknown): unknown } | null> {
-        if (column.oid != null) {
-          return self.lookupCastTypeFromColumn(column) as {
-            serialize?(v: unknown): unknown;
-          } | null;
-        }
-        return self.lookupCastType(column.sqlType ?? "");
-      },
-    };
-    return pgQuoteDefaultExpression.call(
-      this,
-      value,
-      {
-        array: isArray,
-        sqlType: rawSqlType,
-        oid: col?.oid ?? null,
-        fmod: col?.fmod ?? null,
-        type: col?.type ?? null,
-      },
-      lookup,
-    );
+  override quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
+    return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn);
   }
 
   async extensions(): Promise<string[]> {

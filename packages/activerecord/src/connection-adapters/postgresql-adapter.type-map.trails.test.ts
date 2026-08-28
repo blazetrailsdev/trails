@@ -98,7 +98,7 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
 
   it("reads `array` from a live Column instance", async () => {
     stubRegtypeLookup();
-    const column = { sqlType: "integer", array: true };
+    const column = { oid: 1007, fmod: -1, sqlType: "integer[]", array: true };
     expect(await adapter.quoteDefaultExpression([4, 5, 6], column)).toBe("'{4,5,6}'");
   });
 
@@ -128,7 +128,12 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
       seen = fmod;
       return { serialize: (v: unknown) => v };
     }) as never);
-    await adapter.quoteDefaultExpression("x", { oid: 918_274, fmod: 655_366, sqlType: "numeric" });
+    await adapter.quoteDefaultExpression("x", {
+      oid: 918_274,
+      fmod: 655_366,
+      sqlType: "numeric",
+      array: false,
+    });
     expect(seen).toBe(655_366);
     spy.mockRestore();
   });

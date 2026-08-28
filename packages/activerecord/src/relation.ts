@@ -1895,25 +1895,18 @@ export class Relation<T extends Base> {
    *   `model.with_connection { |conn| conn.unprepared_statement {
    *   conn.to_sql(arel) } }` (relation.rb:1217-1219). `withConnection` is a
    *   `Promise`-returning checkout in TypeScript and `toSql` renders
-   *   synchronously, so the checkout is the caller's, read through `_conn()`,
-   *   and `unprepared_statement` is applied by hand around the render.
+   *   synchronously, so the checkout is the caller's, read through `_conn()`;
+   *   `unprepared_statement` itself is the adapter's own method.
    */
   toSql(): string {
-    // `unprepared_statement` applied synchronously: `to_sql` is sync here, so
-    // the flag is saved and restored around the render rather than through the
-    // async `unpreparedStatement` wrapper.
     const conn = this._conn();
-    const wasPrepared = conn.preparedStatements;
-    conn.preparedStatements = false;
-    try {
+    return conn.unpreparedStatement(() => {
       if (this.isEagerLoading) {
         const manager = this._buildEagerOperandManager();
         if (manager !== null) return conn.toSql(manager.ast);
       }
       return conn.toSql(this.arel().ast);
-    } finally {
-      conn.preparedStatements = wasPrepared;
-    }
+    }) as string;
   }
 
   /**
