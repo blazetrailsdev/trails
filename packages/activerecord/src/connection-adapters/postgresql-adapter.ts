@@ -1845,7 +1845,12 @@ export class PostgreSQLAdapter
     return pgTypeCast.call(this, value);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall query_value — PERMANENT
+   * @missingRailsCall quote — PERMANENT
+   * @missingRailsCall to_i — PERMANENT
+   */
   override lookupCastType(sqlType: string | number | null): Type {
     if (typeof sqlType === "string") {
       sqlType = sqlType

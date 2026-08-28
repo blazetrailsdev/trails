@@ -64,7 +64,6 @@ export class TypeMapInitializer {
     return `WHERE\n  t.typelem IN (${knownTypeOids.join(", ")})\n`;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   private registerSqlTypeName(row: PgTypeRow): void {
     const name = row.formatType;
     const oid = toInt(row.oid);
