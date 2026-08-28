@@ -58,7 +58,9 @@ export class AliasTracker {
     aliases?: Map<string, number>,
   ): AliasTracker {
     const connection =
-      typeof pool?.tableAliasLength === "function" ? pool : (pool?.activeConnection ?? undefined);
+      typeof pool?.tableAliasLength === "function"
+        ? pool
+        : (pool?.activeConnection ?? pool?.leaseConnectionSync?.());
     const tableAliasLength = connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH;
 
     const map = aliases ? new Map(aliases) : new Map<string, number>();
