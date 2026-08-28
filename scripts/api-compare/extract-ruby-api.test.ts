@@ -2510,3 +2510,89 @@ describe(
     });
   },
 );
+
+// RFC 0126: a Ruby Hash KEY is a Ruby-side name that no declaration carries, so
+// the extractor pools it per FILE (`file_hash_keys`) for extra-surface to allow.
+describe("Ruby extractor Hash-key name pool", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  function rubyHashKeys(fixtures: Record<string, string>): Record<string, string[]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hashkeys-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        puts JSON.generate(ex.file_hash_keys.transform_values { |ks| ks.to_a.sort })
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("records the literal keys of a Hash constant in either key spelling", () => {
+    const keys = rubyHashKeys({
+      "xml_mini.rb": `
+        module XmlMini
+          PARSING = {
+            "symbol"       => Proc.new { |symbol| symbol.to_s.to_sym },
+            "base64Binary" => Proc.new { |bin| Base64.decode64(bin) },
+            skip_types:       true
+          }.freeze
+        end
+      `,
+    });
+    expect(keys["xml_mini.rb"]).toEqual(["base64Binary", "skip_types", "symbol"]);
+  });
+
+  it("skips a computed key and keeps its literal siblings", () => {
+    const keys = rubyHashKeys({
+      "computed.rb": `
+        module Computed
+          TABLE = { "literal" => 1, key_for(x) => 2 }
+        end
+      `,
+    });
+    expect(keys["computed.rb"]).toEqual(["literal"]);
+  });
+
+  it("records a Symbol key read off an options param or an @options ivar", () => {
+    const keys = rubyHashKeys({
+      "reader.rb": `
+        class Reader
+          def to_tag(key, value, options)
+            options[:skip_instruct]
+          end
+
+          def encode
+            @options.fetch(:escape_html_entities, true)
+          end
+        end
+      `,
+    });
+    expect(keys["reader.rb"]).toEqual(["escape_html_entities", "skip_instruct"]);
+  });
+
+  it("records nothing for a file with no Hash constant and no options read", () => {
+    const keys = rubyHashKeys({
+      "plain.rb": `
+        class Plain
+          def call(x)
+            x.to_s
+          end
+        end
+      `,
+    });
+    expect(keys["plain.rb"]).toBeUndefined();
+  });
+});
