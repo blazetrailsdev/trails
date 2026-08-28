@@ -114,10 +114,13 @@ ADAPTER_SYMBOL_MAP = {
 }.freeze
 
 class TestExtractor
-  attr_reader :test_files
+  attr_reader :test_files, :unexpanded_loops
 
   def initialize
     @test_files = []
+    # `[...].each { define_method("test_...") }` loops whose cases can't be
+    # expanded statically, as "file:line" — reported rather than dropped silently.
+    @unexpanded_loops = []
   end
 
   def process_file(filepath, package_root)
@@ -265,6 +268,11 @@ class TestExtractor
           return
         end
       end
+    end
+
+    # `[A, B].each do |klass| define_method("test_#{...}") do ... end end`
+    if inner.is_a?(Array) && inner[0] == :call && ident_name(inner[3]) == "each"
+      return if process_define_method_loop(inner, block, node)
     end
 
     # Fallback: walk children
@@ -554,6 +562,214 @@ class TestExtractor
       assertionKinds: assertion_kinds,
       assertionValues: assertion_values,
     }, node)
+  end
+
+  # ---- define_method loops ----
+
+  # Rails generates whole families of test methods from a literal array:
+  #
+  #   [Nodes::Sum, Nodes::Exists].each do |klass|
+  #     define_method("test_#{klass.name.gsub('::', '_')}") { ... }
+  #   end
+  #
+  # (arel's visitors/dot_test.rb:18-30, :39-55, :58-81, :84-93). Ripper sees no
+  # `def test_*`, so without expanding the loop the file scores against a TS twin
+  # that is missing two thirds of its cases. Expand statically when the receiver
+  # is a literal array and the generated name resolves; report the loop
+  # otherwise. Returns true when the node was handled.
+  def process_define_method_loop(call, block, node)
+    receiver = call[1]
+    return false unless receiver.is_a?(Array) && receiver[0] == :array
+    return false unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+
+    defines = []
+    collect_define_methods(block[2], defines)
+    return false if defines.empty?
+
+    var = block_var_name(block[1])
+    elements = array_literal_values(receiver[1])
+    if var.nil? || elements.nil?
+      report_unexpanded_loop(node)
+      return true
+    end
+
+    defines.each do |name_node, define_node|
+      names = elements.map { |value| interpolated_name(name_node, var, value) }
+      if names.any?(&:nil?)
+        report_unexpanded_loop(node)
+        next
+      end
+      names.each do |name|
+        next unless name.start_with?("test_")
+        emit_define_method_case(name, define_node)
+      end
+    end
+    true
+  end
+
+  # Every `define_method(<name>) do ... end` in a block body, as
+  # [name-argument node, method_add_block node].
+  def collect_define_methods(node, out)
+    return unless node.is_a?(Array)
+
+    if node[0] == :method_add_block
+      inner = node[1]
+      args =
+        if inner.is_a?(Array) && inner[0] == :command && ident_name(inner[1]) == "define_method"
+          inner[2]
+        elsif inner.is_a?(Array) && inner[0] == :method_add_arg &&
+              inner[1].is_a?(Array) && inner[1][0] == :fcall &&
+              ident_name(inner[1][1]) == "define_method"
+          inner[2]
+        end
+      if args
+        name_node = define_method_name_node(args)
+        out << [name_node, node] if name_node
+        return
+      end
+    end
+
+    node.each { |child| collect_define_methods(child, out) if child.is_a?(Array) }
+  end
+
+  # The first argument of `define_method`, which Rails spells either as a string
+  # literal (`"test_#{k}"`) or a dynamic symbol (`:"test_to_regexp_#{path}"`).
+  def define_method_name_node(args)
+    return nil unless args.is_a?(Array)
+    case args[0]
+    when :string_literal, :dyna_symbol
+      args
+    else
+      args.each do |child|
+        next unless child.is_a?(Array)
+        found = define_method_name_node(child)
+        return found if found
+      end
+      nil
+    end
+  end
+
+  # The single block parameter (`do |klass|`), or nil when the block takes none
+  # or takes several — neither is expandable.
+  def block_var_name(block_var)
+    return nil unless block_var.is_a?(Array) && block_var[0] == :block_var
+    params = block_var[1]
+    return nil unless params.is_a?(Array) && params[0] == :params
+    required = params[1]
+    return nil unless required.is_a?(Array) && required.length == 1
+    ident_name(required[0])
+  end
+
+  # The literal values of an array literal's elements, or nil if any element is
+  # not a constant path, symbol or string.
+  def array_literal_values(elements)
+    return [] if elements.nil?
+    return nil unless elements.is_a?(Array)
+
+    values = elements.map { |element| array_element_value(element) }
+    values.any?(&:nil?) ? nil : values
+  end
+
+  def array_element_value(node)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :var_ref, :const_ref, :const_path_ref, :top_const_ref, :@const
+      path = const_path(node)
+      path && path[:segments].join("::")
+    when :symbol_literal
+      ident_name(node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1])
+    when :dyna_symbol, :string_literal
+      extract_string_content(node[0] == :dyna_symbol ? [:string_literal, node[1]] : node)
+    when :@tstring_content
+      # `%w(a b)` / `%i(a b)` elements, which Ripper emits bare.
+      node[1]
+    end
+  end
+
+  # The name `define_method` receives with the block variable bound to `value`,
+  # or nil when a segment doesn't resolve statically.
+  def interpolated_name(name_node, var, value)
+    content = name_node[1]
+    return nil unless content.is_a?(Array)
+    parts = content[0] == :string_content ? content[1..] : [content]
+
+    out = +""
+    parts.each do |part|
+      next unless part.is_a?(Array)
+      case part[0]
+      when :@tstring_content
+        out << part[1]
+      when :string_embexpr
+        stmts = part[1]
+        return nil unless stmts.is_a?(Array) && stmts.length == 1
+        resolved = eval_loop_expr(stmts[0], var, value)
+        return nil if resolved.nil?
+        out << resolved
+      else
+        return nil
+      end
+    end
+    out
+  end
+
+  # Evaluates the handful of expressions Rails interpolates into a generated test
+  # name: the block variable itself, `.name` / `.to_s` on it, and `.gsub` with two
+  # string literals (`klass.name.gsub('::', '_')`).
+  def eval_loop_expr(node, var, value)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :var_ref, :vcall
+      ident_name(node[1]) == var ? value : nil
+    when :call
+      receiver = eval_loop_expr(node[1], var, value)
+      return nil if receiver.nil?
+      %w[name to_s to_sym].include?(ident_name(node[3])) ? receiver : nil
+    when :method_add_arg
+      inner = node[1]
+      return nil unless inner.is_a?(Array) && inner[0] == :call
+      return nil unless ident_name(inner[3]) == "gsub"
+      receiver = eval_loop_expr(inner[1], var, value)
+      return nil if receiver.nil?
+      args = positional_args(node[2])
+      return nil unless args && args.length == 2
+      pattern = extract_string_content(args[0])
+      replacement = extract_string_content(args[1])
+      return nil if pattern.nil? || replacement.nil?
+      receiver.gsub(pattern, replacement)
+    end
+  end
+
+  def emit_define_method_case(name, define_node)
+    desc = name.sub(/^test_/, "").tr("_", " ")
+    line = extract_line(define_node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(define_node)
+
+    if @module_collect
+      @module_collect << {
+        description: desc, line: line, assertions: assertion_kinds.uniq,
+        assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
+        assertion_values: assertion_values,
+        body_gate: body_skip_gate(define_node)
+      }
+      return
+    end
+
+    @test_cases << add_gate({
+      path: (@describe_stack + [desc]).join(" > "),
+      description: desc,
+      ancestors: @describe_stack.dup,
+      file: @current_file,
+      line: line,
+      style: "define_method",
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
+    }, define_node)
+  end
+
+  def report_unexpanded_loop(node)
+    @unexpanded_loops << "#{@current_file}:#{extract_line(node)}"
   end
 
   # ---- Test gating (adapter / feature conditionals) ----
@@ -1616,6 +1832,13 @@ def run
     gated = extractor.test_files.sum { |f| f[:testCases].count { |t| t[:gate] } }
     suffix = gated.positive? ? " (#{gated} adapter/feature-gated)" : ""
     puts "  #{pkg_name}: #{extractor.test_files.length} files, #{total_tests} tests#{suffix}"
+
+    generated = extractor.test_files.sum { |f| f[:testCases].count { |t| t[:style] == "define_method" } }
+    puts "  #{pkg_name}: #{generated} tests from define_method loops" if generated.positive?
+    unless extractor.unexpanded_loops.empty?
+      puts "  #{pkg_name}: #{extractor.unexpanded_loops.length} define_method loops not statically expandable:"
+      extractor.unexpanded_loops.uniq.sort.each { |loc| puts "    #{loc}" }
+    end
   end
 
   # Print summary
