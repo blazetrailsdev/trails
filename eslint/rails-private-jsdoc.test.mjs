@@ -19,15 +19,24 @@ const FIXTURE = {
     // lock.ts also hosts a local `Mutex` protocol whose `unlock` mirrors the
     // PUBLIC stdlib `Mutex#unlock`.
     "packages/rack/src/lock.ts": ["unlock"],
+    // `attribute` folds out of the file-wide union: private on the instance
+    // half (activemodel/lib/active_model/attributes.rb:161), public on
+    // `Attributes::ClassMethods` (attributes.rb:59).
+    "packages/activemodel/src/attributes.ts": [],
   },
   entities: {
     "packages/rack/src/lock.ts": ["Lock", "Rack"],
+    "packages/activemodel/src/attributes.ts": ["ActiveModel", "Attributes", "ClassMethods"],
+  },
+  instanceFiles: {
+    "packages/activemodel/src/attributes.ts": ["attribute"],
   },
 };
 setManifestForTests(FIXTURE);
 const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const lockFile = path.join(REPO_ROOT, "packages/rack/src/lock.ts");
+const attributesFile = path.join(REPO_ROOT, "packages/activemodel/src/attributes.ts");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -65,6 +74,16 @@ tester.run("rails-private-jsdoc", rule, {
       filename: lockFile,
       code: `interface Mutex {\n  unlock(): void;\n}\n`,
     },
+    // The class-method half of the Concern: `attribute` is PUBLIC on
+    // `Attributes::ClassMethods`, so `instanceFiles` must not gate it.
+    {
+      filename: attributesFile,
+      code: `class Attributes {\n  static attribute() {}\n}\n`,
+    },
+    {
+      filename: attributesFile,
+      code: `export function attribute() {}\n`,
+    },
     // Class method that's already tagged.
     {
       filename: baseFile,
@@ -72,6 +91,13 @@ tester.run("rails-private-jsdoc", rule, {
     },
   ],
   invalid: [
+    // The instance half IS private, and only `instanceFiles` records it.
+    {
+      filename: attributesFile,
+      code: `class Attributes {\n  attribute() {}\n}\n`,
+      errors: [{ messageId: "missingInternal" }],
+      output: `class Attributes {\n  /** @internal */\n  attribute() {}\n}\n`,
+    },
     // The entity Rails DOES have in that file is still gated.
     {
       filename: lockFile,

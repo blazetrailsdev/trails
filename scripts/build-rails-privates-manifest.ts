@@ -39,6 +39,23 @@
  * type that merely shares the file, so one entity's private name no longer
  * gates an unrelated type's same-named member (RFC 0121).
  *
+ * `instanceFiles` is the third half: the same all-private projection run over
+ * the INSTANCE halves alone. One `.rb` can declare the SAME name at two
+ * visibilities on the two halves of one Concern — `attribute` is public on
+ * `ActiveModel::Attributes::ClassMethods`
+ * (activemodel/lib/active_model/attributes.rb:59) and private on the instance
+ * half (attributes.rb:161) — and the file-wide fold then publishes the private
+ * one. The port keeps the two apart (an instance member of `class Attributes`
+ * vs. the `ClassMethods` object), so a rule looking at a non-static member reads
+ * `files` ∪ `instanceFiles`, which recovers exactly the names the class-method
+ * half folded away.
+ *
+ * It is folded per FILE, not per entity, on purpose: two entities' instance
+ * halves in one `.rb` are routinely one TS class (`Rack::Request` and
+ * `Rack::Request::Helpers`), so a per-entity list would start demanding
+ * `@internal` on members a sibling entity publishes — the #7057 over-tagging
+ * regression, in the other direction.
+ *
  * Run after `pnpm parity:api` (or `ruby scripts/api-compare/extract-ruby-api.rb`):
  *   pnpm rails-privates:manifest
  */
@@ -99,7 +116,7 @@ emitDeprecatedManifest();
 emitCallbackInvocationsManifest();
 
 if (!hasRailsApi) {
-  writeJsonManifest(OUT, { files: {}, entities: {} });
+  writeJsonManifest(OUT, { files: {}, entities: {}, instanceFiles: {} });
   flushManifestBatch();
   process.exit(0);
 }
@@ -196,8 +213,9 @@ function ancestorsFor(host: RubyEntity): { instance: RubyEntity[]; klass: RubyEn
 interface Manifest {
   files: Record<string, string[]>;
   entities: Record<string, string[]>;
+  instanceFiles: Record<string, string[]>;
 }
-const manifest: Manifest = { files: {}, entities: {} };
+const manifest: Manifest = { files: {}, entities: {}, instanceFiles: {} };
 
 for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   const pkgDir = PACKAGE_DIRS[pkg];
@@ -208,22 +226,34 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   // marked all-private if every contributor declares it private/protected.
   // rubyFile → name → "all-private" | "mixed"
   const fileVis = new Map<string, Map<string, "all-private" | "mixed">>();
+  // The same over the instance halves alone. rubyFile → name → status
+  const instanceVis = new Map<string, Map<string, "all-private" | "mixed">>();
   // The TS entity names a Ruby file contributes — every segment of every
   // contributing FQN, because the port folds a nested Ruby module onto the
   // outer name (`I18n::Backend::KeyValue::Implementation` is class `KeyValue`).
   // A TS class or interface outside this set is a local helper type Rails does
   // not have, and `rails-private-jsdoc` leaves its members alone (RFC 0121).
   const fileEntities = new Map<string, Set<string>>();
+  const record = (m: Map<string, "all-private" | "mixed">, name: string, isPriv: boolean) => {
+    const prev = m.get(name);
+    if (prev === undefined) m.set(name, isPriv ? "all-private" : "mixed");
+    else if (prev === "all-private" && !isPriv) m.set(name, "mixed");
+  };
   const note = (file: string, name: string, vis: string) => {
     let m = fileVis.get(file);
     if (!m) {
       m = new Map();
       fileVis.set(file, m);
     }
-    const isPriv = vis !== "public";
-    const prev = m.get(name);
-    if (prev === undefined) m.set(name, isPriv ? "all-private" : "mixed");
-    else if (prev === "all-private" && !isPriv) m.set(name, "mixed");
+    record(m, name, vis !== "public");
+  };
+  const noteInstance = (file: string, name: string, vis: string) => {
+    let m = instanceVis.get(file);
+    if (!m) {
+      m = new Map();
+      instanceVis.set(file, m);
+    }
+    record(m, name, vis !== "public");
   };
   const noteEntity = (file: string, fqn: string) => {
     let s = fileEntities.get(file);
@@ -239,8 +269,16 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       if (!host.file) continue;
       const { instance, klass } = ancestorsFor(host);
       noteEntity(host.file, host.fqn);
+      // A Concern's `ClassMethods` module is the class-method half: its
+      // *instance* methods become class methods on whoever includes the
+      // concern, so they contribute to the file-wide union but never to the
+      // instance fold.
+      const isClassMethodsHalf = host.fqn.split("::").at(-1) === "ClassMethods";
       for (const ent of instance) {
-        for (const m of ent.instanceMethods ?? []) note(host.file, m.name, m.visibility);
+        for (const m of ent.instanceMethods ?? []) {
+          note(host.file, m.name, m.visibility);
+          if (!isClassMethodsHalf) noteInstance(host.file, m.name, m.visibility);
+        }
       }
       // Extend / extended-via-Concern: a module's *instance* methods
       // become class methods on the host. Plus the host's own class
@@ -285,6 +323,14 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     manifest.files[tsRel] = [...new Set([...existing, ...tsNames])].sort();
   }
 
+  for (const [rubyFile, names] of instanceVis) {
+    const tsNames = project(names);
+    if (tsNames.size === 0) continue;
+    const tsRel = tsRelFor(rubyFile);
+    const existing = manifest.instanceFiles[tsRel] ?? [];
+    manifest.instanceFiles[tsRel] = [...new Set([...existing, ...tsNames])].sort();
+  }
+
   entitiesByTsFile(fileEntities, tsRelFor, manifest.entities);
 }
 
@@ -292,7 +338,14 @@ const sortedFiles: Record<string, string[]> = {};
 for (const k of Object.keys(manifest.files).sort()) sortedFiles[k] = manifest.files[k];
 const sortedEntities: Record<string, string[]> = {};
 for (const k of Object.keys(manifest.entities).sort()) sortedEntities[k] = manifest.entities[k];
-const final: Manifest = { files: sortedFiles, entities: sortedEntities };
+const sortedInstanceFiles: Record<string, string[]> = {};
+for (const k of Object.keys(manifest.instanceFiles).sort())
+  sortedInstanceFiles[k] = manifest.instanceFiles[k];
+const final: Manifest = {
+  files: sortedFiles,
+  entities: sortedEntities,
+  instanceFiles: sortedInstanceFiles,
+};
 
 writeJsonManifest(OUT, final);
 flushManifestBatch();

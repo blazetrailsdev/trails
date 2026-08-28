@@ -163,6 +163,7 @@ export class Attributes {
       : new AttributeSet();
   }
 
+  /** @internal */
   attribute(attrName: string): unknown {
     return this._attributes.fetchValue(attrName) ?? null;
   }

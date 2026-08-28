@@ -46,7 +46,6 @@ export class Recursive {
     }
   }
 
-  /** @internal */
   async include(
     env: Record<string, any>,
     path: string,

@@ -81,7 +81,12 @@ export class UploadedFile {
     return this._tempfile.read();
   }
 
-  /** @internal Direct access to the underlying tempfile for delegating consumers. */
+  /**
+   * @internal Direct access to the underlying tempfile for delegating consumers.
+   * @noRailsEquivalent CONVERGEABLE Rack reaches the tempfile through
+   * `method_missing` delegation (uploaded_file.rb:39), which forwards to
+   * `@tempfile` rather than exposing a reader.
+   */
   get tempfile(): UploadedFileTempfile {
     return this._tempfile;
   }
@@ -94,6 +99,8 @@ export class UploadedFile {
   /**
    * @internal Compat shim for callers that read `filename` directly
    * (e.g. the existing Rack tests). Rails uses {@link originalFilename}.
+   * @noRailsEquivalent CONVERGEABLE `Rack::Multipart::UploadedFile` exposes only
+   * `original_filename` (uploaded_file.rb:10); the callers should read that.
    */
   get filename(): string {
     return this.originalFilename;

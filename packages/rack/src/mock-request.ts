@@ -90,7 +90,6 @@ export class MockRequest {
     }
   }
 
-  /** @internal */
   static parseUriRfc2396(uri: string): URL {
     try {
       return new URL(uri);
