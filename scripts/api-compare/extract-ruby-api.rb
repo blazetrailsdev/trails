@@ -2154,22 +2154,23 @@ class ApiExtractor
     found
   end
 
-  # Resolve a constant name (`Relation::MULTI_VALUE_METHODS` or a bare `CONST`)
-  # to its recorded pure-symbol-array members, searching @const_symbol_arrays
-  # (which spans files) by matching the container path against stored FQNs. A
-  # leading `::` forces an absolute lookup: the container is anchored to the top
-  # level (`fqn == container`, or the empty top level for `::CONST`) and the
-  # relative `end_with?` suffix match is skipped, honouring Ruby's rule that
-  # `::Foo::KEYS` binds to top-level `Foo`, never a nested `X::Foo`.
+  # The recorded pure-symbol-array members of a constant.
   def resolve_const_symbol_array(name)
     resolve_const_members(name, @const_symbol_arrays)
   end
 
-  # The keys of a symbol-keyed Hash constant, resolved by the same rules.
+  # The recorded symbol keys of a Hash constant.
   def resolve_const_symbol_hash_keys(name)
     resolve_const_members(name, @const_symbol_hash_keys)
   end
 
+  # Resolve a constant name (`Relation::MULTI_VALUE_METHODS` or a bare `CONST`)
+  # to its recorded members in `store` (which spans files) by matching the
+  # container path against stored FQNs. A leading `::` forces an absolute
+  # lookup: the container is anchored to the top level (`fqn == container`, or
+  # the empty top level for `::CONST`) and the relative `end_with?` suffix match
+  # is skipped, honouring Ruby's rule that `::Foo::KEYS` binds to top-level
+  # `Foo`, never a nested `X::Foo`.
   def resolve_const_members(name, store)
     return nil unless name
     absolute = name.start_with?("::")
