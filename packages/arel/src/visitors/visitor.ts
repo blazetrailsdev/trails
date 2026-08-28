@@ -3,7 +3,8 @@ import { isHashAnalogue, rubyClassName, rubyConstantName } from "./ruby-class.js
 function describeClass(object: unknown): string {
   const rubyClass = rubyClassName(object);
   if (rubyClass !== null) return rubyClass;
-  return (object as { constructor?: { name?: string } })?.constructor?.name ?? typeof object;
+  const ctor = (object as { constructor?: object } | null | undefined)?.constructor;
+  return (ctor && rubyConstantName(ctor)) ?? typeof object;
 }
 
 export type NodeCtor = abstract new (...args: never[]) => object;

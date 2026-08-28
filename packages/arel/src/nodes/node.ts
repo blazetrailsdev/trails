@@ -1,6 +1,5 @@
 import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ArelError } from "../errors.js";
 import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface ArelEngine {
