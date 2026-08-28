@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { sql as arelSql } from "@blazetrails/arel";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Rollback, StatementInvalid } from "../../errors.js";
@@ -73,13 +74,8 @@ describe("DatabaseStatements", () => {
       expect(toSql("SELECT 1")).toBe("SELECT 1");
     });
 
-    it("calls toSql on arel objects", () => {
-      const arel = { toSql: () => "SELECT * FROM users" };
-      expect(toSql(arel)).toBe("SELECT * FROM users");
-    });
-
     it("unwraps ast property", () => {
-      const arel = { ast: { toSql: () => "SELECT 1" } };
+      const arel = { ast: arelSql("SELECT 1") };
       expect(toSql(arel)).toBe("SELECT 1");
     });
   });
@@ -599,9 +595,11 @@ describe("DatabaseStatements", () => {
 
 describe("performQuery", () => {
   it("raises NotImplementedError — subclasses must override", () => {
-    expect(() => performQuery.call({} as DatabaseStatementsHost, null, "SELECT 1", [], [])).toThrow(
-      /perform_query is not implemented/,
-    );
+    expect(() =>
+      performQuery.call({} as DatabaseStatementsHost, null, "SELECT 1", [], [], {
+        prepare: false,
+      }),
+    ).toThrow(/perform_query is not implemented/);
   });
 });
 

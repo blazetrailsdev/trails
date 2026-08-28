@@ -326,7 +326,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           try {
             return (
               await this.performQuery(this.driver, sql, binds, driverBinds, {
-                prepare: this.preparedStatements,
+                prepare: false,
                 notificationPayload: payload,
               })
             ).toArray();
@@ -425,7 +425,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           try {
             const counters = { affectedRows: 0, insertRowid: 0 as number | bigint };
             await this.performQuery(this.driver, sql, binds, driverBinds, {
-              prepare: this.preparedStatements,
+              prepare: false,
               notificationPayload: payload,
               counters,
             });
