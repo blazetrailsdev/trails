@@ -61,10 +61,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return "bigint";
   }
 
-  /**
-   * @internal
-   * @missingRailsCall size — PERMANENT
-   */
+  /** @internal */
   protected override prepareColumnOptions(column: MysqlColumn): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column);
     if (column.unsigned) spec["unsigned"] = "true";

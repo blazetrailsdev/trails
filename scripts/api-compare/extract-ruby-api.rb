@@ -344,6 +344,9 @@ class ApiExtractor
     # `Module.new` block, where `self` is a Ruby Module (see
     # module_eval_self_call?).
     @module_eval_depth = 0
+    # The named-capture locals bound by the method body currently being walked
+    # (see named_capture_locals).
+    @capture_locals = Set.new
     @namespace_stack = []
     @visibility_stack = [:public]
     # Tracks whether the current module-scope is under a bare `module_function`
@@ -2186,12 +2189,53 @@ class ApiExtractor
          .map(&:first)
   end
 
+  # `/…(?<name>…)/ =~ expr` ASSIGNS each named capture to a local variable, and
+  # only in that order — a regexp literal on the LEFT (ruby/re.c, documented at
+  # doc/regexp.rdoc "Named Captures"). Ripper does not track that binding, so a
+  # later bare `size` parses as a `:vcall` and would read as a receiverless
+  # call, manufacturing a call-set row no faithful port can ever satisfy: the
+  # port of a capture local IS a local
+  # (activerecord/lib/active_record/connection_adapters/mysql/schema_dumper.rb:13-14).
+  #
+  # Recorded as the walk REACHES the `=~`, never precomputed over the body: the
+  # binding only reaches the rest of the method, so a bare `size` written BEFORE
+  # it is still the receiverless call Ripper parsed.
+  def note_capture_locals(node)
+    return unless node[0] == :binary && node[2] == :=~ && node[1].is_a?(Array) &&
+                  node[1][0] == :regexp_literal
+
+    regexp_literal_source(node[1]).scan(/\(\?<([a-zA-Z_]\w*)>/) { |(name)| @capture_locals << name }
+  end
+
+  # The static text of a `:regexp_literal` — interpolated parts carry no
+  # capture name we could read, so they are simply skipped.
+  def regexp_literal_source(node)
+    parts = node[1]
+    return "" unless parts.is_a?(Array)
+
+    parts.filter_map { |part| part[1] if part.is_a?(Array) && part[0] == :@tstring_content }
+         .join
+  end
+
+  def with_capture_locals
+    outer = @capture_locals
+    @capture_locals = Set.new
+    yield
+  ensure
+    @capture_locals = outer
+  end
+
+  # A bare `:vcall` naming a capture local is a variable READ, not a call.
+  def capture_local?(name)
+    @capture_locals.include?(name)
+  end
+
   # Returns [calls, weak_calls]: the de-duplicated call names, and the subset
   # whose EVERY occurrence had an inert receiver (see walk_for_calls).
   def collect_method_calls(body_node)
     calls = []
     weak = []
-    walk_for_calls(body_node, calls, weak)
+    with_capture_locals { walk_for_calls(body_node, calls, weak) }
     calls = drop_raised_new(calls)
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
@@ -2204,7 +2248,7 @@ class ApiExtractor
   # repeats and the zero-argument sites the argument comparator has to see.
   def collect_call_args(body_node)
     sites = []
-    walk_for_call_args(body_node, sites)
+    with_capture_locals { walk_for_call_args(body_node, sites) }
     sites
   end
 
@@ -2226,7 +2270,7 @@ class ApiExtractor
   # `throw new X(...)` — a ThrowStatement on the TS side, never a call.
   def collect_method_skeleton(body_node)
     tokens = []
-    walk_for_skeleton(body_node, tokens)
+    with_capture_locals { walk_for_skeleton(body_node, tokens) }
     tokens
   end
 
@@ -2255,7 +2299,8 @@ class ApiExtractor
       walk_for_skeleton(node[2], tokens)
       return
     elsif %i[fcall vcall command].include?(kind)
-      skeleton_push_name(tokens, ident_name(node[1]), nil)
+      name = ident_name(node[1])
+      skeleton_push_name(tokens, name, nil) unless kind == :vcall && capture_local?(name)
     elsif %i[call command_call].include?(kind)
       # Receiver before the call it receives, matching
       # extract-ts-api.ts#extractSkeleton; the two orders must agree.
@@ -2268,6 +2313,7 @@ class ApiExtractor
     end
 
     node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
+    note_capture_locals(node)
   end
 
   # Ripper wraps an op-assign operator in an `:op` node on newer parsers and
@@ -2617,6 +2663,7 @@ class ApiExtractor
     end
 
     node.each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+    note_capture_locals(node)
   end
 
   # Decompose a call-ish Ripper node into [callee_node, argument_nodes] — the
@@ -2652,6 +2699,7 @@ class ApiExtractor
     when :fcall, :vcall
       # Unqualified method call: foo() or foo
       name = ident_name(callee[1])
+      name = nil if callee[0] == :vcall && capture_local?(name)
     when :call, :command_call
       # Qualified method call: obj.foo
       recv = callee[1]
@@ -2813,6 +2861,7 @@ class ApiExtractor
       record_call_site(node, sites, [])
     else
       node.each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
+      note_capture_locals(node)
     end
   end
 
@@ -2840,6 +2889,7 @@ class ApiExtractor
     walk_for_call_args(callee[1], sites) if callee[0] == :call || callee[0] == :command_call
 
     name = call_site_name(callee)
+    name = nil if callee[0] == :vcall && capture_local?(name)
     # The argument half of walk_for_calls' `Proc.new` verdict: the call-set gate
     # has already agreed the site can never be satisfied, so recording it here
     # would let the argument gate flag a site the other extractor says is gone.
