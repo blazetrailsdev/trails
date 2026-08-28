@@ -3906,7 +3906,7 @@ export function main() {
         // credits as a move. Only a name nothing else accounts for lands in the
         // `declarationOnly` column, counted as a miss so the file's percentage
         // states what a Rails developer would find on opening it.
-        const declOnly =
+        let declOnly =
           directMatch !== undefined &&
           declarationOnlyInFile(
             expectedTs,
@@ -4032,7 +4032,19 @@ export function main() {
         // Cross-file misplaced fallback: method exists in the cluster
         // file we identified above.
         if (actualMethods) {
-          const misplacedMatch = tsCandidates.find((c) => actualMethods.has(c));
+          const inCluster = tsCandidates.filter((c) => actualMethods.has(c));
+          const misplacedMatch = inCluster.find(
+            (c) =>
+              !declarationOnlyInFile(
+                misplacedActualFile!,
+                c,
+                tsBodylessOwnersByFileName,
+                tsBodiedOwnersByFileName,
+              ),
+          );
+          // The cluster declares the name, but only as a signature — the same
+          // verdict the expected file gets, reported in the same column.
+          if (misplacedMatch === undefined && inCluster.length > 0) declOnly = true;
           if (misplacedMatch) {
             fileMatched++;
             checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule);
