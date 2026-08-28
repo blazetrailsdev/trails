@@ -551,9 +551,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
     const tname = this._pt(name);
-    // Ruby forwards `*arguments, &block` (migration.rb:1043-1052), so an option
-    // hash or block the caller omitted is not passed at all — never as a
-    // materialized trailing `nil`.
     if (fn !== undefined) {
       await this.connection.createTable(tname, optionsOrFn, fn);
     } else if (optionsOrFn !== undefined) {
@@ -991,9 +988,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
     table1 = this._pt(table1);
-    // Ruby forwards `*arguments, &block` (migration.rb:1043-1052), so an option
-    // hash or block the caller omitted is not passed at all — never as a
-    // materialized trailing `nil`.
     if (fn !== undefined) {
       await this.connection.createJoinTable(table1, table2, options, fn);
     } else if (options !== undefined) {
@@ -1031,9 +1025,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     fnOrOptions?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    // Ruby forwards `*arguments, &block` (migration.rb:1043-1052), so an option
-    // hash or block the caller omitted is not passed at all — never as a
-    // materialized trailing `nil`.
     if (fn !== undefined) {
       await this.connection.changeTable(this._pt(tableName), fnOrOptions, fn);
     } else if (fnOrOptions !== undefined) {
