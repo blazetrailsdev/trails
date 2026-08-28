@@ -197,10 +197,10 @@ export function toSqlAndBinds(
   }
 
   if (
-    arelOrSqlString instanceof Nodes.Node ||
-    (typeof arelOrSqlString !== "string" &&
-      arelOrSqlString &&
-      typeof (arelOrSqlString as any).toSql === "function")
+    (arelOrSqlString instanceof Nodes.Node ||
+      (arelOrSqlString && typeof (arelOrSqlString as any).toSql === "function")) &&
+    typeof arelOrSqlString !== "string" &&
+    !(arelOrSqlString instanceof Nodes.SqlLiteral)
   ) {
     if (binds.length > 0) {
       throw new Error(
@@ -234,6 +234,10 @@ export function toSqlAndBinds(
     return [sql, binds, preparable, allowRetry];
   }
 
+  if (arelOrSqlString instanceof Nodes.SqlLiteral) {
+    return [arelOrSqlString.value, binds, preparable, allowRetry];
+  }
+
   if (typeof arelOrSqlString === "string") {
     return [arelOrSqlString, binds, preparable, allowRetry];
   }
@@ -258,48 +262,39 @@ function unpreparedStatement<T>(host: DatabaseStatementsHost, block: () => T): T
 export function cacheableQuery(
   this: DatabaseStatementsHost | void,
   klass: {
-    query?(sql: string): unknown;
-    partialQuery?(parts: unknown): unknown;
-    partialQueryCollector?(): unknown;
+    query(sql: string): unknown;
+    partialQuery(parts: unknown): unknown;
+    partialQueryCollector(): unknown;
   },
   arel: unknown,
 ): [unknown, unknown[]] {
   const host = this as DatabaseStatementsHost;
-  const visitor = (host as any)?.visitor as Visitors.ToSql | undefined;
+  const visitor = (host as any).visitor as Visitors.ToSql;
 
-  let node = arel;
-  if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
-    node = (node as any).ast;
+  let ast = arel;
+  if (ast && (ast as any).ast != null && typeof (ast as any).ast === "object") {
+    ast = (ast as any).ast;
   }
 
-  if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const [sql, binds] = visitor.compile(node, host.collector!() as Collectors.Composite) as [
-      string,
+  let query: unknown;
+  let binds: unknown[];
+  if (host.preparedStatements) {
+    const [sql, compiledBinds] = visitor.compile(
+      ast as Nodes.Node,
+      host.collector!() as Collectors.Composite,
+    ) as unknown as [string, unknown[]];
+    binds = compiledBinds;
+    query = klass.query(sql);
+  } else {
+    const collector = klass.partialQueryCollector() as Collectors.Composite;
+    const [parts, compiledBinds] = visitor.compile(ast as Nodes.Node, collector) as unknown as [
+      unknown,
       unknown[],
     ];
-    return [klass.query(sql), binds];
+    binds = compiledBinds;
+    query = klass.partialQuery(parts);
   }
-
-  if (klass.partialQueryCollector && klass.partialQuery && visitor && node instanceof Nodes.Node) {
-    const collector = klass.partialQueryCollector() as { value: [unknown[], unknown[]] };
-    const [parts, collectedBinds] = visitor.compile(node, collector);
-    return [klass.partialQuery(parts), collectedBinds];
-  }
-
-  let sql: string;
-  if (typeof arel === "string") {
-    sql = arel;
-  } else if (visitor && node instanceof Nodes.Node) {
-    [sql] = toSqlAndBinds.call(host, node);
-  } else {
-    sql = (node as any).toSql?.() ?? String(node);
-  }
-
-  if (klass.partialQuery) {
-    return [klass.partialQuery([sql]), []];
-  }
-  const queryObj = klass.query ? klass.query(sql) : sql;
-  return [queryObj, []];
+  return [query, binds];
 }
 
 export function queryValue(

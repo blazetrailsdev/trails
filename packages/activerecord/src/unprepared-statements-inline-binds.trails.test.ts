@@ -13,6 +13,7 @@ import { describe, it, expect } from "vitest";
 import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Nodes } from "@blazetrails/arel";
 
 describe("unprepared statements inline binds", () => {
   fixtures(["topics"]);
@@ -56,5 +57,28 @@ describe("unprepared statements inline binds", () => {
       const [, , , allowRetry] = conn.toSqlAndBinds(rel.arel());
       expect(allowRetry).toBe(false);
     });
+  });
+
+  it("returns a top-level SqlLiteral untouched", async () => {
+    // `Arel::Nodes::SqlLiteral < String`, so rb:23's
+    // `Arel.arel_node?(x) && !(String === x)` is FALSE for one: Rails skips the
+    // compile branch entirely and rb:48-49 returns it with the caller's
+    // `preparable` / `allow_retry` intact. Routing it through
+    // `visit_Arel_Nodes_SqlLiteral` instead (arel to_sql.rb) would force
+    // `preparable = false` and clear `retryable`.
+    const conn = (await Topic.leaseConnection()) as unknown as {
+      toSqlAndBinds(
+        arel: unknown,
+        binds?: unknown[],
+        preparable?: boolean | null,
+        allowRetry?: boolean,
+      ): [string, unknown[], boolean | null, boolean];
+    };
+    const literal = new Nodes.SqlLiteral("SELECT 1");
+    const [sql, binds, preparable, allowRetry] = conn.toSqlAndBinds(literal, [], true, true);
+    expect(sql).toBe("SELECT 1");
+    expect(binds).toEqual([]);
+    expect(preparable).toBe(true);
+    expect(allowRetry).toBe(true);
   });
 });

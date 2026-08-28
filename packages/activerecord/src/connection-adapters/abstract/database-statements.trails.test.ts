@@ -10,7 +10,6 @@ import {
   combineMultiStatements,
   toSql,
   toSqlAndBinds,
-  cacheableQuery,
   explain,
   transaction,
   transactionIsolationLevels,
@@ -97,15 +96,6 @@ describe("DatabaseStatements", () => {
     it("passes through provided binds", () => {
       const [, binds] = toSqlAndBinds("SELECT ?", [42]);
       expect(binds).toEqual([42]);
-    });
-  });
-
-  describe("cacheableQuery", () => {
-    it("returns query object and binds", () => {
-      const klass = { query: (sql: string) => ({ sql }) };
-      const [queryObj, binds] = cacheableQuery.call(undefined, klass, "SELECT 1");
-      expect((queryObj as any).sql).toBe("SELECT 1");
-      expect(binds).toEqual([]);
     });
   });
 
