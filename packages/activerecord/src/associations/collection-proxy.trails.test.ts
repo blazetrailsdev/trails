@@ -713,7 +713,7 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
   });
 });
 
-// RFC 0023-surfaced-deviations: a CollectionProxy's relation clauses are seeded
+// the activerecord-surfaced-deviations bucket: a CollectionProxy's relation clauses are seeded
 // ONCE at construction. When the owner is a NEW record then, its FK is
 // unresolvable and the seed collapses to the `1=0` NullRelation. A relation
 // spawned off that stale seed (`owner.things.where(...)`) — or the proxy itself

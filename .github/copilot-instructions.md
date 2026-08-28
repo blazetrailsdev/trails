@@ -18,7 +18,7 @@ This is a re-implementation of Rails, not a library inspired by it. When code ha
 
 Only a genuine TypeScript language shortcoming justifies a deviation, and only after the settled workaround is ruled out (`setX()` where a Ruby `x=` setter must be async, `include()`/`Included<>` and `this`-typed functions for Ruby `include`). "Cleaner in TS", "more idiomatic", and "the tests pass either way" are not language shortcomings.
 
-**Converge, never ratify.** An existing deviation — a `call-mismatches-*-exclude` baseline row, an `arity-exclude.json` entry, a `SKIP_GROUPS` name, a `@noRailsEquivalent` / `@missingRailsCall` tag, a story under `0023-surfaced-deviations` — is debt, not permission. It is never a reason to match the shape, extend it, or add a sibling row. A diff that _adds_ one is recording a new deviation: review its `reason` at least as hard as the code, and treat a seeded placeholder or a reason that only restates the code as a finding.
+**Converge, never ratify.** An existing deviation — a `call-mismatches-*-exclude` baseline row, an `arity-exclude.json` entry, a `SKIP_GROUPS` name, a `@noRailsEquivalent` / `@missingRailsCall` tag, a story in a `<package>-surfaced-deviations` bucket — is debt, not permission. It is never a reason to match the shape, extend it, or add a sibling row. A diff that _adds_ one is recording a new deviation: review its `reason` at least as hard as the code, and treat a seeded placeholder or a reason that only restates the code as a finding.
 
 The full standard, and the pre-PR gates that detect drift, are in [CLAUDE.md](../CLAUDE.md) — "Fidelity is the job" and "Before you open the PR".
 

@@ -928,7 +928,7 @@ describe("QueryCacheExpiryTest", () => {
     });
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
+  // TRACKED-PENDING-CONVERGENCE (activerecord-surfaced-deviations:
   // query-cache-dirties-wiring-incomplete): Rails wires `dirties_query_cache`
   // on the public write methods (`:create, :insert, :update, :delete, ...`) so
   // each logical write clears the query cache exactly once. trails wires it on
