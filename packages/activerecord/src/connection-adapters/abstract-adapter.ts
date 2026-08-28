@@ -736,20 +736,20 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
-  static quoteColumnName(name: unknown): string {
-    return abstractQuoteColumnName(name);
+  static quoteColumnName(columnName: unknown): string {
+    return abstractQuoteColumnName(columnName);
   }
 
-  static quoteTableName(name: unknown): string {
-    return abstractQuoteTableName.call(this, name);
+  static quoteTableName(tableName: unknown): string {
+    return abstractQuoteTableName.call(this, tableName);
   }
 
-  quoteTableName(name: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteTableName(name);
+  quoteTableName(tableName: unknown): string {
+    return (this.constructor as typeof AbstractAdapter).quoteTableName(tableName);
   }
 
-  quoteColumnName(name: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteColumnName(name);
+  quoteColumnName(columnName: unknown): string {
+    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {
@@ -1966,7 +1966,7 @@ export class AbstractAdapter implements Quoting {
     name: string | null = "SQL",
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
-    isAsync = false,
+    async = false,
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     try {
@@ -1979,7 +1979,7 @@ export class AbstractAdapter implements Quoting {
           name,
           binds,
           type_casted_binds: typeCastedBinds,
-          async: isAsync,
+          async,
           connection: this,
           transaction: presentTx,
           row_count: 0,

@@ -253,7 +253,7 @@ export class SchemaStatements {
 
   async createTable(
     tableName: string,
-    kwargsOrFn?:
+    options?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
@@ -291,21 +291,21 @@ export class SchemaStatements {
     } = {};
     let definer: ((t: TableDefinitionOf<this>) => void | Promise<void>) | undefined;
 
-    if (typeof kwargsOrFn === "function") {
-      definer = kwargsOrFn;
-    } else if (kwargsOrFn) {
-      kwargs = kwargsOrFn;
+    if (typeof options === "function") {
+      definer = options;
+    } else if (options) {
+      kwargs = options;
       definer = fn;
     }
 
-    const { id, primaryKey, force, ...options } = kwargs;
-    this.validateCreateTableOptionsBang(options);
+    const { id, primaryKey, force, ...restOptions } = kwargs;
+    this.validateCreateTableOptionsBang(restOptions);
 
-    if ((options as { _usesLegacyTableName?: boolean })._usesLegacyTableName !== true) {
+    if ((restOptions as { _usesLegacyTableName?: boolean })._usesLegacyTableName !== true) {
       this.validateTableLengthBang(tableName);
     }
 
-    if (force && "ifNotExists" in options) {
+    if (force && "ifNotExists" in restOptions) {
       throw new ArgumentError(
         "Options `:force` and `:if_not_exists` cannot be used simultaneously.",
       );
@@ -313,7 +313,7 @@ export class SchemaStatements {
 
     const td = await this.buildCreateTableDefinition(
       tableName,
-      { id, primaryKey, force, ...options },
+      { id, primaryKey, force, ...restOptions },
       definer,
     );
 
@@ -414,20 +414,20 @@ export class SchemaStatements {
     );
   }
 
-  async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
+  async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
     await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(tableName)} RENAME COLUMN ${this.quoteColumnName(oldName)} TO ${this.quoteColumnName(newName)}`,
+      `ALTER TABLE ${this.quoteColumnName(tableName)} RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`,
     );
   }
 
   async addIndex(
     tableName: string,
-    columns: string | string[],
+    columnName: string | string[],
     options: AddIndexOptions = {},
   ): Promise<void> {
     const createIndex = await this.buildCreateIndexDefinition(
       tableName,
-      columns,
+      columnName,
       options as Record<string, unknown>,
     );
     await this.execute(await this.schemaCreation.accept(createIndex));
@@ -435,23 +435,23 @@ export class SchemaStatements {
 
   async removeIndex(
     tableName: string,
-    columnOrOptions:
+    columnName:
       | string
       | string[]
       | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
-    let columnName: string | string[] | undefined;
-    if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
-      columnName = columnOrOptions;
+    let column: string | string[] | undefined;
+    if (typeof columnName === "string" || Array.isArray(columnName)) {
+      column = columnName;
     } else {
-      columnName = undefined;
-      options = { ...columnOrOptions, ...options };
+      column = undefined;
+      options = { ...columnName, ...options };
     }
 
-    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
+    if (options.ifExists && !(await this.indexExists(tableName, column, options))) return;
 
-    const indexName = await this.indexNameForRemove(tableName, columnName, options);
+    const indexName = await this.indexNameForRemove(tableName, column, options);
 
     if (this.typeRegistryKey === "mysql2") {
       await this.execute(
@@ -623,23 +623,23 @@ export class SchemaStatements {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | RemoveForeignKeyOptions,
+    toTable?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     if (!this.useForeignKeys()) return;
-    let toTable: string | undefined;
+    let toTableName: string | undefined;
     let opts: RemoveForeignKeyOptions;
-    if (typeof toTableOrOptions === "object" && toTableOrOptions !== null) {
-      opts = { ...toTableOrOptions };
-      toTable = opts.toTable;
+    if (typeof toTable === "object" && toTable !== null) {
+      opts = { ...toTable };
+      toTableName = opts.toTable;
     } else {
-      toTable = toTableOrOptions;
+      toTableName = toTable;
       opts = { ...options };
     }
-    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, toTable))) {
+    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, toTableName))) {
       return;
     }
-    const lookup: ForeignKeyLookupOptions = { ...opts, toTable };
+    const lookup: ForeignKeyLookupOptions = { ...opts, toTable: toTableName };
     delete (lookup as RemoveForeignKeyOptions).ifExists;
     const fk = await this.foreignKeyForBang(fromTable, lookup);
     const at = this.createAlterTable(fromTable);
@@ -678,25 +678,28 @@ export class SchemaStatements {
 
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?:
+    expression?:
       | string
       | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
     options: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
   ): Promise<void> {
-    let expression: string | undefined;
+    let expr: string | undefined;
     let opts: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean };
-    if (typeof expressionOrOptions === "string") {
-      expression = expressionOrOptions;
+    if (typeof expression === "string") {
+      expr = expression;
       opts = { ...options };
     } else {
-      expression = undefined;
-      opts = { ...(expressionOrOptions ?? {}), ...options };
+      expr = undefined;
+      opts = { ...(expression ?? {}), ...options };
     }
     const { ifExists, ...lookupOptions } = opts;
 
     if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
 
-    const chk = await this.checkConstraintForBang(tableName, { expression, ...lookupOptions });
+    const chk = await this.checkConstraintForBang(tableName, {
+      expression: expr,
+      ...lookupOptions,
+    });
     const at = this.createAlterTable(tableName);
     at.dropCheckConstraint(chk.name);
     await this.execute(await this.schemaCreation.accept(at));
@@ -714,25 +717,25 @@ export class SchemaStatements {
   async createJoinTable(
     table1: string,
     table2: string,
-    kwargsOrFn?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
+    options?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
     fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
     let kwargs: JoinTableOptions = {};
     let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
-    if (typeof kwargsOrFn === "function") {
-      definer = kwargsOrFn;
-    } else if (kwargsOrFn) {
-      kwargs = kwargsOrFn;
+    if (typeof options === "function") {
+      definer = options;
+    } else if (options) {
+      kwargs = options;
       definer = fn;
     }
-    const options: JoinTableOptions = { ...kwargs };
-    let columnOptions = options.columnOptions ?? {};
-    delete options.columnOptions;
-    const joinTableName = this.findJoinTableName(table1, table2, options);
+    const joinOptions: JoinTableOptions = { ...kwargs };
+    let columnOptions = joinOptions.columnOptions ?? {};
+    delete joinOptions.columnOptions;
+    const joinTableName = this.findJoinTableName(table1, table2, joinOptions);
     columnOptions = { null: false, index: false, ...columnOptions };
     const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
-    await this.createTable(joinTableName, { ...options, id: false }, (t) => {
+    await this.createTable(joinTableName, { ...joinOptions, id: false }, (t) => {
       t.references(t1Ref, columnOptions);
       t.references(t2Ref, columnOptions);
       if (definer) definer(t);

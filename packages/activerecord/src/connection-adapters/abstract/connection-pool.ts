@@ -118,9 +118,9 @@ export class NullPool implements AbstractPool {
     throw new ConnectionNotEstablished("NullPool does not support checkout");
   }
 
-  checkin(_conn: DatabaseAdapter): void {}
+  checkin(_: DatabaseAdapter): void {}
 
-  remove(_conn: DatabaseAdapter): void {}
+  remove(_: DatabaseAdapter): void {}
 
   get asyncExecutor(): null {
     return null;
@@ -570,8 +570,8 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /** @missingRailsCall lock — PERMANENT */
-  async checkout(timeout?: number): Promise<DatabaseAdapter> {
-    const checkoutTimeout = timeout ?? this.checkoutTimeout;
+  async checkout(checkoutTimeout?: number): Promise<DatabaseAdapter> {
+    checkoutTimeout ??= this.checkoutTimeout;
     const pinned = this._resolvePinnedConnection();
     if (!pinned) {
       return checkoutAndVerify(this, await this.acquireConnection(checkoutTimeout));

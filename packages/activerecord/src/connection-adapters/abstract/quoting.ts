@@ -28,7 +28,7 @@ import {
 import { Value as TimeValue } from "../../type/time.js";
 
 export interface QuotingClassMethods {
-  quoteColumnName(name: unknown): string;
+  quoteColumnName(columnName: unknown): string;
 }
 
 export interface QuotingDispatchHost {
@@ -37,8 +37,8 @@ export interface QuotingDispatchHost {
   quotedTime(value: QuotedTimeValue): string;
   quotedBinary(value: unknown): string;
   quoteString(s: string): string;
-  quoteColumnName(name: unknown): string;
-  quoteTableName(name: unknown): string;
+  quoteColumnName(columnName: unknown): string;
+  quoteTableName(tableName: unknown): string;
   quotedTrue(): string;
   quotedFalse(): string;
   unquotedTrue(): boolean | number;
@@ -60,8 +60,8 @@ export function quoteColumnName(_columnName: unknown): string {
   throw new NotImplementedError();
 }
 
-export function quoteTableName(this: QuotingClassMethods, name: unknown): string {
-  return this.quoteColumnName(name);
+export function quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
+  return this.quoteColumnName(tableName);
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
@@ -305,9 +305,9 @@ export interface Quoting {
 
   quoteString(s: string): string;
 
-  quoteTableName(name: unknown): string;
+  quoteTableName(tableName: unknown): string;
 
-  quoteColumnName(name: unknown): string;
+  quoteColumnName(columnName: unknown): string;
 
   quoteTableNameForAssignment(table: string, attr: string): string;
 
