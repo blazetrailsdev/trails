@@ -1,6 +1,5 @@
 import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ArelError } from "../errors.js";
 
 export interface ArelEngine {
   connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
@@ -11,21 +10,19 @@ export const _engine: { current: ArelEngine | null } = { current: null };
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node {
   not(): Node {
-    return new (assertRegistered(_Not, "Not"))(this);
+    return new _Not!(this);
   }
 
   or(right: Node): Node {
-    return new (assertRegistered(_Grouping, "Grouping"))(
-      new (assertRegistered(_Or, "Or"))([this, right]),
-    );
+    return new _Grouping!(new _Or!([this, right]));
   }
 
   and(right: Node): Node {
-    return new (assertRegistered(_And, "And"))([this, right]);
+    return new _And!([this, right]);
   }
 
   invert(): Node {
-    return new (assertRegistered(_Not, "Not"))(this);
+    return new _Not!(this);
   }
 
   toSql(engine: ArelEngine | null = _engine.current): string {
@@ -47,15 +44,6 @@ export class Node {
   isEquality(): boolean {
     return false;
   }
-}
-
-function assertRegistered<T>(ctor: T | undefined, name: string): T {
-  if (!ctor) {
-    throw new ArelError(
-      `Node.${name} requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.`,
-    );
-  }
-  return ctor;
 }
 
 /**

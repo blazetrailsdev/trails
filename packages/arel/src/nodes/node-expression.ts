@@ -1,15 +1,11 @@
 import { Node } from "./node.js";
 import { _buildQuoted } from "../node-slots.js";
-import { ArelError } from "../errors.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class NodeExpression extends Node {
   /** @internal */
   quotedNode(other: unknown): Node {
-    if (_buildQuoted) return _buildQuoted(other, this);
-    throw new ArelError(
-      'NodeExpression.quotedNode called before buildQuoted was registered. Import from "@blazetrails/arel" so Arel package initialization runs and wires node registries.',
-    );
+    return _buildQuoted!(other, this);
   }
 }
 

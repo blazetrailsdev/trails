@@ -5,7 +5,6 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { ArelError } from "../errors.js";
 
 export class UnsupportedVisitError extends Error {
   constructor(object: unknown) {
@@ -1250,12 +1249,7 @@ export class ToSql extends Visitor {
   /** @internal */
   static registerDispatch(): void {
     const d = ToSql.dispatchCache();
-    const reg = (ctor: NodeCtor, m: string) => {
-      if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
-        throw new ArelError(`ToSql dispatch: method '${m}' is not defined on the prototype`);
-      }
-      d.set(ctor, m);
-    };
+    const reg = (ctor: NodeCtor, m: string) => d.set(ctor, m);
     reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
     reg(Nodes.SelectCore, "visitArelNodesSelectCore");
     reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");

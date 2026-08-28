@@ -77,7 +77,7 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new NamedFunction("COALESCE", exprs);
   },
 
-  cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction {
-    return new NamedFunction("CAST", [expr.as(type)]);
+  cast(name: Node & { as: (type: string) => Node }, type: string): NamedFunction {
+    return new NamedFunction("CAST", [name.as(type)]);
   },
 };

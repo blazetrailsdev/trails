@@ -6,7 +6,6 @@ import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
 import { isHashAnalogue } from "./ruby-class.js";
-import { ArelError } from "../errors.js";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -392,12 +391,7 @@ export class Dot extends Visitor {
       });
       return `${n.id} [label="${label}"];`;
     });
-    const edgeLines = this.edges.map((e) => {
-      if (!e.to) {
-        throw new ArelError(`Dot: edge "${e.name}" has no destination node`);
-      }
-      return `${e.from.id} -> ${e.to.id} [label="${e.name}"];`;
-    });
+    const edgeLines = this.edges.map((e) => `${e.from.id} -> ${e.to!.id} [label="${e.name}"];`);
     return [header, ...nodeLines, ...edgeLines, "}"].join("\n");
   }
 

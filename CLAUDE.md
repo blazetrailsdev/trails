@@ -599,3 +599,12 @@ the TDZ, so a green suite proves nothing here.
 Deferring the subclass edges instead (a slot per `extends` site) is the
 alternative that looks smaller and does not work: nothing then loads the
 subclass modules at all, so their self-registration never runs.
+
+**A slot read carries no guard**, because the Ruby body it mirrors carries none:
+`Arel::Nodes::Node#not` is `Nodes::Not.new self` (`arel/nodes/node.rb:122`) and
+raises `NameError` if the constant will not resolve. So a reader is written
+`new _Not!(this)`, and an unset slot surfaces as a plain `TypeError` at the call
+site — the JS analogue of that `NameError`. A `throw` explaining that the caller
+deep-imported the module is invented surface: it is a guard Rails does not have,
+in a body that is otherwise line-for-line. This is the one place the decision is
+recorded; do not re-derive it per slot or per call site.

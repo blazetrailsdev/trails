@@ -13,16 +13,12 @@ export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { sql, star, fetchAttribute } from "./arel.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
-import { _registerCteFactory } from "./nodes/binary.js";
-import { Cte } from "./nodes/cte.js";
 import "./nodes/unary.js";
 import "./nodes/grouping.js";
 import "./nodes/nary.js";
 import "./nodes/equality.js";
 import "./nodes/in.js";
 import "./nodes/casted.js";
-
-_registerCteFactory((name, relation) => new Cte(name, relation));
 
 /**
  * Mix Predications + Math into NodeExpression (so every expression-valued

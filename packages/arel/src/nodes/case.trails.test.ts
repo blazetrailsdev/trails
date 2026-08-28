@@ -23,7 +23,7 @@ describe("Case", () => {
 
     it("throws when called before #when", () => {
       const node = new Nodes.Case(users.get("status"));
-      expect(() => node.then("A")).toThrow(/Case#then called before Case#when/);
+      expect(() => node.then("A")).toThrow(TypeError);
     });
 
     it("Promise.resolve rejects rather than hanging (thenable hazard)", async () => {
