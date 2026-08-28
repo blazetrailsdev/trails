@@ -217,9 +217,12 @@ export function serialize(
 ): void {
   // serialization.rb:183-190 — `coder: nil, type: Object, yaml: {}, **options`,
   // then `coder ||= default_column_serializer` and the missing-keyword raise.
+  // Ruby's `||=` and `unless` are false for nil and false ONLY, so a `false`
+  // coder falls back to the default and an empty-string one does not raise.
   const { type = Object, yaml = {} } = options;
-  const coder = options.coder ?? this.defaultColumnSerializer;
-  if (!coder) {
+  let coder = options.coder;
+  if (coder == null || coder === false) coder = this.defaultColumnSerializer;
+  if (coder == null || coder === false) {
     throw new ArgumentError(
       "missing keyword: :coder. If no default coder is configured, a coder must be provided to `serialize`.",
     );
