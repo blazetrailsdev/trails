@@ -12,7 +12,7 @@ function insertStatementPerDatabase(values: string): string {
   return `insert into json_data_type (payload) VALUES ('${values}')`;
 }
 
-function postgresqlJsonSetup(columnType: string): () => AbstractAdapter {
+function postgresqlJsonSharedTestCases(columnType: string): void {
   let connection: AbstractAdapter;
 
   beforeEach(async () => {
@@ -31,73 +31,41 @@ function postgresqlJsonSetup(columnType: string): () => AbstractAdapter {
 
   jsonSharedTestCases({ columnType, insertStatementPerDatabase });
 
-  return () => connection;
+  it("default", async () => {
+    await connection.addColumn("json_data_type", "permissions", columnType, {
+      default: { users: "read", posts: ["read", "write"] },
+    });
+    await klass.resetColumnInformation();
+    await klass.loadSchema();
+
+    expect(klass.columnDefaults["permissions"]).toEqual({
+      users: "read",
+      posts: ["read", "write"],
+    });
+    expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
+  });
+
+  it("deserialize with array", async () => {
+    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+    await x.saveBang();
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+    await x.reload();
+    expect(x.objects).toEqual([{ foo: "bar" }]);
+  });
+
+  it("noname columns of different types", async () => {
+    await connection.execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
+    expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
+  });
 }
 
 describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
   fixtures([]);
-  const columnType = "json";
-  const connection = postgresqlJsonSetup(columnType);
-
-  it("default", async () => {
-    await connection().addColumn("json_data_type", "permissions", columnType, {
-      default: { users: "read", posts: ["read", "write"] },
-    });
-    await klass.resetColumnInformation();
-    await klass.loadSchema();
-
-    expect(klass.columnDefaults["permissions"]).toEqual({
-      users: "read",
-      posts: ["read", "write"],
-    });
-    expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
-  });
-
-  it("deserialize with array", async () => {
-    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
-    expect(x.objects).toEqual([{ foo: "bar" }]);
-    await x.saveBang();
-    expect(x.objects).toEqual([{ foo: "bar" }]);
-    await x.reload();
-    expect(x.objects).toEqual([{ foo: "bar" }]);
-  });
-
-  it("noname columns of different types", async () => {
-    await connection().execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
-    expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
-  });
+  postgresqlJsonSharedTestCases("json");
 });
 
 describeIfPostgresqlAdapter("PostgresqlJSONBTest", () => {
   fixtures([]);
-  const columnType = "jsonb";
-  const connection = postgresqlJsonSetup(columnType);
-
-  it("default", async () => {
-    await connection().addColumn("json_data_type", "permissions", columnType, {
-      default: { users: "read", posts: ["read", "write"] },
-    });
-    await klass.resetColumnInformation();
-    await klass.loadSchema();
-
-    expect(klass.columnDefaults["permissions"]).toEqual({
-      users: "read",
-      posts: ["read", "write"],
-    });
-    expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
-  });
-
-  it("deserialize with array", async () => {
-    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
-    expect(x.objects).toEqual([{ foo: "bar" }]);
-    await x.saveBang();
-    expect(x.objects).toEqual([{ foo: "bar" }]);
-    await x.reload();
-    expect(x.objects).toEqual([{ foo: "bar" }]);
-  });
-
-  it("noname columns of different types", async () => {
-    await connection().execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
-    expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
-  });
+  postgresqlJsonSharedTestCases("jsonb");
 });
