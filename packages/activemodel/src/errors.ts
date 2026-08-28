@@ -272,6 +272,13 @@ export class StrictValidationFailed extends globalThis.Error {
   }
 }
 
+export class RangeError extends globalThis.RangeError {
+  constructor(message?: string) {
+    super(message);
+    this.name = "RangeError";
+  }
+}
+
 export class UnknownAttributeError<TRecord extends object = object> extends globalThis.Error {
   readonly record: TRecord;
   readonly attribute: string;
@@ -282,12 +289,5 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
     this.name = "UnknownAttributeError";
     this.record = record;
     this.attribute = attribute;
-  }
-}
-
-export class RangeError extends globalThis.RangeError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "RangeError";
   }
 }

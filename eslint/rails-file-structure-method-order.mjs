@@ -386,10 +386,12 @@ function computeTargetOrder(currentNodes, expectedOrder, declaredKeys) {
   return target;
 }
 
-// Top-level class declarations, in program order, as movable units. Handles
-// `class Foo {}` / `export class Foo {}`; `export default class Foo {}` is
-// excluded — a default export is one per file, so it never has a sibling to
-// order against, and moving it would drag the export with it.
+/**
+ * Top-level class declarations, in program order, as movable units. Handles
+ * `class Foo {}` / `export class Foo {}`; `export default class Foo {}` is
+ * excluded — a default export is one per file, so it never has a sibling to
+ * order against, and moving it would drag the export with it.
+ */
 function collectDeclarationUnits(programNode) {
   const units = [];
   for (const stmt of programNode.body) {
@@ -453,16 +455,18 @@ function declarationReorderIsSafe(units, target, sourceCode) {
   for (let i = 0; i < target.length; i++) {
     for (const name of evalTimeReferences(target[i].node, sourceCode)) {
       const referenced = position.get(name);
-      if (referenced !== undefined && referenced >= i) return false;
+      if (referenced !== undefined && referenced > i) return false;
     }
   }
   return true;
 }
 
-// Identifier names the class evaluates while the declaration itself is being
-// evaluated: its heritage clause, decorators, and any static member's key or
-// initializer. Anything inside an instance member or a method body runs later,
-// so it cannot constrain declaration order.
+/**
+ * Identifier names the class evaluates while the declaration itself is being
+ * evaluated: its heritage clause, decorators, and any static member's key or
+ * initializer. Anything inside an instance member or a method body runs later,
+ * so it cannot constrain declaration order.
+ */
 function evalTimeReferences(classNode, sourceCode) {
   const names = new Set();
   const collect = (node) => {
@@ -485,7 +489,18 @@ function identifiersIn(node, sourceCode) {
   const visit = (n) => {
     if (!n || typeof n.type !== "string") return;
     if (n.type === "Identifier") out.push(n.name);
-    for (const key of sourceCode.visitorKeys[n.type] ?? Object.keys(n)) {
+    // `globalThis.RangeError`'s property is not a binding — counting it would
+    // make `class RangeError extends globalThis.RangeError` look like a
+    // sibling reference (errors.ts:288).
+    const skipKey =
+      (n.type === "MemberExpression" || n.type === "TSQualifiedName") && !n.computed
+        ? n.property
+          ? "property"
+          : "right"
+        : null;
+    for (const key of sourceCode.visitorKeys?.[n.type] ?? Object.keys(n)) {
+      // `parent` is a back-edge the AST carries; following it would loop.
+      if (key === "parent" || key === skipKey) continue;
       const child = n[key];
       if (Array.isArray(child)) child.forEach(visit);
       else if (child && typeof child.type === "string") visit(child);

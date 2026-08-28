@@ -209,20 +209,20 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   // (bucketFile, last-segment); a colliding bucket is DROPPED (not emitted) and
   // warned — enforcing a blended order would be worse than no order at all.
   // (Repo-wide this is currently vanishingly rare.)
-  // (rubyFile) → class names in Rails declaration order.
-  const declarationsByFile = new Map<string, string[]>();
-  const declarationsFor = (rubyFile: string): string[] => {
-    let list = declarationsByFile.get(rubyFile);
-    if (!list) declarationsByFile.set(rubyFile, (list = []));
-    return list;
-  };
-
   const classFqnsByKey = new Map<string, Set<string>>();
   const noteClass = (bucketFile: string, className: string, fqn: string) => {
     const collKey = `${bucketFile}\0${className}`;
     let fqns = classFqnsByKey.get(collKey);
     if (!fqns) classFqnsByKey.set(collKey, (fqns = new Set()));
     fqns.add(fqn);
+  };
+
+  // (rubyFile) → class names in Rails declaration order.
+  const declarationsByFile = new Map<string, string[]>();
+  const declarationsFor = (rubyFile: string): string[] => {
+    let list = declarationsByFile.get(rubyFile);
+    if (!list) declarationsByFile.set(rubyFile, (list = []));
+    return list;
   };
 
   // fqn → class host, so a `Foo::InstanceMethods` / `Foo::ClassMethods` mixin

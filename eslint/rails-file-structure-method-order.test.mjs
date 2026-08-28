@@ -635,6 +635,15 @@ try {
         errors: [{ messageId: "outOfOrder" }],
         output: `export class Alpha {}\nexport class Beta {}\nexport class Gamma {}\n`,
       },
+      // A same-named GLOBAL in the heritage clause is not a sibling reference
+      // (`class RangeError extends globalThis.RangeError`, errors.ts:288), so
+      // the reorder still applies.
+      {
+        filename: declsFile,
+        code: `export class Gamma extends globalThis.Gamma {}\nexport class Alpha {}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `export class Alpha {}\nexport class Gamma extends globalThis.Gamma {}\n`,
+      },
       // A declaration with no Rails counterpart is IGNORED, not ordered: it
       // keeps its slot while the mapped siblings permute around it.
       {
