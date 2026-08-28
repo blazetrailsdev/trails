@@ -10,6 +10,7 @@ export interface PgTypeRow {
   oid: number | string;
   typname: string;
   formatType?: string | null;
+  aliasName?: string | null;
   typelem: number | string;
   typdelim: string;
   typtype: string;
@@ -65,10 +66,12 @@ export class TypeMapInitializer {
   }
 
   private registerSqlTypeName(row: PgTypeRow): void {
-    const name = row.formatType;
     const oid = toInt(row.oid);
-    if (name == null || this.store.isKey(name) || !this.store.isKey(oid)) return;
-    this.store.aliasType(name, oid);
+    if (!this.store.isKey(oid)) return;
+    for (const name of [row.formatType, row.aliasName]) {
+      if (name == null || this.store.isKey(name)) continue;
+      this.store.aliasType(name, oid);
+    }
   }
 
   private registerMappedType(row: PgTypeRow): void {

@@ -738,6 +738,25 @@ export class PostgreSQLAdapter
     yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
     yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
     yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
+    yield this.nativeTypeNamesQuery();
+  }
+
+  private nativeTypeNamesQuery(): string {
+    const names: string[] = [];
+    for (const [key, type] of Object.entries(this.nativeDatabaseTypes())) {
+      if (key === "primary_key") continue;
+      const name = typeof type === "string" ? type : type?.name;
+      if (name == null || names.includes(name)) continue;
+      names.push(name, `${name}[]`);
+    }
+    return [
+      'SELECT t.oid, t.typname, format_type(t.oid, NULL) AS "formatType",',
+      '       a.name AS "aliasName", t.typelem, t.typdelim, t.typinput,',
+      "       r.rngsubtype, t.typtype, t.typbasetype",
+      `FROM unnest(ARRAY[${names.map((name) => this.quote(name)).join(", ")}]::text[]) AS a(name)`,
+      "JOIN pg_type as t ON t.oid = to_regtype(a.name)",
+      "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
+    ].join("\n");
   }
 
   async reloadTypeMap(): Promise<void> {
