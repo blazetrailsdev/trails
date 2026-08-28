@@ -72,7 +72,7 @@ export function parameterize(
       reDuplicateSeparator = /-{2,}/g;
       reLeadingTrailingSeparator = /^-|-$/gi;
     } else {
-      const reSep = separator.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
+      const reSep = regexpEscape(separator);
       reDuplicateSeparator = new RegExp(`${reSep}{2,}`, "g");
       reLeadingTrailingSeparator = new RegExp(`^${reSep}|${reSep}$`, "gi");
     }
@@ -84,4 +84,12 @@ export function parameterize(
 
   if (!preserveCase) parameterizedString = parameterizedString.toLowerCase();
   return parameterizedString;
+}
+
+/**
+ * Ruby `Regexp.escape` (`re.c` `rb_reg_s_quote`), which escapes every character
+ * `Regexp` gives a meaning to plus whitespace. JS has no `RegExp.escape`.
+ */
+function regexpEscape(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
 }

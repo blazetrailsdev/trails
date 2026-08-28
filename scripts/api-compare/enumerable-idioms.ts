@@ -66,9 +66,32 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["match?", ["test"]],
 ]);
 
-/** JS-native call names that count as making Ruby call `rubyCall`. */
+/**
+ * Ruby CORE-library calls — not Enumerable idioms — whose faithful port is a
+ * helper spelled differently because JS has no built-in for them. Same
+ * silence-only contract as {@link JS_ENUMERABLE_ALIASES}, and consulted through
+ * the same {@link jsEnumerableAliases}, but kept a separate table because that
+ * one's KEYS are also lint-calls.ts's noise list (Ruby names whose port is a
+ * NATIVE JS method, so no ported internal is expected to answer them) and the
+ * anchor {@link LOOP_SKELETON_NAMES} is derived through. These names are ported
+ * as ordinary functions, so neither derivation applies.
+ *
+ * `Regexp.escape` (`re.c` `rb_reg_s_quote`) escapes every character `Regexp`
+ * gives a meaning to. JS has no `RegExp.escape`, so each port that needs it
+ * carries a helper: `regexpEscape` (inflector.ts, transliterate.ts),
+ * `escapeRegExp` (cache/store.ts, number-to-rounded-converter.ts,
+ * testing/deprecation.ts), `escapeRegexp` (parameter-filter.ts). Those three
+ * spellings are the whole call's analogue and cannot plausibly be the port of
+ * any OTHER Ruby `escape` (`CGI.escape`, `Shellwords.escape`), so crediting
+ * them cannot silence a dropped call of a different `escape`.
+ */
+export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([
+  ["escape", ["regexpEscape", "escapeRegExp", "escapeRegexp"]],
+]);
+
+/** JS call names that count as making Ruby call `rubyCall`. */
 export function jsEnumerableAliases(rubyCall: string): string[] {
-  return JS_ENUMERABLE_ALIASES.get(rubyCall) ?? [];
+  return JS_ENUMERABLE_ALIASES.get(rubyCall) ?? CORE_LIBRARY_ALIASES.get(rubyCall) ?? [];
 }
 
 /**
