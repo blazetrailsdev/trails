@@ -7,13 +7,25 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
-import { classAttribute, included } from "@blazetrails/activesupport";
+import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
+import * as Timestamp from "../timestamp.js";
 import { Temporal } from "@blazetrails/date";
 import type {
   AttributeMutationTracker,
   DirtyOptions,
   NullMutationTracker,
 } from "@blazetrails/activemodel";
+
+/**
+ * Mirror of Ruby's `RuntimeError` — the class dirty.rb:45's bare
+ * `raise "You cannot include Dirty after Timestamp"` builds.
+ */
+class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
+  }
+}
 
 interface DirtyRecord {
   mutationsFromDatabase: AttributeMutationTracker;
@@ -139,6 +151,14 @@ export class Dirty {
    * lands on `isSavedChangeToAttribute` unchanged.
    */
   static [included](base: DirtyIncludeHost): void {
+    // dirty.rb:44-46 — `if self < ::ActiveRecord::Timestamp; raise ...`.
+    // Timestamp's `_create_record` / `_update_record` wrappers must sit ABOVE
+    // Dirty's `changes_applied` links, so including Dirty second silently
+    // breaks dirty tracking on save; the raise makes that loud.
+    if (isModuleIncluded(base as unknown as { prototype: object }, Timestamp.InstanceMethods)) {
+      throw new RuntimeError("You cannot include Dirty after Timestamp");
+    }
+
     classAttribute.call(base, "partialUpdates", { instanceWriter: false, default: true });
     classAttribute.call(base, "partialInserts", { instanceWriter: false, default: true });
 

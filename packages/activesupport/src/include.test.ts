@@ -5,6 +5,7 @@ import {
   included,
   extended,
   Module,
+  isModuleIncluded,
   type Included,
   type Extended,
 } from "./include.js";
@@ -338,6 +339,107 @@ describe("extend", () => {
       },
     });
     expect((User as any).findByName()).toBe("found");
+  });
+
+  it("leaves a class-body static alone", () => {
+    class User {
+      static findByName() {
+        return "class body";
+      }
+    }
+    extend(User, {
+      findByName() {
+        return "module";
+      },
+    });
+    expect(User.findByName()).toBe("class body");
+  });
+
+  it("replaces a static installed by an earlier extend", () => {
+    class User {}
+    extend(User, {
+      findByName() {
+        return "first";
+      },
+    });
+    extend(User, {
+      findByName() {
+        return "second";
+      },
+    });
+    expect((User as any).findByName()).toBe("second");
+  });
+
+  it("does not treat an inherited static as the subclass's own class body", () => {
+    class Base {
+      static findByName() {
+        return "base class body";
+      }
+    }
+    class User extends Base {}
+    extend(User, {
+      findByName() {
+        return "module";
+      },
+    });
+    expect(User.findByName()).toBe("module");
+    expect(Base.findByName()).toBe("base class body");
+  });
+
+  it("merges a module getter with a class-body setter", () => {
+    const seen: unknown[] = [];
+    class User {
+      static set tableName(value: string) {
+        seen.push(value);
+      }
+    }
+    class Naming {
+      static get tableName() {
+        return "users";
+      }
+    }
+    extend(User, Naming);
+    expect((User as any).tableName).toBe("users");
+    (User as any).tableName = "people";
+    expect(seen).toEqual(["people"]);
+  });
+});
+
+describe("isModuleIncluded", () => {
+  it("answers Ruby's Module#< for an included module", () => {
+    const mod = {
+      greet() {
+        return "hello";
+      },
+    };
+    class User {}
+    class Post {}
+    include(User, mod);
+    expect(isModuleIncluded(User, mod)).toBe(true);
+    expect(isModuleIncluded(Post, mod)).toBe(false);
+  });
+
+  it("sees a module included into a superclass", () => {
+    const mod = {
+      greet() {
+        return "hello";
+      },
+    };
+    class Base {}
+    class User extends Base {}
+    include(Base, mod);
+    expect(isModuleIncluded(User, mod)).toBe(true);
+  });
+
+  it("sees a class module", () => {
+    class Trackable {
+      track() {
+        return "tracked";
+      }
+    }
+    class User {}
+    include(User, Trackable);
+    expect(isModuleIncluded(User, Trackable)).toBe(true);
   });
 });
 

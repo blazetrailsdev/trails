@@ -4528,15 +4528,6 @@ extend(Base, {
   unscoped: _unscoped,
 });
 extend(Base, ModelSchema.ClassMethods);
-// `extend()` copies unconditionally, where Ruby's singleton ancestry puts a
-// `ClassMethods` module BELOW the class body — so the class-body halves of the
-// three members `AttributeRegistration::ClassMethods` also defines are captured
-// here and re-applied after the two includes, leaving Rails' precedence.
-const BaseAttributeRegistrationOverrides = {
-  attribute: Base.attribute,
-  typeForAttribute: Base.typeForAttribute,
-  hookAttributeType: Base.hookAttributeType,
-};
 // base.rb:311 — `include Attributes`, which is
 // `include ActiveModel::AttributeRegistration` (activerecord/attributes.rb:8)
 // and nothing else on the instance side. `ActiveModel::Model` does NOT carry it
@@ -4551,7 +4542,6 @@ include(Base, AttributeRegistration);
 // the registration one (attribute_registration.rb:101-103).
 extend(Base, AMAttributeMethods.ClassMethods);
 include(Base, AMAttributeMethods.InstanceMethods);
-extend(Base, BaseAttributeRegistrationOverrides);
 
 extend(Base, {
   defineAttribute: _defineAttribute,
