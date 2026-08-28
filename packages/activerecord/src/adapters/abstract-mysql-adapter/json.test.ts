@@ -1,13 +1,15 @@
 import { beforeEach } from "vitest";
 import "../../index.js";
-import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, supportsJson } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { jsonSharedTestCases } from "../../cases/json-shared-test-cases.js";
 import type { TableDefinition } from "../../connection-adapters/abstract/schema-definitions.js";
 
 const columnType = "json";
 
-describeIfMysqlAdapter("JSONTest", () => {
+const describeJson = supportsJson ? describeIfMysqlAdapter : describeIfMysqlAdapter.skip;
+
+describeJson("JSONTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
