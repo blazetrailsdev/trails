@@ -70,12 +70,12 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected quoteColumnName(name: string): string {
+  protected quoteColumnName(name: unknown): string {
     return this.conn.quoteColumnName(name);
   }
 
   /** @internal */
-  protected quoteTableName(name: string): string {
+  protected quoteTableName(name: unknown): string {
     return this.conn.quoteTableName(name);
   }
 

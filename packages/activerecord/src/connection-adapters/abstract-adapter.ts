@@ -737,19 +737,19 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
-  static quoteColumnName(name: string): string {
+  static quoteColumnName(name: unknown): string {
     return abstractQuoteColumnName(name);
   }
 
-  static quoteTableName(name: string): string {
+  static quoteTableName(name: unknown): string {
     return abstractQuoteTableName.call(this, name);
   }
 
-  quoteTableName(name: string): string {
+  quoteTableName(name: unknown): string {
     return (this.constructor as typeof AbstractAdapter).quoteTableName(name);
   }
 
-  quoteColumnName(name: string): string {
+  quoteColumnName(name: unknown): string {
     return (this.constructor as typeof AbstractAdapter).quoteColumnName(name);
   }
 

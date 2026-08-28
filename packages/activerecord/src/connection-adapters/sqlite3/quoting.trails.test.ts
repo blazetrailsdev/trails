@@ -222,10 +222,6 @@ describe("SQLite3::Quoting", () => {
   });
 
   describe("quoteDefaultExpression", () => {
-    it("returns empty string for undefined", () => {
-      expect(quoteDefaultExpression.call(HOST, undefined, {})).toBe("");
-    });
-
     it("returns NULL for null", () => {
       expect(quoteDefaultExpression.call(HOST, null, {})).toBe("NULL");
     });

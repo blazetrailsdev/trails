@@ -945,8 +945,9 @@ export const DatabaseStatements = {
       opts?.allowRetry ?? false,
     );
     binds = compiledBinds;
-    const preparable = compiledPreparable ?? (binds != null && binds.length > 0);
-    const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
+    const prepare = !!(
+      (this as { preparedStatements?: boolean }).preparedStatements && compiledPreparable
+    );
     const async = opts?.async ?? false;
     try {
       const result = select.call(this as DatabaseStatementsHost, sql, name, binds, {

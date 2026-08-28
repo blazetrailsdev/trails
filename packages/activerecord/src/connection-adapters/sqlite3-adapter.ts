@@ -183,11 +183,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
   }
 
-  static override quoteColumnName(name: string): string {
+  static override quoteColumnName(name: unknown): string {
     return quoteColumnName(name);
   }
 
-  static override quoteTableName(name: string): string {
+  static override quoteTableName(name: unknown): string {
     return quoteTableName(name);
   }
 
@@ -645,14 +645,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
     if (typeof value === "function") {
-      const result = (value as () => unknown)();
-      const str = typeof result === "string" ? result : isSqlLiteral(result) ? result.value : null;
-      if (str === null) {
-        throw new TypeError(
-          "quoteDefaultExpression expected function default to return a string or SqlLiteral",
-        );
-      }
-      return /^\w+\(.*\)$/.test(str) ? `(${str})` : str;
+      const result = (value as () => unknown)() as string;
+      return /^\w+\(.*\)$/.test(result) ? `(${result})` : result;
     }
     return super.quoteDefaultExpression(value, column);
   }

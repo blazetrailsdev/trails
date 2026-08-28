@@ -213,7 +213,7 @@ export async function executeBatch(
 
 /** @internal */
 interface BuildTruncateStatementsHost {
-  quoteTableName(name: string): string;
+  quoteTableName(name: unknown): string;
 }
 
 /** @internal */

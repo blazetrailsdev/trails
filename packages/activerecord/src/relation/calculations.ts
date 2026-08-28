@@ -62,8 +62,8 @@ interface CalculationConnection {
   visitor?: { compile(node: any, collector?: any): any };
   toSql(arel: unknown): string;
   quote(value: unknown): string;
-  quoteTableName(name: string): string;
-  quoteColumnName(name: string): string;
+  quoteTableName(name: unknown): string;
+  quoteColumnName(name: unknown): string;
   tableAliasFor(tableName: string): string;
   tableAliasLength(): number;
   columnsForDistinct(

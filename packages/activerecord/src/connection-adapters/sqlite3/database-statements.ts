@@ -130,7 +130,7 @@ interface ExecuteBatchHost {
 }
 
 interface QuoteTableNameHost {
-  quoteTableName(tableName: string): string;
+  quoteTableName(tableName: unknown): string;
 }
 
 /** @internal */

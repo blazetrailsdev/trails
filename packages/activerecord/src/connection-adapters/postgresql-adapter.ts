@@ -195,11 +195,11 @@ export class PostgreSQLAdapter
     return pgColumnNameWithOrderMatcher();
   }
 
-  static override quoteColumnName(name: string): string {
+  static override quoteColumnName(name: unknown): string {
     return pgQuoteColumnName(name);
   }
 
-  static override quoteTableName(name: string): string {
+  static override quoteTableName(name: unknown): string {
     return pgQuoteTableName(name);
   }
 

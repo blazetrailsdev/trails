@@ -526,7 +526,7 @@ export class SchemaStatements {
     const column = await this.columnFor(tableName, columnName);
     const clause = await this.quoteDefaultExpression(defaultVal, column);
     await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} SET DEFAULT ${clause || "NULL"}`,
+      `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} SET DEFAULT ${clause}`,
     );
   }
 
