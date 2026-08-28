@@ -55,6 +55,8 @@ export function beforeSetup(): void {
  * the equivalent storage here is module-global, so memoizing would pin the
  * first test's logger for the whole run — the writer's value takes precedence
  * and the slot is re-read otherwise.
+ *
+ * @internal
  */
 export function taggedLogger(): TaggedLogger | null {
   return taggedLoggerValue ?? trailsLogger;

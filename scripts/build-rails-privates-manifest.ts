@@ -24,12 +24,8 @@
  * happen to share a name.
  *
  * That all-private decision is made per RUBY name while the manifest is keyed
- * by TS name, and the two are not one-to-one: `rubyMethodToTs` gives a `?`
- * method the bare stem as a candidate, so private `content_security_policy?`
- * yields `contentSecurityPolicy` — the spelling of the PUBLIC
- * `content_security_policy` class DSL beside it. Every `mixed` name's
- * candidates are therefore subtracted after projection, applying the guard in
- * the TS namespace it actually gates on.
+ * by TS name, and the two are not one-to-one; `privates-projection.ts` carries
+ * the resulting guard and its one exemption.
  *
  * Alongside `files`, the manifest carries `entities` — for each TS file, the
  * names of the Ruby entities that project onto it (every segment of each
@@ -72,6 +68,7 @@ import {
 import { PACKAGE_DIRS } from "./api-compare/config.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 import { entitiesByTsFile } from "./api-compare/privates-entities.js";
+import { projectPrivateNames } from "./api-compare/privates-projection.js";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -296,27 +293,11 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   visit(rubyPkg.classes ?? {});
   visit(rubyPkg.modules ?? {});
 
-  // A Ruby name's `?`/`!` variants share a TS candidate with their bare stem,
-  // so the all-private decision is re-applied in the TS namespace: any name a
-  // `mixed` Ruby name maps onto is subtracted after projection.
-  const project = (names: Map<string, "all-private" | "mixed">): Set<string> => {
-    const tsNames = new Set<string>();
-    for (const [ruby, status] of names) {
-      if (status !== "all-private") continue;
-      for (const c of rubyMethodToTs(ruby) ?? []) tsNames.add(c);
-    }
-    for (const [ruby, status] of names) {
-      if (status === "all-private") continue;
-      for (const c of rubyMethodToTs(ruby) ?? []) tsNames.delete(c);
-    }
-    return tsNames;
-  };
-
   const tsRelFor = (rubyFile: string) =>
     path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
 
   for (const [rubyFile, names] of fileVis) {
-    const tsNames = project(names);
+    const tsNames = projectPrivateNames(names);
     if (tsNames.size === 0) continue;
     const tsRel = tsRelFor(rubyFile);
     const existing = manifest.files[tsRel] ?? [];
@@ -324,7 +305,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   }
 
   for (const [rubyFile, names] of instanceVis) {
-    const tsNames = project(names);
+    const tsNames = projectPrivateNames(names);
     if (tsNames.size === 0) continue;
     const tsRel = tsRelFor(rubyFile);
     const existing = manifest.instanceFiles[tsRel] ?? [];
