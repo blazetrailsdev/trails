@@ -8,7 +8,7 @@ import type { AssociationSpec } from "./query-methods.js";
 import {
   arelColumns,
   constructJoinDependency,
-  QueryMethodBangs,
+  QueryMethods,
   structuralUnionEq,
 } from "./query-methods.js";
 
@@ -139,7 +139,7 @@ export class Merger {
       associations as AssociationSpec[],
       Nodes.InnerJoin,
     );
-    QueryMethodBangs.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
+    QueryMethods.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
   /** @missingRailsCall empty? — PERMANENT */
@@ -169,7 +169,7 @@ export class Merger {
       associations as AssociationSpec[],
       Nodes.OuterJoin,
     );
-    QueryMethodBangs.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
+    QueryMethods.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
   /** @missingRailsCall any? — PERMANENT */

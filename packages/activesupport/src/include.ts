@@ -224,6 +224,109 @@ export function isModuleIncluded(
   return false;
 }
 
+class ArgumentError extends Error {
+  override name = "ArgumentError";
+}
+
+/**
+ * Symbol key for the per-section visibility record `defineModule` stamps onto
+ * the flat module object it returns. Symbol-keyed so it never collides with a
+ * real method name, and so `Object.keys()` consumers see the module unchanged.
+ */
+export const moduleVisibility = Symbol.for("@blazetrails/activesupport:moduleVisibility");
+
+/** The visibility record `defineModule` stamps under `moduleVisibility`. */
+export interface ModuleVisibility {
+  public: string[];
+  protected: string[];
+  private: string[];
+}
+
+/**
+ * Compose a module from its visibility sections, the way a Ruby module body
+ * separates them with statement-position `private` / `protected` keywords.
+ *
+ * Returns the flat composition in section order — public, then protected, then
+ * private — so `include()` and `Included<typeof ...>` consumers see exactly the
+ * object a hand-written spread produced. The section membership is additionally
+ * stamped under `moduleVisibility` for `publicInstanceMethods` to read.
+ *
+ * The sections must be pairwise disjoint. A name in two sections is silently
+ * won by the last spread, which aliases like `buildHavingClause: buildWhereClause`
+ * (query_methods.rb:1654) make plausible, so it is asserted rather than trusted.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby declares member visibility with
+ * statement-position `private` / `protected` inside the module body; a TS
+ * object literal has no statement position, so the sections must be named
+ * values and composed explicitly.
+ */
+export function defineModule<
+  Pub extends ModuleObject,
+  Prot extends ModuleObject = Record<never, never>,
+  Priv extends ModuleObject = Record<never, never>,
+>(publicSection: Pub, protectedSection?: Prot, privateSection?: Priv): Pub & Prot & Priv {
+  const sections: ModuleVisibility = {
+    public: Object.keys(publicSection),
+    protected: protectedSection ? Object.keys(protectedSection) : [],
+    private: privateSection ? Object.keys(privateSection) : [],
+  };
+  assertSectionsDisjoint(sections);
+  const mod = {
+    ...publicSection,
+    ...protectedSection,
+    ...privateSection,
+  } as Pub & Prot & Priv;
+  Object.defineProperty(mod, moduleVisibility, { value: sections });
+  return mod;
+}
+
+function assertSectionsDisjoint(sections: ModuleVisibility): void {
+  const seen = new Map<string, keyof ModuleVisibility>();
+  for (const kind of ["public", "protected", "private"] as const) {
+    for (const name of sections[kind]) {
+      const first = seen.get(name);
+      if (first) {
+        throw new ArgumentError(
+          `defineModule: ${name} appears in both the ${first} and ${kind} sections`,
+        );
+      }
+      seen.set(name, kind);
+    }
+  }
+}
+
+/**
+ * Mirrors: Ruby's Module#public_instance_methods — the module's public
+ * instance methods, own-only when `includeSuper` is false.
+ *
+ * Known limitation: TypeScript's `private` / `protected` are erased at runtime,
+ * so the class form cannot see them and reports every prototype member. Only a
+ * `#`-private field and a `defineModule` section are visible here; enforcement
+ * of the rest is a compare-time gate rather than this runtime walk.
+ */
+export function publicInstanceMethods(
+  mod: ModuleObject | AnyClass | Module,
+  includeSuper = true,
+): string[] {
+  if (mod instanceof Module) return Object.getOwnPropertyNames(carrierOf(mod));
+  if (typeof mod === "function") {
+    const names = new Set<string>();
+    let proto: object | null = (mod as AnyClass).prototype as object;
+    while (proto && proto !== Object.prototype) {
+      for (const name of Object.getOwnPropertyNames(proto)) {
+        if (name !== "constructor") names.add(name);
+      }
+      if (!includeSuper) break;
+      proto = Object.getPrototypeOf(proto) as object | null;
+    }
+    return [...names];
+  }
+  const sections = (mod as Record<symbol, unknown>)[moduleVisibility] as
+    | ModuleVisibility
+    | undefined;
+  return sections ? [...sections.public] : Object.keys(mod);
+}
+
 /**
  * Shared between `Included<>` and `Extended<>`: filter `M` down to its
  * callable string-keyed properties and strip the `this` parameter from
@@ -254,7 +357,7 @@ type CallableMethods<M extends object> = {
  * Strips the `this` parameter from each function signature.
  *
  * Usage:
- *   export interface Relation<T> extends Included<typeof QueryMethodBangs> {}
+ *   export interface Relation<T> extends Included<typeof QueryMethods> {}
  */
 export type Included<M extends object> = CallableMethods<M>;
 

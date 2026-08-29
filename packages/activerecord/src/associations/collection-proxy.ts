@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { QueryMethodsPublicInstanceMethods } from "../relation/query-methods.js";
-import { SpawnMethodsPublicInstanceMethods } from "../relation/spawn-methods.js";
+import { QueryMethods } from "../relation/query-methods.js";
+import { SpawnMethods } from "../relation/spawn-methods.js";
 import {
   CollectionAssociation,
   callback as assocCallback,
@@ -19,7 +19,12 @@ import {
   FinderMethods,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
-import { singularize, camelize, constantize } from "@blazetrails/activesupport";
+import {
+  singularize,
+  camelize,
+  constantize,
+  publicInstanceMethods,
+} from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
 import { autoloadModel, association as associationProxy } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
@@ -652,13 +657,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 }
 
 /** @internal */
-export const MIXIN_PUBLIC_INSTANCE_METHODS = [
-  ...Object.keys(QueryMethodsPublicInstanceMethods),
-  ...Object.keys(SpawnMethodsPublicInstanceMethods),
-];
+export const MIXIN_PUBLIC_INSTANCE_METHODS = [QueryMethods, SpawnMethods].flatMap((klass) =>
+  publicInstanceMethods(klass, false),
+);
+
+const ownPublicInstanceMethods = publicInstanceMethods(CollectionProxy, false);
 
 const delegateMethods = MIXIN_PUBLIC_INSTANCE_METHODS.filter(
-  (name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select",
+  (name) => !ownPublicInstanceMethods.includes(name) && name !== "select",
 ).concat([
   "scoping",
   "values",

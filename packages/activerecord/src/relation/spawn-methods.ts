@@ -1,4 +1,4 @@
-import { except as exceptValues, slice } from "@blazetrails/activesupport";
+import { defineModule, except as exceptValues, slice } from "@blazetrails/activesupport";
 import { Merger, HashMerger } from "./merger.js";
 import { argumentError, setValues } from "./query-methods.js";
 import type { ExceptSkip } from "./query-methods.js";
@@ -74,10 +74,11 @@ export const SpawnMethodsPrivateInstanceMethods = {
   relationWith,
 } as const;
 
-export const SpawnMethods = {
-  ...SpawnMethodsPublicInstanceMethods,
-  ...SpawnMethodsPrivateInstanceMethods,
-} as const;
+export const SpawnMethods = defineModule(
+  SpawnMethodsPublicInstanceMethods,
+  undefined,
+  SpawnMethodsPrivateInstanceMethods,
+);
 
 /** @internal */
 export function relationWith<T extends SpawnRelation<T>>(

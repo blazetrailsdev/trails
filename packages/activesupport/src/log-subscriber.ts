@@ -3,6 +3,7 @@ import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
 import { trailsLogger } from "./trails-logger-slot.js";
 import { transformKeys } from "./hash-utils.js";
+import { publicInstanceMethods } from "./include.js";
 
 /**
  * ActiveSupport::LogSubscriber — a Subscriber that dispatches events
@@ -129,16 +130,16 @@ export class LogSubscriber extends Subscriber {
     this._setEventLevels();
   }
 
+  /**
+   * @missingRailsArgs public_instance_methods — PERMANENT: Ruby calls this on
+   * the module as a receiver; the TS mirror is a free function, so the receiver
+   * is its first argument.
+   */
   protected static override _fetchPublicMethods(
     subscriber: Subscriber,
     inheritAll: boolean,
   ): string[] {
-    // Exclude LogSubscriber's own instance methods, matching Rails'
-    // `subscriber.public_methods(inherit_all) - LogSubscriber.public_instance_methods(true)`
-    const baseKeys = new Set([
-      ...Object.getOwnPropertyNames(Subscriber.prototype),
-      ...Object.getOwnPropertyNames(LogSubscriber.prototype),
-    ]);
+    const baseKeys = new Set(publicInstanceMethods(LogSubscriber, true));
     const keys = new Set<string>();
     let proto = Object.getPrototypeOf(subscriber);
 

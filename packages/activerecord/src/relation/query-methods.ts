@@ -24,7 +24,15 @@ import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
-import { any, compactBlank, foreignKey, rbEqual, rbHash, wrap } from "@blazetrails/activesupport";
+import {
+  any,
+  compactBlank,
+  defineModule,
+  foreignKey,
+  rbEqual,
+  rbHash,
+  wrap,
+} from "@blazetrails/activesupport";
 
 export class WhereChain<R = any> {
   private _scope: R;
@@ -1944,11 +1952,11 @@ export const QueryMethodsPrivateInstanceMethods = {
   structurallyIncompatibleValuesFor,
 } as const;
 
-export const QueryMethodBangs = {
-  ...QueryMethodsPublicInstanceMethods,
-  ...QueryMethodsProtectedInstanceMethods,
-  ...QueryMethodsPrivateInstanceMethods,
-} as const;
+export const QueryMethods = defineModule(
+  QueryMethodsPublicInstanceMethods,
+  QueryMethodsProtectedInstanceMethods,
+  QueryMethodsPrivateInstanceMethods,
+);
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

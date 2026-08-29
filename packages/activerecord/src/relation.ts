@@ -18,7 +18,7 @@ import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
 import {
   WhereChain,
-  QueryMethodBangs,
+  QueryMethods,
   defineValueMethods,
   type UnscopeType,
   type ExceptSkip,
@@ -917,13 +917,13 @@ export class Relation<T extends Base> {
     { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
     block: (relation: Relation<T>, joinDependency: JoinDependency) => R | Promise<R>,
   ): R | Promise<R> {
-    const joinDependency = QueryMethodBangs.constructJoinDependency.call(
+    const joinDependency = QueryMethods.constructJoinDependency.call(
       this as any,
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
     ) as unknown as JoinDependency;
     const relation = this.except("includes", "eagerLoad", "preload");
-    QueryMethodBangs.joinsBang.call(relation as any, joinDependency as any);
+    QueryMethods.joinsBang.call(relation as any, joinDependency as any);
 
     if (
       eagerLoading &&
@@ -932,7 +932,7 @@ export class Relation<T extends Base> {
         this.usingLimitableReflections(joinDependency.reflections as never) &&
         this.usingLimitableReflections(
           (
-            QueryMethodBangs.constructJoinDependency.call(
+            QueryMethods.constructJoinDependency.call(
               this as any,
               _qm.selectAssociationList
                 .call(this as any, this.joinsValues, null)
@@ -967,7 +967,7 @@ export class Relation<T extends Base> {
     if (!this.isEagerLoading) return false;
     if (!this.hasLimitOrOffset) return false;
     return !this._eagerJoinDependencyIsLimitable(
-      QueryMethodBangs.constructJoinDependency.call(
+      QueryMethods.constructJoinDependency.call(
         this as any,
         [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
         Nodes.OuterJoin,
@@ -978,7 +978,7 @@ export class Relation<T extends Base> {
   /** @internal */
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
     const basePk = (this._model as any).primaryKey ?? "id";
-    const jd = QueryMethodBangs.constructJoinDependency.call(
+    const jd = QueryMethods.constructJoinDependency.call(
       this as any,
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
@@ -989,7 +989,7 @@ export class Relation<T extends Base> {
   /** @internal */
   async _materializeDistinctPkIds(): Promise<unknown[]> {
     const basePk = (this._model as any).primaryKey ?? "id";
-    const jd = QueryMethodBangs.constructJoinDependency.call(
+    const jd = QueryMethods.constructJoinDependency.call(
       this as any,
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
@@ -1054,13 +1054,13 @@ export class Relation<T extends Base> {
     limitedIds?: unknown[],
   ): Relation<T> {
     let rel = this.except("includes", "eagerLoad", "preload");
-    QueryMethodBangs.joinsBang.call(rel as any, jd as any);
+    QueryMethods.joinsBang.call(rel as any, jd as any);
     if (
       this.hasLimitOrOffset &&
       !(
         this.usingLimitableReflections(jd.reflections as never) &&
         this.usingLimitableReflections(
-          QueryMethodBangs.constructJoinDependency.call(
+          QueryMethods.constructJoinDependency.call(
             this as any,
             _qm.selectAssociationList
               .call(this as any, this.joinsValues, null)
@@ -1095,7 +1095,7 @@ export class Relation<T extends Base> {
     return (
       this.usingLimitableReflections(jd.reflections as never) &&
       this.usingLimitableReflections(
-        QueryMethodBangs.constructJoinDependency.call(
+        QueryMethods.constructJoinDependency.call(
           this as any,
           _qm.selectAssociationList
             .call(this as any, this.joinsValues, null)
@@ -1114,13 +1114,13 @@ export class Relation<T extends Base> {
     distinctSelectSql?: string,
   ): Relation<T> {
     const relation = this.except("includes", "eagerLoad", "preload");
-    QueryMethodBangs.joinsBang.call(relation as any, jd as any);
+    QueryMethods.joinsBang.call(relation as any, jd as any);
     const values =
       distinctSelectSql !== undefined
         ? [new Nodes.SqlLiteral(distinctSelectSql)]
         : (Array.isArray(basePk) ? basePk : [basePk]).map((column) => this.table.get(column));
     const limited = relation.reselect(...values);
-    QueryMethodBangs.distinctBang.call(limited as any);
+    QueryMethods.distinctBang.call(limited as any);
     return limited;
   }
 
@@ -1171,7 +1171,7 @@ export class Relation<T extends Base> {
 
     const basePk = (this._model as any).primaryKey ?? "id";
 
-    const jd = QueryMethodBangs.constructJoinDependency.call(
+    const jd = QueryMethods.constructJoinDependency.call(
       this as any,
       allEager as any,
       Nodes.OuterJoin,
@@ -1868,7 +1868,7 @@ export interface Relation<T extends Base> {
 }
 
 export interface Relation<T extends Base>
-  extends Included<typeof QueryMethodBangs>, Included<typeof Explain>, CalculationMethods {
+  extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods {
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
@@ -2096,7 +2096,7 @@ export interface Relation<T extends Base> {
 include(Relation, DelegationMethods);
 include(Relation, Explain);
 include(Relation, Batches);
-include(Relation, QueryMethodBangs);
+include(Relation, QueryMethods);
 include(Relation, SpawnMethods);
 include(Relation, Calculations);
 include(Relation, FinderMethods);

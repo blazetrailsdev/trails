@@ -9,6 +9,7 @@ import {
   toTag,
   inGroups,
   inGroupsOf,
+  publicInstanceMethods,
   pluralize,
   singularize,
   split,
@@ -111,32 +112,21 @@ export function delegatedClasses(): Set<typeof Base> {
   return _delegatedClasses;
 }
 
-function ownMethodNamesAbove(
-  ctor: new (...args: never[]) => unknown,
-  boundary: object | null,
-): Set<string> {
-  const names = new Set<string>();
-  let proto: object | null = ctor.prototype as object;
-  while (proto && proto !== boundary && proto !== Object.prototype) {
-    for (const n of Object.getOwnPropertyNames(proto)) {
-      if (n !== "constructor") names.add(n);
-    }
-    proto = Object.getPrototypeOf(proto);
-  }
-  return names;
-}
-
 function computeUncacheableMethods(): Set<string> {
   const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
     _relationFamilySlot;
-  const relationProto = relation ? (relation.prototype as object) : null;
   const result = new Set<string>();
-  for (const sub of [collectionProxy, associationRelation, disableJoinsAssociationRelation]) {
-    if (!sub) continue;
-    for (const n of ownMethodNamesAbove(sub, relationProto)) result.add(n);
+  for (const klass of [
+    relation,
+    collectionProxy,
+    associationRelation,
+    disableJoinsAssociationRelation,
+  ]) {
+    if (!klass) continue;
+    for (const n of publicInstanceMethods(klass)) result.add(n);
   }
   if (relation) {
-    for (const n of ownMethodNamesAbove(relation, null)) result.delete(n);
+    for (const n of publicInstanceMethods(relation)) result.delete(n);
   }
   return result;
 }

@@ -1,4 +1,5 @@
 import { Notifications } from "./notifications.js";
+import { publicInstanceMethods } from "./include.js";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { AnyClass } from "./descendants-tracker.js";
@@ -181,8 +182,13 @@ export class Subscriber {
     sub.patterns.delete(pattern);
   }
 
+  /**
+   * @missingRailsArgs public_instance_methods — PERMANENT: Ruby calls this on
+   * the module as a receiver; the TS mirror is a free function, so the receiver
+   * is its first argument.
+   */
   protected static _fetchPublicMethods(subscriber: Subscriber, inheritAll: boolean): string[] {
-    const baseKeys = new Set(Object.getOwnPropertyNames(Subscriber.prototype));
+    const baseKeys = new Set(publicInstanceMethods(Subscriber, true));
     const keys = new Set<string>();
     let proto = Object.getPrototypeOf(subscriber);
 

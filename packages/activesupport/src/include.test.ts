@@ -6,6 +6,10 @@ import {
   extended,
   Module,
   isModuleIncluded,
+  defineModule,
+  moduleVisibility,
+  publicInstanceMethods,
+  type ModuleVisibility,
   type Included,
   type Extended,
 } from "./include.js";
@@ -548,5 +552,75 @@ describe("Extended<>", () => {
     };
     type T = Extended<typeof Mod>;
     expectTypeOf<T>().toEqualTypeOf<{ establish: () => void }>();
+  });
+});
+
+describe("defineModule", () => {
+  const pub = { one() {}, two() {} };
+  const prot = { three() {} };
+  const priv = { four() {}, fiveAlias: prot.three };
+
+  it("composes the sections into one flat module", () => {
+    const mod = defineModule(pub, prot, priv);
+    expect(Object.keys(mod)).toEqual(["one", "two", "three", "four", "fiveAlias"]);
+    expect(mod.three).toBe(prot.three);
+  });
+
+  it("stamps the section membership", () => {
+    const sections = (defineModule(pub, prot, priv) as Record<symbol, unknown>)[
+      moduleVisibility
+    ] as ModuleVisibility;
+    expect(sections).toEqual({
+      public: ["one", "two"],
+      protected: ["three"],
+      private: ["four", "fiveAlias"],
+    });
+  });
+
+  it("treats the protected and private sections as optional", () => {
+    const sections = (defineModule(pub) as Record<symbol, unknown>)[
+      moduleVisibility
+    ] as ModuleVisibility;
+    expect(sections).toEqual({ public: ["one", "two"], protected: [], private: [] });
+  });
+
+  it("raises when a name appears in two sections", () => {
+    expect(() => defineModule(pub, { one() {} })).toThrow(
+      "defineModule: one appears in both the public and protected sections",
+    );
+  });
+
+  it("does not expose the stamp as a module member", () => {
+    const mod = defineModule(pub, prot, priv);
+    expect(Object.keys(mod)).not.toContain("moduleVisibility");
+    expect(JSON.stringify(Object.keys(mod))).not.toContain("Symbol");
+  });
+});
+
+describe("publicInstanceMethods", () => {
+  it("returns only the public section of a defineModule module", () => {
+    const mod = defineModule({ one() {}, two() {} }, { three() {} }, { four() {} });
+    expect(publicInstanceMethods(mod, false)).toEqual(["one", "two"]);
+  });
+
+  it("returns every key of a plain module object", () => {
+    expect(publicInstanceMethods({ one() {}, two() {} }, false)).toEqual(["one", "two"]);
+  });
+
+  it("returns the carrier methods of a Module instance", () => {
+    const mod = new Module();
+    mod.defineMethod("greet", () => "hello");
+    expect(publicInstanceMethods(mod)).toEqual(["greet"]);
+  });
+
+  it("walks a class prototype, own members only when include_super is false", () => {
+    class Super {
+      inherited() {}
+    }
+    class Sub extends Super {
+      own() {}
+    }
+    expect(publicInstanceMethods(Sub, false)).toEqual(["own"]);
+    expect(publicInstanceMethods(Sub).sort()).toEqual(["inherited", "own"]);
   });
 });
