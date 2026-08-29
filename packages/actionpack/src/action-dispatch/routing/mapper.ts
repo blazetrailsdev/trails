@@ -377,7 +377,7 @@ export class Mapper {
   ): void {
     const opts: NamespaceOptions = typeof options === "function" ? {} : options;
     const cb = typeof options === "function" ? options : callback;
-    if (!cb) throw new Error("Mapper#namespace requires a callback block");
+    if (!cb) throw new Error("no block given (yield)");
     // Rails mapper.rb:1626-1632: inside a resource scope, namespace must go
     // through nested so parent-resource path segments are included correctly.
     // Use _scope.isResourceScope() (level-based) to avoid infinite recursion —
