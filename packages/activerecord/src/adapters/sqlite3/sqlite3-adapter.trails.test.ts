@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import type { Type } from "@blazetrails/activemodel";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
@@ -38,7 +37,7 @@ describe("SqliteAdapter", () => {
     });
   });
 
-  const castType = (sqlType: string) => adapter.lookupCastType(sqlType) as Type;
+  const castType = (sqlType: string) => adapter.lookupCastType(sqlType);
 
   describe("lookupCastType", () => {
     it("resolves base SQL types", () => {

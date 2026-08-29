@@ -2,7 +2,7 @@ import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
 import type { MigrationCommand } from "../../migration/command-recorder.js";
-import { ArgumentError, type Type } from "@blazetrails/activemodel";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Relation } from "../../relation.js";
 import type { Base } from "../../base.js";
@@ -1690,7 +1690,7 @@ export class SchemaStatements {
 
   /** @internal */
   fetchTypeMetadata(sqlType: string | null): SqlTypeMetadata {
-    const castType = this.lookupCastType(sqlType) as Type;
+    const castType = this.lookupCastType(sqlType);
     return new SqlTypeMetadata({
       sqlType,
       type: castType?.type(),
