@@ -537,7 +537,7 @@ describe("ConnectionHandlingTest", () => {
     const env = DatabaseConfigurations.defaultEnv;
 
     const dbConfig = new HashConfig(env, "primary", { url: "sqlite3:db/foo.sqlite3" });
-    expect(dbConfig.adapter).toBeUndefined();
+    expect(dbConfig.adapter).toBe("sqlite");
 
     class BackfillModel extends Base {}
     try {
