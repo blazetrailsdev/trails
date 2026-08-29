@@ -3216,3 +3216,48 @@ describe("misplacedClusterVerdict", () => {
     ).toEqual({ kind: "absent" });
   });
 });
+
+describe("resolvePortedWithArgsSigs (Rails-private prefix)", () => {
+  const sig = (n: number): ParamInfo[] =>
+    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }) as ParamInfo);
+
+  it("resolves a name against the `_`-prefixed port of a Rails-private method", () => {
+    const byFileName = new Map([["connection-pool.ts", new Map([["_connectionLease", [sig(1)]]])]]);
+    const byNameInPkg = new Map([["_connectionLease", [sig(1)]]]);
+    expect(
+      resolvePortedWithArgsSigs(byFileName, byNameInPkg, "connection-pool.ts", "connectionLease"),
+    ).toEqual([sig(1)]);
+  });
+
+  it("prefers the file's own `_`-prefixed member over the package pool's bare one", () => {
+    const byFileName = new Map([["resolver.ts", new Map([["_query", [sig(0)]]])]]);
+    const byNameInPkg = new Map([
+      ["_query", [sig(0)]],
+      ["query", [sig(4)]],
+    ]);
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "resolver.ts", "query")).toEqual([
+      sig(0),
+    ]);
+  });
+
+  it("prefers the unprefixed name when the file declares both", () => {
+    const byFileName = new Map([
+      [
+        "pool.ts",
+        new Map([
+          ["lease", [sig(2)]],
+          ["_lease", [sig(1)]],
+        ]),
+      ],
+    ]);
+    expect(resolvePortedWithArgsSigs(byFileName, new Map(), "pool.ts", "lease")).toEqual([sig(2)]);
+  });
+
+  it("does not strip a prefix the Ruby name itself carries", () => {
+    const byFileName = new Map([["m.ts", new Map([["readAttribute", [sig(1)]]])]]);
+    const byNameInPkg = new Map([["readAttribute", [sig(1)]]]);
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "m.ts", "_readAttribute")).toEqual(
+      [],
+    );
+  });
+});

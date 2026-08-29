@@ -14,7 +14,7 @@
 import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { stripThis, isReceiverParam } from "./arity.js";
-import { normalizeLiteral } from "./literals.js";
+import { normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
@@ -344,7 +344,7 @@ function normalizeArgOrFailure(descriptor: string): string | ArgFailure {
   const kind = descriptor.slice(0, sep);
   const value = descriptor.slice(sep + 1);
   if (kind === "id" || kind === "call") return `ref:${normalizeRef(value)}`;
-  if (kind === "const") return `const:${value}`;
+  if (kind === "const") return normalizeConstantSpelling(value) ?? `const:${value}`;
   const literalKind = LITERAL_KINDS[kind];
   return literalKind === undefined
     ? OPAQUE

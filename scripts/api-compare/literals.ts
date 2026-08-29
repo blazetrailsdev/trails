@@ -141,6 +141,42 @@ export function compareDefaults(
   return result;
 }
 
+/**
+ * Ruby and TS spellings of the SAME numeric constant, mapped onto one key.
+ *
+ * `Float::INFINITY` (cache/coder.rb:17) is the identical IEEE-754 value as JS
+ * `Infinity`, and JavaScript has no spelling that is the token `INFINITY` — so
+ * the divergence is in the comparator, not in any port, and no rewrite of the
+ * port can converge it.
+ *
+ * Deliberately closed and explicit: a spelling table, never a value-equivalence
+ * engine. `Float::MAX` and `Number.MAX_VALUE` are NOT the same value, and
+ * anything not listed here compares by its token exactly as before. Ruby's
+ * negated forms (`-Float::INFINITY`) reach the argument comparator as a `unary`
+ * descriptor, which is opaque on that side, so only the TS half of that pair can
+ * ever be looked up — it is listed for the same reason the positive one is, not
+ * because a Ruby row is waiting for it.
+ *
+ * `INFINITY` and `NAN` are the Ruby spellings, which the extractor records
+ * without the `Float::` namespace; the rest are the TS ones, which
+ * extract-ts-api.ts#describeArg records as `const:` whether they are written as
+ * the bare global or as a `Number` property.
+ */
+const CONSTANT_SPELLINGS: Record<string, string> = {
+  INFINITY: "num:Infinity",
+  NAN: "num:NaN",
+  Infinity: "num:Infinity",
+  POSITIVE_INFINITY: "num:Infinity",
+  NEGATIVE_INFINITY: "num:-Infinity",
+  NaN: "num:NaN",
+};
+
+/** The shared key for a value-equivalent constant spelling, or null when the
+ *  name is not one of them and must go on comparing by its own token. */
+export function normalizeConstantSpelling(name: string): string | null {
+  return CONSTANT_SPELLINGS[name] ?? null;
+}
+
 /** Match a Ruby constant name to a TS one — SCREAMING_SNAKE passes through; also
  *  accept the camelized form for a lowercase Ruby constant ported as camelCase. */
 export function constantNameMatches(rubyName: string, tsName: string): boolean {

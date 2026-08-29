@@ -273,10 +273,7 @@ export class DatabaseConfigurations {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall parse — PERMANENT
-   */
+  /** @internal */
   private buildDbConfigFromString(envName: string, name: string, config: string): DatabaseConfig {
     const url = config;
     if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {

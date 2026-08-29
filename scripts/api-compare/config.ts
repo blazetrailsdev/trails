@@ -53,6 +53,29 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
  */
 export const TEST_SUPPORT_PACKAGES = new Set(["activerecord-test-support"]);
 
+/**
+ * A `packages/<pkg>/src/test-helpers/**` file — test support with no Rails
+ * counterpart, the way `src/support/**` sits outside both compare populations
+ * (see {@link TEST_SUPPORT_PACKAGES}).
+ *
+ * The call-set and call-argument gates resolve a Ruby callee name by asking
+ * whether that name is a ported method taking arguments anywhere in the package
+ * (compare.ts#resolvePortedWithArgsSigs), so a helper standing in for a Ruby
+ * core method puts its name into that population and makes UNRELATED source
+ * files flag. Observed in PR #7015: adding `arel/src/test-helpers/uniq.ts` — the
+ * sibling of `must-be-like.ts` — surfaced a new `uniq` row on
+ * `nodes/bound-sql-literal.ts`, a file nothing had changed, whose port spells
+ * `bound_sql_literal.rb:20-21`'s dedupe as `[...new Set(...)]`.
+ *
+ * Matched on the FIRST path segment only — the extractor's file keys are
+ * relative to the package src dir, and `test-helpers` at depth is a Rails
+ * directory the port mirrors (`action_dispatch/system_testing/test_helpers/`),
+ * not trails test support.
+ */
+export function isTestHelperFile(file: string): boolean {
+  return file.split(/[/\\]/)[0] === "test-helpers";
+}
+
 /** Override package → src subdirectory when package shares a dir */
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actiondispatch: "action-dispatch",

@@ -2,7 +2,13 @@ import * as fs from "fs";
 import * as path from "path";
 import { describe, it, expect } from "vitest";
 
-import { DIR_TO_PACKAGES, MANIFEST_PACKAGES, PACKAGE_DIRS, ROOT_DIR } from "./config.js";
+import {
+  DIR_TO_PACKAGES,
+  MANIFEST_PACKAGES,
+  PACKAGE_DIRS,
+  ROOT_DIR,
+  isTestHelperFile,
+} from "./config.js";
 
 const manifestPath = path.join(ROOT_DIR, "eslint/rails-private-methods.json");
 const manifest: { files: Record<string, string[]> } = fs.existsSync(manifestPath)
@@ -57,5 +63,20 @@ describeManifest("rails-private-methods manifest", () => {
     ["packages/activemodel/src/attributes.ts", "attribute"],
   ])("does not claim %s's %s is Rails-private on a `?` sibling's candidate", (file, name) => {
     expect(manifest.files[file] ?? []).not.toContain(name);
+  });
+});
+
+describe("isTestHelperFile", () => {
+  it("excludes a package's own src/test-helpers tree", () => {
+    expect(isTestHelperFile("test-helpers/uniq.ts")).toBe(true);
+    expect(isTestHelperFile("test-helpers/models/post.ts")).toBe(true);
+  });
+
+  it("keeps a Rails directory the port mirrors under that name", () => {
+    expect(isTestHelperFile("system-testing/test-helpers/screenshot-helper.ts")).toBe(false);
+  });
+
+  it("keeps an ordinary source file", () => {
+    expect(isTestHelperFile("nodes/bound-sql-literal.ts")).toBe(false);
   });
 });

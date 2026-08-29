@@ -93,6 +93,7 @@ import {
   PACKAGES,
   ROOT_DIR,
   SCRIPT_DIR,
+  isTestHelperFile,
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
@@ -690,6 +691,16 @@ export function reorderedCalls(
  * `first`) at once. Arity's pool stays global on purpose — mixin re-export
  * bindings hide the real signature in another file — but this gate must not be
  * widened back to match it.
+ *
+ * Both scopes are asked for the Rails-private `_` spelling of the name too, and
+ * only after the name's own spelling has come up empty there (RFC 0126). trails
+ * ports a Rails private method as `_foo` — the convention
+ * `eslint/rails-private-methods.json` is generated from, and the one
+ * conventions.ts#rubyMethodToTs already offers as a call CANDIDATE — so without
+ * it a file's own `_query` is invisible here and the package pool's unrelated
+ * `query` answers in its place, which is the same-file preference above being
+ * defeated by a prefix. A name that already carries the prefix is never
+ * stripped, so a Ruby `_foo` resolves against the TS `_foo` alone.
  */
 export function resolvePortedWithArgsSigs(
   byFileName: ReadonlyMap<string, ReadonlyMap<string, ParamInfo[][]>>,
@@ -699,9 +710,16 @@ export function resolvePortedWithArgsSigs(
   writerSigs: ReadonlySet<readonly ParamInfo[]> = new Set(),
 ): ParamInfo[][] {
   const readers = (sigs: ParamInfo[][]): ParamInfo[][] => sigs.filter((s) => !writerSigs.has(s));
-  const sameFile = byFileName.get(tsFile)?.get(name);
-  if (sameFile && sameFile.length > 0) return readers(sameFile);
-  return readers(byNameInPkg.get(name) ?? []);
+  const spellings = name.startsWith("_") ? [name] : [name, `_${name}`];
+  for (const n of spellings) {
+    const sameFile = byFileName.get(tsFile)?.get(n);
+    if (sameFile && sameFile.length > 0) return readers(sameFile);
+  }
+  for (const n of spellings) {
+    const inPkg = byNameInPkg.get(n);
+    if (inPkg && inPkg.length > 0) return readers(inPkg);
+  }
+  return [];
 }
 
 /**
@@ -3066,7 +3084,7 @@ export function main() {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
-      if (scope === "package") {
+      if (scope === "package" && !isTestHelperFile(file)) {
         const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
         pkgSigs.push(m.params);
         tsParamsByNameInPkg.set(m.name, pkgSigs);
