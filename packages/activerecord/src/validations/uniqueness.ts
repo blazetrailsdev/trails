@@ -1,28 +1,8 @@
-/**
- * Mirrors: ActiveRecord::Validations::UniquenessValidator
- *
- * Validates that the specified attribute value is unique in the database.
- * Builds a query against the model's table to check for existing records
- * with the same value, optionally scoped to other columns.
- */
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank, except } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
-/**
- * Register a uniqueness validation for one or more attributes, delegating
- * through `_mergeAttributes` so multiple / nested-array attr lists (Rails'
- * `*attr_names` arity) and the trailing options hash are normalized the same
- * way as the other `validates_*_of` helpers.
- *
- * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
- * (activerecord/lib/active_record/validations/uniqueness.rb:291-292) —
- * `validates_with UniquenessValidator, _merge_attributes(attr_names)`. Like
- * Rails, this registers a SINGLE `UniquenessValidator` owning the flattened
- * `attributes` list (its `EachValidator#validate` loops `attributes.each`), so
- * `validators` de-dups to one instance rather than one per attribute.
- */
 export function validatesUniquenessOf(
   this: {
     _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
@@ -36,28 +16,12 @@ export function validatesUniquenessOf(
 export class UniquenessValidator extends EachValidator {
   private _klass: any;
 
-  /**
-   * Memoized list of attribute names covered by a unique index — Rails' `@covered`
-   * in `covered_by_unique_index?`, computed once per validator instance across
-   * all of its `attributes`.
-   * @internal
-   */
+  /** @internal */
   _covered: string[] | null = null;
 
-  /**
-   * Mirrors: ActiveRecord::Validations::UniquenessValidator#covered_by_unique_index?
-   * Assigned from the module function below (the trails mixin idiom for a Ruby
-   * instance method whose body lives at file scope).
-   * @internal
-   */
+  /** @internal */
   declare isCoveredByUniqueIndex: typeof isCoveredByUniqueIndex;
 
-  /**
-   * Mirrors: ActiveRecord::Validations::UniquenessValidator#initialize
-   *
-   * Validates options: :conditions must be callable, :scope must be
-   * strings. Extracts :class option for finder resolution.
-   */
   constructor(options: Record<string, unknown> = {}) {
     if (options.conditions != null && typeof options.conditions !== "function") {
       throw new Error(
@@ -92,17 +56,7 @@ export class UniquenessValidator extends EachValidator {
     this._klass = options.class ?? null;
   }
 
-  /**
-   * Rails' EachValidator#validate reads `record.read_attribute_for_validation`,
-   * which for an association returns the (loaded) associated object. trails'
-   * `readAttributeForValidation` deliberately does NOT lazy-load an unloaded
-   * association (to avoid strict-loading violations), so for an association
-   * attribute we read the underlying foreign-key scalar instead — build_relation
-   * reflects on the same attribute and compares the FK, matching Rails'
-   * observable existence check without triggering a load.
-   *
-   * @internal
-   */
+  /** @internal */
   protected override readAttributeForValidation(record: any, attribute: string): unknown {
     const refl = record?.constructor?._reflectOnAssociation?.(attribute);
     if (refl) {
@@ -113,8 +67,6 @@ export class UniquenessValidator extends EachValidator {
   }
 
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
-    // Mirror EachValidator#validate's allow_nil/allow_blank guard (EachValidator
-    // already applies it, but validateEach is defensive against direct calls).
     if (value === undefined) return;
     const o = this.options as { allowNil?: unknown; allowBlank?: unknown };
     if (value == null && o.allowNil === true) return;
@@ -138,9 +90,6 @@ export class UniquenessValidator extends EachValidator {
 
     if (record.isPersisted?.()) {
       const pk = finderClass.primaryKey;
-      // Rails raises UnknownPrimaryKey rather than excluding the record by id
-      // when a persisted record's finder class has no primary key — there is
-      // no way to exclude the row itself from the existence check.
       if (pk == null) {
         throw new UnknownPrimaryKey(
           finderClass,
@@ -172,10 +121,6 @@ export class UniquenessValidator extends EachValidator {
 
     const exists = await relation.exists();
     if (exists) {
-      // uniqueness.rb:46-47. `:class` is trails' threading of the declaring
-      // class (Rails reads it off the validator's own `@klass`), so it is
-      // excluded here alongside Rails' three keys rather than leaking into the
-      // i18n options.
       const errorOpts: Record<string, unknown> = except(
         opts ?? {},
         "caseSensitive",
@@ -189,22 +134,8 @@ export class UniquenessValidator extends EachValidator {
     }
   }
 
-  /**
-   * Walks up the inheritance chain from `record.class` to the validator's
-   * configured `:class` option, returning the first non-abstract class —
-   * mirrors Rails' rule that the existence check must run from a concrete
-   * (non-abstract) class.
-   *
-   * Mirrors: ActiveRecord::Validations::UniquenessValidator#find_finder_class_for
-   *
-   * @internal
-   */
+  /** @internal */
   private findFinderClassFor(record: any): any {
-    // Rails walks from record.class up to @klass, tracking the most-recent
-    // non-abstract class; STI uses this so the existence query targets the
-    // class where the validation was declared (and its scope/table). When
-    // @klass is unset in Trails, bound the walk at the AR/AM boundary
-    // (parent class without `.where`) so we don't leak into ActiveModel.
     let current = record.constructor;
     let lastConcrete: any = null;
     while (current) {
@@ -220,29 +151,12 @@ export class UniquenessValidator extends EachValidator {
     return lastConcrete ?? record.constructor;
   }
 
-  /**
-   * Builds the base existence-check relation: `klass.unscoped.where(attr = value)`,
-   * with case-sensitivity honoring the `:case_sensitive` option (and the
-   * adapter's default collation when unspecified).
-   *
-   * Mirrors: ActiveRecord::Validations::UniquenessValidator#build_relation
-   *
-   * @internal
-   */
+  /** @internal */
   protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<[any]> {
-    // Wrapped in a tuple because Relation is thenable — a bare `await` would
-    // execute the query and resolve to the row array.
     const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
 
-    // Resolve an attribute alias (`alias_attribute :new_content, :content`) to its
-    // underlying column before building the comparison — Rails routes the bind
-    // through the predicate builder, which resolves aliases.
     attribute = (klass.attributeAliases?.[attribute] as string) ?? attribute;
 
-    // Resolve an association attribute (`validates :event`) to its foreign-key
-    // column for the comparison. `value` already arrives as the FK scalar; if a
-    // record is passed (Rails routes the association object through), read its
-    // primary key. Mirrors build_relation's reflection branch.
     const refl = klass._reflectOnAssociation?.(attribute);
     if (refl) {
       const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
@@ -257,9 +171,6 @@ export class UniquenessValidator extends EachValidator {
       attribute = fk;
     }
 
-    // A nil value must compare as `IS NULL`, not `= NULL` (which never matches).
-    // `where({ col: null })` emits the IS NULL form; Rails routes nil through the
-    // predicate builder for the same effect.
     if (value == null) {
       return [base.where({ [attribute]: null })];
     }
@@ -273,27 +184,10 @@ export class UniquenessValidator extends EachValidator {
     const typeObj =
       typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
 
-    // Serialized columns (`serialize :content`) store the coder-dumped form, but
-    // the value is NOT serialized here: the bind path below runs it through the
-    // attribute's (decorated, coder-wrapping) type, which the arel table resolves
-    // via `typeForAttribute` — so `buildBindAttribute` / `where` already emit the
-    // coder-dumped form. Serializing here too would double-dump (`"x\n"` →
-    // `"x\n\n"`) and never match the stored row. Mirrors Rails' `build_relation`,
-    // which hands the raw value to `bind_attribute` and lets the type serialize.
-
-    // When the attribute supports unencrypted data alongside encrypted values, the
-    // patched Relation#where (ExtendedDeterministicQueries) must receive a hash-style
-    // arg so processArguments can expand the IN list to include the plain-text variant.
-    // The Arel node path below bypasses processArguments entirely and would miss rows
-    // stored without encryption.
     if (typeObj?.supportUnencryptedData) {
       return [base.where({ [attribute]: value })];
     }
 
-    // Rails routes the comparison through the adapter (defaultUniquenessComparison
-    // / caseSensitiveComparison / caseInsensitiveComparison) so adapters with
-    // CI collations / native ILIKE / case-insensitive types can pick the right
-    // SQL form without wrapping the column in LOWER() and defeating indexes.
     if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
       const attr = arel.get(attribute);
       const bind = pb.buildBindAttribute(attribute, value);
@@ -303,9 +197,6 @@ export class UniquenessValidator extends EachValidator {
       } else if (this.options.caseSensitive) {
         comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
       } else {
-        // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
-        // which returns false from can_perform_case_insensitive_comparison_for? for uuid
-        // (PG has no lower(uuid) function). Use plain equality instead.
         const colType =
           typeObj == null
             ? null
@@ -315,9 +206,6 @@ export class UniquenessValidator extends EachValidator {
         if (colType !== "uuid") {
           comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
           if (comparison == null && typeof value === "string") {
-            // No native CI form — fall back to LOWER() with a lowercased bind.
-            // Keeps the bind parameterized so the prepared-statement cache
-            // stays effective.
             const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
             comparison = attr.lower().eq(lowerBind);
           }
@@ -330,14 +218,7 @@ export class UniquenessValidator extends EachValidator {
     return [base.where({ [attribute]: value })];
   }
 
-  /**
-   * Adds `WHERE scope = record.scope` clauses for each `:scope` option,
-   * resolving association-name scopes to their underlying FK value.
-   *
-   * Mirrors: ActiveRecord::Validations::UniquenessValidator#scope_relation
-   *
-   * @internal
-   */
+  /** @internal */
   private scopeRelation(record: any, relation: any): any {
     const scope = this.options.scope;
     if (scope == null) return relation;
@@ -345,13 +226,9 @@ export class UniquenessValidator extends EachValidator {
     let r = relation;
     for (const rawItem of scopes) {
       const ctor = record.constructor;
-      // Resolve an alias scope (`scope: :new_parent_id`) to the real column.
       const item = (ctor.attributeAliases?.[rawItem] as string) ?? rawItem;
       const refl = ctor._reflectOnAssociation?.(item);
       if (refl) {
-        // Read FK (and foreignType for polymorphic) directly off the record —
-        // do NOT load the association (Rails routes through the proxy reader,
-        // but in TS this can trigger lazy-load and strict-loading violations).
         const isPoly =
           typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
         const fks = Array.isArray(refl.foreignKey) ? refl.foreignKey : [refl.foreignKey];
@@ -369,15 +246,7 @@ export class UniquenessValidator extends EachValidator {
   }
 }
 
-/**
- * Returns true if uniqueness must consult the database: when the :conditions
- * or :caseSensitive option is set, when any of the value/scope columns changed
- * or is null, or when no unique index already covers them.
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#validation_needed?
- *
- * @internal
- */
+/** @internal */
 async function isValidationNeeded(
   validator: UniquenessValidator,
   klass: any,
@@ -401,15 +270,7 @@ async function isValidationNeeded(
   return !(await validator.isCoveredByUniqueIndex(klass, record, attribute, scope));
 }
 
-/**
- * Returns true when the configured attribute (plus scope columns) is
- * covered by a unique, non-partial index on the table — used to skip a
- * redundant SELECT before save when the DB already enforces uniqueness.
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#covered_by_unique_index?
- *
- * @internal
- */
+/** @internal */
 async function isCoveredByUniqueIndex(
   this: UniquenessValidator,
   klass: any,
@@ -425,9 +286,6 @@ async function isCoveredByUniqueIndex(
       const attributes = resolveAttributes(record, [...scope, attr]);
       const isCovered = indexes.some((index) => {
         if (!index.unique || index.where != null) return false;
-        // Rails' `(Array(index.columns) - attributes).empty?` — an expression
-        // index stores a String rather than a column list, which `Array()`
-        // wraps as a single (never-matching) entry.
         const columns = Array.isArray(index.columns) ? index.columns : [index.columns];
         return columns.every((c) => attributes.includes(String(c)));
       });
@@ -438,20 +296,10 @@ async function isCoveredByUniqueIndex(
   return validator._covered.includes(String(attribute));
 }
 
-/**
- * Reads the model's index list off the schema cache — Rails'
- * `klass.schema_cache.indexes(klass.table_name)`. Trails' equivalent is async,
- * so this awaits; the lookup is cache-backed, so a warm cache costs no query
- * (the whole point of the optimization is to avoid one).
- *
- * @internal
- */
+/** @internal */
 async function tableIndexes(
   klass: any,
 ): Promise<{ unique?: boolean; where?: string | null; columns?: unknown }[]> {
-  // Prefer the transaction-pinned connection: inside transactional fixtures the
-  // pinned connection is the only one that sees uncommitted DDL, so a cold cache
-  // must introspect through it or it reflects the wrong index list.
   const adapter = threadedConnectionFor(klass) ?? klass?.connection;
   const tableName = klass?.tableName;
   if (!adapter || !tableName) return [];
@@ -463,16 +311,7 @@ async function tableIndexes(
   return (await cache.indexes(tableName)) as Index[];
 }
 
-/**
- * Expands association names to their underlying foreign-key (and
- * foreign-type for polymorphic) columns; non-association attributes pass
- * through. Mirrors Rails' resolve_attributes which lets uniqueness scope
- * by association (e.g. `scope: :user`).
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#resolve_attributes
- *
- * @internal
- */
+/** @internal */
 function resolveAttributes(record: any, attributes: string[]): string[] {
   const out: string[] = [];
   for (const attr of attributes) {
@@ -492,15 +331,7 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
   return out.filter((x) => x != null);
 }
 
-/**
- * Translates a public enum value to its underlying column value before
- * comparison — Rails enums map symbol/string labels to integers (or
- * strings) in the DB, and uniqueness must compare on the stored value.
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#map_enum_attribute
- *
- * @internal
- */
+/** @internal */
 function mapEnumAttribute(klass: any, attribute: string, value: unknown): unknown {
   const enums = klass?.definedEnums?.[String(attribute)];
   if (value != null && enums && Object.prototype.hasOwnProperty.call(enums, String(value))) {

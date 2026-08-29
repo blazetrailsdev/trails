@@ -1,9 +1,3 @@
-// Fidelity: ActiveRecord::Timestamp resolves attribute aliases before reading
-// timestamp columns (timestamp.rb:92-97, 163-167) and ActiveRecord::Integration
-// builds cache keys / versions from the alias-resolved reader (integration.rb).
-// The canonical `Developer` model aliases updated_at/updated_on to the real
-// `legacy_updated_at`/`legacy_updated_on` columns, so cache keys, fixture
-// auto-timestamping, and touch must all follow the aliases.
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Developer } from "./test-helpers/models/developer.js";
@@ -14,8 +8,6 @@ describe("timestamp alias resolution", () => {
 
   it("fixtures auto-fill the aliased timestamp column", async () => {
     const dev = await Developer.first();
-    // The developers table has only legacy_updated_at; fixture fill resolves
-    // the updated_at alias and stamps it.
     expect(dev!.readAttribute("legacy_updated_at")).toBeInstanceOf(Temporal.Instant);
     expect(dev!.readAttribute("updated_at")).toBeInstanceOf(Temporal.Instant);
   });
@@ -36,7 +28,6 @@ describe("timestamp alias resolution", () => {
     try {
       const dev = await Developer.first();
       expect(dev!.cacheVersion()).toMatch(/^\d{20}$/);
-      // Versioning on ⇒ cache key omits the timestamp.
       expect(dev!.cacheKey()).toMatch(/^developers\/\d+$/);
     } finally {
       Developer.cacheVersioning = original;

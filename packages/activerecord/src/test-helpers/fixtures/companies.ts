@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/companies.yml
-// STI hierarchy: Company (base) / Firm / Client / DependentFirm / ExclusivelyDependentFirm
 export const companyFixtureData = {
   first_firm: {
     id: 1,
@@ -50,13 +48,11 @@ export const companyFixtureData = {
   },
   leetsoft: {
     id: 7,
-    // no type in Rails YAML — falls back to Company base class
     name: "Leetsoft",
     client_of: ref("companies", "rails_core"),
   },
   jadedpixel: {
     id: 8,
-    // no type in Rails YAML — falls back to Company base class
     name: "Jadedpixel",
     client_of: ref("companies", "rails_core"),
   },

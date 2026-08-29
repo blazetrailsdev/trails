@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/sharded_blog_posts_tags.yml
 export const shardedBlogPostTagFixtureData = {
   short_read_first_post_blog_one: {
     tag_id: ref("sharded_tags", "short_read_blog_one"),

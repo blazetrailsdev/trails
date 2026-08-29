@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/mixed_case_monkeys.yml
 export const mixedCaseMonkeyFixtureData = {
   first: {
     monkeyID: 1,

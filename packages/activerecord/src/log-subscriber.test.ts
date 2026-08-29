@@ -75,10 +75,6 @@ class MockLogger extends Logger {
   }
 }
 
-/**
- * Test-only subclass that captures debug output, mirroring Rails'
- * TestDebugLogSubscriber in the test file (not production code).
- */
 class TestDebugLogSubscriber extends LogSubscriber {
   debugs: string[] = [];
 
@@ -97,9 +93,6 @@ describe("LogSubscriberTest", () => {
   let subscriber: TestDebugLogSubscriber;
   let oldBaseLogger: typeof Base.logger;
 
-  // The DB-backed tests (basic/exists query logging) drive a real query
-  // through the auto-attached production LogSubscriber, which logs via
-  // ActiveRecord::Base.logger. A `developers` table is all those SELECTs need.
   fixtures([]);
   beforeEach(() => {
     mockLogger = new MockLogger();

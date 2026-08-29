@@ -52,22 +52,11 @@ function idOf(data: Record<string, { id?: number }>, label: string): number {
   return data[label]?.id ?? fixtureId(label);
 }
 
-/**
- * Find the INSERT statement whose VALUES tuple starts with the given primary key.
- * Anchoring on the leading `VALUES (<id>` slot avoids false positives from small
- * integer ids appearing elsewhere in the SQL (counts, dates, other FKs).
- */
 function findInsertWithPk(sqls: string[], pk: number): string | undefined {
   const re = new RegExp(`VALUES\\s*\\(\\s*${pk}\\b`);
   return sqls.find((s) => re.test(s));
 }
 
-/**
- * Assert that the row's VALUES tuple carries `fkId` as one of the column values.
- * Word-boundary match prevents small integer ids from matching as substrings of
- * unrelated values (counts, dates, etc.). Use after `findInsertWithPk` has
- * narrowed the SQL to the specific row we care about.
- */
 function expectValueInRow(sql: string | undefined, fkId: number): void {
   expect(sql).toBeTruthy();
   const valuesMatch = /VALUES\s*\(([^)]*)\)/.exec(sql ?? "");
@@ -99,7 +88,6 @@ describe("topicFixtureData", () => {
       approved: false,
       replies_count: 1,
     });
-    // `first` is an STI base Topic — Rails omits `type:` (NULL discriminator).
     expect("type" in topicFixtureData.first).toBe(false);
   });
 
@@ -174,8 +162,6 @@ describe("commentFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("comments"));
     const greetingsInsert = findInsertWithPk(insertSqls, commentFixtureData.greetings.id);
     expect(greetingsInsert).toBeTruthy();
-    // posts.welcome pins an explicit `id: 1`, so the ref resolves to that pinned id
-    // (not the CRC32 label hash) even though the posts set isn't loaded here.
     expectValueInRow(greetingsInsert, postFixtureData.welcome.id);
     expect(greetingsInsert).not.toContain(String(fixtureId("welcome")));
   });
@@ -214,9 +200,6 @@ describe("authorFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("authors"));
     const davidInsert = findInsertWithPk(insertSqls, authorFixtureData.david.id);
     expect(davidInsert).toBeTruthy();
-    // author_addresses.david_address pins an explicit `id: 1`, so the ref resolves to
-    // that pinned id (not the CRC32 label hash) even though the author_addresses set
-    // isn't loaded here.
     expectValueInRow(davidInsert, authorAddressFixtureData.david_address.id);
     expect(davidInsert).not.toContain(String(fixtureId("david_address")));
   });
@@ -253,16 +236,11 @@ describe("bookFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
     const awdrInsert = findInsertWithPk(insertSqls, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
-    // authors.david pins an explicit `id: 1`, so the ref resolves to that pinned id
-    // (not the CRC32 label hash) even though the authors set isn't loaded here.
     expectValueInRow(awdrInsert, authorFixtureData.david.id);
     expect(awdrInsert).not.toContain(String(fixtureId("david")));
   });
 
   it("ref() resolves cross-table to declared id once target fixture set is loaded", async () => {
-    // Load authors first so the (authors, david) → id=1 entry lands in the
-    // adapter-scoped declared-id registry; then loading books must resolve
-    // books.awdr.author_id to authorFixtureData.david.id, NOT fixtureId("david").
     const adapter = makeAdapter();
     const Author = makeModel("authors");
     const Book = makeModel("books");
@@ -315,7 +293,6 @@ describe("companyFixtureData", () => {
     expect(isFixtureRef(firmRef)).toBe(true);
     expect(firmRef.tableName).toBe("companies");
     expect(firmRef.fixtureName).toBe("first_firm");
-    // client_of: 2 in Rails YAML — first_client's own ID (self-ref; ref() is just ID math)
     const clientOfRef = companyFixtureData.first_client.client_of;
     expect(isFixtureRef(clientOfRef)).toBe(true);
     expect(clientOfRef.fixtureName).toBe("first_client");
@@ -401,9 +378,6 @@ describe("accountFixtureData", () => {
       .filter((s) => s.includes("INSERT INTO") && s.includes("accounts"));
     const signals37Insert = findInsertWithPk(insertSqls, accountFixtureData.signals37.id);
     expect(signals37Insert).toBeTruthy();
-    // companies.first_firm pins an explicit `id: 1`, so ref("companies", "first_firm")
-    // resolves to that pinned id from the canonical fixture-data registry even though
-    // the companies set isn't loaded into the adapter-scoped declared-id registry.
     expectValueInRow(signals37Insert, companyFixtureData.first_firm.id);
     expect(signals37Insert).not.toContain(String(fixtureId("first_firm")));
   });

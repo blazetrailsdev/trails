@@ -137,7 +137,6 @@ describe("HashLookupTypeMapTest", () => {
   });
 });
 
-// TypeMapSharedTests — exercised against HashLookupTypeMap below
 it("default type", () => {
   const mapping = new HashLookupTypeMap();
   expect(mapping.lookup("undefined_key")).toBeInstanceOf(ValueType);

@@ -1,11 +1,3 @@
-/**
- * Trails-only: `CollectionAssociation#size` (collection_association.rb:209-222)
- * has five arms, and trails used to keep only the first two on the OO
- * association — the `group_values` arm and the two `count_records` arms lived on
- * `CollectionProxy#size` alone. Rails has no equivalent test because Rails has
- * no such split; these pin every arm on the association itself, so the counted
- * arms cannot quietly fall back to `target.length` again.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";

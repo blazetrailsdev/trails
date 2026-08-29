@@ -1,7 +1,3 @@
-/**
- * trails-only coverage for BatchEnumerator's Rails constructor kwargs.
- * Mirrors: activerecord/lib/active_record/relation/batches/batch_enumerator.rb
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { recordCursorValues } from "./relation/batches.js";
@@ -57,18 +53,10 @@ describe("BatchEnumerator (trails)", () => {
   it("recordCursorValues reads the attribute even when it is null", async () => {
     const post = (await Post.first())!;
     post.writeAttribute("type", null);
-    // A record carries same-named properties beside its attributes; Rails'
-    // `record.attributes.slice(*cursor).values` (batches.rb:408-409) never
-    // consults them, so a null attribute stays null.
     Object.defineProperty(post, "unrelated", { value: "from the property" });
     expect(recordCursorValues(post, ["type"])).toEqual([null]);
     expect(recordCursorValues(post, ["unrelated"])).toEqual([]);
   });
-  // batches.rb:456-459. Rails has no test for this raise; the guard fires when a
-  // cursor column is nil on a batched row — Ruby reads it out of
-  // `values.flatten`, trails off each record's attributes. The relation is
-  // scoped to the nil-author book: NULLs sort first on SQLite and last on
-  // PostgreSQL, so an unscoped batch reaches the row on one adapter only.
   it("raises when a cursor column is nil", async () => {
     const name = "Bourdain: The Definitive Oral Biography";
     await Book.create({ name });
@@ -79,7 +67,6 @@ describe("BatchEnumerator (trails)", () => {
           of: 1,
           cursor: ["author_id", "name"],
         })) {
-          // no-op: the guard raises on the batch carrying the nil author_id
         }
       })(),
     ).rejects.toThrow(

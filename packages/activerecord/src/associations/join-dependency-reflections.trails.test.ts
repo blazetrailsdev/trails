@@ -1,12 +1,3 @@
-/**
- * Trails-only: pins `JoinDependency#reflections`
- * (join_dependency.rb:81-83, `join_root.drop(1).map!(&:reflection)`) to the
- * reflection each tree node carries, in the depth-first order Ruby's
- * `Enumerable` gives `join_root` (join_part.rb:13, 31-34), with the root
- * dropped. Rails covers this indirectly through
- * `FinderMethods#using_limitable_reflections?`; the walk itself has no Rails
- * test of its own, so the port is pinned here.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";

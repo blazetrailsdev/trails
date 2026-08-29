@@ -7,9 +7,6 @@ import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency nested hydration", () => {
-  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `aliasedRow`, so no bespoke schema is declared
-  // and no `tN_rN` offsets (or canonical-prefix column padding) are hardcoded.
   fixtures({});
 
   // prettier-ignore
@@ -72,8 +69,6 @@ describe("JoinDependency nested hydration", () => {
     expect(authorProxy1?.target).toBe(authorProxy2?.target);
 
     expect(comment1.association("author").target).toBeDefined();
-    // "author" is a Comment association, not a Post one — verify it was not
-    // grafted onto the wrong (Post) parent's association cache.
     expect(post._associationInstances.has("author")).toBe(false);
   });
 

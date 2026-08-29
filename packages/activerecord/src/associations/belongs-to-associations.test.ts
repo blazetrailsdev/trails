@@ -1,9 +1,5 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import {
   SubclassNotFound,
@@ -71,8 +67,6 @@ import { ActiveRecord } from "../ar-config.js";
 import { Temporal } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport";
 
-// Mirrors the inline classes in Rails'
-// belongs_to_associations_test.rb (test_polymorphic_with_custom_name_*).
 class CarPolymorphicName extends Base {
   declare wheels: AssociationProxy<Wheel>;
 
@@ -107,8 +101,6 @@ class WheelPolymorphicName extends Base {
   }
 }
 
-// Mirrors the inline classes in Rails' belongs_to_associations_test.rb
-// (test_dependency_should_halt_parent_destruction*).
 class EssayDestroy extends Base {
   static _tableName = "essays";
   static {
@@ -191,12 +183,6 @@ for (const m of [
   registerModel(m as any);
 }
 
-// Mirrors Rails' dynamic definitions in test_raises_type_mismatch_with_namespaced_class
-// (belongs_to_associations_test.rb:266-283):
-//   Admin.const_set "Region", Class.new(ActiveRecord::Base)
-//   Admin.const_set "RegionalUser", Class.new(Admin::User) { belongs_to(:region) }
-// The `belongs_to :region` carries NO explicit class_name, so the target class is
-// resolved namespace-relative: `region` → Admin::Region (never a top-level Region).
 class AdminRegion extends Base {
   static _tableName = "admin_regions";
   static moduleName = "Admin";
@@ -525,8 +511,6 @@ describe("BelongsToAssociationsTest", () => {
       }
     }
 
-    // The required presence validation must see the defaulted FK, so the save
-    // succeeds even though no developer was supplied.
     let ship = await TempDefault.create({});
     expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
 
@@ -540,7 +524,6 @@ describe("BelongsToAssociationsTest", () => {
     const firstPost = await (comment as any).loadBelongsTo("post");
     await comment!.reload();
     const secondPost = await (comment as any).loadBelongsTo("post");
-    // The point is it doesn't crash and loads the post correctly
     expect(firstPost).not.toBeNull();
     expect(secondPost).not.toBeNull();
   });
@@ -565,13 +548,8 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("raises type mismatch with namespaced class", () => {
-    // Rails requires that there is no top-level Region class, so the association's
-    // class must be resolved by walking the owner's Admin namespace —
-    // `belongs_to :region` on Admin::RegionalUser → Admin::Region.
     expect(modelRegistry.get("Region")).toBeUndefined();
 
-    // Rails names the expected side with reflection.class_name ("Region"), the
-    // demodulized convention name — not the resolved klass ("AdminRegion").
     expect(() => new AdminRegionalUser({ region: "wrong value" })).toThrow(AssociationTypeMismatch);
     expect(() => new AdminRegionalUser({ region: "wrong value" })).toThrow(
       /^Region expected, got "wrong value" which is an instance of String$/,
@@ -748,7 +726,6 @@ describe("BelongsToAssociationsTest", () => {
     expect((await odegyAccount.loadBelongsTo("firm"))!.name).toBe("Odegy");
 
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
-    // Cached version still has old name
     expect(odegyAccount.firm!.name).toBe("Odegy");
 
     await (odegyAccount as any).reloadFirm();
@@ -762,20 +739,16 @@ describe("BelongsToAssociationsTest", () => {
     connection.enableQueryCacheBang();
     connection.clearQueryCache();
     try {
-      // Populate the cache with a query
       const odegyAccount = await Account.find(odegyAccountId);
 
-      // Populate the cache with a second query
       await odegyAccount.loadBelongsTo("firm");
 
       expect(connection.queryCache.size).toBe(2);
 
-      // Clear the cache and fetch the firm again, populating the cache with a query
       await assertQueriesCount(1, false, async () => {
         await (odegyAccount as any).reloadFirm();
       });
 
-      // This query is not cached anymore, so it should make a real SQL query
       await assertQueriesCount(1, false, async () => {
         await Account.find(odegyAccountId);
       });
@@ -1093,7 +1066,6 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
     await lineItem.touch();
-    // verify no error
     expect(lineItem).toBeDefined();
   });
 
@@ -1109,7 +1081,6 @@ describe("BelongsToAssociationsTest", () => {
 
     await lineItem.touch();
     await lineItem2.touch();
-    // verify no error
     expect(lineItem).toBeDefined();
   });
 
@@ -1454,10 +1425,6 @@ describe("BelongsToAssociationsTest", () => {
     expect((essay as any).writer_type).toBeNull();
   });
 
-  // "belongs to proxy should not respond to private methods" is excluded in
-  // scripts/api-compare/unported-files.ts: it probes Ruby method visibility
-  // (private_method raising NoMethodError outside `send`), which has no JS
-  // equivalent — TS has no runtime-enforced private dispatch on proxies.
   it("belongs to proxy should respond to private methods via send", async () => {
     const firm = companies("first_firm");
     expect((firm as any)["privateMethod"]()).toBe("I am Jack's innermost fears and aspirations");
@@ -1731,7 +1698,6 @@ describe("BelongsToAssociationsTest", () => {
       wheelable: car,
     } as any)) as unknown as WheelPolymorphicName;
 
-    // Rails: `touch_time = 1.day.ago.round` — second-precision past timestamp.
     const touchTime = new Date(Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000) * 1000);
 
     travelTo(touchTime);
@@ -1742,8 +1708,6 @@ describe("BelongsToAssociationsTest", () => {
       travelBack();
     }
 
-    // The touch on the old belongs_to (CarPolymorphicName) writes
-    // wheels_owned_at = touch_time.
     const reloaded = await CarPolymorphicName.find(car.id);
     expect((reloaded.wheels_owned_at as Temporal.Instant).epochMilliseconds).toBe(
       touchTime.getTime(),
@@ -1851,7 +1815,7 @@ describe("BelongsToAssociationsTest", () => {
     }
 
     const author = Temp.new();
-    author.writeAttribute("author_address_id", 9223372036854775808n); // out of range in the bigint
+    author.writeAttribute("author_address_id", 9223372036854775808n);
 
     expect(await (author as any).loadBelongsTo("authorAddress")).toBeNull();
     expect(await author.isValid()).toBe(false);
@@ -1962,8 +1926,6 @@ describe("BelongsToAssociationsTest", () => {
 
   it("assigning an association doesn't result in duplicate objects", async () => {
     const post = await Post.create({ title: "title", body: "body" });
-    // Rails' `post.comments = [...]` persists the replacement at assignment;
-    // that needs `await` in JS, so the `=` setter throws (RFC 0068).
     await post.comments.replace([post.comments.build({ body: "body" })]);
     await post.save();
 
@@ -2077,7 +2039,6 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
     expect(Number((ship as any).developer_id)).toBe(Number(david.id));
 
-    // UPDATE and SELECT to check developer presence
     await assertQueriesCount(4, false, async () => {
       await ship.update({ developer_id: jamis.id });
     });
@@ -2085,7 +2046,6 @@ describe("BelongsToAssociationsTest", () => {
     await ship.updateColumns({ developer_id: null });
     await ship.reload();
 
-    // UPDATE and SELECT to check developer presence
     await assertQueriesCount(4, false, async () => {
       await ship.update({ developer_id: david.id });
     });
@@ -2107,7 +2067,6 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
     await ship.reload();
 
-    // UPDATE only, no SELECT to check developer presence
     await assertQueriesCount(3, false, async () => {
       await ship.update({ name: "Leviathan" });
     });
@@ -2133,7 +2092,6 @@ describe("BelongsToAssociationsTest", () => {
       const ship = await TempShip.create({ name: "Medusa", developer_id: david.id });
       await ship.reload();
 
-      // UPDATE and SELECT to check developer presence
       await assertQueriesCount(4, false, async () => {
         await ship.update({ name: "Leviathan" });
       });

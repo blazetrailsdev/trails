@@ -1,21 +1,4 @@
-/**
- * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver
- * (`gem "sqlite3"`, use-site:sqlite3_adapter.rb:14) and the sqlite3 gem's C extension,
- * not Rails, owns the handle protocol: `SQLite3Adapter` calls
- * `::SQLite3::Database.new` (use-site:sqlite3_adapter.rb:34-35) and then `prepare`,
- * `close`, `closed?` on an object Rails does not define
- * (use-site:sqlite3_adapter.rb:98, 207, 224). trails has to write
- * that layer in TS, so this file is the `libsql` npm client's binding — the
- * driver object literals and the connection/statement handles behind them —
- * and no name it declares has a Rails method to converge onto. Its sibling
- * subclass `connection-adapters/libsql-adapter.ts` carries the same reason.
- * MOVED-BY-SHORT-NAME: databaseExists, open.
- * Those two score `moved` only because the oracle matches on bare camelized
- * Ruby short names, and the owners it reports are unrelated: `open` credits
- * `SchemaCache#open` / `MigrationContext#open`, and `databaseExists` credits
- * `AbstractAdapter#database_exists?` — which the port already carries on the
- * adapter, at its Rails name, one layer above this driver.
- */
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "libsql";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import { ConfigurationError } from "../errors.js";
@@ -79,9 +62,7 @@ class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
     this.stmt.safeIntegers(on);
   }
 
-  finalize(): void {
-    // libsql (better-sqlite3 API) has no explicit finalize; statements are GC'd.
-  }
+  finalize(): void {}
 }
 
 /** @internal */
@@ -108,14 +89,6 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
     return this.raw.pragma(source, opts);
   }
 
-  /**
-   * `sqlite3_changes()` / `sqlite3_last_insert_rowid()` — the ruby sqlite3
-   * gem's `Database#changes` / `#last_insert_row_id`, which Rails'
-   * `perform_query` reads after every statement. No driver here exposes them
-   * as an API, so they are read with the SQL functions of the same names: a
-   * pure read, which leaves both counters alone. The prepared statements are
-   * cached because `perform_query` reads them on EVERY statement.
-   */
   changes(): number {
     this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
     return (this.#changesStmt.get() as { v: number }).v;
@@ -133,30 +106,17 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
     this.raw.close();
   }
 
-  /**
-   * Pull the latest changes from the remote primary into this embedded
-   * replica. Only meaningful for replica handles (opened with a `syncUrl`);
-   * libsql's `Database.sync()` throws for plain local/remote handles, so the
-   * replica adapter is the only caller. Exposed here as the narrow,
-   * libsql-specific escape hatch the core `SqliteConnection` interface omits.
-   */
   async sync(): Promise<void> {
     await this.raw.sync();
   }
 }
 
-/**
- * A libsql connection that can pull from a remote primary via {@link sync}.
- * Embedded-replica handles satisfy this; plain local/remote handles do not.
- */
 export interface SyncableSqliteConnection extends SqliteConnection {
   sync(): Promise<void>;
 }
 
 /** @internal */
 function openDatabase(config: SqliteOpenConfig): Database.Database {
-  // libsql shares better-sqlite3's Options shape; spec keys (readOnly, timeout)
-  // win over duplicates in driverOptions so AR config takes precedence.
   const opts: Database.Options = {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
@@ -165,11 +125,6 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
   return new Database(config.database, opts);
 }
 
-/**
- * Returns true when the URL scheme identifies a remote libsql/Turso endpoint
- * (`libsql://`, `http://`, `https://`, `ws://`, `wss://`). Used by the remote
- * driver and config helpers to distinguish network from local-file configs.
- */
 export function isRemoteLibsqlUrl(url: string): boolean {
   return (
     url.startsWith("libsql://") ||
@@ -182,9 +137,6 @@ export function isRemoteLibsqlUrl(url: string): boolean {
 
 /** @internal */
 function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
-  // driverOptions carries authToken (and any other driver-specific keys).
-  // Unlike the local openDatabase, we don't force readonly here — remote
-  // Turso connections don't expose a read-only open mode.
   const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   return new Database(config.database, opts);
@@ -199,19 +151,6 @@ const remoteCapabilities: SqliteDriverCapabilities = {
   immediateTransactions: false,
 };
 
-/**
- * libsql driver for remote Turso connections (`libsql://`, `https://`, etc.).
- *
- * Remote handles are network-backed; they must go through the async-open path
- * (`SQLite3Adapter.openAsync()` / `completeAsyncConnect()`). The driver
- * intentionally omits `openSync` so the abstract base defers to `connectAsync`.
- * `restoreFromPath` and `databaseExists` are omitted — remote databases have no
- * local-file counterpart.
- *
- * `connectAsync` issues `SELECT sqlite_version()` and `PRAGMA encoding` over
- * the network during open. Turso supports both, so the happy path is reliable;
- * a network error surfaces as a `DatabaseConnectionError` at connect time.
- */
 export const libsqlRemoteDriver: SqliteDriver = {
   name: "libsql-remote",
   capabilities: remoteCapabilities,
@@ -221,38 +160,17 @@ export const libsqlRemoteDriver: SqliteDriver = {
   },
 };
 
-/**
- * Returns true when a config selects libsql **embedded-replica** mode — i.e. a
- * non-empty `syncUrl` is present in `driverOptions`. A replica keeps a local
- * file (`config.database`) in sync with the remote primary named by `syncUrl`;
- * this distinguishes it from a plain remote config (no local file) or a plain
- * local config (no `syncUrl`).
- */
 export function isReplicaConfig(config: SqliteOpenConfig): boolean {
   const syncUrl = (config.driverOptions as { syncUrl?: unknown } | undefined)?.syncUrl;
   return typeof syncUrl === "string" && syncUrl.length > 0;
 }
 
-/**
- * libsql's `Database.Options` plus the embedded-replica keys the runtime
- * accepts but the bundled TS types omit: `authToken`, and `syncPeriod` (the
- * native background-sync interval, in seconds). `syncUrl` is already typed.
- */
 export interface LibsqlReplicaOptions extends Database.Options {
   authToken?: string;
   syncPeriod?: number;
 }
 
-/**
- * Build the libsql `Database.Options` for an embedded-replica open. A positive
- * `syncPeriod` (seconds) turns on libsql's **native** background sync loop —
- * opt-in periodic auto-sync that keeps the local replica fresh without an
- * explicit {@link LibsqlConnection.sync} call. The loop is owned by the libsql
- * handle and torn down when the connection closes, so there is no JS timer to
- * manage. Omitting `syncPeriod` (the default) leaves the replica caller-driven,
- * exactly as before.
- * @internal
- */
+/** @internal */
 export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOptions {
   if (!isReplicaConfig(config)) {
     throw new ConfigurationError(
@@ -260,10 +178,6 @@ export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOpti
         "driverOptions (alongside the local replica path); none was provided.",
     );
   }
-  // driverOptions carries syncUrl + authToken + optional syncPeriod (and any
-  // other driver keys). The local replica file is config.database, so unlike
-  // the remote driver we open a path, not a URL. Don't force readonly —
-  // replicas accept writes (which are forwarded to the primary).
   const opts: LibsqlReplicaOptions = {
     ...(config.driverOptions as LibsqlReplicaOptions | undefined),
   };
@@ -297,23 +211,6 @@ const replicaCapabilities: SqliteDriverCapabilities = {
   immediateTransactions: false,
 };
 
-/**
- * libsql driver for **embedded-replica** connections: a local file
- * (`config.database`) kept in sync with a remote Turso primary named by
- * `driverOptions.syncUrl`. Reads are served locally; `sync()` pulls the latest
- * primary state into the local file.
- *
- * Construction (`new Database(localPath, { syncUrl, authToken })`) performs an
- * initial network sync, so the driver goes through the async-open path
- * (`openSync` omitted, like the remote driver). `databaseExists` and
- * `restoreFromPath` are omitted — the replica file is materialized by libsql on
- * first sync, not a caller-managed local DB.
- *
- * Periodic auto-sync is opt-in via a positive `driverOptions.syncPeriod`
- * (seconds): libsql's native background loop refreshes the replica without an
- * explicit `sync()`. It is off by default and the loop is owned by the handle,
- * so it stops when the connection closes — no JS timer to manage.
- */
 export const libsqlReplicaDriver: SqliteDriver = {
   name: "libsql-replica",
   capabilities: replicaCapabilities,
@@ -326,7 +223,6 @@ export const libsqlReplicaDriver: SqliteDriver = {
 const capabilities: SqliteDriverCapabilities = {
   inProcessSync: true,
   streaming: true,
-  // libsql disables runtime extension loading; loadExtension() throws.
   loadExtension: false,
   concurrentStatements: true,
   foreignKeysOnByDefault: false,
@@ -347,7 +243,7 @@ export const libsqlDriver: SqliteDriver = {
 
   databaseExists(config: SqliteOpenConfig): boolean {
     const path = resolveUriDatabasePath(config.database);
-    if (path === null) return true; // memory database
+    if (path === null) return true;
     try {
       return getFs().existsSync(path);
     } catch {
@@ -356,24 +252,14 @@ export const libsqlDriver: SqliteDriver = {
   },
 
   async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
-    // libsql exposes better-sqlite3's backup() signature, but the local build
-    // throws "not implemented" for it (backup is reserved for the remote-sync
-    // path). Try the page-copy primitive first so we benefit if a future build
-    // implements it, then fall back to an async file clone of the source DB.
     const source = new Database(sourcePath, { readonly: true });
     try {
       await source.backup(destination);
       return;
     } catch {
-      /* fall through to file-clone fallback */
     } finally {
       source.close();
     }
-    // File-clone fallback: copy the cleanly-closed source DB file's bytes into
-    // destination. Unlike the native backup primitive (which sets
-    // SQLITE_OPEN_URI and resolves the destination), a raw file write needs a
-    // real path: decode `file:` URIs, and reject in-memory destination URIs
-    // since a clone cannot populate the held shared-cache memory DB.
     const destPath = resolveUriDatabasePath(destination);
     if (destPath === null) {
       throw new ConfigurationError(

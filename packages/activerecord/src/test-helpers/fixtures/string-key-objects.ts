@@ -1,5 +1,3 @@
-// activerecord/test/fixtures/string_key_objects.yml
-// String primary keys: Rails persists `id` as a varchar column.
 export const stringKeyObjectFixtureData = {
   first: {
     id: "record1",

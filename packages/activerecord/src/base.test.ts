@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import { ActiveRecord, Base, NotImplementedError, ReadonlyAttributeError } from "./index.js";
 import { TableNotSpecified, ActiveRecordError } from "./errors.js";
@@ -35,9 +31,6 @@ import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from ".
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
-// ==========================================================================
-// BasicsTest — targets base_test.rb
-// ==========================================================================
 describe("BasicsTest", () => {
   fixtures([]);
   const cleanupConnections: Array<() => unknown> = [];
@@ -224,7 +217,6 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    // Test readonly on relation
     const rel = User.all().readonly();
     expect(rel.isReadonly).toBe(true);
   });
@@ -293,7 +285,6 @@ describe("BasicsTest", () => {
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
-    // new records are not equal
     expect(u1.equals(u2)).toBe(false);
   });
 
@@ -379,7 +370,6 @@ describe("BasicsTest", () => {
 
   it("singular table name guesses for individual table", () => {
     class Person extends Base {}
-    // Rails irregular: "person" → "people"
     expect(Person.tableName).toBe("people");
   });
 
@@ -413,7 +403,6 @@ describe("BasicsTest", () => {
     }
     const p1 = Post.new({}) as any;
     const p2 = Post.new({}) as any;
-    // Two new records with no id should not be considered equal
     expect(p1).not.toBe(p2);
   });
 
@@ -454,8 +443,6 @@ describe("BasicsTest", () => {
   });
 
   it("find by slug", async () => {
-    // Rails: assert_equal Topic.find("1-meowmeow"), Topic.find(1) — the integer
-    // primary key cast strips the non-numeric slug suffix.
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -478,8 +465,6 @@ describe("BasicsTest", () => {
   });
 
   it("preserving date objects", async () => {
-    // Rails: assert_kind_of(Date, Topic.find(1).last_read) — a `date` column
-    // round-trips as a Date (Temporal.PlainDate in trails), not a datetime.
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -530,7 +515,6 @@ describe("BasicsTest", () => {
         this.attribute("body", "string");
       }
     }
-    // Arel table exists and can build attributes
     const table = Post.arelTable;
     expect(table).toBeTruthy();
   });
@@ -594,10 +578,6 @@ describe("BasicsTest", () => {
   });
 
   it("column types typecast", async () => {
-    // Rails base_test.rb#test_column_types_typecast: instantiate a record with a
-    // per-attribute `types` override — a custom Type::Value subclass whose cast
-    // always returns "t.lo" — and assert the override wins over the column's
-    // declared type for `author_name`.
     class Topic extends Base {}
     const seed = await Topic.create({
       title: "The First Topic",
@@ -679,9 +659,6 @@ describe("BasicsTest", () => {
 
     void Topic.resetColumnInformation();
 
-    // Rails stubs connection_pool.schema_cache to raise; reflecting the
-    // columns then propagates that error. Already-loaded records are
-    // unaffected — the data survives once the cache works again.
     const adapter = Topic.connection as any;
     vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
       throw new Error("Some Error");
@@ -715,21 +692,12 @@ describe("BasicsTest", () => {
     await Author.create({ name: "Alice" });
     const pk = Author.columnsHash()["id"];
     const ref = Post.columnsHash()["author_id"];
-    // author_id is explicitly declared as integer — its type must be defined
     expect(ref).toBeDefined();
     expect(ref.type).toBeDefined();
-    // The pk column is loaded from the schema after create; type may vary by adapter
-    // but ref must always be integer-typed.
     expect(ref.type).toMatch(/integer|bigint|int/i);
-    // When pk.type is populated, Rails requires pk.sql_type == ref.sql_type.
     const pkTypes = pk?.type == null ? [ref.type] : [pk.type];
     expect(pkTypes[0]).toBe(ref.type);
   });
-  // `limit!` stores the raw value (query_methods.rb:1215-1218); the value is
-  // only vetted when `build_arel` runs it through `connection.sanitize_limit`
-  // (:1757, database_statements.rb:508-514), so — as in Rails, where these
-  // tests raise from `to_a` — the throw lands at query-build time, not at
-  // `limit(...)`.
   it("invalid limit", () => {
     class User extends Base {
       static {
@@ -800,8 +768,6 @@ describe("BasicsTest", () => {
           this.attribute("written_on", "datetime");
         }
       }
-      // Rails: Time.local(2000) in EST = 2000-01-01 00:00:00-05:00 = 05:00 UTC.
-      // Pass an offset-bearing string to exercise the cast/serialize conversion path.
       const expectedUtc = Temporal.Instant.from("2000-01-01T05:00:00Z");
       const topic = await Topic.create({ written_on: "2000-01-01 00:00:00-05:00" });
       const saved = await Topic.find(topic.id);
@@ -817,8 +783,6 @@ describe("BasicsTest", () => {
           this.attribute("written_on", "datetime");
         }
       }
-      // Rails: Time.zone.local(2000) in CST = 2000-01-01 00:00:00-06:00 = 06:00 UTC.
-      // Pass an offset-bearing string to exercise the cast/serialize conversion path.
       const expectedUtc = Temporal.Instant.from("2000-01-01T06:00:00Z");
       const topic = await Topic.create({ written_on: "2000-01-01 00:00:00-06:00" });
       const saved = await Topic.find(topic.id);
@@ -828,10 +792,6 @@ describe("BasicsTest", () => {
     });
   });
   it("preserving time objects with utc time conversion to default timezone local", async () => {
-    // Rails uses with_env_tz(EST) + default: :local. Our defaultSqlTimezone() implements
-    // default: :local via Temporal.Now.timeZoneId() (the host process TZ), which is not
-    // controllable in tests — that requires with_env_tz infrastructure. Instead we verify
-    // the equivalent round-trip + zone-representation invariant via timeZoneAwareAttributes + zone.
     await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
       class Topic extends Base {
         static {
@@ -843,7 +803,6 @@ describe("BasicsTest", () => {
       const saved = await Topic.find(topic.id);
       const savedTime = saved.readAttribute("written_on") as TimeWithZone;
       expect(savedTime.utc().toTime().epochNanoseconds).toBe(utcMidnight.epochNanoseconds);
-      // Rails: saved_time.to_a == [0, 0, 19, 31, 12, 1999, 5, 365, false, "EST"]
       const local1 = savedTime.utc().toTime().withTimeZone("America/New_York");
       expect(local1.year).toBe(1999);
       expect(local1.month).toBe(12);
@@ -852,23 +811,17 @@ describe("BasicsTest", () => {
     });
   });
   it("preserving time objects with time with zone conversion to default timezone local", async () => {
-    // Rails uses with_env_tz(EST) + Time.use_zone("CST") + default: :local. Our
-    // defaultSqlTimezone() implements default: :local via Temporal.Now.timeZoneId() (host process
-    // TZ), which is not controllable without with_env_tz infrastructure. Instead we verify the
-    // equivalent round-trip + zone-representation invariant via timeZoneAwareAttributes + zone.
     await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
       class Topic extends Base {
         static {
           this.attribute("written_on", "datetime");
         }
       }
-      // Rails: Time.zone.local(2000) in CST = 2000-01-01 00:00:00 CST (UTC-6) = 06:00 UTC = 01:00 EST
       const cstMidnight = Temporal.Instant.from("2000-01-01T06:00:00Z");
       const topic = await Topic.create({ written_on: cstMidnight });
       const saved = await Topic.find(topic.id);
       const savedTime = saved.readAttribute("written_on") as TimeWithZone;
       expect(savedTime.utc().toTime().epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
-      // Rails: saved_time.to_a == [0, 0, 1, 1, 1, 2000, 6, 1, false, "EST"]
       const local2 = savedTime.utc().toTime().withTimeZone("America/New_York");
       expect(local2.year).toBe(2000);
       expect(local2.month).toBe(1);
@@ -881,8 +834,6 @@ describe("BasicsTest", () => {
       class Pet extends Base {
         static {
           this.tableName = "pets";
-          // Rails' Pet model sets `self.primary_key = :pet_id`; canonical `pets`
-          // has no `id` column (vendor/rails/.../models/pet.rb).
           this.primaryKey = "pet_id";
           this.attribute("name", "string");
           this.attribute("created_at", "datetime");
@@ -974,9 +925,6 @@ describe("BasicsTest", () => {
     expect(reversed[0].title).toBe("second");
   });
   it("find by slug with range", async () => {
-    // Rails: Topic.where(id: "1-meowmeow".."2-hello") == Topic.where(id: 1..2)
-    // IntegerType.cast("1-meowmeow") = 1 (parseInt strips non-numeric suffix); the
-    // integer-typed primary key applies that cast to the range bounds.
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -988,7 +936,6 @@ describe("BasicsTest", () => {
     const intRange = new ArRange(t1.id, t2.id);
     const bySlug = await Topic.where({ id: slugRange });
     const byInt = await Topic.where({ id: intRange });
-    // Both queries must find the two created records (not empty)
     expect(byInt).toHaveLength(2);
     expect(bySlug).toHaveLength(2);
     expect(bySlug.map((r: any) => r.id).sort()).toEqual(byInt.map((r: any) => r.id).sort());
@@ -1014,8 +961,6 @@ describe("BasicsTest", () => {
     await car.save();
 
     const bulbsOfCar = Bulb.where({ car_id: car.id });
-    // Rails: assert_equal bulbs_of_car, car.bulbs.includes(:car)
-    // AssociationRelation (includes chain off proxy) returns same rows as plain Relation
     const assocRelation = association(car, "bulbs").includes(":car");
     const relationResults = await bulbsOfCar;
     const assocResults = await assocRelation;
@@ -1030,8 +975,6 @@ describe("BasicsTest", () => {
     association(car, "bulbs").build({});
     await car.save();
 
-    // Rails: assert_equal car.bulbs, car.bulbs.includes(:car)
-    // CollectionProxy and includes-chain produce the same underlying rows
     const proxyResults = await association(car, "bulbs");
     const assocRelResults = await association(car, "bulbs").includes(":car");
     expect(proxyResults).toHaveLength(1);
@@ -1083,11 +1026,8 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changeable");
 
-      // Rails: the value changes in memory but is not persisted on save. After
-      // reload the readonly column is unchanged; the writable one persists.
       post.writeAttribute("title", "changed via write_attribute");
       post.writeAttribute("body", "changed via write_attribute");
-      // The readonly write is NOT skipped: the value lands in memory (Rails super).
       expect(post.readAttribute("title")).toBe("changed via write_attribute");
       await post.saveBang();
       await post.reload();
@@ -1131,13 +1071,11 @@ describe("BasicsTest", () => {
     const author1 = await Author.create({ name: "Alex" });
     const author2 = await Author.create({ name: "Not Alex" });
 
-    // Updating non-readonly attributes on a persisted record is fine
     const post = await ReadonlyAuthorPost.create({ title: "Hi", body: "b", author_id: author1.id });
     await post.update({ title: "Hello" });
     const reloaded = await ReadonlyAuthorPost.find(post.id);
     expect(Number(reloaded.readAttribute("author_id"))).toBe(Number(author1.id));
 
-    // Attempting to change the readonly FK throws ReadonlyAttributeError
     const post2 = await ReadonlyAuthorPost.create({
       title: "Hi",
       body: "b",
@@ -1171,8 +1109,6 @@ describe("BasicsTest", () => {
           .toInstant(),
       );
 
-      // Rails uses save!; saveBang is the faithful form (surfaces save errors).
-      // findBy exercises the serialize round-trip, which is the stronger check.
       await topic.saveBang();
       const found = await Topic.findBy({ bonus_time: "5:42:00AM" });
       expect(found?.id).toBe(topic.id);
@@ -1203,9 +1139,6 @@ describe("BasicsTest", () => {
     expect(u.isDestroyed()).toBe(true);
   });
   it("dup for a composite primary key model", async () => {
-    // Mirrors Rails `basic_test.rb#test_dup_for_a_composite_primary_key_model`:
-    // a persisted composite-PK record's dup preserves regular attributes and
-    // nulls the whole primary key (`[nil, nil]`). CpkBook's PK is [author_id, id].
     const book = await CpkBook.createBang({ id: [1, 2], title: "The first book" });
     const newBook = book.dup();
     expect((newBook as { title: string }).title).toBe("The first book");
@@ -1238,7 +1171,6 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    // Test that large IDs work
     const u = await User.create({ name: "big" });
     expect(u.id).toBeDefined();
   });
@@ -1291,12 +1223,6 @@ describe("BasicsTest", () => {
       );
     });
   });
-  // `establish_connection(default_timezone:)` is observed through default-string
-  // casting: the offset-less `"2004-01-01 00:00:00"` default is parsed lazily at
-  // read time by DateTimeType.cast → fastStringToTime, which interprets it in
-  // ActiveRecord.defaultTimezone (the singleton establishConnection updates). Same cast
-  // path as the `default in utc` test above; Rails reaches it via DB column
-  // defaults + reset_column_information, we via attribute() defaults.
   it("connection in local time", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Default extends Base {
@@ -1325,9 +1251,6 @@ describe("BasicsTest", () => {
         .toZonedDateTime(Temporal.Now.timeZoneId())
         .toInstant();
       expect(ft.epochNanoseconds).toBe(expected.epochNanoseconds);
-      // Rails' PostgreSQL-only branch also asserts on `fixed_time_with_time_zone`
-      // (timestamptz, time-zone-aware); omitted until time_zone_aware_attributes
-      // defaults are wired — tracked under RFC 0016.
     });
   });
   it("connection in utc time", async () => {
@@ -1357,9 +1280,6 @@ describe("BasicsTest", () => {
       expect(ft.epochNanoseconds).toBe(
         Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
       );
-      // Rails' PostgreSQL-only branch also asserts on `fixed_time_with_time_zone`
-      // (timestamptz, time-zone-aware); omitted until time_zone_aware_attributes
-      // defaults are wired — tracked under RFC 0016.
     });
   });
   it("column name properly quoted", () => {
@@ -1479,18 +1399,15 @@ describe("BasicsTest", () => {
   it("benchmark with use silence", async () => {
     const log: string[] = [];
     const savedLogger = Base.logger;
-    // Use the real Logger with its silence(tempLevel, fn) API
     const logger = new Logger({ write: (s: string) => log.push(s) });
     logger.level = Logger.DEBUG;
     Base.logger = logger as any;
     try {
-      // silence: false — inner synchronous log should appear
       await Base.benchmark("Logging", { level: "debug", silence: false }, () => {
         Base.logger?.debug?.("Quiet");
       });
       expect(log.some((m) => m.includes("Quiet"))).toBe(true);
       log.length = 0;
-      // silence: true — inner synchronous log should be suppressed by Logger#silence
       await Base.benchmark("Logging2", { level: "debug", silence: true }, () => {
         Base.logger?.debug?.("Suppressed");
       });
@@ -1500,16 +1417,9 @@ describe("BasicsTest", () => {
     }
   });
 
-  // Rails base_test.rb test_clear_cache!: the per-connection schema cache is
-  // populated on first columns() read, emptied by clear, then repopulated to
-  // an equal value. (Converged from an earlier ad-hoc-model form that relied on
-  // a cold cache synthesizing columns from declared attribute()s — RFC 0031.)
   it("clear cache!", async () => {
     const conn = Base.connection;
-    // `internalSchemaCache` is typed optional on DatabaseAdapter, but AbstractAdapter's
-    // getter always returns one for a connected adapter.
     const cache = conn.internalSchemaCache;
-    // preheat cache
     const c1 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
 
@@ -1520,9 +1430,6 @@ describe("BasicsTest", () => {
     expect(cache.size).not.toBe(0);
     expect(c2!.map((column, i) => column.equals(c1![i]))).toEqual(new Array(c1!.length).fill(true));
 
-    // Restore the harness' always-warm invariant for the rest of the file:
-    // trails cannot re-warm synchronously on read the way Rails' cold-DB-hit
-    // does, and the warm-once guard won't fire again this suite.
     await cache.addAll(conn.pool);
   });
   it("attribute names on abstract class", () => {
@@ -1532,11 +1439,9 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    // Rails: `assert_equal [], AbstractCompany.attribute_names` (base_test.rb:1642).
     expect(AbstractModel.attributeNames()).toEqual([]);
   });
   it("attribute names on table not exists", () => {
-    // Rails: `assert_equal [], NonExistentTable.attribute_names` (base_test.rb:1638).
     class NonExistentTable extends Base {}
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
@@ -1619,11 +1524,6 @@ describe("BasicsTest", () => {
       .first();
     expect(loadedDeveloper!.name).toBe("Developer: name");
   });
-  // Rails base_test.rb: ColumnNamesCachedDeveloper sets ignored_columns and
-  // asserts the ignored column is absent from column_names. column_names is
-  // DB-sourced (Rails model_schema.rb), so we ignore *real* `developers` columns;
-  // re-assigning ignoredColumns invalidates the cached list. (Converged from an
-  // earlier ad-hoc form that ignored virtual attribute()s — RFC 0031.)
   it("when assigning new ignored columns it invalidates cache for column names", () => {
     class Developer extends Base {
       static {
@@ -1721,7 +1621,6 @@ describe("BasicsTest", () => {
       expect(SecondAbstractClass.connectedToQ({ role: "reading" })).toBe(true);
       expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
     } finally {
-      // pop the stack entry added by connectingTo
       connectedToStack().pop();
     }
   });
@@ -1843,8 +1742,6 @@ describe("BasicsTest", () => {
     expect(sql).toContain("test");
   });
 
-  // --- Tests matching Ruby BasicsTest names ---
-
   it("toggle attribute", async () => {
     class User extends Base {
       static {
@@ -1942,7 +1839,6 @@ describe("BasicsTest", () => {
     }
     const log: string[] = [];
     const savedLogger = Base.logger;
-    // Rails filters the debug line by level, not by a missing method.
     const logger = new Logger({ write: (s: string) => log.push(s) });
     logger.level = Logger.WARN;
     Base.logger = logger;
@@ -1959,9 +1855,6 @@ describe("BasicsTest", () => {
   });
 });
 
-// ==========================================================================
-// BasicsTest2 — additional coverage for base_test.rb
-// ==========================================================================
 describe("BasicsTest", () => {
   fixtures([]);
 
@@ -2073,7 +1966,6 @@ describe("BasicsTest", () => {
   it("dup of saved object marks as dirty only changed attributes", async () => {
     const p = await Post.create({ title: "saved" });
     const d = p.dup();
-    // dup creates a new (unpersisted) record — it's a new record with the same attrs
     expect(d.isNewRecord()).toBe(true);
   });
 
@@ -2091,13 +1983,11 @@ describe("BasicsTest", () => {
 describe("BasicsTest", () => {
   fixtures([]);
 
-  // -- Table name inference --
   it("table name guesses", () => {
     class User extends Base {}
     expect(User.tableName).toBe("users");
   });
 
-  // -- Reload --
   it("reload", async () => {
     class Topic extends Base {
       static {
@@ -2105,11 +1995,9 @@ describe("BasicsTest", () => {
       }
     }
     const u = await Topic.create({ title: "Original" });
-    // Directly modify via another instance
     const u2 = await Topic.find(u.id);
     await u2.update({ title: "Modified" });
 
-    // u still has old value
     expect(u.title).toBe("Original");
     await u.reload();
     expect(u.title).toBe("Modified");

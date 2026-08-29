@@ -44,9 +44,6 @@ describe("RailtieTest", () => {
     savedRaiseOnAssignToAttrReadonly = ActiveRecord.raiseOnAssignToAttrReadonly;
     savedExtendQueries = EncryptionConfigurable.config.extendQueries;
 
-    // Simulate a fresh app boot for each test: clear the load-hook registry
-    // and re-emit the load events that base.ts / the adapter files would
-    // fire at module-import time in a real app.
     resetLoadHooks();
     runLoadHooks("active_record", Base);
     runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
@@ -66,9 +63,6 @@ describe("RailtieTest", () => {
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
     ActiveRecord.raiseOnAssignToAttrReadonly = savedRaiseOnAssignToAttrReadonly;
-    // The suite boots with extended query support installed
-    // (cases/helper.ts, mirroring helper.rb:104-107); tests here uninstall it
-    // to observe the initializer doing the install, so put it back.
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
     installExtendedQueriesIfConfigured();
     for (const key of Object.keys(deprecators)) {
@@ -111,8 +105,6 @@ describe("RailtieTest", () => {
   it("runInitializers adds timestamptz to time_zone_aware_types once the postgresql adapter is loaded", () => {
     Base.timeZoneAwareTypes = ["datetime", "time"];
     Trailtie.runInitializers();
-    // beforeEach re-emits `runLoadHooks("active_record_postgresqladapter", ...)`
-    // and `("active_record", ...)`, so the nested on_load fires synchronously.
     expect(Base.timeZoneAwareTypes).toContain("timestamptz");
   });
 
@@ -143,8 +135,6 @@ describe("RailtieTest", () => {
   it("does not assign PostgreSQLAdapter.decodeDates when flag is absent (preserves prior value)", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     delete cfg.postgresqlAdapterDecodeDates;
-    // Use a non-default value so a faulty initializer that always assigns
-    // `true` would visibly overwrite this.
     PostgreSQLAdapter.decodeDates = false;
     Trailtie.runInitializers();
     expect(PostgreSQLAdapter.decodeDates).toBe(false);
@@ -194,18 +184,18 @@ describe("RailtieTest", () => {
   });
 
   it("load_defaults: partial_inserts is true without any version load", () => {
-    Base.partialInserts = true; // framework default before load_defaults
+    Base.partialInserts = true;
     expect(Base.partialInserts).toBe(true);
   });
 
   it("load_defaults 7.0 sets partial_inserts to false", () => {
-    Base.partialInserts = true; // reset to framework default
+    Base.partialInserts = true;
     loadDefaults("7.0");
     expect(Base.partialInserts).toBe(false);
   });
 
   it("load_defaults 7.1 sets raise_on_assign_to_attr_readonly to true", () => {
-    ActiveRecord.raiseOnAssignToAttrReadonly = false; // framework default before load_defaults
+    ActiveRecord.raiseOnAssignToAttrReadonly = false;
     loadDefaults("7.1");
     expect(ActiveRecord.raiseOnAssignToAttrReadonly).toBe(true);
   });

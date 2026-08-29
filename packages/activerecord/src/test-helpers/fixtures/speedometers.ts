@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/speedometers.yml
 export const speedometerFixtureData = {
   cool_first: {
     speedometer_id: "s1",

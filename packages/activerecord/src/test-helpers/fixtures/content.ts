@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/content.yml
 export const contentFixtureData = {
   content: {
     id: 1,

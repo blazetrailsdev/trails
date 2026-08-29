@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/pets.yml
 export const petFixtureData = {
   parrot: {
     pet_id: 1,

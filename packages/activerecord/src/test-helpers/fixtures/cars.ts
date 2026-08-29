@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/cars.yml
 export const carFixtureData = {
   honda: {
     id: 1,

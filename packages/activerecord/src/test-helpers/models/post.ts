@@ -21,7 +21,6 @@ import type { Tag } from "./tag.js";
 import type { VerySpecialComment } from "./comment.js";
 import { throwAbort } from "@blazetrails/activesupport";
 import { ModelName, type ModelLike } from "@blazetrails/activemodel";
-// vendor/rails/activerecord/test/models/post.rb
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -241,17 +240,6 @@ export class Post extends Base {
     this.scope("taggedWithComment", function (this: any, comment: string) {
       return this.joins(":taggings").where({ taggings: { comment } });
     });
-    // Rails: `-> { containing_the_letter_a.or(titled_with_an_apostrophe) }` —
-    // each bare scope call resolves against the lambda's `self` (the current
-    // relation), so both `or` branches inherit `q`'s accumulated scope. trails
-    // passes the *unwrapped* relation as `q` to scope bodies (the scope proxy
-    // calls `scopeFn(target, ...)` with the proxy's raw target — verified:
-    // `typeof q.containingTheLetterA === "undefined"` inside a scope body), so
-    // the two named scopes can't be re-invoked on `q` directly. Inline their
-    // predicates on `q` — exactly what `q.containingTheLetterA()` would expand
-    // to (`q.where(A)`) — which keeps the per-branch scoping `q.where(A).or(
-    // q.where(B))` without evaluating the scopes from `Post.all()` (avoids
-    // re-applying any future default scope).
     this.scope("typographicallyInteresting", function (this: any) {
       return this.where("body LIKE '%a%'").or(this.where("title LIKE '%''%'"));
     });
@@ -278,8 +266,6 @@ export class Post extends Base {
       foreignKey: "author_id",
     });
 
-    // Rails post.rb:56-58 — `def first_comment; super.body; end`.
-    // configurable:false before hasOne prevents defineReaders from overwriting it.
     Object.defineProperty(this.prototype, "firstComment", {
       get(this: any): Promise<string | null> {
         return this.loadHasOne("firstComment").then((c: any) => c?.body ?? null);
@@ -291,16 +277,10 @@ export class Post extends Base {
     this.hasOne("lastComment", (q: any) => q.order("id desc"), { className: "Comment" });
 
     this.hasMany("comments", {
-      // Rails: `has_many :comments do ... end` — the inline extension block on
-      // Post#comments. Mixed onto the CollectionProxy and any relation spawned
-      // off it (e.g. `.offset(1)`), per AssociationsExtensionsTest.
       extend: {
         async findMostRecent(this: any) {
           return this.order("id DESC").first();
         },
-        // Rails post.rb:81-83 — `def newest; created.last; end`. `created` is
-        // the `Comment.created` named scope (`-> { all }`); calling it bare on
-        // the extension's `self` resolves through scope delegation.
         async newest(this: any) {
           return this.created().last();
         },
@@ -360,10 +340,6 @@ export class Post extends Base {
           .not({ p1: { id: 999999 } }),
       { className: "VerySpecialComment" },
     );
-    // trails-authored: a through chain whose intermediate (`through`) reflection
-    // scope contributes a raw-string `joins(...)`. Exercises the through-path
-    // analogue of `verySpecialCommentWithStringJoins` — the string-join source
-    // must attach to the intermediate chain step, not be dropped.
     this.hasMany(
       "commentsWithStringJoins",
       (q: any) =>
@@ -409,8 +385,6 @@ export class Post extends Base {
     });
 
     this.hasMany("taggings", { as: "taggable", counterCache: "tags_count" });
-    // Mirrors post.rb:139-145 — `has_many :tags, through: :taggings do
-    // def add_joins_and_select ... end` (block-form association extension).
     this.hasMany("tags", {
       through: "taggings",
       extend: {
@@ -687,8 +661,6 @@ export class SubAbstractStiPost extends AbstractStiPost {
     ((name: "mainImage") => Promise<Image | null>);
 
   static {
-    // Rails inherits `posts` through the abstract parent; trails derives a
-    // table from the (own) base class name, so pin it explicitly.
     this._tableName = "posts";
   }
 }
@@ -998,12 +970,6 @@ export class PostRecord extends Base {
   }
 }
 
-// Track the STI subtree on the `posts` table so registry-safe row-path
-// resolution (Base.instantiate → discriminateClassForRecord) finds these
-// classes through Post's own subtree rather than the global model registry.
-// Rails: `posts` carries a `type` column, so Post's non-abstract descendants
-// auto-layer a `type IN (...)` finder condition (`finder_needs_type_condition?`,
-// column-presence detected) with no explicit inheritanceColumn assignment.
 for (const klass of [
   SpecialPost,
   StiPost,

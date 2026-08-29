@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/admin/user.rb
 import { Base } from "../../../base.js";
 import { YAMLColumn } from "../../../coders/yaml-column.js";
 

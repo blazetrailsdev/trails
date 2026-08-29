@@ -1,22 +1,11 @@
-/**
- * Attribute reading methods.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Read
- */
-
 import type { AttributeSet } from "@blazetrails/activemodel";
 import { AttrNames, AttributeMethods } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
 
-/**
- * The Read module interface.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Read
- */
 export interface Read {
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
-  /** @internal Rails-private (`private :attribute`, read.rb:42). */
+  /** @internal */
   attribute(name: string): unknown;
 }
 
@@ -24,38 +13,12 @@ interface AttributeHolder {
   _attributes: AttributeSet;
 }
 
-/**
- * `ActiveRecord::AttributeMethods::Read` — the module `attribute_methods.rb:13`
- * includes. Its instance methods are the `this`-typed functions below
- * (CLAUDE.md, "Module mixins"), gathered here so the seat can take a real
- * `include()` call.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Read (read.rb:6-44)
- */
 export const Read = {
   readAttribute,
   _readAttribute,
-  // read.rb:41-42 — `alias :attribute :_read_attribute` / `private :attribute`.
-  // The bare (empty-suffix) attribute-method pattern proxies to this name, the
-  // way the `=` pattern proxies to Write's `attribute=` (write.rb:45) and the
-  // `?` pattern to Query's `attribute?` (query.rb:25).
   attribute: _readAttribute,
 };
 
-/**
- * Returns the value of the attribute identified by `attrName` after it has
- * been type cast.
- *
- * Rails marks the read on the Attribute itself, inside `fetch_value`
- * (activemodel/attribute.rb:41-44), so `read_attribute` (read.rb:33) feeds
- * `accessed_fields` (attribute_methods.rb:460) like every other read path.
- * trails keeps that marker on the record, so each public read path sets it
- * itself — see {@link readGeneratedAttribute}, and the
- * `converge-accessed-fields-onto-attribute-set-accessed` story for why the
- * marker cannot yet move to the Attribute.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Read#read_attribute (read.rb:29-34)
- */
 export function readAttribute(
   this: ReadAttributeHost,
   attrName: string,
@@ -73,17 +36,6 @@ interface ReadAttributeHost {
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
 }
 
-/**
- * Reads directly from the attribute store, bypassing any model-level
- * overrides of `readAttribute` (e.g. alias resolution or the serialize.ts
- * patch). Used internally where the attribute name is already canonical.
- *
- * Rails' public `read_attribute` also resolves `"id"` to the primary-key
- * column name. That redirect will live in our AR-level `readAttribute`
- * override once implemented; `_readAttribute` intentionally skips it.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Read#_read_attribute
- */
 export function _readAttribute(
   this: AttributeHolder,
   name: string,
@@ -92,26 +44,7 @@ export function _readAttribute(
   return this._attributes.fetchValue(name, block) ?? null;
 }
 
-/**
- * Mirrors: ActiveRecord::AttributeMethods::Read::ClassMethods private
- * #define_method_attribute (read.rb:11-22) — the reader hook
- * `define_attribute_method_pattern` dispatches the bare pattern through
- * (activemodel/attribute_methods.rb:333-335).
- *
- * Rails generates `def name; _read_attribute("name") { |n| missing_attribute(n,
- * caller) }; end`. A TS reader is an accessor property, so the generated
- * descriptor also carries the `set` half `define_method_attribute=`
- * (write.rb:15) would otherwise install: a `MethodSet` applies one descriptor
- * per generated name (code_generator.rb:32-36), and a set-only descriptor
- * applied second would drop the getter.
- *
- * Rails marks the attribute read on the Attribute itself, inside `fetch_value`
- * (activemodel/attribute.rb:44-47), which is what `accessed_fields`
- * (attribute_set.rb:38) reports; trails keeps that marker on the record, so the
- * generated reader is where it is set.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export function defineMethodAttribute(
   this: unknown,
   canonicalName: string,
@@ -143,29 +76,12 @@ interface ReadRecord {
   missingAttribute(n: string, stack?: string): never;
 }
 
-/**
- * The body of the generated reader (read.rb:18-20).
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
   return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
 }
 
-/**
- * A Ruby class that defines only `color=` (test/models/bulb.rb:27-29) still gets
- * the generated `color` reader, because the two are separate methods. A JS
- * accessor property is ONE descriptor for both halves, so the class's own
- * `set color` shadows the generated module's reader as well as its writer —
- * completing the class's half-descriptor with the generated half is what keeps
- * the Rails behaviour.
- *
- * @noRailsEquivalent PERMANENT — a JS accessor property is one descriptor for
- * both halves, so a class's own half-accessor shadows the generated module's
- * whole property; no port can split it back into Ruby's two methods. The
- * repo-wide consequence is ratified in CLAUDE.md ("Generated attribute readers
- * are properties").
- */
+/** @noRailsEquivalent PERMANENT */
 export function completeHalfAccessor(
   klass: unknown,
   name: string,

@@ -1,16 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/errors_test.rb
- *
- * Faithful port of Rails' ErrorsTest — one test, no database, no fixtures,
- * no inline `class extends Base`. Enumerates every implemented exported
- * ActiveRecordError subclass and asserts each can be constructed with no
- * arguments.
- *
- * AmbiguousSourceReflectionForThroughAssociation is excluded (same exclusion
- * as Rails). In Rails the no-arg constructor raises ArgumentError (wrong number
- * of arguments); in TS it raises TypeError (sources.join is not a function).
- * Different mechanism, same observable outcome: construction fails.
- */
 import { describe, it, expect } from "vitest";
 import {
   SubclassNotFound,

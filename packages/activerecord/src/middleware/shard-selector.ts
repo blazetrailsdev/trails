@@ -1,9 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Middleware::ShardSelector
- *
- * Middleware for automatic shard selection based on request context.
- */
-
 import { Base } from "../base.js";
 import { Notifications } from "@blazetrails/activesupport";
 
@@ -75,18 +69,9 @@ export class ShardSelector {
     return this.resolver(request);
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
-   *   `options.fetch(:lock, true)` (`shard_selector.rb:57`) — the options hash
-   *   is a plain TS object, so the stored-key test `Hash#fetch` performs is
-   *   spelled `"lock" in this.options ? ... : true`. `fetch` has no TS call
-   *   spelling.
-   */
+  /** @missingRailsCall fetch — PERMANENT */
   private async setShard<T>(shard: string, block: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ shard }, () =>
-      // `options.fetch(:lock, true)` (shard_selector.rb:66) returns the STORED
-      // value whenever the key is present — including an explicit nil — so the
-      // stored-key test is spelled out rather than written as `?? true`.
       Base.prohibitShardSwapping(() => block(), "lock" in this.options ? this.options.lock : true),
     ) as Promise<T>;
   }

@@ -98,7 +98,6 @@ describe("QueryTest", () => {
       }
     }
     const p = new Post({ views: 0 });
-    // queryAttribute calls the getter (42 → true); _queryAttribute reads raw (0 → false)
     expect(p.queryAttribute("views")).toBe(true);
     expect(p._queryAttribute("views")).toBe(false);
   });

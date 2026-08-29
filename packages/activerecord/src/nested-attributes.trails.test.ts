@@ -1,11 +1,3 @@
-/**
- * Trails-only nested-attributes cases with no counterpart in Rails'
- * nested_attributes_test.rb. Kept separate from the faithful mirror
- * (`nested-attributes.test.ts`) so `parity:test` maps the mirror cleanly.
- *
- * These exercise composite-foreign-key and counter-cache interactions that the
- * Rails suite does not cover but trails needs to guard.
- */
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
@@ -18,9 +10,6 @@ import { Parrot } from "./test-helpers/models/parrot.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
 
-// Dynamic column reads/writes (FK/counter-cache columns and the generated
-// `*Attributes=` setters vary per model and are not statically declared), kept
-// type-safe via an unknown-valued record view.
 const cols = (record: Base): Record<string, unknown> =>
   record as unknown as Record<string, unknown>;
 const nested = (record: Base): Record<string, (attributes: unknown) => Promise<void>> =>
@@ -58,9 +47,6 @@ describe("nested attributes (trails-only)", () => {
   it("find with duplicate composite ids uniqs to a single wrapped record", async () => {
     await CpkBook.createBang({ id: [1, 1], title: "Dup" });
 
-    // Rails `find_with_ids` applies `ids.compact.uniq` to the composite tuple
-    // list too, so `find([[1, 1], [1, 1]])` collapses to one tuple and returns
-    // the single record, still wrapped per `expects_array`.
     const found = (await CpkBook.find([
       [1, 1],
       [1, 1],
@@ -72,9 +58,6 @@ describe("nested attributes (trails-only)", () => {
   it("find with variadic duplicate composite ids uniqs to a bare record", async () => {
     await CpkBook.createBang({ id: [2, 2], title: "VarDup" });
 
-    // Rails `expects_array = ids.first.first.is_a?(Array)` is false for a
-    // variadic call, so `find([2, 2], [2, 2])` dedupes to one tuple and
-    // returns the bare record (not `[record]`) — see finder_methods.rb:494-513.
     const found = (await CpkBook.find([2, 2], [2, 2])) as unknown as CpkBook;
     expect(Array.isArray(found)).toBe(false);
     expect(cols(found).title).toBe("VarDup");
@@ -118,11 +101,6 @@ describe("nested attributes flush path alias resolution (trails-only)", () => {
     parrots: [Parrot, {}],
   });
 
-  // The post-save flush (`processNestedAttributes`) routes an existing-record
-  // update through `existing.update(childAttrs)`. The alias-backed key `title`
-  // (aliasAttribute("title", "name")) has a real writer, so it must update the
-  // record rather than raise UnknownAttributeError — matching the build path,
-  // which Rails' `assign_attributes` → `_assign_attribute` also resolves.
   it("updates an existing record via an alias-backed nested key on the flush path", async () => {
     Pirate.acceptsNestedAttributesFor("parrot");
 
@@ -147,15 +125,6 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     developers: [Developer, {}],
   });
 
-  // `acceptsNestedAttributesFor` wraps `save` to flush pending nested
-  // attributes. The wrapper is invisible in Rails (the flush happens inside the
-  // ordinary save), so it must be argument-transparent: dropping its options
-  // silently re-enabled validations for every model that accepts nested
-  // attributes.
-  // Rails buckets Hash-valued keys into `nested_parameter_attributes` and
-  // assigns them only after the scalar pass (attribute_assignment.rb:7-25), so
-  // `reject_if` sees the owner attributes the same `update` call assigned. A
-  // single-pass loop leaves that to hash key order.
   it("assigns scalar attributes before nested ones within one update", async () => {
     Pirate.acceptsNestedAttributesFor("ship", {
       rejectIf: (_attrs, record) => cols(record).catchphrase !== "Aye",
@@ -173,10 +142,6 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     Pirate.acceptsNestedAttributesFor("ship");
   });
 
-  // `new Model(...)` / `Model.create(...)` reach the nested writer by Rails
-  // name (`public_send("#{k}=")`, attribute_assignment.rb:35-48), not by
-  // hunting a `#{name}Attributes=` descriptor on the prototype. RFC 0087 §1
-  // deleted that property setter, so construction has none to find.
   it("assigns constructor nested attributes without the property setter", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
     expect(Object.getOwnPropertyDescriptor(Pirate.prototype, "shipAttributes")).toBeUndefined();
@@ -214,11 +179,6 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     parrots: [Parrot, {}],
   });
 
-  // `_assign_attributes` (attribute_assignment.rb:6-22) buckets every
-  // Hash-valued key out of the main loop and assigns it only after the scalar
-  // pass (:21), so a nested writer's `reject_if` observes an owner whose own
-  // attributes are already set — even when the nested key sits first in the
-  // literal.
   it("assigns nested parameter hashes after the base attributes", async () => {
     const config = Pirate.nestedAttributesOptions.ship;
     const originalRejectIf = config.rejectIf;
@@ -241,9 +201,6 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     expect(observed).toEqual(["Aye"]);
   });
 
-  // `assign_attributes` returns nil (attribute_assignment.rb:28-35); the write a
-  // displacing key owes `remove_target!` is parked on the owner and drained by
-  // `save`, the deferral the constructor's nested re-dispatch already uses.
   it("returns nothing from assignAttributes and drains the displacing write on save", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
     const displaced = await Ship.create({
@@ -261,11 +218,6 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
-  // Rails calls `assign_to_or_mark_for_destruction` once per record inside the
-  // `map` (nested_attributes.rb:517-544, :538), synchronously — so record n's
-  // assignment has fully completed before record n+1's begins. The port chains
-  // each record's send behind the previous one to keep that; fanning them out
-  // concurrently would start both writes in the same tick.
   it("sequences one existing collection record's assignment before the next", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
 
@@ -287,8 +239,6 @@ describe("nested attributes assignment ordering (trails-only)", () => {
       assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
     };
     const original = proto.assignAttributes;
-    // Each record's send answers a promise, as a grandchild key reaching DB I/O
-    // would, so a concurrent fan-out is observable as interleaved start events.
     proto.assignAttributes = function (this: Base, attrs: Record<string, unknown>) {
       const name = String((attrs as { name?: unknown }).name);
       events.push(`start:${name}`);
@@ -315,13 +265,6 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     ]);
   });
 
-  // `_assign_attributes` and `assign_nested_parameter_attributes`
-  // (attribute_assignment.rb:9-23, 26-28) are plain `each` loops, so an
-  // assignment that reaches DB I/O — a displacing `#{name}_attributes=` running
-  // `load_target` / `remove_target!` (has_one_association.rb:59-69) — finishes
-  // before the next key is assigned. `setAttributes` is the awaitable surface
-  // that keeps that order (RFC 0087); `assignAttributes` answers nil like Rails
-  // and parks the displacing write for `save` to drain.
   it("finishes a displacing nested assignment before assigning the next key", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
@@ -356,10 +299,6 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     expect(events).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
   });
 
-  // `#update` is `assign_attributes(attributes); save`
-  // (persistence.rb:563-570), so it holds the same `each` order: the displacing
-  // key's `remove_target!` settles before the next key is assigned, rather than
-  // being parked for the `save` that follows.
   it("finishes a displacing nested assignment before the next key on update", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
@@ -402,9 +341,6 @@ describe("nested attributes destroy dispatch (trails-only)", () => {
     developers: [Developer, {}],
   });
 
-  // Rails' `assign_to_or_mark_for_destruction` calls `record.mark_for_destruction`
-  // (nested_attributes.rb:578), so an override on the record is honoured. A
-  // trails port that wrote the private flag directly instead would bypass it.
   it("dispatches the _destroy flag through the record's markForDestruction", async () => {
     Pirate.acceptsNestedAttributesFor("ship", { allowDestroy: true });
     const pirate = await Pirate.createBang({ catchphrase: "Arr" });

@@ -1,13 +1,7 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Rails `fixtures :topics`. Recreate the canonical topics table empty; each test
-// seeds its own rows and the transactional wrapper rolls them back.
 fixtures({ topics: [Topic, {}] });
 
 describe("Base static query delegations", () => {
@@ -70,10 +64,6 @@ describe("Base static query delegations", () => {
   });
 
   it("reverse_order_value round-trips and survives cloning", () => {
-    // `:reverse_order` is in SINGLE_VALUE_METHODS, so query_methods.rb's
-    // VALUE_METHODS.each generates a reverse_order_value reader/writer that
-    // defaults to nil. Rails' initialize_copy dups @values, so the flag is
-    // preserved across every spawn/clone.
     const rel = Topic.all();
     expect(rel.reverseOrderValue).toBeNull();
 

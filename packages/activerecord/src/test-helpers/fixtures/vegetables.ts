@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/vegetables.yml
 export const vegetableFixtureData = {
   first_cucumber: {
     id: 1,

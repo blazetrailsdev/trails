@@ -1,4 +1,3 @@
-// Faithful port of vendor/rails/activerecord/test/cases/statement_cache_test.rb
 import { describe, it, expect, beforeAll } from "vitest";
 import { StatementCache } from "./statement-cache.js";
 import { Book } from "./test-helpers/models/book.js";
@@ -9,9 +8,6 @@ import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { RecordNotFound } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so association targets
-// (`Molecule`/`Electron` via `Liquid`) resolve by name — no manual
-// `registerModel`.
 import "./support/canonical-model-index.js";
 
 fixtures([]);
@@ -129,9 +125,8 @@ describe("StatementCacheTest", () => {
   it("find by does not use statement cache if table name is changed", async () => {
     const liquid = await Liquid.create({ name: "salty" });
 
-    await Liquid.findBy({ name: liquid.readAttribute("name") }); // warming the statement cache.
+    await Liquid.findBy({ name: liquid.readAttribute("name") });
 
-    // changing the table name should change the query that is not cached.
     Liquid.tableName = "birds";
     try {
       expect(await Liquid.findBy({ name: liquid.readAttribute("name") })).toBeNull();
@@ -143,9 +138,8 @@ describe("StatementCacheTest", () => {
   it("find does not use statement cache if table name is changed", async () => {
     const liquid = await Liquid.create({ name: "salty" });
 
-    await Liquid.find(liquid.id); // warming the statement cache.
+    await Liquid.find(liquid.id);
 
-    // changing the table name should change the query that is not cached.
     Liquid.tableName = "birds";
     try {
       await expect(Liquid.find(liquid.id)).rejects.toThrow(RecordNotFound);

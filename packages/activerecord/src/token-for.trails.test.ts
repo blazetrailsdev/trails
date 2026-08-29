@@ -1,10 +1,3 @@
-/**
- * Trails-only coverage for token-for finders. Rails' token_for_test.rb exercises
- * the unknown-purpose raise through the class-level finder only
- * ("raises when token definition does not exist"); these cases pin the
- * `token_definitions.fetch(purpose)` raise that Relation#find_by_token_for and
- * #find_by_token_for! go through (token_for.rb:42-51).
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { setTokenForSecret } from "./token-for.js";
@@ -15,9 +8,6 @@ import { fixtures } from "./test-fixtures.js";
 class TokenUser extends User {
   static {
     this.generatesTokenFor("lookup");
-    // token_for.rb:24 — `model.instance_eval(&block)`, so a receiver-less body
-    // reads the model. A `function` block is trails' spelling of that; an arrow
-    // takes the same value from its `model` parameter.
     this.generatesTokenFor("token_snapshot", {
       block: function (this: TokenUser) {
         return this.token;
@@ -47,8 +37,6 @@ describe("token-for relation finders", () => {
     expect(await TokenUser.findByTokenFor("token_snapshot", token)).toBeNull();
   });
 
-  // railtie.rb:331 assigns the boot verifier with `||=`, so an explicitly
-  // assigned one survives — Rails' own tests inject a verifier that way.
   it("keeps an explicitly assigned generated_token_verifier when the secret seam re-runs", () => {
     const explicit = new MessageVerifier("explicit");
     Base.generatedTokenVerifier = explicit;

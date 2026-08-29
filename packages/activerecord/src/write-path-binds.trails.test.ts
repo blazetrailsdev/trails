@@ -4,23 +4,10 @@ import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
 
-/**
- * Trails-only: no Rails counterpart. Rails' `_insert_record` / `_update_record`
- * hand every column to Arel as an `ActiveModel::Attribute`, so
- * `visit_ActiveModel_Attribute → collector.add_bind(o)` makes every write-path
- * value a typed prepared-statement parameter — there is no inline-vs-bind split
- * to regress. trails' write path historically inlined every non-string column
- * via `quote()`; this pins that non-string values (here a datetime) now travel
- * as binds rather than SQL literals, on INSERT and UPDATE alike.
- */
 describe("write-path prepared-statement binds", () => {
   fixtures({});
 
   it("binds non-string column values on INSERT and UPDATE", async (ctx) => {
-    // Prepared-statements-only: Rails' non-prepared `to_sql_and_binds` compiles
-    // through `SubstituteBinds`, so every value inlines and `binds == []`
-    // (database_statements.rb:31-45) — the MySQL/MariaDB default. Rails gates
-    // its own bind assertions the same way (bind_parameter_test.rb:9).
     ctx.skip(!(await Task.leaseConnection()).preparedStatements);
     const starting = Temporal.Instant.from("2024-03-05T07:08:09.123456Z");
     const ending = Temporal.Instant.from("2025-03-05T07:08:09.123456Z");
@@ -44,11 +31,7 @@ describe("write-path prepared-statement binds", () => {
     expect(update).toBeDefined();
 
     for (const payload of [insert!, update!]) {
-      // The datetime never appears as an inline literal…
       expect(String(payload.sql)).not.toMatch(/202[45]-03-05/);
-      // …because it travels in the bind slot (adapters differ on the wire
-      // format — quoted_date string vs. driver-normalized — so match the
-      // date prefix rather than one adapter's exact rendering).
       const casted = (
         typeof payload.type_casted_binds === "function"
           ? (payload.type_casted_binds as () => unknown[])()

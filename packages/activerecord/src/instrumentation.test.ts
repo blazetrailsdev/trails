@@ -1,14 +1,8 @@
-/**
- * Faithful port of vendor/rails/activerecord/test/cases/instrumentation_test.rb.
- * Test names mirror the Rails `test_*` methods so `parity:test` maps them.
- */
 import { describe, it, expect, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so association targets resolve by
-// name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -191,8 +185,6 @@ describe("InstrumentationTest", () => {
   });
 });
 
-// Rails defines these two cases in a `TransactionInSqlActiveRecordPayloadTests`
-// module included into a transactional and a non-transactional TestCase.
 function transactionInSqlActiveRecordPayloadTests(): void {
   it("payload without an open transaction", async () => {
     let asserted = false;
@@ -240,8 +232,6 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
 });
 
 describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
-  // Rails: `self.use_transactional_tests = false` — neither case may run inside
-  // the rollback-on-teardown outer transaction.
   fixtures(["books"], {
     usesTransaction: ["payload without an open transaction", "payload with an open transaction"],
   });

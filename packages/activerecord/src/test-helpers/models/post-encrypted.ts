@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/post_encrypted.rb
 import { Base } from "../../base.js";
 import { DerivedSecretKeyProvider } from "../../encryption/derived-secret-key-provider.js";
 

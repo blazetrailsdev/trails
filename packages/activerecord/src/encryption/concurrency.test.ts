@@ -28,11 +28,6 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // E2: Promise.all creates race on the shared adapter's TM after the
-  // AsyncContext filter was removed. Rails uses real threads with separate
-  // connections; our single-connection wrapper can't serialize concurrent
-  // creates without the deleted filter. Re-enable after E4 deletes the
-  // wrapper and all callers use pooled adapters.
   it.skip("models can be encrypted and decrypted in different threads concurrently", async () => {
     const Book = makeEncryptedBook(adapter);
     new Book();

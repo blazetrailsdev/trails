@@ -1,17 +1,9 @@
 import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
 
-/**
- * A type map that uses exact string keys (hash lookup) rather than
- * regex matching. More efficient for known type names.
- *
- * Mirrors: ActiveRecord::Type::HashLookupTypeMap
- */
 export class HashLookupTypeMap {
   private _mapping: Map<string | number, (lookupKey: string | number, ...args: unknown[]) => Type> =
     new Map();
   private _cache: Map<string | number, Map<string, Type>> = new Map();
-  // Rails' HashLookupTypeMap#initialize accepts a parent param but never uses it
-  // (unlike TypeMap which does delegate). Accepted here for API compatibility only.
   constructor(_parent: HashLookupTypeMap | null = null) {}
 
   lookup(lookupKey: string | number, ...args: unknown[]): Type {
@@ -22,7 +14,6 @@ export class HashLookupTypeMap {
     let fallback: ((lookupKey: string | number, ...args: unknown[]) => Type) | undefined;
     let args: unknown[];
 
-    // Last arg is the fallback if it's a function
     if (rest.length > 0 && typeof rest[rest.length - 1] === "function") {
       fallback = rest[rest.length - 1] as (lookupKey: string | number, ...a: unknown[]) => Type;
       args = rest.slice(0, -1);
@@ -120,11 +111,8 @@ export class HashLookupTypeMap {
   }
 
   /**
-   * @missingRailsCall fetch — PERMANENT: hash_lookup_type_map.rb:52-53 is
-   * `@mapping.fetch(type, block)`; a JS Map has no fetch-with-default, so the
-   * port reads the entry and falls back to `block` in the same order.
-   * @missingRailsCall call — PERMANENT: the matched Proc's `#call` is a plain function
-   * invocation in JS, which has no `.call`-named form.
+   * @missingRailsCall fetch — PERMANENT
+   * @missingRailsCall call — PERMANENT
    */
   private performFetch(
     type: string | number,

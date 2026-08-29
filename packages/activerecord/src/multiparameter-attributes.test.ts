@@ -1,6 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/multiparameter_attributes_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
@@ -12,16 +9,9 @@ import { Topic } from "./test-helpers/models/topic.js";
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
 describe("MultiParameterAttributeTest", () => {
-  // fixtures wires the handler suite + transactional fixtures and warms the pool's
-  // schema cache for topics so the synchronous loadSchema path (triggered by
-  // new Topic() inside tests) finds the date/time column types correctly on all
-  // adapters including MariaDB. Mirrors date.test.ts.
   fixtures(["topics"]);
 
   beforeAll(async () => {
-    // Eagerly populate Topic's columnsHash from the warm pool schema cache.
-    // Without this, the sync loadSchema path runs before the cache is applied to the
-    // model class and marks _schemaLoaded=true with no columns.
     await Topic.loadSchema();
   });
 
@@ -178,8 +168,6 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time will raise on big time if missing date parts", async () => {
     const topic = new Topic();
-    // Rails: time parts without date context → Time.new(nil,nil,nil,16,24) raises ArgumentError,
-    // collected into MultiparameterAssignmentErrors.
     expect(() =>
       topic.assignAttributes({ "written_on(4i)": "16", "written_on(5i)": "24" }),
     ).toThrow(MultiparameterAssignmentErrors);
@@ -263,13 +251,10 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with time zone aware attributes", async () => {
-    // zone: -28800 → Pacific Time; June is PDT (UTC-7) so local 16:24 → UTC 23:24.
     try {
       await withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
-          // Mirrors Rails: Topic.reset_column_information so the schema reloads with
-          // awareAttributes: true active, wrapping written_on in TimeZoneConverter.
           void Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
@@ -281,16 +266,13 @@ describe("MultiParameterAttributeTest", () => {
             "written_on(5i)": "24",
             "written_on(6i)": "00",
           });
-          // awareAttributes wraps as TimeWithZone at runtime; declared type is Instant|PlainDateTime
           const twz = (topic as any).written_on as TimeWithZone;
           expect(twz).toBeInstanceOf(TimeWithZone);
-          expect(twz.utc().toTime().hour).toBe(23); // PDT: local 16:24 → UTC 23:24
-          expect(twz.hour).toBe(16); // wall-clock in zone
+          expect(twz.utc().toTime().hour).toBe(23);
+          expect(twz.hour).toBe(16);
         },
       );
     } finally {
-      // mirrors Rails ensure: Topic.reset_column_information
-      // reload re-warms the adapter schema cache so later tests can load the schema sync.
       void Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
@@ -332,7 +314,7 @@ describe("MultiParameterAttributeTest", () => {
             "written_on(6i)": "00",
           });
           const val = topic.written_on;
-          expect(val).not.toBeInstanceOf(TimeWithZone); // assert_not_respond_to :time_zone
+          expect(val).not.toBeInstanceOf(TimeWithZone);
           expect(val).toBeInstanceOf(Temporal.Instant);
         },
       );
@@ -347,7 +329,6 @@ describe("MultiParameterAttributeTest", () => {
       await withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
-          // Mirrors Rails: Topic.skip_time_zone_conversion_for_attributes = [:written_on]
           Topic.skipTimeZoneConversionForAttributes = ["written_on"];
           void Topic.resetColumnInformation();
           await Topic.loadSchema();
@@ -367,7 +348,6 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      // Mirrors Rails ensure: Topic.skip_time_zone_conversion_for_attributes = []
       Topic.skipTimeZoneConversionForAttributes = [];
       void Topic.resetColumnInformation();
       await Topic.loadSchema();
@@ -379,8 +359,6 @@ describe("MultiParameterAttributeTest", () => {
       await withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
-          // Mirrors Rails: Topic.reset_column_information so the schema reloads with
-          // awareAttributes: true active, wrapping bonus_time in TimeZoneConverter.
           void Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
@@ -391,11 +369,9 @@ describe("MultiParameterAttributeTest", () => {
             "bonus_time(4i)": "16",
             "bonus_time(5i)": "24",
           });
-          // awareAttributes wraps time columns as TimeWithZone at runtime; declared type is PlainTime
           const bt = (topic as any).bonus_time as TimeWithZone;
           expect(bt).toBeInstanceOf(TimeWithZone);
           expect(bt.hour).toBe(16);
-          // written_on with empty month/day → null
           await topic.assignAttributes({
             "written_on(1i)": "2000",
             "written_on(2i)": "",
@@ -414,7 +390,6 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes setting time attribute", () => {
     const topic = new Topic();
-    // Rails: topic.attributes = {...} calls assign_attributes
     (topic as any).attributes = {
       "written_on(4i)": "13",
       "written_on(5i)": "30",
@@ -509,10 +484,6 @@ describe("MultiParameterAttributeTest", () => {
     });
     expect(topic.last_read).toBeNull();
   });
-
-  // -------------------------------------------------------------------------
-  // Aggregation tests
-  // -------------------------------------------------------------------------
 
   it("multiparameter assignment of aggregation", async () => {
     class Address {
@@ -640,9 +611,6 @@ describe("MultiParameterAttributeTest", () => {
       "address(2)": "The City",
       "address(3)": "The Country",
     });
-    // Rails: `assert_equal Address.new(nil, "The City", "The Country"),
-    // customer.address` — a blank parameter reads back as nil, and the
-    // aggregation is still built (multiparameter_attributes_test.rb:367-373).
     const addr = (customer as any).address as Address;
     expect(addr.street).toBeNull();
     expect(addr.city).toBe("The City");
@@ -659,9 +627,6 @@ describe("MultiParameterAttributeTest", () => {
     class Meeting extends Base {
       static {
         this.attribute("title", "string");
-        // The aggregation maps onto these columns; declare them so they are
-        // known names under strict writeFromUser (this bespoke model has no
-        // backing table to reflect them from).
         this.attribute("duration_start", "string");
         this.attribute("duration_end", "string");
         composedOf(this, "duration", {

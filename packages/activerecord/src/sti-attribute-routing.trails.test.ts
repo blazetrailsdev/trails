@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 
-/** ActiveModel's `attribute_names` — `attribute_types.keys`
- * (activemodel attributes.rb:74-76). ActiveRecord's override gates on
- * `table_exists?` (attribute_methods.rb:236-241) and would answer `[]` for
- * these adapter-less classes, so the AM spelling is the one that reads them. */
 const attributeNamesOf = (klass: unknown): string[] =>
   Object.keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
 
@@ -37,7 +33,6 @@ describe("STI subclass attribute() registration", () => {
       }
     }
 
-    // Shape IS the STI base (not a subclass), so its map is its own.
     expect(Object.hasOwn(Shape, "_pendingAttributeModifications")).toBe(true);
     expect(attributeNamesOf(Shape)).toContain("name");
   });
@@ -89,15 +84,9 @@ describe("STI subclass attribute() registration", () => {
     }
     class Cat extends Animal {}
 
-    // `encrypts` is per-class in Rails: `encrypted_attributes` is a
-    // `class_attribute` and `encrypt_attribute` calls `decorate_attributes` on
-    // the receiver, while `_default_attributes` replays the superclass's
-    // modifications first and then only the class's OWN pending decorators
-    // (encryption/encryptable_record.rb, activemodel attribute_registration.rb).
     expect(Object.prototype.hasOwnProperty.call(Dog, "_pendingEncryptions")).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(Animal, "_pendingEncryptions")).toBe(false);
 
-    // The declaring subclass encrypts; the base and its siblings do not.
     expect(isEncryptedAttribute(Dog, "name")).toBe(true);
     expect(isEncryptedAttribute(Animal, "name")).toBe(false);
     expect(isEncryptedAttribute(Cat, "name")).toBe(false);
@@ -157,9 +146,6 @@ describe("STI subclass attribute() registration", () => {
         this.attribute("radius", "integer");
       }
     }
-    // Rails' own-table descendant: a class under an STI ancestor that names its
-    // own table owns an independent schema, so its declarations must not land
-    // on the STI base (or leak to shared-table siblings).
     class Ticket extends Circle {
       static override tableName = "tickets";
       static {
@@ -176,7 +162,6 @@ describe("STI subclass attribute() registration", () => {
     expect(attributeNamesOf(Shape)).not.toContain("radius");
     expect(Circle.typeForAttribute("radius").name).toBe("integer");
 
-    // Inherited (shared-ancestor) declarations remain visible on the descendant.
     expect(Ticket.typeForAttribute("radius").name).toBe("integer");
   });
   it("own-table descendant does not clobber the STI base's attributesBuilder cache", () => {

@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/old_and_new_versions/20210716123013_add_people_number_of_legs.rb
 import { Migration } from "../../../migration.js";
 
 export class AddPeopleNumberOfLegs extends Migration {

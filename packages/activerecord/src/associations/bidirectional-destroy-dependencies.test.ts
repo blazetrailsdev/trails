@@ -1,12 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Mirrors associations/bidirectional_destroy_dependencies_test.rb — the
- * mutually `dependent: :destroy` Content/ContentPosition pair. Rails declares
- * `fixtures :content, :content_positions`; we mirror that with one
- * `fixtures` call seeding the canonical tables.
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

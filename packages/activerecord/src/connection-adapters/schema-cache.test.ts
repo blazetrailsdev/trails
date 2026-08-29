@@ -29,10 +29,6 @@ function makeColumn(
   );
 }
 
-/**
- * Warm a cache as Rails' SchemaCache tests do — through the blocking
- * `add(pool, table_name)`, which runs `primary_keys` before `columns`.
- */
 async function warm(
   cache: SchemaCache,
   tableName: string,
@@ -66,7 +62,6 @@ describe("SchemaCacheTest", () => {
     cache.setColumns("courses", [makeColumn("id", "integer")]);
     expect(cache.isCached("courses")).toBe(true);
 
-    // Round-trip through dump/load preserves cached state.
     const filename = path.join(tmpDir, "schema_cache.json");
     cache.dumpTo(filename);
     const loaded = SchemaCache._loadFrom(filename);
@@ -90,7 +85,6 @@ describe("SchemaCacheTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.isCached("users")).toBe(true);
 
-    // Columns are real Column instances with working getters
     const loadedCols = loaded!.getCachedColumnsHash("users");
     expect(loadedCols).toBeDefined();
     expect(loadedCols!["id"]).toBeInstanceOf(Column);
@@ -114,11 +108,6 @@ describe("SchemaCacheTest", () => {
   });
 
   it("yaml dump and load with gzip", async () => {
-    // Trails serializes the schema cache as JSON (not YAML), but the
-    // gzip-round-trip property the Rails test asserts — dump_to a .gz
-    // path and load_from the same path produces a populated cache —
-    // applies to our JSON encoding too. dumpTo(".gz") writes gzipped
-    // JSON; _loadFrom auto-detects the .gz extension and gunzips first.
     const cache = new SchemaCache();
     await warm(cache, "courses", "id", [
       makeColumn("id", "integer", { null: false }),
@@ -153,7 +142,6 @@ describe("SchemaCacheTest", () => {
 
   it("primary key for non existent table", async () => {
     const cache = new SchemaCache();
-    // Cached as having no primary key
     await warm(cache, "other", null);
     const pk = await cache.primaryKeys(null, "other");
     expect(pk).toBeNull();
@@ -183,7 +171,6 @@ describe("SchemaCacheTest", () => {
 
   it("columns for non existent table", () => {
     const cache = new SchemaCache();
-    // Not cached — columns() would need a pool for cache-miss lookup
     expect(cache.isCached("missing")).toBe(false);
     expect(cache.getCachedColumnsHash("missing")).toBeUndefined();
   });
@@ -298,14 +285,12 @@ describe("SchemaCacheTest", () => {
       const cache = new SchemaCache();
       cache.marshalLoad(dumped);
 
-      // courses is cached as normal
       expect((await cache.columns(pool, "courses"))!.length).toBe(3);
       expect(Object.keys((await cache.columnsHash(pool, "courses"))!)).toHaveLength(3);
       expect(await cache.dataSourceExists(pool, "courses")).toBe(true);
       expect(await cache.primaryKeys(pool, "courses")).toBe("id");
       expect((await cache.indexes(pool, "courses")).length).toBe(1);
 
-      // professors is filtered out — behavior matches a non-existent table
       expect(await cache.dataSourceExists(pool, "professors")).toBeUndefined();
       await expect(cache.columns(pool, "professors")).rejects.toBeInstanceOf(StatementInvalid);
       await expect(cache.columnsHash(pool, "professors")).rejects.toBeInstanceOf(StatementInvalid);
@@ -316,12 +301,6 @@ describe("SchemaCacheTest", () => {
     }
   });
   it("marshal dump and load with gzip", async () => {
-    // Rails' equivalent gzips a Marshal payload to a `.dump.gz` file and
-    // round-trips it through `dump_to` / `_load_from`. Trails serializes
-    // via `encodeWith` (JSON) rather than Marshal, but the on-disk
-    // property the Rails test asserts — write a `.gz` file, read it back,
-    // cached columns survive — still applies. `dumpTo(".gz")` gzips the
-    // JSON payload and `_loadFrom` auto-detects the `.gz` suffix.
     const cache = new SchemaCache();
     await warm(cache, "courses", "id", [
       makeColumn("id", "integer"),
@@ -337,9 +316,6 @@ describe("SchemaCacheTest", () => {
     expect(await loaded!.primaryKeys(null, "courses")).toBe("id");
   });
   it("gzip dumps identical", async () => {
-    // Rails: two .gz dumps of the same cache (with a 1s sleep between) must
-    // be byte-identical, since the gzip header carries no mtime. Node's
-    // zlib.gzipSync writes mtime=0 / OS=0xff, so the same property holds.
     const cache = new SchemaCache();
     await warm(cache, "posts", "id", [makeColumn("id", "integer")]);
 
@@ -352,7 +328,6 @@ describe("SchemaCacheTest", () => {
     const bufB = fs.readFileSync(b);
     expect(bufA.equals(bufB)).toBe(true);
 
-    // Round-trip through the gzip reader: the cache loads back identically.
     const loaded = SchemaCache._loadFrom(a);
     expect(loaded!.isCached("posts")).toBe(true);
   });
@@ -364,7 +339,7 @@ describe("SchemaCacheTest", () => {
       dataSourceExists: async () => true,
     });
     expect(await cache.dataSourceExists(pool, "users")).toBe(true);
-    expect(cache.isCached("users")).toBe(false); // isCached checks _columns
+    expect(cache.isCached("users")).toBe(false);
     cache.setColumns("users", [makeColumn("id", "integer")]);
     expect(cache.isCached("users")).toBe(true);
   });
@@ -381,9 +356,7 @@ describe("SchemaCacheTest", () => {
   it("#columns_hash? is populated by #columns_hash", async () => {
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer")]);
-    // setColumns populates both _columns and _columnsHash
     expect(cache.isColumnsHash(null, "users")).toBe(true);
-    // Also verify columnsHash() returns the expected data
     const hash = await cache.columnsHash(null, "users");
     expect(hash!["id"]).toBeInstanceOf(Column);
   });
@@ -399,11 +372,6 @@ describe("SchemaCacheTest", () => {
   });
 
   it("keeps _columns and _columnsHash in sync across set and clear", () => {
-    // Sync readers (model-schema columnsHash/syncLoad, type-caster) gate on
-    // the same map they read. That only stays safe if the two column maps are
-    // populated and cleared together: setColumns must warm both, and
-    // clearDataSourceCacheBang must drop both, so isCached and
-    // isColumnsHash never disagree for a given table.
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer")]);
     expect(cache.isCached("users")).toBe(cache.isColumnsHash(null, "users"));
@@ -415,12 +383,6 @@ describe("SchemaCacheTest", () => {
   });
 
   it("when lazily load schema cache is set cache is lazily populated when est connection", async () => {
-    // Rails: when ActiveRecord.lazily_load_schema_cache is on, the
-    // SchemaReflection's @cache stays nil until first access and is
-    // populated from the schema_cache_path on demand. The end-to-end
-    // connection-pool wiring is covered in connection-pool.test.ts
-    // ("lazily loads the schema cache on first connection when enabled");
-    // here we cover the SchemaReflection-level contract that backs it.
     const cachePath = path.join(tmpDir, "schema_cache.json");
     const cache = new SchemaCache();
     await warm(cache, "gadgets", "id", [makeColumn("id", "integer")]);
@@ -430,11 +392,7 @@ describe("SchemaCacheTest", () => {
     SchemaReflection.checkSchemaCacheDumpVersion = false;
     try {
       const reflection = new SchemaReflection(cachePath);
-      // Cache starts nil
       expect(reflection.loadedCache).toBeNull();
-      // load! populates it from disk (this is the building block
-      // ConnectionPool.adoptConnection invokes when the lazy-load
-      // flag is enabled).
       await reflection.loadBang(new FakePool({}));
       expect(reflection.loadedCache).not.toBeNull();
       expect(reflection.loadedCache!.isCached("gadgets")).toBe(true);
@@ -443,10 +401,6 @@ describe("SchemaCacheTest", () => {
     }
   });
   it("#init_with skips deduplication if told to", () => {
-    // Mirrors Rails: when coder["deduplicated"] is set, init_with uses the
-    // provided columns map directly rather than re-deriving / deep-deduping
-    // it. In TS we model that by passing a real Map<string, Column[]>; the
-    // initWith fast-path assigns the same reference into @columns.
     const cols = new Map<string, Column[]>([["t", [makeColumn("id", "integer")]]]);
     const cache = new SchemaCache();
     cache.initWith({ columns: cols, deduplicated: true });
@@ -468,9 +422,6 @@ describe("SchemaCacheTest", () => {
   });
 
   it("stores and round-trips composite primary keys as arrays", async () => {
-    // Rails' SchemaCache stores composite PKs as an array of column
-    // names. Phase 13 widened the type from string|null to
-    // string|string[]|null. Verify encode → initWith round-trips.
     const cache = new SchemaCache();
     await warm(cache, "memberships", ["user_id", "group_id"]);
 
@@ -481,8 +432,6 @@ describe("SchemaCacheTest", () => {
 
     const restored = new SchemaCache();
     restored.initWith(coder);
-    // Reading back via the internal map — the value survives the
-    // Object.entries → Map → Object.fromEntries round-trip.
     const pool = null;
     return restored.primaryKeys(pool, "memberships").then((pk) => {
       expect(pk).toEqual(["user_id", "group_id"]);
@@ -523,12 +472,10 @@ describe("SchemaReflectionTest", () => {
   it("loads cache from disk on first access", async () => {
     const cachePath = path.join(tmpDir, "schema_cache.json");
 
-    // Dump a cache to disk
     const cache = new SchemaCache();
     await warm(cache, "users", "id", [makeColumn("id", "integer"), makeColumn("name", "text")]);
     cache.dumpTo(cachePath);
 
-    // Create reflection pointing at that file, version check disabled
     const origCheck = SchemaReflection.checkSchemaCacheDumpVersion;
     SchemaReflection.checkSchemaCacheDumpVersion = false;
     try {
@@ -546,7 +493,6 @@ describe("SchemaReflectionTest", () => {
   it("rejects stale cache when version mismatches", async () => {
     const cachePath = path.join(tmpDir, "schema_cache.json");
 
-    // Dump a cache with version "1"
     const coder: Record<string, unknown> = {
       columns: {},
       primary_keys: {},
@@ -562,19 +508,15 @@ describe("SchemaReflectionTest", () => {
     const pool = new FakePool(fakeConnection);
 
     const reflection = new SchemaReflection(cachePath);
-    // Cache should be rejected because version "1" != "2"
     const cols = await reflection.columns(pool, "users");
-    // Falls through to empty cache, no columns
     expect(cols).toBeUndefined();
   });
 
   it("accepts cache when version matches", async () => {
     const cachePath = path.join(tmpDir, "schema_cache.json");
 
-    // Dump a real cache with version "42"
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("title", "varchar(255)")]);
-    // Set version manually via initWith
     const coder: Record<string, unknown> = {};
     cache.encodeWith(coder);
     coder["version"] = "42";
@@ -611,16 +553,6 @@ describe("SchemaReflectionTest", () => {
   });
 });
 
-// ── DDL cache-invalidation safety-net tests ──────────────────────────────────
-//
-// Each test seeds the SchemaCache with a known entry, calls a DDL method on a
-// mock adapter, and asserts the entry is gone afterwards.
-//
-// Only the DDL methods Rails itself invalidates from are covered: `create_table`'s
-// non-force arm (schema_statements.rb:306) and `drop_table` (:542). Rails clears
-// nowhere else in abstract/schema_statements.rb — a case here for add_column,
-// rename_column, add_index et al. would pin behaviour Rails does not have.
-
 class MockAdapter {
   typeRegistryKey = "sqlite" as const;
   quoteColumnName = (n: string) => `"${n}"`;
@@ -631,9 +563,6 @@ class MockAdapter {
   pool = {};
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
-  // `SchemaCreation` delegates every capability probe and its type map to
-  // `@conn` (abstract/schema_creation.rb:16-21); answer as SQLite3Adapter does,
-  // matching the `typeRegistryKey` this mock reports.
   nativeDatabaseTypes = () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
   supportsCheckConstraints = async () => true;
   supportsIndexesInCreate = () => false;
@@ -645,7 +574,6 @@ class MockAdapter {
   supportsUniqueConstraints = () => false;
   useForeignKeys = () => true;
   createTableDefinition = (n: string, opts: Record<string, unknown>) =>
-    // Rails' create_table_definition passes `self` (schema_statements.rb:1041).
     new TableDefinition(this as never, n, { ...opts });
 
   constructor(cache: SchemaCache) {
@@ -655,8 +583,6 @@ class MockAdapter {
     );
   }
 
-  // SchemaStatements' bodies reach the adapter through `this.adapter`; on a
-  // real adapter that self-reference is AbstractAdapter#adapter.
   adapter = this as unknown as AbstractAdapter & SchemaQuoter;
 }
 include(MockAdapter, SchemaStatements);
@@ -683,7 +609,6 @@ describe("DDL cache-invalidation safety-net", () => {
       return [];
     });
 
-    // The adapter is a mock: no DDL reaches a database.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await adapter.dropTable("posts");
 
@@ -716,7 +641,6 @@ describe("DDL cache-invalidation safety-net", () => {
 
   it("createTable clears schema cache entry (non-force branch)", async () => {
     const cache = new SchemaCache();
-    // Stale entry from a prior create (e.g. after a test dropped the table)
     cache.setColumns("posts", [makeColumn("id", "integer")]);
 
     const adapter = makeMockAdapter(cache);
@@ -757,7 +681,7 @@ describe("SchemaCache DDL invalidation", () => {
   });
 
   it("renameTable clears both old and new names before ALTER TABLE RENAME", async () => {
-    warmCache("stuff"); // simulate stale cache for the destination name
+    warmCache("stuff");
     expect(adapter.internalSchemaCache.isCached("stuff")).toBe(true);
     await adapter.renameTable("things", "stuff");
     expect(adapter.internalSchemaCache.isCached("things")).toBe(false);

@@ -30,24 +30,15 @@ import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 
-// database_tasks_test.rb:476-485 — Rails saves and restores
-// `ActiveRecord::Base.configurations` around a stubbed set rather than clearing
-// it: `DatabaseTasks.database_configuration` is a view over that one registry,
-// which also holds the suite's own `arunit` config.
 let originalConfigurations: DatabaseConfigurations | null = null;
 beforeAll(() => {
   originalConfigurations = DatabaseTasks.databaseConfiguration;
 });
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
-  // Rails: `if current_adapter?(:SQLite3Adapter) && !in_memory_db?`
-  // (database_tasks_test.rb:62).
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "raises an error when called with protected environment",
     async () => {
-      // Rails: test_raises_an_error_when_called_with_protected_environment —
-      // stamp the config's metadata with the current env, assert the guard
-      // passes, then protect that env and assert it raises.
       const protectedEnvironments = Base.protectedEnvironments;
       const currentEnv = DatabaseConfigurations.defaultEnv;
       const env = "arunit";
@@ -83,7 +74,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 
       try {
         expect(protectedEnvironments).not.toContain(currentEnv);
-        // Assert no error
         await DatabaseTasks.checkProtectedEnvironmentsBang(env);
 
         Base.protectedEnvironments = [currentEnv];
@@ -92,7 +82,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         );
       } finally {
         Base.protectedEnvironments = protectedEnvironments;
-        // Explicit teardown for the raw-created tables; the tmp dir goes too.
         const cleanup = new BetterSQLite3Adapter(dbFile);
 
         await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
@@ -108,13 +97,9 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 
   it.skip("raises an error when called with protected environment which name is a symbol", () => {
     // PERMANENT-SKIP: Ruby-only (Symbol env names) — protected_environments
-    // symbol→string coercion has no TS equivalent; env names are plain strings.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:98
   });
 
   it("raises an error if no migrations have been made", async () => {
-    // Rails: test_raises_an_error_if_no_migrations_have_been_made
-    // schema_migrations has a row but ar_internal_metadata is absent → NoEnvironmentInSchemaError.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-env-"));
     const dbFile = path.join(tmp, "test.sqlite3");
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
@@ -134,7 +119,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
       );
       await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
-      // dbFile lives under a per-test tmpdir, not the shared worker database.
 
       await adapter.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
     } finally {
@@ -145,8 +129,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         NoEnvironmentInSchemaError,
       );
     } finally {
-      // Explicit teardown for the raw-created `schema_migrations` table (the tmp
-      // dir is also removed below) to balance require-table-teardown.
       const cleanup = new BetterSQLite3Adapter(dbFile);
       await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.close();
@@ -158,12 +140,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 });
 
 describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
-  // Rails: `if current_adapter?(:SQLite3Adapter) && !in_memory_db?`
-  // (database_tasks_test.rb:156).
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())("with multiple databases", async () => {
-    // Rails: test_with_multiple_databases (database_tasks_test.rb:155) —
-    // two sqlite3 file databases in one env, both stamped with the current
-    // environment; the guard passes, then fires once the env is protected.
     const env = "arunit";
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-multi-db-"));
     const primaryDb = path.join(tmp, "primary.sqlite3");
@@ -184,8 +161,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const protectedEnvironments = Base.protectedEnvironments;
 
-    // Mirrors `internal_metadata.create_table_and_set_flags(current_env)` on
-    // both databases.
     for (const dbFile of [primaryDb, secondaryDb]) {
       const adapter = new BetterSQLite3Adapter(dbFile);
       try {
@@ -202,11 +177,8 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
 
     try {
       expect(protectedEnvironments).not.toContain(env);
-      // Assert not raises
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
 
-      // Mirrors `schema_migration.create_table` + `create_version("1")` on the
-      // secondary database.
       const secondary = new BetterSQLite3Adapter(secondaryDb);
       try {
         await secondary.executeMutation(
@@ -346,8 +318,6 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
 
 describe("DatabaseTasksDumpSchemaTest", () => {
   it("ensure db dir", async () => {
-    // Mirrors Rails: schemaDump is a bare filename; schemaDumpPath prepends dbDir.
-    // The dir is removed before dumpSchema runs; dumpSchema must recreate it.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
     const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-db-"));
     const dbFile = path.join(dbTmp, "arunit.sqlite3");
@@ -369,16 +339,12 @@ describe("DatabaseTasksDumpSchemaTest", () => {
       DatabaseTasks.dbDir = prevDbDir;
       try {
         Base.removeConnection();
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.rmSync(dbTmp, { recursive: true, force: true });
     }
   });
   it("db dir ignored if included in schema dump", async () => {
-    // Mirrors Rails: schemaDump is an absolute path whose dirname == dbDir.
-    // schemaDumpPath returns it verbatim (no double-prefix).
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
     const dbTmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-db-"));
     const dbFile = path.join(dbTmp, "arunit.sqlite3");
@@ -390,7 +356,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
       const config = new HashConfig("arunit", "primary", {
         adapter: "sqlite3",
         database: dbFile,
-        schemaDump: schemaPath, // absolute path — dirname == dbDir
+        schemaDump: schemaPath,
       });
       fs.rmSync(tmp, { recursive: true, force: true });
       expect(fs.existsSync(schemaPath)).toBe(false);
@@ -400,9 +366,7 @@ describe("DatabaseTasksDumpSchemaTest", () => {
       DatabaseTasks.dbDir = prevDbDir;
       try {
         Base.removeConnection();
-      } catch {
-        /* ignore */
-      }
+      } catch {}
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.rmSync(dbTmp, { recursive: true, force: true });
     }
@@ -426,11 +390,6 @@ describe("DatabaseTasksCreateAllTest", () => {
   captureStdoutAndStderr();
 
   let created: string[];
-  // database_tasks_test.rb:722-729 — `with_stubbed_configurations_establish_connection`
-  // stubs `connection_handler.establish_connection` so `create_all`'s closing
-  // re-establish (database_tasks.rb:132) is a no-op. The suite's own ambient
-  // connection is what `migration_connection.pool.db_config` (:128) reads;
-  // trails' tasks suite has no ambient connection of its own, so lay one here.
   beforeEach(async () => {
     created = [];
     await Base.establishConnection(ambientPoolConfiguration());
@@ -584,9 +543,6 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
   it("establishes connection for the given environments", async () => {
     await DatabaseTasks.createCurrent("development");
-    // database_tasks_test.rb:588,708 — `assert_called_with(Base,
-    // :establish_connection, [:development])`: the bare env name, resolved
-    // through `Base.configurations`.
     expect(establishSpy).toHaveBeenCalledWith("development");
   });
 });
@@ -664,9 +620,6 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
 
   it("establishes connection for the given environments config", async () => {
     await DatabaseTasks.createCurrent("development");
-    // database_tasks_test.rb:588,708 — `assert_called_with(Base,
-    // :establish_connection, [:development])`: the bare env name, resolved
-    // through `Base.configurations`.
     expect(establishSpy).toHaveBeenCalledWith("development");
   });
 });
@@ -888,36 +841,13 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   });
 });
 
-/**
- * Rails: `DatabaseTasksMigrationTestCase`
- * (vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1029-1060)
- * — the shared base of the Migrate / MigrateScope / MigrateStatus tests. Its
- * setup connects to a memory DB "to avoid having to rollback at the end", then
- * copies the ambient file DB into it with `SQLite3::Backup`; its teardown
- * re-establishes `:arunit`.
- *
- * `self.use_transactional_tests = false` needs no analogue: trails tests are
- * non-transactional unless they opt in via `useTransactionalTests()`. The
- * `folder_name` class attribute is the argument of
- * {@link databaseTasksMigrationTestCase}, since a TS describe block has no
- * class body to override it in.
- */
 const skipMigrationTestCase = adapterType !== "sqlite" || inMemoryDb();
 
 interface MigrationTestCase {
-  /** Rails: `capture_migration_output` (database_tasks_test.rb:1056-1060). */
   captureMigrationOutput(): Promise<string>;
-  /** Rails: `capture(:stdout) { ... }` (activesupport test helper). */
   captureStdout(fn: () => Promise<void>): Promise<string>;
 }
 
-/**
- * Port of the `SQLite3::Backup` step (database_tasks_test.rb:1041-1046). The
- * sqlite3 driver exposes no backup API here, so the copy runs at the SQL
- * level: attach the ambient file DB, replay its schema into the memory DB, and
- * copy every table's rows. Same observable result — the memory DB starts as a
- * copy of the fixture database rather than empty.
- */
 async function backupIntoConnection(sourceFile: string): Promise<void> {
   const adapter = await Base.connectionPool().leaseConnection();
   await adapter.execute(`ATTACH DATABASE ${adapter.quote(sourceFile)} AS backupSource`);
@@ -932,8 +862,6 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
     for (const [type, name] of objects) {
       if (type !== "table") continue;
       const table = adapter.quoteTableName(String(name));
-      // Column list rather than `SELECT *`: `pragma_table_info` omits generated
-      // columns, which cannot be inserted into.
       const columns = await adapter.selectRows(
         `SELECT name FROM pragma_table_info(${adapter.quote(String(name))}, 'backupSource')`,
       );
@@ -944,12 +872,6 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
           `SELECT ${columnList.join(", ")} FROM backupSource.${table}`,
       );
     }
-    // `sqlite_master` hides internal tables behind the `sqlite_%` filter above,
-    // but Rails' page-level backup carries `sqlite_sequence` across, and the
-    // canonical schema's primary keys are `INTEGER PRIMARY KEY AUTOINCREMENT`
-    // (schema-creation.ts:502) — so dropping it would reset every AUTOINCREMENT
-    // counter relative to Rails. It materializes in the destination as soon as
-    // the first AUTOINCREMENT table is created above.
     const [[sequences]] = await adapter.selectRows(
       "SELECT count(*) FROM backupSource.sqlite_master WHERE name = 'sqlite_sequence'",
     );
@@ -996,9 +918,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
     DatabaseTasks.clearRegisteredTasks();
     try {
       Base.removeConnection();
-    } catch {
-      /* no pool */
-    }
+    } catch {}
     if (!skipMigrationTestCase) await Base.establishConnection("arunit");
   });
 
@@ -1036,13 +956,11 @@ describe("DatabaseTasksMigrateTest", () => {
       process.env.VERSION = "2";
       process.env.VERBOSE = "false";
 
-      // run down migration because it was already run on copied db
       expect(await testCase.captureMigrationOutput()).toBe("");
 
       process.env.VERBOSE = "";
       process.env.VERSION = "";
 
-      // re-run up migration
       expect(await testCase.captureMigrationOutput()).toContain("migrating");
     },
   );
@@ -1050,7 +968,6 @@ describe("DatabaseTasksMigrateTest", () => {
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset nonsense values for verbose and version env vars",
     async () => {
-      // run down migration because it was already run on copied db
       process.env.VERSION = "2";
       process.env.VERBOSE = "false";
 
@@ -1059,7 +976,6 @@ describe("DatabaseTasksMigrateTest", () => {
       process.env.VERBOSE = "yes";
       process.env.VERSION = "2";
 
-      // run no migration because 2 was already run
       expect(await testCase.captureMigrationOutput()).toBe("");
     },
   );
@@ -1069,7 +985,6 @@ describe("DatabaseTasksMigrateScopeTest", () => {
   let originalVerbose: string | undefined;
   let originalVersion: string | undefined;
   let originalScope: string | undefined;
-  // Rails: `self.folder_name = "scope"` (database_tasks_test.rb:1103).
   const testCase = databaseTasksMigrationTestCase("scope");
 
   beforeEach(() => {
@@ -1131,7 +1046,6 @@ describe("DatabaseTasksMigrateStatusTest", () => {
 
   beforeEach(async () => {
     if (skipMigrationTestCase) return;
-    // Mirror Rails test setup: @schema_migration.create_table (database_tasks_test.rb:1169)
     const pool = Base.connectionPool();
     await new SchemaMigration(pool).createTable();
   });
@@ -1192,9 +1106,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       else process.env.VERSION = originalVersion;
       try {
         Base.removeConnection();
-      } catch {
-        /* no pool */
-      }
+      } catch {}
       DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -1470,7 +1382,6 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
   });
 
   it("check target version does not raise error on valid version format", () => {
-    // Rails' last case is `001_name.rb`; trails' migrations are `.ts`/`.js`.
     for (const version of ["0", "1", "001", "1_001", "001_name.ts", "20230101120000"]) {
       process.env.VERSION = version;
       expect(() => DatabaseTasks.checkTargetVersion()).not.toThrow();
@@ -1498,8 +1409,6 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
   });
 
   it("check schema file", () => {
-    // Rails: assert_called_with(Kernel, :abort, [/awesome-file.sql/]) — aborts when file missing.
-    // No blank-string branch: Rails only does File.exist?, so "" flows through the same path.
     expect(() => DatabaseTasks.checkSchemaFile("nonexistent-awesome-file.sql")).toThrow(
       /nonexistent-awesome-file\.sql/,
     );
@@ -1591,16 +1500,11 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
       });
       expect(temporaryPool).toBe(ambientPool);
       expect(Base.connectionPool()).toBe(ambientPool);
-      // The relative path survives: nothing may rewrite the registry config
-      // (Rails' with_temporary_pool does no path work — database_tasks.rb:542).
       expect(config.database).toBe("db/relative.sqlite3");
     },
   );
 
   it.skipIf(adapterType !== "sqlite")("replaces the ambient pool when clobber", async () => {
-    // Rails threads `clobber:` down to `establish_connection(db_config, clobber:)`
-    // (database_tasks.rb:512-527,543), where it bypasses the same-config reuse
-    // branch in ConnectionHandler#establish_connection.
     const config = new HashConfig(DatabaseTasks.env, "primary", {
       adapter: "sqlite3",
       database: "db/clobber.sqlite3",
@@ -1627,10 +1531,6 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     });
     await Base.establishConnection(config);
     const ambientPool = Base.connectionPool();
-    // Rails stubs `create` rather than registering a task
-    // (database_tasks_test.rb:587). Registering one here would mean clearing the
-    // registry afterwards, and clearRegisteredTasks() wipes the SQLiteDatabaseTasks
-    // registration the test bootstrap installs (support/connection.ts:396).
     const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
     const previousConfiguration = DatabaseTasks.databaseConfiguration;
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({

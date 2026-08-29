@@ -1,6 +1,5 @@
 import { throwAbort } from "@blazetrails/activesupport";
 import type { Pirate } from "./pirate.js";
-// vendor/rails/activerecord/test/models/bird.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";

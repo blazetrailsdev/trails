@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/admin/randomly_named_c1.rb
 import { Base } from "../../../base.js";
 
 export class AdminClassNameThatDoesNotFollowCONVENTIONS1 extends Base {

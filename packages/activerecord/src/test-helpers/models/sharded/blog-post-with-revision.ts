@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/sharded/blog_post_with_revision.rb
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 

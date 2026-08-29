@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { FamilyTree } from "./family-tree.js";
 import type { Member } from "./member.js";
-// vendor/rails/activerecord/test/models/family.rb
 import { Base } from "../../base.js";
 
 export class Family extends Base {

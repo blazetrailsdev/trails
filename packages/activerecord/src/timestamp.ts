@@ -8,43 +8,16 @@ import { runCallbacks } from "@blazetrails/activesupport";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 
-/**
- * Timestamp handling for ActiveRecord models.
- *
- * Mirrors: ActiveRecord::Timestamp
- */
-
 export interface TouchOptions {
   time?: Date | Temporal.Instant | null;
 }
 
-/**
- * Argument list for Rails' `touch(*names, time: nil)`. Ruby's trailing keyword
- * becomes an optional trailing options object in TS, mirroring `TouchAllArgs` —
- * the options object is only valid in last position, so `touch({ time }, "col")`
- * is a type error just as `touch(time: t, :col)` is a syntax error in Ruby.
- */
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
 
-/**
- * Update the updated_at timestamp (and optionally other timestamp
- * columns) without changing other attributes. Skips validations
- * and callbacks (except after_touch).
- *
- * Mirrors: ActiveRecord::Timestamp#touch
- */
 export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
-  // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
-  // prepended ahead of Persistence#touch: a no_touching block short-circuits
-  // the whole method — including the persisted?/readonly? guards below — so a
-  // new or destroyed record inside one returns falsy rather than raising.
   const ctor = this.constructor as typeof Base;
   if (isNoTouchingApplied(ctor)) return false;
 
-  // Mirrors Rails Persistence#touch: a non-persisted (new or destroyed) record
-  // raises ActiveRecordError via _raise_record_not_touched_error — it does not
-  // return false. The persisted? check runs before the readonly check, matching
-  // persistence.rb:794-795.
   if (!this.isPersisted()) raiseRecordNotTouchedError();
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
@@ -60,11 +33,6 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
   const resolvedNames = names.map((name) => aliases[name] ?? name);
 
-  // Mirrors Rails' Persistence#touch: verify_readonly_attribute runs over the
-  // union of timestamp_attributes_for_update_in_model and the caller-supplied
-  // names — touching an attr_readonly column raises ActiveRecordError (distinct
-  // from the record-level ReadOnlyRecord guard above) and does so before any
-  // column is written.
   const updateTimestampAttrs = timestampAttributesForUpdateInModel.call(
     ctor as unknown as TimestampHost,
   );
@@ -74,31 +42,14 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
     }
   }
 
-  // Mirrors Rails Persistence#touch (persistence.rb:797-803):
-  //   attribute_names = timestamp_attributes_for_update_in_model
-  //   attribute_names = (attribute_names | names)...
-  // Start from the same alias-resolved, columnNames()-filtered set the readonly
-  // check above iterates (updateTimestampAttrs) so the two never diverge, then
-  // union in the caller-supplied names unconditionally — Rails adds them with no
-  // column-existence guard, letting the DB raise on a nonexistent column.
   const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
   const touchCols = Array.from(touchColSet);
 
-  // Mirrors Rails: ActiveRecord::Transactions#touch wraps the persistence-layer
-  // touch in `with_transaction_returning_status`, so the record is enrolled in
-  // the current transaction and its `after_update_commit` /
-  // `after_rollback(on: :update)` callbacks fire on commit/rollback. The
-  // pre-write state snapshot is captured inside (before any writeAttribute) so
-  // rollback restores the pre-touch values.
   return withTransactionReturningStatus.call(this, async () => {
     return touchRow.call(this, touchCols, now);
   }) as Promise<boolean>;
 }
 
-/**
- * Split `touch(*names, time: nil)` args into the splatted names and the
- * trailing keyword hash. Mirrors parseTouchArgs' sibling `parseTouchAllArgs`.
- */
 export function parseTouchArgs(args: TouchArgs): {
   names: string[];
   time: Date | Temporal.Instant | null | undefined;
@@ -110,10 +61,6 @@ export function parseTouchArgs(args: TouchArgs): {
   return { names: args as string[], time: undefined };
 }
 
-/**
- * Mirrors Rails Persistence#_raise_record_not_touched_error (persistence.rb:961).
- * The message matches Rails' squished heredoc verbatim.
- */
 function raiseRecordNotTouchedError(): never {
   throw new ActiveRecordError(
     "Cannot touch on a new or destroyed record object. Consider using " +
@@ -121,34 +68,18 @@ function raiseRecordNotTouchedError(): never {
   );
 }
 
-/**
- * Persistence-layer half of touch: builds and runs the targeted UPDATE, sets
- * the update-callback trigger flag from the affected-row count, applies changes,
- * and runs after_touch. Mirrors Rails' Persistence#touch → _touch_row → _update_row
- * (called from inside with_transaction_returning_status).
- */
 async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
 
-  // Mirrors Rails Callbacks#touch (`_run_touch_callbacks { super }`): the
-  // after_touch callbacks fire around the whole touch, even when the model has
-  // no timestamp columns and no caller-supplied names (persistence.rb:805-810's
-  // `else true end` no-op). This is how a `has_one ..., touch: true` on a model
-  // that itself has no timestamps still propagates the touch to its child.
   if (touchCols.length === 0) {
     await runCallbacks(this, "touch");
     return true;
   }
 
-  // Write new values via writeAttribute so changesApplied() populates previousChanges.
   for (const col of touchCols) {
     this.writeAttribute(col, now);
   }
 
-  // Build a targeted UPDATE directly — mirrors Rails' _touch_row → _update_row.
-  // Does NOT run save callbacks (before_save / after_save), only after_touch.
-  // Use valuesForDatabase() so the adapter's type casting / quoting path is used,
-  // consistent with how save() serializes values.
   const dbValues = (this as any)._attributes.valuesForDatabase();
   const table = ctor.arelTable;
   const setPairs: [InstanceType<typeof Nodes.Node>, unknown][] = touchCols.map((col) => [
@@ -156,14 +87,12 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
     new Nodes.Quoted(dbValues[col]),
   ]);
 
-  // Optimistic locking: include lock_version increment and stale-object check.
   const lockCol = ctor.lockingColumn;
   let rawDbVersion: unknown;
   let lockAttributeWas: import("@blazetrails/activemodel").Attribute | null = null;
   if (ctor.lockingEnabled) {
     const rawVersion = this.readAttribute(lockCol);
     rawDbVersion = this.readAttributeBeforeTypeCast(lockCol);
-    // Snapshot before mutating — mirrors Rails' lock_attribute_was in _update_row.
     lockAttributeWas = (this as any)._attributes.getAttribute(lockCol);
     const current = rawVersion == null ? 0 : Number(rawVersion) || 0;
     const next = current + 1;
@@ -174,9 +103,6 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   const um = new UpdateManager()
     .table(table)
     .set(setPairs)
-    // Mirrors Rails' _touch_row → _update_row(_query_constraints_hash): the
-    // WHERE targets `id_in_database`, so a dirty (in-memory mutated) primary
-    // key still touches the row identified by the value last loaded from the DB.
     .where((ctor as any)._buildPkWhereNode((this as any).idInDatabase));
 
   if (ctor.lockingEnabled) {
@@ -187,37 +113,17 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
     }
   }
 
-  // `c.update(um, "#{self} Update")` (persistence.rb:277-279) — touch routes
-  // through `_update_record`, so it reaches the public statement method
-  // `dirties_query_cache` is wired on (query_cache.rb:13-15).
   const adapter = ctor.connection as any;
   const affected: number = await adapter.update(um, `${ctor.name} Touch`);
   if (ctor.lockingEnabled && affected === 0) {
-    // Mirrors Rails _update_row rescue Exception: restore the attribute snapshot so
-    // the in-memory record is not left with an incorrect lock_version after a stale touch.
     if (lockAttributeWas !== null) {
       (this as any)._attributes.set(lockCol, lockAttributeWas);
     }
     throw new StaleObjectError(this, "touch");
   }
 
-  // Mirrors Rails Persistence#touch: `@_trigger_update_callback = affected_rows == 1`.
-  // This is what trigger_transactional_callbacks? reads to fire after_update_commit /
-  // after_rollback(on: :update) when the enrolling transaction commits/rolls back.
   (this as any)._triggerUpdateCallback = affected === 1;
 
-  // Mirrors Rails AttributeMethods::Dirty#_touch_row (dirty.rb:204-231): touch
-  // clears dirty state via changes_applied, but that resets the WHOLE dirty
-  // baseline — so unrelated in-memory changes the caller made before touching
-  // would be silently forgotten. Rails preserves them: it stashes each
-  // non-touched changed attribute, reverts it so changes_applied snapshots the
-  // pre-change value, then re-writes it afterward so it stays dirty. The
-  // @_skip_dirty_tracking branch (set by touch_later) instead just clears the
-  // touched columns' changes.
-  // Mirrors Rails Locking::Optimistic#_touch_row, which pushes the locking
-  // column into @_touch_attr_names before calling super — so the lock_version
-  // increment is treated as a touched column (its dirty state cleared by
-  // changes_applied), not as an unrelated change to preserve.
   const touched = new Set(touchCols);
   if (ctor.lockingEnabled) touched.add(lockCol);
 
@@ -241,9 +147,6 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
       }
     }
   } finally {
-    // Mirrors Rails AttributeMethods::Dirty#_touch_row `ensure` (dirty.rb:229-231):
-    // clear @_skip_dirty_tracking so a deferred touch (which sets it) doesn't leak
-    // the flag into the record's next, non-deferred touch.
     self._skipDirtyTracking = null;
   }
 
@@ -251,18 +154,9 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   return true;
 }
 
-/**
- * Touch all records matching the current scope.
- *
- * Mirrors: ActiveRecord::Base.touch_all
- */
 export async function touchAll(this: typeof Base, ...args: TouchAllArgs): Promise<number> {
   return this.all().touchAll(...args);
 }
-
-// ---------------------------------------------------------------------------
-// Class methods — mirrors ActiveRecord::Timestamp::ClassMethods
-// ---------------------------------------------------------------------------
 
 const CREATED_ATTRS = ["created_at", "created_on"];
 const UPDATED_ATTRS = ["updated_at", "updated_on"];
@@ -275,7 +169,6 @@ interface TimestampHost {
   _allTimestampAttributesInModel?: string[];
 }
 
-/** Minimal instance-side surface used by Timestamp private/internal helpers. */
 interface TimestampInstanceHost {
   _touchRecord: boolean | null;
   readAttribute?(name: string): unknown;
@@ -289,10 +182,6 @@ interface TimestampInstanceHost {
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
 
-/**
- * Argument list for `touch_all(*names, time: nil)`. Ruby's trailing keyword
- * becomes an optional trailing options object in TS.
- */
 export type TouchAllOptions = { time?: Temporal.Instant };
 
 export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
@@ -310,10 +199,6 @@ export function parseTouchAllArgs(args: TouchAllArgs): {
 
 export function touchAttributesWithTime(
   this: TimestampHost,
-  // Mirrors Rails' `def touch_attributes_with_time(*names, time: nil)` — the
-  // splatted column names followed by the (nullable) `time` keyword. TS forbids
-  // an *optional* element after a rest element, so `time` is required at the
-  // type level; callers pass `undefined` for the current-time default.
   ...args: [...names: string[], time: Temporal.Instant | undefined]
 ): Record<string, Temporal.Instant> {
   const names = args.slice(0, -1) as string[];
@@ -327,40 +212,18 @@ export function touchAttributesWithTime(
   return result;
 }
 
-/**
- * The `touch:` option accepted by counter-cache mutators
- * (`update_counters` / `reset_counters` / `increment_counter`). Mirrors
- * Rails, where `touch` may be `true`, a column name, an array of column
- * names, or a `{ time: }` hash (optionally alongside column names).
- */
 export type CounterCacheTouchOption =
   | boolean
   | string
   | Array<string | { time?: Temporal.Instant }>
   | { time?: Temporal.Instant };
 
-/**
- * Parse a counter-cache `touch:` option into the `names` + `time` arguments
- * for `touchAttributesWithTime`, mirroring the inline branch Rails runs in
- * both `Relation#update_counters` (relation.rb:935-939) and
- * `CounterCache::ClassMethods#reset_counters` (counter_cache.rb:61-66):
- *
- *   names = touch if touch != true
- *   names = Array.wrap(names)
- *   options = names.extract_options!   # the trailing `{ time: }` hash
- *
- * `touch: []` yields no names (not a skip): like Rails, the caller then calls
- * `touch_attributes_with_time()` with none, still touching the default
- * update-timestamp columns.
- */
 export function parseCounterCacheTouch(touch: CounterCacheTouchOption): {
   names: string[];
   time?: Temporal.Instant;
 } {
   const wrapped: Array<string | { time?: Temporal.Instant }> =
     touch === true || touch === false ? [] : Array.isArray(touch) ? touch : [touch];
-  // Mirror Ruby's Array#extract_options!: a trailing plain-object arg is the
-  // `{ time: }` keyword hash, not a column name.
   const last = wrapped[wrapped.length - 1];
   if (last !== undefined && typeof last === "object") {
     return { names: wrapped.slice(0, -1) as string[], time: last.time };
@@ -373,8 +236,6 @@ export function timestampAttributesForCreateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  // Mirrors Rails timestamp.rb:64-66 — intersect the *alias-resolved* timestamp
-  // attributes (e.g. created_at → legacy_created_at) with the model's columns.
   this._timestampAttributesForCreateInModel = timestampAttributesForCreate
     .call(this)
     .filter((a) => cols.has(a));
@@ -386,8 +247,6 @@ export function timestampAttributesForUpdateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  // Mirrors Rails timestamp.rb:69-72 — intersect the *alias-resolved* timestamp
-  // attributes (e.g. updated_at → legacy_updated_at) with the model's columns.
   this._timestampAttributesForUpdateInModel = timestampAttributesForUpdate
     .call(this)
     .filter((a) => cols.has(a));
@@ -404,9 +263,6 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
 }
 
 export function currentTimeFromProperTimezone(): Temporal.Instant {
-  // Mirrors Rails' Timestamp#current_time_from_proper_timezone, which reads
-  // Time.now(.utc) — stubbed by ActiveSupport's TimeHelpers so it honors
-  // travel/travelTo/freezeTime. currentTimeInstant() is the trails equivalent.
   return currentTimeInstant();
 }
 
@@ -430,21 +286,12 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
   return UPDATED_ATTRS.map((name) => aliases[name] ?? name);
 }
 
-// ---------------------------------------------------------------------------
-// Instance methods — mirrors ActiveRecord::Timestamp private block
-// ---------------------------------------------------------------------------
-
 /** @internal */
 export function initInternals(this: TimestampInstanceHost, super_: () => void): void {
   super_();
   this._touchRecord = null;
 }
 
-/**
- * Mirrors `ActiveRecord::Timestamp#initialize_dup` (timestamp.rb:50-53): the
- * clear happens as the `super` stack unwinds, so the initialize callbacks in
- * `Core#initialize_dup` still see the source's timestamps.
- */
 export function initializeDup(
   this: TimestampInstanceHost,
   super_: (other: unknown) => void,
@@ -541,22 +388,14 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
-/**
- * Module methods wired onto Base as static methods via `extend()` in base.ts.
- * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
- */
 export const ClassMethods = {
   touchAll,
 };
 
-/**
- * Instance methods wired onto Base.prototype via `include()` in base.ts.
- */
 export const InstanceMethods = {
   touch,
   recordUpdateTimestamps,
   shouldRecordTimestamps,
-  // Rails instance methods delegate to the class; mirrors `self.class.xxx_in_model`.
   timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {
     return timestampAttributesForCreateInModel.call(this.constructor);
   },

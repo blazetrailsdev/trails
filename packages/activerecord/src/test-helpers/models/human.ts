@@ -2,7 +2,6 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Face } from "./face.js";
 import type { Interest } from "./interest.js";
 import type { MixedCaseMonkey } from "./mixed-case-monkey.js";
-// vendor/rails/activerecord/test/models/human.rb
 import { Base } from "../../base.js";
 
 export class Human extends Base {

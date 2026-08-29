@@ -1,7 +1,3 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/token_for_test.rb
- * Test names match the Rails counterpart.
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { RecordNotFound, registerModel } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
@@ -12,17 +8,13 @@ import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { setTokenForSecret } from "./token-for.js";
 import { fixtures } from "./test-fixtures.js";
-// Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
-// are resolved by name, as Rails resolves them from the autoloaded models tree.
 import "./support/canonical-model-index.js";
 
-// Rails: class User < ::User { generates_token_for :lookup; … }
 class TokenUser extends User {
   static {
     this.generatesTokenFor("lookup");
     this.generatesTokenFor("password_reset", {
       expiresIn: 15 * 60,
-      // first 10 characters of the BCrypt salt — Rails: password_digest.to_s[-(31 + 22), 10]
       block: (r: any) => String(r.password_digest ?? "").slice(-(31 + 22), -(31 + 22) + 10),
     });
     this.generatesTokenFor("snapshot", {
@@ -34,12 +26,6 @@ class TokenUser extends User {
 const DAY = 24 * 60 * 60 * 1000;
 
 describe("TokenForTest", () => {
-  // `useTransactionalTests: false`: these tests `destroy` the user, and a
-  // model destroy opens its own transaction. On PostgreSQL, nesting that destroy
-  // transaction inside the per-test fixtures transaction double-starts the
-  // transaction instrumenter (InstrumentationAlreadyStartedError). Cleaning up
-  // with deleteAll in afterEach (the signed-id.test.ts pattern) keeps the shared
-  // `users` table isolated without an enclosing transaction.
   fixtures([], { useTransactionalTests: false });
   beforeAll(async () => {
     registerModel(Room);
@@ -143,7 +129,6 @@ describe("TokenForTest", () => {
   it("supports JSON-serializable embedded data", async () => {
     const snapshotToken = user.generateTokenFor("snapshot");
     expect((await TokenUser.findByTokenFor("snapshot", snapshotToken))!.id).toBe(user.id);
-    // Rails: @user.touch(time: @user.updated_at.advance(seconds: 1))
     const advanced = new Date(new Date(String((user as any).updated_at)).getTime() + 1000);
     await (user as any).touch({ time: advanced });
     expect(await TokenUser.findByTokenFor("snapshot", snapshotToken)).toBeNull();
@@ -192,7 +177,6 @@ describe("TokenForTest", () => {
   });
 
   it("finds record with a composite primary key", async () => {
-    // Rails: Cpk::Book.create!(id: [1, 3], shop_id: 2) — composite PK [author_id, id].
     const book = await CpkBook.create({ id: [1, 3], shop_id: 2 });
     const token = book.generateTokenFor("test");
 

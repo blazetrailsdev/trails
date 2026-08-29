@@ -18,16 +18,11 @@ describe("registerModel array form", () => {
   it("auto-routes STI subclasses into the parent's _subclasses", () => {
     registerModel([Comment, SpecialComment, SubSpecialComment]);
 
-    // SpecialComment's prototype is Comment (an AR model) → it's a subclass.
     expect((Comment as any)._subclasses).toContain(SpecialComment);
-    // SubSpecialComment's prototype is SpecialComment → subclass of it.
     expect((SpecialComment as any)._subclasses).toContain(SubSpecialComment);
   });
 
   it("registers each subclass at most once (idempotent, like Rails)", () => {
-    // Canonical model files self-register their subclasses at import, so the
-    // array form routes already-registered subclasses again — that must not
-    // produce duplicates in the parent's _subclasses.
     registerModel([Comment, SpecialComment, SubSpecialComment]);
     registerModel([Comment, SpecialComment, SubSpecialComment]);
 
@@ -38,14 +33,10 @@ describe("registerModel array form", () => {
   it("does not treat a base model as a subclass", () => {
     registerModel([Author]);
 
-    // Author extends Base directly, so it must never be pushed onto a
-    // parent's _subclasses list.
     expect((Author as any)._subclasses ?? []).not.toContain(Author);
   });
 
   it("routes a freshly-defined subclass via the array form only", () => {
-    // Fresh classes that nothing has pre-registered, so _subclasses growth
-    // can only come from the array form's auto-routing.
     class BatchBase extends Base {}
     class BatchChild extends BatchBase {}
     class BatchGrandchild extends BatchChild {}

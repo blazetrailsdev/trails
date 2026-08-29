@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/to_copy/1_people_have_hobbies.rb
 import { Migration } from "../../../migration.js";
 
 export class PeopleHaveHobbies extends Migration {

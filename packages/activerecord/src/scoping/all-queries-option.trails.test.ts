@@ -3,10 +3,6 @@ import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { DeveloperwithDefaultMentorScopeNot } from "../test-helpers/models/developer.js";
 
-// `Base.all(all_queries:)` threads the flag into build_default_scope (mirrors
-// ActiveRecord::Base.all). A default scope NOT flagged `all_queries: true`
-// applies to ordinary reads but is suppressed when `all_queries: true` is
-// requested — the path `_find_record` uses on reload.
 describe("Base.all all_queries option", () => {
   fixtures([]);
 

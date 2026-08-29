@@ -2,43 +2,14 @@ import { prepend } from "@blazetrails/activesupport";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { encryptedTypeOf } from "./encryptable-record.js";
 
-/**
- * What AdditionalValue needs from its type — one of the attribute's
- * `previousTypes` (bare previous-scheme EncryptedAttributeTypes, as Rails'
- * delegated `previous_types`).
- */
 export interface SerializableType {
   serialize(value: unknown): unknown;
 }
 
-/**
- * Automatically expands encrypted arguments to support querying both
- * encrypted and unencrypted data during encryption migration periods.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries
- */
 export class ExtendedDeterministicQueries {
   private static _installed = false;
 
-  /**
-   * Install the query-expansion patches. Rails does this via `prepend`:
-   *
-   *   ActiveRecord::Relation.prepend(RelationQueries)
-   *   ActiveRecord::Base.include(CoreQueries)
-   *   ActiveRecord::Encryption::EncryptedAttributeType.prepend(ExtendedEncryptableType)
-   *
-   * TS has no prepend, so we wrap prototype methods in place. Idempotent.
-   * Call this once during app boot when
-   * `Configurable.config.extendQueries` is true (Rails'
-   * `config.active_record.encryption.extend_queries`).
-   *
-   * @missingRailsCall include — PERMANENT:
-   *   `ActiveRecord::Base.include(CoreQueries)`
-   *   (extended_deterministic_queries.rb:28) works because Ruby's ancestor chain
-   *   lets the module's `find_by` `super` into Base's; TS has no such chain, so
-   *   trails installs all three patches through the one `prepend()` shim that
-   *   hands the wrapped method its `super_`.
-   */
+  /** @missingRailsCall include — PERMANENT */
   static installSupport(targets: {
     Relation: {
       prototype: {
@@ -52,13 +23,6 @@ export class ExtendedDeterministicQueries {
   }): void {
     if (this._installed) return;
 
-    // Pre-validate every target method across all three prepend() calls
-    // so a missing method can't leave us with one class already patched
-    // and another un-patched — a non-atomic state that a retry would
-    // double-wrap. Rails' `prepend` at boot is effectively all-or-
-    // nothing; this matches that intent.
-    // `prepend()` needs an open object-with-Function-values shape, so
-    // cast at the call site rather than widening the public signature.
     const relProto = targets.Relation.prototype as unknown as Record<
       string,
       (...args: any[]) => unknown
@@ -112,19 +76,8 @@ export class ExtendedDeterministicQueries {
   }
 }
 
-/**
- * Processes query arguments, expanding deterministic encrypted values
- * to include ciphertexts from previous encryption schemes.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
- */
 export class EncryptedQuery {
-  /**
-   * @missingRailsCall empty? — PERMANENT:
-   *   `owner.deterministic_encrypted_attributes&.empty?`
-   *   (extended_deterministic_queries.rb:45) on a Set — the faithful port is
-   *   `!encryptedAttrs?.size`, a property read with no call form.
-   */
+  /** @missingRailsCall empty? — PERMANENT */
   static processArguments(
     owner: any,
     args: unknown[],
@@ -142,10 +95,6 @@ export class EncryptedQuery {
     let modified = false;
 
     for (const attrName of encryptedAttrs) {
-      // Rails serializes through the FULL `type_for_attribute` type
-      // (extended_deterministic_queries.rb:58-62); `deterministic`/
-      // `previous_types` reach the inner EncryptedAttributeType via
-      // DelegateClass delegation there, via encryptedTypeOf here.
       const fullType = model.typeForAttribute(attrName) as SerializableType | undefined;
       const type = encryptedTypeOf(fullType);
       if (!fullType || !type) continue;
@@ -165,14 +114,6 @@ export class EncryptedQuery {
     checkForAdditionalValues: boolean,
     type: EncryptedAttributeType,
   ): unknown {
-    // Rails' process_encrypted_query_argument short-circuits when the
-    // caller is a Relation (`where`/`exists?`) and the value is already
-    // an expanded array whose last element is an AdditionalValue — that
-    // means a previous `where` on the same relation already ran
-    // processArguments, and re-expanding would produce AV-of-AV. Only
-    // checked for Relation paths (checkForAdditionalValues=true);
-    // `findBy` via CoreQueries uses false and always expands because
-    // its inputs come straight from the user.
     if (
       checkForAdditionalValues &&
       Array.isArray(value) &&
@@ -182,11 +123,6 @@ export class EncryptedQuery {
       return value;
     }
 
-    // Only String/Array arguments expand (extended_deterministic_queries.rb:74).
-    // Plaintexts stay raw at the head of the list — the PredicateBuilder
-    // serializes them through the attribute's resolved type
-    // (HomogeneousIn#castedValues), encrypting with the current scheme; only
-    // previous-scheme candidates are AdditionalValue-wrapped.
     if (typeof value === "string" || Array.isArray(value)) {
       const list = Array.isArray(value) ? value : [value];
       return [
@@ -209,12 +145,6 @@ export class EncryptedQuery {
   }
 }
 
-/**
- * Mixin that patches Relation#where, #exists?, and #scope_for_create to
- * expand encrypted query arguments via EncryptedQuery.processArguments.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQueries
- */
 export class RelationQueries {
   static where(this: any, originalWhere: (...args: any[]) => unknown, args: unknown[]): unknown {
     return originalWhere.call(this, ...EncryptedQuery.processArguments(this, args, true));
@@ -228,12 +158,7 @@ export class RelationQueries {
     return originalExists.call(this, ...EncryptedQuery.processArguments(this, args, true));
   }
 
-  /**
-   * @missingRailsCall any? — PERMANENT:
-   *   `model.deterministic_encrypted_attributes&.any?`
-   *   (extended_deterministic_queries.rb:104) takes no block, so it is a size
-   *   test on a Set — `!encryptedAttrs?.size` reads `.size` and emits no call.
-   */
+  /** @missingRailsCall any? — PERMANENT */
   static scopeForCreate(
     this: any,
     originalScopeForCreate: (...args: any[]) => unknown,
@@ -248,13 +173,6 @@ export class RelationQueries {
       const type = encryptedTypeOf(model.typeForAttribute(attrName));
       if (!type?.deterministic) continue;
       const values = wheres[attrName];
-      // An expanded list is raw plaintext at [0] followed only by
-      // AdditionalValues — collapse it back to the plaintext so the new
-      // record encrypts through the normal write path
-      // (extended_deterministic_queries.rb:115-117). The length guard is
-      // ours: `[].slice(1).every(...)` is vacuously true and would copy
-      // `undefined` into the scope for an empty (unreachable in Rails,
-      // where `[][1..]` is nil) where-list.
       if (
         Array.isArray(values) &&
         values.length > 0 &&
@@ -267,28 +185,15 @@ export class RelationQueries {
   }
 }
 
-/**
- * Mixin that patches Base.findBy to expand encrypted query arguments.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::CoreQueries
- */
 export class CoreQueries {
   static findBy(this: any, originalFindBy: (...args: any[]) => unknown, args: unknown[]): unknown {
     return originalFindBy.call(this, ...EncryptedQuery.processArguments(this, args, false));
   }
 }
 
-/**
- * Wraps a value encrypted with a previous scheme. Used as a marker
- * during query expansion to track which values are already encrypted.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue
- */
 export class AdditionalValue {
   readonly value: unknown;
   readonly type: SerializableType;
-  // Brand flag so EncryptedAttributeType.cast can identify AV instances
-  // without importing this module (which would be circular).
   readonly [ADDITIONAL_VALUE_BRAND] = true;
 
   constructor(value: unknown, type: SerializableType) {
@@ -301,9 +206,6 @@ export class AdditionalValue {
     return this.type.serialize(value);
   }
 
-  // visitArelNodesCasted calls resolveValueForDatabase(node.valueForDatabase())
-  // before quoting; returning this.value here surfaces the already-serialized
-  // ciphertext string so strict adapter quoters (SQLite, PG) can handle it.
   get valueForDatabase(): unknown {
     return this.value;
   }
@@ -312,12 +214,7 @@ export class AdditionalValue {
     return String(this.value);
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/encryption/extended_deterministic_queries.rb:134`
-   *   — Ruby's `AdditionalValue` declares no coercion method and inherits `Object#to_s`).
-   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
-   */
+  /** @noRailsEquivalent PERMANENT */
   valueOf(): unknown {
     return this.value;
   }
@@ -331,12 +228,6 @@ export class AdditionalValue {
   }
 }
 
-/**
- * Patches EncryptedAttributeType#serialize to pass through
- * AdditionalValue instances without re-encrypting.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::ExtendedEncryptableType
- */
 export class ExtendedEncryptableType {
   static serialize(originalSerialize: (data: unknown) => unknown, data: unknown): unknown {
     if (data instanceof AdditionalValue) {

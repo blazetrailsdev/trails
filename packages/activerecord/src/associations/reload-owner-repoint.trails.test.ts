@@ -1,11 +1,3 @@
-// RFC-0022: `reload` re-points each adopted `@association_cache` entry's owner
-// back to self (persistence.rb:752). The concrete prerequisite is a settable
-// owner on the owner-bound holders — Rails' `Association#owner` is settable;
-// our `CollectionProxy` (whose owner lives in its backing `_record`) must
-// expose the same. These tests cover the reassignable owner and confirm the
-// preloaded-only reload path still resolves associations against the reloaded
-// record.
-
 import { describe, it, expect, beforeAll } from "vitest";
 import { association, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -13,9 +5,6 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("reload — association owner re-point", () => {
-  // Ride the boot-laid canonical `authors` / `posts` on `Base.connection`
-  // (single-pool test model) rather than a sidecar `_pool` lease. `fixtures({})`
-  // establishes the handler and per-test transactional rollback (no seed rows).
   fixtures({});
 
   beforeAll(() => {
@@ -33,12 +22,6 @@ describe("reload — association owner re-point", () => {
     expect(proxy.owner).toBe(second);
   });
 
-  // The preloaded-only path (`_findRecord` populates only the `preloaded`
-  // facet) leaves the `instances`/`proxies` facets empty, so reload's owner
-  // re-point loops are a no-op here by design — they are future-proofing for a
-  // fetch that adopts owner-bound holders. This asserts the path stays correct
-  // (associations re-resolve against the reloaded record); the setter itself is
-  // covered directly above.
   it("resolves associations against the reloaded record after reload", async () => {
     const author = await Author.create({ name: "Dev" });
     await Post.create({ title: "a", body: "a", author_id: author.id as number });

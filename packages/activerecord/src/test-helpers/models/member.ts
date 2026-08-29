@@ -11,7 +11,6 @@ import type { SelectedMembership } from "./membership.js";
 import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 import type { TenantMembership } from "./membership.js";
-// vendor/rails/activerecord/test/models/member.rb
 import { Base } from "../../base.js";
 
 export class Member extends Base {

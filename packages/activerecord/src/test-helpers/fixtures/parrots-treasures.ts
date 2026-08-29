@@ -1,9 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/parrots.yml declares the HABTM via the per-parrot
-// `treasures:` lists (george/louis → diamond, sapphire; polly → sapphire, ruby)
-// and the DEFAULTS anchor (→ sapphire, ruby) that the `DEFAULTS` and `davey`
-// rows carry; Rails materializes those into the parrots_treasures join table.
 export const parrotsTreasuresFixtureData = {
   george_diamond: {
     parrot_id: ref("parrots", "george"),

@@ -24,18 +24,13 @@ describe("QueryLogs ExecutionContext wiring", () => {
 
     expect(queryLogs.comment()).toBe("/*application:active_record*/");
 
-    // Mutate the underlying context without going through updateContext() —
-    // which would clear the cache itself — so the only thing that can
-    // invalidate the cached comment is the ExecutionContext.after_change hook.
     (queryLogs as unknown as { _context: Record<string, unknown> })._context.application =
       "after_record";
 
-    // No context change has fired yet, so the stale comment is still served.
     expect(queryLogs.comment()).toBe("/*application:active_record*/");
 
     ExecutionContext.setKey("controller", "users");
 
-    // The after_change hook cleared the cache; the comment recomputes.
     expect(queryLogs.comment()).toBe("/*application:after_record*/");
   });
 });

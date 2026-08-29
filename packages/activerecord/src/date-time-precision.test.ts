@@ -16,18 +16,9 @@ function nsec(v: Temporal.Instant): number {
 }
 
 describe("DateTimePrecisionTest", () => {
-  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
-  // rows). The bespoke `foos` table is recreated per-test, so opt out of
-  // transactional fixtures — the per-test DDL must commit, not roll back inside
-  // a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
 
-  // Rails: `foos` is not a schema.rb fixture table — each test builds it with
-  // `create_table(:foos, force: true)` for the precision under test and the
-  // `teardown` drops it (`drop_table :foos, if_exists: true`). Mirror that
-  // here rather than seeding a placeholder into the canonical schema.
   beforeEach(async () => {
     adapter = Base.connection;
   });
@@ -130,11 +121,9 @@ describe("DateTimePrecisionTest", () => {
       const Foo = makeFoo();
       await Foo.loadSchema();
 
-      // 999999 microseconds = 999.999ms
       const date = Temporal.Instant.from("2014-08-17T12:30:00.999999Z");
       await (Foo as any).create({ created_at: date, updated_at: date });
 
-      // find_by uses the column type to truncate the query value, matching stored precision-0 value
       const foo = await (Foo as any).findBy({ created_at: date });
       expect(foo).not.toBeNull();
       expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
@@ -142,13 +131,10 @@ describe("DateTimePrecisionTest", () => {
       expect(foo.created_at.epochNanoseconds / 1_000_000_000n).toBe(
         date.epochNanoseconds / 1_000_000_000n,
       );
-      // Both match date.to_s format: "2014-08-17 12:30:00 UTC" (no sub-second in default format)
       expect(instantToS(foo.created_at)).toBe(instantToS(date));
       expect(instantToS(foo.updated_at)).toBe(instantToS(date));
-      // precision 0 → microseconds truncated to 0
       const usecCreated = Number(foo.created_at.epochNanoseconds % 1_000_000_000n) / 1000;
       expect(usecCreated).toBe(0);
-      // precision 4 → 999999 microseconds truncated to 4 decimal places = 999900
       const usecUpdated = Number(foo.updated_at.epochNanoseconds % 1_000_000_000n) / 1000;
       expect(usecUpdated).toBe(999900);
     },
@@ -159,8 +145,6 @@ describe("DateTimePrecisionTest", () => {
     "formatting datetime according to precision when time zone aware",
     () => {
       // BLOCKED: type — withTimezoneConfig helper exists (test-helper.ts) but
-      // Base.timeZoneAwareAttributes is not yet wired; TimeZoneConverter.serialize
-      // not implemented (no TZ shift on datetime write).
     },
   );
 

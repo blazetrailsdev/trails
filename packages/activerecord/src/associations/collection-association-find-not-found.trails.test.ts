@@ -1,19 +1,3 @@
-/**
- * `CollectionAssociation#find` not-found path, reached the way application code
- * reaches it — through `CollectionProxy#find`. Rails keeps the decision in
- * `find` (collection_association.rb:104-108): `find_by_scan` only scans and
- * returns, then `find` raises through
- * `scope.raise_record_not_found_exception!(args_flatten, result_size,
- * args_flatten.size)` — so a miss on a loaded `inverse_of` collection surfaces
- * a `RecordNotFound` carrying the model name, the primary key, and the
- * association scope's conditions.
- *
- * `CollectionProxy#find` is a bare delegation (collection_proxy.rb:107-109), so
- * driving the proxy drives the association body. These cases sit outside the
- * ported Rails tests, which assert only that a `RecordNotFound` escapes — not
- * the message payload — and cover neither the partial-miss count nor the
- * `to_s`-shaped key comparison.
- */
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

@@ -1,9 +1,6 @@
 import { describe, it, expectTypeOf, assertType } from "vitest";
 import { Base, Relation } from "@blazetrails/activerecord";
 
-// Scenario: building a search endpoint — users chain scopes, filters, order,
-// and pagination, then `await` the result.
-
 class Post extends Base {
   declare title: string;
   declare published: boolean;
@@ -139,7 +136,6 @@ describe("query chaining DX", () => {
 
       static {
         this.attribute("published", "boolean");
-        // No manual `this: Relation<Article>` annotation needed.
         this.scope("published", function () {
           expectTypeOf(this).toMatchTypeOf<Relation<Article>>();
           return this.where({ published: true });

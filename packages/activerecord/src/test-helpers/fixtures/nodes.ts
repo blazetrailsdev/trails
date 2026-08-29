@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/nodes.yml
 export const nodeFixtureData = {
   grandparent: {
     id: 1,

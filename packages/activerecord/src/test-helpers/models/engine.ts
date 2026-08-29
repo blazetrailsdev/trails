@@ -1,5 +1,4 @@
 import type { Car } from "./car.js";
-// vendor/rails/activerecord/test/models/engine.rb
 import { Base } from "../../base.js";
 
 export class Engine extends Base {

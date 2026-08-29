@@ -1,15 +1,3 @@
-/**
- * Trails-only: pins the `save(&block)` yield point.
- *
- * Rails threads the block from `save`/`save!` through `create_or_update` into
- * `_create_record` / `_update_record`, which yield it after the write and
- * *before* the after_create/after_update callbacks
- * (persistence.rb:891-940). `CollectionAssociation#concat_records` depends on
- * that exact moment to capture `@_was_loaded` before a callback can load the
- * association (collection_association.rb:445). Rails covers the yield only
- * indirectly, through the association behaviour it enables; these tests pin the
- * plumbing itself because that is where the port had no block at all.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -115,12 +103,6 @@ describe("save block threading (trails)", () => {
     expect(seen).toEqual(["block", "after_create"]);
   });
 
-  // AC3: Rails' `@_was_loaded` guard. `concat_records` captures `loaded?` in the
-  // block it hands to `insert_record` (collection_association.rb:445), which
-  // `save` yields before the after_create callbacks (persistence.rb:940). A
-  // callback that loads the association therefore cannot make the capture read
-  // `true`, and `replace_on_target`'s `elsif @_was_loaded || !loaded?`
-  // (collection_association.rb:480) skips the append the load already made.
   it("an after_create callback that loads the collection leaves no duplicate target entry", async () => {
     const author = await Author.find(authors("david").id);
 

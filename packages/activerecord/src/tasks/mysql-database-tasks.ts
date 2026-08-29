@@ -1,9 +1,3 @@
-/**
- * MySQLDatabaseTasks — MySQL/MariaDB-specific database lifecycle operations.
- *
- * Mirrors: ActiveRecord::Tasks::MySQLDatabaseTasks
- */
-
 import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
@@ -65,9 +59,6 @@ export class MySQLDatabaseTasks {
       ignoreTables = dataSources.filter((table) =>
         ignoreTables.some((pattern) => {
           if (!(pattern instanceof RegExp)) return pattern === table;
-          // Ruby's Regexp#=== carries no state; a JS `g`/`y` regex advances
-          // `lastIndex` on every `.test()`, so without this reset the second
-          // table tested against the same pattern can silently miss.
           pattern.lastIndex = 0;
           return pattern.test(table);
         }),
@@ -97,12 +88,6 @@ export class MySQLDatabaseTasks {
     await this.runCmd("mysql", args, "loading");
   }
 
-  /**
-   * Truncate every user table in the current database, skipping
-   * schema_migrations and ar_internal_metadata. Disables FK checks for
-   * the duration so TRUNCATE order doesn't matter (matching Rails'
-   * Mysql2Adapter#truncate_tables behavior).
-   */
   async truncateAll(): Promise<void> {
     const dbName = this.dbConfig.database as string;
     await this.establishConnection();
@@ -131,14 +116,8 @@ export class MySQLDatabaseTasks {
     DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
   }
 
-  /**
-   * @missingRailsCall new — PERMANENT: Verified per-site (RFC 0106): `Hash.new.tap {
-   *   |options| ... }` (`mysql_database_tasks.rb:84`) — a fresh Hash is an
-   *   object literal in TS; `Hash.new` has no TS call spelling.
-   */
+  /** @missingRailsCall new — PERMANENT */
   private creationOptions(): { charset?: string; collation?: string } {
-    // `Hash#include?` is key presence, not a defined value, so a key stored
-    // with an explicit nil still emits its option.
     const options: { charset?: string; collation?: string } = {};
     if (Object.keys(this.configurationHash).includes("encoding")) {
       options.charset = this.configurationHash.encoding as string;
@@ -149,15 +128,6 @@ export class MySQLDatabaseTasks {
     return options;
   }
 
-  /**
-   * `prepare_command_options` (`mysql_database_tasks.rb:76-93`). Reads
-   * `configuration_hash` only: `UrlConfig` has already merged the resolved URL
-   * hash into it (`database_configurations/url_config.rb:41-43`), so there is
-   * nothing left to re-parse here.
-   *
-   * Ruby's `filter_map` guard is `if configuration_hash[opt]`, so only nil/false
-   * are dropped — an empty string still emits its flag.
-   */
   private prepareCommandOptions(): string[] {
     const args = Object.entries({
       host: "--host",
@@ -198,11 +168,6 @@ export class MySQLDatabaseTasks {
       if (result.signal) details.push(`Signal: ${result.signal}`);
       if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
       if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-      // `fail run_cmd_error(cmd, args, action)` (`mysql_database_tasks.rb:105`).
-      // Rails' first line is the whole message because `Kernel.system` lets the
-      // child write straight to the terminal; `spawnSync` captures it instead,
-      // so the captured streams follow the ported message rather than replacing
-      // it.
       throw new Error(
         runCmdError(cmd, args, action) +
           `${cmd} ${args.join(" ")}\n\n` +
@@ -219,11 +184,7 @@ export class MySQLDatabaseTasks {
 
   /**
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
-   *   `configuration_hash.merge(database: nil)` (`mysql_database_tasks.rb:80`) —
-   *   a non-mutating Hash merge is an object spread in TS, which is not a
-   *   `merge` call the comparator can credit.
+   * @missingRailsCall merge — PERMANENT
    */
   private configurationHashWithoutDatabase(): ConfigHash {
     return { ...this.configurationHash, database: null };

@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import "./support/canonical-model-index.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
@@ -230,10 +226,6 @@ describe("ReflectionTest", () => {
     expect((await h2.chefLists.toArray()).length).toBe(1);
     expect(await h2.chefLists.count()).toBe(1);
 
-    // Rails clears via the association writer (`hotel.mocktail_designers = []`),
-    // which deletes the underlying chef_list join rows AND prunes the in-memory
-    // targets of both this and the through (`chef_lists`) association. A bare
-    // out-of-band `deleteAll` would leave `to_a`'s now-cached target stale.
     await h2.mocktailDesigners.replace([]);
 
     expect((await h2.mocktailDesigners.toArray()).length).toBe(0);
@@ -298,9 +290,6 @@ describe("ReflectionTest", () => {
     const bh1r = await SC3Author.find(author.id).then((a: any) => a.bestHardbacks.toArray());
     expect(bh1r.length).toBe(1);
 
-    // Rails clears via the writer (`author.best_hardbacks = []`), which deletes
-    // the through `books` join rows and empties the cached target; a bare
-    // out-of-band `deleteAll` would leave `to_a`'s now-cached target stale.
     await a3.bestHardbacks.replace([]);
 
     expect((await a3.bestHardbacks.toArray()).length).toBe(0);
@@ -535,8 +524,6 @@ describe("ReflectionTest", () => {
     expect(type.serialize(object)).toBe(object);
   });
   it("reflection klass for nested class name", async () => {
-    // Rails passes a nil name here (reflection_test.rb:126) — the test exercises
-    // klass resolution only, and nothing on that path reads the name.
     const anonymous = null as unknown as string;
     const reflection = createReflection(
       "hasMany",
@@ -644,7 +631,6 @@ describe("ReflectionTest", () => {
     const { Author, Book } = makeModels();
     const ref = reflectOnAssociation(Author, "books") as AssociationReflection;
     expect(ref.associationPrimaryKey()).toBe("id");
-    // Custom primary key
     class SpecialBook extends Base {
       declare isbn: string | null;
       declare author_id: number | null;
@@ -733,9 +719,7 @@ describe("ReflectionTest", () => {
         .validate,
     ).toBe(false);
   });
-  it.skip("symbol for class name", () => {
-    // UNPORTED: Ruby Symbol type for className has no JS equivalent.
-  });
+  it.skip("symbol for class name", () => {});
   it("class for class name", () => {
     expect(() =>
       createReflection(
@@ -795,8 +779,6 @@ describe("ReflectionTest", () => {
     registerModel("CatalogCategory", CatalogCategory);
     registerModel("CatalogProduct", CatalogProduct);
     const ref = reflectOnAssociation(CatalogProduct, "catalogCategories");
-    // Rails Builder::HasAndBelongsToMany#table_name collapses a shared
-    // `[._]`-terminated prefix (see vendor reflection_test.rb:551).
     expect(ref!.joinTable).toBe("catalog_categories_products");
   });
 
@@ -822,7 +804,6 @@ describe("ReflectionTest", () => {
     registerModel("CatCategory", CatCategory);
     registerModel("ContentPage", ContentPage);
     const ref = reflectOnAssociation(ContentPage, "catCategories");
-    // Join table derived from model names: pluralize(underscore("ContentPage")) + underscore("catCategories")
     expect(ref!.joinTable).toBe("cat_categories_content_pages");
   });
 
@@ -855,7 +836,6 @@ describe("ReflectionTest", () => {
     const hotel = await CanonicalHotel.create({});
     const dept = await Department.create({ hotel_id: hotel.id });
     await Chef.create({ department_id: dept.id });
-    // includes should accept string association names
     const hotels = await CanonicalHotel.all().includes(":departments");
     expect(hotels).toHaveLength(1);
   });
@@ -870,8 +850,6 @@ describe("ReflectionTest", () => {
     expect(ref!.name).toBe("departments");
   });
   it("reflect on missing source assocation raise exception", () => {
-    // Mirrors Rails test/cases/reflection_test.rb: Hotel has_many :lost_items,
-    // through: :departments; Department has no :lost_items assoc.
     class MsHotel extends Base {
       declare name: string | null;
       declare departments: AssociationProxy<MsDepartment>;
@@ -904,29 +882,17 @@ describe("ReflectionTest", () => {
     expect(ref.sourceReflection).toBeNull();
     expect(() => (ref as any).checkValidityBang()).toThrow(/Could not find the source association/);
   });
-  it.skip("name error from incidental code is not converted to name error for association", () => {
-    // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
-  });
+  it.skip("name error from incidental code is not converted to name error for association", () => {});
   it("automatic inverse suppresses name error for association", () => {
-    // automatic_inverse_of rescues the NameError compute_class raises for the
-    // association's own missing class (reflection.rb:769,
-    // `raise unless error.name.to_s == class_name`) and gives up on the
-    // inverse rather than propagating. `notAClass` names no registered model.
     const reflection = reflectOnAssociation(UserWithInvalidRelation, "notAClass");
     expect(reflection).not.toBeNull();
-    // Rails: `reflection.dup.has_inverse?` — "dup to prevent global
-    // memoization" (reflection_test.rb:651). UserWithInvalidRelation is
-    // module-scoped, so memoizing the failed inverse onto the shared reflection
-    // would leak into every later test. Object#dup is a shallow copy.
     const dup = Object.create(
       Object.getPrototypeOf(reflection),
       Object.getOwnPropertyDescriptors(reflection),
     ) as typeof reflection;
     expect(dup!.hasInverse()).toBe(false);
   });
-  it.skip("automatic inverse does not suppress name error from incidental code", () => {
-    // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
-  });
+  it.skip("automatic inverse does not suppress name error from incidental code", () => {});
 
   it("human name", () => {
     class Post extends Base {
@@ -936,7 +902,6 @@ describe("ReflectionTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Model human name should be derived from the class name
     expect(Post.name).toBe("Post");
   });
 
@@ -963,12 +928,6 @@ describe("ReflectionTest", () => {
 
   it("integer columns", async () => {
     await CanonicalTopic.loadSchema();
-    // Rails asserts `:integer` outright (reflection_test.rb:94-99): its PG
-    // adapter maps `int8` onto Type::Integer with `limit: 8` rather than a
-    // distinct type. trails names it `big_integer`, so a bigserial/bigint PK
-    // reports differently per adapter — tracked debt, not ratified here:
-    // story pg-bigserial-pk-reflects-as-big-integer-not-integer, in the
-    // activerecord-surfaced-deviations bucket.
     expect(["integer", "big_integer"]).toContain(
       (CanonicalTopic as any).columnForAttribute("id").type,
     );
@@ -1029,8 +988,6 @@ describe("ReflectionTest", () => {
 
   it("type", () => {
     expect(reflectOnAssociation(CanonicalPost, "taggings")!.type).toBe("taggable_type");
-    // images declares `foreignType: "imageable_class"` on its `as:` option, so
-    // the reflection type must honor it rather than deriving `imageable_type`.
     expect(reflectOnAssociation(CanonicalPost, "images")!.type).toBe("imageable_class");
     expect(reflectOnAssociation(CanonicalPost, "readers")!.type).toBeNull();
   });
@@ -1104,7 +1061,6 @@ describe("ReflectionTest", () => {
       }
     }
     const reflection = reflectOnAssociation(Post, "nonexistent");
-    // Should return null, not throw
     expect(reflection).toBeNull();
   });
 
@@ -1143,9 +1099,6 @@ describe("ReflectionTest", () => {
     }
     const ref = reflectOnAssociation(Orphan, "ghosts");
     expect(ref).not.toBeNull();
-    // "Ghost" is not registered, so accessing klass should throw. compute_class
-    // wraps the miss in its own NameError (reflection.rb:494-503), and appends
-    // the :class_name hint because no class_name option was given.
     expect(() => ref!.klass).toThrow(
       "Missing model class Ghost for the Orphan#ghosts association." +
         " You can specify a different model class with the :class_name option.",
@@ -1164,7 +1117,6 @@ describe("ReflectionTest", () => {
     }
     const ref = reflectOnAssociation(Orphan2, "items");
     expect(ref).not.toBeNull();
-    // class_name *was* given, so Rails omits the hint suffix.
     expect(() => ref!.klass).toThrow(
       "Missing model class NonExistentModel for the Orphan2#items association.",
     );
@@ -1190,10 +1142,8 @@ describe("ReflectionTest", () => {
     registerModel(Child);
     const ref = reflectOnAssociation(Parent, "children");
     expect(ref).not.toBeNull();
-    // klass should return a class that extends Base
     expect(ref!.klass).toBe(Child);
 
-    // Non-AR subclass registered under a different name raises ArgumentError
     class NotAModel {}
     modelRegistry.set("NotAModel", NotAModel as unknown as typeof Base);
     try {
@@ -1267,59 +1217,42 @@ describe("ReflectionTest", () => {
         this.attribute("balance", "integer");
       }
     }
-    // AggregateReflection backs composed_of; a string class_name pointing at a
-    // constant that isn't registered must raise NameError. Rails'
-    // MacroReflection#compute_class is `name.constantize` (reflection.rb:434),
-    // so the message is constantize's, not a registry-specific one.
     const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
     expect(() => ref.klass).toThrow(NameError);
     expect(() => ref.klass).toThrow(/uninitialized constant NoSuchMoney/);
   });
 
   it("association reflection in modules", async () => {
-    // Cross-namespace className resolution over the real company_in_module
-    // fixtures (vendor/rails/.../models/company_in_module.rb). The qualified
-    // registry keys are DERIVED from each class's `moduleName`, so this also
-    // guards that the derivation replaced the hand-written registerModel strings.
-
-    // Unqualified "Client" resolves namespace-relative from MyApplication::Business::Firm
     const firmRef = reflectOnAssociation(MyAppBusinessFirm, "clientsOfFirm");
     expect(firmRef!.klass).toBe(MyAppBusinessClient);
     expect(firmRef!.className).toBe("Client");
     expect(firmRef!.tableName).toBe("companies");
 
-    // Fully qualified class_name resolves absolutely
     const acctFirmRef = reflectOnAssociation(MyAppBillingAccount, "firm");
     expect(acctFirmRef!.klass).toBe(MyAppBusinessFirm);
     expect(acctFirmRef!.className).toBe("MyApplication::Business::Firm");
     expect(acctFirmRef!.tableName).toBe("companies");
 
-    // Fully qualified billing firm
     const qualRef = reflectOnAssociation(MyAppBillingAccount, "qualifiedBillingFirm");
     expect(qualRef!.klass).toBe(MyAppBillingFirm);
     expect(qualRef!.className).toBe("MyApplication::Billing::Firm");
     expect(qualRef!.tableName).toBe("companies");
 
-    // Unqualified "Firm" resolves namespace-relative from MyApplication::Billing::Account
     const unqualRef = reflectOnAssociation(MyAppBillingAccount, "unqualifiedBillingFirm");
     expect(unqualRef!.klass).toBe(MyAppBillingFirm);
     expect(unqualRef!.className).toBe("Firm");
     expect(unqualRef!.tableName).toBe("companies");
 
-    // Fully qualified, nested
     const nestedQualRef = reflectOnAssociation(MyAppBillingAccount, "nestedQualifiedBillingFirm");
     expect(nestedQualRef!.klass).toBe(MyAppBillingNestedFirm);
     expect(nestedQualRef!.className).toBe("MyApplication::Billing::Nested::Firm");
     expect(nestedQualRef!.tableName).toBe("companies");
 
-    // Partially qualified "Nested::Firm" resolves namespace-relative
     const nestedRef = reflectOnAssociation(MyAppBillingAccount, "nestedUnqualifiedBillingFirm");
     expect(nestedRef!.klass).toBe(MyAppBillingNestedFirm);
     expect(nestedRef!.className).toBe("Nested::Firm");
     expect(nestedRef!.tableName).toBe("companies");
 
-    // Runtime: resolveAssocClass uses the reflection layer for namespace-aware
-    // resolution — verifies the actual loading path, not only ref.klass
     expect(resolveAssocClass(MyAppBusinessFirm, "clientsOfFirm", "Client")).toBe(
       MyAppBusinessClient,
     );
@@ -1348,8 +1281,6 @@ describe("ReflectionTest", () => {
   });
 
   it("join table", () => {
-    // Rails stubs klass on a has_many reflection; join_table derives from both
-    // table names regardless of which side declares the association.
     class DjtCategory extends Base {
       declare name: string | null;
       declare products: AssociationProxy<DjtProduct>;
@@ -1383,8 +1314,6 @@ describe("ReflectionTest", () => {
     const hotel = await CanonicalHotel.create({});
     const dept = await Department.create({ hotel_id: hotel.id });
     const chef = await Chef.create({ department_id: dept.id });
-    // includes should accept a nested association hash (Rails `[departments: :chefs]`)
-    // and actually preload the nested association onto the loaded records.
     const hotels = await CanonicalHotel.all().includes({ ":departments": ":chefs" });
     expect(hotels).toHaveLength(1);
     const departments = hotels[0].association("departments").target as Base[];
@@ -1425,7 +1354,6 @@ describe("ReflectionTest", () => {
 
     const ref = reflectOnAssociation(RfComment, "blogPost")!;
     expect(ref.foreignKey).toBe("blog_post_id");
-    // BelongsTo with composite PK target should infer "id" from [:blog_id, :id]
     expect(ref.associationPrimaryKey()).toBe("id");
   });
 });

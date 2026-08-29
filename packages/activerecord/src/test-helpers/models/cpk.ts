@@ -1,10 +1,8 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { throwAbort } from "@blazetrails/activesupport";
-// vendor/rails/activerecord/test/models/cpk/
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
-// cpk/author.rb
 export class CpkAuthor extends Base {
   declare books: AssociationProxy<CpkBook>;
   declare name: string;
@@ -13,12 +11,10 @@ export class CpkAuthor extends Base {
   static _demodulizedName = "Author";
 
   static {
-    // Rails: dependent: :delete_all — "deleteAll" not yet in AssociationOptions.dependent type
     this.hasMany("books", { className: "CpkBook", foreignKey: "author_id", dependent: "delete" });
   }
 }
 
-// cpk/book.rb
 export class CpkBook extends Base {
   declare order: CpkOrder | null;
   declare orderExplicitFkPk: CpkOrder | null;
@@ -145,7 +141,6 @@ export class CpkBookWithOrderAgreements extends CpkBook {
   }
 }
 
-// cpk/book_destroy_async.rb
 export class CpkBookDestroyAsync extends Base {
   declare chapters: AssociationProxy<CpkChapterDestroyAsync>;
 
@@ -153,7 +148,6 @@ export class CpkBookDestroyAsync extends Base {
   static _tableName = "cpk_books";
 
   static {
-    // Rails: dependent: :destroy_async — not yet in AssociationOptions.dependent type
     this.hasMany("chapters", {
       foreignKey: ["author_id", "book_id"],
       className: "CpkChapterDestroyAsync",
@@ -162,7 +156,6 @@ export class CpkBookDestroyAsync extends Base {
   }
 }
 
-// cpk/chapter.rb
 export class CpkChapter extends Base {
   declare book: CpkBook | null;
   declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
@@ -179,7 +172,6 @@ export class CpkChapter extends Base {
   }
 }
 
-// cpk/chapter_destroy_async.rb
 export class CpkChapterDestroyAsync extends Base {
   declare book: CpkBookDestroyAsync | null;
   declare loadBelongsTo: (name: "book") => Promise<CpkBookDestroyAsync | null>;
@@ -196,7 +188,6 @@ export class CpkChapterDestroyAsync extends Base {
   }
 }
 
-// cpk/order.rb
 export class CpkOrder extends Base {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
   declare books: AssociationProxy<CpkBook>;
@@ -308,7 +299,6 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
   }
 }
 
-// cpk/order_agreement.rb
 export class CpkOrderAgreement extends Base {
   declare order: CpkOrder | null;
   declare loadBelongsTo: (name: "order") => Promise<CpkOrder | null>;
@@ -323,7 +313,6 @@ export class CpkOrderAgreement extends Base {
   }
 }
 
-// cpk/order_tag.rb
 export class CpkOrderTag extends Base {
   declare tag: CpkTag | null;
   declare order: CpkOrder | null;
@@ -344,7 +333,6 @@ export class CpkOrderTag extends Base {
   }
 }
 
-// cpk/tag.rb
 export class CpkTag extends Base {
   declare orderTags: AssociationProxy<CpkOrderTag>;
   declare orders: AssociationProxy<CpkOrder>;
@@ -359,7 +347,6 @@ export class CpkTag extends Base {
   }
 }
 
-// cpk/post.rb
 export class CpkPost extends Base {
   declare comments: AssociationProxy<CpkComment>;
   declare author: string;
@@ -377,7 +364,6 @@ export class CpkPost extends Base {
   }
 }
 
-// cpk/comment.rb
 export class CpkComment extends Base {
   declare commentable: Base | null;
   declare post: CpkPost | null;
@@ -404,7 +390,6 @@ export class CpkComment extends Base {
   }
 }
 
-// cpk/review.rb
 export class CpkReview extends Base {
   declare book: CpkBook | null;
   declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
@@ -424,7 +409,6 @@ export class CpkReview extends Base {
   }
 }
 
-// cpk/car.rb
 export class CpkCar extends Base {
   declare carReviews: AssociationProxy<CpkCarReview>;
   declare make: string;
@@ -441,7 +425,6 @@ export class CpkCar extends Base {
   }
 }
 
-// cpk/car_review.rb
 export class CpkCarReview extends Base {
   declare car: CpkCar | null;
   declare loadBelongsTo: (name: "car") => Promise<CpkCar | null>;

@@ -11,12 +11,6 @@ import { Table, UpdateManager } from "@blazetrails/arel";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
-/**
- * Raised when more nested-attribute records are provided than the
- * association's `limit` option allows.
- *
- * Mirrors: ActiveRecord::NestedAttributes::TooManyRecords
- */
 export class TooManyRecords extends ActiveRecordError {
   constructor(message?: string) {
     super(message);
@@ -24,107 +18,45 @@ export class TooManyRecords extends ActiveRecordError {
   }
 }
 
-/**
- * Returns whether the record is marked for destruction in the context of
- * nested attributes. Mirrors Rails' NestedAttributes instance method `_destroy`,
- * which delegates to `marked_for_destruction?`.
- *
- * Mirrors: ActiveRecord::NestedAttributes#_destroy
- */
 export function _destroy(this: Base): boolean {
   return this.markedForDestruction();
 }
 
-/**
- * Rails: `REJECT_ALL_BLANK_PROC = proc { |attributes| attributes.all? { |key,
- * value| key == "_destroy" || value.blank? } }` (nested_attributes.rb:302).
- * The shared proc `reject_if: :all_blank` resolves to — reject a record when
- * every attribute other than `_destroy` is blank.
- */
 export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): boolean =>
   Object.entries(attributes).every(([key, value]) => key === "_destroy" || isBlank(value));
 
 export interface NestedAttributeOptions {
   allowDestroy?: boolean;
-  // The owner record is passed as a second argument so method-style predicates
-  // (Rails `reject_if: :some_method`) can consult the owner (e.g. `persisted?`).
-  // The string `"all_blank"` (Rails' `:all_blank` symbol) is resolved to the
-  // shared `REJECT_ALL_BLANK_PROC` in `acceptsNestedAttributesFor`.
   rejectIf?: ((attrs: Record<string, unknown>, record: Base) => boolean) | "all_blank";
-  // A string limit names a method/attribute on the owner (Rails `limit: :symbol`).
   limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
 
-/**
- * Configure nested attributes for an association.
- *
- * The registry write is nested_attributes.rb:361-363 — dup the hash, assign the
- * key, write the whole hash back through the `class_attribute` writer.
- *
- * Mirrors: ActiveRecord::Base.accepts_nested_attributes_for
- *
- * Usage:
- *   acceptsNestedAttributesFor(Post, 'comments', { allowDestroy: true })
- *
- * Then when saving:
- *   post.assignAttributes({ commentsAttributes: [{ body: 'hi' }, { id: 1, _destroy: true }] })
- *   await post.save()
- */
 export function acceptsNestedAttributesFor(
   modelClass: typeof Base,
   associationName: string,
   options: NestedAttributeOptions = {},
 ): void {
-  // Rails: `options[:reject_if] = REJECT_ALL_BLANK_PROC if options[:reject_if] ==
-  // :all_blank` (nested_attributes.rb:355) — resolve the `:all_blank` symbol to
-  // the shared proc so `nested_attributes_options[name][:reject_if]` reads back
-  // as a Proc, and every downstream `call_reject_if` sees a callable.
   if (options.rejectIf === "all_blank") {
     options = { ...options, rejectIf: REJECT_ALL_BLANK_PROC };
   }
 
-  // Validate that the association exists
   const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
   if (!reflection) {
     throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
   }
 
-  // Rails sets `reflection.autosave = true` for every nested-attributes
-  // association (nested_attributes.rb:359), so the parent's save cascades into
-  // the in-memory target. The setter writes `options[:autosave]`
-  // (reflection.rb:399-405), which is what the save path reads — and is what
-  // makes the synchronous in-memory target population in
-  // `assignNestedAttributesForCollectionAssociation` reachable for plain
-  // `acceptsNestedAttributesFor(Model, "assoc")` callers, not only those who
-  // also pass `{ autosave: true }` to `hasMany`.
   reflection.autosave = true;
 
-  // Rails accepts_nested_attributes_for calls `define_autosave_validation_callbacks`
-  // after flipping autosave (nested_attributes.rb:368-370). The association's
-  // own declaration registered the autosave *save* callbacks, but its validation
-  // callback is gated on `reflection.validate?` — false at declaration time for a
-  // plain belongs_to/has_one (autosave not yet set). Re-running it here wires the
-  // nested-record validator so a singular nested association is validated.
   defineAutosaveValidationCallbacks.call(modelClass, reflection);
-
-  // Rails does NOT reject polymorphic belongs_to at declaration time — the
-  // check is deferred to build time (the writer raises when it tries to build
-  // a new record and finds no `build_#{association_name}` method). See
-  // assign_nested_attributes_for_one_to_one_association in Rails'
-  // nested_attributes.rb. We mirror that in
-  // assignNestedAttributesForOneToOneAssociation.
 
   const nestedAttributesOptions = { ...modelClass.nestedAttributesOptions };
   nestedAttributesOptions[associationName] = options;
   modelClass.nestedAttributesOptions = nestedAttributesOptions;
 
-  // `type = (reflection.collection? ? :collection : :one_to_one)`
-  // (nested_attributes.rb:361).
   const type = reflection.isCollection() ? "collection" : "one_to_one";
   modelClass.generateAssociationWriter(associationName, type);
 
-  // Wrap save to flush pending nested attributes after the parent is persisted
   const originalSave = modelClass.prototype.save;
   if (!(modelClass as any)._nestedSaveWrapped) {
     (modelClass as any)._nestedSaveWrapped = true;
@@ -133,8 +65,6 @@ export function acceptsNestedAttributesFor(
       this: Base,
       options?: { validate?: boolean; touch?: boolean },
     ): Promise<boolean> {
-      // Finish the reader load the constructor re-dispatch could not await, so
-      // the parent is never saved against a half-assigned graph.
       await awaitPendingNestedReaderLoads(this);
       const result = await originalSave.call(this, options);
       if (!result) return false;
@@ -145,35 +75,22 @@ export function acceptsNestedAttributesFor(
   }
 }
 
-/**
- * Assign nested attributes for an association.
- *
- * Mirrors: ActiveRecord::Base#assign_nested_attributes_for
- */
 export function assignNestedAttributes(
   record: Base,
   associationName: string,
   attributesArray: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): void {
-  // Validate input type
   if (typeof attributesArray !== "object" || attributesArray === null) {
     throw new Error("Hash or Array expected for nested attributes, got: " + typeof attributesArray);
   }
 
-  // Normalize hash-keyed format to array
   let attrs: Record<string, unknown>[];
   if (Array.isArray(attributesArray)) {
     attrs = attributesArray;
   } else {
-    // Rails takes `attributes_collection.values` in insertion order — no
-    // sort (nested_attributes.rb:499-506).
     attrs = Object.values(attributesArray);
   }
 
-  // Rails raises TooManyRecords synchronously from
-  // `assign_nested_attribute_for_collection_association` when `limit:`
-  // is exceeded — mirror that here so callers see the misconfiguration
-  // at assign time, not at save time.
   const ctor = record.constructor as typeof Base;
   const options = ctor.nestedAttributesOptions[associationName];
   const resolvedLimit = resolveNestedLimit(options?.limit, record);
@@ -183,16 +100,12 @@ export function assignNestedAttributes(
     );
   }
 
-  // Store on instance for later processing
   if (!(record as any)._pendingNestedAttributes) {
     (record as any)._pendingNestedAttributes = new Map();
   }
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
 }
 
-/**
- * Process all pending nested attributes after save.
- */
 async function processNestedAttributes(record: Base): Promise<void> {
   const pending: Map<string, Record<string, unknown>[]> | undefined = (record as any)
     ._pendingNestedAttributes;
@@ -207,7 +120,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
     const assocDef = (ctor as any)._reflectOnAssociation?.(assocName);
     if (!assocDef) continue;
 
-    // Resolve target model
     const className = assocDef.className;
 
     const targetModel = modelRegistry.get(className);
@@ -215,22 +127,9 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
     await (targetModel as any).ensureSchemaLoaded();
 
-    // belongs_to keeps the FK on the owner, conventionally `${assoc_name}_id`;
-    // has_one/has_many keep it on the child, conventionally `${owner}_id`. Rails
-    // derives the owner from the association reflection's `active_record` (the
-    // class that *declared* the association), not the runtime instance's class,
-    // so a subclass instance still resolves to the declaring model's FK — both
-    // for a single-column FK and a composite (array) FK from a CPK has_many/
-    // has_one. A composite reflection FK maps element-wise onto the declaring
-    // model's `activeRecordPrimaryKey`; only when the reflection yields no
-    // string/array FK do we fall back to the `${owner}_id` convention.
     const reflection = (ctor as any).reflectOnAssociation?.(assocName);
     const reflectionFk = reflection?.foreignKey;
     const optionFk = assocDef.options.foreignKey;
-    // Rails always resolves the FK through `reflection.foreign_key`, so prefer
-    // the (already option-aware) reflection FK and fall back to the raw option
-    // only when the reflection yields no array. The belongsTo create branch
-    // below uses the same precedence.
     const isCollectionLike = assocDef.type !== "belongsTo";
     const compositeFkColumns: string[] | null = isCollectionLike
       ? Array.isArray(reflectionFk)
@@ -247,13 +146,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
           ? `${underscore(assocName)}_id`
           : `${underscore(ctor.name)}_id`);
 
-    // Foreign-key attributes anchoring a built has_many/has_one child back to
-    // this owner. A composite FK reads each owner PK column named by the
-    // reflection's `activeRecordPrimaryKey`, paired positionally with the FK
-    // columns; a single FK uses the scalar owner id. When the composite FK came
-    // from an explicit array `foreignKey` option but the reflection is absent,
-    // fall back to the owner class's own primary key (Rails' default for
-    // `active_record_primary_key`) so the columns never resolve to undefined.
     const childForeignKeyAttributes = (): Record<string, unknown> => {
       if (!compositeFkColumns) return { [foreignKey]: record.id };
       const ownerPk = reflection?.activeRecordPrimaryKey ?? (ctor as any).primaryKey;
@@ -265,28 +157,16 @@ async function processNestedAttributes(record: Base): Promise<void> {
       return out;
     };
 
-    // limit-check already fired in assignNestedAttributes (Rails
-    // raises synchronously at assign time).
-
     const childPk = (targetModel as any).primaryKey || "id";
 
     for (const attrs of attrsList) {
       const { _destroy, ...restAttrs } = attrs as any;
       const pkValue = restAttrs[childPk] ?? restAttrs["id"];
-      // Remove the PK (and its `id` alias) from child attrs so they aren't set
-      // as regular attributes during update.
       const { [childPk]: _pkIgnored, id: _idIgnored, ...childAttrs } = restAttrs;
 
-      // Validate attributes against the target model's known columns, resolving
-      // `alias_attribute` keys the same way the build path does. `childAttrs`
-      // already has the PK/`id` addressing keys stripped; the foreign-key
-      // columns are real target columns (present in `attribute_types`), so
-      // `assertNestedAttributesAreKnown` accepts them without a bespoke set.
       assertNestedAttributesAreKnown(targetModel, childAttrs);
 
-      // Check _destroy before rejectIf — destroy should work regardless of rejectIf
       if (_destroy && config.allowDestroy) {
-        // Destroy existing record
         if (pkValue) {
           const existing = await (targetModel as any).find(pkValue);
           await existing.destroy();
@@ -294,33 +174,16 @@ async function processNestedAttributes(record: Base): Promise<void> {
         continue;
       }
 
-      // Check rejectIf only for create/update, not destroy. The `"all_blank"`
-      // symbol is resolved to a proc at declaration time, so this is always a
-      // function here.
       const rejectIf = config.rejectIf;
       if (typeof rejectIf === "function" && rejectIf(attrs, record)) {
         continue;
       }
 
       if (pkValue) {
-        // Update existing record
         const existing = await (targetModel as any).find(pkValue);
         await existing.update(childAttrs);
       } else if (assocDef.type === "belongsTo") {
-        // For belongs_to, create the target and set FK on *this* record. Rails
-        // sets the owner's FK columns from `reflection.foreign_key` zipped with
-        // `reflection.association_primary_key` (the *target* PK), regardless of
-        // single- or composite-key — see BelongsToAssociation#replace_keys /
-        // Association#set_owner_attributes. Thread the same here so a belongs_to
-        // to a CPK target writes every FK column (not a single coerced
-        // `created.id`).
         const created = await (targetModel as any).create(childAttrs);
-        // Only thread the FK when the target actually persisted. `create`
-        // returns an *unsaved* record on validation failure; Rails' autosave
-        // (`save_belongs_to_association`) aborts rather than committing a nil FK
-        // onto the owner. `isPersisted()` is also the correct CPK guard — the
-        // old `created.id != null` check was always truthy for a composite PK
-        // (an array), so an invalid CPK target would have written nils.
         if (created != null && created.isPersisted()) {
           const belongsToFkColumns = Array.isArray(reflectionFk)
             ? (reflectionFk as unknown[]).map(String)
@@ -331,8 +194,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
             reflection?.associationPrimaryKey?.() ?? (targetModel as any).primaryKey ?? "id";
           const assocPkColumns = Array.isArray(assocPk) ? assocPk : [assocPk];
           const arelTable = (ctor as any).arelTable as Table;
-          // Use _writeAttribute + direct persistence to avoid re-triggering
-          // nested attributes.
           const sets = belongsToFkColumns.map((col, i) => {
             const value = created._readAttribute(assocPkColumns[i]);
             record._writeAttribute(col, value);
@@ -345,20 +206,9 @@ async function processNestedAttributes(record: Base): Promise<void> {
           const conn = (ctor as any).connection;
           await conn.execute(conn.toSql(um));
 
-          // The deferred FK write above bypasses the normal belongs_to
-          // assignment, so the counter-cache machinery never runs for the
-          // newly-anchored owner. Rails routes this through
-          // `BelongsToAssociation#replace_keys` + `save_belongs_to_association`,
-          // which bumps the target's counter via `update_counters`. Mirror that
-          // here: once the owner has gained its FK, increment the target's
-          // counter column when the reflection declares `counterCache`.
           await (record.association(assocName) as any).incrementCounters?.();
         }
       } else {
-        // For hasMany/hasOne, set FK on the child record.
-        // When inverseOf is declared, cache the parent on the new child before
-        // saving so presence validators that check the association object pass
-        // without a DB round-trip — mirrors Rails' inverse_of auto-population.
         const inverseOf: string | undefined = assocDef.options.inverseOf;
         const fkAttrs = childForeignKeyAttributes();
         if (inverseOf) {
@@ -377,7 +227,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
 const UNASSIGNABLE_KEYS = ["id", "_destroy"] as const;
 
-/** @internal Stateless; one instance shared across all calls. */
+/** @internal */
 const _booleanType = new BooleanType();
 
 /** @internal */
@@ -409,8 +259,6 @@ export function callRejectIf(
   if (isWillBeDestroyed.call(this, associationName, attributes)) return false;
   const ctor = this.constructor as typeof Base;
   const rejectIf = ctor.nestedAttributesOptions[associationName]?.rejectIf;
-  // `"all_blank"` is resolved to a proc in acceptsNestedAttributesFor, so a
-  // stored rejectIf is always a function here.
   return typeof rejectIf === "function" ? rejectIf(attributes, this) : false;
 }
 
@@ -470,11 +318,7 @@ export function raiseNestedAttributesRecordNotFoundBang(
   );
 }
 
-/**
- * Resolve a `limit:` option to a number. A string names a method/attribute on
- * the owner (Rails `limit: :parrots_limit`); a function is invoked.
- * @internal
- */
+/** @internal */
 function resolveNestedLimit(
   limit: number | string | ((...args: unknown[]) => number) | undefined,
   record: Base,
@@ -515,19 +359,7 @@ export function generateAssociationWriter(
       ? assignNestedAttributesForCollectionAssociation
       : assignNestedAttributesForOneToOneAssociation;
 
-  // Rails' `#{name}_attributes=` (nested_attributes.rb:401-404). Rails' writer
-  // loads, removes the displaced record and installs the replacement inline,
-  // raising at the assignment expression; a JS property setter can await none of
-  // that, so the Rails name lands on a `set#{Name}Attributes()` method — the
-  // settled trails shape for a Ruby `x=` that must be async (CLAUDE.md).
-  // Collections get it too, for one uniform writer per association.
   Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
-    // Deliberately not `async`: Ruby's writer raises at the assignment
-    // expression, and an `async` body would turn every synchronous raise
-    // (nested_attributes.rb:415's `Cannot build association` among them) into a
-    // rejection observed only at the `await`. It answers a promise only when the
-    // assignment owes DB I/O, so an in-memory one also *completes* where Ruby's
-    // does — inside `new Model({...})`, before the constructor returns.
     value(this: Base, value: any): Promise<void> | void {
       return assign(this, associationName, value);
     },
@@ -535,9 +367,6 @@ export function generateAssociationWriter(
     configurable: true,
   });
 
-  // Rails' `#{name}_attributes=` (nested_attributes.rb:401-404) — a string key,
-  // not a property setter, so `public_send(setter, v)`
-  // (attribute_assignment.rb:68) reaches it and its promise survives.
   Object.defineProperty(modelClass.prototype, `${attrName}=`, {
     value(this: Base, value: any): Promise<void> | void {
       return assign(this, associationName, value);
@@ -556,85 +385,40 @@ export function isPolymorphicBelongsTo(record: Base, associationName: string): b
   return assocDef?.macro === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
 }
 
-/**
- * Rails builds a nested record via `association.build(attributes)` →
- * `assign_attributes`, which raises `UnknownAttributeError` for any key with no
- * writer. trails' `Model.new`/build silently drops unknown keys (the base-level
- * constructor leniency tracked by RFC 0046), so the nested build path guards
- * explicitly — mirroring the same check the collection flush path already runs.
- * Control keys (`_destroy`, the addressing `id`) are stripped by
- * `except(*UNASSIGNABLE_KEYS)` before this sees them; the primary key is always
- * assignable. When the target schema isn't loaded (`attribute_types` empty)
- * there is nothing to validate against, so the check is skipped.
- */
 function assertNestedAttributesAreKnown(
   targetModel: typeof Base,
   assignable: Record<string, unknown>,
 ): void {
   const keys = Object.keys(assignable);
   if (keys.length === 0) return;
-  // `attribute_types` reflects the schema on first read (`_default_attributes`),
-  // so no warming construction is needed; a genuinely schemaless model yields an
-  // empty set and there is nothing to validate against.
   const attributeTypes = targetModel.attributeTypes();
   if (Object.keys(attributeTypes).length === 0) return;
   let probe: Base | undefined;
   const pk = (targetModel as any).primaryKey;
   const pkColumns = new Set<string>((Array.isArray(pk) ? pk : [pk]).map(String));
-  // `assignable` comes from `except(*UNASSIGNABLE_KEYS)`, which already strips
-  // the `id` addressing key (UNASSIGNABLE_KEYS), so only a non-`id` primary key
-  // needs an explicit exemption here.
   for (const key of keys) {
     if (Object.hasOwn(attributeTypes, key) || pkColumns.has(key)) continue;
-    // Resolve aliases before raising: `hasAttribute` maps an aliased name onto
-    // its real column (matching the flush path's lazy dummy construction).
     probe ??= new (targetModel as any)() as Base;
     if ((probe as any).hasAttribute(key)) continue;
     throw new UnknownAttributeError(probe as object, key);
   }
 }
 
-/**
- * The slice of the singular (`belongsTo`/`hasOne`) runtime association used by
- * the one-to-one nested-attributes writer. `target` is the in-memory record (or
- * null); `build` / `initializeAttributes` mirror Rails' `build_#{name}` and
- * `Association#initialize_attributes`.
- * @internal
- */
+/** @internal */
 interface OneToOneAssociation {
   target: Base | null;
   build(attrs: Record<string, unknown>): Base | null | Promise<Base | null>;
-  // Rails' `build_record` / `set_new_record` — `build`'s two halves
-  // (singular_association.rb:29-31), which this writer runs separately so the
-  // displacement removal can sit between them, where Rails puts it.
   buildRecord(attrs: Record<string, unknown>): Base | null;
   setNewRecord(record: Base): void;
   initializeAttributes(record: Base): Promise<void> | void;
   isLoaded(): boolean;
-  // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
-  // where trails raises strict-loading violations (singular-association.ts:210).
   readonly reader?: Base | null | Promise<Base | null>;
-  // Rails' leading `load_target` (has_one_association.rb:59) and its
-  // `remove_target!` (:69), plus the predicate that says whether either would do
-  // any work — see `detachDisplacedThenSetNewRecord`.
   loadDisplacedForBuild?(): Promise<unknown> | null;
   detachDisplacedTarget?(): Promise<void>;
   displacementNeedsAwait?(): boolean;
 }
 
-/**
- * Rails' `HasOneAssociation#replace` tail, in Rails' order: `load_target`
- * (has_one_association.rb:59) → `remove_target!` (:69) → `self.target = record`
- * (:84).
- *
- * The record was already constructed by `build_record`
- * (singular_association.rb:29-31), which is why the caller passes it in: Rails
- * reaches `load_target` only from `set_new_record`, i.e. *after* the
- * construction, so a build that raises queries nothing. Running the three steps
- * forward means a raising `remove_target!` leaves the OLD record cached,
- * exactly as Rails' `self.target = record` after the transaction block does.
- * @internal
- */
+/** @internal */
 async function detachDisplacedThenSetNewRecord(
   assoc: OneToOneAssociation,
   built: Base | null,
@@ -645,18 +429,8 @@ async function detachDisplacedThenSetNewRecord(
 }
 
 /**
- * Park the async re-entry of {@link assignNestedAttributesForOneToOneAssociation}
- * on the owner: capture its rejection so a never-drained load cannot surface as
- * an unhandled rejection, and queue it for the drain that rethrows.
- *
- * Rails reads the existing record with `send(association_name)`
- * (nested_attributes.rb:434), a plain synchronous call; ours is a promise for an
- * unloaded association. The writer itself awaits that load; this is for the one
- * caller that cannot — `populate_with_current_scope_attributes`, run from a
- * constructor. The deferral is a *read*, so no DB state is in flight to race an
- * interim insert.
  * @internal
- * @noRailsEquivalent PERMANENT Ruby reads the existing record with a synchronous send (nested_attributes.rb:434); ours returns a promise a constructor cannot await.
+ * @noRailsEquivalent PERMANENT
  */
 export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
   const settled = load.then(
@@ -667,19 +441,12 @@ export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
   (host._pendingNestedReaderLoads ??= []).push(settled);
 }
 
-/**
- * The owner-side state {@link parkNestedReaderLoad} parks.
- * @internal
- */
+/** @internal */
 interface NestedReaderLoadHost {
   _pendingNestedReaderLoads?: Promise<unknown>[];
 }
 
-/**
- * Await the re-entries parked by {@link parkNestedReaderLoad}, rethrowing the
- * first failure, so the owner is never saved against a half-assigned graph.
- * @internal
- */
+/** @internal */
 async function awaitPendingNestedReaderLoads(record: Base): Promise<void> {
   const host = record as unknown as NestedReaderLoadHost;
   const pending = host._pendingNestedReaderLoads;
@@ -709,8 +476,6 @@ function storePendingNestedAttributes(
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
 }
 
-// Rails reports the offending value's class name (e.g. `got String`); mirror
-// that with the JS constructor name rather than the lowercase `typeof`.
 function nestedTypeName(value: unknown): string {
   if (value === null) return "NilClass";
   if (value === undefined) return "undefined";
@@ -726,7 +491,6 @@ function nestedTypeName(value: unknown): string {
     case "symbol":
       return "Symbol";
   }
-  // Objects/arrays: JS constructor name aligns with Ruby's (Array, Hash-likes, …).
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
@@ -747,10 +511,6 @@ export function assignNestedAttributesForOneToOneAssociation(
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
-  // Rails: `existing_record = send(association_name)` (nested_attributes.rb:434).
-  // The reader loads an unloaded association; ours answers a promise for that
-  // load, so the whole body is re-entered once it lands (`assoc.isLoaded()` is
-  // true by then, so this resolves and falls through).
   const assoc = record.association(associationName) as unknown as OneToOneAssociation;
   if ((hasId || updateOnly) && assoc.isLoaded() === false && "reader" in assoc) {
     const read = assoc.reader;
@@ -762,9 +522,6 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
   const existingRecord = assoc.target ?? null;
 
-  // Rails nested_attributes.rb:436 — update (or mark for destruction) the
-  // existing record in place when `update_only` is set, or when a matching
-  // `id` was supplied and the in-memory target carries that id.
   if (
     (updateOnly || hasId) &&
     existingRecord &&
@@ -780,32 +537,21 @@ export function assignNestedAttributesForOneToOneAssociation(
     return;
   }
 
-  // Rails nested_attributes.rb:439-440.
   if (hasId) {
     raiseNestedAttributesRecordNotFoundBang(record, associationName, (attributes as any).id);
   }
 
-  // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord.call(record, associationName, attributes)) {
     const assignable = except(attributes, ...UNASSIGNABLE_KEYS);
     const targetModel = resolveCollectionTargetModel(record, associationName);
     if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
     if (existingRecord && existingRecord.isNewRecord()) {
-      // Rails reuses an already-built unsaved target (e.g. after `buildShip`)
-      // rather than replacing it: assign into it, then re-anchor FK/scope/
-      // inverse via `initialize_attributes`.
       const pending = existingRecord.assignAttributes(assignable);
       if (pending) {
         return pending.then(() => assoc.initializeAttributes(existingRecord));
       }
       return assoc.initializeAttributes(existingRecord);
     } else {
-      // Rails nested_attributes.rb:451 — `method = :"build_#{association_name}";
-      // respond_to?(method) ? public_send(method, ...) : raise`. A plain
-      // polymorphic belongs_to has no `build_#{name}` method, so the writer
-      // raises. A `delegated_type` role, however, defines `build_#{role}`
-      // (delegated-type.ts) which instantiates the concrete type named by the
-      // `*_type` column, so it builds through that method instead of raising.
       if (isPolymorphicBelongsTo(record, associationName)) {
         const buildMethod = `build${camelize(associationName, true)}`;
         const builder = (record as unknown as Record<string, unknown>)[buildMethod];
@@ -818,25 +564,10 @@ export function assignNestedAttributesForOneToOneAssociation(
           );
         }
       } else {
-        // Rails' `SingularAssociation#build` is `build_record` then
-        // `set_new_record` (singular_association.rb:29-31), and only the second
-        // reaches `load_target` / `remove_target!`
-        // (has_one_association.rb:59-69). Run the two halves separately and keep
-        // the displacement between them, so a raising `build_record` (an invalid
-        // STI `type`, `SubclassNotFound`) neither queries nor detaches a record
-        // Rails never touches.
         const built = assoc.buildRecord(assignable);
         if (assoc.displacementNeedsAwait?.() === true) {
-          // DB I/O Rails runs inline before `self.target = record` (:84) — a
-          // SELECT for a never-loaded association, then `remove_target!`'s
-          // nullify/destroy save. Returning the promise puts it at the
-          // assignment expression, where Rails runs it.
           return detachDisplacedThenSetNewRecord(assoc, built);
         }
-        // Nothing to displace: Rails' `self.target = record` (:84) is all that
-        // remains of `replace`, and it is in-memory work — so it stays
-        // synchronous, which is what lets `new Model({shipAttributes: …})` build
-        // the associated record inside the constructor Rails runs it in.
         if (built) assoc.setNewRecord(built);
       }
     }
@@ -865,32 +596,12 @@ export function assignNestedAttributesForCollectionAssociation(
     if (keys.includes("id")) {
       attrs = [attributesCollection as unknown as Record<string, unknown>];
     } else {
-      // Rails takes `attributes_collection.values` in insertion order — no
-      // sort (nested_attributes.rb:499-506). Object.values preserves the same
-      // ordering trails can observe.
       attrs = keys.map((k) => (attributesCollection as any)[k]);
     }
   }
 
   checkRecordLimitBang(resolveNestedLimit(config?.limit, record), attrs);
 
-  // Rails `assign_nested_attributes_for_collection_association` marks matching
-  // records for destruction *in memory* at assign time, so validations run
-  // against the post-destroy graph (e.g. the association-aware length validator
-  // excludes records marked for destruction). The actual DELETE still flows
-  // through the post-save flush in `processNestedAttributes`, which only runs
-  // when `save` succeeds — so an invalidated graph leaves the rows untouched,
-  // matching Rails.
-  //
-  // KNOWN LIMITATION vs Rails (nested_attributes.rb:510-515): Rails computes
-  // `existing_records` as `association.loaded? ? target : scope.where(pk => ids)`
-  // — i.e. it queries the DB when the association isn't loaded. We only mark
-  // already-loaded records (the sync setter can't perform trails' async load).
-  // This stays internally consistent: `readAttributeForValidation` also reads
-  // only the loaded proxy, so an unloaded collection is neither validated
-  // against nor marked here. The DB rows are still correctly destroyed by the
-  // post-save flush; only the pre-save size-validation interaction is skipped
-  // for the unloaded case (not exercised by any test).
   if (config?.allowDestroy) {
     const loaded = loadedCollectionTarget(record, associationName);
     if (loaded.length > 0) {
@@ -907,49 +618,12 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  // Rails-style immediate in-memory build: new records (no `id`) are built on
-  // the association at assign time so the collection is readable right after
-  // assignment (`part.trinkets[0].name`); autosave persists them on save.
-  //
-  // Existing records (with an `id`): when the association is autosave-backed
-  // (which all `accepts_nested_attributes_for` collections are in Rails), the
-  // in-memory `@target` is populated synchronously — find the record in the
-  // loaded target or instantiate a persisted stub by id, add it to the target,
-  // and assign the nested attributes in place. Autosave then persists it (and
-  // any grandchildren) on save, mirroring Rails'
-  // `assign_nested_attributes_for_collection_association`. This also makes the
-  // record readable right after assignment and lets a grandchild save reuse the
-  // in-memory record without a DB reload.
-  //
-  // For non-autosave associations there is no autosave cascade to persist the
-  // change, so existing records stay in the pending map for the trails-specific
-  // post-save flush (`processNestedAttributes`).
   const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
   const isAutosave = assocDef?.options?.autosave === true;
 
-  // Rails collects the assignment's result records into `nested_attributes_target`
-  // (association's accessor), preserving order and inserting a `nil` placeholder
-  // for a rejected new record (nested_attributes.rb:520-544).
-  //
-  // The `else` (non-autosave existing-record) branch does NOT append to
-  // `nestedTarget`, which would break that 1:1 ordering — but it is unreachable
-  // for any `accepts_nested_attributes_for` collection: `acceptsNestedAttributesFor`
-  // unconditionally sets `reflection.autosave = true` (above), and `assocDef` is
-  // re-read from the live reflection registry on every call, so `isAutosave` is
-  // always true here. The branch remains only as a guard for a
-  // hypothetical direct caller on a non-autosave collection (which never sets a
-  // nestedAttributesTarget and defers everything to the post-save flush).
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const nestedTarget: (Base | null)[] = [];
   const deferred: Record<string, unknown>[] = [];
-  // `assign_to_or_mark_for_destruction` (nested_attributes.rb:538) sends through
-  // `assign_attributes`, which is awaitable here — a grandchild
-  // `#{name}_attributes` key on an existing record reaches DB I/O. Rails calls it
-  // once per record inside the `map` (:517-544), so record n's send completes
-  // before record n+1's begins; where one answers a promise the next is chained
-  // behind it. The loop itself stays synchronous so its raises
-  // (`raiseNestedAttributesRecordNotFoundBang`, `Cannot build association`) still
-  // raise where Ruby's do.
   let pending: Promise<void> | undefined;
   for (const a of attrs) {
     if (!hasNestedId(a)) {
@@ -985,35 +659,7 @@ export function assignNestedAttributesForCollectionAssociation(
   return pending;
 }
 
-/**
- * Populate the in-memory collection target with an existing (id-bearing) nested
- * record so autosave persists it — and any grandchildren — on save without a DB
- * reload. Mirrors the `existing_record` branch of Rails'
- * `assign_nested_attributes_for_collection_association` (nested_attributes.rb:
- * 527-537): locate the record in the target and add it if absent. The caller
- * sends `assign_to_or_mark_for_destruction` (:538), chained so the records
- * sequence as Rails' `map` does. Reject-if semantics match Rails'
- * existing-record path (`call_reject_if`, not `reject_new_record?`).
- *
- * Rails' `existing_records` set is the loaded target when loaded, else a
- * `scope.where(primary_key => attribute_ids)` SELECT (nested_attributes.rb:
- * 510-516); an id found in neither raises `raise_nested_attributes_record_not_found!`
- * (nested_attributes.rb:542). trails honors that exactly when the association is
- * loaded — `existing_records` is the target, so a missing id raises here. When
- * the association is NOT loaded, trails has no synchronous DB read to materialize
- * Rails' `scope.where(...)` SELECT, so it instantiates a persisted stub keyed by
- * the id instead. Two consequences of that sync-writer constraint, both
- * deviations from Rails:
- *   1. A non-existent id is not rejected at assign time (Rails would raise); the
- *      stub's autosave UPDATE simply matches zero rows.
- *   2. The stub carries only the primary key plus the foreign key back to the
- *      owner (so the child's `belongs_to` — and any `touch: true` on it —
- *      resolves the owner like the DB-loaded record would). Other persisted
- *      column values Rails' SELECT would load are absent — fine for the assigned
- *      attributes, but an autosave callback reading some other column sees a
- *      default, not the DB value.
- * @internal
- */
+/** @internal */
 function populateInMemoryExistingRecord(
   record: Base,
   associationName: string,
@@ -1024,51 +670,27 @@ function populateInMemoryExistingRecord(
   const targetModel = resolveCollectionTargetModel(record, associationName);
   if (!targetModel || !assocDef) return null;
 
-  // Rails' ordering (nested_attributes.rb:527→543→528): find the record in
-  // `existing_records` first — raise RecordNotFound if absent — and only then
-  // consult `call_reject_if`. A non-existent id therefore raises even when the
-  // attributes would otherwise satisfy `reject_if`.
   const proxy = collectionProxyFor(record, associationName);
   const id = (attrs as any).id;
   let existing = findRecordById(targetModel, proxy.target, id);
   let isNewStub = false;
   if (!existing) {
     if (proxy.loaded) {
-      // Loaded association: the target IS Rails' authoritative `existing_records`
-      // set, so an id absent from it is a not-found (nested_attributes.rb:542).
       raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
     }
     const pk = (targetModel as any).primaryKey;
     const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
-    // Seed the foreign key (and polymorphic type) back to the owner so the
-    // stub's `belongs_to` resolves — mirrors the FK seeding in
-    // `CollectionProxy#_buildRaw`. Instantiated as part of the persisted
-    // baseline (not assigned), so it is not dirtied and never enters the
-    // child's UPDATE; it only lets owner-touch / inverse reads find the owner.
     const row: Record<string, unknown> = { [pkCol]: id, ...stubOwnerForeignKey(record, assocDef) };
     existing = (targetModel as any)._instantiate(row);
     isNewStub = true;
   }
 
-  // Rails adds the record to the target and assigns inside the
-  // `unless call_reject_if(...)` block (nested_attributes.rb:528-539), so a
-  // rejected existing record never enters `@target`. Defer the stub's
-  // `add_to_target` until after the reject check to avoid leaving a partial
-  // (PK-only) stub in the in-memory collection.
   if (callRejectIf.call(record, associationName, attrs)) return null;
   if (isNewStub) (proxy as any).addExistingRecord(existing);
   return existing ?? null;
 }
 
-/**
- * Foreign-key (and polymorphic type) attributes pointing a freshly-instantiated
- * collection stub back at its owner, mirroring the FK seeding in
- * `CollectionProxy#_buildRaw`. Only meaningful for direct (non-through)
- * has_many: a has_many :through / HABTM keeps the FK on the join row, not on the
- * target, so seeding a `${owner}_id` column there would be wrong (and may not
- * exist) — return nothing in that case.
- * @internal
- */
+/** @internal */
 function stubOwnerForeignKey(record: Base, assocDef: any): Record<string, unknown> {
   if (assocDef.options?.through || assocDef.type === "hasAndBelongsToMany") return {};
   const ctor = record.constructor as typeof Base;
@@ -1085,13 +707,7 @@ function stubOwnerForeignKey(record: Base, assocDef: any): Record<string, unknow
   return out;
 }
 
-/**
- * The in-memory target of a loaded collection proxy, or `[]` when the
- * association has not been loaded. Mirrors the read path in
- * `readAttributeForValidation` so destruction marking and validation see the
- * same record instances.
- * @internal
- */
+/** @internal */
 function loadedCollectionTarget(record: Base, associationName: string): Base[] {
   const proxy = (record as any)._collectionProxies?.get?.(associationName) as
     | { target?: unknown[] }
@@ -1099,11 +715,7 @@ function loadedCollectionTarget(record: Base, associationName: string): Base[] {
   return Array.isArray(proxy?.target) ? (proxy.target as Base[]) : [];
 }
 
-/**
- * Resolve the model class backing a collection association via the registry —
- * the trails stand-in for Rails' `reflection.klass` constant lookup.
- * @internal
- */
+/** @internal */
 function resolveCollectionTargetModel(
   record: Base,
   associationName: string,

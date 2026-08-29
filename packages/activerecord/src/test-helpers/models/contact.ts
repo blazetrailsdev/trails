@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/contact.rb
 import { Base } from "../../base.js";
 import { ConnectionNotEstablished } from "../../errors.js";
 import { FakeActiveRecordAdapter } from "../../support/fake-adapter.js";
@@ -6,12 +5,6 @@ import type { MergeColumnOptions } from "../../support/fake-adapter.js";
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
-// Stands in for Rails' `lease_connection` reads in contact.rb:6-8/29, with two
-// deviations that keep it from being named after it: trails' `leaseConnection`
-// is async so a class-body caller takes the sync escape hatch, and the adapter
-// kind is asserted rather than cast. The distinct name also matters to
-// parity:api — a `leaseConnection` taking an argument would make the calls
-// gate treat every `lease_connection` call in the package as significant.
 function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
   const connection = klass.connectionPool().leaseConnectionSync();
   if (!(connection instanceof FakeActiveRecordAdapter)) {
@@ -22,7 +15,6 @@ function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
   return connection;
 }
 
-/** Mirrors: ContactFakeColumns#column */
 function column(
   this: typeof Base,
   name: string,
@@ -32,7 +24,6 @@ function column(
   fakeConnection(this).mergeColumn(this.tableName, name, sqlType, options);
 }
 
-/** Mirrors: ContactFakeColumns.extended */
 async function extended(base: ContactFakeColumnsHost): Promise<void> {
   await base.establishConnection({ adapter: "fake" });
 

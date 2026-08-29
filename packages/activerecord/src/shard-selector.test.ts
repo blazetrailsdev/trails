@@ -11,9 +11,6 @@ describe("ShardSelectorTest", () => {
   });
 
   function setupShards() {
-    // Rails' ShardSelectorTest resolves shards from the ambient `arunit`
-    // configuration; the shard pool clones that config rather than naming a
-    // database of its own.
     const dbConfig = new HashConfig("test", "Base", ambientPoolConfiguration());
     Base.connectionHandler.establishConnection(dbConfig, {
       ownerName: "ActiveRecord::Base",

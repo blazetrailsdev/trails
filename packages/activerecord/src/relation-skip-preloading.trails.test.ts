@@ -1,12 +1,3 @@
-/**
- * `skip_preloading!` is read in exactly one place in Rails — the `exec_queries`
- * preload guard (`relation.rb:1414`, `preload_associations(records) unless
- * skip_preloading_value`). trails ported the writer
- * (`query_methods.rb:1513-1514`) but not the read, so the flag was inert: a
- * relation that asked not to preload still issued every preload query. Rails'
- * own coverage (`relation_test.rb:414`, `relation/mutation_test.rb:133`)
- * asserts the writer only, so nothing caught it. This pins the effect.
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";

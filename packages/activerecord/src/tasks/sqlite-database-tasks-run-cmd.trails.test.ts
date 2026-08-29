@@ -12,9 +12,7 @@ describe("SQLiteDatabaseTasks run_cmd output redirect", () => {
     for (const file of created) {
       try {
         fs.unlinkSync(file);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     created.length = 0;
   });

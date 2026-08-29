@@ -10,12 +10,6 @@ import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
 import type { Nodes } from "@blazetrails/arel";
 
-/**
- * Module-private token for the DJAR fast-clone path. Unexported — only
- * `clone` inside this module can forge a payload carrying it,
- * so external callers can't reach the trusted constructor branch even
- * via `any`/`unknown` erasure (they have no reference to the symbol).
- */
 const TRUSTED_CLONE = Symbol("DisableJoinsAssociationRelation.trustedClone");
 
 interface TrustedClonePayload<T extends Base> {
@@ -27,62 +21,15 @@ interface TrustedClonePayload<T extends Base> {
   };
 }
 
-/**
- * Specialized Relation returned by `DisableJoinsAssociationScope`.
- * Operates in one of two modes:
- *
- *   1. **Loaded-chain mode** (Rails' `DisableJoinsAssociationRelation`,
- *      `activerecord/lib/active_record/disable_joins_association_relation.rb`):
- *      constructed with `(klass, key, ids)` after the chain walk is
- *      complete. `load()` loads via Relation, then groups by `key`
- *      and re-emits in `ids` order so callers see join-table ordering
- *      (SQL `IN(...)` doesn't preserve list order). `limit` / `first`
- *      slice the loaded array in-memory rather than appending SQL
- *      LIMIT (matches Rails' deliberate deviation).
- *
- *   2. **Deferred-chain mode**: constructed with a `chainWalker`
- *      callback that performs the async chain walk on first load
- *      and returns the final scope (which itself may be a loaded-chain
- *      DJAR for the ordered-upstream wrap case). Lets `DJAS.scope()`
- *      return a `Relation` synchronously instead of `Promise<{ relation }>` —
- *      matches Rails' `DisableJoinsAssociationScope#scope` returning
- *      a Relation directly.
- */
-/**
- * Join-key shape for the loaded-chain reorder. A plain string names a
- * single column (`"id"`); a string[] names a composite key's columns
- * in order (`["shop_id", "order_number"]`). The id list's shape
- * matches: scalars for single-column, tuples for composite.
- */
 export type DjarKey = string | string[];
 export type DjarIds = unknown[] | unknown[][];
 
-/**
- * Stable Map key for both scalar and tuple join keys. Scalars are used
- * as-is (Map identity already works); tuples are serialized so
- * `[1, 100]` from two independent reads collides in the bucket.
- *
- * `big_integer` columns (PG int8 / MySQL BIGINT) produce JS `bigint`
- * values after driver normalization — composite PKs on large tables are
- * the primary case. `bigint` cannot appear in `JSON.stringify` without a
- * replacer, so we normalize via one that emits `"\u0000B<decimal>"`
- * (a NUL-prefixed tag), keeping `123n` distinct from the plain string
- * `"123"` in the same tuple position. The outer tuple key carries a
- * leading `"\u0000T"` marker so tuple keys are non-collidable with any
- * plausible scalar passed through this helper.
- */
 function serializeKey(v: unknown, composite: boolean): unknown {
-  // Scalars: fold a BigInt PK (int8 default under PG bigserial) to a number so
-  // it collides with a number-typed FK plucked from the upstream chain step —
-  // `1n` and `1` are otherwise distinct Map keys and the reorder drops every
-  // row (Ruby's width-agnostic `Integer ==` matches them).
   if (!composite) return normalizeAssociationKey(v);
   return (
     "\u0000T" +
     JSON.stringify(v, (_k, value) => {
       if (typeof value !== "bigint") return value;
-      // Same number/BigInt fold inside a tuple component, so a BigInt PK and a
-      // number FK in the same position serialize identically.
       const normalized = normalizeAssociationKey(value);
       return typeof normalized === "bigint" ? `\u0000B${normalized.toString()}` : normalized;
     })
@@ -94,42 +41,12 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
 
   readonly key: DjarKey;
-  /** Stored IDs (uniq'd at construction). Exposed as `ids()` to match
-   * Rails' `attr_reader :ids` which shadows `Relation#ids` here. For
-   * composite keys this is a list of tuples (`unknown[][]`); dedup is
-   * by serialized tuple so two independently-read `[1, 100]`s
-   * collapse. */
   private readonly _storedIds: DjarIds;
-  /** Serialized form of `_storedIds` for the composite path — computed
-   * once during constructor dedup so the load-time reorder loop can
-   * reuse it instead of re-running `JSON.stringify` on every tuple
-   * per `toArray()`. `null` for single-column keys (Map identity works
-   * directly on scalars). */
   private readonly _storedKeyStrings: string[] | null;
-  /** Whether `key` is composite (string[] with arity > 1). Derived at
-   * construction; controls tuple-vs-scalar behavior in read/dedup/group. */
   private readonly _composite: boolean;
-  /** Deferred chain walker. Boxed return ({ relation }) defeats
-   * `Relation.then` — without the box, `await Promise<Relation>`
-   * would unwrap to `T[]` (records array) instead of the Relation
-   * itself. The box stays internal; callers see only the public
-   * `toArray()` interface. */
   private readonly _chainWalker?: () => Promise<{ relation: Relation<T> }>;
-  /**
-   * Memoized walker invocation. Both `toArray()` and `ids()` (and any
-   * future deferred-mode consumer) share this so the async chain walk
-   * — including intermediate `pluck`s, which are the expensive part —
-   * runs at most once per DJAR instance.
-   */
   private _walkPromise?: Promise<{ relation: Relation<T> }>;
 
-  // Typed overloads keep `key`/`ids` correlated at the call site so
-  // `new DJAR(..., "id", [[1, 2]])` (string key + tuple ids) or
-  // `new DJAR(..., ["a", "b"], [1, 2])` (tuple key + scalar ids) are
-  // rejected at compile time. The broad `DjarKey`/`DjarIds` union, and the
-  // `TrustedClonePayload<T>` only `clone` can forge, stay on the third overload
-  // — reachable through `deferred` and `clone` alone. Runtime guards in the
-  // body still cover dynamic callers that erase through `unknown` / `any`.
   constructor(klass: typeof Base, key: string, ids: unknown[]);
   constructor(klass: typeof Base, key: string[], ids: unknown[][]);
   constructor(
@@ -145,9 +62,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     chainWalkerOrTrusted?: (() => Promise<{ relation: Relation<T> }>) | TrustedClonePayload<T>,
   ) {
     super(klass);
-    // Fast clone path: `clone` hands us already-normalized
-    // state from another DJAR. Skip dedup / arity checks / per-tuple
-    // JSON.stringify and just adopt the frozen outputs.
     if (
       chainWalkerOrTrusted &&
       typeof chainWalkerOrTrusted === "object" &&
@@ -162,18 +76,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       return;
     }
     const chainWalker = chainWalkerOrTrusted;
-    // Normalize array-key shapes: length 0 is always a bug; length 1
-    // collapses to the string form so `this.key` / `_composite`
-    // stay consistent with the scalar path (and `readAttribute`
-    // never gets `undefined`). When we collapse a length-1 key, we
-    // also flatten singleton-tuple ids (`[[1], [2]]` → `[1, 2]`) so
-    // the caller's shape isn't silently incompatible with the scalar
-    // path they now route through — a tuple-typed overload call like
-    // `new DJAR(..., ["col"], [[1], [2]])` keeps working.
-    // Guard against non-array `ids` up front. Dynamic callers using
-    // `any`/`unknown` could pass a Set, null, undefined, or an
-    // arbitrary object — `.map` / `.length` below would otherwise
-    // throw a generic TypeError or silently store zero ids.
     if (!Array.isArray(ids)) {
       throw argumentError(
         `DisableJoinsAssociationRelation: ids must be an array (got ${ids === null ? "null" : typeof ids})`,
@@ -198,22 +100,11 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
         });
       }
     }
-    // Guard against empty-string key in loaded-chain mode — it would
-    // make `readAttribute("")` return null for every record and the
-    // reorder Map would silently produce an empty result. The
-    // `deferred()` static intentionally passes "" as a placeholder
-    // because the walker's returned relation owns the real key, so
-    // allow it when a chain walker is present.
     if (normalizedKey === "" && !chainWalker) {
       throw argumentError("DisableJoinsAssociationRelation: key must not be empty");
     }
     this.key = normalizedKey;
     this._composite = Array.isArray(normalizedKey);
-    // Scalar case: Set identity dedup matches Rails' `ids.uniq`.
-    // Composite case: dedupe by serialized tuple so `[1, 100]` from
-    // two owner rows collapses to one entry (Set-of-arrays would keep
-    // both by reference). Cache the serialized forms so the load-time
-    // reorder doesn't re-run JSON.stringify.
     if (this._composite) {
       const cols = normalizedKey as string[];
       const arity = cols.length;
@@ -222,10 +113,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       const keyStrings: string[] = [];
       for (let i = 0; i < (normalizedIds as unknown[]).length; i++) {
         const t = (normalizedIds as unknown[])[i];
-        // Fail fast on shape/arity mismatch. Without this, a flat
-        // `unknown[]` slipping through as composite `ids` would
-        // silently dedupe to "one bucket per scalar" and reorder to
-        // nothing, instead of pointing at the caller.
         if (!Array.isArray(t)) {
           throw argumentError(
             `DisableJoinsAssociationRelation: composite ids[${i}] must be an array (got ${typeof t})`,
@@ -236,11 +123,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
             `DisableJoinsAssociationRelation: composite ids[${i}] arity ${t.length} does not match key [${cols.join(", ")}] (arity ${arity})`,
           );
         }
-        // Copy the tuple before storing so later caller mutation
-        // of the outer array doesn't desync `_storedKeyStrings`
-        // (cached serialization) from `_storedIds` (returned by
-        // `ids()`). Cheap — tuples are tiny — and matches Rails'
-        // `ids.uniq` producing a fresh array.
         const tuple = Array.from(t);
         const k = serializeKey(tuple, true) as string;
         if (!seen.has(k)) {
@@ -252,10 +134,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       this._storedIds = out;
       this._storedKeyStrings = keyStrings;
     } else {
-      // Symmetric guard for the scalar path: a dynamic caller
-      // passing tuple ids (via `any`/`unknown` erasure) with a
-      // string key would dedupe by array reference and silently
-      // produce an empty reorder result. Fail fast instead.
       const scalarIds = normalizedIds as unknown[];
       for (let i = 0; i < scalarIds.length; i++) {
         if (Array.isArray(scalarIds[i])) {
@@ -270,19 +148,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     this._chainWalker = chainWalker;
   }
 
-  /**
-   * Construct a deferred-chain DJAR. Used by `DJAS.scope()` to return
-   * a sync Relation while letting the async chain walk happen at
-   * `toArray()` time. `key` and `ids` are placeholders here — the
-   * walker's returned Relation owns the real reorder semantics (it
-   * may itself be a loaded-chain DJAR if upstream was ordered).
-   *
-   * The walker MUST return a boxed `{ relation }`, not a bare
-   * `Promise<Relation>` — bare Relations get unwrapped to `T[]` by
-   * Promise's thenable chaining (since `Relation.then` is the
-   * `toArray` shortcut). Callers construct the box at the source so
-   * the bare Relation never crosses an `await` boundary.
-   */
   static deferred<T extends Base>(
     klass: typeof Base,
     chainWalker: () => Promise<{ relation: Relation<T> }>,
@@ -291,30 +156,11 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return new Ctor(klass, "", [], chainWalker);
   }
 
-  /**
-   * Compose any query state chained onto this deferred DJAR onto the
-   * walker's result relation. Without this,
-   * `DJAS.scope(...).where(...)` and other chained modifiers would
-   * be silently dropped — the walker builds a fresh relation that
-   * doesn't see anything stored on `this`.
-   *
-   * Implementation: use `Relation#merge` for state where overlay
-   * REPLACES walker (limit / offset / wheres get the standard merger
-   * semantics), then selectively recompose fields whose normal chain
-   * behavior is additive (`orderValues`, `selectValues`). `Relation#merge` replaces orders/select
-   * outright (relation/merger.ts:21-32), but `.order(...)` /
-   * `.select(...)` chains conventionally APPEND elsewhere — so a
-   * blanket merge would drop the walker's existing orders/projection
-   * when the user chains `.order(...)`. Recompose those fields
-   * additively here.
-   */
   private _composeChainedState(walkerResult: Relation<T>): Relation<T> {
     type ComposeFields = {
       orderValues?: unknown[];
       selectValues?: unknown[];
     };
-    // Snapshot walker's pre-merge order/select state — the merge
-    // would otherwise replace these.
     const source = walkerResult as unknown as ComposeFields;
     const sourceOrders = [...(source.orderValues ?? [])];
     const sourceSelects = [...(source.selectValues ?? [])];
@@ -327,16 +173,11 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     const isReordering = overlay.reorderingValue ?? false;
 
     if (isReordering) {
-      // `reorder()` signals "replace, don't append": use overlay's orders only.
       target.orderValues = [...overlayOrders];
     } else {
       target.orderValues = [...sourceOrders, ...overlayOrders];
     }
 
-    // Selects: append-and-dedupe so the walker's projection survives
-    // when the overlay extends it. Dedupe is structural via Set
-    // identity for primitive entries; complex AST nodes will dedupe
-    // by reference (matches Relation#select chain behavior).
     if (sourceSelects && sourceSelects.length > 0) {
       target.selectValues = Array.from(new Set([...sourceSelects, ...overlaySelects]));
     }
@@ -344,26 +185,8 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return merged;
   }
 
-  /**
-   * Return the stored id list. The shape is correlated with `this.key`:
-   * a `string` key yields a flat `unknown[]` of scalars, a `string[]`
-   * composite key yields `unknown[][]` of tuples. Narrow with
-   * `Array.isArray(this.key)` at the call site when the key shape isn't
-   * statically known. In deferred-chain mode the walker's loaded-chain
-   * DJAR carries the authoritative shape.
-   *
-   * Returns a defensive shallow copy (and cloned tuples in the
-   * composite case) so caller mutation can't desync the internal
-   * `_storedKeyStrings` cache used by the load-time reorder.
-   */
   override async ids(): Promise<DjarIds> {
     if (this._chainWalker) {
-      // Deferred mode — delegate to the composed walker result's
-      // ids(), which can pluck instead of materializing full records.
-      // Routes through the shared `_walkOnce()` so the chain walk
-      // (including intermediate plucks) runs at most once per DJAR
-      // instance, even if a caller invokes ids() and then toArray()
-      // (or ids() multiple times).
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
       return (merged as unknown as { ids: () => Promise<DjarIds> }).ids();
@@ -374,22 +197,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return (this._storedIds as unknown[]).slice();
   }
 
-  /**
-   * Count via the deferred chain walk without materializing the
-   * target rows. Runs the intermediate plucks (cheap; they happen
-   * anyway for this shape) then emits a single `SELECT COUNT(*)`
-   * (or `COUNT(<column>)` when a column is provided) on the final-
-   * step Relation. Loaded-chain mode delegates to
-   * `Relation.prototype.count` against the current relation state
-   * so any composed limit/offset/where on the loaded-chain DJAR
-   * counts correctly — `_storedIds.length` would over-count if
-   * additional WHEREs narrowed the load below the seed-id list.
-   *
-   * Mirrors Rails' `CollectionAssociation#count` on disable_joins
-   * (which goes through `scope.count` → `records.size` after
-   * loading) — except we skip the materialization since count
-   * doesn't need it. Net: same result, fewer rows hydrated.
-   */
   async count(column?: string): Promise<number | Map<unknown, number>> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
@@ -400,10 +207,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
         }
       ).count(column);
     }
-    // Loaded-chain mode: route through Relation.prototype.count so
-    // any composed limit/offset/where applies. Direct `.count.call`
-    // — not `this.count(column)` — to avoid re-entering this
-    // override.
     const baseCount = (
       Relation.prototype as unknown as {
         count: (this: unknown, col?: string) => Promise<number | Map<unknown, number>>;
@@ -412,15 +215,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return baseCount.call(this, column);
   }
 
-  /**
-   * Calculate over the deferred chain, mirroring `count` above: run the
-   * intermediate plucks, then hand the final-step Relation the calculation.
-   * Rails needs no override — its `DisableJoinsAssociationScope#scope` plucks
-   * the chain ids eagerly (disable_joins_association_scope.rb:8-26), so the
-   * relation it returns already carries `key IN (ids)` and inherited
-   * `Calculations#calculate` is correct on it. trails resolves that chain
-   * asynchronously, so the constraint only exists after the walk.
-   */
   override async calculate(
     operation: "count",
     column?: string,
@@ -441,9 +235,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     operation: string,
     columnName?: string | Nodes.Node | number | null,
   ): Promise<unknown> {
-    // A `none!`d scope (new-owner null scope, collection_association.rb:300) must
-    // answer from the empty relation without running the chain walk — the walk
-    // would fire the intermediate SELECTs Rails never issues for a null scope.
     if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
@@ -460,15 +251,9 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     ).calculate.call(this, operation, columnName);
   }
 
-  /**
-   * Pluck over the deferred chain — same rationale as `calculate` above.
-   */
   override async pluck(
     ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
-    // A `none!`d scope (new-owner null scope, collection_association.rb:300) must
-    // answer from the empty relation without running the chain walk — the walk
-    // would fire the intermediate SELECTs Rails never issues for a null scope.
     if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
@@ -484,10 +269,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     ).pluck.call(this, ...columnNames);
   }
 
-  /**
-   * Memoize the walker invocation so the async chain walk runs at
-   * most once per DJAR instance. Shared by `toArray()` and `ids()`.
-   */
   private _walkOnce(): Promise<{ relation: Relation<T> }> {
     if (!this._walkPromise) {
       this._walkPromise = this._chainWalker!();
@@ -496,22 +277,10 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   }
 
   /**
-   * Preserve the subclass on `clone()` (and any chained `where`/`order`
-   * /`merge`) so the custom `toArray` reordering and `limit`/`first`
-   * overrides survive chaining. Without this, Relation#clone() would
-   * spawn a plain Relation and silently drop the wrapping behavior.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT Ruby's Object#clone is inherited; JS needs a declared override to keep the subclass through spawn (relation.rb:97).
+   * @noRailsEquivalent PERMANENT
    */
   override clone(): Relation<T> {
-    // This runs on every `clone()` — including the
-    // limit/offset-free load clone inside `toArray()`, and every
-    // chained `.where(...)` / `.order(...)` — so re-running the
-    // full constructor (dedup + per-tuple JSON.stringify) on every
-    // chain link would repeat quadratic-ish work for large
-    // composite-id lists. Route through the internal trusted
-    // constructor overload that copies already-normalized state.
     const payload: TrustedClonePayload<T> = {
       [TRUSTED_CLONE]: {
         storedIds: this._storedIds,
@@ -520,12 +289,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
         chainWalker: this._chainWalker,
       },
     };
-    // Branch on `_composite` so we hit one of the public correlated
-    // overloads. The trusted payload is not in the public signature
-    // list (it only lives on the implementation signature, gated by
-    // the module-private TRUSTED_CLONE symbol), so cast it through
-    // the public `chainWalker?` slot — same runtime position, same
-    // module.
     const trusted = payload as unknown as () => Promise<{ relation: Relation<T> }>;
     const Ctor = disableJoinsAssociationRelationClassFor(this.model);
     const rel = (this._composite
@@ -540,23 +303,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return wrapWithScopeProxy(rel);
   }
 
-  /**
-   * Deferred-chain mode is a trails-only arm: the chain walk replaces the
-   * single SELECT Rails' `DisableJoinsAssociationScope` has already finished
-   * by the time it builds the relation, so it stands in for `exec_queries`'
-   * query. It routes through `_walkOnce()` so the walk (including intermediate
-   * plucks) is shared with any earlier `ids()` call, and the chained query
-   * state on `this` (wheres / orders / limit / etc.) composes via
-   * `_composeChainedState` so `DJAS.scope(...).where({title: 'foo'})` filters
-   * the walker's result.
-   *
-   * A limit/offset composed onto a walked scope that is ITSELF a loaded-chain
-   * DJAR is applied in memory, after the id-order regroup, because that is
-   * where Rails' `limit` / `first` overrides apply it
-   * (disable_joins_association_relation.rb:13-24); as SQL it would slice the
-   * wrong rows before the regroup. `merged` is a fresh spawn, so clearing the
-   * values on it is local to this load.
-   */
   protected override async execQueries(): Promise<T[]> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
@@ -581,15 +327,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return super.execQueries();
   }
 
-  /**
-   * Mirrors: ActiveRecord::DisableJoinsAssociationRelation#load
-   * (disable_joins_association_relation.rb:26-38) — load, then group the
-   * records by `key` and re-emit them in `ids` order, because SQL
-   * `IN(...)` does not preserve the id list's order.
-   *
-   * Deferred-chain mode carries no id list of its own — the ordering comes from
-   * the walked scope — so the regroup has nothing to do there.
-   */
   override async load(): Promise<LoadedRelation<this>> {
     await super.load();
     if (this._chainWalker) return stripThenable(this);
@@ -610,19 +347,12 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
 
     const ordered: T[] = [];
     if (composite) {
-      // Walk `_storedKeyStrings` directly — the serialized forms were
-      // computed once at construction, so the reorder avoids re-running
-      // JSON.stringify per tuple on every load.
       for (const k of this._storedKeyStrings!) {
-        // A missing bucket is `records.compact!` (:36) — an id with no loaded row.
         const bucket = recordsById.get(k);
         if (bucket) ordered.push(...bucket);
       }
     } else {
       for (const id of this._storedIds) {
-        // Normalize the looked-up id the same way `serializeKey` normalized the
-        // record-side key, so a number FK from the upstream pluck matches a
-        // BigInt PK on the loaded record (and vice versa).
         const bucket = recordsById.get(normalizeAssociationKey(id));
         if (bucket) ordered.push(...bucket);
       }
@@ -632,57 +362,21 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return stripThenable(this);
   }
 
-  /**
-   * Loaded-chain mode (Rails fidelity): `def limit(value);
-   * records.take(value); end` — load everything then slice in
-   * memory. Deferred-chain mode: chain like a normal Relation. The
-   * walker result composes the limit via `_composeChainedState` and
-   * the underlying relation handles SQL LIMIT (or, if the walker
-   * produced a loaded-chain DJAR, that DJAR's own override slices
-   * in-memory).
-   *
-   * @missingRailsCall take — PERMANENT: Verified per-site (RFC 0106):
-   *   `records.take(value)` (`disable_joins_association_relation.rb:14`) —
-   *   `Array#take` is `slice(0, n)` in JS, which emits no `take` callee.
-   */
+  /** @missingRailsCall take — PERMANENT */
   // @ts-expect-error — deliberate Rails-fidelity deviation in loaded-chain mode: returns Array, not Relation
   override limit(value: number | null): Relation<T> | Promise<T[]> {
     if (this._chainWalker) return Relation.prototype.limit.call(this, value) as Relation<T>;
     return (async () => {
       const records = await this.toArray();
-      // null = "clear the limit" (matches Relation#limit). Without
-      // this guard, `records.slice(0, null)` returns an empty array.
       return value === null ? records : records.slice(0, value);
     })();
   }
 
-  /**
-   * Loaded-chain mode: load + take. Deferred-chain mode: chain like
-   * a normal Relation (limit applied via Relation.prototype.limit
-   * → walker result → SQL LIMIT or loaded-DJAR slice).
-   *
-   * Overload signatures match Relation's: `first()` →
-   * `Promise<T | null>`, `first(n)` → `Promise<T[]>`. The
-   * implementation returns the union and dispatches by argument
-   * presence, so callers keep correct typing without a cast or
-   * `@ts-expect-error`.
-   */
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
-  /**
-   * @missingRailsCall limit — PERMANENT: Verified per-site (RFC 0106):
-   *   `records.limit(limit).first` (`disable_joins_association_relation.rb:18`)
-   *   — in loaded-chain mode `records` is already an Array, so the slice is in
-   *   memory; the deferred-chain arm routes through `findNthWithLimit` so
-   *   Relation#first's ORDER BY is applied before the LIMIT.
-   */
+  /** @missingRailsCall limit — PERMANENT */
   override async first(limit?: number): Promise<T | T[] | null> {
     if (this._chainWalker) {
-      // Rails: disable_joins routes `first` through Relation#first →
-      // ordered_relation, which adds ORDER BY primary key. findNthWithLimit
-      // applies that ordering (and the with_connection shim) before the
-      // LIMIT — a bare limit().toArray() would emit an unordered LIMIT and
-      // pick an arbitrary row when the scope has no explicit order.
       const rows = await (
         this as unknown as { findNthWithLimit: (i: number, l: number) => Promise<T[]> }
       ).findNthWithLimit(0, limit ?? 1);

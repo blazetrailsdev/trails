@@ -40,9 +40,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
 
   it("binary data can be encrypted uncompressed and serialized with message pack", async () => {
     const Book = makeEncryptedBookWithBinaryMessagePackSerialized(adapter);
-    // Rails: both ranges are 128 bytes (< 140 threshold) so neither is compressed.
-    // TS note: highBytes (128–255) encoded as Latin-1 measures as 256 UTF-8 bytes so
-    // it may be compressed; the round-trip is correct either way.
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
     const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
     await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);

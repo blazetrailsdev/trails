@@ -1,6 +1,3 @@
-// Quoter-threading parity. PG/SQLite drop the table prefix in
-// quote_table_name_for_assignment (Rails sanitization.rb:112,
-// postgresql/quoting.rb:133, sqlite3/quoting.rb:70).
 import { describe, it, expect } from "vitest";
 import { ClassMethods, type Quoter } from "./sanitization.js";
 import { ConnectionNotDefined, ConnectionTimeoutError } from "./errors.js";
@@ -77,12 +74,6 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     expect(ClassMethods.sanitizeSqlArray.call(mysqlHost, "name = ?", "x")).toBe("name = 'x'");
   });
 
-  // Rails has no adapter-free quoter: every `sanitize_sql_array` branch runs
-  // inside `with_connection { |c| ... }` (sanitization.rb:167-179) and the
-  // abstract `quote_column_name` is `raise NotImplementedError`
-  // (abstract/quoting.rb:61). A host with no connection therefore surfaces the
-  // connection error rather than emitting the ANSI SQL no adapter asked for —
-  // which on MySQL would have been silently wrong.
   it("raises ConnectionNotDefined when host.connection has no adapter", () => {
     const host = {
       get connection(): never {
@@ -97,19 +88,10 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     ).toThrow(ConnectionNotDefined);
   });
 
-  // Rails opens `with_connection` per quoting branch, and the `statement.blank?`
-  // arm sits between them (sanitization.rb:174-175) — it answers the statement
-  // back without ever asking for a connection.
   it("answers a blank statement without asking for a connection", () => {
     expect(ClassMethods.sanitizeSqlArray.call({}, "")).toBe("");
   });
 
-  // Rails reads the order matcher off `adapter_class`
-  // (sanitization.rb:84-89 over connection_handling.rb:338), a class-level
-  // lookup that checks out no connection and whose `connection_pool` resolves
-  // `strict: true` — so an adapterless host surfaces that error rather than
-  // falling back to the abstract matcher, which would permit an ORDER BY
-  // spelling its own adapter rejects.
   it("surfaces the adapter_class lookup error for sanitizeSqlForOrder", () => {
     const host = {
       ...ClassMethods,

@@ -4,8 +4,6 @@ import { withTransactionalFixtures } from "../test-fixtures/with-transactional-f
 import { repairValidations } from "./validations-repair-helper.js";
 import { leaseFixtureConnection } from "../test-fixtures/fixture-connection.js";
 
-// interests and zines are canonical schema.rb tables laid by the boot schema;
-// the inline models ride them rather than recreating a bespoke shape.
 withTransactionalFixtures(leaseFixtureConnection);
 
 describe("repairValidations", () => {
@@ -21,9 +19,6 @@ describe("repairValidations", () => {
       Interest.validates("topic", { presence: true });
     });
 
-    // The validator made a blank topic invalid inside the block; once the
-    // block returns clear_validators! has run, so a blank topic is valid
-    // again — the validator did not leak.
     const after = new Interest({});
     expect(await after.isValid()).toBe(true);
     expect(Interest.validators()).toHaveLength(0);

@@ -1,9 +1,3 @@
-// trails-only extras for the query cache: assertions on the cached
-// `sql.active_record` payload shape that Rails' query_cache_test.rb does not
-// cover directly, but that
-// vendor/rails/activerecord/lib/active_record/connection_adapters/abstract/query_cache.rb:308-314
-// specifies — `type_casted_binds` is a lambda (deferred cast) and `name` is
-// passed through unchanged.
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -51,26 +45,11 @@ describe("cacheNotificationInfo payload (trails)", () => {
     expect(cached.length).toBe(1);
     const lazy = cached[0].type_casted_binds;
     expect(typeof lazy).toBe("function");
-    // Assert the thunk casts the payload's OWN binds rather than hardcoding a
-    // value: how many binds a find(1) carries is adapter-dependent and
-    // legitimately so — Rails' to_sql_and_binds (database_statements.rb:32-42)
-    // leaves binds empty when prepared_statements is off, which is the MySQL
-    // default, so the slot is `[]` there and `[1]` on SQLite/PG. The exact cast
-    // is pinned by "defers the cast until the slot is read", which supplies its
-    // own bind and is adapter-independent.
     expect((lazy as () => unknown[])()).toHaveLength((cached[0].binds ?? []).length);
   });
 
   it("defers the cast until the slot is read", async () => {
-    // A thunk alone does not prove deferral — an eager `(() => alreadyCast)`
-    // wrapper is also a function. Drive cacheNotificationInfo with a bind whose
-    // valueForDatabase getter counts reads, so the assertion fails if the cast
-    // moves back ahead of the slot read (query_cache.rb:311).
     let casts = 0;
-    // A real `ActiveModel::Attribute`, because that is the only thing
-    // `type_casted_binds` unwraps (abstract/quoting.rb:224). `WithCastValue`
-    // reads its database value through `type.serialize`, so counting there
-    // counts exactly the cast the slot is supposed to defer.
     const countingType = new Types.IntegerType();
     countingType.serialize = (value: unknown) => {
       casts++;
@@ -92,13 +71,6 @@ describe("cacheNotificationInfo payload (trails)", () => {
 
     const casted = (payload.type_casted_binds as () => unknown[])();
     expect(casts).toBe(1);
-    // The slot is filled by the adapter-dispatched `typeCastedBinds`
-    // (abstract/quoting.rb:224), so the exact JS type is the adapter's own:
-    // SQLite's `type_cast` returns BigInt for whole numbers to force
-    // SQLITE_INTEGER binding, while PG/MySQL return the Number. Pin the numeric
-    // *value* (adapter-independent) rather than only comparing against
-    // `typeCastedBinds` again, which would pass even if the cast were wrong on
-    // both sides.
     expect(casted).toHaveLength(1);
     expect(Number(casted[0])).toBe(1);
     expect(casted).toEqual(connection.typeCastedBinds([1]));
@@ -130,11 +102,6 @@ describe("cacheNotificationInfo payload (trails)", () => {
       });
     });
 
-    // `select_all(arel, name = nil, ...)` (abstract/database_statements.rb:69)
-    // passes that nil down explicitly, so `log`'s `name = "SQL"` default
-    // (abstract_adapter.rb:1134) never fires and the uncached payload stays
-    // nameless — exactly what query_cache.rb:313's `name: name` records for
-    // the cached one. The two names are the same value.
     const cached = payloads.filter((p) => p.cached);
     const uncached = payloads.filter((p) => !p.cached);
     expect(cached.length).toBe(1);
@@ -144,11 +111,6 @@ describe("cacheNotificationInfo payload (trails)", () => {
   });
 });
 
-// Rails' "query cache lru eviction" test drives `@max_size` through a public
-// per-connection setter that trails does not expose (it stays skipped in the
-// mirrored file). These construct the Store directly to pin the eviction gate
-// `@max_size && @map.size >= @max_size` (query_cache.rb:75): a null max size is
-// unbounded (never evicts), an integer caps the map and evicts the oldest.
 describe("Store max size eviction gate (trails)", () => {
   const fill = async (store: Store, keys: string[]): Promise<void> => {
     for (const key of keys) {
@@ -171,15 +133,11 @@ describe("Store max size eviction gate (trails)", () => {
     store.enabled = true;
     await fill(store, ["a", "b", "c"]);
     expect(store.size).toBe(2);
-    // "a" was the oldest and gets shifted out; "b"/"c" remain.
     expect(store.get("a")).toBeUndefined();
     expect(store.get("b")).toEqual([{ key: "b" }]);
     expect(store.get("c")).toEqual([{ key: "c" }]);
   });
 
-  // `compute_if_absent` (query_cache.rb:66-80) touches the entry it finds —
-  // `@map.delete(key)` then `@map[key] = entry` — so a cache HIT makes that key
-  // the newest and the eviction shift takes some other key.
   it("a hit refreshes the entry so the shift evicts a colder key", async () => {
     const store = new Store(null, 2);
     store.enabled = true;
@@ -190,9 +148,6 @@ describe("Store max size eviction gate (trails)", () => {
     expect(store.get("b")).toBeUndefined();
   });
 
-  // `@map[key] ||= yield` (query_cache.rb:79) only assigns when the key is
-  // still absent, so the loser of two concurrent misses on the same key does
-  // not clobber the value the winner stored.
   it("a concurrent miss on the same key does not overwrite the stored value", async () => {
     const store = new Store(null, null);
     store.enabled = true;
@@ -209,12 +164,6 @@ describe("Store max size eviction gate (trails)", () => {
   });
 });
 
-// Rails routes schema reflection through `internal_exec_query`, a method
-// `dirties_query_cache` never wraps (database_statements.rb:546-559), so
-// reflection structurally cannot evict the cache. trails previously reproduced
-// that with a `name === "SCHEMA"` check inside the dirtying wrapper; these pin
-// the structural property instead, so re-introducing a name check (or routing
-// `internalExecQuery` back through the wrapped `execute`) fails here.
 describe("schema reflection does not dirty the query cache (trails)", () => {
   fixtures(["tasks"]);
 
@@ -225,8 +174,6 @@ describe("schema reflection does not dirty the query cache (trails)", () => {
       const cachedBefore = conn.queryCache?.size ?? 0;
       expect(cachedBefore).toBeGreaterThan(0);
 
-      // A real reflection call, through the same public API every adapter's
-      // schema statements use — portable across sqlite3/postgresql/mysql2.
       await conn.columns("tasks");
 
       expect(conn.queryCache?.size).toBe(cachedBefore);

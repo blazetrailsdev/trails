@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { OrderedTag } from "./tag.js";
 import type { Tag } from "./tag.js";
-// vendor/rails/activerecord/test/models/tagging.rb
 import { Base } from "../../base.js";
 import { throwAbort } from "@blazetrails/activesupport";
 

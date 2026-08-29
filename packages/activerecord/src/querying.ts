@@ -1,10 +1,3 @@
-/**
- * Querying — find_by_sql, count_by_sql, and delegation of query
- * methods to all().
- *
- * Mirrors: ActiveRecord::Querying
- */
-
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
@@ -13,16 +6,10 @@ import type { Result } from "./result.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 import type { SumBlock } from "./relation/calculations.js";
 
-/**
- * Rails: find_by_sql(sql, binds = [], preparable: nil, allow_retry: false, &block)
- * Executes raw SQL and instantiates model objects from the result rows.
- */
 export async function findBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  // Rails' allow_retry: keyword defaults false, so a nil/absent value is the
-  // default. We accept null/undefined for the same reason and coalesce below.
   opts:
     | { allowRetry?: boolean; preparable?: boolean | null }
     | ((record: InstanceType<T>) => void)
@@ -31,14 +18,6 @@ export async function findBySql<T extends typeof Base>(
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
   const resolvedBlock = typeof opts === "function" ? opts : block;
-  // Rails wraps only `_query_by_sql` in `with_connection`, running
-  // `_load_from_sql` outside the block (querying.rb#find_by_sql). We keep the
-  // load inside the wrap because, unlike Ruby's, trails' instantiation lazily
-  // resolves the schema through the connection getter — so leaving it outside
-  // re-leases the pool permanently under
-  // `permanent_connection_checkout = :deprecated | :disallowed`. Widening the
-  // wrap to cover the load keeps the release behavior faithful; it issues no
-  // extra SQL, so the query semantics are unchanged.
   return this.withConnection(async () => {
     const result = await _queryBySql.call(this, sql, binds, {
       allowRetry: resolvedOpts.allowRetry,
@@ -52,10 +31,6 @@ export async function findBySql<T extends typeof Base>(
   });
 }
 
-/**
- * Rails: async_find_by_sql — same as find_by_sql but returns a Promise.
- * In our async-first codebase, this is identical to findBySql.
- */
 export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
@@ -75,17 +50,11 @@ export async function asyncFindBySql<T extends typeof Base>(
   );
 }
 
-/**
- * Rails: count_by_sql(sql) — returns the count from a raw SQL COUNT query.
- * Uses select_value to get a single scalar, not full row instantiation.
- */
 export async function countBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number> {
   const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
-  // Rails: connection.select_value(sanitize_sql(sql)).to_i
-  // Our adapters return rows; extract the first scalar value.
   return this.withConnection(async (adapter) => {
     const rows = await adapter.execute(sanitized);
     if (!rows[0]) return 0;
@@ -94,9 +63,6 @@ export async function countBySql(
   });
 }
 
-/**
- * Rails: async_count_by_sql — same as count_by_sql but returns a Promise.
- */
 export function asyncCountBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
@@ -104,37 +70,24 @@ export function asyncCountBySql(
   return countBySql.call(this, sql);
 }
 
-/**
- * Internal: execute a raw SQL query through the adapter.
- * Mirrors: ActiveRecord::Querying._query_by_sql
- * @internal
- */
+/** @internal */
 export async function _queryBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
   opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
 ): Promise<Result> {
-  // Rails: connection.select_all(sanitize_sql(sql), "#{name} Load", binds, allow_retry:)
-  // Returns the full Result (not just rows) so `_load_from_sql` can slice the
-  // result set's column_types to type-cast extra/computed select columns.
   const resolvedSql = Array.isArray(sql) ? (this.sanitizeSql(sql) ?? "") : sql;
   const resolvedBinds = Array.isArray(sql) ? [] : binds;
   const selectOpts: { allowRetry: boolean; preparable?: boolean | null } = {
     allowRetry: opts.allowRetry ?? false,
   };
   if (opts.preparable != null) selectOpts.preparable = opts.preparable;
-  // Read the connection threaded by the enclosing `withConnection` wrap
-  // (findBySql), falling back to the deprecated getter for direct callers.
   const adapter = threadedConnectionFor(this) ?? this.connection;
   return adapter.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, selectOpts);
 }
 
-/**
- * Internal: instantiate model objects from a result set.
- * Mirrors: ActiveRecord::Querying._load_from_sql
- * @internal
- */
+/** @internal */
 export function _loadFromSql<T extends typeof Base>(
   this: T,
   resultSet: Result,
@@ -159,27 +112,14 @@ export function _loadFromSql<T extends typeof Base>(
   const payload = { record_count: resultSet.length, class_name: this.name };
 
   return messageBus.instrument("instantiation.active_record", payload, () => {
-    // The reject above (querying.rb:76-78) removed every known attribute name,
-    // so `instantiate`'s third argument — trails' `overrideTypes`, not Rails'
-    // additional types — cannot override a schema cast type here. `toArray()`
-    // stands in for `indexed_rows`: `_instantiate` reads an attribute hash.
     if (resultSet.includesColumn(this.inheritanceColumn)) {
       return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
     } else {
-      // Instantiate a homogeneous set
       return resultSet.toArray().map((record) => this._instantiate(record, block, columnTypes));
     }
   });
 }
 
-// ---------------------------------------------------------------------------
-// Thin static delegators to `all()` — Rails' `Querying::QUERYING_METHODS`
-// list, delegated via `delegate(*QUERYING_METHODS, to: :all)`. Each forwards
-// to the default relation, so calling `Model.where(...)` is equivalent to
-// `Model.all.where(...)`.
-// ---------------------------------------------------------------------------
-
-/** Mirrors: ActiveRecord::Querying#from */
 export function from<T extends typeof Base>(
   this: T,
   source: string | Relation<any> | import("@blazetrails/arel").Nodes.Node,
@@ -188,7 +128,6 @@ export function from<T extends typeof Base>(
   return this.all().from(source, subqueryName);
 }
 
-/** Mirrors: ActiveRecord::Querying#select */
 export function select<T extends typeof Base>(
   this: T,
   ...columns: (string | import("@blazetrails/arel").Nodes.Node | Record<string, unknown>)[]
@@ -196,7 +135,6 @@ export function select<T extends typeof Base>(
   return this.all().select(...columns);
 }
 
-/** Mirrors: ActiveRecord::Querying#order */
 export function order<T extends typeof Base>(
   this: T,
   ...args: Parameters<Relation<InstanceType<T>>["order"]>
@@ -204,7 +142,6 @@ export function order<T extends typeof Base>(
   return this.all().order(...args);
 }
 
-/** Mirrors: ActiveRecord::Querying#group */
 export function group<T extends typeof Base>(
   this: T,
   ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
@@ -212,7 +149,6 @@ export function group<T extends typeof Base>(
   return this.all().group(...columns);
 }
 
-/** Mirrors: ActiveRecord::Querying#limit */
 export function limit<T extends typeof Base>(
   this: T,
   value: number | string | null,
@@ -220,17 +156,14 @@ export function limit<T extends typeof Base>(
   return this.all().limit(value);
 }
 
-/** Mirrors: ActiveRecord::Querying#offset */
 export function offset<T extends typeof Base>(this: T, value: number): Relation<InstanceType<T>> {
   return this.all().offset(value);
 }
 
-/** Mirrors: ActiveRecord::Querying#distinct */
 export function distinct<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
   return this.all().distinct();
 }
 
-/** Mirrors: ActiveRecord::Querying#joins */
 export function joins<T extends typeof Base>(
   this: T,
   ...nodes: import("@blazetrails/arel").Nodes.Join[]
@@ -252,8 +185,6 @@ export function joins<T extends typeof Base>(
   ...args: Array<JoinSpec>
 ): Relation<InstanceType<T>> {
   const relation = this.all();
-  // A single array arg (joins(["a", "b"]) or joins([{ post: "author" }]))
-  // forwards as-is; Relation#joins flattens it like Rails' args.flatten!.
   if (args.length === 1 && Array.isArray(args[0])) {
     return relation.joins(args[0]);
   }
@@ -261,14 +192,11 @@ export function joins<T extends typeof Base>(
     return relation.joins(args[0]);
   }
   if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
-    // Forward all string args so the variadic association-list form
-    // (`joins("a", "b")`, mirroring Rails `joins(:a, :b)`) is preserved.
     return relation.joins(...(args as Array<string>));
   }
   return relation.joins(...(args as import("@blazetrails/arel").Nodes.Join[]));
 }
 
-/** Mirrors: ActiveRecord::Querying#optimizer_hints */
 export function optimizerHints<T extends typeof Base>(
   this: T,
   ...hints: string[]
@@ -276,7 +204,6 @@ export function optimizerHints<T extends typeof Base>(
   return this.all().optimizerHints(...hints);
 }
 
-/** Mirrors: ActiveRecord::Querying#left_joins */
 export function leftJoins<T extends typeof Base>(
   this: T,
   ...args: Array<AssociationSpec | AssociationSpec[]>
@@ -284,28 +211,17 @@ export function leftJoins<T extends typeof Base>(
   return this.all().leftJoins(...args);
 }
 
-/** Mirrors: ActiveRecord::Querying#left_outer_joins */
 export function leftOuterJoins<T extends typeof Base>(
   this: T,
   ...args: Array<AssociationSpec | AssociationSpec[]>
 ): Relation<InstanceType<T>> {
-  // Rails' Querying#left_outer_joins delegates to Relation, whose guard raises
-  // ArgumentError on no arguments; surface that same raise here.
   return this.all().leftOuterJoins(...args);
 }
 
-/** Mirrors: ActiveRecord::Querying#none */
 export function none<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
   return this.all().none();
 }
 
-// ---------------------------------------------------------------------------
-// Bulk / positional / calculation / predicate delegators — further entries
-// on Rails' QUERYING_METHODS list. Each forwards to the default relation,
-// matching `delegate(*QUERYING_METHODS, to: :all)`.
-// ---------------------------------------------------------------------------
-
-/** Mirrors: ActiveRecord::Querying#insert */
 export function insert<T extends typeof Base>(
   this: T,
   record: Record<string, unknown>,
@@ -314,7 +230,6 @@ export function insert<T extends typeof Base>(
   return this.all().insert(record, options);
 }
 
-/** Mirrors: ActiveRecord::Querying#insert! */
 export function insertBang<T extends typeof Base>(
   this: T,
   record: Record<string, unknown>,
@@ -323,7 +238,6 @@ export function insertBang<T extends typeof Base>(
   return this.all().insertBang(record, options);
 }
 
-/** Mirrors: ActiveRecord::Querying#insert_all */
 export function insertAll<T extends typeof Base>(
   this: T,
   records: Record<string, unknown>[],
@@ -332,7 +246,6 @@ export function insertAll<T extends typeof Base>(
   return this.all().insertAll(records, options);
 }
 
-/** Mirrors: ActiveRecord::Querying#insert_all! */
 export function insertAllBang<T extends typeof Base>(
   this: T,
   records: Record<string, unknown>[],
@@ -341,7 +254,6 @@ export function insertAllBang<T extends typeof Base>(
   return this.all().insertAllBang(records, options);
 }
 
-/** Mirrors: ActiveRecord::Querying#upsert */
 export function upsert<T extends typeof Base>(
   this: T,
   attrs: Record<string, unknown>,
@@ -350,7 +262,6 @@ export function upsert<T extends typeof Base>(
   return this.all().upsert(attrs, options);
 }
 
-/** Mirrors: ActiveRecord::Querying#upsert_all */
 export function upsertAll<T extends typeof Base>(
   this: T,
   records: Record<string, unknown>[],
@@ -359,7 +270,6 @@ export function upsertAll<T extends typeof Base>(
   return this.all().upsertAll(records, options);
 }
 
-/** Mirrors: ActiveRecord::Querying#update_all */
 export async function updateAll<T extends typeof Base>(
   this: T,
   updates: Record<string, unknown>,
@@ -370,7 +280,6 @@ export async function updateAll<T extends typeof Base>(
   return this.all().updateAll(updates);
 }
 
-/** Mirrors: ActiveRecord::Querying#delete_all */
 export async function deleteAll<T extends typeof Base>(this: T): Promise<number> {
   if (this.abstractClass) {
     throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
@@ -378,12 +287,10 @@ export async function deleteAll<T extends typeof Base>(this: T): Promise<number>
   return this.all().deleteAll();
 }
 
-/** Mirrors: ActiveRecord::Querying#destroy_all */
 export function destroyAll<T extends typeof Base>(this: T): Promise<InstanceType<T>[]> {
   return this.all().destroyAll();
 }
 
-/** Mirrors: ActiveRecord::Querying#destroy_by */
 export function destroyBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
@@ -391,7 +298,6 @@ export function destroyBy<T extends typeof Base>(
   return this.all().where(conditions).destroyAll();
 }
 
-/** Mirrors: ActiveRecord::Querying#delete_by */
 export function deleteBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
@@ -399,82 +305,62 @@ export function deleteBy<T extends typeof Base>(
   return this.all().where(conditions).deleteAll();
 }
 
-/** Mirrors: ActiveRecord::Querying#second */
 export function second<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().second();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#second! */
 export function secondBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().secondBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#third */
 export function third<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().third();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#third! */
 export function thirdBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().thirdBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#fourth */
 export function fourth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().fourth();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#fourth! */
 export function fourthBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().fourthBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#fifth */
 export function fifth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().fifth();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#fifth! */
 export function fifthBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().fifthBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#forty_two */
 export function fortyTwo<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().fortyTwo();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#forty_two! */
 export function fortyTwoBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().fortyTwoBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#second_to_last */
 export function secondToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().secondToLast();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#second_to_last! */
 export function secondToLastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().secondToLastBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#third_to_last */
 export function thirdToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().thirdToLast();
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#third_to_last! */
 export function thirdToLastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().thirdToLastBang();
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#count — accepts an optional column name
- * and returns either a number or a grouped `Map<unknown, number>` when
- * the active scope has a GROUP BY. Parameters/return are derived from
- * `Relation#count` so the signatures stay in sync.
- */
 export function count<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["count"]>
@@ -483,7 +369,6 @@ export function count<T extends typeof Base>(
   return rel.count(...args) as ReturnType<ReturnType<T["all"]>["count"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#minimum — params/return derived from Relation#minimum. */
 export function minimum<T extends typeof Base>(
   this: T,
   column: Parameters<ReturnType<T["all"]>["minimum"]>[0],
@@ -492,7 +377,6 @@ export function minimum<T extends typeof Base>(
   return rel.minimum(column) as ReturnType<ReturnType<T["all"]>["minimum"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#maximum — params/return derived from Relation#maximum. */
 export function maximum<T extends typeof Base>(
   this: T,
   column: Parameters<ReturnType<T["all"]>["maximum"]>[0],
@@ -501,7 +385,6 @@ export function maximum<T extends typeof Base>(
   return rel.maximum(column) as ReturnType<ReturnType<T["all"]>["maximum"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#average — params/return derived from Relation#average. */
 export function average<T extends typeof Base>(
   this: T,
   column: Parameters<ReturnType<T["all"]>["average"]>[0],
@@ -510,7 +393,6 @@ export function average<T extends typeof Base>(
   return rel.average(column) as ReturnType<ReturnType<T["all"]>["average"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#sum — params/return derived from Relation#sum. */
 export function sum<T extends typeof Base>(this: T, block: SumBlock): Promise<number | bigint>;
 export function sum<T extends typeof Base>(
   this: T,
@@ -535,11 +417,6 @@ export function sum<T extends typeof Base>(
   )(column, block);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#pluck — column args accept anything
- * `Relation#pluck` accepts (strings, Arel nodes, etc.). Types derived
- * from the Relation method.
- */
 export function pluck<T extends typeof Base>(
   this: T,
   ...columns: Parameters<ReturnType<T["all"]>["pluck"]>
@@ -548,12 +425,10 @@ export function pluck<T extends typeof Base>(
   return rel.pluck(...columns) as ReturnType<ReturnType<T["all"]>["pluck"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#ids */
 export function ids<T extends typeof Base>(this: T): Promise<unknown[]> {
   return this.all().ids();
 }
 
-/** Mirrors: ActiveRecord::Querying#pick — same widened params as `pluck`. */
 export function pick<T extends typeof Base>(
   this: T,
   ...columns: Parameters<ReturnType<T["all"]>["pick"]>
@@ -564,7 +439,6 @@ export function pick<T extends typeof Base>(
 
 export function first<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
 export function first<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
-/** Mirrors: ActiveRecord::Querying#first */
 export function first<T extends typeof Base>(
   this: T,
   n?: number,
@@ -572,14 +446,12 @@ export function first<T extends typeof Base>(
   return n === undefined ? this.all().first() : this.all().first(n);
 }
 
-/** Mirrors: ActiveRecord::Querying#first! */
 export function firstBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().firstBang();
 }
 
 export function last<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
 export function last<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
-/** Mirrors: ActiveRecord::Querying#last */
 export function last<T extends typeof Base>(
   this: T,
   n?: number,
@@ -587,14 +459,12 @@ export function last<T extends typeof Base>(
   return n === undefined ? this.all().last() : this.all().last(n);
 }
 
-/** Mirrors: ActiveRecord::Querying#last! */
 export function lastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().lastBang();
 }
 
 export function take<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
 export function take<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
-/** Mirrors: ActiveRecord::Querying#take */
 export function take<T extends typeof Base>(
   this: T,
   n?: number,
@@ -602,22 +472,14 @@ export function take<T extends typeof Base>(
   return n === undefined ? this.all().take() : this.all().take(n);
 }
 
-/** Mirrors: ActiveRecord::FinderMethods#take! */
 export function takeBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().takeBang();
 }
 
-/** Mirrors: ActiveRecord::Querying#sole — single result or throw */
 export function sole<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().sole();
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#exists? — delegates to
- * `Relation#exists?` so the active scope (default scopes, STI type
- * filter, currentScope) applies. Preserves the `false` / `null`
- * short-circuit — Rails returns false for those regardless of data.
- */
 export async function exists<T extends typeof Base>(
   this: T,
   idOrConditions?: unknown,
@@ -628,12 +490,6 @@ export async function exists<T extends typeof Base>(
   return this.all().exists(idOrConditions);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#find_or_create_by — routes through
- * Relation so default scopes, STI filter, and any scope attributes
- * (from currentScope's `where` / `createWith`) apply to both the find
- * and the create paths.
- */
 export function findOrCreateBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
@@ -642,7 +498,6 @@ export function findOrCreateBy<T extends typeof Base>(
   return this.all().findOrCreateBy(conditions, extra);
 }
 
-/** Mirrors: ActiveRecord::Querying#find_or_create_by! — delegates through all(). */
 export function findOrCreateByBang<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
@@ -651,11 +506,6 @@ export function findOrCreateByBang<T extends typeof Base>(
   return this.all().findOrCreateByBang(conditions, extra);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#find_or_initialize_by — same
- * scope-aware dispatch as findOrCreateBy; the new record inherits
- * the active scope's create-with attributes.
- */
 export function findOrInitializeBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
@@ -664,9 +514,6 @@ export function findOrInitializeBy<T extends typeof Base>(
   return this.all().findOrInitializeBy(conditions, extra);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#any? — delegates to all().any?
- */
 export function isAny<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["isAny"]>
@@ -674,9 +521,6 @@ export function isAny<T extends typeof Base>(
   return this.all().isAny(...args);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#many? — delegates to all().many?
- */
 export function isMany<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["isMany"]>
@@ -684,9 +528,6 @@ export function isMany<T extends typeof Base>(
   return this.all().isMany(...args);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#one? — delegates to all().one?
- */
 export function isOne<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["isOne"]>
@@ -694,9 +535,6 @@ export function isOne<T extends typeof Base>(
   return this.all().isOne(...args);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#none? — delegates to all().none?
- */
 export function isNone<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["isNone"]>
@@ -704,21 +542,10 @@ export function isNone<T extends typeof Base>(
   return this.all().isNone(...args);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#empty? — delegates to `all().empty?`.
- *
- * `async` rather than a bare `Promise` return so the I/O is visible on the
- * function object itself: `Object#blank?` (core_ext/object/blank.rb:19) invokes
- * a method-shaped `empty?` and must never reach a querying one, and it tells
- * the two apart by construction — an AsyncFunction, not a return type tsc
- * erases. Every sibling querying `isEmpty` (Relation, CollectionAssociation,
- * Preloader) is already spelled this way.
- */
 export async function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
   return this.all().isEmpty();
 }
 
-/** Mirrors: ActiveRecord::Querying#first_or_create — delegates through all(). */
 export function firstOrCreate<T extends typeof Base>(
   this: T,
   extra?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[0],
@@ -726,7 +553,6 @@ export function firstOrCreate<T extends typeof Base>(
   return this.all().firstOrCreate(extra) as ReturnType<ReturnType<T["all"]>["firstOrCreate"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#first_or_create! — delegates through all(). */
 export function firstOrCreateBang<T extends typeof Base>(
   this: T,
   extra?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[0],
@@ -736,7 +562,6 @@ export function firstOrCreateBang<T extends typeof Base>(
   >;
 }
 
-/** Mirrors: ActiveRecord::Querying#first_or_initialize — delegates through all(). */
 export function firstOrInitialize<T extends typeof Base>(
   this: T,
   extra?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[0],
@@ -746,7 +571,6 @@ export function firstOrInitialize<T extends typeof Base>(
   >;
 }
 
-/** Mirrors: ActiveRecord::Querying#find_each — delegates through all(). */
 export function findEach<T extends typeof Base>(
   this: T,
   opts?: Parameters<ReturnType<T["all"]>["findEach"]>[0],
@@ -754,7 +578,6 @@ export function findEach<T extends typeof Base>(
   return this.all().findEach(opts) as ReturnType<ReturnType<T["all"]>["findEach"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#find_in_batches — delegates through all(). */
 export function findInBatches<T extends typeof Base>(
   this: T,
   opts?: Parameters<ReturnType<T["all"]>["findInBatches"]>[0],
@@ -762,7 +585,6 @@ export function findInBatches<T extends typeof Base>(
   return this.all().findInBatches(opts) as ReturnType<ReturnType<T["all"]>["findInBatches"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#in_batches — delegates through all(). */
 export function inBatches<T extends typeof Base>(
   this: T,
   opts: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
@@ -780,7 +602,6 @@ export function inBatches<T extends typeof Base>(
   return (this.all() as any).inBatches(opts, block);
 }
 
-/** Mirrors: ActiveRecord::Querying#includes */
 export function includes<T extends typeof Base>(
   this: T,
   ...associations: AssociationSpec[]
@@ -788,7 +609,6 @@ export function includes<T extends typeof Base>(
   return this.all().includes(...associations);
 }
 
-/** Mirrors: ActiveRecord::Querying#preload */
 export function preload<T extends typeof Base>(
   this: T,
   ...associations: AssociationSpec[]
@@ -796,7 +616,6 @@ export function preload<T extends typeof Base>(
   return this.all().preload(...associations);
 }
 
-/** Mirrors: ActiveRecord::Querying#eager_load */
 export function eagerLoad<T extends typeof Base>(
   this: T,
   ...associations: AssociationSpec[]
@@ -804,7 +623,6 @@ export function eagerLoad<T extends typeof Base>(
   return this.all().eagerLoad(...associations);
 }
 
-/** Mirrors: ActiveRecord::Querying#references */
 export function references<T extends typeof Base>(
   this: T,
   ...tables: string[]
@@ -812,7 +630,6 @@ export function references<T extends typeof Base>(
   return this.all().references(...tables);
 }
 
-/** Mirrors: ActiveRecord::Querying#extending */
 export function extending<T extends typeof Base, M extends Record<string, (...args: any[]) => any>>(
   this: T,
   mod: M,
@@ -831,7 +648,6 @@ export function extending<T extends typeof Base>(
     : this.all().extending();
 }
 
-/** Mirrors: ActiveRecord::Querying#unscope */
 export function unscope<T extends typeof Base>(
   this: T,
   ...args: Parameters<Relation<InstanceType<T>>["unscope"]>
@@ -839,7 +655,6 @@ export function unscope<T extends typeof Base>(
   return this.all().unscope(...args);
 }
 
-/** Mirrors: ActiveRecord::Querying#reselect */
 export function reselect<T extends typeof Base>(
   this: T,
   ...columns: Parameters<Relation<InstanceType<T>>["reselect"]>
@@ -847,7 +662,6 @@ export function reselect<T extends typeof Base>(
   return this.all().reselect(...columns);
 }
 
-/** Mirrors: ActiveRecord::Querying#reorder */
 export function reorder<T extends typeof Base>(
   this: T,
   ...args: Parameters<Relation<InstanceType<T>>["reorder"]>
@@ -855,7 +669,6 @@ export function reorder<T extends typeof Base>(
   return this.all().reorder(...args);
 }
 
-/** Mirrors: ActiveRecord::Querying#rewhere */
 export function rewhere<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
@@ -863,7 +676,6 @@ export function rewhere<T extends typeof Base>(
   return this.all().rewhere(conditions);
 }
 
-/** Mirrors: ActiveRecord::Querying#regroup */
 export function regroup<T extends typeof Base>(
   this: T,
   ...columns: string[]
@@ -871,7 +683,6 @@ export function regroup<T extends typeof Base>(
   return this.all().regroup(...columns);
 }
 
-/** Mirrors: ActiveRecord::Querying#having */
 export function having<T extends typeof Base>(
   this: T,
   condition: string,
@@ -894,7 +705,6 @@ export function having<T extends typeof Base>(
   return this.all().having(condition as Record<string, unknown>);
 }
 
-/** Mirrors: ActiveRecord::Querying#lock */
 export function lock<T extends typeof Base>(
   this: T,
   clause?: string | boolean,
@@ -902,7 +712,6 @@ export function lock<T extends typeof Base>(
   return this.all().lock(clause);
 }
 
-/** Mirrors: ActiveRecord::Querying#readonly */
 export function readonly<T extends typeof Base>(
   this: T,
   value?: boolean,
@@ -910,7 +719,6 @@ export function readonly<T extends typeof Base>(
   return this.all().readonly(value);
 }
 
-/** Mirrors: ActiveRecord::Querying#with */
 export function withCte<T extends typeof Base>(
   this: T,
   ...ctes: Parameters<Relation<InstanceType<T>>["with"]>
@@ -918,7 +726,6 @@ export function withCte<T extends typeof Base>(
   return this.all().with(...ctes);
 }
 
-/** Mirrors: ActiveRecord::Querying#with_recursive */
 export function withRecursive<T extends typeof Base>(
   this: T,
   ...ctes: Parameters<Relation<InstanceType<T>>["withRecursive"]>
@@ -926,7 +733,6 @@ export function withRecursive<T extends typeof Base>(
   return this.all().withRecursive(...ctes);
 }
 
-/** Mirrors: ActiveRecord::Querying#annotate */
 export function annotate<T extends typeof Base>(
   this: T,
   ...comments: string[]
@@ -934,7 +740,6 @@ export function annotate<T extends typeof Base>(
   return this.all().annotate(...comments);
 }
 
-/** Mirrors: ActiveRecord::Querying#excluding */
 export function excluding<T extends typeof Base>(
   this: T,
   ...records: unknown[]
@@ -942,7 +747,6 @@ export function excluding<T extends typeof Base>(
   return this.all().excluding(...records);
 }
 
-/** Mirrors: ActiveRecord::Querying#or */
 export function or<T extends typeof Base>(
   this: T,
   other: Relation<InstanceType<T>>,
@@ -950,7 +754,6 @@ export function or<T extends typeof Base>(
   return this.all().or(other);
 }
 
-/** Mirrors: ActiveRecord::Querying#and */
 export function and<T extends typeof Base>(
   this: T,
   other: Relation<InstanceType<T>>,
@@ -958,7 +761,6 @@ export function and<T extends typeof Base>(
   return this.all().and(other);
 }
 
-/** Mirrors: ActiveRecord::Querying#in_order_of */
 export function inOrderOf<T extends typeof Base>(
   this: T,
   column: string | import("@blazetrails/arel").Nodes.Node,
@@ -968,7 +770,6 @@ export function inOrderOf<T extends typeof Base>(
   return this.all().inOrderOf(column, values, filter);
 }
 
-/** Mirrors: ActiveRecord::Querying#strict_loading */
 export function strictLoading<T extends typeof Base>(
   this: T,
   value?: boolean,
@@ -976,7 +777,6 @@ export function strictLoading<T extends typeof Base>(
   return this.all().strictLoading(value);
 }
 
-/** Mirrors: ActiveRecord::Querying#create_with */
 export function createWith<T extends typeof Base>(
   this: T,
   attrs: Record<string, unknown> | null,
@@ -984,12 +784,10 @@ export function createWith<T extends typeof Base>(
   return this.all().createWith(attrs);
 }
 
-/** Mirrors: ActiveRecord::Querying#invert_where */
 export function invertWhere<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
   return this.all().invertWhere();
 }
 
-/** Mirrors: ActiveRecord::Querying#without — alias for excluding */
 export function without<T extends typeof Base>(
   this: T,
   ...records: unknown[]
@@ -997,7 +795,6 @@ export function without<T extends typeof Base>(
   return this.all().without(...records);
 }
 
-/** Mirrors: ActiveRecord::SpawnMethods#only */
 export function only<T extends typeof Base>(
   this: T,
   ...types: Parameters<Relation<InstanceType<T>>["only"]>
@@ -1005,7 +802,6 @@ export function only<T extends typeof Base>(
   return this.all().only(...types);
 }
 
-/** Mirrors: ActiveRecord::Querying#merge */
 export function merge<T extends typeof Base, U extends Base>(
   this: T,
   other: Relation<U>,
@@ -1013,21 +809,14 @@ export function merge<T extends typeof Base, U extends Base>(
   return this.all().merge(other);
 }
 
-/** Mirrors: ActiveRecord::Querying#async_ids */
 export function asyncIds<T extends typeof Base>(this: T): Promise<unknown[]> {
   return this.all().asyncIds();
 }
 
-/** Mirrors: ActiveRecord::Querying#extract_associated — delegates through all(). */
 export function extractAssociated<T extends typeof Base>(this: T, name: string): Promise<Base[]> {
   return this.all().extractAssociated(name);
 }
 
-/**
- * Mirrors: ActiveRecord::Querying#except (SpawnMethods#except) — delegates
- * through all(). Rails `except(*skips)` is purely a value-key remover; it has
- * no set-operation branch, so this only accepts skip keys (unknown ones no-op).
- */
 export function except<T extends typeof Base>(
   this: T,
   ...skips: Array<import("./relation/query-methods.js").ExceptSkip>
@@ -1035,7 +824,6 @@ export function except<T extends typeof Base>(
   return this.all().except(...skips);
 }
 
-/** Mirrors: ActiveRecord::Querying#calculate — delegates through all(). */
 export function calculate<T extends typeof Base>(
   this: T,
   operation: "count" | "sum" | "average" | "minimum" | "maximum",
@@ -1045,7 +833,6 @@ export function calculate<T extends typeof Base>(
   return rel.calculate(operation, column);
 }
 
-/** Mirrors: ActiveRecord::Querying#async_count — params/return derived from Relation#asyncCount. */
 export function asyncCount<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["asyncCount"]>
@@ -1054,7 +841,6 @@ export function asyncCount<T extends typeof Base>(
   return rel.asyncCount(...args) as ReturnType<ReturnType<T["all"]>["asyncCount"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#async_average — delegates through all(). */
 export function asyncAverage<T extends typeof Base>(
   this: T,
   column: string,
@@ -1062,7 +848,6 @@ export function asyncAverage<T extends typeof Base>(
   return this.all().asyncAverage(column);
 }
 
-/** Mirrors: ActiveRecord::Querying#async_minimum — delegates through all(). */
 export function asyncMinimum<T extends typeof Base>(
   this: T,
   column: string,
@@ -1070,7 +855,6 @@ export function asyncMinimum<T extends typeof Base>(
   return this.all().asyncMinimum(column);
 }
 
-/** Mirrors: ActiveRecord::Querying#async_maximum — delegates through all(). */
 export function asyncMaximum<T extends typeof Base>(
   this: T,
   column: string,
@@ -1078,7 +862,6 @@ export function asyncMaximum<T extends typeof Base>(
   return this.all().asyncMaximum(column);
 }
 
-/** Mirrors: ActiveRecord::Querying#async_sum — delegates through all(). */
 export function asyncSum<T extends typeof Base>(
   this: T,
   identityOrColumn?: Parameters<Relation<InstanceType<T>>["asyncSum"]>[0],
@@ -1086,7 +869,6 @@ export function asyncSum<T extends typeof Base>(
   return this.all().asyncSum(identityOrColumn);
 }
 
-/** Mirrors: ActiveRecord::Querying#async_pluck — params/return derived from Relation#asyncPluck. */
 export function asyncPluck<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["asyncPluck"]>
@@ -1095,7 +877,6 @@ export function asyncPluck<T extends typeof Base>(
   return rel.asyncPluck(...args) as ReturnType<ReturnType<T["all"]>["asyncPluck"]>;
 }
 
-/** Mirrors: ActiveRecord::Querying#async_pick — params/return derived from Relation#asyncPick. */
 export function asyncPick<T extends typeof Base>(
   this: T,
   ...args: Parameters<ReturnType<T["all"]>["asyncPick"]>
@@ -1104,7 +885,4 @@ export function asyncPick<T extends typeof Base>(
   return rel.asyncPick(...args) as ReturnType<ReturnType<T["all"]>["asyncPick"]>;
 }
 
-// `with` is a reserved JS keyword and cannot be a function declaration name.
-// Re-export under the Rails name so extend(Base, Querying) wires Base.with correctly.
-// Reserved words are valid IdentifierNames in export specifiers (ES2022 §16.2.3).
 export { withCte as with };

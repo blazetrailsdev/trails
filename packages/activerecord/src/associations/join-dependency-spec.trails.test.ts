@@ -1,12 +1,3 @@
-/**
- * Covers JoinDependency#build — the recursive tree construction the constructor
- * runs, which routes nested eager_load specs (hashes, dotted strings, arrays)
- * into the JOIN tree. Verifies shared-prefix deduplication and that an
- * unresolvable segment raises, as Rails' `find_reflection` does.
- *
- * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
- * construction from the eager_load values hash).
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
@@ -16,9 +7,6 @@ import { Nodes } from "@blazetrails/arel";
 import type { AssociationSpec } from "../relation/query-methods.js";
 
 describe("JoinDependency#build", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
   fixtures({});
 
   class Post extends Base {
@@ -60,7 +48,6 @@ describe("JoinDependency#build", () => {
 
   const paths = (jd: JoinDependency) => jd.nodes.map((n) => n.assocName).sort();
 
-  /** Build the way the eager-load paths do — Rails' four-argument constructor. */
   const buildEager = (spec: AssociationSpec | AssociationSpec[]) =>
     new JoinDependency(Post, null, spec, Nodes.OuterJoin);
 

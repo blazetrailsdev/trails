@@ -6,18 +6,7 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
-// Row-level proof of the unified parent-key accessor (`_nodeKey`): a join that
-// multiplies rows — one parent repeated across children, or one child repeated
-// across parents — must collapse to exactly one instance per logical record.
-// The end-to-end equivalents are eager.test.ts "including duplicate objects from
-// {has many,belongs to}" (Rails eager_test.rb #test_including_duplicate_objects_*);
-// these exercise the dedup at the instantiateFromRows boundary this story changes,
-// so the raw-aliased key (seeded and looked up through the single `_nodeKey` path)
-// is the only thing under test.
 describe("JoinDependency dedupes duplicate join rows", () => {
-  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `aliasedRow`, so no bespoke schema is declared
-  // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
   class Comment extends Base {
@@ -55,7 +44,6 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   it("collapses repeated child join rows to one instance for a single parent", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
-    // Same parent, same child, repeated join rows — must dedupe to one comment.
     const row = aliasedRow(jd, {
       "": { id: 1, title: "foo" },
       comments: { id: 10, post_id: 1, body: "hmm" },
@@ -73,8 +61,6 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   it("shares one child instance across distinct parents joined to the same record", () => {
     const jd = new JoinDependency(Reader, null, "post.comments", Nodes.OuterJoin);
 
-    // Two distinct parents share one post which has one comment; the post and the
-    // comment must each be a single shared instance, exactly deduped.
     const rows = [
       aliasedRow(jd, {
         "": { id: 1, post_id: 5 },

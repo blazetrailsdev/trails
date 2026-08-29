@@ -8,8 +8,6 @@ describe("DatabaseConfigurationsTest", () => {
     DatabaseConfigurations.defaultEnv = null;
   });
 
-  // Rails' second assertion (`blank?`) is Object#blank?, an ActiveSupport
-  // alias of the same predicate on this receiver, so `empty` covers both.
   it("empty returns true when db configs are empty", () => {
     const oldConfig = Base.configurations();
     const config = {};
@@ -34,9 +32,6 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("configs for getter with name", () => {
-    // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), which Rails sets by assigning
-    // ENV["RAILS_ENV"] = "arunit2" (database_configurations_test.rb:32).
     DatabaseConfigurations.defaultEnv = "arunit2";
     const configs = new DatabaseConfigurations({
       arunit2: {
@@ -50,9 +45,6 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("configs for with name symbol", () => {
-    // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), which Rails sets by assigning
-    // ENV["RAILS_ENV"] = "arunit2" (database_configurations_test.rb:43).
     DatabaseConfigurations.defaultEnv = "arunit2";
     const configs = new DatabaseConfigurations({
       arunit2: {
@@ -131,8 +123,6 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("configs for with custom key", () => {
-    // `configs_for(name:)` defaults env_name to `default_env`
-    // (database_configurations.rb:99), so key the hash on it.
     DatabaseConfigurations.defaultEnv = "development";
     const configs = new DatabaseConfigurations({
       development: {
@@ -146,7 +136,6 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("resolve returns current-env config when same name exists in multiple envs", () => {
-    // defaultEnv resolves to "test" (NODE_ENV=test in vitest), so the test config is returned.
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "dev.db" },
@@ -210,9 +199,6 @@ describe("DatabaseConfigurationsTest", () => {
     });
 
     it("currentEnv prefers TRAILS_ENV over an explicitly set defaultEnv", () => {
-      // Deliberate deviation from Rails, where Rails.env (our defaultEnv)
-      // outranks ENV["RAILS_ENV"] (our TRAILS_ENV, per BC-2). TRAILS_ENV is how
-      // a deploy declares the process env, so no bootstrap may override it.
       vi.stubEnv("TRAILS_ENV", "production");
       vi.stubEnv("NODE_ENV", "test");
       DatabaseConfigurations.defaultEnv = "default_env";
@@ -227,8 +213,6 @@ describe("DatabaseConfigurationsTest", () => {
     });
 
     it("fromEnv builds the synthesized DATABASE_URL config under currentEnv", () => {
-      // The build env must equal currentEnv() so the runtime selectors in
-      // connection-handling find the synthesized config under the same env.
       vi.stubEnv("TRAILS_ENV", "production");
       vi.stubEnv("DATABASE_URL", "sqlite3:db/prod.sqlite3");
       const configs = new DatabaseConfigurations({});
@@ -239,8 +223,6 @@ describe("DatabaseConfigurationsTest", () => {
     });
 
     it("forCurrentEnv and fromEnv resolve the same env when TRAILS_ENV differs from defaultEnv", () => {
-      // Regression: forCurrentEnv previously used defaultEnv while fromEnv() used
-      // currentEnv(), so findDbConfig by DB name failed when TRAILS_ENV != defaultEnv.
       DatabaseConfigurations.defaultEnv = "development";
       vi.stubEnv("TRAILS_ENV", "production");
 
@@ -251,11 +233,9 @@ describe("DatabaseConfigurationsTest", () => {
         },
       });
 
-      // forCurrentEnv must agree with currentEnv() = "production"
       const productionConfigs = configs.configsFor({ envName: "production" });
       expect(productionConfigs.every((c) => c.forCurrentEnv)).toBe(true);
 
-      // findDbConfig by name must locate the production animals config
       const animalConfig = configs.findDbConfig("animals");
       expect(animalConfig).toBeDefined();
       expect(animalConfig!.database).toBe("prod_animals.db");

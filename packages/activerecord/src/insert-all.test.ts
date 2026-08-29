@@ -1,24 +1,9 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/insert_all_test.rb.
- *
- * Uses the canonical models (Book/Author/Cart/Category/Developer/Ship/
- * Speedometer/Subscriber) and TEST_SCHEMA + handler fixtures rather than
- * bespoke per-test tables, so table/column/model names match Rails exactly.
- *
- * Test names mirror the Ruby method names verbatim (minus the `test_` prefix,
- * underscores rendered as spaces) so scripts/test-compare can match them.
- *
- * The remaining `it.skipIf` guards are adapter conditionals mirroring Rails'
- * own `current_adapter?` / `supports_*` gates, not unported features.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so association targets resolve by
-// name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
@@ -36,37 +21,22 @@ import { Measurement } from "./test-helpers/models/measurement.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 
-// Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
-// Feature-gated tests use itIfSupports(...) / adapterSupports(...) so the
-// parity:test gate extractor sees the same supports_* features Rails skips on.
-// These two remain as plain booleans because they feed a helper / a guard-only
-// `skip if` (not a comparable feature gate).
 const supportsInsertReturning = adapterSupports("insert_returning");
 const supportsInsertConflictTarget = adapterSupports("insert_conflict_target");
 const isMysql = adapterType === "mysql";
 
-// ReadonlyNameBook < Book with attr_readonly :name (insert_all_test.rb:14).
 class ReadonlyNameBook extends Book {
   static {
     this.attrReadonly("name");
   }
 }
 
-// trails-only regression model: a model whose configured primary_key ("isbn")
-// diverges from the table's schema-cache primary keys (books' real PK is "id").
-// "isbn" is chosen because it has a backing unique index, so the conflict-target
-// resolution succeeds and we can observe the `returning` clause. Rails computes
-// `primary_keys` as `Array(schema_cache.primary_keys(table_name))`
-// (insert_all.rb:61), so InsertAll must emit `RETURNING "id"` — not "isbn".
 class DivergentPrimaryKeyBook extends Book {
   static {
     this.primaryKey = "isbn";
   }
 }
 
-// Mirrors the `if supports_insert_returning?` guard inside
-// test_insert_all_and_upsert_all_with_aliased_attributes (insert_all_test.rb:314).
-// Kept out of the test body so vitest/no-conditional-in-test stays happy.
 async function assertInsertAllReturningAlias(): Promise<void> {
   if (!supportsInsertReturning) return;
   const before = (await Book.count()) as number;
@@ -88,7 +58,6 @@ function getYear(val: unknown): number {
   return 0;
 }
 
-/** Ruby `Time#usec` — microseconds within the second. */
 function usec(instant: Temporal.Instant): number {
   return Number((instant.epochNanoseconds % 1_000_000_000n) / 1000n);
 }
@@ -108,17 +77,10 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  // Some tests raise a DB-level RecordNotUnique (a PG unique violation aborts
-  // the transaction); they still run transactionally because the fixture
-  // teardown skips its redundant DELETEs while the pinned transaction is open,
-  // so the abort no longer poisons the rollback.
   fixtures(["authors", "books"]);
 
   beforeAll(async () => {
     ReadonlyNameBook.attrReadonly("name");
-    // Book/Author are reflected via fixtures; the others are queried but not
-    // fixtured, so force column reflection before insertAll's synchronous
-    // attribute/timestamp checks run.
     await Promise.all([
       Cart.loadSchema(),
       Category.loadSchema(),
@@ -147,8 +109,6 @@ describe("InsertAllTest", () => {
     "insert_returning",
     "insert with type casting and serialize is consistent",
     async () => {
-      // Rails assigns an array to the string `name` column and asserts the
-      // create! path and the insert!(returning:) path type-cast it identically.
       const bookName = ["Array"];
       const createdBookId = ((await Book.createBang({ name: bookName })) as any).id;
       const insertResult = await Book.insertBang({ name: bookName }, { returning: "id" });
@@ -177,15 +137,12 @@ describe("InsertAllTest", () => {
   });
 
   itIfSupports("insert_on_duplicate_update", "insert all should handle empty arrays", async () => {
-    // Rails asserts assert_empty on the returned ActiveRecord::Result.
     expect((await Book.insertAll([])).length).toBe(0);
     expect((await Book.insertAllBang([])).length).toBe(0);
     expect((await Book.upsertAll([])).length).toBe(0);
   });
 
   it("insert all raises on duplicate records", async () => {
-    // The third row collides with the awdr fixture (author_id 1, "Agile Web
-    // Development with Rails") on the unique [author_id, name] index.
     await expect(
       Book.insertAllBang([
         { name: "Rework", author_id: 1 },
@@ -240,14 +197,10 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_skip", "insert all can skip duplicate records", async () => {
     const before = (await Book.count()) as number;
-    // id 1 is the `awdr` fixture, so the row is skipped on the PK conflict.
     await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
     expect(await Book.count()).toBe(before);
   });
 
-  // Rails gates these to MySQL (`if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`):
-  // ON DUPLICATE KEY UPDATE is MySQL-specific, and SQLite/PG reject
-  // `DEFAULT VALUES ON CONFLICT`.
   itIfSupports.skipIf(adapterType !== "mysql")(
     "insert_on_duplicate_skip",
     "insert all generates correct sql",
@@ -271,8 +224,6 @@ describe("InsertAllTest", () => {
     "insert all with skip duplicates and autonumber id not given",
     async () => {
       const before = (await Book.count()) as number;
-      // Duplicates per the unique [author_id, name] index, but their IDs are not
-      // specified, so one is skipped by the index rather than by id.
       await Book.insertAll([
         { author_id: 8, name: "Refactoring" },
         { author_id: 8, name: "Refactoring" },
@@ -311,8 +262,6 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "insert all will raise if duplicates are skipped only for a certain conflict target",
     async () => {
-      // The awdr fixture occupies id 1; the conflict target is (author_id, name),
-      // so the colliding primary key surfaces as RecordNotUnique.
       await expect(
         Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }], {
           uniqueBy: "index_books_on_author_id_and_name",
@@ -379,8 +328,6 @@ describe("InsertAllTest", () => {
     "insert all and upsert all finds index with inverted unique by columns",
     async () => {
       const before = (await Book.count()) as number;
-      // [author_id, name] has a unique index; passing the columns reversed must
-      // still resolve to it (sorted-column match).
       await Book.insertAll([{ name: "Remote", author_id: 1 }], { uniqueBy: ["name", "author_id"] });
       await Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: ["name", "author_id"] });
       expect(((await Book.count()) as number) - before).toBe(2);
@@ -400,8 +347,6 @@ describe("InsertAllTest", () => {
       });
       expect(((await Cart.count()) as number) - before).toBe(2);
 
-      // The configured PK is "id"; the DB PK is composite [shop_id, id], so a
-      // bang insert with no unique_by raises on the unmatched "id".
       await expect(Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }])).rejects.toThrow(
         /No unique index found for id/,
       );
@@ -491,9 +436,6 @@ describe("InsertAllTest", () => {
     },
   );
 
-  // Rails guards this with `unless in_memory_db?` (insert_all_test.rb:359).
-  // trails' default SQLite worker is file-backed, never `:memory:`, so the
-  // guard is a no-op here and the test runs on every adapter.
   itIfSupports("insert_on_duplicate_update", "upsert and db warnings", async () => {
     try {
       await withDbWarningsAction("raise", async () => {
@@ -502,8 +444,6 @@ describe("InsertAllTest", () => {
         ).resolves.not.toThrow();
       });
     } finally {
-      // We need to explicitly remove the record, because `withDbWarningsAction`
-      // prevents the wrapping transaction from being rolled back.
       await Book.delete(1001);
     }
   });
@@ -551,20 +491,12 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "upsert all updates existing record by configured primary key fails when database supports insert conflict target",
     async () => {
-      // speedometer_id is the configured PK but has no backing unique index on
-      // the id-less table, so the conflict-target lookup raises.
       await expect(
         Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]),
       ).rejects.toThrow(/No unique index found for speedometer_id/);
     },
   );
 
-  // Speedometer's configured PK (speedometer_id) is not a database primary key,
-  // so Rails InsertAll#readonly_columns (schema_cache primary_keys = []) does NOT
-  // exclude it from the ON DUPLICATE KEY UPDATE set. (On conflict-target adapters
-  // any insert/upsert on this id-less table raises in find_unique_index_for
-  // before the update set is built — see the configured-primary-key tests above —
-  // so this convergence is only observable on MySQL.)
   it.skipIf(!isMysql)(
     "upsert all on a table without a database primary key treats the configured primary key as updatable",
     async () => {
@@ -657,8 +589,6 @@ describe("InsertAllTest", () => {
           published_on: Temporal.Instant.from("1938-04-01T00:00:00Z"),
         },
       ]);
-      // The second row's published_on is NULL, so the partial unique index on
-      // isbn does not apply — it inserts rather than updating the first row.
       await Book.upsertAll([{ name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
         uniqueBy: "index_books_on_isbn",
       });
@@ -1037,10 +967,6 @@ describe("InsertAllTest", () => {
     },
   );
 
-  // trails-only regression (no Rails counterpart): guards insert_all.rb:61 —
-  // `primary_keys` reads the schema cache, so a model whose configured
-  // primary_key ("name") differs from the table's real PK ("id") still emits
-  // `RETURNING "id"`. Before the schema-cache fix this emitted `RETURNING "name"`.
   it.skipIf(!supportsInsertReturning)(
     "insert all returning uses schema-cache primary keys not the model primary key",
     async () => {
@@ -1144,7 +1070,6 @@ describe("InsertAllTest", () => {
     expect(((await Book.find(2)) as any).status).toBe("written");
   });
 
-  // Rails gates to MySQL: VALUES() is MySQL-only ON DUPLICATE KEY UPDATE syntax.
   itIfSupports.skipIf(adapterType !== "mysql")(
     "insert_on_duplicate_update",
     "upsert all updates using values function on duplicate raw sql",
@@ -1164,15 +1089,12 @@ describe("InsertAllTest", () => {
     },
   );
 
-  // Rails skips this unless BOTH supports_insert_conflict_target? AND
-  // supports_insert_on_duplicate_update? (insert_all_test.rb:812); the
-  // comma-joined key gates on the conjunction.
   itIfSupports(
     "insert_conflict_target,insert_on_duplicate_update",
     "upsert all updates using provided sql and unique by",
     async () => {
       const { sql } = await import("@blazetrails/arel");
-      const book = (await Book.find(2)) as any; // books(:rfr)
+      const book = (await Book.find(2)) as any;
       expect(book.status).toBe("proposed");
 
       await Book.upsertAll([{ name: book.name, author_id: book.author_id }], {
@@ -1197,20 +1119,12 @@ describe("InsertAllTest", () => {
     },
   );
 
-  // Rails gates this on current_adapter?(:Mysql2) (insert_all_test.rb) and
-  // qualifies the table with `Book.connection_db_config.database`. The
-  // per-worker slot DB derived from AR_DB_SLOT (test-setup-worker-db.ts)
-  // now surfaces on the db_config hash, so we read it the Rails way.
   it.skipIf(adapterType !== "mysql")("insert all when table name contains database", async () => {
     const databaseName = Book.connectionDbConfig().database;
     Book.tableName = `${databaseName}.books`;
 
     let raised: unknown;
     try {
-      // Rails' `load_schema!` blocks, so the db-qualified table reflects on
-      // first touch (model_schema.rb:592-594). trails' cache read is async and
-      // the qualified name has no cache entry yet, so reflect it explicitly —
-      // `columns_hash` is a pure DB read and Book's enums need their columns.
       await Book.loadSchema();
       await Book.insertAllBang([{ name: "Rework", author_id: 1 }]);
     } catch (e) {

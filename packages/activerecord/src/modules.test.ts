@@ -31,9 +31,6 @@ describe("ModulesTest", () => {
     "variants",
   ]);
 
-  // Rails setup: store_full_sti_class = false; teardown: restore to true.
-  // Module-namespaced models (MyAppBusiness*) store demodulized type names in
-  // the DB — the fixture data uses "Firm" / "Client", not the full module path.
   let _prevStoreFullStiClass: boolean;
   beforeEach(() => {
     _prevStoreFullStiClass = Base.storeFullStiClass;
@@ -86,9 +83,6 @@ describe("ModulesTest", () => {
   });
 
   it("module table name prefix with global prefix", () => {
-    // Mirrors Rails set/reset/assert/ensure. The mutation of the global
-    // Base.tableNamePrefix and the recompute via resetTableName run fully
-    // synchronously (no awaits), so no sibling test can observe the mutated
     // global before the finally restores it.
     const classes = [
       MyAppBusinessCompany,
@@ -121,8 +115,6 @@ describe("ModulesTest", () => {
   });
 
   it("module table name suffix with global suffix", () => {
-    // Mirrors Rails set/reset/assert/ensure; see the prefix test above for why
-    // the synchronous mutate-and-restore is safe under shared-worker fixtures.
     const classes = [
       MyAppBusinessCompany,
       MyAppBusinessFirm,
@@ -148,8 +140,6 @@ describe("ModulesTest", () => {
   });
 
   it("compute type can infer class name of sibling inside module", () => {
-    // Rails modules_test.rb:146-147 sets store_full_sti_class = true for this test;
-    // the outer beforeEach leaves it false, so restore it here for future un-skippers.
     const prev = Base.storeFullStiClass;
     Base.storeFullStiClass = true;
     try {

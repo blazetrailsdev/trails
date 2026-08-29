@@ -5,7 +5,6 @@ import type { Person } from "./person.js";
 import type { PetTreasure } from "./pet-treasure.js";
 import type { Toy } from "./toy.js";
 import type { Treasure } from "./treasure.js";
-// vendor/rails/activerecord/test/models/pet.rb
 import { Base } from "../../base.js";
 
 export class Pet extends Base {
@@ -27,8 +26,6 @@ export class Pet extends Base {
 
   static {
     this._primaryKey = "pet_id";
-    // Rails: `attr_accessor :current_user` — a non-persisted accessor that
-    // nested attributes can assign before the record is destroyed.
     this.attribute("current_user", "string");
     this.belongsTo("owner", { touch: true });
     this.hasMany("toys");

@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/joke.rb
 import { Base } from "../../base.js";
 
 export class Joke extends Base {

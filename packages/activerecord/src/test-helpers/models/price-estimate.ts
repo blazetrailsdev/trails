@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/price_estimate.rb
 import { NumberHelper } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
@@ -18,7 +17,6 @@ export class PriceEstimate extends Base {
     this.validates("price", { numericality: true });
   }
 
-  // Rails overrides the `price` reader with `number_to_currency(super)`.
   get price(): unknown {
     return NumberHelper.numberToCurrency(this.readAttribute("price"));
   }

@@ -7,9 +7,6 @@ import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
-  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `aliasedRow`, so no bespoke schema is declared
-  // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
   class Author extends Base {

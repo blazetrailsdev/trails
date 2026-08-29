@@ -1,17 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Ports vendor/rails/activerecord/test/cases/transactions_test.rb onto the
- * canonical schema: the Rails `TransactionTest` drives `Topic`/`Reply`/`Movie`/
- * `Cpk::Book`/`Author` against `fixtures :topics, :developers, :authors,
- * :author_addresses, :posts`. We mirror that with `fixtures` on the
- * canonical models. Deliberate-error / connection-eviction / query-counting
- * tests opt out of the per-test fixture transaction via `usesTransaction` so a
- * raised StatementInvalid (or a connection thrown away from the pool) cannot
- * poison transactional-fixtures teardown, exactly as Rails runs these with
- * `use_transactional_tests = false`.
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
@@ -39,9 +25,6 @@ import { StatementInvalid, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 const Topic = CanonicalTopic;
-// Register the Topic/Reply STI subtree and the Cpk::Book association graph so
-// association class resolution (Topic#replies/uniqueReplies/sillyUniqueReplies,
-// CpkBook#order/author/chapters) finds them.
 for (const klass of [
   Topic,
   Reply,
@@ -58,10 +41,6 @@ for (const klass of [
   registerModel(klass as any);
 }
 
-// ==========================================================================
-// TransactionCallbacksTests (Ruby module included into TransactionTest)
-// + TransactionTest — targets transactions_test.rb
-// ==========================================================================
 describe("TransactionTest", () => {
   const { topics } = fixtures(["topics", "developers", "authors", "authorAddresses", "posts"], {
     usesTransaction: [
@@ -75,11 +54,6 @@ describe("TransactionTest", () => {
       "mark transaction state as nil",
       "rollback on composite key model",
       "restore composite id after rollback",
-      // TransactionTest uses use_transactional_tests=false (transactions_test.rb:196),
-      // so the user's transaction() is a RealTransaction (full_rollback?=true).
-      // These tests nest saves inside an outer transaction; without a RealTransaction,
-      // the outer fixture SavepointTransaction (full_rollback?=false) combined with
-      // level>1 causes _restoreTransactionRecordState to skip restore.
       "rollback dirty changes",
       "rollback dirty changes multiple saves",
       "rollback dirty changes then retry save",
@@ -99,8 +73,6 @@ describe("TransactionTest", () => {
     first = await Topic.find(1);
     second = await Topic.find(2);
   });
-
-  // ---- TransactionCallbacksTests module ----
 
   it("transaction open?", async () => {
     expect(Topic.currentTransaction().isClosed()).toBe(true);
@@ -169,9 +141,6 @@ describe("TransactionTest", () => {
     });
     expect(called).toBe(0);
 
-    // Invalidating the internal transaction removes it from
-    // `all_open_transactions`, so after_all_transactions_commit yields
-    // immediately (transactions_test.rb:71).
     called = 0;
     await Topic.transaction(async (tx) => {
       tx._internalTransaction.invalidateBang();
@@ -185,12 +154,9 @@ describe("TransactionTest", () => {
 
   it.skip("after current transaction commit multidb nested transactions", () => {
     // PERMANENT-SKIP: requires ARUnit2Model secondary DB connection
-    // (multi-database setup) — not available in single-database test env.
   });
 
   it("transaction after commit callback", async () => {
-    // Rails' multidb (ARUnit2Model) sub-case is omitted: there is no secondary
-    // DB in the single-database test env.
     let called = 0;
     await Topic.currentTransaction().afterCommit(() => {
       called += 1;
@@ -309,8 +275,6 @@ describe("TransactionTest", () => {
     );
   });
 
-  // ---- TransactionTest ----
-
   it("blank?", async () => {
     expect(Topic.currentTransaction().isBlank()).toBe(true);
     await Topic.transaction(async () => {
@@ -330,7 +294,6 @@ describe("TransactionTest", () => {
   });
 
   it("transaction does not apply default scope", async () => {
-    // Regression test for https://github.com/rails/rails/issues/50368
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
     await (Topic.where().not({ id: topic.id }) as any).transaction(async () => {
       expect(await Topic.find(topic.id)).not.toBeNull();
@@ -443,8 +406,6 @@ describe("TransactionTest", () => {
     });
 
     try {
-      // transaction_with_shallow_return: early return from the outer block after
-      // an inner requires_new transaction commits.
       await Topic.transaction(async () => {
         await Topic.transaction(
           async () => {
@@ -468,15 +429,12 @@ describe("TransactionTest", () => {
 
   it.skip("deprecation on ruby timeout outside inner transaction", () => {
     // PERMANENT-SKIP: Ruby catch/throw semantics — `catch`/`throw timeout` is
-    // non-exceptional control flow; JS has no equivalent, and Timeout is
-    // Ruby-stdlib with no Node.js counterpart.
   });
 
   it("break from transaction commits", async () => {
     await first.transaction(async () => {
       expect(first.approved).toBeFalsy();
       await first.updateBang({ approved: true });
-      // early return = Ruby `break` (commit)
       return;
     });
 
@@ -485,8 +443,6 @@ describe("TransactionTest", () => {
 
   it.skip("throw from transaction commits", () => {
     // PERMANENT-SKIP: Ruby-only — catch/throw is non-exceptional control flow
-    // that commits the transaction. JS throw is always exceptional and always
-    // rolls back. `break from transaction commits` covers the JS equivalent.
   });
 
   it("return from transaction commits", async () => {
@@ -540,9 +496,7 @@ describe("TransactionTest", () => {
         await second.save();
         throw new Error("Bad things!");
       });
-    } catch {
-      // caught it
-    }
+    } catch {}
 
     expect(first.approved).toBe(true);
     expect(second.approved).toBe(false);
@@ -552,9 +506,6 @@ describe("TransactionTest", () => {
   });
 
   it("raising exception in callback rollbacks in save", async () => {
-    // Rails defines a singleton `after_save_for_transaction` that raises; the
-    // canonical Topic afterSave hook dispatches to `afterSaveForTransaction`, so
-    // an instance-level override reproduces it.
     first.afterSaveForTransaction = () => {
       throw new Error("Make the transaction rollback");
     };
@@ -622,8 +573,6 @@ describe("TransactionTest", () => {
   });
 
   it("cancellation from before destroy rollbacks in destroy", async () => {
-    // Rails adds a singleton before_destroy that throws :abort; the canonical
-    // Topic beforeDestroy hook dispatches to `beforeDestroyForTransaction`.
     first.beforeDestroyForTransaction = () => {
       throwAbort();
     };
@@ -633,19 +582,6 @@ describe("TransactionTest", () => {
     expect(await Topic.find(first.id)).toBeDefined();
   });
 
-  // Rails dynamically defines four cancellation tests for the `validation` and
-  // `save` filters (transactions_test.rb:714). Each installs a singleton
-  // `before_<filter>_for_transaction` that runs `Book.create` then `throw(:abort)`
-  // and asserts BOTH that the dirtied `author_name` reverts AND that the
-  // `Book.count` DB side effect is rolled back.
-  //
-  // The DB side effect needs async work (`Book.create`) inside the cancelling
-  // before-filter. The canonical Topic `before_save_for_transaction` runs on the
-  // async save-callback chain (the wrapper returns the hook's Promise so it is
-  // awaited inside the save transaction). `before_validation_for_transaction`
-  // runs during `performValidations`, which `save` invokes inside the same
-  // transaction (persistence.ts). In both paths the `throw :abort`
-  // halts the save (status false → Rollback), rolling back `Book.create`.
   for (const filter of ["validation", "save"] as const) {
     const hook =
       filter === "validation" ? "beforeValidationForTransaction" : "beforeSaveForTransaction";
@@ -675,9 +611,7 @@ describe("TransactionTest", () => {
 
       try {
         await first.saveBang();
-      } catch {
-        // ActiveRecord::RecordInvalid / RecordNotSaved
-      }
+      } catch {}
 
       expect((await first.reload()).author_name).toBe(originalAuthorName);
       expect(await Book.count()).toBe(nbooksBeforeSave);
@@ -702,7 +636,6 @@ describe("TransactionTest", () => {
     const newRecordSnapshot = !newTopic.isPersisted();
     const idSnapshot = newTopic.id;
 
-    // Make sure the second save gets the after_create callback called.
     for (let i = 0; i < 2; i++) {
       newTopic.approved = true;
       await expect(newTopic.save()).rejects.toThrow("Make the transaction rollback");
@@ -850,9 +783,7 @@ describe("TransactionTest", () => {
           },
           { requiresNew: true },
         );
-      } catch {
-        /* expected */
-      }
+      } catch {}
     });
 
     expect((await first.reload()).approved).toBe(true);
@@ -875,9 +806,7 @@ describe("TransactionTest", () => {
           },
           { requiresNew: true },
         );
-      } catch {
-        /* expected */
-      }
+      } catch {}
     });
 
     expect((await first.reload()).approved).toBe(true);
@@ -897,9 +826,7 @@ describe("TransactionTest", () => {
           await first.saveBang();
           throw new Error("rollback inner");
         });
-      } catch {
-        /* expected */
-      }
+      } catch {}
     });
 
     expect((await first.reload()).approved).toBe(false);
@@ -934,27 +861,21 @@ describe("TransactionTest", () => {
                       },
                       { requiresNew: true },
                     );
-                  } catch {
-                    /* expected */
-                  }
+                  } catch {}
 
                   three = (await first.reload()).content;
                   throw new Error("roll back to Two");
                 },
                 { requiresNew: true },
               );
-            } catch {
-              /* expected */
-            }
+            } catch {}
 
             two = (await first.reload()).content;
             throw new Error("roll back to One");
           },
           { requiresNew: true },
         );
-      } catch {
-        /* expected */
-      }
+      } catch {}
 
       one = (await first.reload()).content;
     });
@@ -1011,7 +932,6 @@ describe("TransactionTest", () => {
 
   it.skip("rollback when thread killed", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — Thread.kill aborts a thread
-    // mid-transaction; JS is single-threaded with no equivalent kill primitive.
   });
 
   it("restore active record state for all records in a transaction", async () => {
@@ -1047,7 +967,7 @@ describe("TransactionTest", () => {
     const reply = await topic.replies.create({});
 
     await Topic.transaction(async () => {
-      await topic.destroy(); // calls destroy on reply (dependent: destroy)
+      await topic.destroy();
       await reply.destroy();
       throw new Rollback();
     });
@@ -1305,18 +1225,6 @@ describe("TransactionTest", () => {
   });
 });
 
-// ==========================================================================
-// TransactionTest (connection eviction) — Rails removes a connection from the
-// pool (`throw_away!`) whenever the outer `within_new_transaction` ensure sees a
-// still-incomplete transaction. These run OUTSIDE the shared fixture
-// transaction (`usesTransaction`) because evicting the connection mid-test would
-// poison transactional-fixtures teardown.
-//
-// Rails wraps this whole group in `if !in_memory_db?`
-// (transactions_test.rb:232-368): evicting the sole connection of a `:memory:`
-// database throws the database away with it, leaving every later test with an
-// empty schema.
-// ==========================================================================
 describe.skipIf(inMemoryDb())("TransactionTest", () => {
   const { topics } = fixtures(["topics"], {
     usesTransaction: [
@@ -1410,17 +1318,9 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
 
   it.skip("connection removed from pool when thread killed in begin after successfully beginning a transaction", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — Thread.kill mid-transaction; JS
-    // is single-threaded with no equivalent kill primitive.
   });
 });
 
-// ==========================================================================
-// TransactionTest (materialization + savepoint-name determinism) — Rails runs
-// these against a fresh, empty connection. They count exact query sequences and
-// assert savepoint names, so they opt out of the fixture transaction
-// (`usesTransaction`) to begin from a clean connection state; the canonical
-// `topics` table comes from the template clone.
-// ==========================================================================
 describe("TransactionTest", () => {
   fixtures(["topics"], {
     usesTransaction: [
@@ -1443,8 +1343,6 @@ describe("TransactionTest", () => {
     ],
   });
 
-  // Several tests below disable lazy transactions on the shared connection;
-  // re-enable afterward so later tests in this describe start from the default.
   afterEach(async () => {
     (await (Topic as any).leaseConnection()).enableLazyTransactionsBang();
   });
@@ -1452,7 +1350,7 @@ describe("TransactionTest", () => {
   it("savepoints name", async () => {
     const connection = await (Topic as any).leaseConnection();
     await Topic.transaction(async () => {
-      await Topic.deleteAll(); // Dirty the transaction to force a savepoint below
+      await Topic.deleteAll();
 
       expect(connection.currentSavepointName()).toBeNull();
       expect(connection.currentTransaction().savepointName).toBeNull();
@@ -1498,12 +1396,6 @@ describe("TransactionTest", () => {
     });
   });
 
-  // Rails runs this on every adapter and expects
-  // `Topic.transaction { Topic.where("1=1").first }` to emit BEGIN|COMMIT
-  // (transactions_test.rb:1485): a no-bind unprepared SELECT inside an open
-  // lazy transaction materializes it. The read path funnels through
-  // `with_raw_connection` (materializeTransactions defaults true), so the
-  // pending lazy transaction is materialized on sqlite, PG, and MySQL alike.
   it("unprepared statement materializes transaction", async () => {
     await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
       await Topic.transaction(async () => {
@@ -1630,8 +1522,6 @@ describe("TransactionTest", () => {
   it("checking in connection reenables lazy transactions", async () => {
     const connection = await (Topic as any).leaseConnection();
     await connection.rawConnection();
-    // Mirrors `Topic.connection_pool.checkin`: run the `:checkin` callbacks
-    // (one of which is enable_lazy_transactions!) around `expire`.
     connection._runCheckinCallbacks(() => {});
     await assertNoQueries(false, async () => {
       await Topic.transaction(async () => {});
@@ -1663,7 +1553,6 @@ describe("TransactionTest", () => {
           this._tableName = "transaction_without_primary_keys";
           this._primaryKey = null as any;
           this.attribute("thing_id", "integer");
-          // necessary to trigger the has_transactional_callbacks branch
           this.afterCommit(() => {});
         }
       }
@@ -1689,8 +1578,6 @@ describe("TransactionTest", () => {
       await connection.removeColumn("topics", "stuff");
       expect((await connection.columns("topics")).map((c: any) => c.name)).not.toContain("stuff");
 
-      // SQLite supports DDL transactions, so add_column inside a transaction
-      // must not raise.
       await Topic.transaction(async () => {
         await connection.addColumn("topics", "stuff", "string");
       });
@@ -1698,9 +1585,7 @@ describe("TransactionTest", () => {
     } finally {
       try {
         await connection.removeColumn("topics", "stuff");
-      } catch {
-        /* already removed */
-      }
+      } catch {}
       void (Topic as any).resetColumnInformation();
     }
   });
@@ -1715,9 +1600,6 @@ describe("TransactionTest", () => {
   });
 });
 
-// ==========================================================================
-// TransactionsWithTransactionalFixturesTest — from transactions_test.rb
-// ==========================================================================
 describe("TransactionsWithTransactionalFixturesTest", () => {
   fixtures(["topics"]);
 
@@ -1748,18 +1630,13 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
           await first.saveBang();
           throw new Error("boom");
         });
-      } catch {
-        /* expected */
-      }
+      } catch {}
     });
 
     expect((await first.reload()).approved).toBeFalsy();
   });
 });
 
-// ==========================================================================
-// TransactionUUIDTest — from transactions_test.rb
-// ==========================================================================
 describe("TransactionUUIDTest", () => {
   fixtures(["topics"]);
 
@@ -1785,16 +1662,11 @@ describe("TransactionUUIDTest", () => {
   });
 });
 
-// ==========================================================================
-// ConcurrentTransactionTest — from transactions_test.rb
-// ==========================================================================
 describe("ConcurrentTransactionTest", () => {
   it.skip("transaction per thread", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — spawns threads asserting
-    // per-thread transaction isolation; JS is single-threaded.
   });
   it.skip("transaction isolation  read committed", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — uses Thread.new to assert
-    // READ COMMITTED isolation across concurrent threads; JS is single-threaded.
   });
 });

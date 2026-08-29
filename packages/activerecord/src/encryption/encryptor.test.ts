@@ -42,9 +42,6 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
   it("if an encryption error happens when encrypting an encrypted text it should raise", () => {
     const enc = new Encryptor();
-    // Mirrors Rails: stub a key provider whose encryptionKey raises an
-    // Encryption error, and assert encrypt surfaces it (rather than relying on
-    // missing key material — encryption is configured suite-wide now).
     const keyProvider = new DerivedSecretKeyProvider("some key");
     vi.spyOn(keyProvider, "encryptionKey").mockImplementation(() => {
       throw new Encryption("boom");
@@ -70,36 +67,25 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   });
 
   it("compresses when raw compressed bytes < original even if base64(compressed) > original", () => {
-    // Regression test for C1: the old code compared base64(compressed).length vs original.length,
-    // which incorrectly skipped compression when base64 overhead pushed the encoded size above the
-    // original. The new code compares raw bytes, so compression is applied whenever deflated bytes
-    // are smaller — base64 encoding happens after the decision.
-    //
-    // Arrange: a compressor that returns 106 raw bytes for 141-byte input.
-    //   original = 141 bytes → compressed = 106 bytes → base64(106) = 144 bytes > 141 bytes
-    //   Old code: base64(144) NOT < 141 → skipped compression (bug)
-    //   New code: 106 < 141 → compresses (correct)
     const originalText = "a".repeat(141);
-    const originalByteLen = Buffer.byteLength(originalText, "utf-8"); // 141
-    const compressedRaw = Buffer.alloc(106); // 106 raw bytes → base64 = 144 bytes > 141
-    const compressedBase64 = compressedRaw.toString("base64"); // 144 bytes
-    expect(compressedBase64.length).toBeGreaterThan(originalByteLen); // proves base64 > original
+    const originalByteLen = Buffer.byteLength(originalText, "utf-8");
+    const compressedRaw = Buffer.alloc(106);
+    const compressedBase64 = compressedRaw.toString("base64");
+    expect(compressedBase64.length).toBeGreaterThan(originalByteLen);
 
     const spyCompressor = {
       deflate: (_data: string) => compressedRaw,
-      inflate: (_data: Buffer | Uint8Array) => originalText, // simulate decompression
+      inflate: (_data: Buffer | Uint8Array) => originalText,
     };
 
     const enc = new Encryptor({ compress: true, compressor: spyCompressor });
     const key = generateKey();
     const encrypted = enc.encrypt(originalText, { key });
 
-    // Verify the c (compressed) header is set in the message
     const serializer = new MessageSerializer();
     const message = serializer.load(encrypted);
     expect(message.headers.get("c")).toBe(true);
 
-    // Full round-trip
     const decrypted = enc.decrypt(encrypted, { key });
     expect(decrypted).toBe(originalText);
   });
@@ -116,11 +102,9 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     const enc = new Encryptor({ compress: true, compressor: spyCompressor });
     const key = generateKey();
 
-    // Exactly at threshold (140 bytes) — not compressed
     enc.encrypt("x".repeat(140), { key });
     expect(deflateCallCount).toBe(0);
 
-    // One byte above threshold — deflate is called
     enc.encrypt("x".repeat(141), { key });
     expect(deflateCallCount).toBe(1);
   });
@@ -134,9 +118,6 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     const secret = generateKey();
     let receivedMessage: Message | null = null;
 
-    // Key provider that stores publicTags in the message headers and reads them back
-    // during decryption. Mirrors Rails: key_provider.encryption_key.public_tags are
-    // serialized into the message, and decryption_keys receives the full Message.
     const keyProvider = {
       encryptionKey() {
         return { secret, publicTags: { model: "User", attr: "email" } };
@@ -153,14 +134,11 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
     expect(decrypted).toBe("test@example.com");
 
-    // Verify the custom metadata was stored in the message headers.
     const serializer = new MessageSerializer();
     const message = serializer.load(encrypted);
-    // load returns decoded bytes (Buffers); text headers are recovered as UTF-8.
     expect((message.headers.get("model") as Buffer).toString("utf-8")).toBe("User");
     expect((message.headers.get("attr") as Buffer).toString("utf-8")).toBe("email");
 
-    // Verify the key provider received a Message with the custom metadata headers during decryption.
     expect(receivedMessage).not.toBeNull();
     expect((receivedMessage!.headers.get("model") as Buffer).toString("utf-8")).toBe("User");
     expect((receivedMessage!.headers.get("attr") as Buffer).toString("utf-8")).toBe("email");
@@ -184,8 +162,6 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   });
 
   it("decrypt respects encoding even when compression is used", () => {
-    // Use a spy compressor so we can assert deflate/inflate were actually called.
-    // The input is non-ASCII (Unicode) to exercise the UTF-8 round-trip path.
     let deflated = false;
     let inflated = false;
     const spyCompressor = {
@@ -213,7 +189,6 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     const saved = Configurable.config.forcedEncodingForDeterministicEncryption;
     try {
       Configurable.config.forcedEncodingForDeterministicEncryption = "US-ASCII";
-      // "é" (U+00E9) is outside ASCII range — should be replaced with "?"
       const encrypted = enc.encrypt("héllo", { key, deterministic: true });
       const decrypted = enc.decrypt(encrypted, { key });
       expect(decrypted).toBe("h?llo");
@@ -296,7 +271,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
       const cipherSpy = vi.spyOn(enc as any, "cipher");
       const encrypted = enc.encrypt("secret text");
       const decrypted = enc.decrypt(encrypted);
-      expect(cipherSpy).toHaveBeenCalledTimes(2); // once for encrypt, once for decrypt
+      expect(cipherSpy).toHaveBeenCalledTimes(2);
       expect(decrypted).toBe("secret text");
       cipherSpy.mockRestore();
     } finally {

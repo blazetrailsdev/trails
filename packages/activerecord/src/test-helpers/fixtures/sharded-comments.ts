@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/sharded_comments.yml
 export const shardedCommentFixtureData = {
   great_comment_blog_post_one: {
     body: "I really enjoyed the post!",

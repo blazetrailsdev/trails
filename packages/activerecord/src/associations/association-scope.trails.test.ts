@@ -21,12 +21,6 @@ import { MemberDetail } from "../test-helpers/models/member-detail.js";
 
 describe("AssociationScope", () => {
   fixtures([]);
-  // The DB-roundtrip cases ride the canonical Author/Post/Comment,
-  // Categorization/Category, Tag/Tagging and Member/Membership/Club models —
-  // every STI / polymorphic-source-type / has-many-through / has-one-through
-  // shape this resolver harness exercises already lives on those models. The
-  // pure `toSql()` cases below build inline single-purpose classes that never
-  // touch the DB, so they need no schema.
   registerModel(Author);
   registerModel(Post);
   registerModel(Comment);
@@ -36,7 +30,7 @@ describe("AssociationScope", () => {
   registerModel(Tagging);
   registerModel(Member);
   registerModel(Membership);
-  void CurrentMembership; // self-registers as an STI subclass on import
+  void CurrentMembership;
   registerModel(Club);
   registerModel(MemberDetail);
 
@@ -77,7 +71,6 @@ describe("AssociationScope", () => {
 
   it("INSTANCE is a shared identity-transformation instance", () => {
     expect(AssociationScope.INSTANCE).toBeInstanceOf(AssociationScope);
-    // static scope() delegates to INSTANCE.scope()
     expect(typeof AssociationScope.scope).toBe("function");
   });
 
@@ -86,7 +79,6 @@ describe("AssociationScope", () => {
       typeof v === "string" ? v.toUpperCase() : v,
     );
     expect(upcased).toBeInstanceOf(AssociationScope);
-    // Instance-level scope is exposed; static reuses INSTANCE.
     expect(typeof upcased.scope).toBe("function");
   });
 
@@ -120,7 +112,6 @@ describe("AssociationScope", () => {
     });
 
     const sql = scope.toSql();
-    // belongsTo → WHERE target.id = owner.fk; isCollection? false → LIMIT 1.
     expect(sql).toMatch(/["`]as_authors["`].*["`]id["`]\s*=\s*42.*LIMIT\s+1/s);
   });
 
@@ -130,19 +121,17 @@ describe("AssociationScope", () => {
     const reflection = (AsAuthor as any)._reflectOnAssociation("as_posts");
 
     const binds = AssociationScope.getBindValues(author, [reflection]);
-    // hasMany: joinForeignKey = owner PK ("id"). Owner id = 99.
     expect(binds).toEqual([99]);
   });
 
   it("ReflectionProxy delegates joinPrimaryKey / joinForeignKey / klass to the reflection", () => {
     const { AsAuthor, AsPost } = makeModels();
     const reflection = (AsAuthor as any)._reflectOnAssociation("as_posts");
-    const proxy = new ReflectionProxy(reflection, /* aliasedTable */ null);
+    const proxy = new ReflectionProxy(reflection, null);
 
     expect(proxy.joinPrimaryKey()).toBe(reflection.joinPrimaryKey());
     expect(proxy.joinForeignKey).toBe(reflection.joinForeignKey);
     expect(proxy.klass).toBe(AsPost);
-    // Rails' all_includes; block returns nil → we return null.
     expect(proxy.allIncludes()).toBeNull();
   });
 
@@ -185,20 +174,11 @@ describe("AssociationScope", () => {
       klass: reflection.klass,
     });
 
-    // The lambda must run exactly once — addConstraints applies it via
-    // reflection.scope; the loader path must not re-apply options.scope.
     expect(calls).toBe(1);
     expect(scope.toSql()).toMatch(/["`]published["`]\s*=\s*(?:TRUE|1)/i);
   });
 
   it("applies STI type_condition on subclass targets (compensates for our unscoped)", () => {
-    // Rails' klass.unscoped applies STI type_condition via core.rb's
-    // relation() override; ours doesn't, so AssociationScope re-adds it.
-    // Canonical `companies` STI: `VerySpecialClient < SpecialClient < Client`,
-    // a leaf, on the
-    // `type` column the schema really has. `columns_hash` is a pure DB read
-    // (model_schema.rb:592-594), so the type_condition only fires for a model
-    // whose table carries that column.
     class StiOwner extends Base {
       declare very_special_clients: AssociationProxy<Base>;
 
@@ -225,11 +205,6 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany merges target's scope_for_association (default_scope flows through)", async () => {
-    // Rails' Association#scope is
-    //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
-    // (associations/association.rb:313). The reflection-backed loader
-    // path must merge in the target's default_scope so behavior matches
-    // the inline path (targetModel.all().where(...)).
     class DsAuthor extends Base {
       declare ds_posts: AssociationProxy<DsPost>;
 
@@ -256,8 +231,6 @@ describe("AssociationScope", () => {
 
     const author = new DsAuthor({ id: 1 });
     const reflection = (DsAuthor as any)._reflectOnAssociation("ds_posts");
-    // Replicate the loader's merge so the test pins the actual Rails
-    // shape rather than just the unscoped+constraints intermediate.
     const built = AssociationScope.scope({
       owner: author,
       reflection,
@@ -270,13 +243,6 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany applies caller-supplied options.scope when it differs from reflection.scope", async () => {
-    // Regression for the `HasManyThroughAssociation#findTarget` path that wraps
-    // options.scope with sourceType filtering before calling
-    // `HasManyAssociation#findTarget`. The migrated
-    // path skips re-applying when options.scope === reflection.scope
-    // (avoid double-application), but augmented scopes must still run.
-    // `Author#welcomePosts` is the canonical `has_many ... -> { where(title:) }`
-    // (`test/models/author.rb:80`), so the macro scope must filter the load.
     const author = await Author.create({ name: "Alice" });
     await Post.create({ author_id: author.id, title: "draft", body: "x" });
     await Post.create({ author_id: author.id, title: "Welcome to the weblog", body: "y" });
@@ -287,10 +253,6 @@ describe("AssociationScope", () => {
   });
 
   it("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {
-    // Rails: `relation.instance_exec(owner, &scope) || relation`. A
-    // 0-arity scope (e.g. `-> { where(active: true) }`) reads `self`
-    // as the relation, so we must bind `this` rather than passing the
-    // relation as the first arg.
     class ZeroArityAuthor extends Base {
       declare zero_arity_posts: AssociationProxy<ZeroArityPost>;
 
@@ -298,9 +260,6 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
         this.hasMany(
           "zero_arity_posts",
-          // The function's .length is 0, so the loader must use scopeFor's
-          // 0-arity branch (this=relation). If we passed it as a 1-arg
-          // function, `where` would not exist on the empty arg.
           function (this: any) {
             return this.where({ active: true });
           },
@@ -332,10 +291,6 @@ describe("AssociationScope", () => {
   });
 
   it("hasMany :as adds the polymorphic type WHERE on the target table", () => {
-    // For `hasMany :comments, as: :commentable`, Rails' AssociationScope
-    // builds `WHERE comments.commentable_id = owner.id AND
-    // comments.commentable_type = OwnerClass.name`. The type filter
-    // comes from reflection.type === foreignType (`commentable_type`).
     class AsOwner extends Base {
       declare as_comments: AssociationProxy<AsComment>;
 
@@ -368,9 +323,6 @@ describe("AssociationScope", () => {
   });
 
   it("hasMany :as polymorphic type WHERE uses base class polymorphic_name for STI subclass owner", () => {
-    // Rails' AssociationScope builds the type filter from
-    // `owner.class.polymorphic_name` (= base_class.name), so an STI subclass
-    // owner stores the base class name in the *_type column, not the subclass.
     class StiAsOwner extends Base {
       declare "type": string | null;
 
@@ -441,11 +393,6 @@ describe("AssociationScope", () => {
   });
 
   it("polymorphic belongsTo accepts a runtime-resolved klass via AssociationScopeable", () => {
-    // Polymorphic belongsTo: target klass is resolved at runtime from
-    // owner's <assoc>_type column. Callers (loadBelongsTo) pass the
-    // resolved klass via the AssociationScopeable.klass field; the
-    // reflection's joinPrimaryKey returns the target's PK and
-    // joinForeignKey returns the owner-side FK column.
     class PolyTarget extends Base {
       static {
         this.attribute("id", "integer");
@@ -470,21 +417,12 @@ describe("AssociationScope", () => {
     const sql = (
       AssociationScope.scope({ owner: comment, reflection, klass: PolyTarget }) as any
     ).toSql();
-    // Target side: WHERE poly_targets.id = 99 (the FK value), LIMIT 1.
     expect(sql).toMatch(/["`]poly_targets["`]/);
     expect(sql).toMatch(/["`]id["`]\s*=\s*99/);
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 
   it("addConstraints routes a composite-PK mismatch through checkValidityBang", async () => {
-    // The scope-building bypass path (AssociationScope.scope → addConstraints)
-    // never constructs an Association, so it doesn't reach the canonical
-    // `reflection.check_validity!` that `Association#initialize` runs. The
-    // length guard now routes through the real reflection's checkValidityBang
-    // so the error carries the Rails-faithful message derived from
-    // active_record_primary_key / foreign_key — note the FK renders as the
-    // reflection's scalar `broken_order_id`, NOT the trails-computed
-    // `["broken_order_id"]` array the old guard produced.
     const { CompositePrimaryKeyMismatchError } = await import("../index.js");
     class AscCpkBook extends Base {
       declare broken_order_id: number | null;
@@ -522,11 +460,6 @@ describe("AssociationScope", () => {
   });
 
   it("polymorphic belongsTo uses runtime klass's primary key (non-id PK)", () => {
-    // BelongsToReflection#joinPrimaryKey hard-codes "id" for polymorphic
-    // associations because the target klass isn't known at definition
-    // time. The chain head resolves its own runtime klass, so a target
-    // with a non-default PK (e.g. "uuid") gets the right WHERE column.
-    // Regression for Copilot review on PR #618.
     class UuidTarget extends Base {
       declare uuid: string | null;
 
@@ -557,26 +490,17 @@ describe("AssociationScope", () => {
     const sql = (
       AssociationScope.scope({ owner: comment, reflection, klass: UuidTarget }) as any
     ).toSql();
-    // Must WHERE on uuid (the target's actual PK), NOT id.
     expect(sql).toMatch(/["`]uuid["`]\s*=\s*'abc-123'/);
     expect(sql).not.toMatch(/["`]id["`]\s*=/);
   });
 
   it("through chain merges scope on the through reflection (chain.reverse_each)", () => {
-    // Rails' add_constraints walks chain.reverse_each over each
-    // reflection's constraints and merges WHERE/ORDER predicates from
-    // the scope lambda into the main relation. PR 3b adds this for
-    // non-head chain entries: a scope on the through reflection (e.g.
-    // `hasMany :memberships, scope: r => r.where(active: true)`) must
-    // emit `WHERE memberships.active = TRUE` on the JOINed-in table.
     class CcAuthor extends Base {
       declare cc_memberships: AssociationProxy<CcMembership>;
       declare cc_tags: AssociationProxy<CcTag>;
 
       static {
         this.attribute("id", "integer");
-        // Scope on the through reflection — chain.reverse_each must pick
-        // it up when AssociationScope walks the chain for cc_tags.
         this.hasMany("cc_memberships", (rel: any) => rel.where({ active: true }), {
           className: "CcMembership",
           foreignKey: "cc_author_id",
@@ -629,15 +553,6 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany through with sourceType filters by polymorphic source type (PR 3c)", async () => {
-    // Tagging belongs_to :taggable, polymorphic: true (the Tagging model
-    // holds the polymorphic FK + type pair). When we hop through taggings
-    // with a sourceType filter (Tag has_many :taggedPosts, through:
-    // :taggings, source: :taggable, sourceType: "Post"),
-    // PolymorphicReflection wraps the chain entry and adds a type
-    // constraint `where(taggable_type: sourceType)`. PR 3c's
-    // _mergeReflectionScopeChain detects PolymorphicReflection and
-    // applies its constraints() — including the source_type_scope —
-    // to the chain JOIN so only the right polymorphic rows match.
     const tag = await Tag.create({ name: "ruby" });
     const post = await Post.create({ title: "p1", body: "b" });
     const comment = await Comment.create({ post_id: post.id, body: "c1" });
@@ -649,22 +564,12 @@ describe("AssociationScope", () => {
     });
 
     const posts = (await (tag as any).taggedPosts.toArray()) as Post[];
-    // Without sourceType filtering, the through join would return BOTH
-    // tagging rows; we'd then JOIN to the wrong rows. With the filter,
-    // only the Post-typed tagging participates.
     expect(posts.map((p) => p.title)).toEqual(["p1"]);
   });
 
-  // story: association-scope-test-np-uuid-canonical (np_* tables have no schema.rb analog)
   it.skip("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {});
 
   it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
-    // PR 3c also covers hasOne source on the through model. Canonical
-    // MemberDetail has_one :membership through :member, where Member
-    // has_one :membership — so the source (`membership`) is a hasOne, not
-    // a belongsTo. Verifies the join direction differs from belongsTo-
-    // source — target's FK back to through, not the other way — and that
-    // loadHasOne returns exactly one record.
     const member = await Member.create({ name: "Alice" });
     const membership = await Membership.create({ member_id: member.id });
     const memberDetail = await MemberDetail.create({ member_id: member.id });
@@ -675,18 +580,11 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany through with has_many source routes via AssociationScope (PR 3c widening)", async () => {
-    // Canonical Author has_many :posts; Post has_many :comments; Author
-    // has_many :comments, through: :posts (source: :comments → has_many on
-    // Post, NOT belongsTo). PR 3b only routed belongsTo-source shapes; PR
-    // 3c widens to has_many source — the chain machinery already handles
-    // the join direction via reflection.joinPrimaryKey/joinForeignKey
-    // delegation, the gate just needed dropping.
     const author = await Author.create({ name: "Alice" });
     const p1 = await Post.create({ author_id: author.id, title: "p1", body: "b" });
     const p2 = await Post.create({ author_id: author.id, title: "p2", body: "b" });
     await Comment.create({ post_id: p1.id, body: "first" });
     await Comment.create({ post_id: p2.id, body: "second" });
-    // Another author's comment shouldn't show up
     const other = await Author.create({ name: "Bob" });
     const op = await Post.create({ author_id: other.id, title: "op", body: "b" });
     await Comment.create({ post_id: op.id, body: "other" });
@@ -696,11 +594,6 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasOne through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
-    // PR 3b migration covers loadHasOne too. Canonical Member has_one
-    // :club through :currentMembership, where CurrentMembership
-    // belongs_to :club — the source (`club`) is a belongsTo. End-to-end:
-    // insert, call loadHasOne with the through reflection, assert single
-    // result.
     const member = await Member.create({ name: "Alice" });
     const club = await Club.create({ name: "Great club" });
     await CurrentMembership.create({ member_id: member.id, club_id: club.id });
@@ -711,13 +604,6 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany through chain (belongsTo source, no sourceType) routes via AssociationScope", async () => {
-    // PR 3b migration: findTarget for has_many :through where source
-    // is non-polymorphic belongsTo (no sourceType) now routes through
-    // AssociationScope's JOIN-based path instead of the 2-step IN-list
-    // loader. Canonical Author has_many :categories through
-    // :categorizations, where Categorization belongs_to :category.
-    // End-to-end: insert records, call findTarget, assert the right rows
-    // return — exercises the migrated path through real DB.
     const alice = await Author.create({ name: "Alice" });
     const bob = await Author.create({ name: "Bob" });
     const ruby = await Category.create({ name: "ruby" });
@@ -732,11 +618,6 @@ describe("AssociationScope", () => {
   });
 
   it("through chain query loads actual records end-to-end (Author -> Memberships -> Tags)", async () => {
-    // Real DB roundtrip: insert records, build the through scope via
-    // AssociationScope, execute it, assert the right rows come back.
-    // Proves the chain-walking machinery isn't just generating valid-
-    // looking SQL — it actually returns the correct records. Canonical
-    // Author has_many :categories through :categorizations.
     const alice = await Author.create({ name: "Alice" });
     const bob = await Author.create({ name: "Bob" });
     const ruby = await Category.create({ name: "ruby" });
@@ -812,10 +693,6 @@ describe("AssociationScope", () => {
     ).toSql();
     expect(sql).toMatch(/FROM\s+["`]hot_settings["`]/);
     expect(sql).toMatch(/INNER JOIN\s+["`]?hot_accounts["`]?/i);
-    // Pin the ON condition so a regression where the join keys flip
-    // (or get dropped) doesn't slip through. PR 3 builds these via
-    // nextChainScope using joinPrimaryKey / joinForeignKey from the
-    // chain's pair.
     expect(sql).toMatch(
       /ON\s+["`]hot_settings["`]\.["`]hot_account_id["`]\s*=\s*["`]hot_accounts["`]\.["`]id["`]/,
     );
@@ -824,13 +701,6 @@ describe("AssociationScope", () => {
   });
 
   it("through chain emits a JOIN-based query against the through table", () => {
-    // PR 3: chain length 2 (a has_many :through). The generated SQL
-    // selects from the source table, INNER JOINs the through table, and
-    // table-qualifies the owner-FK WHERE on the through.
-    //   SELECT through_posts.* FROM through_posts
-    //   INNER JOIN through_memberships
-    //     ON through_posts.id = through_memberships.through_post_id
-    //   WHERE through_memberships.through_author_id = 1
     class ThroughAuthor extends Base {
       declare through_memberships: AssociationProxy<ThroughMembership>;
       declare through_posts: AssociationProxy<ThroughPost>;
@@ -889,25 +759,6 @@ describe("AssociationScope", () => {
   });
 
   it("through chain with a polymorphic sourceType that repeats a table aliases the join and keeps the _type WHERE qualified", () => {
-    // Polymorphic-source-type variant of the self-referential alias
-    // pin in association-scope-alias-tracker.test.ts. A gallery has
-    // child galleries; each child `belongsTo :imageable` (polymorphic).
-    // `imageables` hops through children with `sourceType: "PstGallery"`,
-    // so the source target is the SAME `pst_galleries` table the scope
-    // seeds the tracker with — the repeat-visit alias branch fires and
-    // the joined-in source gets aliased to `children_imageables`.
-    //
-    // What this pins that the non-polymorphic case doesn't: the
-    // polymorphic source-type filter (`imageable_type = 'PstGallery'`,
-    // from the PolymorphicReflection source_type_scope) must qualify the
-    // ALIASED through rows — the `imageable_*` columns live on the
-    // children, joined in as `children_imageables`, not on the FROM
-    // table. Rails evaluates the scope lambda against
-    // `reflection.build_scope(reflection.aliased_table)`
-    // (association_scope.rb:169, reflection.rb:336/1243), so the
-    // `where(imageable_type:)` predicate binds to the alias. Filtering
-    // `pst_galleries.imageable_type` (the FROM side) would match the
-    // wrong rows.
     class PstGallery extends Base {
       declare pst_gallery_id: number | null;
       declare imageable_id: number | null;
@@ -948,12 +799,8 @@ describe("AssociationScope", () => {
         klass: reflection.klass,
       }) as any
     ).toSql();
-    // The repeat visit to pst_galleries is aliased as the join target.
     expect(sql).toMatch(/INNER JOIN\s+["`]pst_galleries["`]\s+["`]children_imageables["`]/i);
-    // Owner-FK WHERE is qualified by the alias, not the bare table.
     expect(sql).toMatch(/["`]children_imageables["`]\.["`]pst_gallery_id["`]\s*=\s*5/);
-    // Polymorphic source-type filter qualifies the aliased through rows
-    // (Rails' build_scope(reflection.aliased_table)), NOT the FROM table.
     expect(sql).toMatch(/["`]children_imageables["`]\.["`]imageable_type["`]\s*=\s*'PstGallery'/);
     expect(sql).not.toMatch(/["`]pst_galleries["`]\.["`]imageable_type["`]/);
   });

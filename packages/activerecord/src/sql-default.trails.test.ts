@@ -9,14 +9,7 @@ import {
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { TypeMap } from "./type/type-map.js";
 
-// `quote` requires a host receiver (no receiver-less dispatch); bind an empty
-// host so date/time values route through the abstract module helpers.
 const quote = (value: unknown): string => quoteFn.call(quotingHost(), value);
-// `quoteDefaultExpression` self-sends `lookup_cast_type` and then `quote`
-// unconditionally (abstract/quoting.rb:158-163), so the receiver has to be an
-// adapter — Rails' equivalent hosts are all `< AbstractAdapter`. `quotingHost`
-// supplies the abstract quoting members; `lookupCastType` is wired to the
-// abstract type map here because the bare prototype carries no instance config.
 const TYPE_MAP = new TypeMap();
 AbstractAdapter.initializeTypeMap(TYPE_MAP);
 const DEFAULT_EXPRESSION_HOST = quotingHost({

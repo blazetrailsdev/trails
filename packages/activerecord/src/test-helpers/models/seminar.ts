@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Section } from "./section.js";
 import type { Session } from "./session.js";
-// vendor/rails/activerecord/test/models/seminar.rb
 import { Base } from "../../base.js";
 
 export class Seminar extends Base {

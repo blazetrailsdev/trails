@@ -1,48 +1,12 @@
-/**
- * captureSql — subscribe to sql.active_record during a callback and return
- * the SQL strings emitted.
- *
- * Mirrors the setup/teardown stub pattern in Rails'
- * activerecord/test/cases/adapters/abstract_mysql_adapter/active_schema_test.rb:
- * the test monkey-patches `connection.execute` to instrument the SQL and
- * return it instead of running it.  We subscribe to the notification instead.
- * Errors from fn() propagate, matching Rails' capture_sql (test_case.rb:90),
- * which wraps a bare `yield` with no rescue.  In stub mode the statement never
- * reaches the database, so tables referenced in tests need not exist.
- *
- * Usage:
- *   const sqls = await captureSql(() => adapter.addIndex("t", "c"));
- *   expect(sqls[0]).toBe("CREATE INDEX ...");
- *
- * Stub mode (closer to Rails' `setup`):
- *   const sqls = await captureSql(() => adapter.addIndex("t", "c"), { stub: adapter });
- * intercepts the adapter's `execute`/`executeMutation` so DDL only instruments
- * the SQL and returns — the statement never reaches the database.
- */
-
 import { Notifications } from "@blazetrails/activesupport";
 
-/**
- * Minimal surface captureSql's stub mode patches.  Both methods exist on every
- * concrete adapter (Mysql2Adapter, PostgresqlAdapter, Sqlite3Adapter).
- * @internal
- */
+/** @internal */
 export interface StubbableAdapter {
   execute: (sql: string, binds?: unknown[], name?: string) => Promise<unknown>;
   executeMutation: (sql: string, binds?: unknown[], name?: string) => Promise<number>;
-  // PostgreSQL routes DDL (CREATE DATABASE / CREATE INDEX / DROP INDEX) through
-  // the bare-driver `exec`, which bypasses execute/executeMutation. Stub it too
-  // so those statements are instrumented-and-returned rather than run, mirroring
-  // Rails' PostgresqlActiveSchemaTest where `execute` is monkey-patched to a
-  // no-op that returns the SQL.
   exec?: (sql: string) => Promise<void>;
 }
 
-/**
- * Replaces `execute`/`executeMutation` on `adapter` with stubs that instrument
- * the SQL via `sql.active_record` and return without touching the database,
- * mirroring Rails' ActiveSchemaTest `setup` stub.  Returns a restore function.
- */
 function installExecuteStub(adapter: StubbableAdapter): () => void {
   const original = {
     execute: adapter.execute,
@@ -104,11 +68,6 @@ export async function captureSql(
     sqls.push(sql);
   });
   const restore = stub ? installExecuteStub(stub) : undefined;
-  // No catch: Rails' capture_sql wraps a bare `yield` in Notifications.subscribed
-  // (test_case.rb:90) with no rescue, so block errors propagate. Swallowing here
-  // would let captured-query tests assert green after the code under test raised,
-  // since the SQL is instrumented before the error unwinds. Stub mode keeps DDL
-  // off the database by stubbing execute, not by suppressing errors.
   try {
     await fn();
   } finally {

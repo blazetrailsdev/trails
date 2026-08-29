@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/has_one_through_disable_joins_associations_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { registerModel, registerSubclass } from "../index.js";
@@ -40,9 +37,6 @@ registerModel(CurrentMembership);
 registerModel(SuperMembership);
 registerModel(SelectedMembership);
 registerModel(TenantMembership);
-// `Company` declares `has_many :developers, through: :contracts`, whose through
-// reflection resolves Contract during automatic-inverse resolution
-// (reflection.rb:758-780). Rails autoloads it there; trails needs it registered.
 registerModel(Contract);
 registerModel(Company);
 registerModel(Firm);
@@ -63,11 +57,6 @@ registerSubclass(RestrictedWithExceptionFirm);
 registerSubclass(RestrictedWithErrorFirm);
 registerSubclass(Client);
 
-/**
- * Capture the non-SCHEMA `sql.active_record` statements emitted while running
- * `block`. Mirrors Rails' `capture_sql`/`SQLCounter`, which never records
- * adapter-internal SCHEMA introspection.
- */
 async function captureSql(block: () => Promise<unknown>): Promise<string[]> {
   const observed: string[] = [];
   const sub = Notifications.subscribe("sql.active_record", (event: any) => {
@@ -126,11 +115,6 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     for (const nj of noJoins) {
       expect(nj).not.toMatch(/INNER JOIN/i);
     }
-    // Rails SingularAssociation#find_target routes the disable_joins branch
-    // through scope.first -> Relation#first -> ordered_relation, so the
-    // singular target load is ORDER BY pk LIMIT 1 (unlike the unordered
-    // collection / normal-singular path). The second no-joins query is the
-    // organizations target load.
     expect(noJoins[1]).toMatch(/ORDER BY.+organizations.+id.+ASC.+LIMIT/i);
   });
 
@@ -153,9 +137,6 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   it("preload on disable joins through", async () => {
     const loaded = await Member.preload(":organization", ":organizationWithoutJoins");
     const first = loaded[0];
-    // preload must have populated both holders — assert they read as loaded so the
-    // zero-query checks below actually exercise the preload path (a sync `.target`
-    // read never queries regardless of whether preload ran).
     expect(first.association("organization").isLoaded()).toBe(true);
     expect(first.association("organizationWithoutJoins").isLoaded()).toBe(true);
     const queriedOrg = await captureSql(async () => {

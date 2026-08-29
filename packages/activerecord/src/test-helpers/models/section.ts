@@ -1,6 +1,5 @@
 import type { Seminar } from "./seminar.js";
 import type { Session } from "./session.js";
-// vendor/rails/activerecord/test/models/section.rb
 import { Base } from "../../base.js";
 
 export class Section extends Base {

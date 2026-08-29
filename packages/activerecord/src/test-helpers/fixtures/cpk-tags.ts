@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/cpk_tags.yml
 export const cpkTagFixtureData = {
   cpk_tag_loyal_customer: {
     name: "Loyal customer",

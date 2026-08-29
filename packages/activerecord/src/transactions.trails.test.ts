@@ -1,13 +1,3 @@
-/**
- * trails-specific transaction invariants with no Rails counterpart.
- *
- * These guard behaviour that exists only in the trails port — the
- * TransactionManager#after_failure_actions PreparedStatementCacheExpired
- * handling, the SchemaAdapter→TM delegation path, and the
- * rememberTransactionRecordState / restoreTransactionRecordState identity
- * machinery. They were relocated verbatim out of transactions.test.ts (which
- * mirrors transactions_test.rb) so the convention file tracks Rails 1:1.
- */
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { throwAbort, LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
 import { Base, transaction, registerModel } from "./index.js";
@@ -20,8 +10,6 @@ import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 
-// Internal record state poked by the rememberTransactionRecordState /
-// rolledbackBang guards below; not part of Base's public surface.
 type StartTransactionState = { level: number; attributes: unknown } | null;
 interface TxRecordInternals {
   _newRecord: boolean;
@@ -35,10 +23,6 @@ interface TxRecordInternals {
   attributeWas(name: string): unknown;
 }
 
-// The wrapper adapter exposes currentTransaction() at runtime but not on the
-// public DatabaseAdapter type; narrow to just the member these guards read.
-// `restore_transaction_record_state` is a Rails-private member, wired onto
-// Base's prototype but absent from its public type.
 interface CpkRestoreView {
   restoreTransactionRecordState(forceRestoreState?: boolean): void;
 }
@@ -47,8 +31,6 @@ interface AdapterTxView {
   currentTransaction?(): unknown;
 }
 
-// Register the Cpk::Book association graph (CpkBook#order/author/chapters) so
-// association class resolution finds them.
 for (const klass of [CpkBook, CpkOrder, CpkAuthor, CpkChapter]) {
   registerModel(klass as unknown as typeof Base);
 }
@@ -76,9 +58,7 @@ afterEach(async () => {
   for (const a of openAdapters.splice(0)) {
     try {
       await a.exec("DROP TABLE IF EXISTS topics");
-    } catch {
-      /* adapter may already be closed */
-    }
+    } catch {}
     await a.close();
   }
 });
@@ -86,11 +66,6 @@ afterEach(async () => {
 describe("TransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  // trails-extra: a block-arg `tx.afterCommit(...)` registered on the explicit
-  // `transaction(Model, (tx) => ...)` handle fires once the transaction commits.
-  // No Rails counterpart (Rails registers commit callbacks on the model, not the
-  // transaction handle); guards the standalone block-arg callback wiring — the
-  // rollback twin is covered in transaction-callbacks.test.ts.
   it("block-arg tx.afterCommit fires after the transaction commits", async () => {
     const log: string[] = [];
 
@@ -105,19 +80,6 @@ describe("TransactionTest", () => {
   });
 
   describe("after_failure_actions on PreparedStatementCacheExpired", () => {
-    // Mirrors Rails' TransactionManager#after_failure_actions: when a
-    // transaction fails with PreparedStatementCacheExpired we must drop
-    // cached prepared statements on the connection. The error itself
-    // re-raises unchanged — Rails does NOT retry the body.
-    // A shared afterEach restores spies so a mid-test throw can't leak
-    // mocks into later tests.
-    //
-    // `after_failure_actions` dispatches on the connection instance
-    // (`transaction.rb:1221`, `@connection.clear_cache!`), so the spy sits on
-    // AbstractAdapter's prototype: Rails has no adapter override of
-    // `clear_cache!` (abstract_adapter.rb:739-748) and neither does trails, so
-    // every adapter dispatches to that one body.
-
     afterEach(() => {
       vi.restoreAllMocks();
     });
@@ -143,12 +105,6 @@ describe("TransactionTest", () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    // The "after_failure_actions" tests above run on the handler adapter (D-1),
-    // which takes the TM path. They cover SchemaAdapter→TM delegation by
-    // spying on the adapter class that owns clearCacheBang. The test below covers
-    // the pure-TM path directly, against a hand-rolled TransactionManager
-    // with no SchemaAdapter wrapper — guards against TM-internal regressions
-    // independently of the wrapper.
     it("calls clearCacheBang via TransactionManager.withinNewTransaction", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
       const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
@@ -173,12 +129,6 @@ describe("TransactionTest", () => {
       expect(clearCacheBang).toHaveBeenCalledTimes(1);
     });
 
-    // Rails-fidelity guard: TransactionManager#after_failure_actions only
-    // fires for RealTransaction frames (abstract/transaction.rb:670 —
-    // `return unless transaction.is_a?(RealTransaction)`). Savepoints
-    // don't drop the underlying connection's cached plans, so clearing
-    // them on a savepoint failure would be wasted work (and on PG would
-    // pointlessly DEALLOCATE the outer-txn cache).
     it("does not call clearCacheBang for SavepointTransaction failures (RealTransaction-only guard)", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
       const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
@@ -198,9 +148,6 @@ describe("TransactionTest", () => {
         lock: new LoadInterlockAwareMonitor(),
       };
       const tm = new TransactionManager(conn as never);
-      // Force inner frame to SavepointTransaction (not
-      // RestartParentTransaction): outer must be non-restartable, which
-      // requires `joinable: false`.
       await expect(
         tm.withinNewTransaction({ joinable: false }, async () => {
           await tm.withinNewTransaction({}, () => {
@@ -208,24 +155,12 @@ describe("TransactionTest", () => {
           });
         }),
       ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
-      // Inner savepoint frame raised — guard skipped clear. Outer
-      // frame also raised (PSCE bubbled), is a RealTransaction, so
-      // clear fires exactly once for the outer.
       expect(clearCacheBang).toHaveBeenCalledTimes(1);
     });
   });
 });
 
 describe("savepoint statements dirty the current transaction (trails ensure relocation)", () => {
-  // trails-specific: mysql2/PG/sqlite internalExecute run materializeTransactions
-  // OUTSIDE withRawConnection, so Rails' `ensure dirty_current_transaction if
-  // materialize_transactions` (abstract_adapter.rb:1046) is relocated to
-  // internalExecute's own finally. A savepoint statement (materialize:true, per
-  // savepoints.rb:11-20) therefore dirties the current transaction — the PARENT
-  // frame for a RELEASE/ROLLBACK TO SAVEPOINT whose committing frame was already
-  // popped — so isRestorable() refuses to restore a parent whose child savepoint
-  // op may have partially executed after a reconnect. Exercised here on sqlite
-  // (which shares the internalExecute finally); the mysql2/PG paths are the same.
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -234,8 +169,6 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
     const { adapter } = await makeSQLiteTopic();
     const tm = adapter.transactionManager;
     await tm.withinNewTransaction({}, async () => {
-      // BEGIN is emitted with materializeTransactions:false, so the frame is
-      // materialized but clean.
       await tm.materializeTransactions();
       expect(tm.isRestorable()).toBe(true);
       await adapter.createSavepoint("sp1");
@@ -249,9 +182,6 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
     await tm.withinNewTransaction({}, async () => {
       await tm.materializeTransactions();
       expect(tm.isRestorable()).toBe(true);
-      // Simulate a reconnect/connection-loss mid savepoint op: the raw driver
-      // rejects, the statement throws — and internalExecute's finally must still
-      // dirty the parent, mirroring Rails' `ensure` firing on the raise path.
       const driver = (adapter as unknown as { driver: { exec: (s: string) => Promise<unknown> } })
         .driver;
       vi.spyOn(driver, "exec").mockRejectedValueOnce(
@@ -277,7 +207,6 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     expect(state).not.toBeNull();
     expect(state?.level).toBe(1);
     expect(state?.attributes).toBeDefined();
-    // Second call increments level, does not overwrite attributes snapshot
     rememberTransactionRecordState.call(topic);
     expect(internals._startTransactionState?.level).toBe(2);
   });
@@ -288,9 +217,6 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     const topic = new Topic({ title: "original" });
     const internals = topic as unknown as TxRecordInternals;
     internals._newRecord = false;
-    // A new record is dirty against its defaults (Rails parity); persisting
-    // clears that. Mark the constructed-as-persisted record clean so "original"
-    // is the pre-TX baseline, not a construction-time change.
     internals.changesApplied();
 
     rememberTransactionRecordState.call(topic);
@@ -302,9 +228,6 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     });
 
     expect(internals._startTransactionState).toBeNull();
-    // In-TX user edit preserved: "changed-during-tx" stays live in memory,
-    // "original" (pre-TX) is the dirty baseline. Mirrors Rails' attribute
-    // reconstruction via attr.with_value_from_user(current_value).
     expect(internals.readAttribute("title")).toBe("changed-during-tx");
     expect(internals.changes).toEqual({
       title: ["original", "changed-during-tx"],
@@ -332,9 +255,6 @@ describe("restoreTransactionRecordState composite primary key arm", () => {
   });
 });
 
-// ==========================================================================
-// Story K-followup regression tests
-// ==========================================================================
 describe("restore_transaction_record_state after rollback (Story K-followup)", () => {
   it("rollback preserves in-TX user edits as dirty", async () => {
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
@@ -352,8 +272,6 @@ describe("restore_transaction_record_state after rollback (Story K-followup)", (
       shouldRunCallbacks: false,
     });
 
-    // Post-TX value stays live in memory; pre-TX value becomes the dirty baseline.
-    // Mirrors Rails: attr.with_value_from_user keeps current value, pre-TX as original.
     expect(internals.readAttribute("title")).toBe("tx-edit");
     expect(internals.attributeChanged("title")).toBe(true);
     expect(internals.attributeWas("title")).toBe("original");
@@ -371,7 +289,6 @@ describe("restore_transaction_record_state after rollback (Story K-followup)", (
     internals.changesApplied();
 
     rememberTransactionRecordState.call(topic);
-    // No attribute writes during TX
 
     await rolledbackBang.call(topic, {
       forceRestoreState: true,
@@ -383,50 +300,17 @@ describe("restore_transaction_record_state after rollback (Story K-followup)", (
   });
 });
 
-// ==========================================================================
-// SchemaAdapter TM delegation regression test (Phase 1)
-// ==========================================================================
 describe("SchemaAdapter TM delegation", () => {
-  // These tests read `Base.connection` directly (Rails' counterparts run under
-  // ActiveRecord::TestCase, which has an established base connection before the
-  // body calls lease_connection). This is a separate top-level describe from
-  // TransactionTest, so bootstrap the handler here rather than depending on a
-  // sibling describe having run first. Non-transactional: these tests commit
-  // rows to `items` and clean up in afterAll (Rails `use_transactional_tests`
-  // is not in play here).
   fixtures({}, { useTransactionalTests: false });
-  // Tests here spy on `Base.connection`; without local restore, spies leak
-  // into the next test in this file.
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  // These tests create rows in the shared `items` table (via `Base.connection`)
-  // outside of any transactional rollback guard. In PG, adapters
-  // pointing at the same database share the create-table signature cache, so a
-  // later file's canonical schema load is a cache hit and does NOT drop the
-  // table — leaving these rows visible to tests in other files (e.g. the
-  // `EachTest > findEach yields each record` case in batches.test.ts which
-  // expects an empty items table). Clean up unconditionally after all tests here.
   afterAll(async () => {
     await Base.connection.executeMutation("DELETE FROM items");
   });
 
-  // SchemaAdapter.setup() calls execDdlWithSavepoint which issues
-  // this.inner.createSavepoint directly — bypassing TM intentionally.
-  // After Phase 1, TM may have an open frame when setup() fires inside a
-  // test transaction. This test confirms that:
-  //   1. SchemaAdapter routes transaction() through TM.
-  //   2. setup() triggered inside a transaction (via DDL recovery) doesn't
-  //      interfere with the enclosing SavepointTransaction: TM's commit()
-  //      releases the SavepointTransaction's own savepoint name, not the
-  //      already-released DDL savepoints.
-  //
-  // DDL savepoints are released eagerly (releaseSavepoint right after exec);
-  // TM does not track them and never tries to release them again.
   it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
-    // The model runs on `Base.connection`; spy on that same adapter — it's what
-    // TM dispatches `withinNewTransaction` against.
     const testAdapter = Base.connection;
     const spy = vi.spyOn(testAdapter, "withinNewTransaction");
     class Item extends Base {
@@ -474,17 +358,11 @@ describe("SchemaAdapter TM delegation", () => {
       );
     });
 
-    // Outer must be a real DB transaction frame; inner must be a Savepoint
-    // (NOT RestartParent or NullTransaction). This guards against TM joining
-    // the parent instead of opening a savepoint.
     expect(outerType).toBe(RealTransaction.name);
     expect(innerType).toBe(SavepointTransaction.name);
   });
 
   it.skip("concurrent Promise.all top-level transactions are serialized (no shared TM frame)", async () => {
-    // E2: tests AsyncContext chain-isolation on the wrapper, which was deleted
-    // in favour of pool-per-connection isolation (tested by the E1 safety-net
-    // in with-transactional-fixtures.trails.test.ts). Wrapper deleted entirely in E4.
     const testAdapter = Base.connection;
     class Item extends Base {
       static {
@@ -493,12 +371,9 @@ describe("SchemaAdapter TM delegation", () => {
         this.adapter = testAdapter;
       }
     }
-    // Prime schema reflection up front so concurrent creates don't race on it.
     await Item.create({ name: "prime" });
 
     const observed: Array<{ inside: unknown }> = [];
-    // Track concurrent execution: increment on entry, decrement on exit.
-    // The mutex should keep this at 1 for the entire run.
     let active = 0;
     let maxActive = 0;
     await Promise.all(
@@ -507,9 +382,6 @@ describe("SchemaAdapter TM delegation", () => {
           active++;
           if (active > maxActive) maxActive = active;
           try {
-            // Each chain must see its own frame inside. If foreign chains
-            // were leaking, two concurrent callers would observe the SAME
-            // frame here.
             await Item.create({ name: `concurrent-${i}` });
             const inside = (testAdapter as unknown as AdapterTxView).currentTransaction?.();
             observed.push({ inside });
@@ -520,16 +392,10 @@ describe("SchemaAdapter TM delegation", () => {
       ),
     );
 
-    // After all transactions complete, the adapter's chain-aware view sees
-    // no current transaction — NullTransaction is the Rails-correct sentinel.
     expect((testAdapter as unknown as AdapterTxView).currentTransaction?.()).toBeInstanceOf(
       NullTransaction,
     );
-    // Mutex must have fully serialized — no two bodies ever overlapped.
     expect(maxActive).toBe(1);
-    // Every chain must have seen a frame (no nulls/undefined) AND each frame
-    // must be distinct — if the mutex degenerated to "join", or if a chain
-    // saw the empty NULL_TRANSACTION, this would fail.
     expect(observed).toHaveLength(6);
     for (const o of observed) {
       expect(o.inside).toBeDefined();
@@ -575,14 +441,6 @@ describe("SchemaAdapter TM delegation", () => {
 describe("aborting before_validation halts before the validators run", () => {
   fixtures({});
 
-  // No Rails counterpart: Rails gets this for free from the module layering
-  // (`Transactions#save { Validations#save { perform_validations; ... } }`), so
-  // there is no test asserting it. trails used to run `performValidations`
-  // outside the save transaction, which made the validators run even when an
-  // aborting `before_validation` should have halted first — leaving errors on a
-  // record Rails leaves clean. This pins the converged ordering.
-  // WrongReply validates content presence (errorsOnEmptyContent), so a blank-content
-  // WrongReply is invalid on its own.
   const newInvalidReply = () =>
     WrongReply.new({ title: "a reply", content: "" }) as unknown as {
       save(): Promise<boolean | undefined>;
@@ -590,9 +448,6 @@ describe("aborting before_validation halts before the validators run", () => {
       beforeValidationForTransaction: () => Promise<void>;
     };
 
-  // Positive control: without the aborting hook the validators DO run and DO
-  // record an error. Without this, the assertion below would pass vacuously if
-  // WrongReply ever stopped being invalid here.
   it("records the validation error when nothing aborts", async () => {
     const reply = newInvalidReply();
 

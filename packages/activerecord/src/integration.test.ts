@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/cases/integration_test.rb
 import { Temporal } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { CachedDeveloper, Developer } from "./test-helpers/models/developer.js";
@@ -10,13 +9,9 @@ import { registerModel } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 
-// Pet `belongs_to :owner, touch: true` resolves Owner through the association
-// registry when touched.
 registerModel(Owner);
 registerModel(Pet);
 
-// Rails' `Time#to_fs(:usec)` → "YYYYMMDDHHMMSSuuuuuu" (20 chars) and
-// `:number` → "YYYYMMDDHHMMSS" (14 chars). Mirrors `dev.updated_at.utc.to_fs(...)`.
 function toFs(ts: unknown, fmt: "usec" | "number"): string {
   if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
   const dt = ts.toZonedDateTimeISO("UTC");
@@ -32,7 +27,6 @@ function toFs(ts: unknown, fmt: "usec" | "number"): string {
   return `${head}${us}`;
 }
 
-// Rails' IntegrationTest#with_cache_versioning helper.
 async function withCacheVersioning(fn: () => Promise<void> | void): Promise<void> {
   const original = Developer.cacheVersioning;
   Developer.cacheVersioning = true;
@@ -47,8 +41,6 @@ describe("IntegrationTest", () => {
   const { owners, pets } = fixtures(["companies", "developers", "owners", "pets"]);
 
   it("to param should return string", async () => {
-    // `assert_kind_of String`: a JS string primitive is not an `instanceof
-    // String`, so box it — `Object("x")` is a String wrapper, `Object(1)` is not.
     expect(Object((await Client.first())!.toParam())).toBeInstanceOf(String);
   });
 
@@ -70,7 +62,6 @@ describe("IntegrationTest", () => {
 
   it("to param class method truncates words properly", async () => {
     const firm = await Firm.find(4);
-    // Rails `firm.name << ", Inc."` — append to the existing fixture name.
     firm.name = (firm.readAttribute("name") as string) + ", Inc.";
     expect(firm.toParam()).toBe("4-flamboyant-software");
   });
@@ -164,8 +155,6 @@ describe("IntegrationTest", () => {
 
   it("cache key for existing record is not timezone dependent", async () => {
     const utcKey = (await Developer.first())!.cacheKey();
-    // Rails uses `with_timezone_config zone: "EST"` (an ActiveSupport zone
-    // alias); the canonical IANA name is America/New_York.
     await withTimezoneConfig({ zone: "America/New_York" }, async () => {
       const estKey = (await Developer.first())!.cacheKey();
       expect(estKey).toBe(utcKey);
@@ -194,8 +183,6 @@ describe("IntegrationTest", () => {
     await owner.updateColumn("updated_at", now);
     const key = owner.cacheKey();
 
-    // Rails `travel(1.second) { assert pet.touch }` — Pet `belongs_to :owner,
-    // touch: true`, so touching the pet bumps the owner's updated_at.
     expect(await pet.touch({ time: now.add({ seconds: 1 }) })).toBeTruthy();
     await owner.reload();
     expect(owner.cacheKey()).not.toBe(key);
@@ -232,7 +219,6 @@ describe("IntegrationTest", () => {
   it("cache key format is precise enough", async () => {
     const dev = await Developer.first();
     const key = dev!.cacheKey();
-    // Rails `travel_to dev.updated_at + 0.000001 do dev.touch end`.
     await dev!.touch({
       time: (dev!.readAttribute("updated_at") as Temporal.Instant).add({ microseconds: 1 }),
     });
@@ -282,7 +268,6 @@ describe("IntegrationTest", () => {
     await withCacheVersioning(async () => {
       const developer = await Developer.first();
       const firstVersion = developer!.cacheVersion();
-      // Rails `travel 10.seconds do developer.touch end`.
       await developer!.touch({
         time: (developer!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 10 }),
       });

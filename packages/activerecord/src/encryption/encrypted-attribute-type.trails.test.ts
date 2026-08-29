@@ -30,15 +30,7 @@ describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast t
   });
 
   it("coder.load is called exactly once during deserialize — not inside databaseTypeToText", () => {
-    // Rails: binary_cast_type = cast_type.serialized? ? cast_type.subtype : cast_type
-    // In databaseTypeToText we use BinaryType (subtype) to convert BinaryData→Uint8Array→latin1 string.
-    // Only after decryption does castType.deserialize run, which loads the payload exactly once.
-    // Rails' deserialize also probes `coder.load(nil)` via default_value?
-    // (serialized.rb:18-23, :61-63), so the payload loads are counted apart
-    // from that probe — a databaseTypeToText regression shows up as a second
-    // payload load, which is what this guards.
     const coder = {
-      // coder.load receives Uint8Array from BinaryType.deserialize (the decrypted binary payload).
       load: vi.fn((v: unknown) => {
         const s = v instanceof Uint8Array ? Buffer.from(v).toString() : v;
         return typeof s === "string" ? JSON.parse(s) : s;
@@ -65,9 +57,6 @@ describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast t
 });
 
 describe("EncryptedAttributeType#decryptAsText — plaintext-default short-circuit guard", () => {
-  // Rails' guard is `@default && @default == value` (encrypted_attribute_type.rb:87),
-  // a plain Ruby truthiness check. A falsey column default (`nil`/`false`) is
-  // treated as ABSENT and does NOT short-circuit, so the stored value is decrypted.
   function typeWithDefault(defaultValue: unknown) {
     const decrypt = vi.fn((v: unknown) => `decrypted:${String(v)}`);
     const encryptor = {
@@ -94,15 +83,12 @@ describe("EncryptedAttributeType#decryptAsText — plaintext-default short-circu
   });
 
   it("does not short-circuit a falsey false default even when it equals the stored value", () => {
-    // `false && false == false` is falsey in Ruby, so a `false` default is
-    // treated as absent and the value goes down the decrypt path.
     const { type, decrypt } = typeWithDefault(false);
     expect(type.deserialize(false)).toBe("decrypted:false");
     expect(decrypt).toHaveBeenCalledTimes(1);
   });
 
   it("short-circuits an empty-string default that equals an empty stored value", () => {
-    // `"" && "" == ""` → `"" && true` is truthy in Ruby: `""` is a present default.
     const { type, decrypt } = typeWithDefault("");
     expect(type.deserialize("")).toBe("");
     expect(decrypt).not.toHaveBeenCalled();
@@ -140,10 +126,6 @@ describe("EncryptedAttributeType — delegations to scheme", () => {
 });
 
 describe("EncryptedAttributeType#supportUnencryptedData — global config conjunct", () => {
-  // encrypted_attribute_type.rb:61-63 —
-  //   config.support_unencrypted_data && scheme.support_unencrypted_data? && !previous_type?
-  // The global config is not merely the scheme's fallback (scheme.rb:48-50): it
-  // AND-gates an explicit per-attribute opt-in too.
   let savedConfig: ReturnType<typeof snapshotEncryptionConfig>;
 
   beforeEach(() => {

@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/readers.yml
-// person_id: 4 has no matching row in people.yml — kept as literal to mirror Rails.
 export const readerFixtureData = {
   michael_welcome: {
     id: 1,

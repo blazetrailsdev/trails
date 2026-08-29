@@ -1,15 +1,3 @@
-/**
- * Regression: `getModelColumns` must exclude model-declared virtual attributes
- * (no backing DB column) from the eager-load SELECT projection, regardless of
- * schema-cache warmth.
- *
- * `Company` declares `attribute("metadata", "json")` (company.ts) but the
- * canonical `companies` table has no `metadata` column. Eager-loading
- * `Firm.includes(":clients")` (both STI on `companies`) over a *partial* schema
- * — only `companies` defined — previously projected `companies.metadata`,
- * failing the query with `no such column: companies.metadata`. Rails' eager
- * SELECT projects only real table columns.
- */
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";

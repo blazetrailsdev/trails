@@ -3,7 +3,6 @@ import type { Parrot } from "./parrot.js";
 import type { PriceEstimate } from "./price-estimate.js";
 import type { RichPerson } from "./person.js";
 import type { Ship } from "./ship.js";
-// vendor/rails/activerecord/test/models/treasure.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 

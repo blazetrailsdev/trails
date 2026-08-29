@@ -1,5 +1,4 @@
 import type { User } from "./user.js";
-// vendor/rails/activerecord/test/models/room.rb
 import { Base } from "../../base.js";
 
 export class Room extends Base {

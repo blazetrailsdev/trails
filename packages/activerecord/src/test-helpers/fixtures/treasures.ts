@@ -1,8 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/treasures.yml
-// `looter: <row> (<Type>)` is Rails' polymorphic shorthand → looter_id +
-// looter_type pair.
 export const treasureFixtureData = {
   diamond: {
     name: "diamond",

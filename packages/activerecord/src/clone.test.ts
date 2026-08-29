@@ -1,14 +1,8 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/clone_test.rb — canonical Topic
- * model + handler `topics` fixtures, test names verbatim from the Ruby methods.
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("CloneTest", () => {
-  // `fixtures` wires the handler suite internally and is
-  // transactional, mirroring Rails' `fixtures :topics`.
   fixtures(["topics"]);
 
   it("persisted", async () => {

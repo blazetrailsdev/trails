@@ -1,29 +1,4 @@
 /**
- * Shared test adapter helpers.
- *
- * Resolves which backend the active lane uses the way Rails does — from
- * `ARCONN` naming a key of the `connections:` hash, never from the presence of
- * a connection detail (see `support/config.ts`):
- *   - ARCONN=postgresql → PostgreSQLAdapter
- *   - ARCONN=mysql2     → Mysql2Adapter
- *   - (default)         → SQLite3Adapter (the per-worker template clone, or the
- *     configured fixture database `support/connection.ts` resolves)
- *
- * RFC 0059 retired the standing sidecar `_pool`: Rails has no sidecar test
- * pool (`grep -r sidecar vendor/rails/activerecord/test` = 0 hits) — every
- * test rides `ActiveRecord::Base.connection`, and a test that genuinely needs
- * its own pool builds one IN-TEST from the primary config
- * (`vendor/rails/activerecord/test/cases/connection_pool_test.rb:16-30`). So
- * the standing sidecar pool and its divergent
- * `file:trails_test_N?mode=memory&cache=shared` handle are gone:
- * `newRawTestAdapter` /
- * `ambientPoolConfiguration` describe the primary lane config, and
- * `createPooledTestAdapter` builds its duplicate pool from that same config.
- *
- * Schemas are declared explicitly by tests via `defineSchema()` / `fixtures()`.
- */
-
-/**
  * @noRailsEquivalent CONVERGEABLE the pool-mechanics setup of the Rails pool test (test/cases/connection_pool_test.rb:16-30), which Ruby writes inline per test.
  */
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -34,24 +9,11 @@ import { buildAdapterArg } from "./connection-adapters/adapter-args.js";
 import { Base } from "./base.js";
 import { activeLane, testConfigurationHashes } from "./support/connection.js";
 
-/**
- * Which adapter backend is active. Read once at module load — the worker's
- * isolation slot is published by test-setup-worker-db.ts (a setupFile that runs
- * before this module loads), so the settings below are already worker-scoped.
- */
 export const adapterType: "sqlite" | "postgres" | "mysql" = activeLane();
 
-/** Type alias for pool-leased adapters returned by test factories. */
 export type TestDatabaseAdapter = DatabaseAdapter;
 
-/**
- * Adapter shape returned by {@link createPooledTestAdapter}. The concrete
- * `AbstractAdapter` subclasses (SQLite3 / PostgreSQL / Mysql2) expose these
- * members at runtime; surfacing them here lets callers reach transaction
- * lifecycle methods without unsafe casts.
- *
- * @internal
- */
+/** @internal */
 export type LeasedTestAdapter = DatabaseAdapter & {
   transactionManager: TransactionManager;
   withinNewTransaction<T>(
@@ -62,24 +24,6 @@ export type LeasedTestAdapter = DatabaseAdapter & {
   openTransactions: number;
 };
 
-// --- Primary lane config + raw adapter factory ------------------------------
-//
-// The configuration hash for the active CI lane's PRIMARY connection — the
-// same database `Base.connection` rides (no separate handle). Mirrors Rails'
-// `ActiveRecord::Base.connection_pool.db_config.configuration_hash`, letting
-// pool-mechanics tests clone the ambient config (with per-test overrides)
-// instead of hardcoding `adapter: "sqlite3"`.
-//
-// It is the `arunit` entry `connect()` establishes the primary pool from, so
-// the two cannot drift; resolved with top-level await because the sqlite3
-// database is only known asynchronously (`sqliteHash()`).
-//
-// Order-dependent: this snapshot and `connect()` resolve the entry separately
-// and agree only because `test-setup-worker-db.ts` stamps AR_TEST_WORKER_DB /
-// AR_DB_SLOT before anything imports this module. A module in that setupFile's
-// graph reaching test-adapter.ts (or adapter-helper.ts, which imports it) would
-// snapshot the fixture database while Base rides the worker clone —
-// `test-adapter.trails.test.ts` asserts the two stay equal.
 const _primaryEnvConfig = (await testConfigurationHashes()).envConfig;
 const _primaryConfiguration: Record<string, unknown> = {
   ..._primaryEnvConfig.configurationHash,
@@ -97,10 +41,6 @@ export function ambientPoolConfiguration(): Record<string, unknown> {
   return { ..._primaryConfiguration };
 }
 
-// The per-connection driver caps the lane wiring below applies to a raw test
-// adapter (PG `max`, MySQL `connectionLimit`/`flags`). Not part of the primary
-// lane's own configuration hash, which is why they live here and not in
-// `ambientPoolConfiguration`.
 let rawTestAdapterCaps: Record<string, unknown> = {};
 
 /**
@@ -115,27 +55,9 @@ export function rawTestAdapterConfiguration(): Record<string, unknown> {
   return { ...ambientPoolConfiguration(), ...rawTestAdapterCaps };
 }
 
-/**
- * Synchronous factory that creates a fresh underlying adapter on the PRIMARY
- * lane database — the same database `Base.connection` rides (on the file-backed
- * sqlite lane its connections share the worker DB, exactly like Rails'
- * file-backed `arunit`). This is the raw counterpart of a test-local
- * {@link ConnectionPool}'s `ConnectionPool#new_connection`
- * (`connection_pool.rb`) — and nothing else: the adapter it returns still
- * carries the constructor's `NullPool` seed (`abstract_adapter.rb:153`) until a
- * pool adopts it. A test that wants a pool-owned adapter calls
- * {@link checkoutRawTestAdapter}.
- *
- * Wired at module load, importing only the active lane's driver.
- *
- * @internal
- */
+/** @internal */
 export let newRawTestAdapter: () => DatabaseAdapter;
 
-// `buildAdapterArg` is the boundary `ConnectionPool#newConnection` builds its
-// adapters through, so going through it here means a raw adapter is constructed
-// from the ambient hash exactly as the primary pool's are — including the
-// per-adapter key whitelisting that keeps config-only keys out of the drivers.
 const adapterArgs = buildAdapterArg(_primaryConfiguration.adapter as string, _primaryConfiguration);
 
 const { HashConfig } = await import("./database-configurations/hash-config.js");
@@ -199,14 +121,10 @@ export async function checkoutRawTestAdapter(): Promise<{
 if (adapterType === "postgres") {
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
   const [config] = adapterArgs as [Record<string, unknown>];
-  // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
-  // exactly one PG server connection (the outer ConnectionPool multiplexes).
   rawTestAdapterCaps = { max: 1 };
   newRawTestAdapter = () =>
     new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
-  // Built from the config hash rather than a URL so a socket-configured run
-  // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   const [config] = adapterArgs as [Record<string, unknown>];
   rawTestAdapterCaps = { connectionLimit: 1, flags: ["FOUND_ROWS"] };
@@ -218,20 +136,10 @@ if (adapterType === "postgres") {
     }) as unknown as DatabaseAdapter;
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
-  // Recombined into the Rails-shaped single-hash form the adapter constructor
-  // prefers; `buildAdapterArg` returns the positional pair only because the
-  // pool's resolver predates that overload.
   const [filename, options] = adapterArgs as [string, SQLite3AdapterOptions | undefined];
   const config: SQLite3Config = { ...options, database: filename };
   newRawTestAdapter = () => new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter;
 }
-
-// --- In-test pool for pool-mechanics suites ---------------------------------
-//
-// Mirrors connection_pool_test.rb:16-30: "Keep a duplicate pool so we do not
-// bother others." Derived from `Base.connection_pool.db_config` so it rides the
-// SAME schema-loaded database, and memoized so repeated
-// `createPooledTestAdapter()` calls in a file share one pool.
 
 let _inTestPool: ConnectionPool | null = null;
 let _inTestPoolPromise: Promise<ConnectionPool> | null = null;
@@ -245,11 +153,6 @@ async function buildInTestPool(): Promise<ConnectionPool> {
 
   const src = Base.connectionPool().dbConfig;
 
-  // Duplicate the primary config with a short checkout_timeout so pool-mechanics
-  // tests don't stall on the shared primary — mirrors connection_pool_test.rb's
-  // `configuration_hash.merge(checkout_timeout: 0.2)`. The duplicate inherits
-  // the primary's pool size directly (Rails' default 5 on the file-backed lane),
-  // exactly like connection_pool_test.rb derives from `Base.connection_pool.db_config`.
   const dbConfig = new HashConfig(src.envName, src.name, {
     ...src.configurationHash,
     ...rawTestAdapterCaps,
@@ -284,8 +187,6 @@ export async function createPooledTestAdapter(): Promise<{
 }> {
   if (!_inTestPoolPromise) {
     _inTestPoolPromise = buildInTestPool().catch((err) => {
-      // Drop the memoized promise on failure so a follow-up call can retry
-      // instead of permanently resolving every caller to the rejection.
       _inTestPoolPromise = null;
       throw err;
     });
@@ -296,13 +197,7 @@ export async function createPooledTestAdapter(): Promise<{
   return { adapter, pool };
 }
 
-/**
- * Tear down the memoized in-test pool (Rails' `@pool.disconnect!` teardown).
- * Best-effort — the returned promise is swallowed so a drain rejection during
- * test teardown never surfaces as an unhandled rejection.
- *
- * @internal — for pool-mechanics tests only.
- */
+/** @internal */
 export function _resetPooledTestAdapterForTests(): void {
   if (_inTestPool) {
     _inTestPool.disconnectBang().catch(() => {});

@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/cases/encryption/contexts_test.rb
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
@@ -26,26 +25,12 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   let titleCleartext: unknown;
   let titleCiphertext: unknown;
 
-  // Rails' EncryptedPost (`< Post`, `self.table_name = "posts"`) and EncryptedBook
-  // (`encrypted_books`) both ride canonical tables; contexts_test.rb declares
-  // `fixtures :posts`. Those canonical tables are laid at boot by
-  // loadCanonicalSchema, so no per-suite schema setup is needed.
   beforeEach(async () => {
     configSnapshot = snapshotEncryptionConfig();
     Configurable.config.previousSchemes = [];
     configureEncryption();
     Configurable.config.supportUnencryptedData = true;
 
-    // Models are defined inline (rather than via the makeEncryptedPost /
-    // makeEncryptedBook factories) because those factories pin `this.adapter`
-    // to a passed adapter, which bypasses the connection handler and would put
-    // writes outside the per-test BEGIN/ROLLBACK savepoint that the
-    // transactional `fixtures([])` wiring relies on. The sibling handler-suite
-    // encryption test (uniqueness-validations.test.ts) hand-rolls models for
-    // the same reason. They are also defined after configureEncryption so
-    // encrypts() builds the scheme against the configured key material
-    // (otherwise the Encryptor raises "No encryption key provided" on the first
-    // serialize).
     EncryptedPost = class EncryptedPost extends Base {
       static {
         this._tableName = "posts";
@@ -73,8 +58,6 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
       body: "Some body",
     });
     titleCleartext = post.title;
-    // Reload so before-type-cast holds the persisted ciphertext (TS keeps the
-    // in-memory before-type-cast as plaintext until the row is re-read).
     await post.reload();
     titleCiphertext = post.ciphertextFor("title");
   });
@@ -135,13 +118,6 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   });
 
   it(".without_encryption doesn't raise on binary encoded data", async () => {
-    // Rails passes `"Dune".encode(Encoding::BINARY)` to exercise the
-    // NullEncryptor.isBinary() === false gate in encryptAsText. TS strings
-    // carry no binary encoding, so this payload is degenerate and the binary
-    // gate itself can't be meaningfully driven here — the actual binary-column
-    // encryption path is covered by EncryptedBookWithBinary in
-    // encryptable-record.test.ts. This test retains the name-for-name parity
-    // and still asserts the create-under-NullEncryptor path doesn't raise.
     await expect(
       Contexts.withoutEncryption(() => (EncryptedBook as any).createBang({ name: "Dune" })),
     ).resolves.not.toThrow();
@@ -158,8 +134,6 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
 
     await Contexts.protectingEncryptedData(async () => {
       const found = await (EncryptedBook as any).findBy({ name: "Dune" });
-      // `assert_equal book, find_by(...)` leans on AR record equality (`Core#==`,
-      // class + id); vitest's toEqual is a structural deep compare instead.
       expect(found?.id).toEqual(book.id);
     });
   });

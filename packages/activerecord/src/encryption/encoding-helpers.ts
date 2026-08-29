@@ -1,15 +1,8 @@
-/**
- * @noRailsEquivalent PERMANENT Ruby strings carry an Encoding object and re-encode with String#encode (encryption/encryptor.rb:166); JS strings carry none, so the encoding arms are modelled here.
- */
-
-/**
- * Shared encoding normalization helpers used by Encryptor and
- * EncryptedAttributeType for deterministic encryption.
- */
+/** @noRailsEquivalent PERMANENT */
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby strings carry an Encoding object (encryption/encryptor.rb:166); JS strings do not.
+ * @noRailsEquivalent PERMANENT
  */
 export function normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1" | null {
   switch (encoding.toLowerCase().replace(/[^a-z0-9]/g, "")) {
@@ -29,12 +22,8 @@ export function normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1"
 }
 
 /**
- * Read a message header value as text. After `MessageSerializer.load`, decoded
- * values are raw-byte Buffers (Rails' ASCII-8BIT strings); a fresh message may
- * still hold the original string. Text headers are UTF-8, so decode accordingly.
- *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby reads an ASCII-8BIT header string directly (encryption/message_serializer.rb:24); TS must decode the Buffer.
+ * @noRailsEquivalent PERMANENT
  */
 export function headerString(value: unknown): string | undefined {
   if (value == null) return undefined;
@@ -44,7 +33,7 @@ export function headerString(value: unknown): string | undefined {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby's String#encode with :replace does this (encryption/encryptor.rb:166); JS has no encoding-aware replacement.
+ * @noRailsEquivalent PERMANENT
  */
 export function replaceUnencodable(value: string, maxCodePoint: number): string {
   const out: string[] = [];

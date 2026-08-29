@@ -19,10 +19,6 @@ import { association } from "../associations.js";
 import { Person } from "../test-helpers/models/person.js";
 import { BadReference } from "../test-helpers/models/reference.js";
 
-// The fixture-set base models (Developer, Project, Post, Comment, Category,
-// Person, Reference, Author) auto-register on fixture resolution (#4348). Only
-// the test-specific subclasses the fixture thunks don't return need explicit
-// registration here.
 registerModel(DeveloperOrderedBySalary);
 registerModel(DeveloperFilteredOnJoins);
 registerModel(SpecialComment);
@@ -223,10 +219,6 @@ describe("RelationScopingTest", () => {
   });
 
   it("find with annotation unscoped", async () => {
-    // Rails: Developer.annotate("scoped").unscoped { ... }
-    // Relation#unscoped (0-arg) delegates to klass.unscoped(); we then call
-    // .scoping(callback) on that unscoped relation — the TS equivalent of
-    // passing a Ruby block to Relation#unscoped.
     await Developer.annotate("scoped")
       .unscoped()
       .scoping(async () => {
@@ -282,7 +274,6 @@ describe("RelationScopingTest", () => {
     const welcome = (await Post.find(1)) as Base;
     const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
     expect(commentIds).toContain(newComment.id);
-    // Rails: assert_equal "default", new_comment.label (enum cast of DB default 0).
     expect(newComment.label).toBe("default");
   });
 
@@ -295,7 +286,6 @@ describe("RelationScopingTest", () => {
     const welcome = (await Post.find(1)) as Base;
     const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
     expect(commentIds).toContain(newComment.id);
-    // Rails: assert_equal "default", new_comment.label (enum cast of DB default 0).
     expect(newComment.label).toBe("default");
   });
 
@@ -324,9 +314,7 @@ describe("RelationScopingTest", () => {
       await Developer.where("name = 'Jamis'").scoping(async () => {
         throw new Error("an exception");
       });
-    } catch {
-      // ignore
-    }
+    } catch {}
     expect(Developer.all().toSql()).not.toContain("name = 'Jamis'");
   });
 

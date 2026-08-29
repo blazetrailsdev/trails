@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/customers.yml
 export const customerFixtureData = {
   david: {
     id: 1,

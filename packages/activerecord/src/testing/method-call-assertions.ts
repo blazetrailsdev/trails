@@ -1,19 +1,7 @@
-/**
- * Method-call assertions — test helpers for asserting whether a method is
- * invoked on instances of a class during a block.
- *
- * Mirrors: ActiveSupport::Testing::MethodCallAssertions
- * (activesupport/lib/active_support/testing/method_call_assertions.rb)
- */
-// This is a test-assertion helper: a failed assertion raises a bare Error the
-// way Minitest raises Minitest::Assertion, so the rails-error-parity rule
-// (which governs ported domain error classes) does not apply here.
 /* eslint-disable blazetrails/rails-error-parity */
 
-/** A constructor-like value with a prototype we can stub on. */
 type ClassLike = { prototype: object; name: string };
 
-/** Mirrors the Ruby keyword args of `assert_called_on_instance_of`. */
 export interface CallAssertionOptions {
   times?: number;
   returns?: unknown;
@@ -35,17 +23,6 @@ function findDescriptor(proto: object, name: string): FoundDescriptor | null {
   return null;
 }
 
-/**
- * Replace `methodName` on `klass.prototype` with a stub that counts calls and
- * returns `returns` (it does NOT call the original — matching Rails'
- * `define_method("stubbed_#{method_name}")`), run `block`, then restore the
- * prototype. Supports both plain methods and accessor getters. Returns the
- * number of times the member was accessed/called.
- *
- * Mirrors the stub-and-restore body of `assert_called_on_instance_of`, where
- * Rails aliases the original away, installs the stub, yields, and restores in
- * an `ensure` block.
- */
 async function countInstanceCalls(
   klass: ClassLike,
   methodName: string,
@@ -92,12 +69,6 @@ async function countInstanceCalls(
   return count;
 }
 
-/**
- * Assert that `methodName` is invoked exactly `times` (default 1) on instances
- * of `klass` during `block`.
- *
- * Mirrors: assert_called_on_instance_of(klass, method_name, message, times:, returns:, &block)
- */
 export async function assertCalledOnInstanceOf(
   klass: ClassLike,
   methodName: string,
@@ -112,12 +83,6 @@ export async function assertCalledOnInstanceOf(
   }
 }
 
-/**
- * Assert that `methodName` is NOT invoked on any instance of `klass` during
- * `block`.
- *
- * Mirrors: assert_not_called_on_instance_of(klass, method_name, message, &block)
- */
 export async function assertNotCalledOnInstanceOf(
   klass: ClassLike,
   methodName: string,

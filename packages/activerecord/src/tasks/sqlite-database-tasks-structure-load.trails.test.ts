@@ -14,9 +14,7 @@ describe("SQLiteDatabaseTasks structure_load input redirect", () => {
     for (const file of created) {
       try {
         fs.unlinkSync(file);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     created.length = 0;
   });
@@ -26,8 +24,6 @@ describe("SQLiteDatabaseTasks structure_load input redirect", () => {
     const filename = path.join(os.tmpdir(), `trails-structure-load-${randomUUID()}.sql`);
     created.push(database, filename);
 
-    // 0xFF is not valid UTF-8: buffering the dump through a JS string replaces
-    // it with U+FFFD (ef bf bd) before sqlite3 ever sees it.
     fs.writeFileSync(
       filename,
       Buffer.concat([

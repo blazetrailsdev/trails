@@ -40,7 +40,6 @@ describe("Migration", () => {
 
     it("send delegates to record", () => {
       const recorder = new CommandRecorder({ createTable(_name: string) {} });
-      // The recorder only records the command — no DDL runs, so there is no table to tear down.
       // eslint-disable-next-line blazetrails/require-table-teardown
       (recorder as unknown as { createTable(name: string): void }).createTable("horses");
       expect(recorder.commands).toEqual([["createTable", ["horses"], undefined]]);

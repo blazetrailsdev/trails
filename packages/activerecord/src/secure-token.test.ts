@@ -1,7 +1,3 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/secure_token_test.rb
- * Test names match the Rails counterpart.
- */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
@@ -19,7 +15,6 @@ describe("SecureTokenTest", () => {
     user = new User();
   });
 
-  // Rails: Class.new(ActiveRecord::Base) { self.table_name = "users"; has_secure_token on: :initialize }
   async function onInitializeModel(): Promise<typeof Base> {
     class TokenUser extends Base {
       static _tableName = "users";
@@ -105,11 +100,6 @@ describe("SecureTokenTest", () => {
   });
 
   it("token calls the setter method", async () => {
-    // Rails: a model with `has_secure_token on: :initialize` overriding
-    //   def token=(value); super; self.modified_token = "#{value}_modified"; end
-    // The on-initialize callback assigns via the writer, so the override sees
-    // the generated value. We emulate `super` by wrapping the column's own
-    // accessor descriptor (installed by loadSchema) before overriding.
     class TokenUser extends Base {
       static _tableName = "users";
     }

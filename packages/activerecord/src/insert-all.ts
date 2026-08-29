@@ -16,10 +16,6 @@ import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } fr
 
 type ModelClass = typeof Base;
 
-// Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#column_name_with_order_matcher
-// Intentionally more restrictive than Rails: quoted identifiers ("col", `col`) and COLLATE
-// clauses are not matched. Callers with those forms must use Arel.sql(). This is the safe
-// direction — false-negatives force Arel.sql(), false-positives would allow SQL injection.
 const COLUMN_NAME_WITH_ORDER =
   /^\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*\s*$/i;
 
@@ -32,17 +28,7 @@ export interface InsertAllOptions {
 }
 
 /**
- * The connection and schema-cache facts Rails' `InsertAll#initialize` reads
- * synchronously at `insert_all.rb:38-45` — `supports_insert_returning?`,
- * `supports_insert_conflict_target?`, `schema_cache.primary_keys(table_name)`
- * and `schema_cache.indexes(table_name)`. Every one of those is async in
- * trails, so `InsertAll.execute` resolves them before constructing and the
- * constructor body stays the pure assignment Rails' is.
- *
- * @noRailsEquivalent PERMANENT: a genuine TypeScript shortcoming — a
- *   constructor cannot await. Resolving in the async factory keeps the
- *   Rails-named constructor tail in place rather than deferring it to
- *   `execute`.
+ * @noRailsEquivalent PERMANENT
  * @internal
  */
 interface ResolvedConnectionFacts {
@@ -55,14 +41,7 @@ interface ResolvedConnectionFacts {
 }
 
 /**
- * Resolves the facts above off the connection and schema cache. A missing
- * support predicate reads as unsupported, matching Rails'
- * `AbstractAdapter#supports_insert_conflict_target?` returning false, so a
- * wrapper adapter that forgets to delegate cannot emit a bogus conflict
- * target.
- *
- * @noRailsEquivalent PERMANENT: the async half of `ResolvedConnectionFacts`
- *   above, for the same constructor-cannot-await reason.
+ * @noRailsEquivalent PERMANENT
  * @internal
  */
 async function resolveConnectionFacts(
@@ -107,12 +86,6 @@ export class InsertAll {
   readonly connection: ModelClass["connection"];
   inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
-  /**
-   * Initially the user's `:unique_by` input (column name, column list, or
-   * index name). After `_populateUpdatableColumns` resolves, this is
-   * mutated to the matching IndexDefinition — matching Rails' shape, so
-   * Builder.conflictTarget can read `index.columns` / `index.where`.
-   */
   uniqueBy: string | string[] | IndexDefinition | undefined;
   returning: string | string[] | Nodes.SqlLiteral | false | undefined;
 
@@ -143,16 +116,7 @@ export class InsertAll {
     ) as Promise<Result>;
   }
 
-  /**
-   * `facts` carries what Rails' constructor tail (insert_all.rb:38-45) reads
-   * synchronously off the connection and schema cache; see
-   * `ResolvedConnectionFacts`.
-   *
-   * @missingRailsArgs except — PERMANENT: Ruby's `scope_for_create.except(col)`
-   * is a receiver-form call; JS objects have no `except`, so the activesupport
-   * port takes the receiver as its first argument and the argument list is one
-   * longer than Rails'. The Ruby arguments are passed unchanged after it.
-   */
+  /** @missingRailsArgs except — PERMANENT */
   constructor(
     relation: Relation<any>,
     connection: ModelClass["connection"],
@@ -190,8 +154,6 @@ export class InsertAll {
       this.keys = new Set(Object.keys(first(this.inserts) as Record<string, unknown>));
     }
 
-    // Rails: scope_for_create.except(model.inheritance_column) — STI type is
-    // handled by resolveSti (reverse_merge) so it must not be re-injected here.
     this.scopeAttributes = except(
       (relation as any).scopeForCreate() as Record<string, unknown>,
       this.model.inheritanceColumn as string,
@@ -213,41 +175,23 @@ export class InsertAll {
 
   async execute(): Promise<Result> {
     if (isEmpty(this.inserts)) return Result.empty();
-    // Mirrors Rails InsertAll#execute: build the log/instrumentation label
-    // ("Book Bulk Insert" / "Book Upsert") and route through exec_insert_all
-    // so the RETURNING rows are captured into an ActiveRecord::Result rather
-    // than discarded (executeMutation only reports the affected-row count).
     let message = `${this.model.name} `;
     if (many(this.inserts)) message += "Bulk ";
     message += this.onDuplicate === "update" ? "Upsert" : "Insert";
     return this.connection.execInsertAll(await this.toSql(), message);
   }
 
-  /**
-   * Mirrors: ActiveRecord::InsertAll#to_sql — the adapter assembles the
-   * dialect-specific statement from the Builder's fragments.
-   * @internal
-   */
+  /** @internal */
   async toSql(): Promise<string> {
     return this.connection.buildInsertSql(new Builder(this));
   }
 
-  /** Mirrors: ActiveRecord::InsertAll#updatable_columns (insert_all.rb:58-60). */
   updatableColumns(): string[] {
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
     return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
   }
 
-  /**
-   * Mirrors: ActiveRecord::InsertAll#primary_keys (insert_all.rb:61-63) — the
-   * *database* primary keys, empty for an id-less table, distinct from the
-   * model's configured `primary_key`.
-   *
-   * @missingRailsCall table_name — PERMANENT: Language shortcoming: Rails reads
-   * `schema_cache.primary_keys(model.table_name)` here; that schema-cache read
-   * is async in trails, so the table name is passed where the read happens
-   * (`resolveConnectionFacts`) and this reader returns the resolved value.
-   */
+  /** @missingRailsCall table_name — PERMANENT */
   primaryKeys(): string[] {
     return this._facts.primaryKeys;
   }
@@ -270,11 +214,6 @@ export class InsertAll {
           if (!(col in attributes)) attributes[col] = val;
         }
       }
-      // Rails calls verify_attributes here (insert_all.rb:79), after the
-      // scope merge and the timestamps reverse_merge — and it must stay here,
-      // not in the constructor: `keysIncludingTimestamps` reads the model's
-      // timestamp attributes off the reflected schema, which is not loaded yet
-      // at construction time.
       this.verifyAttributes(attributes);
       return keysList.map((key) => fn(key, attributes[key]));
     });
@@ -300,9 +239,6 @@ export class InsertAll {
 
   /** @internal */
   private verifyAttributes(attributes: Record<string, unknown>): void {
-    // Rails compares against keys_including_timestamps, NOT @keys — the caller
-    // has already reverse_merged the create timestamps into `attributes`, so
-    // both sides carry them whenever record_timestamps? is on.
     const expected = this.keysIncludingTimestamps();
     const rowKeys = new Set(Object.keys(attributes));
     if (rowKeys.size !== expected.size || ![...expected].every((k) => rowKeys.has(k))) {
@@ -310,15 +246,10 @@ export class InsertAll {
     }
   }
 
-  /**
-   * @internal
-   * Mirrors: ActiveRecord::InsertAll#configure_on_duplicate_update_logic
-   * (insert_all.rb:129-143).
-   */
+  /** @internal */
   private configureOnDuplicateUpdateLogic(): void {
     const onDuplicate = this.onDuplicate;
     if (this.isCustomUpdateSqlProvided() && isPresent(this.updateOnly)) {
-      // Rails: raise ArgumentError (insert_all.rb).
       throw new ArgumentError(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
       );
@@ -350,15 +281,13 @@ export class InsertAll {
     return this.onDuplicate instanceof Nodes.SqlLiteral;
   }
 
-  /** @internal Mirrors: ActiveRecord::InsertAll#unique_by_columns */
+  /** @internal */
   private uniqueByColumns(): string[] {
-    // Mirrors Rails' `Array(unique_by&.columns)` — an expression index keeps
-    // `columns` as a bare string, wrapped here into one element.
     if (!(this.uniqueBy instanceof IndexDefinition)) return [];
     return Array.isArray(this.uniqueBy.columns) ? this.uniqueBy.columns : [this.uniqueBy.columns];
   }
 
-  /** @internal Mirrors: ActiveRecord::InsertAll#ensure_valid_options_for_connection! */
+  /** @internal */
   private ensureValidOptionsForConnectionBang(): void {
     if (this.returning && !this._facts.supportsInsertReturning) {
       throw new ArgumentError(
@@ -387,7 +316,6 @@ export class InsertAll {
 
   /** @internal */
   private hasAttributeAliases(attributes: Record<string, unknown>): boolean {
-    // attributeAliases is on the AttributeMethods mixin host, not yet declared on typeof Base
     const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
     if (!aliases) return false;
     return Object.keys(attributes).some((attr) => attr in aliases);
@@ -395,16 +323,8 @@ export class InsertAll {
 
   /** @internal */
   private resolveSti(): void {
-    // Rails injects the STI type only for models that actually participate in STI
-    // (`finder_needs_type_condition?` — a non-abstract subclass whose table carries
-    // the inheritance column). Gating on the column-aware check, not the bare
-    // hierarchical `descends_from_active_record?`, keeps a plain concrete subclass
-    // with no `type` column (e.g. a readonly-attribute subclass) from inserting a
-    // value into a non-existent column.
     if (!isFinderNeedsTypeCondition(this.model)) return;
     const stiType = this.model.stiName();
-    // STI is active on this path, so the column resolves to a name; `?? "type"`
-    // only satisfies the now-nullable getter's type.
     this.inserts = this.inserts.map((insert) =>
       reverseMerge(insert, { [String(this.model.inheritanceColumn ?? "type")]: stiType }),
     );
@@ -420,9 +340,6 @@ export class InsertAll {
       }
       return resolved;
     });
-    // Mirrors insert_all.rb:121-122: update_only and unique_by are alias-resolved
-    // alongside the insert keys so the ON CONFLICT update list and conflict
-    // target reference physical column names.
     if (this.updateOnly !== undefined) {
       const cols = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
       this.updateOnly = cols.map((attribute) => this.resolveAttributeAlias(attribute));
@@ -440,25 +357,18 @@ export class InsertAll {
     return aliases?.[attribute] ?? attribute;
   }
 
-  /** @internal Mirrors: ActiveRecord::InsertAll#find_unique_index_for */
+  /** @internal */
   private findUniqueIndexFor(
     uniqueBy: string | string[] | IndexDefinition | undefined,
   ): IndexDefinition | undefined {
     if (uniqueBy instanceof IndexDefinition) return uniqueBy;
     const conn = this.connection as { constructor?: { name?: string } };
     if (!this._facts.supportsInsertConflictTarget) {
-      // Rails returns nil for a nil unique_by even when conflict targets are
-      // unsupported (plain insertAll on MySQL); a given unique_by raises.
       if (uniqueBy == null) return undefined;
       throw new ArgumentError(
         `${(conn as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
       );
     }
-    // Rails: `name_or_columns = unique_by || model.primary_key`. The match runs
-    // against the model's configured primary key, while the primary-key branch
-    // below compares against the *database* primary keys (schema_cache), so a
-    // model whose configured PK lacks a backing unique index (e.g. Speedometer)
-    // raises rather than emitting a bogus conflict target.
     const modelPk = this.model.primaryKey;
     const modelPrimaryKeys =
       modelPk == null || modelPk === "" ? [] : Array.isArray(modelPk) ? modelPk : [modelPk];
@@ -477,28 +387,19 @@ export class InsertAll {
         ? idx
         : new IndexDefinition(tableName, idx.name, true, idx.columns, { where: idx.where });
     }
-    // The PK fallback is order-sensitive (Rails `match == primary_keys`,
-    // insert_all.rb:163) — unlike the index match above, which sorts. A
-    // composite PK supplied in a different column order falls through to the
-    // raise, matching Rails. `primaryKeys()` is the schema-cache value.
     const dbPrimaryKeys = this.primaryKeys().map(String);
     if (match.join(",") === dbPrimaryKeys.join(",")) {
       return uniqueBy == null
         ? undefined
         : new IndexDefinition(tableName, `${tableName}_primary_key`, true, [...match]);
     }
-    // Rails interpolates `name_or_columns` verbatim (insert_all.rb:165): a
-    // scalar renders bare, an array as a bracketed list.
     const display = Array.isArray(uniqueBy)
       ? `[${match.join(", ")}]`
       : (uniqueBy ?? nameOrCols.join(", "));
     throw new ArgumentError(`No unique index found for ${display}`);
   }
 
-  /**
-   * @internal
-   * Mirrors: ActiveRecord::InsertAll#unique_indexes (insert_all.rb:169-171).
-   */
+  /** @internal */
   private uniqueIndexes(): unknown[] {
     return this._facts.indexes(this.model.tableName).filter((i: any) => i.unique);
   }
@@ -519,7 +420,7 @@ export class InsertAll {
     );
   }
 
-  /** Mirrors: ActiveRecord::InsertAll#timestamps_for_create (insert_all.rb:221-223). @internal */
+  /** @internal */
   private timestampsForCreate(): Record<string, unknown> {
     const now = Temporal.Now.instant();
     const result: Record<string, unknown> = {};
@@ -530,18 +431,7 @@ export class InsertAll {
   }
 }
 
-/**
- * The fragment surface an adapter's `buildInsertSql` consumes to assemble a
- * dialect-specific INSERT statement. Mirrors the methods Rails'
- * `ActiveRecord::InsertAll::Builder` exposes to `connection.build_insert_sql`.
- *
- * Note: unlike Rails' two-fragment split (`"INSERT #{insert.into} #{insert.values_list}"`),
- * `into()` here bundles the compiled `VALUES (...)` list, so adapters emit just
- * `INSERT ${insert.into()}`. `Builder.valuesList()` still exists for the compile
- * step but isn't part of this contract.
- */
 export interface InsertBuilder {
-  /** Mirrors Rails `InsertAll::Builder`’s `attr_reader :model` (insert_all.rb:226). */
   readonly model: ModelClass;
   into(): string;
   conflictTarget(): string;
@@ -551,29 +441,10 @@ export interface InsertBuilder {
   rawUpdateSql(): Nodes.SqlLiteral | undefined;
   skipDuplicates(): boolean;
   updateDuplicates(): boolean;
-  /** Mirrors Rails `InsertAll::Builder`’s `delegate :keys, to: :insert_all` (insert_all.rb:228). */
   readonly keys: Set<string>;
   quotedTableName(): string;
 }
 
-/**
- * Builds SQL fragments for InsertAll operations.
- *
- * Mirrors: ActiveRecord::InsertAll::Builder
- *
- * Identifier quoting delegates to the connection's `quoteColumnName` /
- * `quoteTableName` (mirroring Rails' `quote_column` → `quote_column_name`
- * indirection), so each dialect emits its own form directly: SQLite/PG
- * double-quote (with embedded `"` doubled), MySQL backticks. Embedded-quote
- * doubling therefore comes from the adapter, not ad-hoc `.replace` here.
- *
- * MySQL note: the adapter's `mysqlQuote()` still rewrites double-quoted
- * identifiers to backticks at execution time for *Arel-generated* SQL (the
- * compiled VALUES list runs through the visitor). That blanket pass is still
- * needed and stays; the identifiers this Builder emits for MySQL are already
- * backticks, which `mysqlQuote()` passes through unchanged (it only rewrites
- * `"`), so there is no double-conversion.
- */
 export class Builder implements InsertBuilder {
   readonly model: ModelClass;
   private _insertAll: InsertAll;
@@ -585,18 +456,7 @@ export class Builder implements InsertBuilder {
     this._connection = insertAll.connection;
   }
 
-  /**
-   * Mirrors: ActiveRecord::InsertAll::Builder#extract_types_from_columns_on
-   * (insert_all.rb:306-313).
-   *
-   * Rails reads `@model.schema_cache.columns_hash(table_name)`, which blocks on
-   * a connection checkout when the entry is cold. `SchemaCache#columnsHash` is
-   * async in trails and this builder path cannot await, so the read is the
-   * query-free `getCachedColumnsHash` off `internalSchemaCache` — the sync-peek
-   * slot behind `AbstractAdapter#schema_cache` (the RFC 0073 constraint both
-   * document).
-   * @internal
-   */
+  /** @internal */
   private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
     const columns = (
       this._connection as unknown as {
@@ -606,17 +466,9 @@ export class Builder implements InsertBuilder {
       }
     ).internalSchemaCache.getCachedColumnsHash(tableName);
 
-    // Ruby's blocking read always has the columns to judge against. A cold
-    // entry here means trails cannot yet know them, and judging the keys
-    // against nothing would raise on a column the reflect is about to produce
-    // — `Book.table_name = "\${db}.books"` (insert_all_test.rb:836-845) resets
-    // the schema and inserts before anything has warmed the qualified name.
     if (columns != null) {
       const unknownColumn = keys.find((key) => !(key in columns));
       if (unknownColumn !== undefined) {
-        // UnknownAttributeError only reads record?.constructor?.name; skip the
-        // full constructor (attribute init, defaults, callbacks) on the error
-        // path by handing it a bare object with the right constructor link.
         throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
       }
     }
@@ -626,12 +478,12 @@ export class Builder implements InsertBuilder {
     return types;
   }
 
-  /** Mirrors Rails `quote_column` → `connection.quote_column_name`. @internal */
+  /** @internal */
   private quoteColumn(name: string): string {
     return this._connection.quoteColumnName(name);
   }
 
-  /** Mirrors Rails `connection.quote_table_name`. @internal */
+  /** @internal */
   private quoteTable(name: string): string {
     return this._connection.quoteTableName(name);
   }
@@ -661,7 +513,6 @@ export class Builder implements InsertBuilder {
     return this._insertAll.updateDuplicates();
   }
 
-  /** Mirrors: `delegate :keys, to: :insert_all` (insert_all.rb:228). */
   get keys(): Set<string> {
     return this._insertAll.keys;
   }
@@ -692,29 +543,14 @@ export class Builder implements InsertBuilder {
       if (value instanceof Nodes.SqlLiteral) return value;
       const type = types[key];
       value = SerializeCastValue.serialize(type, type.cast(value));
-      // Rails hands the serialized value to the ValuesList *as a value*
-      // (insert_all.rb:246): `connection.visitor.compile` renders it, quoting
-      // each entry through `connection.quote` (to_sql.rb:106-114). So no
-      // pre-quoting here — the visitor's `quote` is the single quoting site,
-      // and date/time, binary and array `Data` values all resolve their dialect
-      // from the connection's own `quoted_date` / `quoted_binary` / array
-      // encoder there.
       return value;
     });
     return new Nodes.ValuesList(rows);
   }
 
   conflictTarget(): string {
-    // Mirrors ActiveRecord::InsertAll::Builder#conflict_target: a resolved
-    // unique index emits its columns (and partial WHERE); update_duplicates
-    // without a unique_by falls back to the primary keys; the skip path
-    // without a unique_by emits no target (`ON CONFLICT DO NOTHING` catches
-    // every constraint).
     const index = this._insertAll.uniqueBy;
     if (index instanceof IndexDefinition) {
-      // Expression indexes store `columns` as a raw SQL string (e.g.
-      // "(lower(external_id))"), kept verbatim like Rails' format_columns;
-      // ordinary column lists are quoted.
       const rawCols = index.columns as unknown as string | string[];
       const cols = Array.isArray(rawCols)
         ? rawCols.map((c) => this.quoteColumn(c)).join(",")
@@ -752,7 +588,7 @@ export class Builder implements InsertBuilder {
       .join("");
   }
 
-  /** Mirrors Rails `touch_timestamp_attribute?` (insert_all.rb:300-302). @internal */
+  /** @internal */
   private touchTimestampAttribute(columnName: string): boolean {
     return !this._insertAll.updatableColumns().includes(columnName);
   }

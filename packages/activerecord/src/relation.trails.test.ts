@@ -1,12 +1,3 @@
-/**
- * Trails-specific Relation tests relocated from relation.test.ts (RFC 0043).
- *
- * These guard documented trails-specific invariants — SQL generation shapes,
- * join-ordering internals, build_arel convergence, and the deferred
- * distinct-PK materialization mechanism — that have no like-named Rails test
- * in relation_test.rb. Moved verbatim so they no longer count as bespoke
- * "extra" tests against the Rails parity metric.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
@@ -37,17 +28,9 @@ import { captureSql } from "./testing/sql-capture.js";
 import { quoteTableName, quoteColumnName } from "./support/quote-regex.js";
 
 describe("isBlank / isPresent", () => {
-  // `developers` is canonical (schema.rb `create_table :developers`) and
-  // boot-laid empty on the primary worker DB, so ride `Base.connection` (the
-  // handler suite) rather than a sidecar-pool lease with an in-test
-  // `createTable`. Transactional fixtures roll back the inserted row per test.
   fixtures([]);
 
   it("isBlank returns true when no records exist", async () => {
-    // Inline model on the canonical `developers` table (not the canonical
-    // Developer model): this exercises isBlank/isPresent mechanics, and
-    // Developer's `name` is a restricted, non-dirty-tracked attribute, so
-    // `create({ name })` needs a plainly-declared `name` to persist.
     class SampleRecord extends Base {
       static _tableName = "developers";
       static {
@@ -68,12 +51,6 @@ describe("isBlank / isPresent", () => {
 describe("RelationTest", () => {
   fixtures([]);
 
-  // No like-named Rails test: relation_test.rb only covers the invalid-key path
-  // ("merging a hash with unknown keys raises"). This guards the positive
-  // HashMerger path — a valid VALUE_METHODS-keyed hash builds a fresh base
-  // Relation (merger.rb:26-30) and dispatches each key to its value-method
-  // bang setter, then merges through Merger — so a regression to the old
-  // where-conditions behavior is caught.
   it("merging a valid-key hash dispatches to value-methods", () => {
     const rel = CanonPost.all().merge({ where: { title: "a" }, limit: 5, order: "id" } as any);
     const sql = rel.toSql();
@@ -84,36 +61,21 @@ describe("RelationTest", () => {
     expect(CanonPost.all().merge({ readonly: true } as any).isReadonly).toBe(true);
   });
 
-  // No like-named Rails test: guards trails' merge/merge! structure, which
-  // mirrors Rails' `merge` = `spawn.merge!` (spawn_methods.rb). `merge` clones
-  // first so the receiver is untouched; `merge!` runs the one Merger#merge
-  // algorithm in place, returning the same object. Both must land the same
-  // conditions — a regression that re-splits the two paths is caught here.
   it("merge is non-destructive while mergeBang mutates in place through one path", () => {
     const base = CanonPost.all().where({ title: "a" });
     const baseSqlBefore = base.toSql();
 
     const merged = base.merge(CanonPost.where({ type: "SpecialPost" }));
-    // merge() left the receiver untouched (spawn cloned first)...
     expect(base.toSql()).toBe(baseSqlBefore);
-    // ...and produced the combined conditions on a fresh relation.
     expect(merged.toSql()).toContain("title");
     expect(merged.toSql()).toContain("type");
 
-    // mergeBang() mutates the receiver in place and returns it (same object),
-    // landing the identical conditions merge() produced on its clone.
     const target = CanonPost.all().where({ title: "a" });
     const returned = (target as any).mergeBang(CanonPost.where({ type: "SpecialPost" }));
     expect(returned).toBe(target);
     expect(target.toSql()).toBe(merged.toSql());
   });
 
-  // No like-named Rails test: guards the merge/merge! Array dispatch
-  // (spawn_methods.rb:33-51). `merge` special-cases an Array as `records & other`
-  // (the receiver's records intersected by AR equality — async in trails, so a
-  // Promise of the intersection); `merge!` never treats an Array as a Hash and
-  // raises. A JS Array is `typeof "object"`, so this guards against it wrongly
-  // routing into HashMerger.
   it("merge with an array returns the records intersection while mergeBang rejects it", async () => {
     const a = await CanonPost.createBang({ title: "ary-a", body: "b" });
     await CanonPost.createBang({ title: "ary-b", body: "b" });
@@ -121,9 +83,6 @@ describe("RelationTest", () => {
     const intersection = await (CanonPost.where({ title: ["ary-a", "ary-b"] }) as any).merge([a]);
     expect(intersection.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
 
-    // Rails `records & other` is Array#& — set-style, so a receiver that loads
-    // `a` twice (e.g. a join that duplicates the row) still yields it once. Drive
-    // performMerge with a stub receiver whose records include the duplicate.
     const dupReceiver = { toArray: async () => [a, a] };
     const deduped = await (performMerge as (this: unknown, o: unknown) => Promise<any[]>).call(
       dupReceiver,
@@ -134,10 +93,6 @@ describe("RelationTest", () => {
     expect(() => (CanonPost.all() as any).mergeBang([a])).toThrow(/not an ActiveRecord::Relation/);
   });
 
-  // No like-named Rails test: guards Rails' `|=` union for the preload/includes/
-  // eager_load merge folds (merger.rb / query_methods.rb) — a repeated spec across
-  // a merge must dedup structurally, not accumulate duplicate specs the preloader
-  // then double-loads.
   it("merge unions preload/includes/eager_load specs without duplicating", () => {
     const preloadMerged = CanonPost.preload(":comments").merge(CanonPost.preload(":comments"));
     expect((preloadMerged as any).preloadValues).toEqual([":comments"]);
@@ -149,12 +104,6 @@ describe("RelationTest", () => {
     expect((eagerMerged as any).eagerLoadValues).toEqual([":comments"]);
   });
 
-  // No like-named Rails test: guards the documented proc-merge path
-  // (`Post.where(...).merge(-> { ... })`, spawn_methods.rb). Through the single
-  // path `merge` = `spawn.merge!` and `merge!` runs the block via
-  // `instance_exec(&other)` — trails routes a function argument to
-  // `other.call(this)` on the spawned clone, so the receiver stays untouched and
-  // the block's returned relation carries the added condition.
   it("merge evaluates a proc against the spawned relation", () => {
     const base = CanonPost.all().where({ title: "a" });
     const baseSqlBefore = base.toSql();
@@ -173,7 +122,6 @@ describe("RelationTest", () => {
         this.attribute("id", "integer");
       }
     }
-    // Rails never strips or re-qualifies cross-table references in string form.
     expect(Post.order("comments.body ASC").toSql()).toContain("ORDER BY comments.body ASC");
     expect(Post.order("posts.id DESC").toSql()).toContain("ORDER BY posts.id DESC");
   });
@@ -185,20 +133,16 @@ describe("RelationTest", () => {
         this.attribute("created_at", "string");
       }
     }
-    // Function expressions pass through as raw SQL (not quoted as identifier)
     const fnSql = Order.group("DATE(created_at)").toSql();
     expect(fnSql).toContain("GROUP BY DATE(created_at)");
     expect(fnSql).not.toContain('"orders"."DATE(created_at)"');
-    // Cast expressions pass through as raw SQL (not quoted as identifier)
     const castSql = Order.group("created_at::date").toSql();
     expect(castSql).toContain("GROUP BY created_at::date");
     expect(castSql).not.toContain('"orders"."created_at::date"');
-    // Positional GROUP BY passes through as raw SQL
     expect(Order.group("1").toSql()).toContain("GROUP BY 1");
   });
 
   it("constructJoinDependency handles array-form spec — joins(['posts','comments'])", () => {
-    // leftJoins([":posts", ":comments"]) is equivalent to chaining leftJoins(":posts").leftJoins(":comments").
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -221,14 +165,12 @@ describe("RelationTest", () => {
     registerModel("CJDAuthor", Author);
     registerModel("CJDPost", Post);
     registerModel("CJDComment", Comment);
-    // Array spec goes directly through constructJoinDependency via leftJoins
     const sql = Author.all().leftJoins([":posts", ":comments"]).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
   });
 
   it("constructJoinDependency handles hash spec — leftJoins({ posts: 'comments' })", () => {
-    // Hash spec { ":posts": ":comments" } means: join posts, then join comments via posts.
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -254,8 +196,6 @@ describe("RelationTest", () => {
     const sql = Author.all().leftJoins({ ":posts": ":comments" }).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
-    // Verify comments is joined through posts: ON clause must reference the
-    // effective SQL name of the posts table (real name or collision alias).
     const postsJoinMatch = sql.match(
       /LEFT OUTER JOIN\s+["`]?posts["`]?(?:\s+(?:AS\s+)?["`]?(\w+)["`]?)?\s+ON/i,
     );
@@ -292,8 +232,6 @@ describe("RelationTest", () => {
     registerModel("LeftJoinPost2", Post);
 
     const rel = Author.leftJoins(":posts");
-    // Association name stored in leftOuterJoinsValues verbatim; the join is
-    // resolved to SQL only at build time, by the join dependency.
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
     expect(rel.toSql()).toMatch(/LEFT OUTER JOIN\s+\S*posts\S*\s+ON/i);
   });
@@ -314,19 +252,12 @@ describe("RelationTest", () => {
     registerModel("LazyRaiseAuthor", Author);
     registerModel("LazyRaisePost", Post);
 
-    // Rails stores args verbatim (`left_outer_joins_values |= args`) and only
-    // raises in build_join_buckets — for ANY non-Hash/Symbol/Array arg, not just
-    // a whitespace string. A bare Integer is neither, so building raises.
     const rel = Author.leftJoins(5 as any);
     expect((rel as any).leftOuterJoinsValues).toContain(5);
     expect(() => rel.toSql()).toThrow("only Hash, Symbol and Array are allowed");
   });
 
   it("includes().references() + leftJoins(): no duplicate LEFT OUTER JOIN in SQL", () => {
-    // Regression: includes promoted to eager load via references() puts the eager
-    // JoinDependency in `joins_values`, and `leftJoins(:assoc)` constructs a
-    // left-outer JD for the same association. Both fold into one
-    // `join_constraints` call, so the JD `walk` dedups them to a single JOIN.
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -344,15 +275,11 @@ describe("RelationTest", () => {
 
     const rel = Author.all().includes(":posts").references("posts").leftJoins(":posts");
     const sqlStr = rel.toSql();
-    // "posts" table should appear only once in LEFT OUTER JOIN clauses
     const leftJoinMatches = sqlStr.match(/LEFT OUTER JOIN/gi) ?? [];
     expect(leftJoinMatches.length).toBe(1);
   });
 
   it("eagerLoad + leftJoins: buildJoinBuckets short-circuit does not drop eager stash", () => {
-    // Regression: when joins_values is empty, buildJoinBuckets
-    // short-circuits for the left-outer-only path. If eagerLoadValues is
-    // also present, the short-circuit must not fire — eager stash would be skipped.
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -367,11 +294,9 @@ describe("RelationTest", () => {
     }
     registerModel("EagerLeftAuthor", Author);
     registerModel("EagerLeftPost", Post);
-    // Both eagerLoad and leftJoins present, no explicit joins_values
     const rel = Author.leftJoins(":posts").eagerLoad(":posts");
     expect((rel as any).eagerLoadValues).toContain(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
-    // buildJoinBuckets must not short-circuit; SQL must be non-empty (no throw)
     expect(() => rel.toSql()).not.toThrow();
   });
 
@@ -402,14 +327,11 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    // SelectManager#as produces a Nodes.TableAlias — mirrors Rails'
-    // `relation.arel.as("ranked")` as the from() argument.
     const ranked = Book.select("title").arel().as("ranked");
     const result = Book.from(ranked).where("ranked.title IS NOT NULL").toSql();
     expect(result).toContain("FROM (SELECT");
     expect(result).toContain(") ranked");
     expect(result).toContain("ranked.title IS NOT NULL");
-    // Must not produce [object Object]
     expect(result).not.toContain("[object");
   });
 
@@ -421,7 +343,6 @@ describe("RelationTest", () => {
       }
     }
     const sql = Book.from(Book.where({ active: true }), "books").toSql();
-    // Rails: FROM (SELECT "books".* FROM "books" WHERE ...) books  ← bare alias
     expect(sql).toMatch(/FROM \(SELECT .+\) books/);
     expect(sql).not.toContain(') "books"');
   });
@@ -483,10 +404,8 @@ describe("RelationTest", () => {
           registerModel(this);
         }
       }
-      // hasMany is a collection association → not limitable → IN-subquery for fan-out avoidance
       const sql = EagerArticle.all().eagerLoad(":eagerComments").limit(5).toSql();
       expect(sql).toContain(" IN (SELECT");
-      // LIMIT 5 lives inside the subquery, not on the outer query
       expect(sql).toMatch(/IN \(SELECT .* LIMIT 5\)/s);
     } finally {
       modelRegistry.delete("EagerComment");
@@ -539,10 +458,6 @@ describe("RelationTest", () => {
           registerModel(this);
         }
       }
-      // Eager reflection (belongsTo) is singular → limitable on its own, but the
-      // joins ∪ left_outer_joins clause (finder_methods.rb:464-470) has a
-      // collection (hasMany), so the two-clause using_limitable_reflections? test
-      // is false and the relation defers to distinct-PK materialization.
       const limitableEager = JlArticle.all().eagerLoad(":jlAuthor").limit(5);
       expect((limitableEager as any)._isDeferredDistinctPkSubquery()).toBe(false);
 
@@ -558,10 +473,6 @@ describe("RelationTest", () => {
         .limit(5);
       expect((withCollectionLeftJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
 
-      // Singular joins — including a nested-hash chain (jlAuthor → jlProfile,
-      // both belongsTo) — resolve to non-collection reflections, so the second
-      // using_limitable_reflections? clause stays true and the relation does NOT
-      // defer (Rails resolves the hash via construct_join_dependency.reflections).
       const singularJoin = JlArticle.all().eagerLoad(":jlAuthor").joins(":jlAuthor").limit(5);
       expect((singularJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
 
@@ -579,11 +490,6 @@ describe("RelationTest", () => {
   });
 });
 
-// Mirrors: ActiveRecord::Relation#arel returning the full build_arel manager
-// (active_record/relation/query_methods.rb#build_arel). Asserts that the AST
-// from `relation.arel()` carries joins/HAVING/GROUP/FROM/LOCK/CTEs and compiles
-// to exactly the same SQL as `relation.toSql()` — i.e. the legacy string-assembly
-// path and the Arel-manager path can no longer drift.
 describe("Relation#arel build_arel convergence", () => {
   fixtures([]);
   beforeAll(() => {
@@ -612,13 +518,6 @@ describe("Relation#arel build_arel convergence", () => {
     }
   }
 
-  // Rails' `Relation#to_sql` renders inside `unprepared_statement`
-  // (relation.rb:1217-1219), while `connection.to_sql` honours
-  // `prepared_statements` and emits placeholders
-  // (database_statements.rb:32-42; bind_parameter_test.rb:205-211). These cases
-  // are about what arel CARRIES (joins/HAVING/FROM/LOCK/CTEs), so both sides
-  // render with binds inlined — the flag is saved and restored around the
-  // render, as `Relation#toSql` (relation.ts:1901) does for the same reason.
   const arelSql = (rel: any) => {
     const conn = Widget.connection as any;
     const wasPreparedStatements = conn.preparedStatements;
@@ -655,7 +554,6 @@ describe("Relation#arel build_arel convergence", () => {
     const rel = Widget.with({ cheap: Widget.where({ category: "fruit" }) }).where("1 = 1");
     const sql = arelSql(rel);
     expect(sql).toContain("WITH");
-    // Quote-char varies by adapter ("cheap" on sqlite/PG, `cheap` on MySQL).
     expect(sql).toMatch(/["`]cheap["`]/);
     expect(sql).toBe(placeholderSql(rel));
   });
@@ -665,11 +563,6 @@ describe("Relation#arel build_arel convergence", () => {
     expect(arelSql(rel)).toBe(placeholderSql(rel));
   });
 
-  // Rails `arel`/`build_arel` projects the model's normal columns even when
-  // eager loading — the `t0_r0…` alias projection belongs only to
-  // apply_join_dependency on the loading path. So an eager relation used as a
-  // subquery with an explicit single-column select projects that one column,
-  // not JoinDependency aliases (regression guard for build_arel convergence).
   it("arel of an eager relation projects normal columns, not join-dependency aliases", () => {
     const rel = Gadget.eagerLoad(":widget").select(Gadget.arelTable.get("id"));
     const sql = Gadget.connection.toSql(rel.arel().ast);
@@ -677,9 +570,6 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).toMatch(/SELECT\s+["`]gadgets["`]\.["`]id["`]/);
   });
 
-  // Mirrors Rails RelationHandler applying apply_join_dependency before the
-  // subquery: an eager-loading relation used as a `where(id: …)` value has its
-  // eager_load converted to a LEFT OUTER JOIN (not dropped), projecting only PK.
   it("where with eager-loading relation subquery converts eager-load to a join", () => {
     const sql = Widget.where({ id: Gadget.eagerLoad(":widget") }).toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
@@ -687,11 +577,6 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).not.toMatch(/t\d+_r\d+/);
   });
 
-  // Rails' RelationHandler has no single-column validation: a subquery with an
-  // explicit projection (including `table.*` or multiple columns) passes
-  // straight to `attribute.in(value.arel)`, and the database — not trails —
-  // raises on any column-count mismatch. Regression guard for removing the
-  // bespoke `ensureSingleColumnSelect` throw.
   it("where with a star-projection subquery passes the projection through unchanged", () => {
     const sql = Widget.where({ id: Gadget.select("gadgets.*") }).toSql();
     expect(sql).toMatch(/IN \(SELECT gadgets\.\*/);
@@ -702,12 +587,6 @@ describe("Relation#arel build_arel convergence", () => {
     expect(sql).toMatch(/IN \(SELECT id, widget_id/);
   });
 
-  // Rails apply_join_dependency materializes distinct primary keys (executing a
-  // query) when eager loading with a limit over a collection reflection. trails
-  // defers that query to relation load time; the synchronous `toSql()` display
-  // path cannot run it, so it renders the inline `IN (SELECT DISTINCT … LIMIT n)`
-  // fallback (valid on SQLite/PostgreSQL). The load path substitutes a literal
-  // id list instead — see the canonical RelationTest materialization tests.
   it("where with eager-loading limited collection relation subquery renders the inline distinct subquery for sync toSql", () => {
     const sql = Gadget.where({ widget_id: Widget.eagerLoad(":gadgets").limit(5) }).toSql();
     expect(sql).toMatch(/widget_id\W+IN \(SELECT DISTINCT ["`]widgets["`]\.["`]id["`]/);
@@ -735,14 +614,6 @@ describe("RelationTest", () => {
     registerModel(CanonCategorization);
   });
 
-  // Rails RelationHandler#call routes an eager-loading subquery that also has a
-  // limit/offset over a collection reflection through
-  // distinct_relation_for_primary_key (finder_methods.rb:463), which EXECUTES a
-  // `SELECT DISTINCT <pk> … LIMIT n` to materialize a literal id list rather than
-  // nesting `IN (SELECT … LIMIT n)` (MySQL rejects LIMIT inside IN). trails'
-  // `.where()` is synchronous, so the materialization is deferred to relation
-  // load time: the main query carries the literal `author_id IN (<ids>)`, never
-  // a LIMIT-bearing subquery, on every adapter.
   it("where with eager-loading limited collection relation subquery materializes distinct primary keys at load time", async () => {
     const subquery = CanonAuthor.eagerLoad(":posts").order({ id: "asc" }).limit(2);
 
@@ -758,13 +629,9 @@ describe("RelationTest", () => {
     expect(records.map((p) => p.id)).toEqual(expectedPostIds);
     expect(expectedPostIds.length).toBeGreaterThan(0);
 
-    // A standalone DISTINCT-pk materialization query ran (Rails
-    // distinct_relation_for_primary_key), carrying the LIMIT.
     expect(queries.some((sql) => /SELECT\s+DISTINCT/i.test(sql) && /\bLIMIT\b/i.test(sql))).toBe(
       true,
     );
-    // The main Post query embeds the materialized ids as a literal IN list — no
-    // nested subquery, no LIMIT inside IN (the MySQL parity assertion).
     const mainQuery = queries.find((sql) => /\bIN\b/i.test(sql) && /author_id/i.test(sql));
     expect(mainQuery).toBeDefined();
     expect(/IN\s*\(\s*SELECT/i.test(mainQuery!)).toBe(false);
@@ -773,9 +640,6 @@ describe("RelationTest", () => {
     }
   });
 
-  // An empty materialized id set yields an empty `IN`, which the where clause
-  // short-circuits as a contradiction (Rails `none!`): an empty result with no
-  // main query issued and no error.
   it("where with eager-loading limited collection relation subquery yielding no ids is empty", async () => {
     const subquery = CanonAuthor.where({ id: -1 })
       .eagerLoad(":posts")
@@ -788,14 +652,9 @@ describe("RelationTest", () => {
     });
 
     expect(records).toEqual([]);
-    // No main Post SELECT was issued (contradiction short-circuit before SQL).
     expect(queries.some((sql) => /author_id/i.test(sql) && /\bIN\b/i.test(sql))).toBe(false);
   });
 
-  // The deferred materialization must fire for every terminal that compiles the
-  // where clause — not just toArray — or count/pluck/exists would render the
-  // inline LIMIT-in-IN subquery MySQL rejects. Rails materializes at
-  // `.where()`-build time, so all terminals see `pk IN (ids)`.
   it("count, pluck, and exists over an eager-loading limited collection subquery materialize distinct primary keys", async () => {
     const subquery = () => CanonAuthor.eagerLoad(":posts").order({ id: "asc" }).limit(2);
     const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
@@ -808,7 +667,6 @@ describe("RelationTest", () => {
       count = (await CanonPost.where({ author_id: subquery() }).count()) as number;
     });
     expect(count).toBe(expectedPostIds.length);
-    // No terminal renders the inline LIMIT-in-IN subquery MySQL rejects.
     expect(countQueries.every((sql) => !/IN\s*\(\s*SELECT/i.test(sql))).toBe(true);
 
     const pluckedIds = await CanonPost.where({ author_id: subquery() }).order("id").pluck("id");
@@ -817,10 +675,6 @@ describe("RelationTest", () => {
     expect(await CanonPost.where({ author_id: subquery() }).exists()).toBe(true);
   });
 
-  // Rails `apply_join_dependency(eager_loading: group_values.empty?)`
-  // (finder_methods.rb:457): a grouped subquery passes `eager_loading: false`,
-  // skipping distinct_relation_for_primary_key — so a grouped eager+limit
-  // subquery is NOT deferred and builds the plain `IN (SELECT … GROUP BY …)`.
   it("where with a grouped eager-loading limited subquery does not defer materialization", () => {
     const subquery = CanonAuthor.eagerLoad(":posts").group("authors.id").limit(2);
     const sql = CanonPost.where({ author_id: subquery }).toSql();
@@ -828,32 +682,17 @@ describe("RelationTest", () => {
     expect(sql).toMatch(/GROUP BY/i);
   });
 
-  // Rails resolves nested-hash/array eager specs through
-  // construct_join_dependency(eager_load_values | includes_values).reflections
-  // (finder_methods.rb:457-470, join_dependency.rb:81-82) before
-  // using_limitable_reflections?. A spec whose whole tree is singular
-  // (Author hasOne post → Post belongsTo author) stays limitable, so a
-  // limit/offset relation is NOT deferred to distinct_relation_for_primary_key.
   it("where with a singular nested-hash eager-loading limited subquery does not defer materialization", () => {
     const subquery = CanonAuthor.eagerLoad({ ":post": ":author" }).order({ id: "asc" }).limit(2);
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(false);
   });
 
-  // A collection anywhere in the nested eager tree (Author hasOne post → Post
-  // hasMany comments) makes the reflection set non-limitable, so the relation
-  // defers to distinct-PK materialization just as a top-level collection does.
   it("where with a collection nested-hash eager-loading limited subquery defers materialization", () => {
     const subquery = CanonAuthor.eagerLoad({ ":post": ":comments" }).order({ id: "asc" }).limit(2);
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(true);
   });
 });
 
-// Ruby's `self.class.name` is namespace-qualified, so Rails' inspect wrapper
-// reads `#<ActiveRecord::Relation ...>` — pinned for the plain Relation by
-// relations_test.rb:2108-2111. Its sibling wrapper classes have no like-named
-// Rails test, so guard their qualified names here: JS `constructor.name` is
-// unqualified (and bundler-manglable), which is why each class pins the Rails
-// constant path on `_railsClassName`.
 describe("inspect wrapper class name", () => {
   fixtures(["authors", "posts"]);
 
@@ -871,38 +710,17 @@ describe("inspect wrapper class name", () => {
     expect(relation.inspect().startsWith("#<ActiveRecord::AssociationRelation [")).toBe(true);
   });
 
-  // The unloaded branch elides entries with `[...]` (sync JS can't block on the
-  // load Rails does here), but the wrapper name is Rails' either way.
   it("renders the qualified Rails class name for an unloaded relation", () => {
     const relation = CanonPost.all();
     expect(relation.isLoaded).toBe(false);
     expect(relation.inspect()).toBe("#<ActiveRecord::Relation [...]>");
   });
 
-  // reverse_sql_order's empty-order branch has two outcomes; the no-PK raise is
-  // covered by Rails' test_default_reverse_order_on_table_without_primary_key in
-  // relations.test.ts. This guards the other half, which has no like-named Rails
-  // test: a PK-bearing table falls back to ORDER BY <pk> DESC. Before the
-  // reverseOrderBang fix, an empty order was a silent no-op and emitted no
-  // ORDER BY at all.
   it("defaults an unordered reverseOrder to the primary key descending", () => {
     expect(CanonPost.all().reverseOrder().toSql()).toContain("ORDER BY");
     expect(CanonPost.all().reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
   });
 
-  // A composite primary key is an Array, which is truthy in Rails'
-  // `return [table[primary_key].desc] if primary_key` guard, so it takes the
-  // same default-order path as a scalar PK rather than raising. trails used to
-  // invent an IrreversibleOrderError here.
-  //
-  // Note the resulting SQL is a *broken* column reference in Rails too:
-  // `Arel::Table#[]` builds `Attribute.new(table, name)` for any name
-  // (arel/table.rb:82) and `visit_Arel_Attributes_Attribute` hands it to the
-  // adapter's `quote_column_name`, which stringifies the Array via `name.to_s`.
-  // We match Rails byte-for-byte — `"cpk_orders"."[\"shop_id\", \"id\"]"` —
-  // because the visitor routes the name through `rubyToS` (Ruby's `Array#to_s`
-  // is inspect-style, not JS's comma-join). Both fail at the database;
-  // reproducing Rails' exact text is the point.
   it("defaults an unordered reverseOrder to a composite primary key descending", () => {
     const clauses = reverseSqlOrder.call(CpkOrder.all() as any, []);
     expect(clauses).toHaveLength(1);
@@ -910,19 +728,12 @@ describe("inspect wrapper class name", () => {
     expect(ordering).toBeInstanceOf(Nodes.Descending);
     expect((ordering.expr as any).name).toEqual(["shop_id", "id"]);
 
-    // End-to-end: builds rather than raising.
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(`ORDER BY`);
-    // Assert through the active adapter's quoter rather than hardcoding
-    // double quotes: the inspect-style name is escaped differently per
-    // dialect (MySQL backticks it; SQLite/PG double the interior quotes).
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(
       `${quoteTableName("cpk_orders")}.${quoteColumnName('["shop_id", "id"]')} DESC`,
     );
   });
 
-  // compact_blank: a blank string order is rejected before the reverse, so the
-  // relation still falls back to the primary-key default rather than trying to
-  // flip "" into " DESC".
   it("treats a blank string order as no order when reversing", () => {
     expect(CanonPost.order("").reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
   });
@@ -949,12 +760,6 @@ describe("apply_join_dependency limitable reflections (trails)", () => {
   fixtures([]);
 
   it("materializes distinct parent ids when a joined reflection is a collection", () => {
-    // finder_methods.rb:463-470 gates the distinct_relation_for_primary_key
-    // rewrite on BOTH using_limitable_reflections? clauses: the eager
-    // JoinDependency's reflections AND those of
-    // select_association_list(joins_values) + left_outer_joins_values. `author`
-    // is singular, but the joined `comments` collection is not, so a limit here
-    // takes the rewrite rather than a direct LIMIT on the fanned-out join.
     const sql = CanonPost.eagerLoad(":author").joins(":comments").limit(1).toSql();
     expect(sql).toMatch(/WHERE .*IN \(SELECT DISTINCT /);
     expect(sql).not.toMatch(/\bLIMIT 1\s*$/);
@@ -968,15 +773,6 @@ describe("apply_join_dependency limitable reflections (trails)", () => {
 });
 
 describe("relation.rb:68 mixin ancestry", () => {
-  // `relation.rb:68` is a single multi-argument include:
-  //
-  //   include FinderMethods, Calculations, SpawnMethods, QueryMethods,
-  //           Batches, Explain, Delegation
-  //
-  // Ruby inserts those so the FIRST argument ends up highest in the ancestry
-  // (`K.ancestors == [K, A, B, C]` for `include A, B, C`), so a name defined by
-  // two of them resolves to the one nearer the front of this list. All seven
-  // are listed here in relation.rb order.
   const modules: [string, Record<string, unknown>][] = [
     ["FinderMethods", FinderMethods as unknown as Record<string, unknown>],
     ["Calculations", Calculations as unknown as Record<string, unknown>],
@@ -990,8 +786,6 @@ describe("relation.rb:68 mixin ancestry", () => {
   it("resolves a colliding method to the module highest in relation.rb:68's order", () => {
     const proto = Relation.prototype as unknown as Record<string, unknown>;
 
-    // Every (module, key) pair whose key is ALSO defined by a module lower in
-    // relation.rb:68's order — i.e. every place the include() order matters.
     const collisions = modules.flatMap(([name, mod], i) =>
       Object.keys(mod)
         .filter((key) => typeof mod[key] === "function" && !/^[A-Z]/.test(key))
@@ -1004,19 +798,11 @@ describe("relation.rb:68 mixin ancestry", () => {
         .filter((entry) => entry.lower !== undefined),
     );
 
-    // The class body outranks every mixin (include() never replaces it), so a
-    // key whose installed value came from neither module is not this gate's
-    // business. Of the rest, the higher module must be the one that won.
     const misresolved = collisions
       .filter(({ key, mod, lower }) => proto[key] === lower![1][key] && proto[key] !== mod[key])
       .map(({ name, key, lower }) => `${key}: ${lower![0]} outranks ${name}`);
     expect(misresolved).toEqual([]);
 
-    // Today nothing collides, so the check above is vacuous. This line records
-    // that fact and turns red the moment a collision appears — at which point
-    // the check becomes the real gate on the include() order at the bottom of
-    // relation.ts, and whoever added the collision must confirm it against
-    // relation.rb:68 before updating this expectation.
     expect(collisions.map(({ name, key }) => `${name}#${key}`)).toEqual([]);
   });
 });
@@ -1042,9 +828,6 @@ describe("Relation Enumerable surface (trails)", () => {
     const first = (await posts)[0] as any;
     expect((indexed[first.id] as any).id).toBe(first.id);
 
-    // `reject(&:blank?)` over records (enumerable.rb:184-186): no persisted
-    // record is blank, so the identity of the survivors is what this pins —
-    // the same instances, in load order, not merely the same count.
     const loaded = await posts;
     expect(await posts.compactBlank()).toEqual(loaded);
     expect((await CanonPost.where({ id: -1 }).compactBlank()).length).toBe(0);
@@ -1058,10 +841,6 @@ describe("Relation Enumerable surface (trails)", () => {
   });
 });
 
-// `AssociationRelation#==` is `other == records` (association_relation.rb:14-16)
-// and `CollectionProxy#==` is `load_target == other` (collection_proxy.rb:980-982):
-// both re-dispatch instead of hand-rolling a record loop, so the semantics come
-// from the OTHER side's `==` — a Relation runs `Relation#==` (relation.rb:1253-1262).
 describe("association equality re-dispatches to the other side", () => {
   fixtures(["authors", "posts"]);
 
@@ -1071,13 +850,9 @@ describe("association equality re-dispatches to the other side", () => {
     const records = await relation.records();
     const other = CanonPost.where({ id: records.map((r: any) => r.id) });
 
-    // `other == records`: Relation#=='s Array arm (relation.rb:1259-1260)
-    // compares OTHER's records against ours, so the answer is other's, not a
-    // loop over our own array.
     expect(await relation.equals(other)).toBe(await other.equals(records));
     expect(await relation.equals(CanonPost.where({ id: -1 }))).toBe(false);
 
-    // Anything with no `==` of its own is simply unequal.
     expect(await relation.equals("posts")).toBe(false);
   });
 
@@ -1108,11 +883,6 @@ describe("Relation#empty_scope? STI type_condition (trails)", () => {
   });
 });
 
-// `lock!` (query_methods.rb:1242-1249) stores the ARGUMENT — `locks || true`
-// for String/true/nil, `false` otherwise. The `FOR UPDATE` default belongs to
-// Arel's `SelectManager#lock` (select_manager.rb:52-59), so the stored value
-// and the emitted SQL are two different things. Rails' relation_mutation_test
-// only pins the String arm.
 describe("lock_value stores the argument", () => {
   fixtures([]);
 
@@ -1123,8 +893,6 @@ describe("lock_value stores the argument", () => {
     expect(CanonPost.all().lock("FOR SHARE").lockValue).toBe("FOR SHARE");
   });
 
-  // The SQLite visitor drops the LOCK node entirely (arel/visitors/sqlite.rb),
-  // so assert against the AST rather than the rendered SQL.
   it("builds the Arel default clause for a bare lock", () => {
     expect((CanonPost.all().arel() as any).ast.lock).toBe(null);
     expect(String((CanonPost.all().lock().arel() as any).ast.lock.expr)).toBe("FOR UPDATE");

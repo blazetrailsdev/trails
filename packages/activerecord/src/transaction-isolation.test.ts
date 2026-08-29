@@ -5,8 +5,6 @@ import { adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
 import { transactionIsolationLevels } from "./connection-adapters/abstract/database-statements.js";
 
-// Runs when the adapter does NOT support transaction isolation (or is SQLite3).
-// Rails: TransactionIsolationUnsupportedTest
 describe("TransactionIsolationUnsupportedTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -27,16 +25,6 @@ describe("TransactionIsolationUnsupportedTest", () => {
   });
 });
 
-// Rails: TransactionIsolationTest, guarded by `supports_transaction_isolation? &&
-// !current_adapter?(:SQLite3Adapter)` (transaction_isolation_test.rb:20-21), which
-// the parity:test Ruby extractor renders as adapters=[mysql,postgresql]
-// features=[transaction_isolation]. Each subtest carries the compound skipIf below
-// to mirror both dimensions of Rails' gate (non-SQLite adapter set + the feature).
-//
-// Tag and Tag2 each establish their own connection to the active lane's primary
-// database (via ambientPoolConfiguration) so their transactions run on independent
-// physical connections — matching Rails' `Tag.establish_connection :arunit` /
-// `Tag2.establish_connection :arunit` pattern, generically across pg + mysql.
 describe("TransactionIsolationTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -73,11 +61,6 @@ describe("TransactionIsolationTest", () => {
     await Tag.destroyAll();
   });
 
-  // PG aliases READ UNCOMMITTED to READ COMMITTED — Rails notes this test only
-  // asserts that the second connection's auto-committed insert becomes visible.
-  // Rails additionally defines this test only when
-  // `transaction_isolation_levels.include?(:read_uncommitted)`
-  // (transaction_isolation_test.rb:41) — mirrored via the map term below.
   it.skipIf(
     adapterType === "sqlite" ||
       !adapterSupports("transaction_isolation") ||
@@ -93,7 +76,6 @@ describe("TransactionIsolationTest", () => {
     );
   });
 
-  // A dirty read must not happen: Tag2's uncommitted insert is invisible to Tag.
   it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
     "read committed",
     async () => {
@@ -111,11 +93,6 @@ describe("TransactionIsolationTest", () => {
     },
   );
 
-  // A non-repeatable read must not happen: a committed update from the second
-  // connection is invisible to the first connection's repeatable-read snapshot.
-  // Rails additionally defines this test only when
-  // `transaction_isolation_levels.include?(:repeatable_read)`
-  // (transaction_isolation_test.rb:66) — mirrored via the map term below.
   it.skipIf(
     adapterType === "sqlite" ||
       !adapterSupports("transaction_isolation") ||
@@ -139,7 +116,6 @@ describe("TransactionIsolationTest", () => {
     expect(tag.name).toBe("emily");
   });
 
-  // No-error smoke test for serializable — DBs enforce serializability differently.
   it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
     "serializable",
     async () => {

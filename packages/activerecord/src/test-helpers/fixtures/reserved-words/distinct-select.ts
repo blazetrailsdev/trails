@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/reserved_words/distinct_select.yml
 export const reservedWordsDistinctSelectFixtureData = {
   distinct_select1: {
     distinct_id: 1,

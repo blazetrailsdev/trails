@@ -4,7 +4,7 @@ import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-regis
 import { registerModel } from "./associations.js";
 import { FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
-import "./relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
+import "./relation.js";
 import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
@@ -21,15 +21,6 @@ import {
   leaseFixtureConnectionFor,
 } from "./test-fixtures/fixture-connection.js";
 
-/**
- * Resolves an entry's model thunk to its table-bearing class, registering the
- * full resolved list exactly as {@link resolveFixtureNames} does. The thunk may
- * return an array (a table-bearing model plus extra classes to register, e.g.
- * STI subclasses or HABTM targets); the first element is the table-bearing one.
- * Registration is what these conformance/seed assertions implicitly depend on —
- * e.g. `developers` seeds its `sharedComputers` HABTM label only once `Computer`
- * is registered, which used to happen as a side effect of the model thunk.
- */
 async function resolvePrimaryModel(entry: {
   model: () => Promise<typeof Base | readonly (typeof Base)[]>;
 }): Promise<typeof Base> {
@@ -50,19 +41,12 @@ function makeAdapter(): DatabaseAdapter {
     createSavepoint: vi.fn(async () => {}),
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
-    // Rails wraps a fixture set's table_deletes in this
-    // (database_statements.rb:486-495) and every adapter defines it
-    // (abstract_adapter.rb:634), so the mock runs the block the way the base
-    // implementation does rather than making the caller guard for its absence.
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
     },
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,
-    // Every Rails adapter carries a pool (abstract_adapter.rb:153); the
-    // fixture machinery reads it to decide whether a set seeds through the
-    // model's own pool.
     pool: new NullPool(),
   } as unknown as DatabaseAdapter;
 }
@@ -75,13 +59,6 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   } as any;
 }
 
-// Configures encryption with the shared test keys so encrypted fixtures seed as
-// ciphertext and decrypt on read, returning a restore fn for `afterAll`.
-// Dynamically imports the encryption test-helpers so this file doesn't register
-// `Base.encrypts` hooks at module-collection time — the per-entry `addOn` is what
-// loads encryption lazily at run time, and keeping it out of module scope preserves
-// the opt-in property. Mirrors how Rails' encryption test cases set keys via
-// ActiveRecord::EncryptionTestCase, scoped to the suite that needs them.
 async function setupScopedEncryption(): Promise<() => void> {
   const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
     await import("./encryption/test-helpers.js");
@@ -89,8 +66,6 @@ async function setupScopedEncryption(): Promise<() => void> {
   configureEncryption();
   return () => restoreEncryptionConfig(snapshot);
 }
-
-// --- useFixtures ---
 
 describe("useFixtures", () => {
   const adapter = makeAdapter();
@@ -100,8 +75,6 @@ describe("useFixtures", () => {
 
   const { topics } = fixtures(
     { topics: [Topic, { rails: { title: "Rails" } }] },
-    // Mock adapter over a non-canonical / stubbed table: seeding goes through
-    // the mock adapter, so no real table is involved.
     { connection: () => adapter, useTransactionalTests: false },
   );
 
@@ -131,8 +104,6 @@ describe("useFixtures multi-set", () => {
       topics: [Topic, { rails: { title: "Rails" } }],
       posts: [Post, { hello: { title: "Hello" } }],
     },
-    // Mock adapter over a non-canonical / stubbed table: seeding goes through
-    // the mock adapter, so no real table is involved.
     { connection: () => adapter, useTransactionalTests: false },
   );
 
@@ -142,20 +113,14 @@ describe("useFixtures multi-set", () => {
   });
 });
 
-// --- useFixtures slash-key smoke test ---
-
 describe("useFixtures slash-keyed fixture sets", () => {
   const adapter = makeAdapter();
   const rowId = fixtureId("david");
   const rows = new Map([[rowId, { id: rowId, name: "David" }]]);
   const AccountModel = makeModel("accounts", rows);
 
-  // Slash-keyed entries in the object-map overload. The result property is
-  // accessible via bracket notation only; dot-access would be a syntax error.
   const result = fixtures(
     { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
-    // Mock adapter over a non-canonical / stubbed table: seeding goes through
-    // the mock adapter, so no real table is involved.
     { connection: () => adapter, useTransactionalTests: false },
   );
 
@@ -168,13 +133,6 @@ describe("useFixtures slash-keyed fixture sets", () => {
     expect(acct).toMatchObject({ id: rowId });
   });
 });
-
-// --- all/ fixture sets (Phase 9) ---
-// Mirrors LoadAllFixturesTest / FileFixtureConflictTest in fixtures_test.rb:
-// "fixtures :all" from the `all/` dir loads developers, namespaced/accounts,
-// people, and tasks (admin is a symlink treated as a file fixture conflict and
-// excluded). developers/people/tasks are empty YAMLs; only namespaced/accounts
-// carries a row.
 
 describe("all/ fixture sets — explicit enumeration", () => {
   const adapter = makeAdapter();
@@ -192,8 +150,6 @@ describe("all/ fixture sets — explicit enumeration", () => {
       "all/tasks": [TaskModel, {}],
       "all/namespaced/accounts": [AccountModel, { signals37: { name: "37signals" } }],
     },
-    // Mock adapter over a non-canonical / stubbed table: seeding goes through
-    // the mock adapter, so no real table is involved.
     { connection: () => adapter, useTransactionalTests: false },
   );
 
@@ -210,15 +166,11 @@ describe("all/ fixture sets — explicit enumeration", () => {
   });
 });
 
-// --- useFixtures type contract ---
-
 describe("useFixtures type contract", () => {
   class Topic extends Base {
     declare title: string;
     static {
       this.tableName = "topics";
-      // Stub findBy so the beforeEach registered by useFixtures doesn't require
-      // the full Relation infrastructure during type-assertion tests.
       this.findBy = vi.fn(async () => new Topic()) as any;
     }
   }
@@ -235,8 +187,6 @@ describe("useFixtures type contract", () => {
       topics: [Topic, { first: { title: "First" }, second: { title: "Second" } }],
       posts: [Post, { welcome: { body: "Hi" } }],
     },
-    // Mock adapter over stubbed models: seeding goes through the mock
-    // adapter, so no real table is involved.
     { connection: () => makeAdapter() as any, useTransactionalTests: false },
   );
 
@@ -256,13 +206,9 @@ describe("useFixtures type contract", () => {
   });
 });
 
-// --- useFixtures by registry name (string[] overload, real seeding) ---
-
 describe("useFixtures by registry name", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // author_addresses listed first: authors.author_address_id ref() resolves to its
-  // declared ids, so the target set must load before its dependent.
   const { authors, posts } = fixtures(["authorAddresses", "authors", "posts"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
@@ -282,18 +228,10 @@ describe("useFixtures by registry name", () => {
   });
 
   it("resolves cross-fixture ref() to the target fixture's declared id", async () => {
-    // authors.david.author_address_id = ref("author_addresses", "david_address"),
-    // and author_addresses.david_address declares id: 1. Read the persisted FK
-    // straight from the row so the assertion doesn't depend on a reflected getter.
-    // Both columns are `t.references` bigints (schema.rb:91, 973), and a raw read
-    // hands back each driver's own wide-integer spelling — bigint on SQLite
-    // (readBigInts), a decimal string from node-postgres' int8 — so compare the
-    // numeric value rather than the driver's representation of it.
     const [a] = await Base.adapter.execute(
       `SELECT author_address_id FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
     );
     expect(Number((a as { author_address_id: unknown }).author_address_id)).toBe(1);
-    // posts.welcome.author_id = ref("authors", "david"), authors.david declares id: 1.
     const [p] = await Base.adapter.execute(
       `SELECT author_id FROM ${Base.adapter.quoteTableName(Post.tableName)} WHERE id = 1`,
     );
@@ -322,8 +260,6 @@ describe("useFixtures by registry name", () => {
 describe("useFixtures seeds HABTM join tables (no model class)", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // categories + posts declare explicit ids, so they load BEFORE the join set —
-  // categoriesPosts' category_id/post_id ref()s then resolve to those declared ids.
   const { categories, posts, categoriesPosts } = fixtures(
     ["categories", "posts", "categoriesPosts"],
     { connection: () => Base.adapter, useTransactionalTests: false },
@@ -373,12 +309,9 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
   });
 });
 
-// --- vertices + edges cross-fixture ref() ---
-
 describe("useFixtures vertices and edges", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // vertices must load before edges so edge ref()s resolve to declared vertex ids.
   const { vertices, edges } = fixtures(["vertices", "edges"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
@@ -398,14 +331,9 @@ describe("useFixtures vertices and edges", () => {
   });
 });
 
-// --- timestamp auto-stamp (Rails' fill_timestamps) ---
-
 describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // people.michael declares neither created_at nor updated_at, but both columns
-  // are NOT NULL — defineFixtures must fill them with the current time, mirroring
-  // Rails' FixtureSet::TableRow#fill_timestamps. Without it the INSERT fails.
   const { people } = fixtures(["people"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
@@ -423,15 +351,9 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   });
 });
 
-// --- string / non-integer declared primary keys ---
-
 describe("useFixtures with a string primary key", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // Subscriber sets `self.primary_key = "nick"` (a string column). The fixture
-  // row declares `nick: "alterself"`; resolveDeclaredPk must use that string
-  // verbatim instead of coercing/rejecting it. Without string-PK support the
-  // seeder threw on the non-integer declared id.
   const { subscribers } = fixtures(["subscribers"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
@@ -451,26 +373,17 @@ describe("useFixtures with a string primary key", () => {
   });
 });
 
-// --- custom / absent PK column names (model defaults to `id`, schema differs) ---
-
 describe("useFixtures reconciles the PK column against the schema", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // Bulb declares no `primary_key`, so the model defaults to `id`, but the
-  // `bulbs` table's PK column is `ID` (schema.rb: `primary_key: "ID"`). The
-  // seeder must seed `ID`, not a phantom `id`. Bulb also has a default_scope
-  // (`where(name: "defaulty")`) that would hide the `special` row on reload —
-  // the unscoped reload covers that.
   const { bulbs } = fixtures(["bulbs"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
   });
-  // mixed_case_monkeys: `t.primary_key :monkeyID` under a non-`id` camelCased name.
   const { mixedCaseMonkeys } = fixtures(["mixedCaseMonkeys"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
   });
-  // mateys is id-less (`id: false`, no PK) — no PK column may be seeded at all.
   const { mateys } = fixtures(["mateys"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
@@ -501,18 +414,9 @@ describe("useFixtures reconciles the PK column against the schema", () => {
   });
 });
 
-// --- composite primary keys ---
-
 describe("useFixtures seeds composite-primary-key tables", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // CpkOrder declares a composite model PK (`["shop_id", "id"]`) while the test
-  // schema keeps a plain autoincrement `id`; Rails' composite_primary_key? is
-  // model-level, so both key columns are generated from the label via
-  // compositeIdentify. CpkOrderTag's schema PK IS composite (`["order_id",
-  // "tag_id"]`); both key columns are supplied by ref()s in the fixture row.
-  // cpkOrders loads first so its declared key map backs the cpkOrderTags
-  // order_id ref() (which resolves to the order's `id` column).
   const { cpkOrders, cpkOrderTags, cpkBooks } = fixtures(
     ["cpkOrders", "cpkOrderTags", "cpkBooks"],
     { connection: () => Base.adapter, useTransactionalTests: false },
@@ -527,7 +431,6 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 
   it("seeds a composite-schema-PK row from its ref()'d key columns", () => {
     const tag = cpkOrderTags("cpk_first_order_loyal_customer");
-    // order_id resolves to cpk_orders.cpk_groceries_order_1's id; tag_id to a cpk_tag.
     expect(Number(tag.readAttribute("order_id"))).toBe(
       Number(cpkOrders("cpk_groceries_order_1").readAttribute("id")),
     );
@@ -540,8 +443,6 @@ describe("useFixtures seeds composite-primary-key tables", () => {
   });
 
   it("generates both key columns for a composite-PK row that supplies neither", () => {
-    // cpk_book_with_generated_pk omits author_id and id; compositeIdentify fills
-    // both (Rails' generate_composite_primary_key), so the row still round-trips.
     const book = cpkBooks("cpk_book_with_generated_pk");
     expect(book.readAttribute("author_id")).not.toBeNull();
     expect(book.readAttribute("author_id")).not.toBeUndefined();
@@ -550,20 +451,13 @@ describe("useFixtures seeds composite-primary-key tables", () => {
   });
 });
 
-// --- STI subclass standalone load ---
-
 describe("useFixtures resolves STI subclasses on standalone load", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // parrots.yml rows carry a custom inheritance column (`parrot_sti_class`)
-  // pointing at LiveParrot/DeadParrot. Loading the base `parrots` set must
-  // hydrate each row as its declared subclass — the subclasses live in the same
-  // module as Parrot, so the registry's `model` thunk eagerly loads them.
   const { parrots } = fixtures(["parrots"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
   });
-  // vegetables.yml uses `custom_type` → Cucumber/Cabbage/RedCabbage.
   const { vegetables } = fixtures(["vegetables"], {
     connection: () => Base.adapter,
     useTransactionalTests: false,
@@ -580,10 +474,6 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
   });
 
   it("resolves the subclass-only `breed` enum via the row's STI class", async () => {
-    // breed is an enum LiveParrot declares but Parrot (the base) does not, so the
-    // string key must be mapped through the subclass — Rails' resolve_enums keyed
-    // by reflection_class. Stored as the integer (african: 0, australian: 1), not
-    // the verbatim string that strict engines would reject on an integer column.
     const [row] = (await Base.adapter.execute(
       `SELECT breed FROM ${Base.adapter.quoteTableName("parrots")} WHERE name = 'Curious George'`,
     )) as { breed: number }[];
@@ -602,8 +492,6 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
     expect(vegetables("first_cabbage")).toBeInstanceOf(Cabbage);
   });
 });
-
-// --- fixture registry conformance ---
 
 describe("fixtureRegistry conformance", () => {
   it("every entry resolves to a Base subclass with a table name and non-empty data", async () => {
@@ -628,9 +516,6 @@ describe("fixtureRegistry conformance", () => {
           0,
         );
       }
-      // Composite primary keys are seedable now (the seed-conformance describe
-      // below proves each entry actually inserts), so a composite `primaryKey` is
-      // no longer disqualifying — the model PK is reconciled against the schema.
 
       const data = (entry as { data: Record<string, unknown> }).data;
       const labels = Object.keys(data);
@@ -650,9 +535,6 @@ describe("fixtureRegistry conformance", () => {
 
 describe("fixtureRegistry ref targets", () => {
   it("every ref() points at a table that is itself loadable by name", async () => {
-    // A registered set whose data ref()s a non-registered table would seed FK
-    // values from the CRC32 fallback (≠ the target's declared id), since the
-    // target can't be loaded by name to populate the declared-id registry.
     const loadable = new Set<string>();
     for (const entry of Object.values(fixtureRegistry)) {
       if (isJoinTableEntry(entry)) {
@@ -684,8 +566,6 @@ describe("fixtureRegistry ref targets", () => {
 
 describe("resolveFixtureNames same-table guard", () => {
   it("resolves two requested sets that map to the same table", async () => {
-    // deadParrots + liveParrots are both STI subclasses on the `parrots` table.
-    // They merge into one load now (disjoint labels), so both entries resolve.
     const map = await resolveFixtureNames(["deadParrots", "liveParrots"]);
     expect(Object.keys(map)).toEqual(["deadParrots", "liveParrots"]);
     expect(map.deadParrots.table).toBe("parrots");
@@ -693,8 +573,6 @@ describe("resolveFixtureNames same-table guard", () => {
   });
 
   it("rejects two same-table sets whose rows collide on a primary key", async () => {
-    // dogs (sophie) and otherDogs (lassie) both map to `dogs` and both pin id: 1,
-    // so merging them would collide on the primary key.
     await expect(resolveFixtureNames(["dogs", "otherDogs"])).rejects.toThrow(
       /both map to table "dogs" with a row that resolves to the same primary key/,
     );
@@ -706,12 +584,7 @@ describe("resolveFixtureNames same-table guard", () => {
   });
 });
 
-// --- same-table multi-set load ---
-
 describe("fixtures() loads multiple same-table fixture sets in one call", () => {
-  // deadParrots + liveParrots are STI subclasses backed by the same `parrots`
-  // table. They load together: the table is deleted once and both sets' rows are
-  // merged into one insert, with each accessor returning its own rows.
   const { deadParrots, liveParrots } = fixtures(["deadParrots", "liveParrots"]);
 
   it("resolves a DeadParrot-typed row from the deadParrots accessor", () => {
@@ -734,22 +607,8 @@ describe("fixtures() loads multiple same-table fixture sets in one call", () => 
   });
 });
 
-// Seed-level conformance: the structural checks above can't see whether the
-// model's primary key matches the *schema* table (id-less tables, custom-PK
-// columns like `ID`/`monkeyID`, NOT NULL timestamps, composite schema PKs), nor
-// strict-engine type mismatches that SQLite's dynamic typing hides (int→bool,
-// integer overflow, STI string into an integer column, tz datetime literals).
-// The only authoritative check is to actually seed each entry against the
-// canonical TEST_SCHEMA — exactly what the name-based API does at runtime. This
-// runs on every CI engine (SQLite/PostgreSQL/MariaDB), so "seedable" means
-// seedable on the strictest engine. An entry that can't seed must move to the
-// registry's gap list, not stay exposed.
 describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
   withTransactionalFixtures(leaseFixtureConnection);
-  // Encrypted entries (encryptedBooks…) reload through the encrypted attribute
-  // type, which needs keys + the cleartext fallback. Configure (scoped) so the
-  // seed loop can reload them, and restore after so this describe doesn't leak
-  // encryption config to later suites.
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     restoreEncryption = await setupScopedEncryption();
@@ -768,9 +627,6 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          // Rails' `FixtureSet` seeds through the set's own
-          // `model_class.connection_pool` (`fixtures.rb:665`); a primary-database
-          // model resolves back to the pinned fixture connection.
           const seedAdapter = await leaseFixtureConnectionFor(ModelClass, Base.adapter);
           await defineFixtures(seedAdapter, ModelClass, data);
         }
@@ -782,13 +638,9 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
   }, 300000);
 });
 
-// --- encryption add-on bootstrap (opt-in addOn hook) ---
-
 describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
   withTransactionalFixtures(leaseFixtureConnection);
 
-  // Reading encrypted fixtures back needs keys + the cleartext fallback. Configure
-  // that here (scoped, with snapshot/restore) rather than in the addOn, so the
   // global encryption config doesn't leak into later suites in the worker.
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
@@ -798,19 +650,6 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
     restoreEncryption?.();
   });
 
-  // EncryptedBook calls `encrypts("name", { deterministic: true })` in a static
-  // block, which throws at import unless the encryption add-on registered its
-  // hooks first. The registry entry's `addOn` runs before the model thunk and
-  // bootstraps it. defineFixtures encrypts the fixture row at seed time
-  // (mirrors Rails' EncryptedFixtures) so the DB stores ciphertext; the
-  // encrypted attribute type decrypts on read back.
-  //
-  // `encryptedBooks` and `encryptedBookThatIgnoresCases` both map to the
-  // `encrypted_books` table, and each `useFixtures` registers its own beforeEach
-  // seeder that deletes the table before inserting. Loading both in one scope
-  // would have the second seeder wipe the first set on every test (the same
-  // hazard `resolveFixtureNames` rejects within a single call), so each is scoped
-  // to its own nested describe — only one seeder runs per test.
   describe("encryptedBooks set", () => {
     const { encryptedBooks } = fixtures(["encryptedBooks"], {
       connection: () => Base.adapter,
@@ -823,12 +662,9 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
 
     it("stores ciphertext in the DB column, not cleartext", async () => {
       const book = encryptedBooks("awdr");
-      // readAttributeBeforeTypeCast returns the raw DB value (before cast/deserialize).
       const rawDbValue = book.readAttributeBeforeTypeCast?.("name");
-      // Ciphertext is a JSON string (the encryptor's envelope format), not the plaintext.
       expect(rawDbValue).not.toBe("Agile Web Development with Rails");
       expect(typeof rawDbValue).toBe("string");
-      // The encrypted attribute type reports it as encrypted.
       const { encryptedAttribute } = await import("./encryption/encryptable-record.js");
       expect(encryptedAttribute.call(book, "name")).toBe(true);
     });
@@ -841,9 +677,6 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
     });
 
     it("reads an ignore-case encrypted fixture back as plaintext", () => {
-      // For ignoreCase attributes, the `name` column stores the lowercased ciphertext;
-      // `original_name` stores the original-cased ciphertext. The prototype getter for
-      // `name` reads `original_name` first (preserving case), mirroring Rails.
       expect((encryptedBookThatIgnoresCases("rfr") as any).name).toBe("Ruby for Rails");
     });
 
@@ -867,17 +700,10 @@ describe("useFixtures encryption add-on is opt-in", () => {
     expect(
       typeof (fixtureRegistry.encryptedBookThatIgnoresCases as { addOn?: unknown }).addOn,
     ).toBe("function");
-    // A non-encryption fixture never carries the hook, so loading it can't pull
-    // the encryption add-on into the runtime.
     expect((fixtureRegistry.authors as { addOn?: unknown }).addOn).toBeUndefined();
   });
 
   it("awaits an entry's addOn before invoking its model thunk", async () => {
-    // The contract that makes the add-on work: `resolveFixtureNames` must run
-    // `addOn` (which registers the encryption hooks) BEFORE the `model` thunk
-    // imports book-encrypted.ts, or the `encrypts()` static block throws. Spy on
-    // a real entry (stubbing the model so no actual import happens) and assert the
-    // call order, so a regression that moves the hook after the thunk is caught.
     type SpyableEntry = { addOn?: () => Promise<void>; model: () => Promise<typeof Base> };
     const entry = fixtureRegistry.encryptedBooks as unknown as SpyableEntry;
     const originalAddOn = entry.addOn;
@@ -888,8 +714,6 @@ describe("useFixtures encryption add-on is opt-in", () => {
     });
     entry.model = vi.fn(async () => {
       order.push("model");
-      // `resolveFixtureNames` folds in `registerModel`, which takes a `Base`
-      // subclass only, so the spy forwards to the real thunk.
       return originalModel.call(entry);
     });
     try {
@@ -901,8 +725,6 @@ describe("useFixtures encryption add-on is opt-in", () => {
     expect(order).toEqual(["addOn", "model"]);
   });
 });
-
-// --- FixtureSet.createFixtures ---
 
 describe("FixtureSet.createFixtures", () => {
   it("returns keyed instances for all declared labels", async () => {
@@ -943,12 +765,6 @@ describe("FixtureSet.createFixtures", () => {
   });
 });
 
-/**
- * `setup_fixtures` pins EVERY writing pool, not just the one behind the
- * connection fixtures default to (`test_fixtures.rb:177-184`). `colleges` lives
- * in arunit2, so `fixtures()` seeds it through `College`'s own pool; without a
- * pin on that pool its rows commit and only teardown's DELETE removes them.
- */
 describe("fixtures() pins every pool its sets seed through", () => {
   withSecondPool();
   const { colleges } = fixtures(["colleges"]);

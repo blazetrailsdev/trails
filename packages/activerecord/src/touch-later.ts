@@ -12,16 +12,6 @@ import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { beforeCommittedBang as transactionsBeforeCommittedBang } from "./transactions.js";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 
-/**
- * Deferred-touch mixin.
- *
- * When called inside a transaction, `touchLater` writes timestamp attrs
- * in-memory (without marking dirty) and defers the DB UPDATE to
- * `beforeCommitted!`, which fires just before the transaction commits.
- *
- * Mirrors: ActiveRecord::TouchLater
- */
-
 function raiseRecordNotTouchedError(): never {
   throw new ActiveRecordError(
     "Cannot touch on a new or destroyed record object. Consider using " +
@@ -29,13 +19,6 @@ function raiseRecordNotTouchedError(): never {
   );
 }
 
-/**
- * Defer touching timestamp columns until before_committed!.
- * Writes values in-memory immediately without marking dirty so associations
- * that read the attribute see the updated time before the commit.
- *
- * Mirrors: ActiveRecord::TouchLater#touch_later
- */
 export async function touchLater(this: Base, ...names: string[]): Promise<void> {
   if (!this.isPersisted()) raiseRecordNotTouchedError();
   if (this.isReadonly()) throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
@@ -59,11 +42,6 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   self._touchTime = currentTimeFromProperTimezone();
   surreptitiouslyTouch.call(this, self._deferTouchAttrs as string[]);
 
-  // Register with the current transaction so beforeCommitted! fires before
-  // commit — mirrors Rails' add_to_transaction call in touch_later.
-  // Only defer when the adapter supports addTransactionRecord AND a real
-  // (non-null) transaction is currently open. NullTransaction.addRecord is
-  // a no-op, so deferring into it would silently lose the flush.
   const adapter = ctor.connection as any;
   const hasAddRecord = typeof adapter?.addTransactionRecord === "function";
   const currentTx =
@@ -80,8 +58,6 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
     return;
   }
 
-  // Touch belongs_to / has_one parents that have touch: option — mirrors the
-  // reflect_on_all_associations loop in Rails' touch_later.
   for (const r of ctor.reflectOnAllAssociations()) {
     const touch = r.options?.touch;
     if (!touch) continue;
@@ -99,21 +75,12 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   }
 }
 
-/**
- * If deferred attrs are pending, merge them into the normal touch call so they
- * all flush in a single UPDATE, then clear deferred state.
- *
- * Mirrors: ActiveRecord::TouchLater#touch
- */
 export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const self = this as any;
   if (self._deferTouchAttrs?.length) {
     const deferredAttrs = self._deferTouchAttrs as string[];
     const deferredTime = self._touchTime as Temporal.Instant | null;
     const { names, time } = parseTouchArgs(args);
-    // Mirrors touch_later.rb:38-44 `names |= @_defer_touch_attrs; super(*names,
-    // time: time)` — the caller's `time:` governs; the deferred @_touch_time is
-    // deliberately NOT substituted when the caller passed none.
     const merged: string[] = [...new Set([...names, ...deferredAttrs])];
     self._deferTouchAttrs = null;
     self._touchTime = null;
@@ -128,12 +95,6 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   return timestampTouch.call(this, ...args);
 }
 
-/**
- * Flush deferred touch attrs before the record's transaction commits,
- * then run before_commit callbacks (super).
- *
- * Mirrors: ActiveRecord::TouchLater#before_committed!
- */
 export async function beforeCommittedBang(this: Base): Promise<void> {
   const self = this as any;
   if (self._deferTouchAttrs?.length && this.isPersisted()) {
@@ -142,17 +103,11 @@ export async function beforeCommittedBang(this: Base): Promise<void> {
   await transactionsBeforeCommittedBang(this);
 }
 
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
-
 /** @internal */
 export function surreptitiouslyTouch(this: Base, attrNames: string[]): void {
   const time = (this as any)._touchTime;
   for (const attrName of attrNames) {
     (this as any).writeAttribute(attrName, time);
-    // Per-attribute clear so the baseline rebinds to the touched value;
-    // otherwise a later write would diff against the pre-touch original.
     if (typeof (this as any).clearAttributeChange === "function") {
       (this as any).clearAttributeChange(attrName);
     } else if (typeof (this as any).clearAttributeChanges === "function") {
@@ -168,17 +123,7 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   const time = (self._touchTime as Temporal.Instant | null) ?? currentTimeFromProperTimezone();
   self._deferTouchAttrs = null;
   self._touchTime = null;
-  // Mirrors Rails touch_deferred_attributes (touch_later.rb:61-63): set
-  // @_skip_dirty_tracking so _touch_row takes the cheap clear_attribute_changes
-  // path (the deferred attrs were already written + cleared by
-  // surreptitiously_touch) instead of the stash/restore dance. _touch_row's
-  // `ensure` (dirty.rb:229-231) — mirrored in timestamp.ts touchRow — clears it.
   self._skipDirtyTracking = true;
-  // Mirrors Rails: touch(time: @_touch_time). Passes the deferred timestamp
-  // through the canonical touch path (type casting, locking, after_touch).
-  // On failure, restore deferred state so the touch can be retried —
-  // mirrors touch_later.rb where @_defer_touch_attrs/@_touch_time are cleared
-  // only after the super call succeeds.
   try {
     await timestampTouch.call(this, ...deferredAttrs, { time });
   } catch (error) {
@@ -186,12 +131,6 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
     self._touchTime = time;
     throw error;
   } finally {
-    // Rails clears @_skip_dirty_tracking in _touch_row's `ensure` (dirty.rb:229-231),
-    // which wraps the DB update too — so a StaleObjectError or adapter error inside
-    // touchRow still resets it. touchRow only resets on its post-update path, so
-    // guarantee cleanup here at the setter: otherwise a failed deferred touch would
-    // leave the flag set and a later non-deferred touch() would wrongly take the
-    // fast clearAttributeChanges path, discarding unrelated in-memory changes.
     self._skipDirtyTracking = null;
   }
 }
@@ -202,26 +141,14 @@ export const InstanceMethods = {
   beforeCommittedBang,
 };
 
-/**
- * Initialize deferred-touch state on a record during init_internals.
- *
- * Mirrors: ActiveRecord::TouchLater#init_internals (private)
- *
- * @internal
- */
+/** @internal */
 export function initInternals(this: any, super_: () => void): void {
   super_();
   this._deferTouchAttrs = null;
   this._touchTime = null;
 }
 
-/**
- * Returns true when the record has pending deferred touch attributes.
- *
- * Mirrors: ActiveRecord::TouchLater#has_defer_touch_attrs? (private)
- *
- * @internal
- */
+/** @internal */
 export function hasDeferTouchAttrs(record: any): boolean {
   const attrs = record._deferTouchAttrs;
   return Array.isArray(attrs) && attrs.length > 0;

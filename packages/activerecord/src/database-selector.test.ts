@@ -198,8 +198,6 @@ describe("DatabaseSelectorTest", () => {
 
   it.skip("preventing writes works in a threaded environment", async () => {
     // BLOCKED: connection-pool — async-isolation — connectedToStack is a mutable array shallow-copied by
-    // IsolatedExecutionState.scope, so concurrent async tasks bleed preventWrites across
-    // each other. Ruby uses thread-local storage; JS needs per-scope array instances.
   });
 
   it("read from replica with no delay", async () => {

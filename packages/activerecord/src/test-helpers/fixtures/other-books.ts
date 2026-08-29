@@ -1,8 +1,3 @@
-// activerecord/test/fixtures/other_books.yml
-// Rails sets `_fixture: model_class: Book` and ignores the PUBLISHED*
-// YAML-anchor rows; only `awdr` and `rfr` materialize. Enum symbols expanded
-// to the integer values from books.ts (status :published = 2, language
-// :english = 0).
 export const otherBookFixtureData = {
   awdr: {
     status: 2,

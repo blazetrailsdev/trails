@@ -4,7 +4,6 @@ import type { Relation } from "../../relation.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Pirate } from "./pirate.js";
 import type { Treasure } from "./treasure.js";
-// vendor/rails/activerecord/test/models/parrot.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 

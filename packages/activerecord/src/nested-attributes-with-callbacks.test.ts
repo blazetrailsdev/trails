@@ -1,21 +1,9 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Targets: activerecord/test/cases/nested_attributes_with_callbacks_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Shared callback sink — Rails uses a class variable `@@add_callback_called`
-// captured by the `before_add` procs declared on the associations below.
 let addCallbackCalled: NwcBird[] = [];
 
-// Rails uses the real `Pirate`/`Bird` models (`pirates`/`birds` tables) and
-// declares the `birds_with_add` associations on Pirate at test-case load. We
-// mirror that with dedicated classes mapped to the canonical tables so the
-// before_add procs and nested-attributes wiring stay isolated to this file.
 class NwcBird extends Base {
   static {
     this._tableName = "birds";
@@ -37,18 +25,6 @@ NwcPirate.hasMany("birds", {
   className: "NwcBird",
   foreignKey: "pirate_id",
 });
-// Mirrors Rails' `before_add: proc { |p, b| @@add_callback_called << b;
-// p.birds_with_add_load.to_a }` — the proc both records the added bird and
-// loads the target. The `.to_a` force-load is synchronous in Rails, but
-// trails fires before_add from the synchronous add path while the collection
-// load is async, so the proc can only fire-and-forget (`void`). The added
-// record still lands in the in-memory target via the sync build path, so the
-// observable assertions match Rails; only the proc's own side-effect load is
-// non-blocking. This is settled (not convergeable): it is a direct
-// consequence of the async-everywhere DB model — there is no synchronous
-// `loadTarget()` and the entry point (`birds_with_add_load_attributes=`) is a
-// sync TS property setter, so the proc cannot `await`. See
-// packages/website/docs/guides/activerecord-rails-deviations.md §11.
 NwcPirate.hasMany("birdsWithAddLoad", {
   className: "NwcBird",
   foreignKey: "pirate_id",
@@ -92,8 +68,6 @@ describe("NestedAttributesWithCallbacksTest", () => {
 
   const existingBirdsAttributes = () => birds.map((bird) => ({ id: bird.id, name: bird.name }));
 
-  // Rails' `new_birds` = `birds_with_add.to_a - @birds`; the new bird is the
-  // one with no persisted id (built in memory at assignment time).
   const newBirds = async (): Promise<NwcBird[]> => {
     const all = (await pirate.birdsWithAdd.toArray()) as NwcBird[];
     const existingIds = new Set(birds.map((b) => b.id));
@@ -121,7 +95,6 @@ describe("NestedAttributesWithCallbacksTest", () => {
     expect(addCallbackCalled).toEqual([]);
   };
 
-  // Characterizing when :before_add callback is called
   it(":before_add called for new bird when not loaded", async () => {
     expect(pirate.birdsWithAdd.loaded).toBe(false);
     await pirate.setBirdsWithAddAttributes(newBirdAttributes());
@@ -158,8 +131,6 @@ describe("NestedAttributesWithCallbacksTest", () => {
     await assertCallbacksNotCalled();
   });
 
-  // Ensuring that the records in the association target are updated,
-  // whether the association is loaded before or not
   const assertAssignmentAffectsRecordsInTarget = async (associationName: string) => {
     const association = pirate[associationName].target as NwcBird[];
     const updated = association.find((b: NwcBird) => String(b.id) === String(birdToUpdate().id));
@@ -180,8 +151,6 @@ describe("NestedAttributesWithCallbacksTest", () => {
     await assertAssignmentAffectsRecordsInTarget("birdsWithAdd");
   });
 
-  // The "and callback loads target" variants: same description, but exercise
-  // `birds_with_add_load`, whose `before_add` proc force-loads the target.
   it("Assignment updates records in target when not loaded", async () => {
     expect(pirate.birdsWithAddLoad.loaded).toBe(false);
     await pirate.setBirdsWithAddLoadAttributes(updateNewAndDestroyBirdAttributes());

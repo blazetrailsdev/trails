@@ -126,6 +126,15 @@ const PERMANENCE_RE = /^\s*[—:-]?\s*(PERMANENT|CONVERGEABLE)\b/u;
  */
 const STORY_ID_RE = /^[\s:—-]*\(?(?:story\s+)?([a-z0-9]+(?:-[a-z0-9]+){2,})\)?/u;
 
+/**
+ * The clause a file-level `@noRailsEquivalent` reason uses to declare which of
+ * its `moved` scores are bare-short-name coincidences. `extra-surface.ts` reads
+ * it (`declaredCoincidentalMovedNames`, MOVED_BY_SHORT_NAME_RE) and refuses the
+ * blanket without it, so it is a reviewed argument like the permanence token,
+ * not prose. It runs from the marker to the end of its sentence.
+ */
+const MOVED_BY_SHORT_NAME_RE = /MOVED-BY-SHORT-NAME:[^.]*\.?/u;
+
 /** Tags whose permanence claim the extractors switch on. */
 const REQUIRES_PERMANENCE = new Set(["noRailsEquivalent", "missingRailsCall", "missingRailsArgs"]);
 
@@ -248,7 +257,21 @@ function renderTag({ name, text }) {
     permanence?.[1] === "CONVERGEABLE"
       ? STORY_ID_RE.exec((takesSubject ? rest : text).slice(permanence[0].length))?.[1]
       : undefined;
-  return [`@${name}`, rubyCall, rubyCall && permanence && "—", permanence?.[1], story]
+  // A `CONVERGEABLE` claim with no story id is the same case as a missing
+  // permanence token one branch up: `lint-missing-rails-call-reasons` reads a
+  // receipt reduced to a bare `CONVERGEABLE` as half a receipt and fails on it,
+  // and the id cannot be invented here. Left as written, for a human to name
+  // the story.
+  if (permanence?.[1] === "CONVERGEABLE" && story === undefined) return null;
+  const movedByShortName = MOVED_BY_SHORT_NAME_RE.exec(takesSubject ? rest : text)?.[0];
+  return [
+    `@${name}`,
+    rubyCall,
+    rubyCall && permanence && "—",
+    permanence?.[1],
+    story,
+    movedByShortName,
+  ]
     .filter(Boolean)
     .join(" ");
 }

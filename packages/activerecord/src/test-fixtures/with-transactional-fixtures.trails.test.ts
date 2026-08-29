@@ -12,8 +12,6 @@ import { NullTransaction } from "../connection-adapters/abstract/transaction.js"
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { fixtures } from "../test-fixtures.js";
 
-// Resolve a pool-leased adapter from the primary (schema-loaded) pool rather
-// than the divergent sidecar `_pool`. Rails has no sidecar test pool.
 async function primaryAdapter(): Promise<TestDatabaseAdapter> {
   return Base.connection;
 }
@@ -44,9 +42,6 @@ describe("withTransactionalFixtures", () => {
 
   withTransactionalFixtures(() => adapter);
 
-  // These two tests run in order. If the wrap works, the second sees zero
-  // rows because the first's INSERT was rolled back by `afterEach`. If it
-  // doesn't, the second test sees the row from the first.
   it("inserts a row (first run)", async () => {
     await a().exec(`INSERT INTO fixture_users (id, name) VALUES (1, 'alice')`);
     const rows = await a().execute(`SELECT * FROM fixture_users`);
@@ -59,14 +54,10 @@ describe("withTransactionalFixtures", () => {
   });
 
   it("pins a connection pool established inside the test body", async () => {
-    // Rails pins mid-test pools from its "!connection.active_record" subscriber
-    // (test_fixtures.rb:183-200); the notification is emitted by
-    // ConnectionHandler#establish_connection (connection_handler.rb:149).
     const pool = Base.connectionHandler.establishConnection(
       { adapter: "sqlite3", database: ":memory:" },
       { ownerName: "MidTestPool" },
     );
-    // The subscriber's pin/lease is async, so let its microtasks settle.
     await Promise.resolve();
     await Promise.resolve();
     expect((pool as unknown as { _fixturePin: unknown })._fixturePin).not.toBeNull();
@@ -88,11 +79,6 @@ describe("withTransactionalFixtures", () => {
   });
 });
 
-// Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
-// raw DatabaseAdapter directly instead of leasing one from a pool (Base.connection
-// or createPooledTestAdapter()). The helper must accept that shape —
-// `transactionManager` lives on the adapter itself via AbstractAdapter, not
-// behind an `innerAdapter` wrapper.
 describe("withTransactionalFixtures (raw adapter)", () => {
   let adapter: SQLite3Adapter;
   const exec = (sql: string) => adapter.exec(sql);
@@ -123,11 +109,6 @@ describe("withTransactionalFixtures (raw adapter)", () => {
   });
 });
 
-// Phase C: when the adapter was leased from a real ConnectionPool (i.e.
-// produced by `createPooledTestAdapter()`), the helper detects the `.pool`
-// back-reference and routes setup/teardown through `pinConnectionBang(false)`
-// / `unpinConnectionBang()` rather than the wrapper-direct TM begin/rollback.
-// This mirrors Rails test_fixtures.rb:177-184's pin/lease lifecycle exactly.
 describe("withTransactionalFixtures (pooled adapter)", () => {
   let adapter: LeasedTestAdapter;
   const exec = (sql: string) =>
@@ -163,24 +144,11 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
   });
 });
 
-// Concurrency safety-net: two Base.transaction() calls running concurrently
-// from unrelated async chains must NOT observe each other's transaction state.
-// Base.transaction() routes through withinNewTransaction()/TransactionManager,
-// so the test targets that mechanism directly — the invariant boundary is the
-// same whether callers go via Base.transaction() or withinNewTransaction().
-//
-// These adapters come straight from the primary pool (`Base.connection`).
-// Pool-backed isolation (each checkout gets its own AsyncLocalStorage context)
-// lands at E5; these tests remain skipped until that ships.
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
-  // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
     const chainA = (await primaryAdapter()) as unknown as LeasedTestAdapter;
     const chainB = (await primaryAdapter()) as unknown as LeasedTestAdapter;
 
-    // Coordinate so chain B reads state WHILE chain A holds an open transaction.
-    // Without coordination, chain B would read before chain A's async TM open,
-    // passing vacuously regardless of whether the filter is in place.
     let signalBReady!: () => void;
     let signalADone!: () => void;
     const bReady = new Promise<void>((r) => {
@@ -196,45 +164,30 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
     await Promise.all([
       chainA.withinNewTransaction({ joinable: false }, async () => {
-        // Verify chain A genuinely has an open transaction before signalling B,
-        // so a vacuous pass (e.g. lazy open) is caught immediately.
         expect(chainA.openTransactions).toBeGreaterThan(0);
-        // Transaction is open. Signal chain B to read.
         signalBReady();
-        // Hold the transaction open until chain B has read.
         await aDone;
       }),
       (async () => {
-        // Wait until chain A is inside a live transaction before reading.
         await bReady;
         try {
           bObservedOpen = chainB.openTransactions;
           bObservedTransactionOpen = chainB.isTransactionOpen();
-          // currentTransaction() returns null (current filter) or NullTransaction
-          // (pool isolation, post-E2/E3). Both have joinable===false. Asserting on
-          // joinable rather than identity keeps this green through E2–E5.
           const ct = chainB.currentTransaction() as { joinable?: boolean } | null;
           bObservedCurrentTxJoinable = ct?.joinable ?? false;
         } finally {
-          // Always unblock chain A so the test fails rather than hangs.
           signalADone();
         }
       })(),
     ]);
 
-    // Chain B must not have observed chain A's transaction state.
-    // currentTransaction() is the most critical: Base.transaction() consults
-    // it first to decide whether to join a foreign frame.
     expect(bObservedOpen).toBe(0);
     expect(bObservedTransactionOpen).toBe(false);
     expect(bObservedCurrentTxJoinable).toBe(false);
   });
 
-  // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", async () => {
     const adapter = (await primaryAdapter()) as unknown as LeasedTestAdapter;
-    // Pool-leased adapters return NullTransaction (not null) when no transaction
-    // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
     expect(adapter.openTransactions).toBe(0);
     expect(adapter.isTransactionOpen()).toBe(false);
     expect(adapter.currentTransaction()).toBeInstanceOf(NullTransaction);
@@ -252,8 +205,6 @@ describe("the DDL recording window arms around a test's DDL", () => {
 });
 
 describe("the DDL recording window leaves no own property behind", () => {
-  // The `beforeAll` is the only point after the previous block's teardown and
-  // before this block's window is armed.
   let ownAddIndex = true;
   const spied: string[] = [];
 

@@ -89,9 +89,6 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   });
 
   it("keyProvider raises when no key/keyProvider/deterministic configured", () => {
-    // The suite-wide bootstrap (cases/helper.ts, mirroring Rails helper.rb)
-    // configures a global primary key, so clear it locally to exercise the
-    // truly-unconfigured resolution path.
     const c = Configurable.config;
     const saved = {
       primaryKey: c.primaryKey,

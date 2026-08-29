@@ -23,7 +23,6 @@ describe("ColumnSerializerTest", () => {
 
   it("dump and assert_valid_value accept primitives when no objectClass given", () => {
     const cs = new ColumnSerializer("attr", JsonCoder);
-    // Default objectClass is Object — mirrors Ruby `Object === anything` (no restriction).
     expect(() => cs.dump(1)).not.toThrow();
     expect(() => cs.dump("hello")).not.toThrow();
     expect(() => cs.assertValidValue(42, { action: "dump" })).not.toThrow();
@@ -50,9 +49,6 @@ describe("ColumnSerializerTest", () => {
   });
 
   it("check_arity_of_constructor raises for classes that throw during construction", () => {
-    // Rails rescues ArgumentError alone (column_serializer.rb:56) and re-raises
-    // it as the "0 argument constructor" ArgumentError; anything else the
-    // constructor raises propagates unchanged.
     class ThrowsOnConstruct {
       constructor() {
         throw new Error("cannot construct without args");

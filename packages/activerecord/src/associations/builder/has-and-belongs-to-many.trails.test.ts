@@ -1,12 +1,3 @@
-/**
- * Trails-internal coverage for `Builder::HasAndBelongsToMany#through_model`
- * (has_and_belongs_to_many.rb:13-56) — Rails has no unit test for it, and the
- * property under test is the one its source comment states: "Table name needs
- * to be resolved lazily because RHS class might not have been loaded".
- *
- * Rides the canonical `developers` / `projects` / `developers_projects` tables
- * and the canonical `Developer` / `Project` models.
- */
 import { describe, it, expect } from "vitest";
 import "../../index.js";
 import "../../support/canonical-model-index.js";

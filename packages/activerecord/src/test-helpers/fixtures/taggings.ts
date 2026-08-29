@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/taggings.yml
 export const taggingFixtureData = {
   welcome_general: {
     id: 1,

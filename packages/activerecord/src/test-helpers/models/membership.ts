@@ -2,7 +2,6 @@ import type { Relation } from "../../relation.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Club } from "./club.js";
 import type { Member } from "./member.js";
-// vendor/rails/activerecord/test/models/membership.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -47,11 +46,6 @@ export class Membership extends Base {
   declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
-    // Rails declares `enum :type` on the default STI inheritance column, so the
-    // enum *backs* an integer `type` column that also drives STI dispatch.
-    // trails needs STI enabled explicitly; with the enum on the same column the
-    // `type_condition` serializes each subclass' sti_name (its class name) to
-    // the enum integer (e.g. SelectedMembership → 3).
     this.enum("type", [
       "Membership",
       "CurrentMembership",

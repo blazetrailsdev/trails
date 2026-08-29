@@ -10,23 +10,6 @@ import {
 import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 
-/**
- * Optimistic locking support for ActiveRecord models.
- * When a model has a lock_version column, updates include a version
- * check to detect concurrent modifications.
- *
- * Mirrors: ActiveRecord::Locking::Optimistic
- */
-
-/**
- * Type wrapper for the lock_version column that ensures nil → 0 on
- * serialize/deserialize so passing nil doesn't trigger StaleObjectError.
- * cast() coerces null → 0; deserialize() and serialize() also coerce null → 0.
- * Rails' LockingType has no cast() override but AR seeds defaults via
- * from_database, so both paths produce 0 for new records with no lock default.
- *
- * Mirrors: ActiveRecord::Locking::LockingType
- */
 export class LockingType extends ValueType<number> {
   private _subtype: Type;
   override readonly name: string;
@@ -37,10 +20,6 @@ export class LockingType extends ValueType<number> {
     this.name = subtype.name;
   }
 
-  // Diverges from Rails: Rails' LockingType has no cast() override (cast(nil) → nil).
-  // We coerce null → 0 here so that user-declared locking attributes (via
-  // this.attribute("lock_version", "integer")) also return 0 for new records,
-  // matching the observable behavior Rails gets via from_database initialization.
   override cast(value: unknown): number {
     return (this._subtype.cast(value) as number | null) ?? 0;
   }
@@ -77,13 +56,8 @@ function buildBaseConstraints(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Class methods — mirrors ActiveRecord::Locking::Optimistic::ClassMethods
-// ---------------------------------------------------------------------------
-
 const DEFAULT_LOCKING_COLUMN = "lock_version";
 
-/** Receiver shape Locking::Optimistic's instance methods read. */
 interface LockingRecord {
   constructor: { lockingEnabled: boolean; lockingColumn: string };
   readAttribute(name: string): unknown;
@@ -91,7 +65,6 @@ interface LockingRecord {
   clearAttributeChange(name: string): void;
 }
 
-/** Mirrors: ActiveRecord::Locking::Optimistic#locking_enabled? (optimistic.rb:59-61) */
 export function lockingEnabled(this: LockingRecord): boolean {
   return this.constructor.lockingEnabled;
 }
@@ -105,14 +78,6 @@ interface LockingHost {
   ): Promise<number>;
 }
 
-/**
- * Mirrors: ActiveRecord::Locking::Optimistic#increment! (optimistic.rb:63-70)
- *
- * `super.tap { ... }` — Persistence#increment! runs first, then the locking
- * arm bumps the in-memory lock_version and rebinds its dirty baseline so the
- * next save() doesn't re-persist it. trails has no cross-mixin `super`, so the
- * Persistence body is invoked by name; `include()` orders this override last.
- */
 export async function incrementBang(
   this: LockingRecord & { lockingEnabled(): boolean },
   ...args: Parameters<typeof persistenceIncrementBang>
@@ -129,35 +94,25 @@ export async function incrementBang(
   return result;
 }
 
-/**
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#reset_locking_column
- */
 export function resetLockingColumn(this: LockingHost): void {
   (this as unknown as typeof Base).lockingColumn = DEFAULT_LOCKING_COLUMN;
 }
 
-/** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods */
 export class ClassMethods {
-  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_column */
   static get lockingColumn(): string {
     return (this as any)._lockingColumn ?? DEFAULT_LOCKING_COLUMN;
   }
 
   static set lockingColumn(column: string) {
     (this as any).reloadSchemaFromCache();
-    // Rails stores `value.to_s`, and every call site assigns a Symbol
-    // (`self.locking_column = :version`). `nil.to_s` is "", not "null".
     (this as any)._lockingColumn = column == null ? "" : String(column);
   }
 
-  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? (optimistic.rb:160-162)
-   *  — `lock_optimistically && columns_hash[locking_column]`. */
   static get lockingEnabled(): boolean {
     const self = this as unknown as typeof Base;
     return self.lockOptimistically && self.columnsHash()[self.lockingColumn] != null;
   }
 
-  /** Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically */
   static get lockOptimistically(): boolean {
     return (this as any)._lockOptimistically !== false;
   }
@@ -167,18 +122,6 @@ export class ClassMethods {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#update_counters
- *
- *   def update_counters(id, counters)
- *     counters = counters.merge(locking_column => 1) if locking_enabled?
- *     super
- *   end
- *
- * Merges a `locking_column => 1` bump into the counters and delegates to the
- * CounterCache implementation (`superFn`), so any counter-cache increment,
- * decrement, or `update_counters` call also advances the lock version by one.
- */
 export async function updateCounters(
   this: typeof Base,
   superFn: (id: unknown, counters: CounterCacheCounters) => Promise<number>,
@@ -209,10 +152,7 @@ type InstanceLockingHost = {
   changes: Record<string, [unknown, unknown]>;
 };
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#_create_record
- */
+/** @internal */
 export function _createRecord(
   this: InstanceLockingHost,
   attributeNames: string[],
@@ -226,10 +166,7 @@ export function _createRecord(
   return superFn(attributeNames);
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#_touch_row
- */
+/** @internal */
 export function _touchRow(
   this: InstanceLockingHost,
   touchAttrNames: string[],
@@ -243,10 +180,7 @@ export function _touchRow(
   return superFn(touchAttrNames, time);
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#_update_row
- */
+/** @internal */
 export async function _updateRow(
   this: InstanceLockingHost,
   attributeNames: string[],
@@ -281,10 +215,7 @@ export async function _updateRow(
   }
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#destroy_row
- */
+/** @internal */
 export function destroyRow(
   this: InstanceLockingHost,
   superFn: () => number | Promise<number>,
@@ -297,14 +228,7 @@ export function destroyRow(
   });
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#_lock_value_for_database
- *
- * `Attribute::FromDatabase#_original_value_for_database` is the raw
- * `value_before_type_cast`, so a lock column that is NULL in the row constrains
- * on NULL: `LockingType#deserialize`'s `nil.to_i` 0 never reaches the WHERE.
- */
+/** @internal */
 export function _lockValueForDatabase(this: InstanceLockingHost, lockingColumn: string): unknown {
   if (isWillSaveChangeToAttribute(this as any, lockingColumn)) {
     return this._attributes.getAttribute(lockingColumn).valueForDatabase;
@@ -312,10 +236,7 @@ export function _lockValueForDatabase(this: InstanceLockingHost, lockingColumn: 
   return this._attributes.getAttribute(lockingColumn).originalValueForDatabase();
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#_clear_locking_column
- */
+/** @internal */
 export function _clearLockingColumn(this: InstanceLockingHost): void {
   const ctor = this.constructor;
   const lockingColumn = ctor.lockingColumn;
@@ -323,11 +244,6 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
   this.clearAttributeChange(lockingColumn);
 }
 
-/**
- * Mirrors `ActiveRecord::Locking::Optimistic#initialize_dup`
- * (optimistic.rb:72-75): `super` first, so the initialize callbacks in
- * `Core#initialize_dup` still observe the source's `lock_version`.
- */
 export function initializeDup(
   this: InstanceLockingHost,
   super_: (other: unknown) => void,
@@ -337,10 +253,7 @@ export function initializeDup(
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic#_query_constraints_hash
- */
+/** @internal */
 export function _queryConstraintsHash(
   this: InstanceLockingHost,
   base: Record<string, unknown>,
@@ -351,10 +264,7 @@ export function _queryConstraintsHash(
   return { ...base, [col]: _lockValueForDatabase.call(this, col) };
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#hook_attribute_type
- */
+/** @internal */
 export function hookAttributeType(this: LockingHost, name: string, castType: Type): Type {
   if (this.lockOptimistically !== false && name === this._lockingColumn) {
     return new LockingType(castType);

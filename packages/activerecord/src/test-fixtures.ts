@@ -1,17 +1,3 @@
-/**
- * `ActiveRecord::TestFixtures` — the `fixtures()` DSL and the setup/teardown
- * that seeds and pins a fixture set for a test scope.
- *
- * Rails home: `activerecord/lib/active_record/test_fixtures.rb` — `module
- * TestFixtures` (`:6`), `use_transactional_tests` (`:34`), `fixtures` (`:56`). This is
- * **library** code, not test support: Rails ships it inside `lib/`, so this
- * file sits at the package root under the kebab rendering of that filename
- * rather than under `test-helpers/`. It was misfiled as
- * `test-helpers/use-fixtures.ts` (RFC 0064 bucket D). The `test_fixtures.rb`
- * responsibilities that are large enough to warrant their own module live in
- * the sibling `test-fixtures/` directory, mirroring how Rails splits
- * `fixtures.rb` across `lib/active_record/fixture_set/`.
- */
 import { afterEach, beforeEach } from "vitest";
 import {
   prepareModelFixtures,
@@ -42,14 +28,6 @@ import {
   leaseFixtureConnectionFor,
 } from "./test-fixtures/fixture-connection.js";
 
-/**
- * A tableless fixture entry: seeds rows directly into the named table with no
- * model class. Mirrors Rails' "naked" fixture path — the table's schema columns
- * are validated at seed time, but no `ActiveRecord::Base` subclass is involved.
- *
- * The accessor key is the `table` value as-is (e.g. `{ table: "accounts" }` →
- * `result.accounts`). Rows return as plain resolved-attribute objects.
- */
 export type TablelessFixtureEntry = {
   table: string;
   data: Record<string, Record<string, unknown>>;
@@ -62,11 +40,6 @@ type FixtureAttrs = Record<string, unknown>;
 
 export type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>]>;
 
-/**
- * Internally-resolved fixture set. `model === null` marks a HABTM join-table set
- * (seeded via {@link defineJoinTableFixtures}); otherwise it's a model-backed set.
- * `table` is the DB table to seed and clean.
- */
 type ResolvedFixtureSet = {
   table: string;
   model: BaseClass | null;
@@ -79,7 +52,6 @@ type FixtureAccessor<T extends BaseClass, K extends string> = {
   all(): InstanceType<T>[];
 };
 
-/** Accessor for a HABTM join-table set: rows are plain resolved-attribute objects (no model instance). */
 type JoinTableAccessor<K extends string> = {
   (name: K): Record<string, unknown>;
   all(): Record<string, unknown>[];
@@ -94,10 +66,6 @@ export type UseFixturesResult<M extends FixtureMap> = {
     : never;
 };
 
-/**
- * Result of the `string[]` overload: one accessor per requested fixture-set name,
- * with the label union pulled from the registry entry's data keys.
- */
 export type UseFixturesByNameResult<N extends FixtureName> = {
   [K in N]: IsJoinTableName<K> extends true
     ? JoinTableAccessor<Extract<keyof RegistryData<K>, string>>
@@ -105,17 +73,6 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
 };
 
 export interface FixturesConnectionOpts {
-  /**
-   * Caller-supplied connection/adapter thunk. When set, {@link fixtures}
-   * seeds, cleans, and (when transactional) pins fixtures
-   * through this connection instead of the default pool lease
-   * ({@link leaseFixtureConnection}).
-   *
-   * Mirrors Rails loading a fixture set through a model-specific `connection`
-   * (multi-database suites) or through a suite's own adapter. Composes with
-   * `useTransactionalTests: false`: when non-transactional, the thunk is the raw
-   * seed/clean connection; when transactional, the savepoint wrapper pins it too.
-   */
   connection?: () => DatabaseAdapter;
 }
 
@@ -142,11 +99,6 @@ export async function resolveFixtureNames(
   names: readonly FixtureName[],
 ): Promise<ResolvedFixtureMap> {
   const map: ResolvedFixtureMap = {};
-  // Per-table map of already-claimed primary-key values → a descriptor of the set
-  // (and label) that claimed each, so two same-table sets whose rows resolve to the
-  // same PK are rejected while disjoint sets merge cleanly. The key is the row's
-  // effective PK (explicit pin OR the label-derived CRC32 id, in one keyspace),
-  // computed off the model's real primaryKey column — see effectiveFixtureKey.
   const tableRowKeys = new Map<string, Map<string, string>>();
   for (const name of names) {
     const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
@@ -155,10 +107,6 @@ export async function resolveFixtureNames(
         `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
       );
     }
-    // Join-table sets have no model class — resolve straight to the literal table.
-    // A model entry may declare an `addOn` (e.g. the encryption bootstrap) that
-    // MUST run before its model thunk: the model's import-time side effects
-    // (`encrypts()`) throw unless the add-on registered its hooks first.
     let table: string;
     let model: BaseClass | null;
     if (isJoinTableEntry(entry)) {
@@ -167,23 +115,12 @@ export async function resolveFixtureNames(
     } else {
       if ("addOn" in entry) await entry.addOn?.();
       const resolved = await entry.model();
-      // A declared fixture set makes its model resolvable, exactly as Rails'
-      // `fixtures :authors` autoloads the `Author` constant on first reference —
-      // no explicit `registerModel` call in the test. The thunk may return an
-      // array whose first element is the table-bearing model and the rest are
-      // extra classes to register alongside it (STI subclasses so `findStiClass`
-      // resolves each row's inheritance-column value; HABTM targets whose join
-      // table the loader writes). The array form routes any STI subclass through
-      // `registerSubclass`. Idempotent across files/tests (Map.set).
       const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
       registerModel(models);
       const m = models[0];
       table = m.tableName;
       model = m;
     }
-    // Same-table sets merge (each accessor keeps its own rows), but two rows that
-    // resolve to the same primary key would clobber each other — reject that. Only
-    // model-backed sets have a PK; join-table sets (model === null) concatenate.
     if (model !== null) {
       let rowKeys = tableRowKeys.get(table);
       if (rowKeys === undefined) {
@@ -191,9 +128,6 @@ export async function resolveFixtureNames(
         tableRowKeys.set(table, rowKeys);
       }
       for (const [label, row] of Object.entries(entry.data)) {
-        // Resolve to the row's actual PK value the way the loader does, so an
-        // explicit pin and a label-derived id share one keyspace (see
-        // effectiveFixtureKey). Keyed on the model's real primaryKey column.
         const key = effectiveFixtureKey(model, label, row);
         const prior = rowKeys.get(key);
         if (prior !== undefined) {
@@ -211,28 +145,15 @@ export async function resolveFixtureNames(
   return map;
 }
 
-/**
- * Result of the tableless overload: one `JoinTableAccessor` per entry, keyed by `table`.
- * The label union is derived from `entry.data`'s own keys so `accessor("root")` is
- * compile-time checked when the data literal is inlined (same pattern as the by-name overload).
- */
 export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[]> = {
   [E in T[number] as E["table"]]: JoinTableAccessor<Extract<keyof E["data"], string>>;
 };
 
-/**
- * Implements the tableless overload of `useFixtures`. Seeds each entry directly
- * into the named table via {@link defineJoinTableFixtures} — no model class required.
- * Columns are validated against the live schema; unknown columns throw at seed time.
- * @internal
- */
+/** @internal */
 function useTablelessFixtures(
   entries: readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
 ): Record<string, unknown> {
-  // Tableless entries key their accessor by `table`, so two entries on the same
-  // table would clobber each other's store slot. (Model-backed same-table sets in
-  // resolveFixtureNames merge instead, because they key by set name.)
   const seenTables = new Set<string>();
   for (const { table } of entries) {
     if (seenTables.has(table)) {
@@ -249,8 +170,6 @@ function useTablelessFixtures(
 
   beforeEach(async () => {
     const adapter = getAdapter();
-    // Prepare every entry then insert through one insertFixturesSet — one
-    // referential-integrity toggle per load (see the by-name loader above).
     const prepared: PreparedFixtureSet[] = [];
     const tables: string[] = [];
     for (const { table, data } of entries) {
@@ -263,10 +182,6 @@ function useTablelessFixtures(
     });
   });
 
-  // Rails' `teardown_fixtures` (`test_fixtures.rb`) issues no DELETE: it resets
-  // the fixture cache and the pinned pool and stops. The rows go away at the
-  // next load, because `insert_fixtures_set` prefixes its inserts with
-  // `table_deletes` (`abstract/database_statements.rb:486-495`).
   afterEach(() => {
     for (const key of keys) delete store[key];
   });
@@ -292,57 +207,7 @@ function useTablelessFixtures(
   return result;
 }
 
-/**
- * Vitest helper that inserts fixture rows in a `beforeEach` and cleans them up in `afterEach`.
- *
- * **Internal implementation — test files must call {@link fixtures}
- * instead.** This lower-level entry point
- * takes an explicit `getAdapter` thunk and runs a per-test delete/reseed. It
- * was once a documented escape hatch for suites that could not use the
- * handler-resolved path (non-transactional suites committing across
- * connections, multi-database suites seeding through model-specific
- * connections, adapter-owning suites). Every one of those call sites has since
- * converged: non-transactional and caller-supplied-connection needs are now
- * expressed through the `useTransactionalTests` / `connection` options on
- * {@link fixtures}, which forwards the resolved thunk
- * here. It is no longer exported: the only caller is {@link fixtures}
- * (below, same module), so no test file can reach the raw engine directly.
- *
- * Returns an object of typed accessor functions — one per fixture set. Each accessor is callable
- * by label (`topics("first")`) and has an `.all()` method.
- *
- * ```ts
- * const { topics, posts } = useFixtures(
- *   { topics: [Topic, topicData], posts: [Post, postData] },
- *   () => adapter,
- * );
- * ```
- *
- * Or by Rails-style fixture-set name, resolved through `fixtures-registry.ts`:
- *
- * ```ts
- * const { authors, posts } = useFixtures(["authors", "posts"], () => adapter);
- * authors("david"); // → Author instance
- * ```
- *
- * Subdirectory fixture sets use slash-keyed names; access via bracket notation.
- * Once the set is registered in `fixtures-registry.ts` (Phase 2+), the names
- * overload works too. Until then, use the object-map overload:
- *
- * ```ts
- * const fixtures = useFixtures(
- *   { "admin/accounts": [AdminAccount, adminAccountFixtureData] },
- *   () => adapter,
- * );
- * fixtures["admin/accounts"]("signals37"); // → Admin::Account instance
- * ```
- *
- * No `schema` is needed: globalSetup lays the full `TEST_SCHEMA` into every
- * worker DB and clones it to each per-worker slot, so the canonical tables
- * already exist before any test runs — `useFixtures` only seeds and cleans rows.
- *
- * @internal
- */
+/** @internal */
 function useFixtures<M extends FixtureMap>(
   fixtures: M,
   getAdapter: () => DatabaseAdapter,
@@ -359,12 +224,6 @@ function useFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
 ): Record<string, unknown> {
-  // Tableless array: every element is an object with { table, data }.
-  // The `length > 0` guard is intentional: an empty array is vacuously correct for
-  // both the by-name and tableless overloads (both seed zero fixtures and return `{}`),
-  // so falling through to the by-name path is safe. Callers passing a non-empty
-  // tableless array computed dynamically must ensure at least one element is present;
-  // the TypeScript overload resolution enforces the correct return type at the call site.
   if (
     Array.isArray(fixturesOrNames) &&
     fixturesOrNames.length > 0 &&
@@ -372,9 +231,6 @@ function useFixtures(
     (fixturesOrNames as readonly unknown[])[0] !== null &&
     "table" in ((fixturesOrNames as readonly TablelessFixtureEntry[])[0] as object)
   ) {
-    // Validate that all elements are uniformly tableless to catch mixed arrays early
-    // rather than surfacing a confusing downstream error in resolveFixtureNames or
-    // defineJoinTableFixtures.
     for (let i = 1; i < (fixturesOrNames as readonly unknown[]).length; i++) {
       const el = (fixturesOrNames as readonly unknown[])[i];
       if (typeof el !== "object" || el === null || !("table" in el)) {
@@ -386,9 +242,6 @@ function useFixtures(
     }
     return useTablelessFixtures(fixturesOrNames as readonly TablelessFixtureEntry[], getAdapter);
   }
-  // Symmetric guard: if the first element is a by-name string, scan remaining elements
-  // for any tableless { table, data } object. A mixed array here would reach
-  // resolveFixtureNames with an object, producing a confusing "no registry entry" error.
   if (
     Array.isArray(fixturesOrNames) &&
     fixturesOrNames.length > 1 &&
@@ -405,16 +258,10 @@ function useFixtures(
     }
   }
   const isNameArray = Array.isArray(fixturesOrNames);
-  // Keys are known synchronously (the names, or the map's own keys) so accessors
-  // can be wired up before the (possibly async) model resolution in beforeEach.
   const keys: string[] = isNameArray
     ? (fixturesOrNames as readonly string[]).slice()
     : Object.keys(fixturesOrNames as FixtureMap);
 
-  // The resolved set map. For the object-map overload it's known up front (each
-  // `[Model, data]` tuple maps to a model-backed set); for the name-array overload
-  // it's filled in beforeEach once the model thunks resolve (dynamic imports must
-  // stay lazy — see fixtures-registry).
   let fixtures: ResolvedFixtureMap | undefined = isNameArray
     ? undefined
     : Object.fromEntries(
@@ -424,34 +271,13 @@ function useFixtures(
         ]),
       );
 
-  // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
 
-  // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
-  // (before the pinned transaction opens) when transactional fixtures are
-  // active, falling back to this per-test seed otherwise. Deferred to a follow-up
-  // PR to keep this one under the LOC ceiling (fixtures-adoption follow-up).
   beforeEach(async () => {
-    // Resolve from the `keys` snapshot, not `fixturesOrNames`: a caller can mutate
-    // the (mutable-assignable) array after this call, which would otherwise seed a
-    // different set than the accessors built below from `keys`.
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
     const fixtureConnection = getAdapter();
-    // Prepare every set (in declaration order, so a later set's ref() resolves
-    // ids a prior set registered), then insert each connection's sets through
-    // ONE insertFixturesSet — one referential-integrity toggle per load per
-    // connection, mirroring Rails' fixtures.rb `insert`, which groups the sets
-    // by `model_class.connection_pool` and merges each group's table_rows into
-    // a single insert_fixtures_set.
     const groups = new Map<DatabaseAdapter, { prepared: PreparedFixtureSet[]; keys: string[] }>();
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
-      // Auto-register the (object-map) model, mirroring the by-name path's
-      // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
-      // declaring the set is the opt-in, so no test needs a manual
-      // `registerModel` call for a fixture-backed model. Idempotent. Guarded to
-      // real AR model classes (they inherit Base's `_isActiveRecordBase`), so
-      // the lightweight `{ tableName, ... }` stubs some infra tests pass through
-      // the object-map form are left untouched.
       if (model !== null && "_isActiveRecordBase" in model) {
         registerModel(model);
       }
@@ -476,13 +302,6 @@ function useFixtures(
     }
   });
 
-  // Rails' `teardown_fixtures` (`test_fixtures.rb`) issues no DELETE at all: it
-  // resets the fixture cache and the shared pool and stops. The rows go away at
-  // the *next* load, whose `insert_fixtures_set` prefixes the inserts with a
-  // `DELETE FROM` per table it is about to fill
-  // (`abstract/database_statements.rb:486-495`), all inside that call's single
-  // `disable_referential_integrity` block on a freshly-leased connection. So
-  // teardown only drops this scope's resolved rows.
   afterEach(() => {
     for (const key of Object.keys(store)) {
       delete store[key];
@@ -512,45 +331,7 @@ function useFixtures(
 
 type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
 
-/**
- * Rails-faithful public surface for declaring fixtures in a test file — the sole
- * fixture entry point.
- *
- * One-call wiring that combines {@link withTransactionalFixtures} + the
- * module-private `useFixtures` engine,
- * eliminating the three-line boilerplate every fixture-backed describe block
- * previously required. The engine lives here (unexported) so no test file can
- * reach it directly — `fixtures()` is the only fixture surface. Mirrors Rails'
- * `fixtures :authors, :posts` declaration and the `ActiveRecord::TestCase`
- * contract where including `TestFixtures`, declaring `fixtures :name`, and
- * enabling `use_transactional_tests` are a single class-level opt-in.
- *
- * Calling `fixtures()` IS the opt-in to the canonical schema: the full
- * `TEST_SCHEMA` is laid into every worker DB once by globalSetup (trails'
- * `db:test:prepare`) and cloned to each per-worker slot, so the canonical
- * tables already exist before any test runs — `fixtures()` only seeds and
- * cleans rows, never issues DDL.
- *
- * @example  // primary documented form
- *   const { authors, posts } = fixtures({
- *     authors: [Author, { david: { name: "David" } }],
- *     posts: [Post, { welcome: { title: "Welcome" } }],
- *   });
- *
- * @example  // by registry name
- *   const { authors, posts } = fixtures(["authors", "posts"]);
- *
- * @example  // non-transactional (Rails `use_transactional_tests = false`)
- *   const { books } = fixtures(["books", "authors"], { useTransactionalTests: false });
- *
- * @example  // seed through a caller-supplied connection/adapter
- *   const { colleges } = fixtures(["colleges"], {
- *     connection: () => College.connection,
- *     useTransactionalTests: false,
- *   });
- *
- * @internal
- */
+/** @internal */
 export function fixtures<M extends FixtureMap>(
   fixtures: M,
   options?: FixturesOptions,
@@ -569,15 +350,8 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, connection } = options ?? {};
 
-  // Caller-supplied connection/adapter thunk wins over the default handler
-  // connection: multi-database suites seed through a model-specific
-  // `*.connection`, and adapter-owning suites seed through their own adapter.
   const getConnection = connection ?? leaseFixtureConnection;
 
-  // Rails' `use_transactional_tests = false` (default is true): skip the
-  // savepoint-pinned wrapper so the engine's per-test delete/reseed commits
-  // real DML, visible across pooled connections. Mirrors the direct-adapter
-  // escape hatch the view/signed-id suites used before converging here.
   if (useTransactionalTests !== false) {
     withTransactionalFixtures(getConnection, { usesTransaction });
   } else {

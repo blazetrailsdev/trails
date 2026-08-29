@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
- */
 import { findCollectionTarget as findHasManyTarget } from "../test-helpers/find-collection-target.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
@@ -41,11 +38,6 @@ import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
 
-/**
- * Rails' `with_has_many_inversing(model = ActiveRecord::Base)` toggles
- * `has_many_inversing` for the duration of the block. We mirror it as a
- * per-model flag that is reset afterwards.
- */
 async function withHasManyInversing(
   model: typeof Base,
   fn: () => Promise<void> | void,
@@ -59,11 +51,6 @@ async function withHasManyInversing(
   }
 }
 
-/**
- * Rails' `with_automatic_scope_inversing(*reflections)` temporarily marks each
- * reflection's target class as allowing automatic inverse detection through
- * scoped associations.
- */
 async function withAutomaticScopeInversing(
   reflections: any[],
   fn: () => Promise<void> | void,
@@ -118,8 +105,6 @@ describe("AutomaticInverseFindingTests", () => {
       Room,
       Company,
       SpecialContract,
-      // Company#developers is `through: :contracts`; automatic-inverse
-      // resolution reaches Contract, which Rails autoloads.
       Contract,
       Book,
       Subscription,
@@ -231,8 +216,6 @@ describe("AutomaticInverseFindingTests", () => {
 
   it("has many with scoped belongs to does not find inverse automatically", async () => {
     const book = books("tlg");
-    // Mirror Rails: book.update_attribute(:author_visibility, :invisible) so the scoped
-    // belongs_to query (author_visibility: 0) returns nil even when the FK is set.
     await (book as any).updateAttribute("author_visibility", 1);
     expect(await association(book, "subscriptions").build({}).book).toBeNull();
 
@@ -510,12 +493,16 @@ describe("InverseHasOneTests", () => {
 });
 
 describe("InverseHasManyTests", () => {
-  const { humans, comments, authors } = fixtures(
-    // authors before posts: a `ref("authors", …)` in the posts fixtures resolves
-    // to a CRC32 fallback id unless the authors set is already loaded, which
-    // would orphan every post's `author_id`.
-    ["humans", "interests", "authors", "posts", "comments", "cpkAuthors", "cpkOrders", "cpkBooks"],
-  );
+  const { humans, comments, authors } = fixtures([
+    "humans",
+    "interests",
+    "authors",
+    "posts",
+    "comments",
+    "cpkAuthors",
+    "cpkOrders",
+    "cpkBooks",
+  ]);
   beforeAll(async () => {
     [Human, Interest, Post, SpecialPost, Author, Comment, CpkAuthor, CpkBook, CpkOrder].forEach(
       (m) => registerModel(m),
@@ -925,9 +912,6 @@ describe("InverseBelongsToTests", () => {
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("trainspotting");
     const human = (await loadSingularTarget(interest, "human"))!;
-    // Rails: human.interests.detect { |_iz| _iz.id == interest.id } — block-find
-    // over the CollectionProxy (Enumerable#detect loads the target), not the AR
-    // PK finder.
     const iz = await (human as any).interests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
@@ -1134,22 +1118,14 @@ describe("InversePolymorphicBelongsToTests", () => {
     const faceAssoc = (human as any).association("autosaveFace");
     const face = await faceAssoc.loadTarget();
 
-    await face.reload(); // clear cached load of autosave_human
+    await face.reload();
     face.description = "new description";
     await human.saveBang();
 
-    // After the owner save, autosave's set_inverse_instance must have wired the
-    // child's belongs_to back to the owner without a fresh DB load.
     expect(face.association("autosaveHuman").isLoaded()).toBe(true);
     expect(face.association("autosaveHuman").target).not.toBeNull();
   });
 
-  // Regression (trails-specific, surfaced in PR #3503): the module-level
-  // `association()` helper returns a CollectionProxy for *every* association
-  // type, so a has_one `createBang` used to append the new record to the
-  // proxy's array `_target`. That array surfaced through `_associationCache`
-  // as an array-shaped singular `target`, and `autosaveHasOne` bailed on
-  // `Array.isArray(child)` — silently skipping the child on owner save.
   it("has_one createBang stores a single record as target, not an array", async () => {
     const human = await Human.createBang({});
     const face = await (human as any)
@@ -1160,8 +1136,6 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(Array.isArray(holder.target)).toBe(false);
     expect(holder.target).toBe(face);
 
-    // autosave must not bail: a description change on the created child is
-    // persisted when the owner is saved.
     face.description = "new description";
     await human.saveBang();
     await face.reload();
@@ -1171,7 +1145,6 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("llama_wrangling");
     const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
-    // Rails: human.polymorphic_interests.detect { |_iz| _iz.id == interest.id }
     const iz = await human.polymorphicInterests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
     expect(iz.topic).toBe((interest as any).topic);
@@ -1231,8 +1204,6 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 });
 
-// NOTE - these tests might not be meaningful, ripped as they were from the parental_control plugin
-// which would guess the inverse rather than look for an explicit configuration option.
 describe("InverseMultipleHasManyInversesForSameModel", () => {
   fixtures(["humans", "interests", "zines"]);
   beforeAll(() => {
@@ -1253,10 +1224,6 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
   });
 });
 
-// Rails declares `test_recursive_inverse_on_recursive_model_has_many_inversing`
-// inside `InverseBelongsToTests`; a second same-named describe carries the
-// dedicated `branches` table setup BrokenBranch needs without disturbing the
-// fixture-backed block above.
 describe("InverseBelongsToTests", () => {
   fixtures({});
   beforeAll(() => {

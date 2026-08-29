@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Base, Range, UnknownAttributeReference } from "./index.js";
@@ -9,9 +5,6 @@ import { fixtures } from "./test-fixtures.js";
 
 fixtures({});
 
-// ==========================================================================
-// SanitizeTest — targets sanitize_test.rb
-// ==========================================================================
 describe("SanitizeTest", () => {
   it("sanitize sql array handles named bind variables", () => {
     class Post extends Base {
@@ -113,7 +106,6 @@ describe("SanitizeTest", () => {
     class Binary extends Base {
       static _tableName = "binaries";
     }
-    // An Arel.sql literal is trusted SQL — disallowRawSqlBang must not raise.
     expect(() => Binary.disallowRawSqlBang([arelSql("field(id, ?)")])).not.toThrow();
   });
 
@@ -199,8 +191,6 @@ describe("SanitizeTest", () => {
         this.attribute("title", "string");
       }
     }
-    // `:a` is the only bind variable; `::integer` and `::date` are PostgreSQL
-    // type casts and must be left untouched.
     const a = Post.connection;
     const result = Post.sanitizeSqlArray(":a::integer '2009-01-01'::date", { a: "10" });
     expect(result).toBe(`${a.quote("10")}::integer '2009-01-01'::date`);
@@ -212,7 +202,6 @@ describe("SanitizeTest", () => {
         this.attribute("title", "string");
       }
     }
-    // A value containing a literal colon should be preserved in the output
     const sql = Post.sanitizeSqlArray("title = ?", "10:00");
     expect(sql).toContain("'10:00'");
   });
@@ -262,10 +251,6 @@ describe("SanitizeTest", () => {
 });
 
 describe("sanitizeSql", () => {
-  // D-Y-INCOMPATIBLE: D-Y routes quoterFor() through the canonical SQLite adapter
-  // (better-sqlite3), which quotes `true` as `1`, not `TRUE`. The test assertion
-  // was written for the abstract/PG quoter. Phase G: assert adapter-neutral behavior
-  // or test boolean quoting separately per adapter.
   it.skip("sanitizeSqlArray replaces ? placeholders with quoted values", () => {
     class User extends Base {
       static _tableName = "users";
@@ -300,8 +285,6 @@ describe("sanitizeSql", () => {
     class User extends Base {
       static _tableName = "users";
     }
-    // Rails aliases sanitize_sql to sanitize_sql_for_conditions, whose first
-    // branch returns nil for condition.blank? (sanitization.rb:33-41).
     expect(User.sanitizeSql("")).toBeNull();
     expect(User.sanitizeSql("   ")).toBeNull();
     expect(User.sanitizeSql([] as unknown as [string, ...unknown[]])).toBeNull();
@@ -345,8 +328,6 @@ describe("sanitizeSql", () => {
     }
     expect(Post.sanitizeSqlArray("id = %d", 1)).toBe("id = 1");
     expect(Post.sanitizeSqlArray("id = %d", "12")).toBe("id = 12");
-    // Ruby's `Integer()` (via `statement % values`) rejects trailing garbage and
-    // non-integers, unlike parseInt's lenient prefix-parse.
     expect(() => Post.sanitizeSqlArray("id = %d", "12abc")).toThrow(/invalid value for %d/);
     expect(() => Post.sanitizeSqlArray("id = %d", "3.5")).toThrow(/invalid value for %d/);
   });
@@ -399,17 +380,11 @@ describe("sanitizeSql", () => {
       }
     }
     const result = Post.sanitizeSqlForOrder(["field(id, ?)", [1, 2]]);
-    // sanitizeSqlForOrder wraps the sanitized string in Arel.sql() (a SqlLiteral
-    // node). Read `.value` to confirm the subclass's sanitizeSqlArray override
-    // produced the sanitized text.
     expect((result as { value?: string }).value).toBe("id, 1, 2");
     expect(disallowCalled).toBe(true);
   });
 
   it("sanitizeSqlForOrder substitutes binds when the first element is an Arel.sql literal", () => {
-    // Rails reads `condition.first.to_s` (sanitization.rb:84-97), so an
-    // Arel.sql literal — a Node whose text lives on `.value`, with no
-    // toString override — must still enter the `?` branch and substitute binds.
     let sanitizeCalled = false;
     class Post extends Base {
       static _tableName = "posts";
@@ -428,8 +403,6 @@ describe("sanitizeSql", () => {
     class Post extends Base {
       static _tableName = "posts";
     }
-    // Rails' else branch returns the original condition (sanitization.rb:99),
-    // not just its first element.
     const condition: [string, ...unknown[]] = ["name ASC", "id DESC"];
     expect(Post.sanitizeSqlForOrder(condition)).toEqual(condition);
   });
@@ -438,13 +411,9 @@ describe("sanitizeSql", () => {
     class Post extends Base {
       static _tableName = "posts";
     }
-    // sanitize_sql_like
     expect(Post.sanitizeSqlLike("50%_off")).toBe("50\\%\\_off");
-    // sanitize_sql_for_order passes raw Arel/strings through
     expect(Post.sanitizeSqlForOrder("id asc")).toBe("id asc");
-    // sanitize_sql_for_assignment hash form
     expect(Post.sanitizeSqlForAssignment({ title: "hi" }, "posts")).toContain("= 'hi'");
-    // disallow_raw_sql! rejects non-column-ish input
     expect(() => Post.disallowRawSqlBang(["DROP TABLE users"])).toThrow(/Dangerous query method/);
   });
 
@@ -502,8 +471,6 @@ describe("sanitizeSql", () => {
       );
     });
 
-    // D-Y-INCOMPATIBLE: same SQLite boolean quoting as above — canonical adapter
-    // produces `1`, not `TRUE`. Phase G.
     it.skip("handles mixed types in named bind variables", () => {
       class Post extends Base {
         static _tableName = "posts";

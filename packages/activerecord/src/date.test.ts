@@ -1,28 +1,15 @@
-/**
- * Mirrors: activerecord/test/cases/date_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("DateTest", () => {
-  // `fixtures` wires the handler suite internally, so no separate call.
-  // Rails date_test.rb declares no `fixtures`; wiring the canonical `topics`
-  // table lets the file ride the shared Topic model with a real `last_read`
-  // date column instead of an inline scratch table that collided under
-  // parallel forks.
   fixtures(["topics"]);
 
   beforeAll(async () => {
-    // Eagerly resolve the `last_read` date type (Rails loads schema at boot). The
-    // `assign valid dates` case below builds `Topic.new` synchronously, so without
-    // a warmed type registry the multiparameter assembler can't see `last_read` is
-    // a date column — on MariaDB it then yields a non-PlainDate.
     await Topic.loadSchema();
   });
 
-  // Rails: test_date_with_time_value
   it("date with time value", async () => {
     const timeValue = Temporal.PlainDateTime.from({
       year: 2016,
@@ -36,7 +23,6 @@ describe("DateTest", () => {
     expect(found!.id).toBe(topic.id);
   });
 
-  // Rails: test_date_with_string_value
   it("date with string value", async () => {
     const stringValue = "2016-05-11 19:00:00";
     const topic = await Topic.create({ last_read: stringValue });
@@ -45,7 +31,6 @@ describe("DateTest", () => {
     expect(found!.id).toBe(topic.id);
   });
 
-  // Rails: test_assign_valid_dates
   it("assign valid dates", () => {
     const validDates: Array<[number, number, number]> = [
       [2007, 11, 30],
@@ -53,9 +38,6 @@ describe("DateTest", () => {
       [2008, 2, 29],
     ];
 
-    // Rails: invalid multiparameter dates roll over the way Time does
-    // (Date.new raises → rescued → instantiate_time_object(...).to_date),
-    // so Nov 31 → Dec 1 and Feb 29 in a common year → Mar 1.
     const invalidDates: Array<[[number, number, number], [number, number, number]]> = [
       [
         [2007, 11, 31],

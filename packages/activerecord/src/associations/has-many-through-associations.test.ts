@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/has_many_through_associations_test.rb
- */
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
@@ -148,8 +145,6 @@ describe("HasManyThroughAssociationsTest", () => {
     "organizations",
   ]);
 
-  // Register models at describe-time (synchronously) so reflections
-  // are available before any eager validation triggered by fixtures.
   registerModel([
     Tag,
     OrderedTag,
@@ -227,10 +222,6 @@ describe("HasManyThroughAssociationsTest", () => {
     SpecialCategorization,
   ]);
 
-  // Mirrors HasManyThroughAssociationsTest#setup: dummy records to force column
-  // loads so query counts are clean. The dummy Person also occupies people.id 4,
-  // so records created within a test land past the fixture id range — notably
-  // clear of the deliberately dangling readers(:bob_welcome) row (person_id: 4).
   beforeEach(async () => {
     await Person.create({ first_name: "gummy" });
     await Reader.create({ person_id: 0, post_id: 0 });
@@ -281,9 +272,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const postList = await Post.where({ id: [davidId, maryId] })
       .preload(":author", ":authorFavoritesWithScope")
       .order("id");
-    // With preloading, author_favorites_with_scope should be cached
     for (const p of postList) {
-      // association already loaded — should not issue a new query
       expect((p as any).authorFavoritesWithScope).toBeDefined();
     }
     expect(await (postList[0] as any).authorFavoritesWithScope.size()).toBe(1);
@@ -331,7 +320,6 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("ordered has many through", async () => {
-    // Rails creates an anonymous person class with ordered posts
     class PersonPrime extends Base {
       declare readers: AssociationProxy<Reader>;
       declare posts: AssociationProxy<Post>;
@@ -373,7 +361,6 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("no pk join table append", async () => {
-    // Rails: make_no_pk_hm_t creates anonymous models using lessons/lessons_students/students
     class NoPkLesson extends Base {
       declare name: string | null;
       declare lessonStudents: AssociationProxy<NoPkLessonStudent>;
@@ -621,9 +608,6 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("associating a persisted record with unsaved changes saves those changes", async () => {
-    // Rails' insert_record gate is `record.new_record? || record.has_changes_to_save?`
-    // (has_many_through_association.rb:27) — the second arm saves a persisted-but-dirty
-    // target before the join row is written.
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("michael").id);
     person.writeAttribute("first_name", "Bongo");
@@ -748,8 +732,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = new Post({ title: "Hello", body: "world" });
     const person = new Person({ first_name: "Sean" });
 
-    // Rails: `post.people = [person]`. RFC 0087 §1 removed the sync `=`
-    // setter; `writer` is the awaitable port of the same Rails writer.
     await (post as any).association("people").writer([person]);
     await post.save();
 
@@ -829,12 +811,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(found.attached_reason).toBe("This is our loyal customer");
   });
 
-  // TS-only: guard the write (construct_join_attributes) path for a
-  // composite-PK target has_many :through. Pushing an order into a tag's
-  // `orders` builds the join row (cpk_order_tags) via the source belongs_to's
-  // association_primary_key — the converged path no longer trips a trails-only
-  // `ConfigurationError` for the composite-PK target, mirroring Rails' single
-  // `construct_join_attributes` build for every shape.
   it("appends a composite-pk target record through a join model", async () => {
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
     const tag = cpkTags("cpk_tag_loyal_customer");
@@ -848,17 +824,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(orders.map((o: any) => Number(o.id_value))).toContain(Number((order as any).id_value));
   });
 
-  // TS-only: guard the JOIN routing for the remaining composite through
-  // shapes. All three used to trip a `ConfigurationError` in the
-  // single-column IN-subquery fallback (composite target FK / composite-PK
-  // target / composite through-model PK); routing through
-  // the `scope()` seam builds Rails' chain-based composite scope
-  // instead. The assertions read the generated JOIN SQL (adapter-agnostic
-  // via quoteTableName) so they hold under SQLite / PG / MariaDB.
-
-  // has_many :order_agreements, through: :order — composite belongsTo through
-  // (`order`, FK [shop_id, order_id]) anchoring a scalar source. The owner's
-  // composite key surfaces as a two-column predicate on the JOINed order row.
   it("composite through-key has_many through routes via join scope", async () => {
     const { CpkBookWithOrderAgreements, CpkOrderAgreement } =
       await import("../test-helpers/models/cpk.js");
@@ -872,10 +837,8 @@ describe("HasManyThroughAssociationsTest", () => {
     const orderAgreementsFk = quoteTableName("cpk_order_agreements.order_id");
     const orderId = quoteTableName("cpk_orders.id");
     const orderShopId = quoteTableName("cpk_orders.shop_id");
-    // JOIN, not IN-subquery: the ON matches the source FK to the through PK…
     expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_orders")}`, "i"));
     expect(sql).toMatch(new RegExp(`${orderAgreementsFk} = ${orderId}`, "i"));
-    // …and the composite owner key constrains BOTH columns of the through row.
     expect(sql).toMatch(new RegExp(`${orderShopId} =`, "i"));
     expect(sql).toMatch(new RegExp(`${orderId} =`, "i"));
 
@@ -883,10 +846,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(rows.map((a: any) => a.id)).toEqual([agreement.id]);
   });
 
-  // has_many :orders, through: :order_tags — composite-PK through model
-  // (cpk_order_tags, PK [order_id, tag_id]) with a composite-PK target
-  // (cpk_orders, PK [shop_id, id]). Routes through the JOIN scope instead of
-  // the throwing IN-subquery fallback.
   it("composite-pk target and through model has_many through routes via join scope", async () => {
     const tag = cpkTags("cpk_tag_loyal_customer");
     const sql = await (tag as any).orders.toSql();
@@ -901,9 +860,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(orders.length).toBeGreaterThan(0);
   });
 
-  // has_many :chapters, through: :book — composite source FK
-  // (cpk_chapters, FK [author_id, book_id]) yields the full composite ON
-  // clause. Owner (cpk_orders) also has a composite PK.
   it("composite source fk has_many through routes via join scope", async () => {
     const { CpkOrderWithSingularBookChapters } = await import("../test-helpers/models/cpk.js");
     const order = await CpkOrderWithSingularBookChapters.create({ id: [5, 6] });
@@ -914,7 +870,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const chapBookId = quoteTableName("cpk_chapters.book_id");
     const bookAuthorId = quoteTableName("cpk_books.author_id");
     const bookId = quoteTableName("cpk_books.id");
-    // Full composite ON clause on the source join.
     expect(sql).toMatch(new RegExp(`${chapAuthorId} = ${bookAuthorId}`, "i"));
     expect(sql).toMatch(new RegExp(`${chapBookId} = ${bookId}`, "i"));
     await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
@@ -992,7 +947,6 @@ describe("HasManyThroughAssociationsTest", () => {
       expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
       expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
 
-      // Check that the destroy callback on Reference did NOT run
       const reloadedPerson = await Person.find(people("michael").id);
       expect((reloadedPerson as any).comments).toBeNull();
     } finally {
@@ -1016,7 +970,6 @@ describe("HasManyThroughAssociationsTest", () => {
       expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
       expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
 
-      // Check that the destroy callback on Reference ran
       const reloadedPerson = await Person.find(people("michael").id);
       expect((reloadedPerson as any).comments).toBe("Reference destroyed");
     } finally {
@@ -1104,8 +1057,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag = await (post as any).tags.create({ name: "doomed" });
     await tag.taggedPosts.push(await Post.find(posts("thinking").id));
 
-    // Rails' `tag.tagged_posts = []` persists the replacement at assignment;
-    // that needs `await` in JS, so the `=` setter throws (RFC 0068).
     await tag.taggedPosts.replace([]);
     await post.reload();
 
@@ -1262,9 +1213,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const countBefore = await (firm as any).developers.count();
     try {
       await (firm as any).developers.create({ name: "0" });
-    } catch (_e) {
-      // swallow invalid record
-    }
+    } catch (_e) {}
     expect(await (firm as any).developers.count()).toBe(countBefore);
   });
 
@@ -1396,7 +1345,6 @@ describe("HasManyThroughAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const michael = await Person.find(people("michael").id);
     await (michael as any).posts.reload();
-    // Post ids should be accessible from already-loaded association
     const ids1 = await (michael as any).postIds;
     const ids2 = await (michael as any).postIds;
     expect([...ids1].sort()).toEqual([...ids2].sort());
@@ -1431,7 +1379,6 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const readerSpy = vi.spyOn(Reader, "transaction");
     try {
-      // _pushThrough wraps in the through model (Reader)'s transaction
       await association(post, "people").replace([david, michael]);
       expect(readerSpy).toHaveBeenCalled();
     } finally {
@@ -1446,7 +1393,6 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("merge join association with has many through association proxy", async () => {
     const mary = await Author.find(authors("mary").id);
-    // Should not raise — chaining on the has_many_through proxy should produce valid SQL
     const sql = await (mary as any).comments.where("1=1").toSql();
     expect(sql).toBeDefined();
   });
@@ -1639,8 +1585,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const company = await Company.find(companies("rails_core").id);
     const dev = (await Developer.first())!;
     const ids = [dev.id as number, -9999];
-    // Rails asserts the full message, including the trailing `not_found_ids`
-    // sentence (`klass.all.raise_record_not_found_exception!(…, not_found_ids)`).
     await expect((company as any).association("developers").idsWriter(ids)).rejects.toThrow(
       `Couldn't find all Developers with 'id': (${dev.id}, -9999) (found 1 results, but was looking for 2). Couldn't find Developer with id -9999.`,
     );
@@ -1656,7 +1600,6 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("build a model from hm through association with where clause", async () => {
     const book = await Book.find(books("awdr").id);
-    // Should not raise
     const sub = (book as any).subscribers.where({ nick: "marklazz" }).build();
     expect(sub).toBeDefined();
   });
@@ -1939,7 +1882,6 @@ describe("HasManyThroughAssociationsTest", () => {
     (Categorization as any).validate((r: any) => r.errors.add("base", "Invalid Categorization"));
     try {
       const firstAuthor = await Author.first();
-      // Should not throw
       await expect(
         Category.create({ name: "Fishing", authors: [firstAuthor] }),
       ).resolves.toBeDefined();
@@ -2424,8 +2366,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(tagsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
 
     expect(tagIds.length).toBeGreaterThan(0);
-    // bigint id columns come back as BigInt on PG/MariaDB but Number on SQLite;
-    // normalize both sides like the sibling `tags has manu posts` assertion.
     expect([...tagIds].map(Number).sort()).toEqual([...expectedTagIds].map(Number).sort());
   });
 
@@ -2456,16 +2396,11 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("through association resolves composite source association primary key", async () => {
-    // Sharded::BlogPost#tags is has_many through blog_post_tags; the source
-    // belongs_to :tag targets a query-constraints model (Sharded::Tag,
-    // [blog_id, id]), so construct_join_attributes keys the delete scope off
-    // the source reflection's composite association_primary_key.
     const blogPost = await ShardedBlogPost.find(shardedBlogPosts("great_post_blog_one").id);
     const tags = await (blogPost as any).tags.toArray();
     expect(tags.length).toBeGreaterThan(0);
     const tag = tags[0];
 
-    // delete-by-record drops the join row and prunes the composite-keyed target.
     await (blogPost as any).tags.delete(tag);
     const remaining = await (blogPost as any).tags.reload();
     expect(remaining.map((t: any) => Number(t.id))).not.toContain(Number(tag.id));
@@ -2512,10 +2447,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const chapterBook = await chapter.association("book").loadTarget();
     expect(chapterBook?.id).toEqual(book.id);
 
-    // TS-only guard: the composite source FK routes through the JOIN-based
-    // AssociationScope rather than the single-column IN-subquery fallback, so
-    // assert the read path (not just build()) is safe for a composite owner PK
-    // — the scope must emit the composite ON clause and execute without error.
     const chaptersSql = await (order as any).chapters.toSql();
     const chapAuthorId = quoteTableName("cpk_chapters.author_id");
     const chapBookId = quoteTableName("cpk_chapters.book_id");
@@ -2526,7 +2457,6 @@ describe("HasManyThroughAssociationsTest", () => {
     await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
   });
 
-  // TS-only: insertRecord with validate false still raises on invalid join record
   it("insertRecord with validate false still raises on invalid join record", async () => {
     class IrpvTagging extends Base {
       declare taggable_id: number | null;
@@ -2573,7 +2503,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await IrpvTagging.where({ taggable_id: post.id }).count()).toBe(0);
   });
 
-  // TS-only: loads through a join model
   it("loads through a join model", async () => {
     const post = await Post.find(posts("welcome").id);
     const tagsBefore = await (post as any).tags.toArray();
@@ -2585,7 +2514,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(postTags2.map((p: any) => p.id)).toContain(post.id);
   });
 
-  // TS-only: delete_all for with dependent option delete_all
   it("delete_all for with dependent option delete_all", async () => {
     const person = await Person.find(people("michael").id);
     const countBefore = await (person as any).jobsWithDependentDeleteAll.count();
@@ -2596,7 +2524,6 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await Reference.count()).toBe(Number(refCountBefore) - Number(countBefore));
   });
 
-  // TS-only: delete_all for with dependent option nullify
   it("delete_all for with dependent option nullify", async () => {
     const person = await Person.find(people("michael").id);
     const countBefore = await (person as any).jobsWithDependentNullify.count();

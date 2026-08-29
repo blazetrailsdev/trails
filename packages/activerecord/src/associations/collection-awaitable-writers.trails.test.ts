@@ -1,21 +1,3 @@
-/**
- * Trails-only: collection associations have NO native `=` writers. Rails
- * generates `#{name}=` and `#{name.singularize}_ids=`
- * (vendor/rails/activerecord/lib/active_record/associations/builder/collection_association.rb:67-74),
- * but both do DB I/O at assignment time — `writer` → `replace` diffs the
- * loaded target and runs the deletes + inserts in a transaction
- * (collection_association.rb:46-48, :242), and `ids_writer` resolves the ids
- * with a query first (:61-83). A JS property setter cannot `await` either, so
- * RFC 0087 §1 deletes them: the awaitable ports on the association —
- * `writer` / `replace` / `idsWriter` — are the only collection-mutation
- * surface. There is no Rails test for this deviation.
- *
- * Mass assignment reaches the collection keys as Rails does (`assign_attributes`
- * → `public_send("#{k}=")`, attribute_assignment.rb:67-69): `_assignAttribute`
- * resolves the association-level writer for the key and sends it, so
- * `assign_attributes` answers a promise for the I/O the send owes and an awaited
- * caller gets Rails' inline timing.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, RecordNotFound } from "../index.js";
 import { CollectionIdsAssignmentError } from "./errors.js";
@@ -67,7 +49,6 @@ describe("CollectionAwaitableWriters", () => {
   it("no native = setter is generated for the collection", async () => {
     const author = await Author.create({ name: "Bill" });
     const post = await Post.create({ title: "t", body: "b" });
-    // The reader survives; only the writer half of the property is gone.
     expect(() => {
       (author as unknown as { posts: unknown }).posts = [post];
     }).toThrow(TypeError);
@@ -83,11 +64,6 @@ describe("CollectionAwaitableWriters", () => {
   });
 
   it("ids= mass-assignment reaches the association writer on either owner arm", async () => {
-    // `_assign_attribute` sends (attribute_assignment.rb:67-69), so
-    // `#{singular}Ids` reaches Rails' generated `post_ids=`
-    // (builder/collection_association.rb:67-74) and its resolving query. That
-    // query is the reason `assign_attributes` answers a promise here, and an
-    // awaited caller gets Rails' timing on both owner arms.
     const post = await Post.create({ title: "t", body: "b" });
     const assignOn = (owner: Author): Promise<void> | void =>
       (owner as unknown as CollectionOwner).assignAttributes({ postIds: [post.id] });
@@ -122,9 +98,6 @@ describe("CollectionAwaitableWriters", () => {
   });
 
   it("mass-assignment reaches the association writer on a persisted owner", async () => {
-    // Rails' `replace` (collection_association.rb:46-48) runs its diffed
-    // deletes+inserts inline at assignment; `assign_attributes` answers a promise
-    // for exactly that I/O.
     const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
     const post = await Post.create({ title: "t", body: "b" });
     await author.assignAttributes({ posts: [post] });
@@ -133,25 +106,16 @@ describe("CollectionAwaitableWriters", () => {
   });
 
   it("assigns the association key in place, after the keys before it", async () => {
-    // Rails' `_assign_attributes` is a plain `each_pair`
-    // (activemodel/attribute_assignment.rb:60-64): each send finishes before the
-    // loop moves on, so `posts` is written with `name` already assigned — the
-    // order the chained sends here have to keep.
     const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
     const post = await Post.create({ title: "t", body: "b" });
 
     await author.assignAttributes({ name: "Bob", posts: [post] });
     expect((author as unknown as { name: string }).name).toBe("Bob");
-    // `replace` persisted the collection; `name` is assigned but unsaved, as in
-    // Rails — `assign_attributes` never saves the owner.
     await (author as unknown as Author).reload();
     expect(await postsOf(author as unknown as Author).count()).toBe(1);
   });
 
   it("keeps in-memory assignment on construction", async () => {
-    // Rails defers here too (`replace_records` without a save — the FK isn't
-    // known yet), so the constructor's in-memory arm is faithful and autosave
-    // persists at the owner's first `save()`.
     const post = new Post({ title: "t", body: "b" });
     const author = new Author({ name: "Bill", posts: [post] });
 
@@ -162,9 +126,6 @@ describe("CollectionAwaitableWriters", () => {
   });
 
   it("constructor-form ids= reaches the association writer", async () => {
-    // The throw IS the assertion: without the deferral past `super()` these
-    // die with a `TypeError` on an undefined `_associationInstances`, never
-    // reaching the writer that raises the deviation.
     const post = await Post.create({ title: "t", body: "b" });
     expect(() => new Author({ name: "Bill", postIds: [post.id] })).toThrow(
       CollectionIdsAssignmentError,

@@ -1,9 +1,3 @@
-/**
- * SQL sanitization utilities.
- *
- * Mirrors: ActiveRecord::Sanitization
- */
-
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
@@ -13,18 +7,12 @@ import {
   UnknownAttributeReference,
 } from "./errors.js";
 
-/** Subset of {@link Quoting} the sanitization helpers need. @internal */
+/** @internal */
 export type Quoter = Pick<
   Quoting,
   "quote" | "quoteColumnName" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
 >;
 
-/**
- * `withConnection` is Rails' `with_connection { |c| ... }`, which each quoting
- * branch opens for itself (sanitization.rb:167-179) — the `statement.blank?`
- * arm between them answers without one, so the lookup cannot be hoisted ahead
- * of it. @internal
- */
 function _sanitizeSqlArray(
   withConnection: () => Quoter,
   template: string,
@@ -47,12 +35,6 @@ function _sanitizeSqlArray(
   }
 
   const quoter = withConnection();
-  // Format-string support (e.g., "name = '%s'", "id = %d") — Rails:
-  //   statement % values.collect { |v| connection.quote_string(v.to_s) }
-  // Ruby's Kernel#format applies after each value is quoted to a string, so
-  // `%d` coerces the quoted string back to an integer. We support the `%s`
-  // (quoted string) and `%d`/`%i` (integer) specifiers that appear in
-  // conditions fragments.
   const specifiers = statement.match(/%[sdi]/g) ?? [];
   if (specifiers.length > 0) {
     raiseIfBindArityMismatch(statement, specifiers.length, binds.length);
@@ -60,17 +42,6 @@ function _sanitizeSqlArray(
     return statement.replace(/%[sdi]/g, (spec) => {
       const value = values.shift();
       if (spec === "%s") return quoter.quoteString(String(value ?? ""));
-      // Rails applies `statement % values.collect { quote_string(v.to_s) }`, so
-      // Ruby's `%d` runs `Integer()` on the stringified value, rejecting trailing
-      // garbage (`Integer("12abc")`) and non-integers (`Integer("3.5")`), not just
-      // empties — so we validate a plain base-10 integer rather than lean on
-      // `parseInt`'s lenient prefix-parse (which would emit `12` / `3`).
-      // DEVIATION: Ruby's `Integer()` also honors base prefixes on strings
-      // (`"012"` → 8-radix 10, `"0x1A"` → 26); we intentionally treat the value
-      // as base-10 only. `%d` binds are integers in practice (finder_test.rb uses
-      // `["id = %d", 1]`); a leading-zero/hex *string* bind to a `%d` fragment is
-      // pathological and absent from the Rails suite, so we don't reproduce the
-      // base-prefix parse.
       const text = String(value ?? "").trim();
       if (!/^[+-]?\d+$/.test(text)) {
         throw new PreparedStatementInvalid(
@@ -96,7 +67,6 @@ function _sanitizeSqlHashForAssignment(
 ): string {
   return Object.entries(attrs)
     .map(([attr, value]) => {
-      // Rails: type = type_for_attribute(attr); value = type.serialize(type.cast(value))
       if (typeForAttribute) {
         const type = typeForAttribute(attr);
         if (type) {
@@ -104,7 +74,6 @@ function _sanitizeSqlHashForAssignment(
           if (type.serialize) value = type.serialize(value);
         }
       }
-      // Rails sanitization.rb:112 — PG/SQLite drop the table prefix.
       const col = table
         ? quoter.quoteTableNameForAssignment(table, attr)
         : quoter.quoteColumnName(attr);
@@ -113,18 +82,11 @@ function _sanitizeSqlHashForAssignment(
     .join(", ");
 }
 
-/**
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#disallow_raw_sql!
- */
 export function disallowRawSqlBang(
   this: { adapterClassSync(): unknown },
   args: (string | symbol | Nodes.Node)[],
   { permit }: { permit?: RegExp } = {},
 ): void {
-  // Rails defaults the kwarg to `adapter_class.column_name_matcher`
-  // (sanitization.rb:183); `column_name_matcher` is in `Quoting::ClassMethods`
-  // (abstract/quoting.rb:32), so it is a static the adapter constructor type
-  // does not carry.
   const columnMatcher =
     permit ??
     (this.adapterClassSync() as { columnNameMatcher(): RegExp } | null)?.columnNameMatcher() ??
@@ -133,8 +95,6 @@ export function disallowRawSqlBang(
   for (const arg of args) {
     if (typeof arg === "symbol") continue;
     if (arg instanceof Nodes.Node) continue;
-    // Ruby `arg.to_s.strip` (sanitization.rb:186): `nil.to_s` is `""`, not the
-    // `"null"` a bare JS `String(arg)` would produce.
     const str = arg == null ? "" : arg.toString();
     if (!columnMatcher.test(str.trim())) {
       unexpected.push(str);
@@ -148,20 +108,8 @@ export function disallowRawSqlBang(
   }
 }
 
-/**
- * Sanitize a string for use in a SQL LIKE clause.
- * Escapes %, _, and the escape character itself.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_like
- */
 export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
-  // Empty escape character: Rails inserts "" before each wildcard — net no-op.
   if (escapeChar === "") return value;
-  // Rails inserts the escape character before each % and _ in a single pass.
-  // When escapeChar is not itself a wildcard, it also escapes occurrences of
-  // escapeChar in the string first (via the same single pattern union).
-  // Using a single pass avoids double-escaping the prefix inserted for one
-  // wildcard when the escape character happens to be the other wildcard.
   const escapedEsc = escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (escapeChar !== "%" && escapeChar !== "_") {
     return value.replace(new RegExp(`${escapedEsc}|[%_]`, "g"), (c) => escapeChar + c);
@@ -169,14 +117,6 @@ export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): strin
   return value.replace(/[%_]/g, (c) => escapeChar + c);
 }
 
-/**
- * In Rails, `sanitize_sql` is an alias of `sanitize_sql_for_conditions`
- * (sanitization.rb:41), so blank input returns `nil` and an Array dispatches
- * to `sanitize_sql_array`. We dispatch through `this.sanitizeSqlArray` so
- * subclass overrides take effect.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql
- */
 export function sanitizeSql(
   this: { sanitizeSqlArray(template: string, ...binds: unknown[]): string },
   input: string | [string, ...unknown[]] | null | undefined,
@@ -187,7 +127,7 @@ export function sanitizeSql(
   return this.sanitizeSqlArray(template, ...binds);
 }
 
-/** Rails `Object#blank?` for the condition inputs we accept. @internal */
+/** @internal */
 function isBlankCondition(value: unknown): boolean {
   if (value == null) return true;
   if (typeof value === "string") return value.trim() === "";
@@ -200,37 +140,17 @@ interface QuoterHost {
   connection?: unknown;
 }
 
-/**
- * Resolves quoting via `connection`, which is the `with_connection { |c| ... }`
- * each QUOTING branch of `sanitize_sql_array` opens for itself
- * (sanitization.rb:167-179) — never the `statement.blank?` arm between them.
- * Rails has no adapter-free quoter to fall back to — `quote_column_name` is
- * `raise NotImplementedError` on the abstract (abstract/quoting.rb:61) — so a
- * caller with no connection surfaces the connection error rather than emitting
- * ANSI SQL no adapter asked for. @internal
- */
+/** @internal */
 function quoterFor(host: QuoterHost): Quoter {
   const conn = host.connection as Quoter | null | undefined;
   if (!conn || typeof conn.quote !== "function") throw new ConnectionNotDefined();
   return conn;
 }
 
-/**
- * Threads the active adapter as the quoter, matching Rails'
- * `connection.quote` dispatch.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_array
- */
 export function sanitizeSqlArray(this: QuoterHost, template: string, ...binds: unknown[]): string {
   return _sanitizeSqlArray(() => quoterFor(this), template, binds);
 }
 
-/**
- * Dispatches through `this.sanitizeSql` (and therefore `this.sanitizeSqlArray`),
- * matching Rails' Ruby `self` dispatch through `ClassMethods`.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_conditions
- */
 export function sanitizeSqlForConditions(
   this: QuoterHost & {
     sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
@@ -241,12 +161,6 @@ export function sanitizeSqlForConditions(
   return this.sanitizeSql(condition);
 }
 
-/**
- * Dispatches the `Array` case through `this.sanitizeSql` — matching Rails'
- * self dispatch from `sanitize_sql_for_assignment` → `sanitize_sql_array`.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_assignment
- */
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
     tableName?: string;
@@ -259,24 +173,14 @@ export function sanitizeSqlForAssignment(
       ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
     ): string;
   },
-  // Rails defaults `default_table_name` to the model's `table_name`
-  // (sanitization.rb:68); an explicitly-passed value still wins.
   assignments: string | [string, ...unknown[]] | Record<string, unknown>,
   defaultTableName: string = this.tableName ?? "",
 ): string {
   if (typeof assignments === "string") return assignments;
-  // A non-empty Array is never blank, so `sanitizeSql` returns a string here;
-  // `?? ""` only guards the degenerate empty-array case (Rails returns "").
   if (Array.isArray(assignments)) return this.sanitizeSql(assignments) ?? "";
   return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
 }
 
-/**
- * Dispatches `disallowRawSqlBang` and `sanitizeSqlArray` through `this` —
- * matching Rails' self dispatch.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_order
- */
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
     adapterClassSync(): unknown;
@@ -288,18 +192,8 @@ export function sanitizeSqlForOrder(
   if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition)) {
     const first: unknown = condition[0];
-    // Rails reads `condition.first.to_s`; a SqlLiteral carries its text on
-    // `.value` (it has no `toString()` override), so read that for the `?`
-    // check and the template passed to sanitizeSqlArray.
     const firstText = first instanceof Nodes.SqlLiteral ? first.value : String(first);
     if (firstText.includes("?")) {
-      // Rails checks the *raw* first element with the adapter order matcher
-      // (sanitization.rb:85-88); `disallowRawSqlBang` skips Node instances, so
-      // `Arel.sql("field(id, ?)")` is permitted and only the substituted
-      // result is returned.
-      // `column_name_with_order_matcher` is in `Quoting::ClassMethods`
-      // (abstract/quoting.rb:33), so it is a static the adapter constructor
-      // type does not carry.
       const adapterClass = this.adapterClassSync() as {
         columnNameWithOrderMatcher(): RegExp;
       };
@@ -310,18 +204,9 @@ export function sanitizeSqlForOrder(
       return arelSql(sanitized);
     }
   }
-  // Rails' `else` branch returns the original `condition` unchanged
-  // (sanitization.rb:99) — for a non-bind array, the full array, not just its
-  // first element.
   return condition;
 }
 
-/**
- * Uses the active adapter as the quoter — so `Model.sanitizeSqlHashForAssignment`
- * emits dialect-correct identifiers (backticks on MySQL).
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_hash_for_assignment
- */
 export function sanitizeSqlHashForAssignment(
   this: QuoterHost,
   attrs: Record<string, unknown>,
@@ -333,10 +218,6 @@ export function sanitizeSqlHashForAssignment(
   return _sanitizeSqlHashForAssignment(quoterFor(this), attrs, table, typeForAttribute);
 }
 
-/**
- * Module methods wired onto Base as static methods via `extend()` in base.ts.
- * Mirrors Rails' `ActiveRecord::Sanitization::ClassMethods`.
- */
 export const ClassMethods = {
   sanitizeSql,
   sanitizeSqlArray,
@@ -348,14 +229,7 @@ export const ClassMethods = {
   disallowRawSqlBang,
 };
 
-/**
- * Replace `?` placeholders with quoted bind variable values.
- * Called by sanitizeSqlArray when positional binds are present.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#replace_bind_variables
- *
- * @internal
- */
+/** @internal */
 function replaceBindVariables(connection: Quoter, statement: string, values: unknown[]): string {
   raiseIfBindArityMismatch(statement, statement.match(/\?/g)?.length ?? 0, values.length);
   const bound = [...values];
@@ -364,19 +238,8 @@ function replaceBindVariables(connection: Quoter, statement: string, values: unk
   return result;
 }
 
-/**
- * Quote a single bind variable value.
- * Handles Relation objects (converts to SQL) and complex values (arrays, etc).
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#replace_bind_variable
- *
- * @internal
- */
+/** @internal */
 function replaceBindVariable(connection: Quoter, value: unknown): string {
-  // Rails checks `ActiveRecord::Relation === value` first and inlines the
-  // relation's SQL as a subquery. Duck-typed here to avoid importing Relation
-  // (circular): a Relation exposes both `toSql` and `toArray`, which a record
-  // or scalar bind value does not.
   if (isRelationLike(value)) {
     return (value as { toSql(): string }).toSql();
   }
@@ -391,14 +254,7 @@ function isRelationLike(value: unknown): value is { toSql(): string } {
   );
 }
 
-/**
- * Replace named bind variables (`:name` syntax) with quoted values.
- * Handles PostgreSQL type casts (`::`) and escaped colons.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#replace_named_bind_variables
- *
- * @internal
- */
+/** @internal */
 function replaceNamedBindVariables(
   connection: Quoter,
   statement: string,
@@ -409,13 +265,10 @@ function replaceNamedBindVariables(
     /([:\\]?):([a-zA-Z]\w*)/g,
     (match: string, prefix: string, name: string) => {
       if (prefix === ":") {
-        // PostgreSQL type cast like `::type` — return unchanged
         return match;
       } else if (prefix === "\\") {
-        // Escaped literal colon — return without the backslash
         return match.slice(1);
       } else {
-        // Named bind variable
         if (!Object.prototype.hasOwnProperty.call(bindVars, name)) {
           throw new PreparedStatementInvalid(`missing value for :${name} in ${statement}`);
         }
@@ -426,25 +279,13 @@ function replaceNamedBindVariables(
   return result;
 }
 
-/**
- * Quote a single value for use in SQL.
- * Handles arrays and Sets (converts to comma-separated quoted values),
- * objects with `id_for_database` method, and primitive values.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#quote_bound_value
- *
- * @internal
- */
+/** @internal */
 function quoteBoundValue(connection: Quoter, value: unknown): string {
   if (hasIdForDatabase(value)) {
     const cast = connection.castBoundValue(value.idForDatabase);
     return connection.quote(cast);
   }
 
-  // Handle collections recognized by isEnumerable (Array and Set only).
-  // Rails uses respond_to?(:map) and !acts_like?(:string), but this
-  // implementation intentionally limits support to those two collection
-  // types and does not expand arbitrary iterables (Buffer/Map/etc).
   if (isEnumerable(value)) {
     const values = Array.from(value);
     if (values.length === 0) {
@@ -474,32 +315,17 @@ function hasIdForDatabase(value: unknown): value is { idForDatabase: unknown } {
   );
 }
 
-/**
- * Check if a value is enumerable (Array or Set).
- * Rails uses respond_to?(:map) and !acts_like?(:string) which includes
- * Array, Range, Set, and other Enumerable types. JS approximation:
- * accepts only Array and Set so we don't accidentally expand strings,
- * Buffers, Maps, or arbitrary iterables that aren't collections of
- * scalar bind values.
- */
 function isEnumerable(value: unknown): value is Iterable<unknown> {
   return Array.isArray(value) || value instanceof Set;
 }
 
-/** True for plain JS objects (Object.prototype or null proto), matching Ruby Hash semantics. */
 function isPlainHash(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * Validate that the number of bind variables matches the number of placeholders.
- *
- * Mirrors: ActiveRecord::Sanitization::ClassMethods#raise_if_bind_arity_mismatch
- *
- * @internal
- */
+/** @internal */
 function raiseIfBindArityMismatch(statement: string, expected: number, provided: number): void {
   if (expected !== provided) {
     throw new PreparedStatementInvalid(

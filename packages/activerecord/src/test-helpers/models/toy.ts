@@ -3,7 +3,6 @@ import type { Relation } from "../../relation.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Pet } from "./pet.js";
 import type { Sponsor } from "./sponsor.js";
-// vendor/rails/activerecord/test/models/toy.rb
 import { Base } from "../../base.js";
 
 export class Toy extends Base {

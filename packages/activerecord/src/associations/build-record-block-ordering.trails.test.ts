@@ -1,13 +1,3 @@
-/**
- * Trails-only: `Association#build_record` yields the caller's block INSIDE the
- * block it hands `reflection.build_association`, after `initialize_attributes`
- * (association.rb:383-388) and before `Core#initialize` runs the initialize
- * callbacks (core.rb:479). Ruby gets that from `&block` alone and has no test
- * for it; trails took no block parameter at all in `buildRecord` and ran the
- * caller's block after construction had already returned, so the block saw a
- * record with neither the association's scope attributes nor its inverse wired
- * up. Nothing pinned the difference.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

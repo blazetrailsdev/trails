@@ -70,29 +70,16 @@ import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 import type { Base } from "./base.js";
 
-/** The one `Base` member `execute_migration_in_transaction` names. */
 type BaseWithLogger = Pick<typeof Base, "logger">;
 
 let _base: BaseWithLogger | undefined;
 
-/**
- * @internal Receives `ActiveRecord::Base` at module init, as
- * `schema-migration.ts`'s `_registerBase` does. Rails resolves the `Base`
- * constant inside `execute_migration_in_transaction` at call time via autoload
- * (`migration.rb:1532`), so base.rb is not required there; in ESM a value
- * import of `base.js` would be a load-time edge into an import cycle.
- */
+/** @internal */
 export function _registerBase(base: BaseWithLogger): void {
   _base = base;
 }
 
-// Registry for AR config injected by Base — breaks the migration ↔ base import cycle.
 /** @internal */
-/**
- * The `columnOptionsKeys` (limit/precision/scale/default/null/collation/comment)
- * that Rails' `column_exists?(table, column, type = nil, **options)` matches
- * against, in addition to the name and optional `type`.
- */
 export interface ColumnExistsOptions {
   limit?: unknown;
   precision?: unknown;
@@ -103,7 +90,6 @@ export interface ColumnExistsOptions {
   comment?: unknown;
 }
 
-// Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial) operating on UTF-8 bytes.
 function crc32(str: string): number {
   const bytes = new TextEncoder().encode(str);
   let crc = 0xffffffff;
@@ -115,11 +101,6 @@ function crc32(str: string): number {
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
-
-// Migration error classes. Rails defines these in migration.rb, so
-// they live here. internal-metadata.ts imports EnvironmentStorageError
-// back from this module; the ESM cycle is safe because each callsite
-// references the class from a method body (lazy), not at module init.
 
 export class MigrationError extends ActiveRecordError {
   constructor(message?: string) {
@@ -182,24 +163,6 @@ export class InvalidMigrationTimestampError extends MigrationError {
 }
 
 export class PendingMigrationError extends MigrationError {
-  /**
-   * Mirrors: `PendingMigrationError#initialize` (`migration.rb:159-165`).
-   *
-   * Ruby's `initialize(message = nil, pending_migrations: nil)` lets a caller
-   * pass the kwarg on its own; TypeScript has no kwargs, so the options hash is
-   * accepted in the first parameter's place — the union-typed first parameter
-   * with runtime dispatch that `ConnectionNotEstablished` (`errors.ts`) already
-   * uses for Ruby's `Exception.new(any_object)`. Passing `undefined` positionally
-   * instead would put an argument in the call that Rails' call sites
-   * (`migration.rb:722,743`) do not pass.
-   *
-   * The one arm that cannot converge is Rails' nil default (`migration.rb:161`),
-   * which reads `connection_pool.migration_context.open.pending_migrations` —
-   * asynchronous in trails, and a JS constructor cannot await. Raise sites
-   * resolve the list first, as `check_pending_migrations` and
-   * `check_all_pending!` already do (`migration.rb:722,743`); reaching the arm
-   * anyway raises rather than inventing a message Rails never produces.
-   */
   constructor(
     message?: string | { pendingMigrations?: MigrationProxy[] },
     options: { pendingMigrations?: MigrationProxy[] } = {},
@@ -213,8 +176,6 @@ export class PendingMigrationError extends MigrationError {
             "itself (migration.rb:161), which is asynchronous here and cannot run in a constructor.",
         );
       }
-      // `detailedMigrationMessage` reads no instance state, and `super` has to
-      // run before `this` exists.
       super(PendingMigrationError.prototype.detailedMigrationMessage(pendingMigrations));
     } else {
       super(message);
@@ -278,52 +239,28 @@ export class EnvironmentStorageError extends MigrationError {
   }
 }
 
-/**
- * @internal Backing store for `Migration.verbose` (`migration.rb:797`,
- * defaulted at `:811`). Rails' `cattr_accessor` is one variable shared by the
- * class and every instance; a static class field would be shadowed by a
- * subclass assigning to it, so the storage lives at module scope.
- */
+/** @internal */
 let migrationVerbose = true;
 
-/**
- * @internal `Migration#write`'s body (`migration.rb:1001`) for callers that
- * have no Migration instance. Rails puts migration output on `$stdout` via
- * `Kernel#puts`; `stdout` is the activesupport shim standing in for `$stdout`
- * — no logger is involved.
- */
+/** @internal */
 function writeMigrationMessage(text = ""): void {
   if (migrationVerbose) {
     stdout.write(`${text}\n`);
   }
 }
 
-/** @internal The banner `Migration#announce` (`migration.rb:1005`) hands to `write`. */
+/** @internal */
 function announceMigrationText(header: string, message: string): string {
   const text = `${header}: ${message}`;
   const pad = Math.max(0, 75 - text.length);
   return `== ${text} ${"=".repeat(pad)}`;
 }
 
-/**
- * @internal Storage for the blocks `up`/`down` selected, drained by
- * `Migration#reversible`. Rails' Struct has no such field: Ruby's `up`/`down`
- * run their block inline (`yield unless reverting`), but a trails callback is
- * async while the registering block is not, so the selected blocks are
- * collected here and awaited after the block returns. The key is a
- * module-private Symbol so the field is not part of the class' surface.
- */
+/** @internal */
 const toRun = Symbol("toRun");
 
-/**
- * Mirrors: ActiveRecord::Migration::ReversibleBlockHelper (migration.rb:873-880),
- * `Struct.new(:reverting)` with `up` (`yield unless reverting`) and `down`
- * (`yield if reverting`).
- */
 export class ReversibleBlockHelper {
-  /**
-   * @noRailsEquivalent PERMANENT Ruby's `up`/`down` yield straight into the block (migration.rb:873-880); an async block has to be queued and awaited after it returns.
-   */
+  /** @noRailsEquivalent PERMANENT */
   [toRun]: Array<() => Promise<void>> = [];
 
   constructor(public reverting: boolean) {}
@@ -337,72 +274,29 @@ export class ReversibleBlockHelper {
   }
 }
 
-/**
- * A migration class, as `Migration#run` / `Migration#revert` take it
- * (migration.rb:937, migration.rb:852) — Ruby passes the class object itself
- * and calls `.new` on it.
- */
 export type MigrationClass = new () => Migration;
 
-/** The trailing options hash `Migration#run` pops with `extract_options!`. */
 type MigrationRunOptions = { direction?: "up" | "down"; revert?: boolean };
 
-/**
- * @noRailsEquivalent PERMANENT — Ruby gives a block its own slot, so
- * `revert(*migration_classes, &block)` (migration.rb:852) needs no test to tell
- * a migration class from the block. In TS both arrive as trailing positional
- * functions, so the two can only be told apart by shape.
- */
+/** @noRailsEquivalent PERMANENT */
 function isMigrationClass(fn: unknown): fn is MigrationClass {
   return typeof fn === "function" && (fn === Migration || fn.prototype instanceof Migration);
 }
 
-/**
- * Rails asks the connection itself whether it is a recorder —
- * `connection.respond_to? :revert` (migration.rb:855, 1046) and
- * `connection.respond_to?(:reverting)` (migration.rb:871). A TS adapter type
- * cannot be narrowed by a duck-typed `respond_to?`, so the same question is
- * asked of the class.
- */
 function isCommandRecorder(connection: unknown): connection is CommandRecorder {
   return connection instanceof CommandRecorder;
 }
 
-/**
- * Migration — base class for database migrations.
- *
- * `A` names the adapter this migration runs against, so a `create_table`
- * block resolves that adapter's own column methods — `t.enum` on PostgreSQL
- * — the way Ruby resolves them at call time on the yielded definition
- * (migration.rb:1024-1036). It defaults to the abstract adapter, so a
- * migration that needs nothing adapter-specific declares nothing.
- *
- * Mirrors: ActiveRecord::Migration
- */
 export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
-  /**
-   * @internal Per-migration connection override — mirrors Rails' @connection
-   * ivar, which holds the adapter OR the `CommandRecorder` that `#revert`
-   * swaps in for the duration of a recorded block (migration.rb:857-864).
-   */
+  /** @internal */
   protected _connectionOverride?: DatabaseAdapter | CommandRecorder;
-  /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
+  /** @internal */
   protected _poolOverride?: ConnectionPool;
   private _executionStrategy?: ExecutionStrategy;
   private _name?: string;
-  /**
-   * The migration instance class-level schema operations route through
-   * (mirrors Rails `class << self; attr_accessor :delegate`, `migration.rb:684`).
-   * Seeded with `Migration.delegate = new Migration()` at the bottom of this
-   * file, exactly as Rails does at `migration.rb:813`.
-   * Rails defines `delegate` and `nearest_delegate` only inside `class << self`
-   * (`migration.rb:684-689`); the instance side reaches the adapter through
-   * `connection` (`migration.rb:1006-1012`), never through a delegate reader.
-   */
   static delegate: Migration | null = null;
   private _version?: number;
 
-  /** Mirrors: ActiveRecord::Migration.verbose (`cattr_accessor`, `migration.rb:797`). */
   static get verbose(): boolean {
     return migrationVerbose;
   }
@@ -420,73 +314,36 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
   private static _disableDdlTransaction = false;
 
-  /**
-   * Mirrors: ActiveRecord::Migration#initialize
-   */
   constructor(name?: string, version?: number) {
     this._name = name;
     this._version = version;
   }
 
-  /**
-   * Get the migration base class for a specific version.
-   *
-   * Usage:
-   *   class CreateUsers extends Migration.forVersion(1.0) {
-   *     async change() { ... }
-   *   }
-   *
-   * Mirrors: ActiveRecord[version] (e.g. ActiveRecord::Migration[7.2])
-   */
   static forVersion(v: string | number): typeof Migration {
     return findVersion(v) as unknown as typeof Migration;
   }
 
-  /**
-   * Run the migration in the given direction (class method).
-   *
-   * Mirrors: ActiveRecord::Migration.migrate — `new.migrate(direction)`, so the
-   * class-level entry point runs through the instance announce/timing/write +
-   * exec_migration path (`active_record/migration.rb:727`).
-   */
   static async migrate(direction: "up" | "down"): Promise<void> {
     await new (this as unknown as new () => Migration)().migrate(direction);
   }
 
-  /**
-   * Override to define the forward migration.
-   */
   async up(): Promise<void> {
     const legacy = this._legacyClassDirection("up");
     if (legacy) return legacy();
-    // Default: run change() in the forward direction.
     await this.change();
   }
 
-  /**
-   * Override to define the rollback migration.
-   * Default: run change() in reverse direction.
-   */
   async down(): Promise<void> {
     const legacy = this._legacyClassDirection("down");
     if (legacy) return legacy();
-    // Mirrors Rails exec_migration: `down` == `revert { change }`.
     await this.revert(() => this.change());
   }
 
-  /**
-   * Rails legacy delegate shape (`active_record/migration.rb:951-960`): a legacy
-   * migration defines its own class-level `self.up`/`self.down`; the instance
-   * `up`/`down` run that body with itself as the delegate (so its schema ops
-   * route back through this instance), and no-op for a direction the legacy
-   * class doesn't define (`return unless self.class.respond_to?(direction)`).
-   * Returns null for the normal `change`-based path (no class-level up/down).
-   */
   private _legacyClassDirection(direction: "up" | "down"): (() => Promise<void>) | null {
     const ctor = this.constructor as typeof Migration;
     const owns = (d: "up" | "down"): boolean => Object.prototype.hasOwnProperty.call(ctor, d);
-    if (!owns("up") && !owns("down")) return null; // change-based, not legacy
-    if (!owns(direction)) return async (): Promise<void> => {}; // Rails: return unless respond_to?
+    if (!owns("up") && !owns("down")) return null;
+    if (!owns(direction)) return async (): Promise<void> => {};
     const fn = (ctor as unknown as Record<string, () => Promise<void>>)[direction];
     return async (): Promise<void> => {
       const prev = Migration.delegate;
@@ -499,39 +356,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     };
   }
 
-  /**
-   * Override for reversible migrations.
-   * Called by both up() and down() with a direction parameter.
-   */
-  async change(): Promise<void> {
-    // Subclasses override
-  }
+  async change(): Promise<void> {}
 
-  // -- Schema operations (delegated to the connection adapter) --
-  // Migration records operations for reversibility, then delegates
-  // actual SQL execution to this.connection. In Rails, these methods
-  // live on the connection adapter via
-  // ActiveRecord::ConnectionAdapters::SchemaStatements.
-
-  /** @internal Mirrors Rails Migration#method_missing's proper_table_name dispatch. */
+  /** @internal */
   protected _pt(name: string): string {
-    // `method_missing` applies `proper_table_name` only when the connection is
-    // not the recorder (migration.rb:1046-1047) — a recorded command keeps the
-    // raw name, and replay prefixes it when it runs for real.
     if (isCommandRecorder(this.connection)) return name;
     return Migration.properTableName(name, Migration.tableNameOptions());
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
-   *   `Migration::Current#create_table` (migration.rb:580-586), a wrapper whose only
-   *   job is to yield the block through the identity hook
-   *   `compatible_table_definition` (migration.rb:612-614) so a
-   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
-   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
-   *   scope for the port, so the wrapper is not ported and the base
-   *   `create_table` is what pairs here.
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createTable(
     name: string,
     optionsOrFn?:
@@ -560,16 +393,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
-   *   `Migration::Current#drop_table` (migration.rb:602-608), a wrapper whose only
-   *   job is to yield the block through the identity hook
-   *   `compatible_table_definition` (migration.rb:612-614) so a
-   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
-   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
-   *   scope for the port, so the wrapper is not ported and the base
-   *   `drop_table` is what pairs here.
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async dropTable(
     ...args: Array<
       | string
@@ -578,8 +402,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     >
   ): Promise<void> {
     const rest = [...args] as unknown[];
-    // Rails drop_table(*table_names, **options, &block): the trailing block is
-    // the table definition, kept only so the recorder can recreate on reversal.
     const block = (typeof rest[rest.length - 1] === "function" ? rest.pop() : undefined) as
       | ((t: TableDefinition) => void)
       | undefined;
@@ -590,9 +412,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       : undefined;
     const names = (hasOptions ? rest.slice(0, -1) : rest) as string[];
     const tnames = names.map((n) => this._pt(n)) as [string, ...string[]];
-    // Ruby passes the block on its own channel (`&block`), which `drop_table`
-    // ignores and the recorder keeps; TS has only a trailing argument, so the
-    // adapter drops a trailing function the same way Ruby's signature does.
     if (options !== undefined && block !== undefined) {
       await this.connection.dropTable(...tnames, options, block);
     } else if (options !== undefined) {
@@ -640,7 +459,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.connection.addIndex(tableName, columns, options);
   }
 
-  // Rails migration compatibility: `remove_index(table_name, column_name = nil, **options)`.
   async removeIndex(
     tableName: string,
     columnOrOptions:
@@ -724,7 +542,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.connection.addReference(tableName, refName, options);
   }
 
-  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
   async addBelongsTo(
     tableName: string,
     refName: string,
@@ -747,7 +564,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.connection.removeReference(tableName, refName, options);
   }
 
-  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
   async removeBelongsTo(
     tableName: string,
     refName: string,
@@ -786,8 +602,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   async addCheckConstraint(
     tableName: string,
     expression: string,
-    // Mirrors Rails' `add_check_constraint(table, expression, **options)`:
-    // unrecognized options are forwarded verbatim, not rejected.
     options: {
       name?: string;
       validate?: boolean;
@@ -893,8 +707,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     valuesOrOptions?: string[] | { ifExists?: boolean },
     options?: { ifExists?: boolean },
   ): Promise<void> {
-    // Normalize: if second arg is a plain object it is the options hash (no values).
-    // Mirrors Rails drop_enum(name, values = nil, **options) which allows options-only calls.
     const isOptsObj =
       valuesOrOptions !== null &&
       typeof valuesOrOptions === "object" &&
@@ -938,8 +750,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     columnNameOrOptions?: string | string[] | UniqueConstraintOptions,
     options?: UniqueConstraintOptions,
   ): Promise<void> {
-    // Normalize: if second arg is a plain object it is the options hash (no column).
-    // Mirrors Rails extract_options! semantics for remove_unique_constraint(table, **opts).
     const isOptsObj =
       columnNameOrOptions !== null &&
       typeof columnNameOrOptions === "object" &&
@@ -968,19 +778,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.connection.removeTimestamps(tableName);
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
-   *   `Migration::Current#create_join_table` (migration.rb:594-600), a wrapper whose only
-   *   job is to yield the block through the identity hook
-   *   `compatible_table_definition` (migration.rb:612-614) so a
-   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
-   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
-   *   scope for the port, so the wrapper is not ported and the base
-   *   `create_join_table` is what pairs here.
-   *
-   * Same call-time block resolution as `createTable` above: `A` types the
-   * yielded definition.
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createJoinTable(
     table1: string,
     table2: string,
@@ -1010,16 +808,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /**
-   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
-   *   `Migration::Current#change_table` (migration.rb:588-592), a wrapper whose only
-   *   job is to yield the block through the identity hook
-   *   `compatible_table_definition` (migration.rb:612-614) so a
-   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
-   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
-   *   scope for the port, so the wrapper is not ported and the base
-   *   `change_table` is what pairs here.
-   */
+  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async changeTable(
     tableName: string,
     fnOrOptions?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
@@ -1070,10 +859,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     tableName: string,
     ...columnsAndOptions: Array<string | ({ type: ColumnType } & ColumnOptions)>
   ): Promise<void> {
-    // The per-column loop lives on the adapter, as Rails' `add_columns`
-    // (abstract/schema_statements.rb:643-647) does; a migration only forwards,
-    // so a recorded call records one `addColumns` command rather than N
-    // `addColumn`s.
     const connection = this.connection as unknown as {
       addColumns(
         tableName: string,
@@ -1107,21 +892,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return this.connection.views();
   }
 
-  /**
-   * Get the migration name.
-   *
-   * Mirrors: ActiveRecord::Migration#name
-   */
   get name(): string {
     return this._name ?? this.constructor.name;
   }
 
-  /**
-   * Reverts the given migration classes, and/or a block of operations.
-   *
-   * Mirrors: ActiveRecord::Migration#revert (`migration.rb:852-869`) —
-   * `run(*migration_classes.reverse, revert: true) unless migration_classes.empty?`.
-   */
   async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
     const last = migrationClasses[migrationClasses.length - 1];
     const fn = typeof last === "function" && !isMigrationClass(last) ? last : undefined;
@@ -1131,9 +905,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
     if (fn === undefined) return;
     if (isCommandRecorder(this.connection)) {
-      // `connection.revert(&block)` when the connection is already the recorder
-      // (migration.rb:855-856): no fresh recorder, no replay, and no
-      // suppress_messages — Rails only suppresses in the outer branch.
       await this.connection.revert(fn);
       return;
     }
@@ -1146,18 +917,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await recorder.replay(this as unknown as Record<string, (...a: unknown[]) => Promise<void>>);
   }
 
-  /**
-   * Runs the given migration classes.
-   *
-   * Last argument can specify options:
-   * - `direction` - Default is `up`.
-   * - `revert` - Default is `false`.
-   *
-   * Mirrors: ActiveRecord::Migration#run (`migration.rb:937-949`) — when the
-   * current migration is itself reverting, running a sub-migration `up` means
-   * executing it `down` without reverting, so it wraps the call in a nested
-   * `revert`.
-   */
   async run(...migrationClasses: Array<MigrationClass | MigrationRunOptions>): Promise<void> {
     const [klasses, opts] = extractOptionsBang(migrationClasses) as [
       MigrationClass[],
@@ -1166,7 +925,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     let dir = opts.direction ?? "up";
     if (opts.revert) dir = dir === "down" ? "up" : "down";
     if (this.isReverting()) {
-      // If in revert and going :up, say, we want to execute :down without reverting, so
       await this.revert(async () => {
         await this.run(...klasses, { direction: dir, revert: true });
       });
@@ -1177,19 +935,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /**
-   * Define reversible operations.
-   *
-   * Mirrors: ActiveRecord::Migration#reversible (migration.rb:909-912),
-   * `helper = ReversibleBlockHelper.new(reverting?)` then
-   * `execute_block { yield helper }`. The helper runs each `up`/`down` block
-   * inline as Ruby yields; the callbacks here are async and the block that
-   * registers them is not, so they are collected on the helper and awaited on
-   * the way out of the same `execute_block`. The whole invocation of `fn` —
-   * not just the selected callbacks — happens inside `execute_block`, so a
-   * recording pass defers the block's own statements to `replay` as Ruby's
-   * `yield helper` does (`migration/command_recorder.rb:148-152`).
-   */
   async reversible(fn?: (dir: ReversibleBlockHelper) => void): Promise<void> {
     if (!fn) return;
     const helper = new ReversibleBlockHelper(this.isReverting());
@@ -1199,36 +944,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     });
   }
 
-  /**
-   * Run code only in the up direction.
-   *
-   * Mirrors: ActiveRecord::Migration#up_only (migration.rb:928-930),
-   * `execute_block(&block) unless reverting?`.
-   */
   async upOnly(fn?: () => Promise<void>): Promise<void> {
     if (!this.isReverting() && fn) {
       await this.executeBlock(fn);
     }
   }
 
-  /**
-   * Run the migration in a given direction.
-   *
-   * Mirrors: ActiveRecord::Migration#migrate (migration.rb:964-983). The body
-   * runs inside `DatabaseTasks.migration_connection.pool.with_connection`
-   * (`:973`) so the connection `exec_migration` is handed is one checked out
-   * for the duration of the migration. `DatabaseTasks` is reached through the
-   * call-time config source rather than an import for the same reason
-   * `#connection` does — naming `tasks/database-tasks.js` here would be a
-   * load-time edge back into a module that already imports this one.
-   *
-   * The opening `return unless respond_to?(direction)` (`:965`) is answered by
-   * `Migration`'s own instance `up` and `down` (`migration.rb:951, 957`, the
-   * legacy-delegate shape), so it is true for both directions on every
-   * migration, change-only ones included. Resolving it against
-   * SUBCLASS-defined `up`/`down` instead would skip every change-based
-   * migration, which Rails runs.
-   */
   async migrate(direction: "up" | "down"): Promise<void> {
     if (typeof this[direction] !== "function") return;
     this.announce(direction === "up" ? "migrating" : "reverting");
@@ -1244,15 +965,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this.write();
   }
 
-  /**
-   * Check if the migration is currently reverting (recording operations
-   * for later reversal).
-   *
-   * Mirrors: ActiveRecord::Migration#reverting?
-   */
   isReverting(): boolean {
-    // `connection.respond_to?(:reverting) && connection.reverting`
-    // (migration.rb:871-873).
     const connection = this.connection;
     return isCommandRecorder(connection) && connection.reverting;
   }
@@ -1272,25 +985,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return this.connection.indexExists(this._pt(tableName), columnName);
   }
 
-  /**
-   * Retrieve a migration by version. Placeholder — returns null.
-   *
-   * Mirrors: ActiveRecord::Migration.get
-   */
   static get(_version: string): Migration | null {
     return null;
   }
 
-  /**
-   * Get the migration version. Rails initializes `@version` to nil
-   * (`migration.rb:799`) — only `@name` defaults to the class name — so an
-   * unversioned migration has no version.
-   */
   get version(): number | undefined {
     return this._version;
   }
-
-  // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
 
   write(text = ""): void {
     if (Migration.verbose) {
@@ -1299,7 +1000,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   announce(message: string): void {
-    // Ruby interpolates a nil version as "", not "undefined".
     this.write(announceMigrationText(`${this.version ?? ""} ${this.name}`, message));
   }
 
@@ -1329,18 +1029,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  // --- Connection (Rails: Migration#connection, #connection_pool) ---
-
   get connection(): A {
-    // Rails' @connection is whatever answers the schema statements — the
-    // adapter, or the CommandRecorder #revert swaps in. TS has no duck type
-    // spanning both, so the reader keeps the adapter type and the recorder
-    // arms narrow with `isCommandRecorder`.
-    // Rails: `@connection || DatabaseTasks.migration_connection`
-    // (`migration.rb:1036-1038`). `DatabaseTasks` is reached through the
-    // call-time config source rather than an import: naming
-    // `tasks/database-tasks.js` here would be a load-time edge back into a
-    // module that already imports this one.
     return (this._connectionOverride ??
       migrationArConfig()!.databaseTasks().migrationConnection()) as A;
   }
@@ -1349,17 +1038,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._connectionOverride = conn;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Migration#connection_pool (`migration.rb:1040-1042`).
-   * `DatabaseTasks` is reached through the call-time config source for the same
-   * reason `Migrator#connection` does — naming `tasks/database-tasks.js` here
-   * would be a load-time edge back into a module that already imports this one.
-   */
   get connectionPool(): ConnectionPool {
     return this._poolOverride ?? migrationArConfig()!.databaseTasks().migrationConnectionPool();
   }
-
-  // --- Execution (Rails: Migration#exec_migration, #execution_strategy, etc.) ---
 
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
     this._connectionOverride = conn;
@@ -1390,28 +1071,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._disableDdlTransaction = true;
   }
 
-  // --- Class methods (Rails: Migration.copy, .proper_table_name, etc.) ---
-
-  /**
-   * `MigrationFilenameRegexp` (`migration.rb:637`). Rails' migrations end in
-   * `.rb`; trails' end in `.ts`/`.js`.
-   */
   static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/;
 
   static isValidVersionFormat(version: string): boolean {
-    return [
-      Migration.MigrationFilenameRegexp,
-      /^\d(_?\d)*$/, // integer with optional underscores
-    ].some((pattern) => pattern.test(version));
+    return [Migration.MigrationFilenameRegexp, /^\d(_?\d)*$/].some((pattern) =>
+      pattern.test(version),
+    );
   }
 
   static nextMigrationNumber(number?: number | bigint | string): string {
-    // Rails: max(now.utc.strftime("%Y%m%d%H%M%S"), "%.14d" % number) — so a
-    // numerically-larger sequence wins over a same-second timestamp. Callers
-    // (e.g. Migration.copy) pass `last.version + 1` to guarantee monotonicity
-    // across iterations within the same second. Accepts bigint/string so
-    // versions beyond Number.MAX_SAFE_INTEGER (e.g. future renumbering above
-    // 9.0e15) survive without precision loss.
     const raw =
       number == null
         ? 0n
@@ -1419,17 +1087,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           ? number
           : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
     const n = raw < 0n ? 0n : raw;
-    // Rails' `else "%.3d" % number.to_i` branch: sequential numbering, no
-    // timestamp consulted at all (migration.rb:1128-1134).
     if (!ActiveRecord.timestampedMigrations) return n.toString().padStart(3, "0");
     const stamp = Temporal.Now.instant()
       .toString()
       .replace(/[-T:Z.]/g, "")
       .slice(0, 14);
     if (number == null) return stamp;
-    // Numeric (BigInt) comparison — string compare goes lexicographic once
-    // either side exceeds 14 digits and would mis-order (e.g. a 15-digit
-    // "100…" would sort below a 14-digit "2026…" string).
     return n > BigInt(stamp) ? n.toString().padStart(14, "0") : stamp;
   }
 
@@ -1437,11 +1100,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     name: string | { tableName?: unknown },
     options: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
   ): string {
-    // Mirrors Rails `name.respond_to?(:table_name)`: any non-null reference
-    // exposing a string `tableName` is honored. Model classes (functions)
-    // expose it as a static getter, so `typeof name === "function"` must
-    // count too — guarding only on "object" silently produces a stringified
-    // function name with prefix/suffix applied.
     if (
       name != null &&
       (typeof name === "object" || typeof name === "function") &&
@@ -1461,12 +1119,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     };
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT: Ruby's `options[:on_skip].call(scope,
-   *   migration)` (migration.rb:1216) is a Proc invocation; a JS callback is
-   *   invoked directly as `options.onSkip(scope, source)`, which records no
-   *   `call` token.
-   */
+  /** @missingRailsCall call — PERMANENT */
   static async copy(
     destination: string,
     sources: Record<string, string>,
@@ -1475,11 +1128,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       onCopy?: (scope: string, migration: MigrationProxy, oldPath: string) => void;
     } = {},
   ): Promise<MigrationProxy[]> {
-    // Mirrors Rails' Migration.copy: discover migrations in each scoped source
-    // directory, dedupe by Rails-name against the destination, renumber so
-    // the copied migration's version is greater than the latest existing one,
-    // emit `${version}_${name.underscore}.${scope}.ts`, and invoke optional
-    // on_skip / on_copy callbacks. See Rails migration.rb:1060-1108.
     const fs = getFs();
     const path = getPath();
 
@@ -1499,9 +1147,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
     const copied: MigrationProxy[] = [];
     for (const [scope, sourcePath] of Object.entries(sources)) {
-      // Must round-trip through `MigrationContext#parseMigrationFilename` (regex
-      // `[a-z0-9_]*`) or the copied file would be invisible to subsequent
-      // discovery via `MigrationContext#migrations`.
       if (!/^[a-z0-9_]+$/.test(scope)) {
         throw new ArgumentError(
           `Invalid migration scope '${scope}': must match /^[a-z0-9_]+$/ to be discoverable by MigrationContext#migrations.`,
@@ -1527,15 +1172,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         const nextNumber = last ? last.version + 1 : 0;
         const newVersion = toInteger(Migration.nextMigrationNumber(nextNumber));
         const fileBase = underscore(source.name);
-        // Preserve the source file extension — a `.js` source must stay
-        // loadable under a JS-only runtime; switching to `.ts` would break
-        // both `MigrationContext#migrations` discovery (regex matches .ts|.js) and
-        // the proxy's dynamic `import()`.
         const ext = path.extname(source.filename) || ".ts";
         const newPath = path.join(destination, `${newVersion}_${fileBase}.${scope}${ext}`);
         const oldPath = source.filename;
-        // Build a fresh migration factory that imports the NEW path — spreading
-        // `source` would carry over a closure pinned to the old engine file.
         const proxyName = source.name;
         let loaded: Promise<Migration> | undefined;
         const copy: MigrationProxy = {
@@ -1554,9 +1193,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         };
         last = copy;
 
-        // Preserve TS compiler magic directives (// @ts-check, // @ts-nocheck)
-        // before the provenance line, mirroring Rails' frozen_string_literal /
-        // encoding handling (migration.rb:1082).
         const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
         const magic = magicMatch ? magicMatch[1] : "";
         const rest = magic.length > 0 ? body.slice(magic.length) : body;
@@ -1569,9 +1205,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return copied;
   }
 
-  // --- Pending checks (Rails class methods) ---
-
-  /** Mirrors: `ActiveRecord::Migration.check_pending_migrations` (`migration.rb:739-746`) */
   static async checkPendingMigrations(): Promise<void> {
     const migrations = await this.pendingMigrations();
 
@@ -1580,12 +1213,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /**
-   * Mirrors: `ActiveRecord::Migration.check_all_pending!` (`migration.rb:714-728`).
-   *
-   * Raises {@link PendingMigrationError} if any migrations are pending for all
-   * database configurations in an environment.
-   */
   static async checkAllPendingBang(): Promise<void> {
     const pendingMigrations: MigrationProxy[][] = [];
 
@@ -1603,7 +1230,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`). */
   static async loadSchemaIfPendingBang(): Promise<void> {
     if (await this.anySchemaNeedsUpdate()) {
       await this.loadSchemaBang();
@@ -1614,11 +1240,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   static async maintainTestSchemaBang(): Promise<void> {
     if (ActiveRecord.maintainTestSchema) {
-      // Rails writes `suppress_messages { load_schema_if_pending! }`
-      // (migration.rb:719); the bare class-level call lands in
-      // `method_missing` (migration.rb:723-725), which forwards to
-      // `nearest_delegate`. TS has no static `method_missing`, so the
-      // forwarding Ruby does implicitly is spelled out here.
       await this.nearestDelegate?.suppressMessages(async () => {
         await this.loadSchemaIfPendingBang();
       });
@@ -1640,10 +1261,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
-    // Ruby carries the block on its own channel, so it is part of neither
-    // `format_arguments` nor `arguments.first` (migration.rb:1045-1052); TS
-    // passes it as a trailing function argument, which must not be mistaken
-    // for either.
     const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
     return await this.sayWithTime(`${name}(${this.formatArguments(args)})`, async () => {
       const conn = this.connection as unknown as Record<string, unknown>;
@@ -1671,24 +1288,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     });
   }
 
-  /**
-   * Mirrors: ActiveRecord::Migration#execute_block (migration.rb:1146-1152).
-   *
-   *   def execute_block
-   *     if connection.respond_to? :execute_block
-   *       super # use normal delegation to record the block
-   *     else
-   *       yield
-   *     end
-   *   end
-   *
-   * Ruby's `super` has no super-definition, so it falls through to
-   * `method_missing`, which delegates to the connection — the CommandRecorder
-   * while reverting, which records the block for inversion
-   * (command_recorder.rb:52).
-   *
-   * @internal
-   */
+  /** @internal */
   async executeBlock(fn: () => Promise<void>): Promise<void> {
     const connection = this.connection as unknown as Record<string, unknown>;
     if (typeof connection["executeBlock"] === "function") {
@@ -1698,15 +1298,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await fn();
   }
 
-  /**
-   * Render a dispatched statement's arguments the way Ruby's
-   * `format_arguments` does: every argument through `inspect`, with a
-   * trailing options Hash stripped of internal (`_`-prefixed) keys and
-   * omitted when nothing survives. An empty argument list still yields
-   * `"nil"`, matching Ruby's `arguments.last` on an empty array.
-   *
-   * @internal
-   */
+  /** @internal */
   formatArguments(args: unknown[]): string {
     const argList = args.slice(0, -1).map((a) => rubyInspect(a));
     const last = args[args.length - 1];
@@ -1731,11 +1323,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return new CommandRecorder(this.connection);
   }
 
-  /**
-   * @internal Mirrors: `ActiveRecord::Migration.any_schema_needs_update?`
-   * (`migration.rb:747-751`). Rails reads `ActiveRecord.schema_format`; trails
-   * keeps that setting on `DatabaseTasks` (it is also `schemaUpToDate`'s default).
-   */
+  /** @internal */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
     const databaseTasks = migrationArConfig()!.databaseTasks();
 
@@ -1745,7 +1333,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return false;
   }
 
-  /** @internal Mirrors: `ActiveRecord::Migration.pending_migrations` (`migration.rb:757-769`) */
+  /** @internal */
   private static async pendingMigrations(): Promise<MigrationProxy[]> {
     const pendingMigrations: MigrationProxy[][] = [];
 
@@ -1759,7 +1347,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return pendingMigrations.flat();
   }
 
-  /** @internal Mirrors: `ActiveRecord::Migration.db_configs_in_current_env` (`migration.rb:753-755`) */
+  /** @internal */
   private static dbConfigsInCurrentEnv(): DatabaseConfig[] {
     return migrationArConfig()!.configurations().configsFor({ envName: this.env() });
   }
@@ -1777,28 +1365,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
   }
 
-  /**
-   * @internal Mirrors: `ActiveRecord::Migration.load_schema!` (`migration.rb:775-783`).
-   *
-   * Rails roundtrips to Rake — `FileUtils.cd(root) { clear_all_connections!; system("bin/rails
-   * db:test:prepare") }` — so plugins can hook into database initialization. trails has no
-   * process surface to shell to, so it calls what that Rake task reaches directly.
-   * `db:test:prepare` invokes `db:test:load_schema` (`databases.rake:531-539`), which
-   * depends on `db:test:purge` (`:541-545`) — so every test config is purged by a direct
-   * `configs_for(env_name: "test")` loop with no pool open, and only then does
-   * `load_schema` open a temporary pool per config. Both phases are kept, in that order:
-   * the purge must not run behind an established connection to a database it is about
-   * to recreate. `ENV["SCHEMA_FORMAT"]` overrides the configured format there
-   * (`:537`), so it does here; trails keeps that setting on `DatabaseTasks`.
-   *
-   * `ActiveRecord::Schema.verbose = false` (`:534`) silences the load; `Schema`
-   * inherits `Migration`'s `verbose` cattr, so the assignment writes the same
-   * state. The constant is reached through a call-time `await import` rather
-   * than a module-scope one because `schema.ts` is `class Schema extends
-   * Current`: a value import would close a cycle through this file and evaluate
-   * `Schema` with `Current` in TDZ. Ruby resolves it when the task runs, which
-   * is where the dynamic import resolves it too.
-   */
+  /** @internal */
   private static async loadSchemaBang(): Promise<void> {
     const databaseTasks = migrationArConfig()!.databaseTasks();
 
@@ -1813,40 +1380,24 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
       const dbConfig = pool.dbConfig;
       Schema.verbose = false;
-      // `databases.rake:537` — `DatabaseTasks.schemaFormat` is the trails home
-      // of Rails' global `ActiveRecord.schema_format`.
       const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
       await databaseTasks.loadSchema(dbConfig, schemaFormat);
     });
   }
 }
 
-// === Migrator (Rails defines this in migration.rb) ===
-
 export interface MigrationProxy {
   version: number;
   name: string;
   filename?: string;
-  /** Mirrors: ActiveRecord::MigrationProxy#scope — engine name for copied engine migrations */
   scope?: string;
-  /**
-   * Mirrors: ActiveRecord::MigrationProxy#migration — `@migration ||=
-   * load_migration` (`migration.rb:1190-1192`). Memoized by the implementer, so
-   * every member Rails delegates through the proxy sees the same instance.
-   */
   migration: () => Migration | Promise<Migration>;
-  /** @internal Mirrors: ActiveRecord::MigrationProxy#basename */
+  /** @internal */
   basename?(): string;
-  /** @internal Mirrors: ActiveRecord::MigrationProxy#load_migration */
+  /** @internal */
   loadMigration?(): Promise<Migration>;
 }
 
-/**
- * Mirrors: ActiveRecord::MigrationProxy#load_migration (`migration.rb:1195`) —
- * `name.constantize.new(name, version)`. The module's export named after the
- * migration is the class; the instance is always constructed here so it
- * carries the proxy's name and version.
- */
 async function loadMigrationFrom(
   mod: Record<string, unknown>,
   name: string,
@@ -1859,17 +1410,6 @@ async function loadMigrationFrom(
   throw new Error(`Migration ${name} must export a Migration class named "${name}"`);
 }
 
-/**
- * Rails' `sort_by(&:version)` over migration proxies: numeric, not
- * lexicographic, so version 10 sorts after version 2. BigInt because a
- * timestamp version exceeds `Number.MAX_SAFE_INTEGER`.
- */
-/**
- * Ruby's `String#to_i`: the leading signed integer prefix, or 0 when there is
- * none — so `"123abc"` is 123 and a non-numeric legacy version sorts as 0
- * rather than raising. A migration version is a 14-digit timestamp at most, so
- * it is exactly representable as a JS number.
- */
 function toInteger(value: string): number {
   const match = value.match(/^\s*(-?\d+)/);
   if (!match) return 0;
@@ -1880,16 +1420,7 @@ function byVersion(a: MigrationProxy, b: MigrationProxy): number {
   return a.version - b.version;
 }
 
-/**
- * The `schema_migration` / `internal_metadata` arguments of
- * `MigrationContext#initialize` (`migration.rb:1214`), whose Ruby defaults are
- * `nil`. Both may be omitted — but only while the context's collaborators are
- * still the real ones, so `MigrationContext#initialize`'s
- * `schema_migration || SchemaMigration.new(connection_pool)` fallback
- * (`migration.rb:1215-1216`) cannot be reached by a context typed for the null
- * objects `Migration.copy` seats (`migration.rb:1065-1066`).
- * @internal
- */
+/** @internal */
 type SeatedCollaborators<S, I> = [S] extends [SchemaMigration]
   ? [I] extends [InternalMetadata]
     ? [] | [schemaMigration: S] | [schemaMigration: S, internalMetadata: I]
@@ -1898,55 +1429,14 @@ type SeatedCollaborators<S, I> = [S] extends [SchemaMigration]
     ? [schemaMigration: S] | [schemaMigration: S, internalMetadata: I]
     : [schemaMigration: S, internalMetadata: I];
 
-/**
- * = \Migration \Context
- *
- * MigrationContext sets the context in which a migration is run.
- *
- * A migration context requires the path to the migrations is set in the
- * `migrationsPaths` parameter. Optionally a `schemaMigration` object can be
- * provided. Multiple database applications will instantiate a
- * `SchemaMigration` object per database.
- *
- * Mirrors: ActiveRecord::MigrationContext (migration.rb:1211)
- */
 export class MigrationContext<
   S extends SchemaMigration | NullSchemaMigration = SchemaMigration,
   I extends InternalMetadata | NullInternalMetadata = InternalMetadata,
 > {
-  /** Mirrors: `attr_reader :migrations_paths, :schema_migration, :internal_metadata` (`migration.rb:1212`). */
   readonly migrationsPaths: string[];
   readonly schemaMigration: S;
   readonly internalMetadata: I;
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#initialize
-   * (`migration.rb:1214-1218`).
-   *
-   * A caller with no pool hands in the null objects `Migration.copy` does
-   * (`migration.rb:1065-1066`), which the discovery half (`migrations`,
-   * `migrationFiles`, `parseMigrationFilename`) never calls into. Rails'
-   * `NullSchemaMigration` (`schema_migration.rb:9`) / `NullInternalMetadata`
-   * (`internal_metadata.rb:13`) are empty classes duck-typed into the same
-   * slot, and `attr_reader` (`migration.rb:1212`) hands back whatever was
-   * seated.
-   *
-   * TS has no duck typing, so the collaborators are the class' two type
-   * parameters, defaulted to the real classes: a context built with the null
-   * objects is a `MigrationContext<NullSchemaMigration, NullInternalMetadata>`,
-   * which is not assignable to `MigrationContext`, and the connected half
-   * (`up`/`down`/`currentVersion`, …) is annotated `this: MigrationContext`.
-   * Calling one of those on a discovery-only context is therefore a compile
-   * error rather than a null object receiving a `SchemaMigration` message, and
-   * the readers hand back exactly what was seated, as `attr_reader` does.
-   *
-   * TS cannot say "when this argument is omitted, its type parameter is at its
-   * default", so the two `||` fallbacks are written through {@link SeatedCollaborators}:
-   * seating nothing is only well-typed when the parameters still are the real
-   * collaborators, which is the sole branch that reaches them. Omitting a
-   * collaborator on a narrowed context — the one call that would make them
-   * lie — does not compile.
-   */
   constructor(migrationsPaths: string[], ...seated: SeatedCollaborators<S, I>) {
     const [schemaMigration, internalMetadata] = seated;
     this.migrationsPaths = migrationsPaths;
@@ -1954,20 +1444,10 @@ export class MigrationContext<
     this.internalMetadata = internalMetadata ?? (new InternalMetadata(this.connectionPool()) as I);
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#connection_pool
-   * (`migration.rb:1365-1367`). `DatabaseTasks` is reached through the
-   * call-time config source rather than an import, for the same reason
-   * `Migration#connection_pool` does.
-   */
   private connectionPool(): ConnectionPool {
     return migrationArConfig()!.databaseTasks().migrationConnectionPool();
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#migrate
-   * (`migration.rb:1228-1238`).
-   */
   async migrate(
     this: MigrationContext,
     targetVersion?: number | string | null,
@@ -1981,7 +1461,6 @@ export class MigrationContext<
     return this.up(targetVersion, block);
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#up (`migration.rb:1248-1256`) */
   async up(
     this: MigrationContext,
     targetVersion?: number | string | null,
@@ -1997,7 +1476,6 @@ export class MigrationContext<
     ).migrate();
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
   async down(
     this: MigrationContext,
     targetVersion?: number | string | null,
@@ -2013,29 +1491,14 @@ export class MigrationContext<
     ).migrate();
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#rollback
-   * (`migration.rb:1240-1242`) — `move(:down, steps)`, not `Migrator`'s own
-   * `rollback`. The two are not equivalent: `move` indexes into the sorted
-   * migration list from `currentMigration` and raises
-   * `UnknownMigrationVersionError` when the current version has no matching
-   * migration, where `Migrator#rollback` walks the last N *applied* versions
-   * and silently rolls back a different set when migrations ran out of order.
-   */
   async rollback(this: MigrationContext, steps: number = 1): Promise<MigrationProxy[]> {
     return this.move("down", steps);
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#forward
-   * (`migration.rb:1244-1246`) — `move(:up, steps)`. See {@link rollback} for
-   * why this does not delegate to `Migrator#forward`.
-   */
   async forward(this: MigrationContext, steps: number = 1): Promise<MigrationProxy[]> {
     return this.move("up", steps);
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
   async run(
     this: MigrationContext,
     direction: "up" | "down",
@@ -2050,16 +1513,10 @@ export class MigrationContext<
     ).run();
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#open
-   * (`migration.rb:1272-1274`) — a fresh `Migrator` over this context's
-   * migrations, so each read sees current schema_migrations.
-   */
   open(this: MigrationContext): Migrator {
     return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#migrations_status (`migration.rb:1317-1330`) */
   async migrationsStatus(
     this: MigrationContext,
   ): Promise<Array<{ status: "up" | "down"; version: string; name: string }>> {
@@ -2108,7 +1565,6 @@ export class MigrationContext<
     return DatabaseConfigurations.defaultEnv;
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
   async protectedEnvironment(this: MigrationContext): Promise<boolean> {
     const stored = await this.lastStoredEnvironment();
     if (!stored) return false;
@@ -2116,7 +1572,6 @@ export class MigrationContext<
     return (Base.protectedEnvironments ?? ["production"]).includes(stored);
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#last_stored_environment (`migration.rb:1348-1357`) */
   async lastStoredEnvironment(this: MigrationContext): Promise<string | null> {
     const internalMetadata = this.internalMetadata;
     if (!internalMetadata.enabled) return null;
@@ -2133,7 +1588,6 @@ export class MigrationContext<
     return environment;
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#get_all_versions */
   async getAllVersions(this: MigrationContext): Promise<number[]> {
     if (await this.schemaMigration.tableExists()) {
       return this.schemaMigration.integerVersions();
@@ -2141,10 +1595,6 @@ export class MigrationContext<
     return [];
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#current_version
-   * (`migration.rb:1292-1295`), whose bare `rescue NoDatabaseError` returns nil.
-   */
   async currentVersion(this: MigrationContext): Promise<number | undefined> {
     try {
       const versions = await this.getAllVersions();
@@ -2155,31 +1605,16 @@ export class MigrationContext<
     }
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#needs_migration?
-   * (`migration.rb:1295-1297`).
-   *
-   * @missingRailsCall size — PERMANENT: Ruby `Array#size` (migration.rb:1296)
-   *   is a method; the JS counterpart `.length` is a property, so no callee is
-   *   recorded.
-   */
+  /** @missingRailsCall size — PERMANENT */
   async needsMigration(this: MigrationContext): Promise<boolean> {
     return (await this.pendingMigrationVersions()).length > 0;
   }
 
-  /** Mirrors: ActiveRecord::MigrationContext#pending_migration_versions */
   async pendingMigrationVersions(this: MigrationContext): Promise<number[]> {
     const applied = new Set(await this.getAllVersions());
     return this.migrations.map((m) => m.version).filter((v) => !applied.has(v));
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#migrations
-   * (`migration.rb:1303-1315`). Discovery reads *this context's*
-   * `migrationsPaths`, which Rails keeps as per-instance constructor state
-   * (`attr_reader :migrations_paths`), so two contexts built for two migration
-   * directories do not collide.
-   */
   get migrations(): MigrationProxy[] {
     const migrations = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
@@ -2212,20 +1647,7 @@ export class MigrationContext<
     return migrations.sort(byVersion);
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#migration_files
-   * (`migration.rb:1369-1372`).
-   *
-   * Rails globs `#{paths}/**\/[0-9]*_*.rb`. trails scaffolds migrations in
-   * TypeScript, so the extension set is `ts|js` — and that extension set is the
-   * one way a single migration can be present twice, as a `.ts` source beside
-   * the `.js` its build emitted. Rails has no such twin, so it loads once:
-   * `.ts` beats `.js`, source over compiled output.
-   *
-   * `protected`, not `private`: Ruby's `private` still lets a subclass override
-   * the method, which is how a context over a non-filesystem source (the
-   * browser CLI's virtual FS) names its own files.
-   */
+  /** @internal */
   protected migrationFiles(): string[] {
     const { readdirSync, existsSync } = getFs();
     const { join } = getPath();
@@ -2258,15 +1680,8 @@ export class MigrationContext<
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#parse_migration_filename
-   * (`migration.rb:1374-1376`) — Rails'
-   * `/\A([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.rb\z/` with `ts|js` for `rb`.
-   *
-   * @missingRailsCall first — PERMANENT: Ruby `Array#first` on the `scan`
-   *   result (migration.rb:1375) is a method; JS reads the first match off the
-   *   `String#match` result by index, which records no callee.
-   *
-   * `protected` for the same reason {@link migrationFiles} is.
+   * @internal
+   * @missingRailsCall first — PERMANENT
    */
   protected parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "");
@@ -2275,12 +1690,12 @@ export class MigrationContext<
     return [m[1], m[2], m[3] ?? ""];
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#validate_timestamp? (`migration.rb:1378-1380`) */
+  /** @internal */
   private isValidateTimestamp(): boolean {
     return ActiveRecord.timestampedMigrations && ActiveRecord.validateMigrationTimestamps;
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#valid_migration_timestamp? (`migration.rb:1382-1384`) */
+  /** @internal */
   private isValidMigrationTimestamp(version: string | number): boolean {
     const tomorrow = Temporal.Now.plainDateTimeISO("UTC").add({ days: 1 });
     const limit = Number(
@@ -2289,12 +1704,7 @@ export class MigrationContext<
     return Number(version) < limit;
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::MigrationContext#move
-   * (`migration.rb:1386-1401`), whose closing `public_send(direction, version)`
-   * returns whatever `up` / `down` returned — so `rollback` / `forward` answer
-   * the migrations that ran.
-   */
+  /** @internal */
   async move(
     this: MigrationContext,
     direction: "up" | "down",
@@ -2311,9 +1721,6 @@ export class MigrationContext<
     if (currentVersion !== 0 && !currentMigration) {
       throw new UnknownMigrationVersionError(currentVersion);
     }
-    // Rails' `migrations.index(current_migration)` is `Array#index`, i.e.
-    // `MigrationProxy#==` — Struct value equality, not identity. Versions are
-    // unique (`Migrator#validate`), so matching on version is that comparison.
     const migrations = migrator.migrations;
     const startIndex =
       currentVersion === 0
@@ -2326,7 +1733,6 @@ export class MigrationContext<
 }
 
 export class Migrator {
-  /** Mirrors: ActiveRecord::Migrator.migrations_paths (`migration.rb:1407`, `:1419`) */
   static migrationsPaths: string[] = ["db/migrate"];
 
   private _migrations: MigrationProxy[];
@@ -2336,13 +1742,6 @@ export class Migrator {
   private readonly _targetVersion: number | null;
   private _migratedVersions?: Set<number>;
 
-  /**
-   * Mirrors: `ActiveRecord::Migrator#initialize` (`migration.rb:1418-1433`) —
-   * `(direction, migrations, schema_migration, internal_metadata,
-   * target_version = nil)`. The bookkeeping objects are arguments, as Rails has
-   * them, so a multi-database caller can hand each Migrator its own pair
-   * (`multi_db_migrator_test.rb:142,149`).
-   */
   constructor(
     direction: "up" | "down",
     migrations: MigrationProxy[],
@@ -2358,33 +1757,13 @@ export class Migrator {
     this._migrations = this._sortMigrations(migrations);
   }
 
-  /** Mirrors: ActiveRecord::Migrator#migrations */
   get migrations(): MigrationProxy[] {
     return this.isDown() ? [...this._migrations].reverse() : this._sortMigrations(this._migrations);
   }
 
-  // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32("googol"))
   private static readonly _MIGRATOR_SALT = 2053462845;
 
-  /**
-   * Wrap a block with an advisory lock to prevent concurrent migrations.
-   *
-   * Once the lock is held, `loadMigrated` reloads schema_migrations to be sure
-   * it wasn't changed by another process while we blocked (migration.rb:1601).
-   *
-   * Whether the adapter can take a lock at all is the *caller's* question:
-   * `use_advisory_lock?` (migration.rb:1596-1598) is checked by `#migrate` /
-   * `#run` (migration.rb:1447, 1461), never inside this body. Adapters that
-   * cannot lock answer `isAdvisoryLocksEnabled()` falsey.
-   *
-   * The one call with no Rails counterpart is `_ensureSchemaTable()`: Rails
-   * creates the bookkeeping tables in `Migrator#initialize`
-   * (migration.rb:1470-1476), and a TS constructor cannot await, so they are
-   * ensured at the one point that must see them — before `loadMigrated` reads
-   * schema_migrations.
-   *
-   * @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock
-   */
+  /** @internal */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
     const lockId = await this.generateMigratorAdvisoryLockId();
     const gotLock = await this.connection.getAdvisoryLock(lockId);
@@ -2393,8 +1772,6 @@ export class Migrator {
     }
     await this._ensureSchemaTable();
     await this.loadMigrated();
-    // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).
-    // Release errors are swallowed when fn itself failed so the migration error wins.
     const _sentinel = Symbol();
     let fnResult: T | typeof _sentinel = _sentinel;
     let fnError: unknown = _sentinel;
@@ -2403,8 +1780,6 @@ export class Migrator {
     } catch (e) {
       fnError = e;
     }
-    // Any non-true return — false or undefined — is treated as failure, matching
-    // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
     let released: boolean | undefined;
     try {
       released = await this.connection.releaseAdvisoryLock(lockId);
@@ -2419,32 +1794,19 @@ export class Migrator {
     return fnResult as T;
   }
 
-  /** Mirrors: ActiveRecord::Migrator#run (`migration.rb:1444-1450`) */
   async run(): Promise<number | undefined> {
     return this.isUseAdvisoryLock()
       ? this.withAdvisoryLock(() => this.runWithoutLock())
       : this.runWithoutLock();
   }
 
-  /**
-   * Mirrors: ActiveRecord::Migrator#migrate (`migration.rb:1452-1458`)
-   * — the advisory-lock gate over `migrate_without_lock`. The direction and
-   * target version are the ones this Migrator was constructed with; the
-   * `target_version.nil? / == 0 / >` dispatch belongs to
-   * {@link MigrationContext.migrate} (`migration.rb:1228-1238`).
-   */
   async migrate(): Promise<MigrationProxy[]> {
     return this.isUseAdvisoryLock()
       ? this.withAdvisoryLock(() => this.migrateWithoutLock())
       : this.migrateWithoutLock();
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::Migrator#run_without_lock
-   *
-   * Reads the direction and target version this Migrator was constructed with,
-   * as Rails does with `@direction` / `@target_version`.
-   */
+  /** @internal */
   async runWithoutLock(): Promise<number | undefined> {
     await this._ensureSchemaTable();
     const migration = this._migrations.find((m) => m.version === this._targetVersion);
@@ -2453,9 +1815,8 @@ export class Migrator {
     return this.executeMigrationInTransaction(migration);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
+  /** @internal */
   async migrateWithoutLock(): Promise<MigrationProxy[]> {
-    // isInvalidTarget() is only ever true for a non-null target version.
     if (this.isInvalidTarget()) {
       throw new UnknownMigrationVersionError(this._targetVersion ?? "");
     }
@@ -2468,22 +1829,20 @@ export class Migrator {
     return runnable;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#up? */
+  /** @internal */
   isUp(): boolean {
     return this._direction === "up";
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#down? */
+  /** @internal */
   isDown(): boolean {
     return this._direction === "down";
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#record_environment */
+  /** @internal */
   async recordEnvironment(): Promise<void> {
     if (this.isDown()) return;
     if (this._internalMetadata.enabled) {
-      // `NullConfig#env_name` is nil for a bare-adapter Migrator, as in Rails
-      // (`abstract/connection_pool.rb:17-22`); the cast narrows, it does not default.
       await this._internalMetadata.set(
         "environment",
         this.connection.pool.dbConfig.envName as string,
@@ -2491,76 +1850,51 @@ export class Migrator {
     }
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::Migrator#connection
-   * (`migration.rb:1488-1491`). `DatabaseTasks` is reached through the
-   * call-time config source: naming `tasks/database-tasks.js` here would be a
-   * load-time edge back into a module that already imports this one.
-   */
+  /** @internal */
   private get connection(): DatabaseAdapter {
     return migrationArConfig()!.databaseTasks().migrationConnection();
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#ran? */
+  /** @internal */
   async isRan(proxy: MigrationProxy): Promise<boolean> {
     const applied = await this.migrated();
     return applied.has(proxy.version);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#invalid_target? (`migration.rb:1523-1525`) */
+  /** @internal */
   isInvalidTarget(): boolean {
     return this._targetVersion !== null && this._targetVersion !== 0 && !this.target();
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction
-   *
-   * Rails' early returns yield nil; the version is returned only when the
-   * migration actually ran, which is what `run_without_lock` hands back to
-   * `MigrationContext#run`.
-   */
+  /** @internal */
   async executeMigrationInTransaction(migration: MigrationProxy): Promise<number | undefined> {
-    // Ruby's method-level `rescue` (`migration.rb:1538`) covers the guards and
-    // the log line too, not just the ddl_transaction.
     try {
       const applied = await this.migrated();
       if (this.isDown() && !applied.has(migration.version)) return undefined;
       if (this.isUp() && applied.has(migration.version)) return undefined;
 
-      // Rails' guard is just `if Base.logger`; the `?.` on `info` is forced by
-      // trails' `Base.logger` type, which declares every level optional
-      // (base.ts:1717-1723) because the logger is app-supplied, where Ruby's is
-      // an ActiveSupport::Logger that always responds to `info`.
       if (_base?.logger)
         _base.logger.info?.(`Migrating to ${migration.name} (${migration.version})`);
 
       await this.ddlTransaction(migration, async () => {
-        // Rails delegates `migrate` through the proxy (`migration.rb:1187`);
-        // trails resolves it here because the proxy's loader is an async ESM
-        // `import()` where Ruby's `load` is synchronous.
         await (await migration.migration()).migrate(this._direction);
         await this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {
-      // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
-      // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
-      // load raises again from inside the rescue and escapes unwrapped.
       const useTx = await this.isUseTransaction(migration);
-      // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
-      // the `Error: ` prefix JS String(e) would add.
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
     return migration.version;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#target */
+  /** @internal */
   private target(): MigrationProxy | undefined {
     if (this._targetVersion === null) return undefined;
     return this.migrations.find((m) => m.version === this._targetVersion);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#finish */
+  /** @internal */
   private finish(): number {
     const migrations = this.migrations;
     const target = this.target();
@@ -2568,7 +1902,7 @@ export class Migrator {
     return index === -1 ? migrations.length - 1 : index;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#start */
+  /** @internal */
   private async start(): Promise<number> {
     if (this.isUp()) return 0;
     const current = await this.current();
@@ -2576,7 +1910,7 @@ export class Migrator {
     return index === -1 ? 0 : index;
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating */
+  /** @internal */
   async recordVersionStateAfterMigrating(version: number): Promise<void> {
     const migrated = await this.migrated();
     if (this.isDown()) {
@@ -2588,27 +1922,17 @@ export class Migrator {
     }
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock?
-   *
-   * Rails gates solely on `connection.advisory_locks_enabled?`
-   * (`supports_advisory_locks? && @advisory_locks_enabled`), mirrored here by
-   * `isAdvisoryLocksEnabled()`.
-   */
+  /** @internal */
   isUseAdvisoryLock(): boolean {
     return this.connection.isAdvisoryLocksEnabled();
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
+  /** @internal */
   async generateMigratorAdvisoryLockId(): Promise<bigint> {
-    // Rails sends `current_database` unconditionally; an adapter that does not
-    // define it raises NoMethodError. The `!` reproduces that unconditional
-    // send — it is not a claim that the member is always present.
     const dbNameHash = crc32(await this.connection.currentDatabase!());
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 
-  /** Mirrors: ActiveRecord::Migrator#current_version (`migration.rb:1435-1437`) */
   async currentVersion(): Promise<number> {
     const migrated = await this.migrated();
     return migrated.size > 0 ? Math.max(...migrated) : 0;
@@ -2618,17 +1942,7 @@ export class Migrator {
     return [...migrations].sort(byVersion);
   }
 
-  /**
-   * @internal Mirrors: ActiveRecord::Migrator#validate (`migration.rb:1557-1563`).
-   *
-   * Rails' `group_by(&:name).find { |_, v| v.length > 1 }` reports the first
-   * *name* in first-occurrence order that has any duplicate — not the name
-   * whose repeat appears earliest — and names are checked before versions, so
-   * a list of same-name, version-less migrations raises
-   * DuplicateMigrationNameError rather than being rejected for a missing
-   * version. A JS `Map` preserves insertion order the same way Ruby's Hash
-   * does, so the group/find pair carries both properties.
-   */
+  /** @internal */
   private validate(migrations: MigrationProxy[]): void {
     const [name] = [...groupBy(migrations, (m) => m.name)].find(([, v]) => v.length > 1) ?? [];
     if (name != null) throw new DuplicateMigrationNameError(name);
@@ -2640,14 +1954,6 @@ export class Migrator {
 
   private _schemaTablesEnsured?: Promise<void>;
 
-  /**
-   * Deliberate stand-in for Rails' constructor-time creation: `initialize`
-   * creates both bookkeeping tables as its last act (migration.rb:1429-1430),
-   * so everything downstream may assume they exist. `createTable` is async and
-   * a constructor cannot await, so the creation is memoized here and awaited at
-   * the entry points instead — still exactly once per Migrator, and a failure
-   * stays terminal the way a raise from `initialize` would.
-   */
   private _ensureSchemaTable(): Promise<void> {
     return (this._schemaTablesEnsured ??= (async () => {
       await this._schemaMigration.createTable();
@@ -2659,21 +1965,7 @@ export class Migrator {
     return new Set(await this._schemaMigration.integerVersions());
   }
 
-  /**
-   * Wrap the migration in a DDL transaction if the adapter supports
-   * it and the migration hasn't opted out. Mirrors Rails'
-   * `Migrator#ddl_transaction`:
-   *
-   *     def ddl_transaction(migration)
-   *       if use_transaction?(migration)
-   *         connection.transaction { yield }
-   *       else
-   *         yield
-   *       end
-   *     end
-   *
-   * @internal
-   */
+  /** @internal */
   async ddlTransaction(migration: MigrationProxy, fn: () => Promise<void>): Promise<void> {
     if (await this.isUseTransaction(migration)) {
       await this.connection.transaction(fn);
@@ -2682,35 +1974,21 @@ export class Migrator {
     }
   }
 
-  /**
-   * Mirrors Rails' `Migrator#use_transaction?`:
-   * `!migration.disable_ddl_transaction && connection.supports_ddl_transactions?`
-   *
-   * @internal
-   */
+  /** @internal */
   async isUseTransaction(migration: MigrationProxy): Promise<boolean> {
-    // `migration.disable_ddl_transaction` is delegated through the proxy
-    // (`migration.rb:1187`); trails resolves it here because the proxy's loader
-    // is an async ESM `import()` where Ruby's `load` is synchronous.
     if ((await migration.migration()).disableDdlTransaction) return false;
-    // Check adapter support via the DatabaseAdapter interface.
-    // SQLite returns true, PG returns true, MySQL returns false.
-    // Absent (undefined) defaults to false.
     return this.connection.supportsDdlTransactions?.() ?? false;
   }
 
-  /** Mirrors: ActiveRecord::Migrator#current_migration (`migration.rb:1439-1441`) */
   async currentMigration(): Promise<MigrationProxy | null> {
     const currentVersion = await this.currentVersion();
     return this.migrations.find((m) => m.version === currentVersion) ?? null;
   }
 
-  /** Mirrors: ActiveRecord::Migrator `alias :current :current_migration` (`migration.rb:1442`) */
   async current(): Promise<MigrationProxy | null> {
     return this.currentMigration();
   }
 
-  /** Mirrors: ActiveRecord::Migrator#runnable */
   async runnable(): Promise<MigrationProxy[]> {
     const runnable = this.migrations.slice(await this.start(), this.finish() + 1);
     const kept: MigrationProxy[] = [];
@@ -2727,78 +2005,31 @@ export class Migrator {
     return kept;
   }
 
-  /** Mirrors: ActiveRecord::Migrator#pending_migrations (`migration.rb:1475-1478`) */
   async pendingMigrations(): Promise<MigrationProxy[]> {
     const alreadyMigrated = await this.migrated();
     return this.migrations.filter((m) => !alreadyMigrated.has(m.version));
   }
 
-  /** Mirrors: ActiveRecord::Migrator#migrated (`migration.rb:1480-1482`) */
   async migrated(): Promise<Set<number>> {
     return this._migratedVersions ?? this.loadMigrated();
   }
 
-  /**
-   * Rails' `initialize` creates both bookkeeping tables (`migration.rb:1429-1430`)
-   * before anything can read `migrated`, so `load_migrated` may assume
-   * schema_migrations exists. `_ensureSchemaTable` is trails' async stand-in for
-   * that constructor step (a constructor cannot await), so every entry point
-   * that reads versions has to await it — not just `pendingMigrations`.
-   */
   async loadMigrated(): Promise<Set<number>> {
     await this._ensureSchemaTable();
     return (this._migratedVersions = await this._appliedVersions());
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Migration::Current
- *
- * Alias for the latest migration version. Migrations that don't
- * specify a version inherit from this.
- *
- * Equivalent to Migration.forVersion(CURRENT_VERSION).
- */
 export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migration<A> {
   static readonly VERSION = CURRENT_VERSION;
 
-  /**
-   * Mirrors: ActiveRecord::Migration::Current#compatible_table_definition
-   * (migration.rb:612-614), the identity hook the four table-definition
-   * wrappers above it yield through.
-   *
-   * Those wrappers (`create_table`, `change_table`, `create_join_table`,
-   * `drop_table`, migration.rb:580-609) exist solely so
-   * `Migration::Compatibility`'s version classes can override this hook
-   * (compatibility.rb:156, 219, 262, 310, 408, 462). Version compatibility
-   * (`Migration[x.y]`) is out of scope for the port, so the hook has no caller
-   * in the ported subset and the wrappers are not ported with it — porting
-   * four identity wrappers whose only job is to reach an identity hook would
-   * be indirection with no reader.
-   */
   compatibleTableDefinition(t: unknown): unknown {
     return t;
   }
 }
 
-// Register the current version so Migration.forVersion(1.0) works
 registerVersion(CURRENT_VERSION, Current);
 
-/**
- * This class is used to verify that all migrations have been run before
- * loading a web page if `config.active_record.migration_error` is set to
- * `:page_load`.
- *
- * Mirrors: `ActiveRecord::Migration::CheckPending` (`migration.rb:648-681`).
- *
- * `@mutex` is `Mutex.new` (`:651`), Ruby's non-reentrant core mutex. trails has
- * no `Mutex` port — Ruby's core classes are ported only where Rails' own code
- * is what needs them — so this holds `Monitor`
- * (`activesupport/concurrency/monitor.ts`), the one lock primitive the repo
- * carries whose `synchronize` takes an async block. It is `MonitorMixin`, so it
- * is reentrant where Ruby's `Mutex` deadlocks; `call` is the sole caller and
- * never re-enters, so the two agree on every path this class has.
- */
 export class CheckPending {
   private app: (env: Record<string, unknown>) => Promise<unknown>;
   private needsCheck: boolean;
@@ -2834,17 +2065,6 @@ export class CheckPending {
     return this.app(env);
   }
 
-  /**
-   * Mirrors: `build_watcher` (`migration.rb:675-680`). Rails watches `["rb"]`
-   * under each migrations path; trails' migrations end in `.ts`/`.js`
-   * (`MigrationFilenameRegexp`, `migration.rb:637`).
-   *
-   * Rails opens with `ConnectionHandling::DEFAULT_ENV.call` (`:676`).
-   * `DEFAULT_ENV` lives in connection-handling.ts, whose module graph reaches
-   * back into this file through connection-pool.ts, so the port reads
-   * `DatabaseConfigurations.defaultEnv` — the value that Proc returns
-   * (connection-handling.ts:707) — and takes no new import edge.
-   */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
     const currentEnvironment = DatabaseConfigurations.defaultEnv;
     const allConfigs = migrationArConfig()!.configurations().configsFor({
@@ -2867,7 +2087,4 @@ export class CheckPending {
   }
 }
 
-// Rails: `self.delegate = new` (`migration.rb:813`) — instantiate the delegate
-// after the class body, so class-level schema operations have a delegate before
-// any migration runs.
 Migration.delegate = new Migration();

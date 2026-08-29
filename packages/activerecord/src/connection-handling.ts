@@ -23,12 +23,6 @@ import {
 } from "./core.js";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
-/**
- * Connection establishment and management for ActiveRecord models.
- *
- * Mirrors: ActiveRecord::ConnectionHandling
- */
-
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
 const QUERY_CONNECTION_KEY = Symbol.for("ar_query_connection");
@@ -74,10 +68,6 @@ export function threadedConnectionFor(modelClass: typeof Base): DatabaseAdapter 
   }
 }
 
-// --- ConnectionHandling module methods (mixed into Base as static methods) ---
-
-// Mirrors: self == Base — own-property marker set only on the literal Base class,
-// not inherited by subclasses.
 function isBaseClass(klass: typeof Base): boolean {
   return Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase");
 }
@@ -106,9 +96,6 @@ export function connectsTo(
   }
 
   const connections: ConnectionPool[] = [];
-  // Mirrors Rails' flow: capture @shard_keys before the default-merge, then
-  // inject {default: database} when no shards were given, then read
-  // shards.keys.first for default_shard from the post-merge map.
   (this as any)._shardKeys = Object.keys(shards);
   const shardEntries: Record<string, Record<string, unknown>> = Object.keys(shards).length > 0
     ? shards
@@ -160,16 +147,12 @@ export function connectedTo<T>(
 
 type ConnectedToManyOptions = { role: string; shard?: string; preventWrites?: boolean };
 
-// Mirrors Rails' connected_to_many(*classes, role:, ...) splat.
-// Array form: connectedToMany([A, B], options, fn)
 export function connectedToMany<T>(
   this: typeof Base,
   classes: (typeof Base)[],
   options: ConnectedToManyOptions,
   fn: () => T,
 ): T;
-// Variadic form: connectedToMany(A, options, fn) or connectedToMany(A, B, options, fn) etc.
-// At least one class is required before options+fn.
 export function connectedToMany<T>(
   this: typeof Base,
   ...args: [typeof Base, ...(typeof Base)[], ConnectedToManyOptions, () => T]
@@ -177,7 +160,6 @@ export function connectedToMany<T>(
 export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   const fn = args[args.length - 1] as () => T;
   const options = args[args.length - 2] as ConnectedToManyOptions;
-  // Everything before options+fn: may be a single class, an array, or N positional classes.
   const classArgs = args.slice(0, args.length - 2);
   const normalized = classArgs.flat() as (typeof Base)[];
 
@@ -206,14 +188,7 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   const { role, shard } = options;
   const preventWrites = role === READING_ROLE || !!options.preventWrites;
 
-  // Mirrors Rails: push the literal classes (`klasses: classes`) rather than
-  // their resolved connection_class_for_self. The caller's CCFS is resolved
-  // at read time in core.ts#currentRole, so a `connected_to_many` scope
-  // doesn't leak across abstract subclasses that happen to share a CCFS.
   const klasses: any[] = [...normalized];
-  // Rails ends with `connected_to_stack.pop` (connection_handling.rb:177); this
-  // unwind runs through `withCleanup` around a possibly-async body, so it removes
-  // this entry by identity — which is why the literal is captured here.
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
   appendToConnectedToStack((entry = { role, shard, preventWrites, klasses }));
 
@@ -276,8 +251,6 @@ export function connectingTo(
     role,
     shard,
     preventWrites,
-    // Mirrors Rails: push `[self]` (resolution to connection_class_for_self
-    // happens at read time in core.ts#currentRole).
     klasses: [this],
   });
 }
@@ -309,12 +282,6 @@ export function isShardSwappingProhibited(): boolean {
 }
 
 export function clearQueryCachesForCurrentThread(this: typeof Base): void {
-  // Mirror Rails' `each_connection_pool { pool.clear_query_cache }`
-  // (connection_handling.rb:258-260): clear the pool's per-thread Store
-  // directly, NOT `pool.active_connection.clear_query_cache`. A pool whose
-  // connection is currently checked in still holds this thread's cached rows
-  // in its registry (they survive checkin, keyed by execution context), so a
-  // re-read after checkout would hit stale results unless the Store is cleared.
   this.connectionHandler.eachConnectionPool((pool) => {
     (pool as unknown as { clearQueryCache?: () => void }).clearQueryCache?.();
   });
@@ -328,27 +295,6 @@ export function releaseConnection(this: typeof Base): boolean {
   return connectionPool.call(this).releaseConnection();
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionHandling#with_connection
- * (`connection_handling.rb`) — `connection_pool.with_connection`.
- *
- * The pool-less arm has no Rails counterpart because the models that take it
- * have none either: a model backed by a directly-assigned adapter
- * (`Model.adapter = x`) and an HABTM join model (whose `.connection` delegates
- * to the owner) both have no pool to lease from, so there is no lease to manage
- * and the block runs inline on the connection the getter resolves. Keeping that
- * arm here, rather than at each internal call site, is what lets those sites
- * spell Rails' `with_connection`.
- *
- * The leased connection is also threaded through {@link currentQueryConnection}
- * for the duration of the block, so the internal build/execute/callback path
- * reads *it* rather than the deprecated `Model.connection` getter — which would
- * otherwise flip the lease permanent under `permanent_connection_checkout =
- * :deprecated | :disallowed`. That stands in for Ruby's block parameter `c`,
- * which Rails' own callers thread by hand down a shorter path. A user who
- * explicitly calls `Model.lease_connection` inside the block still makes the
- * lease permanent (matching Rails), because that path goes through the getter.
- */
 export function withConnection<T>(
   this: typeof Base,
   fn: (conn: DatabaseAdapter) => T | Promise<T>,
@@ -369,15 +315,7 @@ export function withConnection<T>(
   }
 }
 
-/**
- * The pool an internal call site can lease from, or null when there is no
- * lease to manage: a model backed by a directly-assigned adapter
- * (`Model.adapter = x`), or one without a handler-registered pool (e.g. HABTM
- * join models, whose `.connection` delegates to the owner and whose
- * `connectionPool()` therefore throws for a direct-adapter owner).
- *
- * @internal
- */
+/** @internal */
 function leasablePool(modelClass: typeof Base): ConnectionPool | null {
   const klass = modelClass as unknown as {
     _adapter?: unknown;
@@ -427,7 +365,6 @@ const CONNECTION_DEPRECATION_MSG =
 
 /** @deprecated */
 export function connection(this: typeof Base): DatabaseAdapter {
-  // Fast path: directly assigned via `Model.adapter = x` (tests + simple setups)
   if ((this as any)._adapter) return (this as any)._adapter;
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
@@ -437,16 +374,6 @@ export function connection(this: typeof Base): DatabaseAdapter {
     } else if (setting === "disallowed") {
       throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
     }
-    // Rails' getter leases synchronously here, flipping the lease permanent.
-    // trails' Rails-named `leaseConnection` is now async (it awaits per-checkout
-    // `verifyBang` — see ConnectionPool#checkout), which a synchronous getter
-    // cannot await. This deprecated path therefore uses the sync
-    // `leaseConnectionSync` escape hatch: it resolves a pinned connection and
-    // establishes a first lease exactly as before, but WITHOUT the async
-    // per-checkout verify/self-heal. That lost self-heal on the deprecated sync
-    // path is the documented residual tracked by
-    // `converge-sync-connection-lease-per-checkout-verify`; the async
-    // Rails-named path (`withConnection`/`leaseConnection`) keeps full parity.
     return pool.leaseConnectionSync();
   }
   return pool.activeConnection!;
@@ -462,21 +389,6 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
   >;
 }
 
-/**
- * Synchronous, non-leasing variant of {@link adapterClass}. Resolves the
- * adapter constructor from a directly-assigned `_adapter` (test/simple setups)
- * or the pool's pre-warmed sync adapter cache, without ever leasing a
- * connection. Mirrors Rails' `model.adapter_class` — a class-level lookup that
- * does not check out a connection — for code paths (e.g.
- * `column_name_with_order_matcher`) that only need static adapter metadata.
- *
- * `connection_pool` resolves `strict: true` (connection_handling.rb:342), so
- * `adapter_class` (connection_handling.rb:338) RAISES for a model with no
- * established connection; the pool error propagates here for the same reason,
- * rather than being answered as a `null` every caller has to re-raise. `null`
- * is left for the one condition Rails cannot be in — the adapter module not yet
- * imported, which Ruby's autoload does synchronously and ESM cannot.
- */
 export function adapterClassSync(
   this: typeof Base,
 ): (new (...args: any[]) => DatabaseAdapter) | null {
@@ -506,26 +418,12 @@ export function removeConnection(this: typeof Base): DatabaseConfig | undefined 
 }
 
 export function connectionSpecificationName(this: typeof Base): string {
-  // Mirrors Rails' connection_specification_name reader (connection_handling.rb:316-320):
-  //   if @connection_specification_name.nil?
-  //     return self == Base ? Base.name : superclass.connection_specification_name
-  //   @connection_specification_name
-  //
-  // Three branches, in order:
-  //   1. Non-nil own property → explicit assignment; return it.
-  //   2. Nil own property (cleared by removeConnection) → walk parent chain.
-  //      primaryClassQ/connectionClassQ are NOT consulted here, matching Rails
-  //      where nil always delegates regardless of connection_class?.
-  //   3. No own property → derive from class shape (TS-specific shortcuts).
-
   const ownHas = Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName");
 
-  // Branch 1: explicit value.
   if (ownHas && (this as any)._connectionSpecificationName != null) {
     return (this as any)._connectionSpecificationName;
   }
 
-  // Branch 2: explicitly cleared → parent walk (Base terminates).
   if (ownHas) {
     if (this.name === "Base") return "ActiveRecord::Base";
     const parent = Object.getPrototypeOf(this);
@@ -535,17 +433,10 @@ export function connectionSpecificationName(this: typeof Base): string {
     return "ActiveRecord::Base";
   }
 
-  // Branch 3: no own property — derive from class shape.
-  // Base is always its own terminal (Rails' `Base.name`); primary classes
-  // (ApplicationRecord) store their pool under that same name, which is the
-  // string `ConnectionDescriptor#name` answers for them
-  // (connection_handler.rb:63).
   if (this.name === "Base") return "ActiveRecord::Base";
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "ActiveRecord::Base";
   }
-  // connectionClass = true means establish_connection or connectsTo was called
-  // and planted a pool under this class's name without setting the ivar explicitly.
   if ((this as any).connectionClassQ?.()) {
     return this.name;
   }
@@ -581,14 +472,10 @@ export function defaultShard(this: typeof Base): string {
   return (connClass as any)._defaultShard ?? "default";
 }
 
-// --- Private helpers ---
-
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return value != null && typeof (value as any).then === "function";
 }
 
-// Mirrors Rails' `is_a? ActiveRecord::Relation` check. Requires both .load and
-// .toArray to avoid false positives on unrelated objects that happen to have .load().
 function isRelationLike(value: unknown): boolean {
   return (
     value != null &&
@@ -620,11 +507,6 @@ export function withRoleAndShard<T>(
   fn: () => T,
 ): T {
   const resolvedPreventWrites = role === READING_ROLE || preventWrites;
-  // Mirrors Rails `with_role_and_shard`: push `[self]` raw, and let
-  // core.ts#currentRole resolve the caller's connection_class_for_self at
-  // read time. Pushing the pre-resolved CCFS would leak a scope opened on
-  // an abstract subclass without `connectsTo` (so CCFS walks up to Base)
-  // into every pool.
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
   appendToConnectedToStack(
     (entry = {
@@ -643,15 +525,7 @@ export function withRoleAndShard<T>(
     throw error;
   }
 
-  // Force-load any Relation within the role/shard scope so lazy queries don't
-  // escape to a different connection context.
-  // Mirrors: return_value.load if return_value.is_a? ActiveRecord::Relation (ensure pops stack)
-  //
-  // Check .load BEFORE isThenable: Relation is thenable (delegates .then to toArray),
-  // so Promise.resolve(relation) would unwrap it to records instead of calling .load().
   if (isRelationLike(result)) {
-    // Sync Relation returned: .load() is async, cleanup fires via withCleanup's .finally().
-    // Guard against a sync throw from .load() (mirrors Rails' ensure semantics).
     let loaded: unknown;
     try {
       loaded = (result as any).load();
@@ -663,7 +537,6 @@ export function withRoleAndShard<T>(
   }
 
   if (isThenable(result)) {
-    // Async fn: resolve first, then check if the resolved value is a Relation.
     const loaded = Promise.resolve(result as unknown).then((v) =>
       isRelationLike(v) ? (v as any).load() : v,
     );
@@ -686,38 +559,15 @@ export function appendToConnectedToStack(entry: {
   connectedToStack().push(entry);
 }
 
-// Delegates to ConnectionAdapters.resolve, which holds the registry of
-// pre-registered and user-registered adapters.
 async function _loadAdapter(name: string): Promise<new (arg: unknown) => DatabaseAdapter> {
   return resolveConnectionAdapter(name);
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionHandling::DEFAULT_ENV
- * (connection_handling.rb:7) — `-> { RAILS_ENV.call || "default_env" }`.
- * `DatabaseConfigurations.defaultEnv` is trails' `RAILS_ENV` chain plus that
- * literal fallback; the three other Rails `DEFAULT_ENV.call` sites
- * (`database_configurations.rb:188`, `database_config.rb:91`,
- * `migration.rb:1341`) still reach it through `defaultEnv` because a static
- * import edge from those modules back into this one would close a module-eval
- * cycle. Rails runs the delegation the other way — `default_env` is
- * `DEFAULT_ENV.call.to_s` (`database_configurations.rb:188-190`) — so the
- * resolution body lives at `defaultEnv` and this lambda delegates to it.
- */
 export const DEFAULT_ENV = (): string => DatabaseConfigurations.defaultEnv;
 
 /**
- * @missingRailsCall call — PERMANENT: Rails defaults the argument through
- *   `DEFAULT_ENV.call` (connection_handling.rb:51). `DEFAULT_ENV` is now ported
- *   at the Rails name, but Ruby needs `Proc#call` to invoke a Proc where JS
- *   invokes the function value directly — `DEFAULT_ENV()` IS `DEFAULT_ENV.call`,
- *   so there is no `call` identifier left for the comparator to match.
- * @missingRailsCall connection_handler — PERMANENT: Verified per-site (RFC
- *   0106): `connection_handler.establish_connection(...)`
- *   (`connection_handling.rb:53`) — the TS `establishConnection` resolves the
- *   adapter class asynchronously first and makes the handler call from the
- *   helper it delegates to, so the call is outside the method the comparator
- *   scopes to.
+ * @missingRailsCall call — PERMANENT
+ * @missingRailsCall connection_handler — PERMANENT
  */
 export async function establishConnection(
   modelClass: typeof Base,
@@ -736,7 +586,6 @@ export async function establishConnection(
       },
 ): Promise<void> {
   if (!modelClass.name) throw new Error("Anonymous class is not allowed.");
-  // Clear cached adapters up the prototype chain (Base → ApplicationRecord → Model)
   let current: any = modelClass;
   while (current && typeof current === "function") {
     if ("_adapter" in current) {
@@ -749,40 +598,12 @@ export async function establishConnection(
     current = parent;
   }
 
-  // Mirrors Rails `establish_connection(config_or_env)`
-  // (connection_handling.rb:50-54): `config_or_env ||= DEFAULT_ENV.call.to_sym`,
-  // then every input — env name, string URL, hash, or an already-resolved
-  // DatabaseConfig (the `run_without_connection` restore path) — funnels through
-  // `resolve_config_for_connection`, which plants the
-  // connection_specification_name and then `configurations.resolve(...)` (a
-  // no-op that returns the object unchanged for a DatabaseConfig). The
-  // resolved object then goes to the handler verbatim, so the pool stores it
-  // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
-  // and buildAdapterArg live inside establishWithDbConfig.
   configOrEnv ??= DEFAULT_ENV();
   const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
   await establishWithDbConfig(modelClass, dbConfig);
 }
 
-/**
- * Validate a `default_timezone` entry in an `establish_connection` config,
- * returning the normalized value (or `null` when absent).
- *
- * Rails stores the connection's `default_timezone` as per-adapter instance
- * state (`AbstractAdapter#default_timezone`, abstract_adapter.rb:167/219-220),
- * so two simultaneous connections can cast in different zones. Our date/time
- * casting resolves the zone from the process-wide `ActiveRecord.defaultTimezone`, so the
- * caller applies the validated value to that singleton on success — giving the
- * same observable result for the single-connection case the tests exercise.
- * The multi-connection divergence (last establish_connection wins for all
- * subsequent casts) is a tracked fidelity deviation, not yet converged; see the
- * activerecord-surfaced-deviations bucket.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter.validate_default_timezone
- */
 function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc" | "local" | null {
-  // Rails reads only `config[:default_timezone]` (abstract_adapter.rb:73-81);
-  // no camelCase alias.
   const raw = config.default_timezone;
   if (raw == null) return null;
   if (raw !== "utc" && raw !== "local") {
@@ -791,12 +612,6 @@ function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc
   return raw;
 }
 
-/**
- * Mirrors Rails `establish_connection(db_config)` where the argument is already
- * a resolved `DatabaseConfig`. Derives the adapter name and connection URL from
- * the object and threads it through {@link establishWithConfig} so the pool
- * stores the captured config verbatim instead of rebuilding one from its hash.
- */
 async function establishWithDbConfig(
   modelClass: typeof Base,
   dbConfig: DatabaseConfig,
@@ -811,16 +626,6 @@ async function establishWithDbConfig(
     );
   }
 
-  // The handler reads the adapter off the resolved config (resolvePoolConfig).
-  // UrlConfig now infers the adapter for scheme-less shorthands (e.g. the bare
-  // `:memory:` a DATABASE_URL carries with no scheme) at build time, so the
-  // config already names its adapter — matching Rails, whose URL configs always
-  // parse a scheme. Defensively backfill should a non-UrlConfig path ever hand
-  // us an adapter-less hash with a derivable URL.
-  // Replaces the hash rather than writing into it: configuration hashes are
-  // frozen (Rails freezes them in HashConfig#initialize), and the object
-  // identity the handler's pool-reuse check keys on is the DatabaseConfig, not
-  // its hash.
   let configForConnect = config;
   if (!dbConfig.adapter) {
     configForConnect = _setConfigurationHash(dbConfig, {
@@ -833,23 +638,6 @@ async function establishWithDbConfig(
   if (tz) ActiveRecord.defaultTimezone = tz;
 }
 
-/**
- * Derive the adapter name and the URL to forward to the adapter layer from a
- * resolved DatabaseConfig, for {@link establishWithDbConfig}.
- *
- * The original URL is always usable for adapter inference (e.g.
- * `sqlite3:db/test.sqlite3` → "sqlite3"), even when the connection target
- * should be built from a (possibly-mutated) configuration hash.
- *
- * `connectUrl` prefers the configuration hash over the raw URL string when an
- * explicit `database` is set — Rails' `establish_connection` resolves from
- * `configuration_hash`, not the raw URL, so callers that mutate `_database`
- * (e.g. TestDatabases.create_and_load_schema appending a worker index) actually
- * reconnect to the mutated DB. The URL is only forwarded to the adapter layer
- * when the configuration carries no explicit `database` — i.e. for opaque
- * adapter strings like `jdbc:` that buildUrlHash passes through without
- * decomposing.
- */
 function deriveAdapterAndUrl(dbConfig: DatabaseConfig): {
   adapterName: string | undefined;
   connectUrl: string;
@@ -871,26 +659,8 @@ async function establishWithConfig(
   config?: Record<string, unknown>,
   dbConfigOverride?: DatabaseConfig,
 ): Promise<void> {
-  // No Rails counterpart: Ruby's `require` is synchronous, so
-  // `db_config.new_connection` names the adapter class with no preceding load.
-  // Warming the sync cache here is what keeps `ConnectionPool#new_connection`
-  // synchronous. The original (un-normalized) name goes to the registry so a
-  // caller override like `register("mysql2", ...)` is not shadowed.
   await _loadAdapter(adapterName);
 
-  // Mirror Rails' db_config_handler (database_configurations.rb:65-70):
-  // `url ? UrlConfig.new(env, name, url, config) : HashConfig.new(...)`.
-  // A UrlConfig parses the URL into its hash and surfaces the database name
-  // living in the path — e.g. the per-worker slot DB `activerecord_unittest_2` that
-  // test-setup-worker-db.ts suffixes on — natively via the URL fallback
-  // (url-config.ts), so `connectionDbConfig().database` is no longer undefined.
-  //
-  // The raw `url` is stripped from the config override before it reaches
-  // UrlConfig — Rails' build_db_config_from_hash deletes :url from the hash so
-  // the URL lives only on `@url`, and `configuration_hash` carries the parsed
-  // discrete fields (database/host/port/...) rather than the verbatim string.
-  // This matches the resolver path (database-configurations.ts:246) and the
-  // "url removed from hash" parity test.
   const env = DatabaseConfigurations.defaultEnv;
   let dbConfig: DatabaseConfig;
   if (dbConfigOverride) {
@@ -902,17 +672,8 @@ async function establishWithConfig(
     dbConfig = new HashConfig(env, "primary", { adapter: adapterName, url, ...config });
   }
 
-  // Mirror Rails: establish_connection makes the receiver its own connection
-  // class so it gets an independent pool entry under its own name instead of
-  // inheriting the Base pool. Without this Tag.establishConnection and
-  // Tag2.establishConnection both resolve connectionClassForSelf() → Base and
-  // register under the same primary-class pool key, defeating cross-connection
-  // isolation tests.
   modelClass.connectionClass = true;
 
-  // Honor the active connected_to scope so callers like
-  // `connected_to(role:, shard:) { establish_connection(db_config) }` register
-  // the new pool under the current role/shard instead of writing/default.
   const role = coreCurrentRole.call(modelClass as any);
   const shard = coreCurrentShard.call(modelClass as any);
 
@@ -923,26 +684,13 @@ async function establishWithConfig(
   });
 }
 
-// Re-exports for backward compat — these now live in adapter-args.ts so
-// ConnectionPool can use them without back-edging through connection-handling.
 export {
   normalizeAdapterName,
   parseSqliteUrl,
   buildAdapterArg,
 } from "./connection-adapters/adapter-args.js";
-// Re-exported for backward compat: adapterNameFromUrl now lives in adapter-args.
 export { adapterNameFromUrl };
 
-/**
- * Module methods wired onto Base as static methods via `extend()` in base.ts.
- *
- * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention: a Concern
- * module exposes a `ClassMethods` object whose members become class methods
- * on any class that includes the Concern. Grouping them here keeps the
- * mixin surface colocated with the implementations, so adding a new class
- * method only requires touching this file — `base.ts` wires the whole
- * object in one line.
- */
 export const ClassMethods = {
   connectsTo,
   connectedTo,
@@ -975,31 +723,14 @@ export const ClassMethods = {
   appendToConnectedToStack,
 };
 
-/**
- * Resolve a config-or-env value through Base.configurations and set the
- * connection_specification_name on the calling class.
- *
- * Mirrors: ActiveRecord::ConnectionHandling#resolve_config_for_connection (private)
- *
- * @internal
- */
+/** @internal */
 export function resolveConfigForConnection(
   this: typeof Base,
   configOrEnv: unknown,
 ): DatabaseConfig {
   if (!this.name) throw new Error("Anonymous class is not allowed.");
-  // Mirrors Rails: connection_name = primary_class? ? Base.name : name, then
-  // self.connection_specification_name = connection_name. The primary class
-  // (Base/ApplicationRecord) stores its pool under `Base.name` — the same
-  // string ConnectionDescriptor#name answers (connection_handler.rb:63) — so
-  // subsequent connectionPool() lookups hit the right key. The reader uses
-  // an own-property check so writing here doesn't bleed through JS static
-  // inheritance into unrelated subclasses.
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this)
     ? "ActiveRecord::Base"
     : this.name;
-  // Rails: `Base.configurations.resolve(config_or_env)` — the `Base` constant
-  // literally (connection_handling.rb:385-391), never `self`, so a model-local
-  // `configurations` cannot redirect resolution.
   return baseConfigurations().resolve(configOrEnv);
 }

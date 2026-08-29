@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/friendships.yml
 export const friendshipFixtureData = {
   "Connection 1": {
     id: 1,

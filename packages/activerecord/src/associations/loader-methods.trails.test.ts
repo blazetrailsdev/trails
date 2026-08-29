@@ -1,25 +1,8 @@
-// Per-macro instance loaders — `record.loadBelongsTo(name)` and
-// `record.loadHasOne(name)`.
-//
-// Two methods on Base.prototype that delegate to the standalone
-// `loadBelongsTo` / `loadHasOne` helpers. Method name matches the
-// association macro the user wrote, giving compile-time enforcement
-// via virtualizer-emitted overloads.
-//
-// For collections (`hasMany` / `hasAndBelongsToMany`), the
-// AssociationProxy's thenable handles the load — `await record.<name>`.
-
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
-  // Ride `Base.connection` (single-pool test model) rather than a sidecar
-  // `_pool` lease. `fixtures({})` establishes the handler and per-test
-  // transactional rollback (no seed rows). The `lo_*` tables are genuinely
-  // bespoke (no canonical equivalent), so they're still laid via
-  // the adapter and dropped in afterAll — but on the primary boot
-  // connection.
   fixtures({});
 
   class LoAuthor extends Base {

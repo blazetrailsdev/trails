@@ -1,5 +1,4 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-// vendor/rails/activerecord/test/models/comment_overlapping_counter_cache.rb
 import { Base } from "../../base.js";
 
 export class CommentOverlappingCounterCache extends Base {

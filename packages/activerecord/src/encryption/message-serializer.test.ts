@@ -10,8 +10,6 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     message.headers.set("iv", "test-iv");
     const serialized = serializer.dump(message);
     const loaded = serializer.load(serialized);
-    // load returns decoded raw bytes (Buffers), mirroring Rails' ASCII-8BIT
-    // strings; the consumer interprets them.
     expect(loaded.payload.toString()).toBe("hello");
     expect((loaded.headers.get("iv") as Buffer).toString()).toBe("test-iv");
     expect(message.equals(loaded)).toBe(true);
@@ -71,17 +69,12 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   });
 
   it("encodes non-ASCII string headers as UTF-8 bytes, matching Rails", () => {
-    // Rails base64s the String's own bytes (UTF-8 for a UTF-8 string). Header text
-    // must be UTF-8-encoded — latin1 would diverge for 0x80..0xFF and truncate
-    // code points > 0xFF (e.g. emoji).
     const serializer = new MessageSerializer();
     const message = new Message({ payload: "payload" });
     message.headers.set("tag", "café 😀");
     const dumped = serializer.dump(message);
     const parsed = JSON.parse(dumped) as { h: { tag: string } };
     expect(parsed.h.tag).toBe(Buffer.from("café 😀", "utf-8").toString("base64"));
-    // load returns the decoded bytes; the consumer recovers the text losslessly
-    // (no mojibake, no truncation of code points > 0xFF).
     const loaded = serializer.load(dumped);
     expect((loaded.headers.get("tag") as Buffer).toString("utf-8")).toBe("café 😀");
   });

@@ -1,9 +1,3 @@
-// Fidelity: ActiveRecord::Timestamp::ClassMethods#reload_schema_from_cache
-// (timestamp.rb:84-89) nils the three timestamp-attribute memos and calls
-// `super`, so it is the outermost link of the
-// Timestamp -> Attributes -> ModelSchema override chain. This asserts the
-// dispatch actually reaches it: with the Timestamp half unseated, the memos
-// survive a schema reload and go stale.
 import { describe, it, expect } from "vitest";
 import { Toy } from "./test-helpers/models/toy.js";
 import { fixtures } from "./test-fixtures.js";

@@ -11,10 +11,6 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("binary? returns false because this implementation uses JSON, not MessagePack binary", () => {
-    // isBinary() returns true: mirrors Rails' MessagePackMessageSerializer#binary?,
-    // which signals that the serialized form must be stored in a binary column.
-    // The wire format is now real MessagePack binary (the test name predates that
-    // change; it stays verbatim so parity:test keeps matching the Rails test).
     expect(new MessagePackMessageSerializer().isBinary()).toBe(true);
   });
 
@@ -53,16 +49,6 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
     expect(() => serializer.dump("it can only serialize messages!" as any)).toThrow(ForbiddenClass);
   });
 
-  // Pinned against real MRI Rails 8.0.2. Generated with the msgpack gem (>= 1.7.0):
-  //
-  //   require "active_record/encryption/message_pack_message_serializer"
-  //   M = ActiveRecord::Encryption::Message
-  //   ser = ActiveRecord::Encryption::MessagePackMessageSerializer.new
-  //   msg = M.new(payload: "some payload".b)
-  //   msg.headers["key_1"] = "1"
-  //   msg.headers["iv"] = (0..11).to_a.pack("C*")
-  //   msg.headers["at"] = (100..115).to_a.pack("C*")
-  //   ser.dump(msg).bytes  # => the array below
   const MRI_FIXTURE = [
     204, 128, 130, 161, 112, 196, 12, 115, 111, 109, 101, 32, 112, 97, 121, 108, 111, 97, 100, 161,
     104, 131, 165, 107, 101, 121, 95, 49, 161, 49, 162, 105, 118, 196, 12, 0, 1, 2, 3, 4, 5, 6, 7,
@@ -84,10 +70,10 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("round-trips values that span the str8/bin16/map16 length-prefix boundaries", () => {
-    const message = new Message({ payload: Buffer.from("x".repeat(50)) }); // bin8
-    message.headers.set("long", "y".repeat(40)); // str8 (> 31 bytes)
-    message.headers.set("big", Buffer.from("z".repeat(300))); // bin16 (> 255 bytes)
-    for (let i = 0; i < 20; i++) message.headers.set(`k${i}`, `v${i}`); // map16 (> 15 entries)
+    const message = new Message({ payload: Buffer.from("x".repeat(50)) });
+    message.headers.set("long", "y".repeat(40));
+    message.headers.set("big", Buffer.from("z".repeat(300)));
+    for (let i = 0; i < 20; i++) message.headers.set(`k${i}`, `v${i}`);
 
     expect(serializer.load(serializer.dump(message))).toEqual(message);
   });

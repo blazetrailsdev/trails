@@ -34,18 +34,11 @@ export {
   AdditionalValue,
   ExtendedEncryptableType,
 } from "./extended-deterministic-queries.js";
-// `installExtendedQueriesIfConfigured` is intentionally NOT re-exported
-// here — its top-level `Base`/`Relation` imports would expand the
-// dependency surface of `@blazetrails/activerecord/encryption` for
-// consumers that only need encryption primitives. Use the dedicated
-// subpath: `@blazetrails/activerecord/encryption/install.js`.
 export {
   ExtendedDeterministicUniquenessValidator,
   EncryptedUniquenessValidator,
 } from "./extended-deterministic-uniqueness-validator.js";
 
-// The wiring entry points used by `Base.encrypts` are re-exported here
-// so the subpath is the canonical encryption surface.
 export { encrypts } from "./encryptable-record.js";
 export {
   applyPendingEncryptions,
@@ -53,7 +46,6 @@ export {
   keyLength,
   ivLength,
   eagerLoadBang,
-  // Module-level delegates (mirrors Rails' include Configurable + include Contexts).
   withEncryptionContext,
   withoutEncryption,
   protectingEncryptedData,

@@ -1,16 +1,3 @@
-/**
- * Regression coverage for the fixture machinery's connection source.
- *
- * Rails bans the soft-deprecated `Base.connection` getter suite-wide
- * (`test/cases/helper.rb:27`, `permanent_connection_checkout = :disallowed`) and
- * its fixture setup leases from the pool instead (`test_fixtures.rb:179/194`).
- * These tests pin that the trails fixture default does the same: they fail
- * against the previous `() => Base.connection` default, which raises under
- * `"disallowed"`.
- *
- * Run this file only (not the whole suite):
- *   pnpm vitest run packages/activerecord/src/test-fixtures/fixture-connection.trails.test.ts
- */
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { ActiveRecord } from "../ar-config.js";

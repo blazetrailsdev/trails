@@ -9,7 +9,6 @@ import {
 } from "../testing/query-assertions.js";
 import { Notifications } from "@blazetrails/activesupport";
 
-/** Instrument an sql.active_record event the way the adapter does. */
 function instrumentSql(sql: string, name?: string, cached = false): void {
   Notifications.instrument("sql.active_record", { sql, name: name ?? "SQL", cached });
 }
@@ -166,8 +165,6 @@ describe("QueryAssertionsTest", () => {
   });
 
   it("assert queries match global regex does not alternate due to lastIndex statefulness", async () => {
-    // Ruby Regexp#=== is always stateless; JS RegExp.test with /g advances lastIndex.
-    // assertQueriesMatch must reset lastIndex before each test call.
     await assertQueriesMatch(/SELECT/gi, 3, false, async () => {
       instrumentSql("SELECT 1");
       instrumentSql("SELECT 2");

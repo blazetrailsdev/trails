@@ -29,8 +29,6 @@ describe("JoinTable#findJoinTableName", () => {
   });
 
   it("deletes tableName from the hash it is given", () => {
-    // join_table.rb:7-9 is `options.delete(:table_name)`, which REMOVES the key
-    // so the caller can splat the rest into create_table/drop_table.
     const options: { tableName?: string; ifExists?: boolean } = {
       tableName: "custom",
       ifExists: true,
@@ -42,10 +40,6 @@ describe("JoinTable#findJoinTableName", () => {
 
 describe("SchemaStatements#dropJoinTable", () => {
   it("does not delete tableName from the caller's options", async () => {
-    // Ruby's `**options` (schema_statements.rb:427) collects a fresh hash, so
-    // `find_join_table_name`'s delete never reaches the caller's — verified
-    // against MRI. A TS object is passed by reference, so `dropJoinTable` has
-    // to copy before handing it over.
     const dropped: Array<[string, unknown]> = [];
     const adapter = {
       findJoinTableName,

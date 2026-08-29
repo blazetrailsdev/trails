@@ -14,9 +14,7 @@ class SubWidget extends Widget {}
 
 describe("assertNotCalledOnInstanceOf", () => {
   it("passes when the method is not called", async () => {
-    await assertNotCalledOnInstanceOf(Widget, "build", async () => {
-      // no instance created
-    });
+    await assertNotCalledOnInstanceOf(Widget, "build", async () => {});
   });
 
   it("throws when the method is called", async () => {

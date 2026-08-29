@@ -6,16 +6,9 @@ import { User } from "./test-helpers/models/user.js";
 import { fixtures } from "./test-fixtures.js";
 import { pp } from "./pretty-print.js";
 
-// Rails: `fixtures :"admin/users", :"admin/accounts"` + `Admin::User`, `Admin::Account`,
-// `User`. With the YAML store coder implemented, `Admin::User` (which declares
-// `store("params", { coder: YAMLColumn })`) now loads and the `admin/users` fixture set is
-// registry-resident, so the Admin::User-backed assertions run on the real model.
-
-// admin/accounts listed first: admin/users rows ref() admin_accounts ids.
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("FilterAttributesTest", () => {
-  /** `PP.pp(user, StringIO.new(actual))` (filter_attributes_test.rb:120-145). */
   async function ppString(obj: unknown): Promise<string> {
     let out = "";
     await pp(obj, { write: (s: string) => (out += s) });
@@ -27,14 +20,10 @@ describe("FilterAttributesTest", () => {
   beforeEach(() => {
     previousFilterAttributes = Base.filterAttributes;
     Base.filterAttributes = ["name"];
-    // Rails also sets ActiveRecord.use_yaml_unsafe_load = true here; trails' YAML
-    // coder has no unsafe-load mode (it only ever produces plain JS values).
   });
 
   afterEach(() => {
     Base.filterAttributes = previousFilterAttributes;
-    // Rails resets per-model overrides via `instance_variable_set(:@filter_attributes, nil)`.
-    // Dropping the own slot makes the model delegate to Base again.
     for (const model of [AdminAccount, AdminUser, User] as const) {
       delete (model as { _filterAttributes?: unknown })._filterAttributes;
       (model as { _inspectionFilter?: unknown })._inspectionFilter = null;
@@ -111,7 +100,6 @@ describe("FilterAttributesTest", () => {
     try {
       AdminAccount.filterAttributes = [];
 
-      // Above change should not impact other models
       for (const user of await AdminUser.all()) {
         expect(user.inspect()).toContain("name: [FILTERED]");
         expect(user.inspect().match(/\[FILTERED\]/g)?.length).toBe(1);
@@ -122,8 +110,6 @@ describe("FilterAttributesTest", () => {
         expect(account.inspect().match(/\[FILTERED\]/g)?.length ?? 0).toBe(0);
       }
     } finally {
-      // Mirrors Rails' instance_variable_set(:@filter_attributes, nil) — drop the
-      // per-class override so AdminAccount inherits from Base again.
       delete (AdminAccount as unknown as { _filterAttributes?: unknown })._filterAttributes;
     }
   });

@@ -1,7 +1,3 @@
-/**
- * Port of `ActiveRecord::Migration::InvalidOptionsTest`
- * (vendor/rails/activerecord/test/cases/migration/invalid_options_test.rb).
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { currentAdapter } from "../support/adapter-helper.js";

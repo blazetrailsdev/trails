@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/developers_projects.yml
-// HABTM join table — no synthetic id; developer_id + project_id are the composite key.
 export const developersProjectsFixtureData = {
   david_action_controller: {
     developer_id: ref("developers", "david"),

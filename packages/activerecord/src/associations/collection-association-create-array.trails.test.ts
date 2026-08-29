@@ -1,10 +1,3 @@
-/**
- * Trails-only: pins the Array arm of `CollectionAssociation#_create_record`
- * (collection_association.rb:358-360) and `HasManyAssociation#_create_record`
- * (has_many_association.rb:143-149) at the OO association surface. Rails
- * exercises the arm through `CollectionProxy#create`; these tests reach the
- * association directly because that is the decomposition the port had missing.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Post } from "../test-helpers/models/post.js";

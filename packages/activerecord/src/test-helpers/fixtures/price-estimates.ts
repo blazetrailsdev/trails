@@ -1,9 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/price_estimates.yml
-// `estimate_of: <row> (<Type>)` is Rails' polymorphic shorthand → estimate_of_id
-// + estimate_of_type pair. `honda` uses Rails' numeric-FK form (estimate_of_id: 1,
-// estimate_of_type: Car) → ref to cars.honda.
 export const priceEstimateFixtureData = {
   sapphire_1: {
     price: 10,

@@ -9,7 +9,6 @@ import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
 import { throwAbort } from "@blazetrails/activesupport";
-// vendor/rails/activerecord/test/models/company.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -92,9 +91,6 @@ export class SpecialCo extends Company {
     ((name: "dummyAccount") => Promise<Account | null>);
 }
 
-// Ruby: module Namespaced; class Company < ::Company; end; ...
-// `moduleName` carries the Ruby module so `registerModel` derives the qualified
-// "Namespaced::*" registry key for cross-namespace className resolution.
 export class NamespacedCompany extends Company {
   declare loadHasOne: ((name: "account") => Promise<Account | null>) &
     ((name: "dummyAccount") => Promise<Account | null>);
@@ -112,8 +108,6 @@ export class NamespacedFirm extends Company {
   static _demodulizedName = "Firm";
 
   static {
-    // foreignKey explicit: JS class name NamespacedFirm would derive namespaced_firm_id,
-    // but Rails demodulizes Namespaced::Firm → firm_id.
     this.hasMany("clients", { className: "Namespaced::Client", foreignKey: "firm_id" });
   }
 }
@@ -460,9 +454,6 @@ export class Client extends Company {
     this.hasMany("accounts", { through: "firm", source: "accounts" });
     this.belongsTo("account");
 
-    // Rails `validate do firm end` (company.rb:153) synchronously references
-    // the firm association and discards the result. The dotted `this.firm`
-    // getter is the sync association reader, so the validate block stays sync.
     this.validate(function (this: Client) {
       void (this as { firm?: unknown }).firm;
     });
@@ -628,24 +619,12 @@ for (const klass of [
   registerModel(klass);
 }
 
-// `registerModel` derives the qualified "Namespaced::*" registry key from each
-// class's own `moduleName`, so cross-namespace className resolution works
-// without hand-written `registerModel("Ruby::Name", …)` strings.
 for (const klass of [NamespacedCompany, NamespacedFirm, NamespacedClient]) {
   registerModel(klass);
 }
 
-// Rails: companies.type drives STI across the Company hierarchy (Firm/Client/etc.)
-// with no assignment in company.rb — `inheritance_column` already defaults to
-// "type" and the autoloader resolves a row's type name on demand. trails has no
-// autoloader, so the assignment doubles as the sentinel that opts this hierarchy
-// into registry-resolved dispatch (`stiEnabled` in inheritance.ts) and scopes
-// `Firm.all` to `WHERE type IN (...)`.
 Company.inheritanceColumn = "type";
 
-// Track the STI subtree so registry-safe subclass resolution (STI dispatch at
-// `new`, `descendants`) can find these classes through Company's own subtree
-// rather than the global, bare-name model registry.
 for (const klass of [
   SpecialCo,
   NamespacedCompany,

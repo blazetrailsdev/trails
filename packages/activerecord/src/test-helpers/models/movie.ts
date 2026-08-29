@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/movie.rb
 import { Base } from "../../base.js";
 
 export class Movie extends Base {

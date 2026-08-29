@@ -26,9 +26,6 @@ async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string
   return adapter;
 }
 
-// Async-only drivers (no `openSync()`) exercising the async construction path
-// the way expo-sqlite / WASM drivers do, backed by better-sqlite3 so they run
-// in any Node test environment.
 const openVia = async (config: Parameters<SqliteDriver["open"]>[0]): Promise<SqliteConnection> =>
   betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
 const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
@@ -156,9 +153,6 @@ describe("SQLite adapter driver binding", () => {
               closed = true;
             };
           }
-          // Resolve against the target, not the proxy: the driver's readback
-          // methods (`changes`, `lastInsertRowId`) keep their statement handles
-          // in private fields, which a proxy receiver cannot reach.
           const value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
@@ -173,8 +167,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("close() resolves when an async driver.close() fired by disconnectBang rejects", async () => {
-    // The async close() fired by disconnectBang rejects; close() must drain the
-    // swallowed rejection without surfacing it.
     const driver = asyncDriver(async (config) => {
       const conn = await openVia(config);
       return new Proxy(conn, {
@@ -195,9 +187,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("completes a deferred async-only open on the first query (sync checkout path)", async () => {
-    // Mirrors what the synchronous pool checkout does: construct the adapter
-    // without awaiting openAsync(), then issue the first query. The query must
-    // transparently complete the deferred open rather than touch an unset handle.
     const adapter = new SQLite3Adapter(":memory:", { driver: asyncOnlyDriver });
     expect(await adapter.active()).toBe(false);
     await adapter.internalExecute(
@@ -213,8 +202,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("completes a deferred open when the first call is a schema introspection", async () => {
-    // columns()/exec() must also drain the pending open: the first call after a
-    // sync checkout is not always a SELECT.
     const adapter = new SQLite3Adapter(":memory:", { driver: asyncOnlyDriver });
     await adapter.exec("CREATE TABLE schema_first (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
     const cols = await adapter.columns("schema_first");
@@ -230,9 +217,6 @@ describe("SQLite adapter driver binding", () => {
       return openVia(config);
     });
     const adapter = new SQLite3Adapter(":memory:", { driver });
-    // These are the FIRST operations — no prior query has cleared the pending
-    // flag, so all three race into completeAsyncConnect() and must dedupe onto
-    // the single in-flight open rather than each opening their own handle.
     expect(await adapter.active()).toBe(false);
     await Promise.all([
       adapter.execute("SELECT 1 AS one"),
@@ -244,9 +228,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("serves an async-only driver through the synchronous pool checkout", async () => {
-    // End-to-end: ConnectionPool#checkout is synchronous and hands back the
-    // freshly-constructed (still-pending) adapter without awaiting the open.
-    // The first query on the checked-out connection must complete it.
     const adapter = await registerTestAdapter(
       () =>
         new SQLite3Adapter(":memory:", { driver: asyncOnlyDriver }) as unknown as DatabaseAdapter,
@@ -271,10 +252,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("pool disconnect drains an in-flight async-only close before resolving", async () => {
-    // Pool teardown with an async-only driver: disconnectBang() fires
-    // driver.close() but can't await it (sync void contract). disconnect()
-    // must drain the per-adapter _closingDriver so the handle is fully closed
-    // before a subsequent re-open of the same DB races the prior handle.
     let closed = false;
     let resolveClose: () => void;
     const closeGate = new Promise<void>((resolve) => {
@@ -291,9 +268,6 @@ describe("SQLite adapter driver binding", () => {
               closed = true;
             };
           }
-          // Resolve against the target, not the proxy: the driver's readback
-          // methods (`changes`, `lastInsertRowId`) keep their statement handles
-          // in private fields, which a proxy receiver cannot reach.
           const value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
@@ -323,8 +297,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("pool disconnect no-ops to a resolved promise for a sync driver", async () => {
-    // better-sqlite3 closes synchronously inside disconnectBang(); the drain
-    // contributes nothing and disconnect() still resolves.
     const adapter = await registerTestAdapter(
       () =>
         new SQLite3Adapter(":memory:", {
@@ -347,9 +319,6 @@ describe("SQLite adapter driver binding", () => {
     expect(await conn.active()).toBe(false);
   });
 
-  // A driver whose connection's close() is gated on an external promise, so a
-  // test can observe the close still in flight after a synchronous teardown
-  // seam returns and confirm the *Async variant drains it before resolving.
   const gatedCloseDriver = (): {
     driver: SqliteDriver;
     release: () => void;
@@ -371,9 +340,6 @@ describe("SQLite adapter driver binding", () => {
               closed = true;
             };
           }
-          // Resolve against the target, not the proxy: the driver's readback
-          // methods (`changes`, `lastInsertRowId`) keep their statement handles
-          // in private fields, which a proxy receiver cannot reach.
           const value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
@@ -396,8 +362,6 @@ describe("SQLite adapter driver binding", () => {
       () =>
         new Proxy(new SQLite3Adapter(":memory:", { driver }), {
           get(target, prop, receiver) {
-            // SQLite is a reload-requiring adapter in Rails; the abstract base
-            // defaults to false, so force it true to exercise the reload seam.
             if (prop === "requiresReloading") return () => true;
             return Reflect.get(target, prop, receiver);
           },
@@ -445,9 +409,6 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS discard_t", "SCHEMA");
-    // Rails' discard! abandons the handle without closing; fire the async close
-    // directly on the still-pooled adapter so discardBang has an in-flight
-    // close to drain before it drops the pool's references.
     conn.disconnectBang();
 
     const draining = pool.discardBang();
@@ -465,8 +426,6 @@ describe("SQLite adapter driver binding", () => {
         () =>
           new Proxy(new SQLite3Adapter(":memory:", { driver }), {
             get(target, prop, receiver) {
-              // checkout_and_verify runs clean!; throwing from it drives the
-              // swap/checkout-failure discard path (pool.remove + disconnectBang).
               if (prop === "cleanBang")
                 return () => {
                   if (failCheckout) throw new Error("checkout boom");
@@ -482,8 +441,6 @@ describe("SQLite adapter driver binding", () => {
     pool.checkin(conn as unknown as DatabaseAdapter);
 
     failCheckout = true;
-    // The next checkout reuses the open available conn, fails verification, and
-    // discards it — firing an async close the sync catch can't await.
     await expect(pool.checkout()).rejects.toThrow(/checkout boom/);
     expect(isClosed()).toBe(false);
     release();
@@ -492,8 +449,6 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("sync-driver teardown seams stay synchronous (whenClosed no-ops)", async () => {
-    // better-sqlite3 closes synchronously inside disconnectBang(); each async
-    // seam variant contributes nothing and resolves immediately.
     const pool = new ConnectionPool(
       await makePoolConfig(
         () =>
@@ -516,19 +471,13 @@ describe("SQLite adapter driver binding", () => {
     const adapter = await SQLite3Adapter.openAsync(":memory:", { driver: asyncOnlyDriver });
     adapter.disconnectBang();
     expect(await adapter.active()).toBe(false);
-    // Full lifecycle: reconnectBang() -> reconnect() (opens) -> configureConnection().
     await adapter.reconnectBang();
     expect(await adapter.active()).toBe(true);
-    // foreign_keys defaults OFF in SQLite; ON proves configure_connection ran.
     const rows = await adapter.execute("PRAGMA foreign_keys");
     expect(rows).toEqual([{ foreign_keys: 1 }]);
     adapter.disconnectBang();
   });
 
-  // A driver whose connection returns a Promise from pragma() — the way a
-  // genuinely async-only driver (expo-sqlite, WASM) behaves. The plain
-  // `asyncOnlyDriver` above is backed by a sync better-sqlite3 handle, so it
-  // can't surface the sync-getter-on-async-driver hazard this story closes.
   const asyncPragmaDriver = asyncDriver(async (config) => {
     const conn = await openVia(config);
     return new Proxy(conn, {

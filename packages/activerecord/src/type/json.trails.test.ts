@@ -1,8 +1,3 @@
-/**
- * Unit tests for ActiveRecord::Type::Json (cast behavior).
- * Integration tests (changes_in_place, etc.) live in json_shared_test_cases.rb
- * and are ported to adapters/postgresql/json.test.ts etc.
- */
 import { describe, it, expect } from "vitest";
 import { Json } from "./json.js";
 

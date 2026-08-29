@@ -3,7 +3,6 @@ import type { Author } from "./author.js";
 import type { Category } from "./category.js";
 import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
-// vendor/rails/activerecord/test/models/categorization.rb
 import { Base } from "../../base.js";
 
 export class Categorization extends Base {

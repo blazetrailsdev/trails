@@ -4,7 +4,6 @@ import type { Reply } from "./reply.js";
 import type { SillyUniqueReply } from "./reply.js";
 import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
-// vendor/rails/activerecord/test/models/topic.rb
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -75,7 +74,6 @@ export class Topic extends Base {
     this.scope("replied", function (this: any) {
       return this.where("replies_count > 0");
     });
-    // "true"/"false" are reserved words; call via bracket notation: Topic["true"]()
     this.scope("true", function (this: any) {
       return this.where({ approved: true });
     });
@@ -95,10 +93,6 @@ export class Topic extends Base {
       },
       { one: () => 1 },
     );
-    // Rails topic.rb: `scope :scope_stats, -> stats { stats[:count] = count; self }`.
-    // The scope body mutates the passed stats hash with the relation's count and
-    // returns the relation (`self`). trails relations count asynchronously, so the
-    // body is async — the lone faithful divergence from Rails' sync `count`.
     this.scope("scopeStats", function (this: any, stats: { count?: number }) {
       return this.count().then((c: number) => {
         stats.count = c;
@@ -132,20 +126,7 @@ export class Topic extends Base {
     this.beforeDestroy(async (record: Topic) => {
       await (record as any).destroyChildren();
     });
-    // Rails registers these as plain synchronous method hooks
-    // (`before_validation :before_validation_for_transaction`, etc. —
-    // all `def ...; end`), so we mirror them as sync. The record arrives as the
-    // callback arg (not `this`), matching the `afterInitialize`/`setEmailAddress`
-    // hook below. Returned so the async validation chain awaits the hook: the
-    // cancellation test installs a `before_validation_for_transaction` that
-    // performs a DB write then `throw :abort`, and `perform_validations` runs
-    // inside the save transaction so the write rolls back with it
-    // (transactions_test.rb:714).
     this.beforeValidation((record: Topic) => (record as any).beforeValidationForTransaction());
-    // Returned so the async save-callback chain awaits the hook: a cancelling
-    // `before_save` that performs a DB side effect then `throw :abort` must run
-    // inside the save transaction so the write rolls back with it
-    // (transactions_test.rb:714). The default no-op returns undefined (sync).
     this.beforeSave((record: Topic) => (record as any).beforeSaveForTransaction());
     this.beforeDestroy((record: Topic) => {
       (record as any).beforeDestroyForTransaction();
@@ -159,7 +140,6 @@ export class Topic extends Base {
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
     });
-    // class_attribute :after_initialize_called (topic.rb:84-89).
     this.afterInitialize(() => {
       Topic.afterInitializeCalled = true;
     });
@@ -172,16 +152,11 @@ export class Topic extends Base {
 
   static afterInitializeCalled: boolean | null = null;
 
-  // Rails topic.rb: `def self.klass_stats(stats); stats[:count] = count; self; end`.
-  // Like `scope_stats` but a plain class method; `count` honors the current scope
-  // installed when called on a relation (`Topic.all.klass_stats(stats)`). Async
-  // because trails counts asynchronously.
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
     stats.count = (await this.count()) as number;
     return this;
   }
 
-  // Rails topic.rb: `def self.nested_scoping(scope); scope.base; end`.
   static nestedScoping(scope: any): Relation<Topic> {
     return scope.base();
   }
@@ -258,9 +233,6 @@ export class WebTopic extends Base {
   }
 }
 
-// Track the STI subtree on the `topics` table so registry-safe row-path
-// resolution finds these through Topic's own subtree. Reply and its descendants
-// register themselves from reply.ts.
 for (const klass of [DefaultRejectedTopic, BlankTopic, TitlePrimaryKeyTopic]) {
   registerSubclass(klass);
 }

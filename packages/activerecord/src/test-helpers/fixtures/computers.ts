@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/computers.yml
 export const computerFixtureData = {
   workstation: {
     id: 1,

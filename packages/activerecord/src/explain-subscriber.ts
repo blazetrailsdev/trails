@@ -9,19 +9,11 @@ export interface ExplainPayload {
   [key: string]: unknown;
 }
 
-/**
- * ActiveRecord::ExplainSubscriber — collects queries for EXPLAIN analysis.
- *
- * Subscribes to `sql.active_record` and pushes [sql, binds] pairs into
- * ExplainRegistry when collection is enabled.
- */
 export class ExplainSubscriber {
   static readonly IGNORED_PAYLOADS = ["SCHEMA", "EXPLAIN"];
   static readonly EXPLAINED_SQLS = /^\s*(\/\*.*\*\/)?\s*(with|select|update|delete|insert)\b/i;
 
-  start(_name: unknown, _id: unknown, _payload: ExplainPayload): void {
-    // unused — matches Rails' no-op start
-  }
+  start(_name: unknown, _id: unknown, _payload: ExplainPayload): void {}
 
   finish(_name: unknown, _id: unknown, payload: ExplainPayload): void {
     if (ExplainRegistry.collectEnabled() && !this.ignorePayload(payload)) {

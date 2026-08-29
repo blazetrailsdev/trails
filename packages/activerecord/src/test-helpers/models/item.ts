@@ -1,5 +1,4 @@
 import type { Tagging } from "./tagging.js";
-// vendor/rails/activerecord/test/models/item.rb
 import { Base } from "../../base.js";
 
 export class AbstractItem extends Base {

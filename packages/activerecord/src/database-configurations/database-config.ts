@@ -1,10 +1,3 @@
-/**
- * Mirrors: ActiveRecord::DatabaseConfigurations::DatabaseConfig
- *
- * Abstract base class for database configuration objects.
- * Concrete subclasses (HashConfig, UrlConfig) implement the accessor methods.
- */
-
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -36,17 +29,11 @@ export interface DatabaseConfigOptions {
 
 let _defaultEnvGetter: (() => string) | null = null;
 
-/** @internal Set by DatabaseConfigurations to break circular dependency */
+/** @internal */
 export function _setDefaultEnvGetter(fn: () => string): void {
   _defaultEnvGetter = fn;
 }
 
-// Registration-based indirection: avoids a static import edge from
-// database-configurations/* into connection-adapters/*, which (transitively)
-// would re-enter database-configurations.ts before HashConfig finishes
-// extending DatabaseConfig. Registered by abstract/connection-handler.ts so
-// any consumer of `ConnectionHandler` (including those that don't import
-// connection-handling.ts directly) wires up the resolvers.
 type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]) => unknown>;
 type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
 type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown[];
@@ -75,12 +62,7 @@ export function _setAdapterClassResolver(
 
 let writeConfigurationHash!: (config: DatabaseConfig, hash: DatabaseConfigOptions) => void;
 
-/**
- * Replace a config's hash with a frozen copy of `hash`, preserving the
- * `DatabaseConfig` object's identity (the pool-reuse check keys on it).
- *
- * @internal
- */
+/** @internal */
 export function _setConfigurationHash(
   config: DatabaseConfig,
   hash: DatabaseConfigOptions,
@@ -90,19 +72,11 @@ export function _setConfigurationHash(
   return frozen;
 }
 
-/**
- * Mirrors: ActiveRecord::DatabaseConfigurations::DatabaseConfig
- */
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
   #configuration: DatabaseConfigOptions;
 
-  // Rails is `attr_reader :configuration_hash` — no writer, but it reassigns
-  // `@configuration_hash` from inside the class (`url_config.rb:43`). The paths
-  // that replace the hash go through _setConfigurationHash, which reaches the
-  // private field via this static-block closure rather than a Rails-visible
-  // public writer.
   static {
     writeConfigurationHash = (config, hash) => {
       config.#configuration = hash;
@@ -112,9 +86,6 @@ export class DatabaseConfig {
   constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
     this.envName = envName;
     this.name = name;
-    // Rails: `@configuration_hash = configuration_hash.symbolize_keys.freeze`
-    // (hash_config.rb:40) — a new frozen hash, so the caller's literal is
-    // never aliased and no later write can reach it.
     this.#configuration = Object.freeze({ ...configuration });
   }
 
@@ -122,32 +93,18 @@ export class DatabaseConfig {
     return this.#configuration;
   }
 
-  /**
-   * Mirrors: DatabaseConfig#configuration_hash
-   *
-   * Alias for configuration — Rails uses configuration_hash as the canonical
-   * accessor on HashConfig.
-   */
   get configurationHash(): DatabaseConfigOptions {
     return this.configuration;
   }
 
-  /**
-   * Mirrors: DatabaseConfig#inspect
-   */
   inspect(): string {
     return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter=${this.adapter}>`;
   }
 
-  /**
-   * Mirrors: DatabaseConfig#for_current_env?
-   */
   get forCurrentEnv(): boolean {
     const defaultEnv = _defaultEnvGetter ? _defaultEnvGetter() : "default_env";
     return this.envName === defaultEnv;
   }
-
-  // --- Accessors (implemented in HashConfig, stubbed here for the type contract) ---
 
   get adapter(): string | undefined {
     return this.configuration.adapter;
@@ -157,43 +114,15 @@ export class DatabaseConfig {
     return this.configuration.database;
   }
 
-  /**
-   * Mirrors: DatabaseConfig#_database=
-   *
-   * Internal setter for the database name. Rails exposes this so things like
-   * db:create can swap the database without creating a new config.
-   */
   set _database(database: string) {
     this.#configuration = Object.freeze({ ...this.#configuration, database });
   }
 
-  /**
-   * Mirrors: DatabaseConfig#seeds?
-   *
-   * Abstract on DatabaseConfig — HashConfig overrides with real logic.
-   */
   get seeds(): boolean | null {
     return false;
   }
 
-  /**
-   * Mirrors Rails:
-   *
-   *   def adapter_class
-   *     @adapter_class ||= ActiveRecord::ConnectionAdapters.resolve(adapter)
-   *   end
-   *
-   * Async in trails because ESM imports are async (Rails' autoload is sync).
-   * After at least one await, the sync mirror is populated and
-   * {@link newConnection} can run sync.
-   *
-   * @missingRailsCall resolve — PERMANENT: Verified per-site (RFC 0106):
-   *   `ActiveRecord::ConnectionAdapters.resolve(adapter)`
-   *   (`database_config.rb:18`) — `database-config.ts` cannot import the adapter
-   *   registry (it would close a module-eval cycle through
-   *   `connection-adapters`), so `resolve` is reached through the
-   *   `_setAdapterClassResolver` late-binding hook the registry installs.
-   */
+  /** @missingRailsCall resolve — PERMANENT */
   async adapterClass(): Promise<new (...args: any[]) => unknown> {
     if (!_adapterClassResolver) {
       throw new Error(
@@ -206,22 +135,6 @@ export class DatabaseConfig {
     return _adapterClassResolver(this.adapter);
   }
 
-  /**
-   * Mirrors Rails:
-   *
-   *   def new_connection
-   *     adapter_class.new(configuration_hash)
-   *   end
-   *
-   * Synchronous because adapter classes are pre-resolved (via
-   * {@link loadAdapter} or the async resolve kicked off by
-   * `ConnectionHandler.establishConnection`, exposed as `pool.adapterReady`).
-   *
-   * Uses {@link buildAdapterArg} for the trails-specific argument shape
-   * (SQLite takes `[filename, options?]`; PG/MySQL take a single config
-   * object). Rails passes `configuration_hash` directly because its adapter
-   * constructors uniformly accept a hash; trails' don't (yet).
-   */
   newConnection(): unknown {
     if (!_adapterClassResolverSync) {
       throw new Error(
@@ -246,25 +159,11 @@ export class DatabaseConfig {
     return new (Klass as new (...args: unknown[]) => unknown)(...args);
   }
 
-  /**
-   * Synchronous, non-leasing variant of {@link adapterClass}: resolves the
-   * adapter constructor from the pre-warmed sync cache without establishing or
-   * leasing a connection. Returns `null` when the adapter hasn't been resolved
-   * yet (no prior `await adapterClass()` / `loadAdapter()`). Used by call sites
-   * that only need static adapter metadata (e.g. `column_name_with_order_matcher`)
-   * and must not lease a connection just to read it.
-   */
   adapterClassSync(): (new (...args: any[]) => unknown) | null {
     if (!_adapterClassResolverSync || !this.adapter) return null;
     return _adapterClassResolverSync(this.adapter);
   }
 
-  /**
-   * Pre-warm the synchronous adapter-class cache for this configuration's
-   * adapter. The returned promise resolves once {@link newConnection} can
-   * succeed synchronously. Mirrors Rails' implicit autoload step — trails
-   * needs it explicit because ESM imports are async.
-   */
   async loadAdapter(): Promise<unknown> {
     return this.adapterClass();
   }
@@ -305,9 +204,6 @@ export class DatabaseConfig {
   }
 
   get reapingFrequency(): number | null {
-    // Rails: `configuration_hash.fetch(:reaping_frequency, 60)&.to_f` —
-    // missing key defaults to 60; explicit `nil` stays nil; any other value
-    // (including "0") is coerced with `to_f`.
     const raw = this.configuration.reapingFrequency;
     if (raw === null) return null;
     if (raw === undefined) return 60.0;
@@ -335,21 +231,7 @@ export class DatabaseConfig {
     return val === undefined ? true : !!val;
   }
 
-  /**
-   * Mirrors: DatabaseConfig#validate!
-   *
-   * Validates the configuration by resolving the adapter class.
-   * Returns true on success or throws.
-   *
-   * Deviation: Rails resolves the adapter class here; trails checks the
-   * adapter name against the registry instead, because {@link adapterClass}
-   * is async (ESM imports are) and `validate!`'s callers are sync. A
-   * registered adapter whose module fails to import surfaces at first
-   * checkout rather than here.
-   */
   validateBang(): true {
-    // `!= null`, not truthiness: `adapter: ""` is truthy in Ruby, so Rails
-    // validates it and raises AdapterNotFound rather than AdapterNotSpecified.
     if (this.adapter != null) {
       if (!_validateAdapterName) {
         throw new Error(
@@ -362,10 +244,6 @@ export class DatabaseConfig {
   }
 }
 
-// Mirrors Ruby's String#to_i / to_f. Parses leading sign+digits/float prefix
-// and returns 0 for non-numeric input. Matches Rails behavior for config
-// values that may arrive as strings from query params or env vars, e.g.
-// "5abc".to_i == 5, "5.2abc".to_f == 5.2, "abc".to_i == 0.
 function toInt(value: unknown): number {
   if (typeof value === "number") {
     return Number.isFinite(value) ? Math.trunc(value) : 0;

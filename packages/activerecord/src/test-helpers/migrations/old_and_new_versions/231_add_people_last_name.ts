@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/old_and_new_versions/231_add_people_last_name.rb
 import { Migration } from "../../../migration.js";
 
 export class AddPeopleLastName extends Migration {

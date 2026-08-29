@@ -1,13 +1,3 @@
-/**
- * Mirrors vendor/rails/activerecord/test/cases/associations/belongs_to_associations_test.rb
- *
- * Guards SingularAssociation#reader's stale-target reload: Rails
- * (singular_association.rb:10-13) reloads a loaded belongs_to/has_one target
- * when the owner's foreign key changes after load (`!loaded? || stale_target?`).
- * Before the fix, the reader returned the stale cached target because it short
- * circuited on `loaded?`. Uses the canonical `Client`/`Firm` STI models and the
- * `companies` fixtures — no `defineSchema`.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
@@ -63,9 +53,6 @@ describe("BelongsToAssociationsTest", () => {
 
     expect(await targetId(firmProxy.loadTarget())).toBe(firstFirmId);
 
-    // Changing the owner FK makes the loaded target stale. Rails' guard
-    // `(@stale_state && stale_target?) || find_target?` issues a fresh query
-    // on the stale branch rather than returning the in-memory cache.
     client.client_of = anotherFirmId as bigint;
 
     expect(firmProxy.isStaleTarget()).toBe(true);

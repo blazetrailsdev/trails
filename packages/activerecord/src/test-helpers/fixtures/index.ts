@@ -1,6 +1,3 @@
-// Barrel of all fixture-data modules. Auto-generated companion to
-// fixtures-registry.ts; re-exports every `<name>FixtureData` const so the
-// registry can pull them via a single namespace import.
 export * from "./1-need-quoting.js";
 export * from "./accounts.js";
 export * from "./all/namespaced/accounts.js";

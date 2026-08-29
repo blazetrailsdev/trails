@@ -1,27 +1,10 @@
-/**
- * Thin registry that decouples base.ts from the encryption namespace.
- *
- * base.ts imports these no-op stubs so the barrel doesn't drag
- * zlib/crypto into browser bundles. encryption.ts registers the real
- * implementations at module-load time, which only happens when a
- * consumer explicitly imports the encryption namespace.
- *
- * @internal
- */
+/** @internal */
 
 export interface EncryptionHooks {
   encrypts(klass: any, ...args: any[]): void;
 
   applyPendingEncryptions(klass: any): void;
 
-  /**
-   * Re-check the ignoreCase `original_<name>` missing-column requirement against
-   * the authoritative column set reflected from the real adapter schema. Called
-   * from schema reflection so a genuinely absent column raises Configuration
-   * even when `encrypts(ignoreCase)` was declared before the adapter connected
-   * (fail-closed, matching Rails). Optional: only registered once the encryption
-   * namespace is loaded; base.ts callers no-op through the stub otherwise.
-   */
   requireOriginalColumnsAfterReflection?(klass: any, columnNames: string[]): void;
 
   encryptedAttribute(record: any, name: string): boolean;
@@ -51,7 +34,7 @@ export const encryptionHooks: EncryptionHooks = {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby names ActiveRecord::Encryption at call time (encryption/encryptable_record.rb:87); a TS import from the core path would close a module cycle.
+ * @noRailsEquivalent PERMANENT
  */
 export function registerEncryptionHooks(hooks: EncryptionHooks): void {
   Object.assign(encryptionHooks, hooks);

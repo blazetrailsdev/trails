@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/valid_with_subdirectories/sub1/3_innocent_jointable.rb
 import { Migration } from "../../../../migration.js";
 
 export class InnocentJointable extends Migration {

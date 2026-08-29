@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/owners.yml
 export const ownerFixtureData = {
   blackbeard: {
     owner_id: 1,

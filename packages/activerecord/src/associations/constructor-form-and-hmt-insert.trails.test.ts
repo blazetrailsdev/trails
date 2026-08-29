@@ -1,15 +1,3 @@
-/**
- * HMT Slot C smoke tests:
- *   - constructor-form collection writer in assignAttributes
- *   - association.resetScope invocation during saveCollectionAssociation
- *   - has_many :through insert_record two-step alignment
- *     (super.insertRecord → save_through_record)
- *
- * No 1:1 Rails counterpart — a trails-internal harness for the
- * constructor-form / through-insert write path. Rides the canonical schema
- * (`Author has_many :posts`/`has_one :post`, `Post has_many :tags, through:
- * :taggings`) + fixtures; no inline tables and no `defineSchema`.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -45,18 +33,11 @@ describe("constructor-form association writer", () => {
 
   it("dispatches alongside a multiparameter key in the same constructor bag", () => {
     const p1 = new Post({ title: "a" });
-    // Mix in a parenthesized key so construction takes the multiparameter
-    // branch — the association must still be dispatched in that branch. The
-    // value content is irrelevant.
     const author = new Author({ posts: [p1], "name(1)": "x" });
     expect((author as any).association("posts").target).toEqual([p1]);
   });
 
   it("routes an association key reached through assignAttributes", async () => {
-    // `_assign_attribute` sends the writer it resolved
-    // (attribute_assignment.rb:67-69), so mass assignment reaches the collection
-    // writer as Rails does. On a new owner `replace` does no I/O, so the send
-    // completes in memory.
     const author = new Author();
     const post = new Post({ title: "a" });
     await author.assignAttributes({ posts: [post] });
@@ -76,11 +57,7 @@ describe("HABTM insert_record two-step", () => {
     const tag = new Tag({ name: "ruby" });
     const ok = await (post as any).association("tags").insertRecord(tag, true, false);
     expect(ok).toBe(true);
-    // super.insertRecord saved the target
     expect(tag.isPersisted()).toBe(true);
-    // Reload to force a fresh through-load from the DB so we know the join
-    // row was actually persisted (rather than just cached in the in-memory
-    // proxy from build()).
     const reloaded = await Post.find(post.id);
     const tags = await (reloaded as any).association("tags").loadTarget();
     expect(tags).toHaveLength(1);
@@ -92,17 +69,12 @@ describe("resetScope on owner save", () => {
   it("clears the memoized association scope before iterating children", async () => {
     const author = await Author.create({ name: "o" });
     const assoc = (author as any).association("posts");
-    // saveCollectionAssociation must call resetScope() before iterating
-    // children so a stale scope doesn't survive into per-child saves.
     let resetCount = 0;
     const original = assoc.resetScope.bind(assoc);
     assoc.resetScope = function () {
       resetCount++;
       return original();
     };
-    // Build rather than assign: `author.posts = []` on a persisted owner now
-    // throws (RFC 0068), and an unsaved child is what makes the owner's save
-    // reach saveCollectionAssociation at all.
     (author as any).posts.build({ title: "t", body: "b" });
     await author.save();
     expect(resetCount).toBeGreaterThan(0);
@@ -110,11 +82,6 @@ describe("resetScope on owner save", () => {
 
   it("clears the scope of a built association that never loaded a target", async () => {
     const author = new Author({ name: "unloaded" });
-    // Build the association wrapper without loading or building any child, so
-    // it holds no cached target data. Rails' `association_instance_get` is a
-    // bare `@association_cache[name]` read (autosave_association.rb:420), so
-    // this association still reaches `association.reset_scope` (:428) on the
-    // owner's save; trails' `associationInstanceGet` gates on cached data.
     const assoc = (author as any).association("posts");
     let resetCount = 0;
     const original = assoc.resetScope.bind(assoc);
@@ -122,8 +89,6 @@ describe("resetScope on owner save", () => {
       resetCount++;
       return original();
     };
-    // Memoize the scope while the owner is still new, so it carries the
-    // unresolved foreign key.
     assoc.scope();
     await author.save();
     expect(resetCount).toBeGreaterThan(0);

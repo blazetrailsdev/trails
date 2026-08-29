@@ -52,7 +52,6 @@ describe("RuntimeRegistryTest", () => {
     expect(was).toBe(8.0);
     expect(stats().sqlRuntime).toBe(0);
     expect(stats().asyncSqlRuntime).toBe(0);
-    // queries count is not reset by resetRuntimes
     expect(stats().queriesCount).toBe(2);
   });
 
@@ -74,9 +73,7 @@ describe("RuntimeRegistryTest", () => {
   });
 
   it("notification subscription records sql.active_record events", () => {
-    Notifications.instrument("sql.active_record", { name: "User Load" }, () => {
-      // simulate query work
-    });
+    Notifications.instrument("sql.active_record", { name: "User Load" }, () => {});
     expect(stats().queriesCount).toBe(1);
     expect(stats().sqlRuntime).toBeGreaterThanOrEqual(0);
   });

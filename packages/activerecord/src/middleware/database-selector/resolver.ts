@@ -1,7 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Middleware::DatabaseSelector::Resolver
- */
-
 import { Notifications } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Session } from "./resolver/session.js";
@@ -64,14 +60,7 @@ export class Resolver {
     );
   }
 
-  /**
-   * @missingRailsCall instrument — PERMANENT: Verified per-site (RFC 0106):
-   *   `instrumenter.instrument("database_selector.active_record.read_from_primary",
-   *   &blk)` (`resolver.rb:58`) — the block is async here, and
-   *   `Instrumenter#instrument` is trails' synchronous form; `instrumentAsync`
-   *   is the settled awaiting split (instrumenter.rb:59-67 carries the same
-   *   note).
-   */
+  /** @missingRailsCall instrument — PERMANENT */
   private async readFromPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: Base.writingRole, preventWrites: true }, () =>
       this.instrumenter.instrumentAsync(
@@ -82,12 +71,7 @@ export class Resolver {
     ) as Promise<T>;
   }
 
-  /**
-   * @missingRailsCall instrument — PERMANENT: Verified per-site (RFC 0106):
-   *   `instrumenter.instrument("database_selector.active_record.read_from_replica",
-   *   &blk)` (`resolver.rb:64`) — same synchronous/awaiting split as
-   *   `read_from_primary`: the block is async, so the call is `instrumentAsync`.
-   */
+  /** @missingRailsCall instrument — PERMANENT */
   private async readFromReplica<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: Base.readingRole, preventWrites: true }, () =>
       this.instrumenter.instrumentAsync(
@@ -98,13 +82,7 @@ export class Resolver {
     ) as Promise<T>;
   }
 
-  /**
-   * @missingRailsCall instrument — PERMANENT: Verified per-site (RFC 0106):
-   *   `instrumenter.instrument("database_selector.active_record.wrote_to_primary")`
-   *   (`resolver.rb:70`) — same synchronous/awaiting split: the block is async
-   *   (and carries the `ensure` timestamp bump), so the call is
-   *   `instrumentAsync`.
-   */
+  /** @missingRailsCall instrument — PERMANENT */
   private async writeToPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: Base.writingRole, preventWrites: false }, () =>
       this.instrumenter.instrumentAsync(

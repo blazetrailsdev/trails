@@ -16,14 +16,8 @@ class ApplicationRecord extends Base {
 }
 
 describe("PrimaryClassTest", () => {
-  // Rails: `self.use_transactional_tests = false` (primary_class_test.rb:6).
-  // The connects_to tests below need a live primary connection to share.
   fixtures({}, { useTransactionalTests: false });
 
-  // Mirrors ActiveRecord::TestCase#clean_up_connection_handler (Rails'
-  // per-test `teardown { clean_up_connection_handler }`, primary_class_test.rb:8):
-  // drop every non-default (e.g. :reading) role the connects_to tests
-  // established, leaving the writing pool.
   function cleanUpConnectionHandler(): void {
     const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
       Base.connectionHandler as unknown as {

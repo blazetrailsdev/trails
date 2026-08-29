@@ -1,19 +1,3 @@
-/**
- * Faithful port of vendor/rails/activerecord/test/cases/enum_test.rb.
- *
- * Rides the canonical `Book` model (test-helpers/models/book.ts) and the real
- * `books` fixtures (test-helpers/fixtures/books.ts), mirroring Rails' own test
- * names and assertions. Ruby predicate/scope/bang accessors translate to the
- * trails camelCase surface (`@book.published?` → `book.isPublished()`,
- * `Book.published` → `Book.published()`, `@book.written!` → `book.writtenBang()`,
- * `Book.statuses` → `Book.statuses`).
- *
- * The `cover` string enum, the `boolean_status` boolean enum, and the
- * `last_read` `forgotten: nil` value are wired on the canonical `Book` model
- * (EnumType supports string/boolean/nil values). Remaining sub-assertion gaps
- * on the canonical `Book` surface were scoped by `enum-canonical-book-gaps`
- * (RFC 0050, landed) and are marked by the inline comments below.
- */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -46,8 +30,6 @@ describe("EnumTest", () => {
     expect(type.serialize("unknown")).toBeNull();
   });
 
-  // Rails: `type.cast(:unknown)` / `type.cast("unknown")` pass the unknown value
-  // through unchanged (`value.presence`).
   it("type.cast", () => {
     const type = Book.typeForAttribute("status");
     expect(type.cast(0)).toBe("proposed");
@@ -79,9 +61,6 @@ describe("EnumTest", () => {
     expect((book as any).author_visibility).toBe("visible");
     expect((book as any).illustrator_visibility).toBe("visible");
     expect((book as any).difficulty).toBe("medium");
-    // Rails also asserts `@book.cover == "soft"` as an enum reader; `cover` is a
-    // raw string column on canonical Book (no enum), so the assertion is omitted
-    // to avoid false fidelity (`enum-canonical-book-gaps`, RFC 0050).
   });
 
   it("find via scope", async () => {
@@ -92,9 +71,6 @@ describe("EnumTest", () => {
     expect((await (Book as any).authorVisibilityVisible().first())?.id).toBe(book.id);
     expect((await (Book as any).illustratorVisibilityVisible().first())?.id).toBe(book.id);
     expect((await (Book as any).mediumToRead().first())?.id).toBe(book.id);
-    // Rails also asserts `Book.forgotten.first == books(:ddd)` (last_read
-    // `forgotten: nil`, not mapped on canonical Book) and
-    // `authors(:david).unpublished_books.first` — both pending.
   });
 
   it("find via negative scope", async () => {
@@ -130,7 +106,6 @@ describe("EnumTest", () => {
     expect((await Book.where({ cover: (Book as any).covers.soft }).first())?.id).toBe(book.id);
   });
 
-  // Ruby symbols map to trails' label strings.
   it("find via where with symbols", async () => {
     book = books("awdr");
     expect((await Book.where({ status: "published" }).first())?.id).toBe(book.id);
@@ -157,11 +132,6 @@ describe("EnumTest", () => {
     expect(await Book.where({ status: "prohibited" }).first()).toBeNull();
   });
 
-  // Rails passes a 64-bit-out-of-range value (2^63) as an enum array element
-  // and as a Range end bound, plus numeric-string forms. Each element/bound
-  // serializes through EnumType → its integer subtype: the OOR value collapses
-  // via the Unboundable threading (array IN drops it; the Range end bound
-  // becomes unbounded), so every shape still finds the published book.
   it("find via where with large number", async () => {
     book = books("awdr");
     const big = 9223372036854775808n;
@@ -186,9 +156,6 @@ describe("EnumTest", () => {
   it("build from scope", () => {
     expect((Book as any).written().build().isWritten()).toBe(true);
     expect((Book as any).written().build().isProposed()).toBe(false);
-    // Rails also asserts `PublishedBook.hard.build.hard?` /  `.soft?` — canonical
-    // PublishedBook omits the `cover` enum (`enum :cover, { hard: "0", soft: "1" }`),
-    // so that half is omitted (`enum-canonical-book-gaps`, RFC 0050).
   });
 
   it("build from where", () => {
@@ -209,13 +176,11 @@ describe("EnumTest", () => {
     expect((book as any).isInEnglish()).toBe(true);
     await (book as any).authorVisibilityVisibleBang();
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
-    // Rails also asserts `@book.hard!` — `cover` enum not on canonical Book.
   });
 
   it("update by setter", async () => {
     await book.updateBang({ status: "written" });
     expect((book as any).isWritten()).toBe(true);
-    // Rails also asserts `@book.update! cover: :hard` — `cover` enum absent.
   });
 
   it("enum methods are overwritable", async () => {
@@ -226,13 +191,11 @@ describe("EnumTest", () => {
   it("direct assignment", () => {
     (book as any).status = "written";
     expect((book as any).isWritten()).toBe(true);
-    // Rails also asserts `@book.cover = :hard` — `cover` enum not on canonical Book.
   });
 
   it("assign string value", () => {
     (book as any).status = "written";
     expect((book as any).isWritten()).toBe(true);
-    // Rails also asserts `@book.cover = "hard"` — `cover` enum not on canonical Book.
   });
 
   it("enum changed attributes", () => {
@@ -384,8 +347,6 @@ describe("EnumTest", () => {
   it("NULL values from database should be casted to nil", async () => {
     await Book.where({ id: book.id }).updateAll("status = NULL");
     await book.reload();
-    // Rails asserts only `assert_nil @book.reload.status`; the predicate checks
-    // confirm EnumType#deserialize(null) leaves every state query false.
     expect((book as any).status).toBeNull();
     expect((book as any).isPublished()).toBe(false);
     expect((book as any).isWritten()).toBe(false);
@@ -411,7 +372,6 @@ describe("EnumTest", () => {
     expect((book as any).status).toBeNull();
   });
 
-  // Rails treats `false` as blank → casts to nil.
   it("assign false value to a field defined as not boolean", () => {
     (book as any).status = false;
     expect((book as any).status).toBeNull();
@@ -453,7 +413,6 @@ describe("EnumTest", () => {
     ).toBe(true);
   });
 
-  // Rails: `status_before_type_cast` returns the raw stored integer.
   it("attribute_before_type_cast", () => {
     expect((book as any).statusBeforeTypeCast).toBe(2);
     expect((book as any).status).toBe("published");
@@ -463,7 +422,6 @@ describe("EnumTest", () => {
     expect((book as any).statusBeforeTypeCast).toBe("published");
     expect((book as any).status).toBe("published");
   });
-  // Rails: `status_for_database` returns the serialized integer.
   it("attribute_for_database", () => {
     expect((book as any).statusForDatabase).toBe(2);
     expect((book as any).status).toBe("published");
@@ -482,27 +440,19 @@ describe("EnumTest", () => {
   });
 
   it("invalid definition values raise an ArgumentError", () => {
-    // Rails wraps each in `Class.new(ActiveRecord::Base) { self.table_name =
-    // "books"; enum :status, ... }`; mirror with a fresh class on the books
-    // table so a bad definition never mutates the canonical Book.
     const defineStatusEnum = (values: unknown) => {
       class K extends Base {
         static _tableName = "books";
       }
       (K as any).enum("status", values);
     };
-    expect(() => defineStatusEnum(undefined)).toThrow(ArgumentError); // no-arg `enum :status`
+    expect(() => defineStatusEnum(undefined)).toThrow(ArgumentError);
     expect(() => defineStatusEnum({})).toThrow(ArgumentError);
     expect(() => defineStatusEnum([])).toThrow(ArgumentError);
     expect(() => defineStatusEnum([{ proposed: 1, written: 2 }])).toThrow(ArgumentError);
     expect(() => defineStatusEnum({ "": 1, active: 2 })).toThrow(ArgumentError);
     expect(() => defineStatusEnum(["active", ""])).toThrow(ArgumentError);
     expect(() => defineStatusEnum(new (class {})())).toThrow(ArgumentError);
-    // Rails also asserts the exact message patterns (`must not be empty`,
-    // `must not contain a blank name`, `must only contain symbols or strings`,
-    // `must be either a non-empty hash or an array`); trails' wording differs, so
-    // the message surface is asserted in enum.trails.test.ts
-    // (assertValidEnumDefinitionValues) rather than against Rails' strings here.
   });
 
   it("reserved enum names", () => {
@@ -513,8 +463,6 @@ describe("EnumTest", () => {
       }
     }
 
-    // Each of these generates a method that conflicts with an Active Record
-    // method: `column` → `columns` (class), `logger` / `attributes=` (instance).
     const conflicts = ["column", "logger", "attributes"];
     conflicts.forEach((name, i) => {
       expect(() => (Klass as any).enum(name, [`value_${i}`])).toThrow(
@@ -530,9 +478,6 @@ describe("EnumTest", () => {
       }
     }
 
-    // Each value generates a method conflicting with an AR method: `new` → a
-    // scope clashing with the class method, `valid`/`save` → `valid?`/`save!`,
-    // `proposed` → an existing enum value, and `id` → AR querying.
     const conflicts = ["new", "valid", "save", "proposed", "id"];
     conflicts.forEach((value, i) => {
       expect(() => (Klass as any).enum(`status_${i}`, [value])).toThrow(
@@ -541,11 +486,6 @@ describe("EnumTest", () => {
     });
   });
   it("reserved enum values for relation", () => {
-    // A value whose scope name matches a Relation instance method conflicts
-    // with the message reporting `source: ActiveRecord::Relation`. Rails samples
-    // `[:records, :to_ary, :scope_for_create]`; trails' Relation has no `to_ary`
-    // (Ruby's array-coercion hook has no TS equivalent), so `scoping` — another
-    // Relation instance method — stands in for it.
     const relationMethodSamples = ["records", "scoping", "scope_for_create"];
     relationMethodSamples.forEach((value) => {
       expect(() => {
@@ -572,8 +512,6 @@ describe("EnumTest", () => {
     expect(() => {
       class Klass extends Base {
         static _tableName = "books";
-        // Rails: `def published!; super; "do publish work..."; end` defined
-        // before the enum, then `def written!` after — both must not raise.
         publishedBang() {
           return "do publish work...";
         }
@@ -588,7 +526,6 @@ describe("EnumTest", () => {
     }).not.toThrow();
   });
 
-  // Rails: anonymous AR class with `validates_uniqueness_of` / inclusion.
   it("validate uniqueness", async () => {
     class Klass extends Base {
       static _tableName = "books";
@@ -620,7 +557,6 @@ describe("EnumTest", () => {
     expect(await validBook.isValid()).toBe(true);
   });
 
-  // Rails: `book.status_change` / per-class & inheritable enum redefinition.
   it("enums are distinct per class", async () => {
     class Klass1 extends Base {
       static _tableName = "books";
@@ -661,9 +597,6 @@ describe("EnumTest", () => {
     expect(book2.statusChange).toEqual(["drafted", "uploaded"]);
   });
 
-  // Rails: `Book.statuses` is frozen; a mutation raises "can't modify frozen".
-  // In trails the mapping is a frozen plain object, so mutation/deletion throws
-  // a TypeError in strict mode.
   it("attempting to modify enum raises error", () => {
     expect(() => {
       (Book as any).statuses["bad_enum"] = 40;
@@ -704,7 +637,6 @@ describe("EnumTest", () => {
     expect(typeof (instance as any).isValue1LastRead).toBe("function");
   });
 
-  // Rails: `alias_attribute` combined with `enum` on the alias.
   it("enum with alias_attribute", async () => {
     class Klass extends Base {
       static _tableName = "books";
@@ -724,10 +656,6 @@ describe("EnumTest", () => {
     expect(record.aliased_status).toBe("proposed");
   });
 
-  // Real Rails raises "Undeclared attribute type for enum" when `enum` is
-  // declared BEFORE `alias_attribute` on the same name: the enum keys a phantom
-  // attribute with no backing column. The raise fires lazily, on first use.
-  // (No dedicated Rails test — Rails treats it as the undeclared-type case.)
   it("enum declared before alias_attribute raises on first use", async () => {
     class Klass extends Base {
       static _tableName = "books";
@@ -741,23 +669,14 @@ describe("EnumTest", () => {
     await expect((Klass as any).create({ status: "written" })).rejects.toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
     );
-    // Also raises via type_for_attribute (Rails materializes attribute_types).
     expect(() => (Klass as any).typeForAttribute("aliased_status")).toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
     );
-    // And via the enum helper path (predicate → castEnumValue → enumTypeOf),
-    // which keys off the un-aliased enum name: Rails routes type casting through
-    // type_for_attribute, whose decorate block raises.
     expect(() => new (Klass as any)().isProposed()).toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
     );
   });
 
-  // A column-backed enum whose name is LATER reused as an alias target must not
-  // raise: Rails' decorate block only raises when the decorated subtype is the
-  // default (no column), and a real column reflects its own subtype at replay
-  // regardless of a later alias. Guards against a coarse "pending ∩ alias-key"
-  // heuristic false-positiving a legitimate column-backed enum.
   it("column-backed enum whose name is later aliased does not raise", () => {
     class Klass extends Base {
       static _tableName = "books";
@@ -768,21 +687,10 @@ describe("EnumTest", () => {
     }
     registerModel(Klass);
 
-    // Materialize (typeForAttribute + a fresh instance's predicate) without
-    // persisting — aliasing the enum name onto another real column would list it
-    // twice in an INSERT, which is orthogonal to the raise being tested.
     expect(() => (Klass as any).typeForAttribute("nullable_status")).not.toThrow();
     expect(() => new (Klass as any)().isSingle()).not.toThrow();
   });
 
-  // An enum declared on an abstract parent with no column of its own must defer
-  // to its concrete subclass's columns (Rails replays the superclass decorator
-  // into the subclass attribute set). A concrete subclass that DOES back the enum
-  // (Lion has lions.gender via Cat) stays green; one that does NOT raises against
-  // its own columns — not silently install, and not throw TableNotSpecified on the
-  // abstract parent's tableless schema. The message names the DECLARING class:
-  // Rails interpolates `self.name` (enum.rb:241) and the block is a closure over
-  // the class body `enum` was called in, not the materializing subclass.
   it("enum on abstract parent resolves against concrete subclass columns", () => {
     class AbstractParent extends Base {
       static {
@@ -791,7 +699,7 @@ describe("EnumTest", () => {
       }
     }
     class Concrete extends AbstractParent {
-      static _tableName = "books"; // books has no `typeless_genre` column
+      static _tableName = "books";
     }
     registerModel(Concrete);
 
@@ -800,16 +708,6 @@ describe("EnumTest", () => {
     );
   });
 
-  // The inherited-enum raise must also fire through the create/materialization
-  // path — not only `type_for_attribute`. Rails replays a superclass's pending
-  // `decorate_attributes` block into the concrete subclass's attribute set
-  // (attribute_registration.rb:81-87), so the enum block runs and raises
-  // `Undeclared attribute type for enum` while `_default_attributes`
-  // materializes. Constructing a record (or bare `_defaultAttributes()`) is
-  // enough; no prior `type_for_attribute` lookup is required. (The green
-  // counterpart — a subclass that DOES back the inherited enum — is the
-  // `Lion < abstract Cat` case, covered on the canonical models in
-  // enum.trails.test.ts.)
   it("enum on abstract parent raises through subclass materialization", () => {
     class AbstractParent extends Base {
       static {
@@ -818,7 +716,7 @@ describe("EnumTest", () => {
       }
     }
     class Concrete extends AbstractParent {
-      static _tableName = "books"; // books has no `typeless_genre` column
+      static _tableName = "books";
     }
     registerModel(Concrete);
 
@@ -921,8 +819,6 @@ describe("EnumTest", () => {
     expect((new K() as any).status).toBe("published");
   });
 
-  // Rails: the legacy `:_default` / `:_prefix` / `:_suffix` / `:_scopes` /
-  // `:_instance_methods` options must raise (assertValidEnumOptions).
   it(":_default is invalid in the new API", () => {
     expect(() => {
       class Klass extends Base {
@@ -987,7 +883,6 @@ describe("EnumTest", () => {
     }).toThrow(/invalid option\(s\): :_instance_methods/);
   });
 
-  // Rails: `scopes: false` / `instance_methods: false` opt-outs.
   it("scopes can be disabled by :scopes", () => {
     class K extends Base {
       static _tableName = "books";
@@ -1080,10 +975,6 @@ describe("EnumTest", () => {
     expect(typeof (K as any).balineseJavanese).toBe("function");
   });
 
-  // Rails: anonymous-class enum names with capitals / unicode / slashes. Labels
-  // with characters outside `\w` get the original-form predicate (bracket
-  // notation) alongside the camelized scope, mirroring Rails'
-  // `define_method("Etc/GMT+1?")` surface.
   it("capital characters for enum names", () => {
     class Klass extends Base {
       static _tableName = "computers";
@@ -1115,18 +1006,11 @@ describe("EnumTest", () => {
         this.enum("timezone", ["Etc/GMT+1", "Etc/GMT-1"]);
       }
     }
-    // Rails calls the scope by its literal label (`public_send(:"Etc/GMT+1")`);
-    // trails scope names go through camelize, which maps "/" to "::" —
-    // "Etc/GMT+1" → "etc::GMT+1". The original-form predicates keep the label.
     const computer = (Klass as any)["etc::GMT+1"]().build();
     expect(computer["isEtc/GMT+1"]()).toBe(true);
     expect(computer["isEtc/GMT-1"]()).toBe(false);
   });
 
-  // Rails keys the hash with `Struct.new(:to_s).new("proposed")` objects and
-  // asserts `book.status` returns the original key. JS object keys stringify, so
-  // the trails-idiom equivalent is a plain string label key — `cast` returns the
-  // original key (label) via the reverse mapping, matching Rails' `mapping.key`.
   it("deserialize enum value to original hash key", async () => {
     class K extends Base {
       static _tableName = "books";
@@ -1141,9 +1025,6 @@ describe("EnumTest", () => {
     expect((b as any).isProposed()).toBe(true);
     expect((b as any).isWritten()).toBe(false);
   });
-  // Rails' out-of-range Integer literals translate to BigInt: an unmapped
-  // number past the column's byte range is not serializable, the string label
-  // is (it maps to 0/1).
   it("serializable? with large number label", async () => {
     class Klass extends Base {
       static _tableName = "books";
@@ -1169,9 +1050,6 @@ describe("EnumTest", () => {
     expect((await Klass.where({ status: "-9223372036854775809" }).last())?.id).toBe(book2.id);
   });
 
-  // Rails routes the clash message through the model logger; trails routes it
-  // through the `setEnumWarn` sink (default `console.warn`). The exact wording
-  // diverges, so we assert on the warning behavior rather than Rails' string.
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
@@ -1240,7 +1118,6 @@ describe("EnumTest", () => {
     }
   });
 
-  // Rails: `type_for_attribute` on an enum with an undeclared / explicit type.
   it("raises for attributes with undeclared type", () => {
     class Klass extends Book {
       static {

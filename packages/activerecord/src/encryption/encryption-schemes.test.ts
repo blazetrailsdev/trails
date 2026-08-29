@@ -65,7 +65,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   let savedSupportUnencryptedData: boolean;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
 
-  // Laid once: DDL inside the per-test transaction auto-commits on MariaDB.
   beforeAll(async () => {
     await freshAdapter();
   });
@@ -83,8 +82,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("can decrypt encrypted_value encrypted with a different encryption scheme", async () => {
     Configurable.config.supportUnencryptedData = false;
-    // Use a distinct key for the previous scheme so current-scheme decryption
-    // fails and the fallback path is actually exercised.
     const prevKeyProvider = makeKeyProvider("prev-key-for-schemes-test-32bytes!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider }] as SchemeOptions[];
     const Author = makeEncryptedAuthor(await freshAdapter());
@@ -93,8 +90,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
     const prevType = currentType.previousTypes[0];
     expect(prevType).toBeDefined();
-    // Write the ciphertext produced by the previous scheme directly — bypass
-    // validations (length validator) with updateColumns.
     const oldCiphertext = prevType.serialize("dhh") as string;
     await withoutEncryption(async () => {
       await author.updateColumns({ name: oldCiphertext });
@@ -106,8 +101,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("when defining previous encryption schemes, you still get Decryption errors when using invalid clear values", async () => {
     Configurable.config.supportUnencryptedData = false;
-    // Configure a previous scheme — the test verifies that even with previous
-    // schemes, an unencrypted plaintext raises Decryption.
     Configurable.config.previous = [
       { keyProvider: makeKeyProvider("prev-key-for-decryption-error-32b!") },
     ] as SchemeOptions[];
@@ -132,7 +125,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     new EncryptedAuthor1();
     const author = await EncryptedAuthor1.create({ name: "1" });
     expect(author.name).toBe("1");
-    // Reload to get DB ciphertext in memory so encryptedAttribute returns true.
     const reloaded = await EncryptedAuthor1.find(author.id);
     expect(reloaded.name).toBe("1");
     expect(reloaded.encryptedAttribute("name")).toBe(true);
@@ -158,10 +150,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     expect(author.name).toBe("2");
     const found = await EncryptedAuthor2.findBy({ name: "2" });
     expect(found).not.toBeNull();
-    // Reload to verify DB ciphertext — encryptedAttribute checks the raw DB value.
     const authorReloaded = await EncryptedAuthor2.find(author.id);
     expect(authorReloaded.encryptedAttribute("name")).toBe(true);
-    // Write plaintext directly to DB (simulates an unencrypted legacy row).
     const RawModel = class extends Base {
       static {
         this._tableName = "authors";
@@ -175,8 +165,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     await rawRecord.update({ name: "1" });
     const reloaded = await EncryptedAuthor2.find(author.id);
     expect(reloaded.name).toBe("1");
-    // findBy plaintext also works because TestEncryptor.encrypt("1") returns "1"
-    // (not in map), so the WHERE clause matches the raw value.
     const foundByPlaintext = await EncryptedAuthor2.findBy({ name: "1" });
     expect(foundByPlaintext).not.toBeNull();
     expect(reloaded.encryptedAttribute("name")).toBe(false);
@@ -199,11 +187,9 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     expect(type.previousTypes).toHaveLength(2);
     const [previousType1, previousType2] = type.previousTypes;
 
-    // primary cannot decrypt legacy ciphertexts — falls back to previousType1
     const ciphertext1 = previousType1.serialize("legacy1") as string;
     expect(type.deserialize(ciphertext1)).toBe("legacy1");
 
-    // primary and previousType1 cannot decrypt — falls back to previousType2
     const ciphertext2 = previousType2.serialize("legacy2") as string;
     expect(type.deserialize(ciphertext2)).toBe("legacy2");
   });
@@ -222,7 +208,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       prev2Scheme,
     ]);
 
-    // clean-text scheme is appended when supportUnencryptedData → 3 total
     expect(type.previousTypes).toHaveLength(3);
     const [previousType1, previousType2] = type.previousTypes;
 
@@ -279,10 +264,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         previousSchemes: [oldScheme],
       }),
     });
-    // fixed: true by default for deterministic → serialize uses oldest scheme
     const cipher = type.serialize("alice") as string;
     expect(cipher).toBe("alice_old_cipher");
-    // decrypt path falls back: current can't decrypt it, oldest can
     expect(type.deserialize(cipher)).toBe("alice");
   });
 
@@ -323,7 +306,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         previousSchemes: [oldScheme],
       }),
     });
-    // fixed: false → serialize uses current (newest) scheme
     const cipher = type.serialize("alice") as string;
     expect(cipher).toBe("alice_new_cipher");
     expect(type.deserialize(cipher)).toBe("alice");
@@ -333,7 +315,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.supportUnencryptedData = false;
     const savedExtendQueries = Configurable.config.extendQueries;
 
-    // Snapshot prototype methods before installing query patches (mirrors uniqueness-validations.test.ts).
     const savedMethods = {
       where: Relation.prototype.where,
       exists: (Relation.prototype as any).exists,
@@ -348,9 +329,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       const prevEncryptor = new TestEncryptor({ alice: "alice_prev_cipher" });
       const currentEncryptor = new TestEncryptor({ alice: "alice_cur_cipher" });
 
-      // fixed: false so the attribute stores with the current cipher ("alice_cur_cipher").
-      // The raw row uses the prev cipher ("alice_prev_cipher"), which is only findable
-      // if query expansion includes the global previous scheme — proving the expansion works.
       Configurable.config.previousSchemes = [];
       Configurable.config.previous = [
         { encryptor: prevEncryptor, deterministic: true } as SchemeOptions,
@@ -371,7 +349,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       } as any;
       new Author();
 
-      // Insert a row encrypted with the previous scheme directly (legacy row).
       const Raw = class extends Base {
         static {
           this._tableName = "authors";
@@ -383,8 +360,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       new Raw();
       await Raw.create({ name: "alice_prev_cipher" });
 
-      // Without query expansion, findBy would only search for "alice_cur_cipher" and miss
-      // the row. With expansion, the prev-scheme ciphertext is also included → found.
       const found = await Author.findBy({ name: "alice" });
       expect(found).not.toBeNull();
       expect(found!.name).toBe("alice");
@@ -405,7 +380,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.deterministicKey = "12345";
     const savedExtendQueries = Configurable.config.extendQueries;
 
-    // Snapshot prototype methods before installing query patches (mirrors uniqueness-validations.test.ts).
     const savedMethods = {
       where: Relation.prototype.where,
       exists: (Relation.prototype as any).exists,
@@ -488,11 +462,9 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
     const type = modelClass.typeForAttribute("name") as unknown as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(2);
 
-    // value encrypted with first global previous scheme decrypts correctly
     const ciphertext1 = type.previousTypes[0].serialize("legacy1") as string;
     expect(type.deserialize(ciphertext1)).toBe("legacy1");
 
-    // value encrypted with second global previous scheme decrypts correctly
     const ciphertext2 = type.previousTypes[1].serialize("legacy2") as string;
     expect(type.deserialize(ciphertext2)).toBe("legacy2");
   });
@@ -519,7 +491,6 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
     });
 
     const type = modelClass.typeForAttribute("name") as unknown as EncryptedAttributeType;
-    // non-deterministic attribute: only the non-deterministic global scheme is compatible
     expect(type.previousTypes).toHaveLength(1);
     expect(type.deserialize("cipher_non")).toBe("legacy_non");
   });

@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/valid_with_timestamps/20100101010101_valid_with_timestamps_people_have_last_names.rb
 import { Migration } from "../../../migration.js";
 
 export class ValidWithTimestampsPeopleHaveLastNames extends Migration {

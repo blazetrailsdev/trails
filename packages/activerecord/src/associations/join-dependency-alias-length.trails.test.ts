@@ -1,12 +1,3 @@
-/**
- * JoinDependency seeds its AliasTracker with the base model's connection
- * `table_alias_length`, so a MySQL join chain caps aliases at 256 (not the
- * hardcoded 64 default). Rails builds the tracker inside `pool.with_connection`
- * (alias_tracker.rb:24), so the cap is always the connection's value.
- *
- * trails-specific: exercises the sync connection-length threading with a stub
- * connection, which has no Rails analog.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes, Table } from "@blazetrails/arel";
 import { JoinDependency } from "./join-dependency.js";
@@ -32,7 +23,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const jd = new JoinDependency(stubBaseModel(256), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     const posts = new Table("posts");
-    tracker.aliasedTableFor(posts, null, () => "unused"); // claim once so a repeat aliases + truncates
+    tracker.aliasedTableFor(posts, null, () => "unused");
     expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(300)).name)).toBe(
       "a".repeat(256),
     );
@@ -52,8 +43,6 @@ describe("JoinDependency AliasTracker seeding", () => {
     const jd = new JoinDependency(stubBaseModel(256), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     const candidate = "a".repeat(300);
-    // First claim keeps the full 256-slice; the repeat aliases through
-    // `truncate` (slice to tableAliasLength - 2) with a `_2` suffix.
     const posts = new Table("posts");
     tracker.aliasedTableFor(posts, null, () => "unused");
     expect(String(tracker.aliasedTableFor(posts, null, () => candidate).name)).toBe(
@@ -74,7 +63,6 @@ describe("JoinDependency AliasTracker seeding", () => {
     } as unknown as BaseModelArg;
     const jd = new JoinDependency(noConnModel, null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
-    // maxIdentifierLength default is 64.
     const posts = new Table("posts");
     tracker.aliasedTableFor(posts, null, () => "unused");
     expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(200)).name)).toBe(
@@ -96,9 +84,6 @@ describe("JoinDependency AliasTracker seeding", () => {
   });
 
   it("propagates a connection error that is not a no-connection error", () => {
-    // ConnectionTimeoutError is a ConnectionNotEstablished but not a
-    // ConnectionNotDefined, so it is a genuine failure that must not be
-    // swallowed into the default alias cap.
     const timingOutModel = {
       tableName: "posts",
       arelTable: new Table("posts"),

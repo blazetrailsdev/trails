@@ -1,7 +1,4 @@
 import type { BookDestroyAsync } from "./book-destroy-async.js";
-// vendor/rails/activerecord/test/models/essay_destroy_async.rb
-// Rails uses dependent: :destroy_async on both belongs_to associations.
-// Using "destroy" until AssociationOptions.dependent includes "destroyAsync".
 import { Base } from "../../base.js";
 
 export class EssayDestroyAsync extends Base {

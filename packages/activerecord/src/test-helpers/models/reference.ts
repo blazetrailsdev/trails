@@ -2,7 +2,6 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Author } from "./author.js";
 import type { Job } from "./job.js";
 import type { Person } from "./person.js";
-// vendor/rails/activerecord/test/models/reference.rb
 import { Base } from "../../base.js";
 
 export class Reference extends Base {

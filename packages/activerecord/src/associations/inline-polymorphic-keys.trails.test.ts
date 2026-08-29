@@ -5,13 +5,6 @@ import type { Base } from "../base.js";
 import type { AssociationOptions } from "../associations.js";
 
 describe("_inlinePolymorphicKeys", () => {
-  // The "couldn't correctly interpret the query constraints" raise mirrors
-  // Rails' deriveFkQueryConstraints (reflection.rb): the query_constraints
-  // list is rendered with Ruby's Array#inspect — `["blog_id", "id"]`, with
-  // brackets and quoted elements — not the bare `blog_id,id` a JS array
-  // coerces to. This shape is unreachable through a real 2-attribute list
-  // (the owner PK always sits at one end), so we force the defensive branch
-  // by having `includes` report the PK present while neither end matches.
   it("renders the query constraints list as a Ruby array inspect in the ArgumentError", () => {
     const pk = "post_id";
     const qc: string[] = ["blog_id", "id"];

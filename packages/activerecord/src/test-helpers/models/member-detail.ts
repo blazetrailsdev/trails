@@ -3,7 +3,6 @@ import type { Member } from "./member.js";
 import type { Membership } from "./membership.js";
 import type { MemberType } from "./member-type.js";
 import type { Organization } from "./organization.js";
-// vendor/rails/activerecord/test/models/member_detail.rb
 import { Base } from "../../base.js";
 
 export class MemberDetail extends Base {

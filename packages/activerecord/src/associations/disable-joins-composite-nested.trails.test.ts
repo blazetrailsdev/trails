@@ -1,33 +1,3 @@
-/**
- * DJAS composite-key + nested-through intersection (task #19).
- *
- * PR #645 shipped composite-key support via
- * `PredicateBuilder.buildComposite`; PR #668 dropped the nested-
- * through routing gate. Each PR has its own test coverage, but
- * the combination — a nested-through whose composite-key edge
- * forces the buildComposite predicate into the reverseChain walk —
- * wasn't exercised directly.
- *
- * Chain here:
- *   CknShop
- *     has_many :cknOrders (shop_id → shop.id)
- *     has_many :cknLineItemsThroughOrders, through: :cknOrders,
- *                                          source: :cknLineItems
- *       # source edge uses composite FK
- *       # (ckn_order_shop_id, ckn_order_number) →
- *       # CknOrder's composite PK (shop_id, order_number)
- *     has_many :cknLineItemTags, through: :cknLineItemsThroughOrders,
- *                                source: :cknTags,
- *                                disable_joins: true
- *       # Nested-through — `through:` is itself a through
- *
- * The walk runs three step queries (orders → line_items →
- * line_item_tags) — the middle step emits an Arel OR-of-AND
- * composite predicate from PredicateBuilder.buildComposite.
- *
- * Tables use the `ckn_*` prefix (not `ck_*`) to avoid colliding
- * with disable-joins-composite-key.test.ts on the same worker.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";

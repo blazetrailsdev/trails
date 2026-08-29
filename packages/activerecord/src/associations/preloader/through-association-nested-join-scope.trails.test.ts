@@ -1,23 +1,3 @@
-/**
- * Preloader::ThroughAssociation#through_scope — multi-level nested join carry.
- *
- * Rails' `through_scope` nests the whole reflection-scope structural spec under
- * the source reflection name — `joins!/left_outer_joins!/includes!(source => …)`
- * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb:120-142)
- * — so a scope whose `.left_joins(category: :categorizations)` reaches a
- * TWO-levels-deep table (`categorizations`, via club → category →
- * categorizations) realizes that deeper join on the through query, and a
- * predicate qualifying it (`categorizations.author_id = …`) constrains which
- * through row wins on the through query itself rather than deferring to the
- * source-preloader stage.
- *
- * trails widens the has_one-through query's resolvable-table set with the tables
- * the scope's joins/includes reach; `_resolveNestedTableNames` now walks nested
- * hash specs recursively, resolving each level against the correct klass, so the
- * two-level `categorizations` table enters the set. No canonical has_one-through
- * model scope reaches two levels, so this pins the behavior by declaring one on
- * the canonical Member model (mirroring `general_club`).
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -58,11 +38,6 @@ type HasManyHost = {
   ) => void;
 };
 
-// A has_one-through mirroring `general_club` (Member → current_membership →
-// club) but whose scope reaches `categorizations` — two levels deep from the
-// source klass Club (club → category → categorizations) — and predicates on it.
-// `categorizations.author_id = 1` (david) matches category `general`, so
-// groucho's through row (boring_club, category general) survives.
 (Member as unknown as HasOneHost).hasOne(
   "davidCategorizedClub",
   (rel: NestedRel) =>
@@ -73,11 +48,6 @@ type HasManyHost = {
   },
 );
 
-// Same shape but reaching the deeper table via `.includes` instead of
-// `.leftJoins`. Rails' through_scope nests the scope's `values[:includes]` under
-// the source reflection (`includes!(source => includes)`), so `.includes` and
-// `.leftJoins` both realize the deeper join on the through query. Pins that a
-// has_one-through honors an explicit `.includes` in its scope.
 (Member as unknown as HasOneHost).hasOne(
   "davidIncludedCategorizedClub",
   (rel: NestedRel) =>
@@ -90,11 +60,6 @@ type HasManyHost = {
   },
 );
 
-// A has_MANY-through whose scope carries a `.includes` reaching a belongs_to
-// association (`category` on Club) plus a predicate on it. A belongs_to join is
-// 1:1, so it does NOT fan the through rows out and IS nested onto the through
-// query even for a collection target — the predicate must resolve there, not
-// leak onto the source query where `categories` is unjoined.
 (Member as unknown as HasManyHost).hasMany(
   "generalClubs",
   (rel: NestedRel) =>
@@ -107,14 +72,6 @@ type HasManyHost = {
   },
 );
 
-// A has_MANY-through whose scope includes a two-level nested path
-// (`categorizations`, a has_many via club → category → categorizations) AND
-// predicates on it. Rails' `through_scope` nests `values[:includes]` under the
-// source reflection and eager-loads it, whose JoinDependency instantiates
-// distinct parents by primary key — so the deeper join no longer fans the
-// middle records out. The join and its `categorizations.author_id` predicate
-// are realized on the through query, resolving there instead of leaking onto
-// the source stage.
 (Member as unknown as HasManyHost).hasMany(
   "categorizedClubs",
   (rel: NestedRel) =>
@@ -155,12 +112,6 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests the two-level scope join under the source reflection on the through query", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "davidCategorizedClub");
-    // The deeper `categorizations` join is realized on the through query by
-    // nesting the scope's `.leftJoins({ ":category": ":categorizations" })` under the
-    // source reflection, and the copied full where_clause qualifies it, so the
-    // predicate rides the through query's WHERE too.
-    // Quote identifiers via the active adapter (Rails' `quote_table_name`
-    // pattern) so the assertions run on SQLite/PG (`"x"`) and MariaDB (`` `x` ``).
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(
@@ -171,10 +122,6 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests an explicit scope includes under the source reflection on the through query", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "davidIncludedCategorizedClub");
-    // Rails nests `values[:includes]` under the source reflection, joining the
-    // deeper tables so the copied `categorizations.author_id` predicate resolves
-    // on the through query (rather than being left on the source query where the
-    // table is not joined).
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(
@@ -185,10 +132,6 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests a belongs_to scope includes onto the through query for a has_many-through", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "generalClubs");
-    // `category` (belongs_to on Club) is a 1:1 join, so even for this collection
-    // target it is nested onto the through query and the `categories.name`
-    // predicate resolves there — not left on the source query where `categories`
-    // is unjoined (an invalid predicate).
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
     expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
   });
@@ -196,11 +139,6 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests a has_many-through fan-out include+predicate onto the through query via eager-load", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "categorizedClubs");
-    // Rails nests the scope's `values[:includes]` under the source reflection
-    // and eager-loads it; the JoinDependency dedups the middle records by PK, so
-    // the two-level `categorizations` join is realized on the through query and
-    // the copied `categorizations.author_id` predicate resolves there rather than
-    // being deferred to (and orphaned on) the source stage.
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(
       new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),

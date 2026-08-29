@@ -1,17 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/scoping/named_scoping_test.rb
- *
- * Every Rails test is ported with a faithful body against the canonical
- * `Topic`/`Post`/`Comment`/`Reply`/`Author`/`Developer` models and the real
- * `topics`/`posts`/`authors`/`comments` fixtures (the named scopes live on the
- * canonical models, exactly as Rails defines them on `topic.rb`/`post.rb`).
- * Cases that exercise behavior the engine does not yet implement (scope-body
- * callability guard, reserved/conflicting scope-name guard, positional
- * stats-mutating scopes) are kept as `it.skip` with a one-line note rather than
- * fabricated passing stubs, so their names stay tracked by parity:test.
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../index.js";
@@ -37,8 +23,6 @@ registerModel(Developer);
 
 const ids = (rows: any[]) => rows.map((r) => r.id);
 const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => Number(a) - Number(b));
-// Rails capture_sql(include_schema: false): drop introspection queries so the
-// query counts match Rails' assert_queries_count.
 const capSql = (fn: () => unknown) =>
   captureSql(fn as () => Promise<void>, { includeSchema: false });
 
@@ -92,8 +76,6 @@ describe("NamedScopingTest", () => {
   });
 
   it("method missing priority when delegating", async () => {
-    // Rails: klazz.to.since.to_a == klazz.since.to.to_a — chaining the two
-    // scopes in either order yields the same conjunction/result set.
     const epoch = Temporal.Instant.fromEpochMilliseconds(0);
     const now = Temporal.Now.instant();
     Topic.scope("since", function (this: any) {
@@ -155,14 +137,8 @@ describe("NamedScopingTest", () => {
     expect(sortedIds(await Topic.writtenBefore(null))).toEqual(sortedIds(await Topic.all()));
   });
 
-  // Rails' `scope_stats`/`klass_stats` mutate a passed stats hash with a `count`
-  // side-effect and return the relation/self. trails counts asynchronously, so
-  // the canonical Topic's `scopeStats` scope and `klassStats` class method are
-  // async — the lone faithful divergence from Rails' synchronous `count`.
   it("positional scope method", async () => {
     const stats: { count?: number } = {};
-    // scopeStats returns the relation (`self`); awaiting the async scope through
-    // the thenable relation hydrates it, so `rows.length` is the relation count.
     const rows = await (Topic as any).all().scopeStats(stats);
     expect(rows.length).toBe(stats.count);
   });
@@ -222,11 +198,6 @@ describe("NamedScopingTest", () => {
     expect(got).toEqual(expected);
   });
 
-  // Rails: `Post.top(limit)` is `def self.top(limit); ranked_by_comments.limit_by(limit); end`,
-  // so the bare `ranked_by_comments` call honors whatever current scope is in
-  // effect — `authors(:david).posts.top(5)` ranks only david's posts. The class
-  // method delegated onto a relation/association installs the relation as the
-  // current scope for the duration of the call.
   it("scopes honor current scopes from when defined", async () => {
     const david = (await Author.find(authors("david").id)) as any;
     const postRanked = await (Post as any).rankedByComments().limitBy(5).toArray();
@@ -250,7 +221,6 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes name is relation method", () => {
-    // trails Relation method names (Rails: records/to_ary/to_sql/explain).
     const conflicts = ["records", "toArray", "toSql", "explain"];
     for (const name of conflicts) {
       const klass = class extends Post {};
@@ -293,9 +263,9 @@ describe("NamedScopingTest", () => {
   it("empty should not load results", async () => {
     const t = Topic.base();
     const sql = await capSql(async () => {
-      await t.isEmpty(); // count query
-      await t.load(); // force load
-      await t.isEmpty(); // loaded, no query
+      await t.isEmpty();
+      await t.load();
+      await t.isEmpty();
     });
     expect(sql.length).toBe(2);
   });
@@ -303,15 +273,14 @@ describe("NamedScopingTest", () => {
   it("any should not load results", async () => {
     const t = Topic.base();
     const sql = await capSql(async () => {
-      await t.isAny(); // count query
-      await t.load(); // force load
-      await t.isAny(); // loaded, no query
+      await t.isAny();
+      await t.load();
+      await t.isAny();
     });
     expect(sql.length).toBe(2);
   });
 
   it("any should call proxy found if using a block", async () => {
-    // Rails: `topics.any? { true }` runs one query and never calls `empty?`.
     const t = Topic.base();
     const sql = await capSql(async () => {
       await t.isAny();
@@ -337,9 +306,9 @@ describe("NamedScopingTest", () => {
   it("many should not load results", async () => {
     const t = Topic.base();
     const sql = await capSql(async () => {
-      await t.isMany(); // count query
-      await t.load(); // force load
-      await t.isMany(); // loaded, no query
+      await t.isMany();
+      await t.load();
+      await t.isMany();
     });
     expect(sql.length).toBe(2);
   });
@@ -457,16 +426,12 @@ describe("NamedScopingTest", () => {
   });
 
   it("spaces in scope names", async () => {
-    // Rails defines `scope :"title containing space", ->(space: " ") { ... }`
-    // and dispatches via `public_send(:"title containing space", space: " ")`.
     Topic.scope("title containing space", function (this: any, opts: { space?: string } = {}) {
       return this.where(`title LIKE '%${opts.space ?? " "}%'`);
     });
     const expected = sortedIds(await Topic.where("title LIKE '% %'"));
     const got = sortedIds(await (Topic as any)["title containing space"]({ space: " " }).toArray());
     expect(got).toEqual(expected);
-    // (2) chained onto an already-constrained relation: the space-named scope
-    // must not reset the prior `approved` condition.
     const chainedExpected = sortedIds(await Topic.approved().where("title LIKE '% %'"));
     const chainedGot = sortedIds(
       await (Topic as any).approved()["title containing space"]({ space: " " }).toArray(),
@@ -474,11 +439,6 @@ describe("NamedScopingTest", () => {
     expect(chainedGot).toEqual(chainedExpected);
   });
 
-  // Permanently descoped: Rails asserts `to_a.select(&:approved) ==
-  // to_a.find_all(&:approved)` — i.e. Ruby Array#select and Array#find_all are
-  // aliases. trails materializes to a plain JS array with only `.filter`, so
-  // there is no distinct relation method to compare; the case has no meaningful
-  // trails analog and never will.
   it.skip("find all should behave like select", () => {});
 
   it("rand should select a random object from proxy", async () => {
@@ -512,9 +472,6 @@ describe("NamedScopingTest", () => {
   });
 
   it("should not duplicates where values", () => {
-    // Rails: relation.where_clause == relation.scope_with_lambda.where_clause —
-    // calling the scope on the already-conditioned relation must not duplicate
-    // the WHERE clause.
     const relation = Topic.where("1=1");
     expect(relation.toSql()).toBe((relation as any).scopeWithLambda().toSql());
   });
@@ -535,27 +492,21 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining combines conditions when searching", async () => {
-    // Normal hash conditions
     expect(sortedIds(await (Topic as any).rejected().approved().toArray())).toEqual(
       sortedIds(await Topic.where({ approved: false }).where({ approved: true })),
     );
     expect(sortedIds(await (Topic as any).approved().rejected().toArray())).toEqual(
       sortedIds(await Topic.where({ approved: true }).where({ approved: false })),
     );
-    // Nested hash conditions with same keys
     expect(await (Post as any).withSpecialComments().withVerySpecialComments().toArray()).toEqual(
       [],
     );
-    // Nested hash conditions with different keys
     const sti = posts("sti_comments");
     const uniq = [...new Set(ids(await (Post as any).withSpecialComments().withPost(4).toArray()))];
     expect(uniq).toEqual([sti.id]);
   });
 
   it("class method in scope", async () => {
-    // Reply.ordered = `-> { Reply.order(:id) }` references the class, escaping
-    // the approved_replies association's parent_id constraint, so it returns
-    // BOTH approved replies (second + fourth) regardless of parent.
     const first = (await Topic.find(topics("first").id)) as any;
     const rows = await first.approvedReplies.ordered().toArray();
     expect(ids(rows)).toEqual([topics("second").id, topics("fourth").id]);
@@ -570,10 +521,6 @@ describe("NamedScopingTest", () => {
     );
   });
 
-  // Rails: `Topic.rejected.nested_scoping(expected)` where
-  // `def self.nested_scoping(scope); scope.base; end`. The class method, called
-  // on the `rejected` relation, returns `scope.base` (the passed relation under
-  // its own `base`/`all` scope) — independent of the receiver's `rejected` scope.
   it("nested scoping", async () => {
     const expected = Reply.approved();
     const got = await (Topic as any).rejected().nestedScoping(expected).toArray();
@@ -589,7 +536,6 @@ describe("NamedScopingTest", () => {
     }
     expect(collected.length).toBe(approvedCount);
 
-    // Rails also exercises find_in_batches(batch_size: 2) over the same scope.
     const grouped: any[] = [];
     for await (const group of Topic.approved().findInBatches({ batchSize: 2 })) {
       for (const t of group) {
@@ -601,8 +547,6 @@ describe("NamedScopingTest", () => {
   });
 
   it("table names for chaining scopes with and without table name included", async () => {
-    // Rails assert_nothing_raised: the chained scopes (one bare column, one
-    // table-qualified) must build and execute without raising.
     const rows = await (Comment as any).forFirstPost().forFirstAuthor().toArray();
     expect(Array.isArray(rows)).toBe(true);
   });
@@ -677,10 +621,6 @@ describe("NamedScopingTest", () => {
     });
   });
 
-  // Rails' `newest` is a `comments` association-extension method on Post
-  // (`has_many :comments do def newest; created.last; end end`,
-  // post.rb:81-83), body `created.last` — `created` is the `Comment.created`
-  // named scope resolved on the extension's `self`.
   it("scopes to get newest", async () => {
     const post = (await Post.find(posts("welcome").id)) as any;
     const oldLastComment = await post.comments.newest();
@@ -694,24 +634,14 @@ describe("NamedScopingTest", () => {
 
     for (const method of ["destroyAll", "reset", "deleteAll"] as const) {
       const before = post.comments.containingTheLetterE();
-      // Mirror Rails' `post.association(:comments).public_send(method)`: drive
-      // the reset through the association object, not the proxy reader.
       await post.association("comments")[method]();
-      // Rails' `assert_not_same` — `scope :name` rebuilds a fresh relation on
-      // every call (named.rb:174-178), so the reset object is never the same.
       expect(post.comments.containingTheLetterE()).not.toBe(before);
     }
 
-    // Guard the destructive methods actually ran (not dead calls): destroyAll +
-    // deleteAll removed every comment on `welcome`.
     expect(await Comment.where({ post_id: post.id }).count()).toBe(0);
   });
 
   it("scoped are lazy loaded if table still does not exist", async () => {
-    // Rails: `assert_nothing_raised { require "models/without_table" }` — the
-    // default_scope lambda must not query the (absent) table at definition
-    // time. Importing the model (declaring the class + default scope) must not
-    // throw.
     const mod = await import("../test-helpers/models/without-table.js");
     expect(mod.WithoutTable).toBeDefined();
   });
@@ -727,9 +657,6 @@ describe("NamedScopingTest", () => {
   });
 
   it("model class should respond to extending", () => {
-    // Rails: Comment.unscoped.oops_comments.destroy_all raises OopsError from
-    // the OopsExtension `destroy_all` override the scope extends onto its
-    // relation.
     expect(() => (Comment as any).unscoped().oopsComments().destroyAll()).toThrow(OopsError);
   });
 
@@ -753,7 +680,6 @@ describe("NamedScopingTest", () => {
     });
     const sql = (Topic as any).includingAnnotateInScope().toSql();
     expect(sql).toContain("from-scope");
-    // Rails also asserts the annotation does not filter records.
     expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
       sortedIds(await Topic.all()),
     );

@@ -1,13 +1,3 @@
-/**
- * Port of `ActiveRecord::Migration::ChangeSchemaTest` and
- * `ActiveRecord::Migration::ChangeSchemaWithDependentObjectsTest`
- * (vendor/rails/activerecord/test/cases/migration/change_schema_test.rb).
- *
- * Driven by the ambient connection, mirroring Rails'
- * `@connection = ActiveRecord::Base.lease_connection`. `testings` is created
- * and dropped by the test in Rails too, so it is not a canonical-schema table.
- *
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { Migration } from "../migration.js";
@@ -63,7 +53,6 @@ function detect(columns: readonly Column[], name: string): Column {
   return columns.find((c) => c.name === name)!;
 }
 
-// MySQL doesn't allow defaults on TEXT or BLOB columns.
 const mysql = currentAdapter("Mysql2Adapter", "TrilogyAdapter");
 
 describe("Migration", () => {
@@ -289,8 +278,6 @@ describe("Migration", () => {
       expect(await connection.tableExists("testings")).toBeTruthy();
     });
 
-    // SQLite3 will not allow you to add a NOT NULL
-    // column to a table without a default value.
     it.skipIf(adapterType === "sqlite")("add column not null without default", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings", (t) => {
@@ -374,14 +361,12 @@ describe("Migration", () => {
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
       await personConnection.execute("insert into testings (title) values ('tester')");
 
-      // change column default to see that column doesn't lose its not null definition
       await personConnection.changeColumnDefault("testings", "wealth", 100);
       void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["wealth"]).toBe(100);
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
 
-      // rename column to see that column doesn't lose its not null and/or default definition
       await personConnection.renameColumn("testings", "wealth", "money");
       void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
@@ -389,7 +374,6 @@ describe("Migration", () => {
       expect(PersonKlass.columnDefaults["money"]).toBe(100);
       expect(PersonKlass.columnsHash()["money"].null).toBe(false);
 
-      // change column
       await personConnection.changeColumn("testings", "money", "integer", {
         null: false,
         default: 1000,
@@ -399,7 +383,6 @@ describe("Migration", () => {
       expect(PersonKlass.columnDefaults["money"]).toBe(1000);
       expect(PersonKlass.columnsHash()["money"].null).toBe(false);
 
-      // change column, make it nullable and clear default
       await personConnection.changeColumn("testings", "money", "integer", {
         null: true,
         default: null,
@@ -409,7 +392,6 @@ describe("Migration", () => {
       expect(PersonKlass.columnsHash()["money"].default).toBeNull();
       expect(PersonKlass.columnsHash()["money"].null).toBe(true);
 
-      // change_column_null, make it not nullable and set null values to a default value
       await personConnection.execute("UPDATE testings SET money = NULL");
       await personConnection.changeColumnNull("testings", "money", false, 2000);
       void PersonKlass.resetColumnInformation();
@@ -565,7 +547,6 @@ describe("Migration", () => {
       await connection.createTable("sobrinho");
       expect(await connection.tableExists("testings")).toBeTruthy();
       expect(await connection.tableExists("sobrinho")).toBeTruthy();
-      // Dropping both names in one call is the assertion.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await connection.dropTable("testings", "sobrinho", { ifExists: true });
       expect(await connection.tableExists("testings")).toBeFalsy();
@@ -606,12 +587,10 @@ describe("Migration", () => {
       "create table with force cascade drops dependent objects",
       async () => {
         const connection = await ambientConnection();
-        // can't re-create table referenced by foreign key
         await expect(connection.createTable("trains", { force: true })).rejects.toThrow(
           StatementInvalid,
         );
 
-        // can recreate referenced table with force: :cascade
         await connection.createTable("trains", { force: "cascade" });
         expect(await connection.foreignKeys("wagons")).toEqual([]);
       },

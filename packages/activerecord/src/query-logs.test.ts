@@ -12,35 +12,16 @@ import { fixtures } from "./test-fixtures.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { adapterType } from "./test-adapter.js";
 
-// Rails drives these tests through `ActiveRecord::Base.lease_connection.execute`.
 type RawAdapter = { execute(sql: string, binds?: unknown[], name?: string): Promise<unknown> };
 function leaseConnection(): RawAdapter {
   return Base.connection as unknown as RawAdapter;
 }
 
-// Mirrors: activerecord/test/cases/query_logs_test.rb
-//
-// These tests drive real queries through the full pipeline — the
-// `ActiveRecord.queryTransformers` loop wired into `preprocessQuery` (QL PR 3) appends
-// the
-// QueryLogs comment, and the `sql.active_record` notification carries the
-// post-transform SQL — and assert the tagged SQL via `assertQueriesMatch`
-// (Rails' `assert_queries_match` / `SQLCounter`), exactly as the Rails
-// counterpart does (`Dashboard.first`, `connection.execute "SELECT 1"`).
 describe("QueryLogsTest", () => {
-  // Rails: `fixtures :dashboards`. `fixtures` wires the handler suite
-  // internally; canonical tables come from the template clone.
   fixtures(["dashboards"]);
 
   let originalTransformers: QueryTransformer[];
 
-  // Mirrors the Rails setup/teardown: register QueryLogs into
-  // `ActiveRecord.query_transformers`, reset its config, and seed the default
-  // `application: -> { "active_record" }` tagging. trails resolves string tags
-  // (`:application`) from the QueryLogs context, so the default tagging is the
-  // `updateContext({ application: "active_record" })` below (Rails stores it in
-  // `taggings`). Restored in afterEach so nothing leaks to sibling files
-  // sharing the process-global registry / singleton.
   beforeEach(() => {
     ExecutionContext.clear();
     originalTransformers = [...ActiveRecord.queryTransformers];
@@ -67,7 +48,6 @@ describe("QueryLogsTest", () => {
     ExecutionContext.clear();
   });
 
-  // Unit tests — Rails' `escape_sql_comment` is exercised directly, no fixtures.
   it("escaping good comment", () => {
     expect(escapeComment("app:foo")).toBe("app:foo");
   });
@@ -84,9 +64,6 @@ describe("QueryLogsTest", () => {
     expect(escapeComment("* *//; DROP TABLE USERS;//* *")).toBe("* * //; DROP TABLE USERS;// * *");
   });
 
-  // Rails executes `select id from posts`; trails drives the equivalent raw
-  // SELECT against the seeded `dashboards` fixture table to avoid the shared
-  // `posts`-table contention documented across the AR handler suite.
   it("basic commenting", async () => {
     queryLogs.tags = ["application"];
     await assertQueriesMatch(
@@ -130,8 +107,6 @@ describe("QueryLogsTest", () => {
   it("update is commented", async () => {
     queryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
-      // Dashboard declares only its primary key, so widen to reach the
-      // schema-backed `name` column for the Rails `dash.name = ...` write.
       const dash = (await Dashboard.first()) as (Dashboard & { name: string }) | null;
       dash!.name = "New name";
       await dash!.save();
@@ -157,8 +132,6 @@ describe("QueryLogsTest", () => {
     let i = 0;
     queryLogs.tags = [{ query_counter: () => ++i }];
 
-    // The proc increments on each comment build; caching means it runs once, so
-    // both queries carry `query_counter:1`.
     await assertQueriesMatch(/SELECT 1 \/\*query_counter:1\*\//, undefined, false, async () => {
       await leaseConnection().execute("SELECT 1");
     });
@@ -229,9 +202,6 @@ describe("QueryLogsTest", () => {
 
   it("connection does not override already existing connection in context", async () => {
     const fakeConnection = {};
-    // Rails sets `ExecutionContext[:connection]`; trails resolves tag context
-    // from the QueryLogs context, so the fake is seeded via updateContext. The
-    // live adapter passed by the transformer loop must not clobber it.
     queryLogs.updateContext({ connection: fakeConnection } as never);
     queryLogs.tags = [
       {
@@ -347,12 +317,6 @@ describe("QueryLogsTest", () => {
     });
   });
 
-  // PostgreSQL validates query encoding; other adapters don't. Mirrors Rails'
-  // `unless current_adapter?(:PostgreSQLAdapter)` guard. Rails' input is a lone
-  // 0xFF byte (invalid UTF-8); the JS analog is a lone surrogate `\uD800`, which
-  // cannot be encoded to valid UTF-8 either. The point (Rails: `assert_nothing_raised`)
-  // is that comment-appending survives an invalid-encoding query string — asserting
-  // the comment also confirms no error was raised.
   it.skipIf(adapterType === "postgres")("invalid encoding query", async () => {
     queryLogs.tags = ["application"];
     await expect(leaseConnection().execute("select 1 as '\uD800'")).resolves.not.toThrow();
@@ -393,11 +357,6 @@ describe("GetKeyHandler", () => {
   });
 
   it("lazy-creates a handler if a tag is pushed without going through tags=", () => {
-    // tagContent must survive callers that mutate the live tags
-    // array directly — the handler cache is populated lazily on
-    // first access so we can't crash on a missing map entry.
-    // Output is alphabetical by key (action < controller), matching Rails'
-    // sorted rebuild_handlers.
     const logs = new QueryLogs();
     logs.tags = ["controller"];
     logs.tags.push("action");
@@ -419,7 +378,6 @@ describe("LegacyFormatter", () => {
 describe("QueryLogs.formatter =", () => {
   it("accepts a static-method class (LegacyFormatter / SQLCommenter) directly", () => {
     const logs = new QueryLogs();
-    // Class value — typeof === "function". Must not throw.
     expect(() => (logs.formatter = SQLCommenter)).not.toThrow();
     expect(() => (logs.formatter = LegacyFormatter)).not.toThrow();
   });

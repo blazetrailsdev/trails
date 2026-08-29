@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import {
   Base,
@@ -27,8 +23,6 @@ import {
   assertNoQueries,
 } from "./testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "./support/quote-regex.js";
-// Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
-// rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment, SpecialComment } from "./test-helpers/models/comment.js";
@@ -50,23 +44,10 @@ import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { Temporal } from "@blazetrails/date";
 
-// ==========================================================================
-// FinderTest — faithful port of finder_test.rb riding canonical Topic +
-// topics fixtures (RFC 0048 convergence). The full ordinal/last cluster
-// (take/sole/first/second/third/fourth/fifth/*-to-last/last-bang and the
-// take/first/last-with-integer + irreversible-order tests) is a faithful port
-// against the real topics fixtures. The remaining clusters
-// (exists/find-by/conditions, and the posts/comments STI last/first-on-relation
-// pair) still ride the canonical schema (canonical tables/columns, no bespoke
-// defineSchema shape) but remain thin ad-hoc coverage; faithful porting of
-// those onto the real finder_test.rb models/fixtures is tracked under RFC 0048.
-// ==========================================================================
 describe("FinderTest", () => {
   const { topics } = fixtures(["topics"]);
   const rid = (r: unknown) => (r as { id: number }).id;
   const Topic = CanonicalTopic;
-  // Register by Rails name so STI Reply rows resolve their belongs_to :topic
-  // even before the first query warms the model registry (touch-first tests).
   registerModel("Topic", Topic);
   registerModel("Reply", CanonicalReply);
 
@@ -146,8 +127,6 @@ describe("FinderTest", () => {
   });
 
   it("first have primary key order by default", async () => {
-    // Rails touches the expected row because PostgreSQL changes the default
-    // order if no order clause is used.
     const expected = topics("first");
     await expected.touch();
     expect(rid(await Topic.first())).toBe(rid(expected));
@@ -257,14 +236,12 @@ describe("FinderTest", () => {
   it("second to last", async () => {
     expect((await Topic.secondToLast())!.title).toBe(topics("fourth").title);
 
-    // test with offset
     expect(rid(await Topic.offset(1).secondToLast())).toBe(rid(topics("fourth")));
     expect(rid(await Topic.offset(2).secondToLast())).toBe(rid(topics("fourth")));
     expect(rid(await Topic.offset(3).secondToLast())).toBe(rid(topics("fourth")));
     expect(await Topic.offset(4).secondToLast()).toBeNull();
     expect(await Topic.offset(5).secondToLast()).toBeNull();
 
-    // test with limit
     expect(await Topic.limit(1).second()).toBeNull();
     expect(await Topic.limit(1).secondToLast()).toBeNull();
   });
@@ -285,14 +262,12 @@ describe("FinderTest", () => {
   it("third to last", async () => {
     expect((await Topic.thirdToLast())!.title).toBe(topics("third").title);
 
-    // test with offset
     expect(rid(await Topic.offset(1).thirdToLast())).toBe(rid(topics("third")));
     expect(rid(await Topic.offset(2).thirdToLast())).toBe(rid(topics("third")));
     expect(await Topic.offset(3).thirdToLast()).toBeNull();
     expect(await Topic.offset(4).thirdToLast()).toBeNull();
     expect(await Topic.offset(5).thirdToLast()).toBeNull();
 
-    // test with limit
     expect(await Topic.limit(1).third()).toBeNull();
     expect(await Topic.limit(1).thirdToLast()).toBeNull();
     expect(await Topic.limit(2).third()).toBeNull();
@@ -410,7 +385,7 @@ describe("FinderTest", () => {
   });
 
   it("exists with large number", async () => {
-    const big = 9223372036854775808n; // 2^63, one past signed-int64 max
+    const big = 9223372036854775808n;
     const negBig = -9223372036854775809n;
     expect(await Topic.where({ id: [1, big] }).exists()).toBe(true);
     expect(await Topic.where({ id: new Range(1n, big) }).exists()).toBe(true);
@@ -427,10 +402,6 @@ describe("FinderTest", () => {
     ).toBe(true);
     expect(await Topic.where().not({ id: big }).exists()).toBe(true);
 
-    // Rails' 3-arg `predicate_builder[:id, val, :gt/:gteq/:lt/:lteq]` builds an
-    // Arel comparison node whose right-hand side is a bind attribute; we stand
-    // it in with the arel gt/gteq/lt/lteq predicates over a QueryAttribute bind
-    // built from the same predicate builder.
     const id = Topic.arelTable.get("id");
     const bind = (v: bigint) => Topic.predicateBuilder.buildBindAttribute("id", v);
     const existsWhere = (node: unknown) => Topic.where(node as any).exists();
@@ -447,12 +418,8 @@ describe("FinderTest", () => {
   });
 
   it("all-out-of-range array collapses to IN (NULL)", async () => {
-    // Every value is past the 8-byte signed bound, so HomogeneousIn#castedValues
-    // (via IntegerType#serializable?) drops them all, leaving `id IN (NULL)` —
-    // matching nothing — and `id NOT IN (NULL)` — a NULL predicate that also
-    // matches nothing. Exercised on SQLite/MySQL/PostgreSQL via the CI matrix.
-    const big = 9223372036854775808n; // 2^63
-    const negBig = -9223372036854775809n; // -(2^63) - 1
+    const big = 9223372036854775808n;
+    const negBig = -9223372036854775809n;
 
     const inRel = Topic.where({ id: [big, negBig] });
     expect(inRel.toSql()).toMatch(/IN \(NULL\)/);
@@ -464,15 +431,6 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest — faithful ports of the finder_test.rb find/find_by cluster
-// riding the real canonical models + fixtures Rails uses: Topic (topics
-// fixtures) for the scalar find/find_by tests and Cpk::Book (cpk_books
-// fixtures) for the composite-primary-key find cluster. The aggregate-attribute
-// find_by ports (Customer composed_of — find_by_address / find_by_balance...)
-// are deferred pending composed_of hash-condition expansion in the predicate
-// builder; tracked in the activerecord-surfaced-deviations bucket.
-// ==========================================================================
 describe("FinderTest", () => {
   const { topics, cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"]);
   const Topic = CanonicalTopic;
@@ -562,9 +520,6 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest — targets finder_test.rb
-// ==========================================================================
 describe("FinderTest", () => {
   fixtures([]);
 
@@ -751,7 +706,6 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Invalid SQL should throw or return error
     try {
       await Topic.findBySql("INVALID SQL");
     } catch (e) {
@@ -889,8 +843,6 @@ describe("FinderTest", () => {
   });
 
   it("find by on attribute that is a reserved word", async () => {
-    // `group` is a reserved SQL word and a real topics column, exercising the
-    // adapter's identifier quoting on the finder path.
     class Topic extends Base {
       static {
         this.attribute("group", "string");
@@ -928,10 +880,6 @@ describe("FinderTest", () => {
     const found = await Post.findBy({ title: "proc_test" });
     expect(found).toBeDefined();
   });
-  // "exists with aggregate having three mappings" and its "…with one
-  // difference" sibling live in the fixture-backed FinderTest block below —
-  // they ride the real customers fixture, and declaring fixtures() in this
-  // stub-heavy block would trip test-fixture-parity on every thin stub here.
   it("include on unloaded relation with mismatched class", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "mis" });
@@ -1233,9 +1181,6 @@ describe("FinderTest", () => {
 
   it("find with ids with no id passed", async () => {
     const { Post } = makeModel();
-    // Rails test_find_with_ids_with_no_id_passed: a zero-arg find raises
-    // RecordNotFound "Couldn't find <Model> without an ID" (find_with_ids
-    // `when 0`), carrying model + primary_key.
     try {
       await (Post.find as (...ids: unknown[]) => Promise<unknown>).call(Post);
       expect.fail("should have thrown");
@@ -1256,7 +1201,6 @@ describe("FinderTest", () => {
   it("find passing active record object is not permitted", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "obj" });
-    // Finding by id directly should work
     const found = await Post.find(p.id!);
     expect(found.id).toBe(p.id);
   });
@@ -1445,8 +1389,6 @@ describe("FinderTest", () => {
       expect.unreachable("should throw");
     } catch (e: any) {
       expect(e).toBeInstanceOf(RecordNotFound);
-      // Rails raise_record_not_found_exception! multi-id: pluralized model
-      // name + "(found N results, but was looking for M)." suffix.
       expect(e.message).toBe(
         `Couldn't find all Topics with 'id': (${t.id}, 999999) (found 1 results, but was looking for 2).`,
       );
@@ -1454,9 +1396,6 @@ describe("FinderTest", () => {
   });
 
   it("find with eager loading collection and ordering by collection primary key", async () => {
-    // Ride the canonical posts -> comments -> ratings chain (post_id / comment_id),
-    // but register under file-local names so we never clobber the global
-    // canonical Post/Comment/Rating registrations shared across the worker.
     class EagerPost extends Base {
       static {
         this.tableName = "posts";
@@ -1500,9 +1439,6 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest2 — additional coverage for finder_test.rb
-// ==========================================================================
 describe("FinderTest", () => {
   const { posts, topics, accounts, companies } = fixtures([
     "posts",
@@ -1561,8 +1497,6 @@ describe("FinderTest", () => {
   });
 
   it("finder with offset string", async () => {
-    // Rails passes the offset as a string here; trails types `offset()` as
-    // number, so the cast is what keeps the string path under test.
     await expect(CanonicalTopic.offset("3" as unknown as number)).resolves.toBeDefined();
   });
 
@@ -1588,9 +1522,6 @@ describe("FinderTest", () => {
     expect(rid(found)).toBe(rid(topics("first")));
   });
 
-  // Rails: test "find_by! raises RecordNotFound if the record is missing"
-  // (finder_test.rb) — the not-found message carries the relation's WHERE
-  // conditions clause: `arel.where_sql(model)` → "WHERE (1 = 0)".
   it("find_by! raises RecordNotFound if the record is missing", async () => {
     let error: any;
     try {
@@ -1654,19 +1585,10 @@ describe("FinderTest", () => {
   fixtures(["topics"]);
   registerModel("Topic", CanonicalTopic);
 
-  // Rails: test_find_with_array_of_ids
-  // Rails: test_find_raises_record_not_found
-  // Rails: test_find_by_with_conditions
-  // Rails: test_find_by_returns_nil
   it("find_by returns nil if the record is missing", async () => {
     const found = await CanonicalTopic.findBy({ title: "Nobody" });
     expect(found).toBeNull();
   });
-
-  // Rails: test_find_by_bang_raises
-  // Rails: test_exists_with_no_args
-  // Rails: test_exists_with_matching_record
-  // Rails: test_exists_with_where
 });
 
 describe("FinderTest", () => {
@@ -1685,12 +1607,6 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest — *_on_relation_with_limit_and_offset ride the canonical
-// posts -> comments STI chain (posts(:sti_comments) with 5 comments), matching
-// finder_test.rb:1055-1085. Faithful port of the two tests deferred from
-// faithful-port-finder-test-synthetic-clusters.
-// ==========================================================================
 describe("FinderTest", () => {
   const { posts } = fixtures(["posts", "comments"]);
   registerModel(CanonicalPost);
@@ -1761,28 +1677,7 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest — faithful port of the finder_test.rb hash-condition / range /
-// time-interpolation cluster onto canonical Topic + Comment + Company/Firm +
-// Post models and their real fixtures (ported under the
-// activerecord-surfaced-deviations bucket).
-//
-// The array-conditions form (`where(["name = ?", x])`) is disambiguated from
-// the composite-key `where(cols, tuples)` extension by argument count: a single
-// all-strings array is Rails' sanitized-conditions form and routes through
-// `buildWhereClause` (RFC 0023 finder-array-conditions-composite-ambiguity).
-// The aggregate `where(balance:
-// Money.new(...))` tests need composedOf where-clause expansion (unsupported;
-// tracked under RFC 0023 converge-where-composed-of-aggregate-expansion), and
-// test_find_on_hash_conditions_with_open_ended_range needs the arel unboundable
-// range fix in flight as PR #4433.
-// ==========================================================================
 describe("FinderTest", () => {
-  // The malformed-condition test intentionally raises StatementInvalid (unknown
-  // `dhh` column), which aborts the PG transaction; it still runs
-  // transactionally because the fixture teardown skips its redundant DELETEs
-  // while the pinned transaction is open, so the abort no longer poisons the
-  // rollback.
   fixtures(["topics", "comments", "posts", "companies", "accounts"]);
   registerModel("Topic", CanonicalTopic);
   registerModel("Reply", CanonicalReply);
@@ -1794,8 +1689,6 @@ describe("FinderTest", () => {
   const Comment = CanonicalComment;
   const Post = CanonicalPost;
   const Company = CanonicalCompany;
-  // Normalize to Number: PG/MariaDB return bigint ids, and sorting bigints via
-  // `a - b` throws (Array#sort coerces the comparator's bigint return to Number).
   const ids = (rows: unknown[]) =>
     rows.map((r) => Number((r as { id: number | bigint }).id)).sort((a, b) => a - b);
 
@@ -1810,7 +1703,6 @@ describe("FinderTest", () => {
   });
 
   it("find on hash conditions with qualified attribute dot notation symbol", async () => {
-    // JS object keys are always strings, so the string/symbol variants coincide.
     expect(await Topic.where({ "topics.approved": false }).find(1)).toBeDefined();
     await expect(Topic.where({ "topics.approved": true }).find(1)).rejects.toThrow(RecordNotFound);
   });
@@ -1904,8 +1796,6 @@ describe("FinderTest", () => {
   it("condition hash interpolation", async () => {
     expect(await Company.where({ name: "37signals" }).first()).toBeInstanceOf(CanonicalFirm);
     expect(await Company.where({ name: "37signals!" }).first()).toBeNull();
-    // Rails: assert_kind_of Time — the mapped time column deserializes to a
-    // Temporal Instant/PlainDateTime rather than a bare truthy value.
     const writtenOn = (await Topic.where({ id: 1 }).first())!.written_on;
     expect(
       writtenOn instanceof Temporal.Instant || writtenOn instanceof Temporal.PlainDateTime,
@@ -1935,10 +1825,6 @@ describe("FinderTest", () => {
     expect((topic as { last_read: unknown }).last_read).toBeNull();
   });
 
-  // Rails wraps these in with_env_tz("America/New_York") + with_timezone_config
-  // and passes topic.written_on.getutc. trails has no with_env_tz helper, and
-  // written_on is a zone-agnostic Temporal.Instant, so `.getutc` collapses to the
-  // instant itself; withTimezoneConfig preserves the default-timezone intent.
   it("hash condition utc time interpolation with default timezone local", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.first();
@@ -1959,8 +1845,6 @@ describe("FinderTest", () => {
     });
   });
 
-  // Rails: assert_kind_of Time — the mapped time column deserializes to a
-  // Temporal Instant/PlainDateTime rather than a bare truthy value.
   const isTime = (v: unknown) =>
     v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
 
@@ -1986,9 +1870,6 @@ describe("FinderTest", () => {
     expect(await Company.where(["name = ?", "37signals!' OR 1=1"]).first()).toBeNull();
     const topic = await Topic.where(["id = ?", 1]).first();
     expect(isTime((topic as { written_on: unknown }).written_on)).toBe(true);
-    // trails validates bind arity eagerly when the BoundSqlLiteral is built
-    // (at `where`), where Rails defers to statement execution; both raise
-    // PreparedStatementInvalid.
     expect(() => Company.where(["id=? AND name = ?", 2])).toThrow(PreparedStatementInvalid);
     expect(() => Company.where(["id=?", 2, 3, 4])).toThrow(PreparedStatementInvalid);
   });
@@ -2017,11 +1898,6 @@ describe("FinderTest", () => {
     expect(isTime((topic as { written_on: unknown }).written_on)).toBe(true);
   });
 
-  // Rails wraps these in with_env_tz("America/New_York") + with_timezone_config
-  // and passes topic.written_on.getutc / .getlocal. trails has no with_env_tz
-  // helper, and written_on is a zone-agnostic Temporal.Instant, so the getutc /
-  // getlocal conversions collapse to the instant itself; withTimezoneConfig
-  // preserves the default-timezone intent.
   it("condition utc time interpolation with default timezone local", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.first();
@@ -2045,16 +1921,6 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest — targets finder_test.rb (continued)
-// ==========================================================================
-
-// ==========================================================================
-// FinderTest — faithful port of the finder_test.rb include?/member? cluster
-// riding canonical Customer + Cpk::Book + Author models and their real
-// fixtures. `include?`/`member?` (alias) share one implementation, so each
-// Customer/Cpk::Book pair asserts identical behavior.
-// ==========================================================================
 describe("FinderTest", () => {
   const { customers, cpkBooks, authors, topics } = fixtures([
     "customers",
@@ -2268,10 +2134,6 @@ describe("FinderTest", () => {
   });
 });
 
-// Fixture-backed FinderTest cases riding the real `customers` fixture +
-// canonical Customer composed_of mappings (mirrors Rails `fixtures :customers`).
-// Kept in its own describe so declaring fixtures() does not activate
-// test-fixture-parity across the stub-heavy exists/find-by block above.
 describe("FinderTest", () => {
   const { customers } = fixtures(["customers"]);
   const Customer = CanonicalCustomer;
@@ -2317,13 +2179,6 @@ describe("FinderTest", () => {
   });
 });
 
-// ==========================================================================
-// FinderTest — faithful port of the finder_test.rb `test_exists*` cluster,
-// riding canonical models (Topic/Author/Post/Comment/Subscriber/Customer/
-// Developer) + the real fixtures. Replaces the earlier synthetic `exists`
-// coverage (the activerecord-surfaced-deviations bucket). Test names match Rails
-// verbatim.
-// ==========================================================================
 describe("FinderTest", () => {
   const { topics, authors, developers } = fixtures([
     "topics",
@@ -2346,11 +2201,7 @@ describe("FinderTest", () => {
   const Developer = CanonicalDeveloper;
   registerModel("Topic", Topic);
   registerModel("Reply", CanonicalReply);
-  // Post#tags_with_destroy (dependent: :destroy) walks the Tag class on the
-  // destroy cascade in `exists with loaded relation having unsaved records`.
   registerModel("Tag", CanonicalTag);
-  // uniqueCategorizedPosts.includes(":specialComments") resolves the SpecialComment
-  // STI subtype through the registry.
   registerModel("SpecialComment", SpecialComment);
 
   it("exists", async () => {
@@ -2366,8 +2217,6 @@ describe("FinderTest", () => {
     expect(await Topic.exists(9999999999999999999999999999999n)).toBe(false);
     expect(await Topic.exists((new Topic() as any).id)).toBe(false);
 
-    // Rails routes `[1, 2]` through `where!([1, 2])`, which raises ArgumentError
-    // (finder_test.rb:202). trails' where() tags that error `name: "ArgumentError"`.
     await expect(Topic.exists([1, 2])).rejects.toMatchObject({ name: "ArgumentError" });
   });
 
@@ -2621,8 +2470,6 @@ describe("FinderTest", () => {
   });
 
   it("exists does not instantiate records", async () => {
-    // Rails: assert_not_called(Developer, :instantiate) — `instantiate` is a
-    // class (singleton) method, so we spy the static directly.
     const original = (Developer as any).instantiate;
     let called = false;
     (Developer as any).instantiate = function (this: unknown, ...args: unknown[]) {

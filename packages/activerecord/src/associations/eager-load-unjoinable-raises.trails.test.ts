@@ -1,16 +1,3 @@
-/**
- * An eager-load spec JoinDependency can't resolve raises on EVERY path, not
- * just the record-loading one.
- *
- * `JoinDependency#build` used to accept a `fallbackAssociations` out-parameter:
- * a top-level spec whose segment couldn't be JOINed was rolled back and handed
- * to the preloader, so a load could silently degrade while
- * `count`/`sum`/`exists?` — which validate through `Relation#_checkEagerLoadable`
- * rather than building the tree — raised. Rails has no such mode
- * (`join_dependency.rb:228` only ever raises via `find_reflection`), and the
- * lane is gone; these cover that the loading and calculation/exists paths now
- * agree on raising.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";

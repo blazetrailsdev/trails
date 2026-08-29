@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/numeric_data.rb
 import { Base } from "../../base.js";
 
 export class NumericData extends Base {

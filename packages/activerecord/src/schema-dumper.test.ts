@@ -13,29 +13,6 @@ import {
 } from "./support/schema-dumping-helper.js";
 import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 
-// The first describe uses `fixtures({})` (canonical schema); the later
-// bespoke-table describes only need `Base.connection` *established* — which the
-// worker setup file already did, as Rails' `cases/helper.rb` does for the whole
-// process.
-
-// Faithful port of the Rails cases that dump the *standard loaded schema*
-// (`standard_dump` / `dump_table_schema "companies"`). Rails loads `schema.rb`;
-// we ride the canonical `TEST_SCHEMA` — the trails mirror of `schema.rb` —
-// which `fixtures({})` materializes on the shared worker DB, so `Base.adapter`
-// already carries every canonical table.
-// No per-test ad-hoc tables. Split into its own describe (no bespoke
-// table-building cases) so nothing `force`-recreates a canonical table out from
-// under the dump.
-// Each full `standard_dump` introspects all ~330 canonical tables (boot-laid
-// once per worker and never dropped between tests), running
-// ~4.1–4.8s on a single local PG worker — already near the 5s per-test vitest
-// default. Under CI's 6-worker PG fork load one contention spike tips them over.
-// Give only the genuine full-dump cases explicit headroom via the options form
-// `it(name, { timeout }, fn)` (keeps the callback as the last arg); the
-// single-table `dumpCanonicalTable` cases stay on the default timeout, the global
-// timeout is untouched, and the (Rails-matching) test names are unchanged. The
-// shared `FULL_DUMP_TIMEOUT_MS` lives beside `dumpAllTableSchema` in the helper.
-
 describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -48,12 +25,6 @@ describe("SchemaDumperTest", () => {
   function dumpCanonicalTable(...tables: string[]): Promise<string> {
     return dumpTableSchema(canonicalSource(), ...tables);
   }
-  // Whether a dumped canonical `companies` index surfaces its descending sort
-  // order. Rails gates this on `supports_index_sort_order?` (PostgreSQL/SQLite
-  // always; MySQL/MariaDB version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1). We
-  // mirror that by consulting the live adapter flag rather than blanket-excluding
-  // the MySQL family — the CI MariaDB 11 lane supports it, so `companies` dumps
-  // the descending `order:` exactly as Rails does there.
   async function dumpsIndexSortOrder(): Promise<boolean> {
     return (
       Base.adapter as unknown as { supportsIndexSortOrder(): Promise<boolean> }
@@ -93,7 +64,6 @@ describe("SchemaDumperTest", () => {
   it("arguments no line up", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
-    // no padding before option keys — each key is preceded by "{ " or ", ", never extra spaces
     for (const pattern of [/default: /, /limit: /, /null: /]) {
       for (const line of columnLines.filter((l) => pattern.test(l))) {
         const m = line.match(pattern)!;
@@ -109,14 +79,11 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump includes not null columns", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    // Rails: dump_all_table_schema([/^[^r]/]) — keep only tables starting with
-    // `r`, then assert some column dumps `null: false`.
     const output = await standardDump([/^[^r]/]);
     expect(output).toContain("null: false");
   });
 
   it("schema dump with string ignored table", async () => {
-    // Rails: dump_table_schema("authors") — every other data source is ignored.
     const output = await dumpCanonicalTable("authors");
     expect(output).not.toMatch(/createTable\("accounts"/);
     expect(output).toMatch(/createTable\("authors"/);
@@ -134,7 +101,6 @@ describe("SchemaDumperTest", () => {
     "schema dump should honor nonstandard primary keys",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      // Rails: standard_dump — canonical `movies` has `primary_key: "movieid"`.
       const output = await standardDump();
       const match = output.match(/createTable\("movies"(.*)/);
       expect(match).not.toBeNull();
@@ -143,13 +109,11 @@ describe("SchemaDumperTest", () => {
   );
 
   it("schema dump should use false as default", async () => {
-    // Rails: dump_table_schema "booleans" — canonical `has_fun` default false.
     const output = await dumpCanonicalTable("booleans");
     expect(output).toMatch(/t\.boolean\("has_fun",.*default: false/);
   });
 
   it("schema dump does not include limit for text field", async () => {
-    // Rails: dump_table_schema "admin_users" — canonical `params` is text.
     const output = await dumpCanonicalTable("admin_users");
     expect(output).toMatch(/t\.text\("params"\)/);
     expect(output).not.toMatch(/text.*"params".*limit/);
@@ -168,18 +132,8 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump aliased types", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    // Rails: standard_dump — canonical `binaries.blob_data` (t.blob) dumps as
-    // binary, `numeric_data.numeric_number` (t.numeric) dumps as decimal.
     const output = await standardDump();
     expect(output).toMatch(/t\.binary\("blob_data"\)/);
-    // Rails sources the decimal precision default from native_database_types
-    // (nil on SQLite/PostgreSQL), so precision-less `t.decimal`/`t.numeric`
-    // columns dump bare there. MySQL/MariaDB physically materialize a bare
-    // `decimal` as `decimal(10,0)` (SQL-standard default), so it reflects a
-    // precision of 10. The scale is 0 but does not dump: `decimal(N,0)` maps to
-    // `Type::DecimalWithoutScale`, whose `scale` is nil (not 0), so the dumper's
-    // `column.scale.inspect if column.scale` guard skips it — matching Rails on
-    // MySQL, which likewise dumps `precision: 10` with no scale.
     const decimalTail = adapterType === "mysql" ? ", { precision: 10 })" : ")";
     expect(output).toContain(`t.decimal("numeric_number"${decimalTail}`);
     expect(output).toContain(`t.decimal("decimal_number"${decimalTail}`);
@@ -189,8 +143,6 @@ describe("SchemaDumperTest", () => {
     "schema dump keeps id column when id is false and id column added",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      // Rails: standard_dump — canonical `goofy_string_id` is `id: false` with a
-      // non-PK `id` string column.
       const output = await standardDump();
       const match = output.match(/createTable\("goofy_string_id"(.*)\n(.*)\n/);
       expect(match).not.toBeNull();
@@ -199,8 +151,6 @@ describe("SchemaDumperTest", () => {
     },
   );
 
-  // Helper: grep the lone dumped `addIndex` line for `companies` matching `re`,
-  // mirroring Rails' `dump_table_schema("companies").split(/\n/).grep(...).first`.
   function companyIndexLine(output: string, re: RegExp): string {
     return (output.split(/\n/).find((l) => /t\.index\(/.test(l) && re.test(l)) ?? "").trim();
   }
@@ -208,10 +158,6 @@ describe("SchemaDumperTest", () => {
   it("schema dumps index columns in right order", async () => {
     const output = await dumpCanonicalTable("companies");
     const line = companyIndexLine(output, /company_index/);
-    // Rails branches on current_adapter? + supports_index_sort_order?: MySQL
-    // keeps the sub-part length map, other adapters drop it; the sort order is
-    // present only where the backend surfaces it (schema_dumper_test.rb:170-183).
-    // `index_parts` emits length before order.
     const base = 't.index(["firm_id", "type", "rating"], { name: "company_index"';
     const lengthPart = adapterType === "mysql" ? ", length: { type: 10 }" : "";
     const orderPart = (await dumpsIndexSortOrder()) ? ', order: { rating: "desc" }' : "";
@@ -221,8 +167,6 @@ describe("SchemaDumperTest", () => {
   it("schema dumps partial indices", async () => {
     const output = await dumpCanonicalTable("companies");
     const line = companyIndexLine(output, /company_partial_index/);
-    // Rails branches on supports_partial_index?; unsupported backends (MySQL)
-    // emit the plain index with no `where:`.
     const expected = adapterSupports("partial_index")
       ? 't.index(["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
       : 't.index(["firm_id", "type"], { name: "company_partial_index" });';
@@ -232,8 +176,6 @@ describe("SchemaDumperTest", () => {
   it("schema dumps nulls not distinct", async () => {
     const output = await dumpCanonicalTable("companies");
     const line = companyIndexLine(output, /company_nulls_not_distinct/);
-    // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
-    // unsupported backends emit a plain index with no `nullsNotDistinct:`.
     const expected = adapterSupports("nulls_not_distinct")
       ? 't.index(["firm_id"], { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
       : 't.index(["firm_id"], { name: "company_nulls_not_distinct" });';
@@ -243,9 +185,6 @@ describe("SchemaDumperTest", () => {
   it("schema dumps index sort order", async () => {
     const output = await dumpCanonicalTable("companies");
     const line = companyIndexLine(output, /_name_and_rating/);
-    // Rails IndexDefinition#concise_options collapses a uniform order map to a
-    // scalar (`order: :desc`); backends that don't surface sort order here emit a
-    // plain index (schema_dumper_test.rb:203-211).
     const expected = (await dumpsIndexSortOrder())
       ? 't.index(["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });'
       : 't.index(["name", "rating"], { name: "index_companies_on_name_and_rating" });';
@@ -255,7 +194,6 @@ describe("SchemaDumperTest", () => {
   it("schema dumps index length", async () => {
     const output = await dumpCanonicalTable("companies");
     const line = companyIndexLine(output, /_name_and_description/);
-    // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
     const expected =
       adapterType === "mysql"
         ? 't.index(["name", "description"], { name: "index_companies_on_name_and_description", length: 10 });'
@@ -276,10 +214,6 @@ describe("SchemaDumperTest", () => {
     }
   });
 
-  // Rails: schema_dumper_test.rb:313 — current_adapter?(:Mysql2, :Trilogy)
-  // inside the supports_expression_index? block, asserting the canonical
-  // companies `full_name_index` concat_ws expression round-trips with MySQL's
-  // backtick/charset-literal escaping intact.
   itIfSupports.skipIf(adapterType !== "mysql")(
     "expression_index",
     "schema dump expression indices escaping",
@@ -292,8 +226,6 @@ describe("SchemaDumperTest", () => {
   );
 
   it("schema dump includes decimal options", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    // Rails: dump_all_table_schema([/^[^n]/]) — keep only tables starting with
-    // `n` (numeric_data), then assert the scaled decimal + default round-trips.
     const output = await standardDump([/^[^n]/]);
     expect(output).toMatch(/precision: 3,\s+scale: 2,\s+default: "2\.78"/);
   });
@@ -302,8 +234,6 @@ describe("SchemaDumperTest", () => {
     "schema dump keeps large precision integer columns as decimal",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      // Rails: standard_dump — canonical `numeric_data.atoms_in_universe` is a
-      // precision-55, scale-0 decimal, dumped without a scale option.
       const output = await standardDump();
       expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
     },
@@ -313,13 +243,9 @@ describe("SchemaDumperTest", () => {
     "schema dump includes limit constraint for integer columns",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      // Rails: dump_all_table_schema([/^(?!integer_limits)/]) with per-adapter
-      // `limit` expectations for `integer_limits.c_int_1..8`.
       const output = await standardDump([/^(?!integer_limits)/]);
       expect(output).toMatch(/"c_int_without_limit"(?!.*limit)/);
 
-      // c_int_1..4: PostgreSQL rounds limit 1..2 → 2 bytes and drops it for the
-      // 4-byte 3..4; MySQL keeps 1..3 and drops the 4-byte 4; SQLite keeps 1..4.
       const lowExpectations: RegExp[] =
         adapterType === "postgres"
           ? [
@@ -336,8 +262,6 @@ describe("SchemaDumperTest", () => {
                 /"c_int_4"(?!.*limit)/,
               ]
             : [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /c_int_4.*limit: 4/];
-      // c_int_5..8: only SQLite keeps them as limited integers; PG/MySQL widen to
-      // a bare bigint.
       const highExpectations: RegExp[] =
         adapterType === "sqlite"
           ? [/c_int_5.*limit: 5/, /c_int_6.*limit: 6/, /c_int_7.*limit: 7/, /c_int_8.*limit: 8/]
@@ -352,19 +276,6 @@ describe("SchemaDumperTest", () => {
   );
 });
 
-// Deferred-convergence cases: still build ad-hoc, non-canonical tables
-// (adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
-// in `schema.rb`, decimal precision/integer limit that SQLite reflection can't
-// recover, table-name prefix/suffix migrations, etc.). Kept on the plain
-// per-test reset (no `fixtures({})`). The `companies` index-dump cases have moved to the canonical
-// block above (RFC 0048 IndexSpec extension); the rest await the missing
-// adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
-// Nothing drops their bespoke tables between tests, so each case that would
-// collide clears its own up front and the file-level `afterAll` below drops the
-// rest. Each dumps only its own tables — `SchemaDumper.dumpTableSchema(adapter,
-// name)` introspects only the named table (no `tables()` enumeration of the
-// ~330 canonical tables the truncate-reset preserves) — so no empty-DB
-// precondition (and no drop-all crutch) is needed.
 describe("SchemaDumperTest", () => {
   afterEach(() => {
     SchemaDumper.ignoreTables = [];
@@ -375,9 +286,6 @@ describe("SchemaDumperTest", () => {
     const schemaMigration = Base.connectionPool().schemaMigration;
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();
-    // Rails' `dump_schema_information` returns nil for an empty
-    // `schema_migrations`; minitest's `assert_no_match` passes on nil, so
-    // normalize before matching rather than asserting on the null.
     const schemaInfo = (await Base.connection.dumpSchemaInformation!()) ?? "";
     expect(schemaInfo).not.toMatch(/INSERT INTO/);
   });
@@ -413,17 +321,11 @@ describe("SchemaDumperTest", () => {
     await sm.createTable();
     await sm.createVersion("20240601120000");
     const output = (await TopLevelDumper.dump(adapter)).join("\n");
-    // Rails asserts %r{ActiveRecord::Schema\[...\]\.define} against the dump
-    // header (schema_dumper_test.rb:44-47); trails' generated DSL is a plain
-    // function, so the same header carries the version and the define call.
     expect(output).toMatch(/version: 2024_06_01_120000/);
     expect(output).toContain("defineSchema");
   }, 60000);
 
   it("schema dump with regexp ignored table", async () => {
-    // The `ignoreTables` filter runs during table enumeration, so drive the
-    // dumper from a mock async SchemaSource of just the two tables under test
-    // rather than a full-DB dump of the shared canonical schema.
     const source = {
       tables: async () => ["users", "temp_cache"],
       columns: async () => [{ name: "name", type: "string" }],
@@ -435,17 +337,6 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("temp_cache");
   });
 
-  // Deferred: Rails dumps the canonical `string_key_objects` — `id: false` +
-  // `t.string :id, null: false` + `t.index :id, unique: true`
-  // (schema.rb:1162-1166) — via `standard_dump`
-  // (schema_dumper_test.rb:466-469). Riding the canonical table needs a trails
-  // MySQL/MariaDB fix first — reflection there promotes the unique NOT NULL `id`
-  // index to the primary key, so the dump emits `id: "string"` instead of
-  // `id: false`. Until that's fixed this stays on a table of its own whose
-  // unique column is `key` (not `id`), which keeps the explicit `id: false` in
-  // the dump on every adapter. The name is deliberately NOT the canonical one:
-  // `force`-recreating `string_key_objects` here drifted the shared worker DB
-  // for every later file. Tracked as an RFC 0048 follow-up story.
   it("schema dump keeps id false when id is false and unique not null column added", async () => {
     await Base.connection.createTable(
       "dump_string_key_objects",
@@ -461,10 +352,6 @@ describe("SchemaDumperTest", () => {
 
   itIfSupports("check_constraints", "schema dumps check constraints", async () => {
     const testAdapter = Base.connection;
-    // Rails dumps the canonical `products`, whose check constraint schema.rb
-    // adds (schema.rb:1020). trails' canonical loader has no check-constraint
-    // support yet, so the constraint is built here — on a table of its own, so
-    // the shared worker DB keeps its canonical `products`.
     await testAdapter.createTable("dump_check_constraints", { force: true }, (t) => {
       t.decimal("price");
       t.decimal("discounted_price");
@@ -526,7 +413,6 @@ describe("SchemaDumperTest", () => {
       });
       const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_uc_no_idx");
       expect(output).toContain("t.uniqueConstraint");
-      // The backing index must not also appear as an index call.
       expect(output).not.toMatch(/t\.index\(.*test_uc_no_idx_position/);
     },
   );
@@ -561,9 +447,6 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema does not include limit for emulated mysql boolean fields",
     async () => {
-      // Rails dumps the canonical `booleans`, whose `has_fun` is
-      // `null: false, default: false` (schema.rb:171-173);
-      // schema_dumper_test.rb:348-351 creates nothing.
       const output = await SchemaDumper.dumpTableSchema(Base.connection, "booleans");
       expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
     },
@@ -577,11 +460,6 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes bigint default", async () => {
-    // Mirrors Rails: test_schema_dump_includes_bigint_default
-    // (activerecord/test/cases/schema_dumper_test.rb:366)
-    // assert_match %r{t\.bigint\s+"bigint_default",\s+default: 0}, output
-    // `defaults` (with its `0::bigint` default) is laid at boot by the
-    // postgres arm of loadSchema, mirroring postgresql_specific_schema.rb:43.
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "defaults");
     expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
   });
@@ -611,10 +489,6 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
     const adapter = Base.connection;
     const original = (adapter as any).extensions;
-    // This asserts only the extensions header, but the dumper needs a table to
-    // dump. Dump a single throwaway table via `dumpTableSchema` (which does
-    // NOT enumerate the ~330 canonical tables the truncate-reset preserves)
-    // rather than a full dump, so the header stays cheap under CI fork load.
     await adapter.createTable("schema_dump_probe", { force: true }, (t) => {
       t.integer("x");
     });
@@ -651,9 +525,6 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
-    // Rails dumps the canonical `numeric_data`, which already carries
-    // `t.float :temperature_with_limit, limit: 24` (schema.rb:855);
-    // schema_dumper_test.rb:424-427 creates nothing.
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "numeric_data");
     expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
   });
@@ -662,8 +533,6 @@ describe("SchemaDumperTest", () => {
     async () => {
       const adapter = Base.connection;
       await (adapter as any).createEnum("enum_with_comma", ["value1", "value,2", "value3"]);
-      // Dump a throwaway table (not a full dump) so the enum-type header is
-      // emitted without introspecting the ~330 canonical tables.
       await adapter.createTable("schema_dump_probe", { force: true }, (t) => {
         t.integer("x");
       });
@@ -671,8 +540,6 @@ describe("SchemaDumperTest", () => {
         const output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
         expect(output).toContain('createEnum("enum_with_comma", ["value1","value,2","value3"])');
       } finally {
-        // Nothing drops enum types between tests — clean up explicitly so the
-        // type does not leak onto the shared worker DB.
         await (adapter as any).dropEnum("enum_with_comma", { ifExists: true });
       }
     },
@@ -739,7 +606,6 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain('"books"');
   });
   itIfSupports("foreign_keys", "do not dump foreign keys when bypassed by config", async () => {
-    // Source has no foreignKeys hook — equivalent to a connection where FK dumping is unavailable.
     const source = {
       tables: async () => ["authors", "books"],
       columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
@@ -827,14 +693,12 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", (ctx) => {
     ctx.skip();
     // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
   });
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
     (ctx) => {
       ctx.skip();
       // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -894,7 +758,6 @@ describe("SchemaDumperTest", () => {
     (ctx) => {
       ctx.skip();
       // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -902,7 +765,6 @@ describe("SchemaDumperTest", () => {
     (ctx) => {
       ctx.skip();
       // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
     },
   );
 
@@ -924,8 +786,6 @@ describe("SchemaDumperDefaultsTest", () => {
   let adapter: TestDatabaseAdapter;
   beforeEach(() => {
     adapter = Base.connection;
-    // See SchemaDumperTest above: dumps go through `dumpTableSchema` on the
-    // named table only, so no empty-DB precondition is needed.
   });
 
   it("schema dump defaults with universally supported types", async () => {
@@ -942,7 +802,6 @@ describe("SchemaDumperDefaultsTest", () => {
     expect(output).toMatch(/decimal.*"decimal_with_default".*precision: 3.*scale: 2/);
   });
 
-  // MySQL 8 strict mode forbids TEXT column defaults; MariaDB allowed them.
   itIfSupports("text_column_with_default", "schema dump with text column", async () => {
     await adapter.createTable("dump_defaults", { force: true }, (t) => {
       t.text("text_with_default", { default: "John" });
@@ -971,14 +830,6 @@ describe("SchemaDumperDefaultsTest", () => {
   });
 });
 
-// The deferred bespoke cases in the second `SchemaDumperTest` describe build
-// real ad-hoc tables via the adapter DSL on the shared per-worker DB; drop
-// every one they create, by name, so the leaked tables don't collide with
-// sibling files under parallel forks. Every name below is bespoke to this
-// file — no canonical table is created, dropped, or reshaped here, so the
-// canonical tables the first describe *rides* (accounts/authors/booleans/
-// numeric_data/products/…) stay exactly as `fixtures({})` laid them and no
-// rebuild is needed.
 afterAll(async () => {
   const o = { ifExists: true } as const;
   await Base.connection.dropTable("dump_check_constraints", o);

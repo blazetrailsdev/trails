@@ -1,12 +1,6 @@
 import { underscore } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
 
-/**
- * Automatically adds encrypted attribute names to the application's
- * filter_parameters list, preventing them from appearing in logs.
- *
- * Mirrors: ActiveRecord::Encryption::AutoFilteredParameters
- */
 export class AutoFilteredParameters {
   private _filterParameters: string[];
   private _attributesByClass: Map<any, string[]>;
@@ -67,12 +61,7 @@ export class AutoFilteredParameters {
     );
   }
 
-  /**
-   * @missingRailsCall new — PERMANENT: `Concurrent::Array.new`
-   *   (auto_filtered_parameters.rb:48): the per-class attribute list is an array
-   *   literal in TS, which emits no constructor call, and Concurrent::
-   *   thread-safe collections have no analogue on a single-threaded event loop.
-   */
+  /** @missingRailsCall new — PERMANENT */
   private collectForLater(klass: any, attribute: string): void {
     if (!this._attributesByClass.has(klass)) {
       this._attributesByClass.set(klass, []);

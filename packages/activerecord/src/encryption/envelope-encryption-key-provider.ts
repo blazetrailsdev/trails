@@ -1,10 +1,3 @@
-/**
- * Envelope encryption key provider — generates random data keys,
- * encrypted by the primary key.
- *
- * Mirrors: ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider
- */
-
 import { Key } from "./key.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyProvider } from "./key-provider.js";

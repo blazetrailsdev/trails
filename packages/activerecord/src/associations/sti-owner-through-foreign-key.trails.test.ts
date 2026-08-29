@@ -1,20 +1,3 @@
-// An STI subclass owner building/creating through a `has_many :through`
-// association declared on its base class must write the join row's owner FK
-// derived from the *declaring* class (`reflection.foreign_key`), not the STI
-// subclass name. `Post has_many :people, through: :readers`, so a `SpecialPost`
-// owner writes `readers.post_id`, never `special_post_id` (which is not even a
-// column). The parent convergence PR could not exercise this — no canonical STI
-// has_one :through fixture — so that coverage lives here on the has_many path.
-//
-// The singular sibling below covers the same rule on the has_one *build* path,
-// `association(name).build(...)` → `setOwnerAttributes` →
-// `HasOneAssociation#foreignKeyColumns`. #5355 fixed `foreignKeyColumns` to
-// consult the rich reflection, but reached it from the writer path only — the
-// build assertion in `default-scoping.test.ts` still went through the dead
-// `buildHasOne` engine function, which carried its own copy of the rule. So the
-// live build path was never exercised. It passes as written; this is the
-// coverage that was missing, not a regression guard.
-
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -24,10 +7,6 @@ import { Reader } from "../test-helpers/models/reader.js";
 import { Comment, VerySpecialComment } from "../test-helpers/models/comment.js";
 
 describe("STI owner has_many :through — declaring-class owner FK", () => {
-  // Ride the boot-laid canonical `posts` / `people` / `readers` on
-  // `Base.connection` (single-pool test model) rather than a sidecar `_pool`
-  // lease. `fixtures({})` establishes the handler and per-test transactional
-  // rollback (no seed rows).
   fixtures({});
 
   beforeAll(() => {

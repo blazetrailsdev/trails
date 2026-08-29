@@ -6,12 +6,6 @@ import { Editor } from "../test-helpers/models/editor.js";
 import { Editorship } from "../test-helpers/models/editorship.js";
 
 describe("ReloadAssociationCacheTest", () => {
-  // Ride the boot-laid canonical `publications` / `editorships` / `editors`
-  // on `Base.connection` (single-pool test model) rather than a sidecar
-  // `_pool` lease. `fixtures({})` establishes the handler and per-test
-  // transactional rollback (no seed rows). The former in-test `createTable`
-  // re-lay only existed to prime the sidecar wrapper's separate signature
-  // cache — unnecessary now that the suite rides the boot connection.
   fixtures({});
 
   beforeAll(() => {
@@ -30,9 +24,6 @@ describe("ReloadAssociationCacheTest", () => {
       buildEditorInChief(attrs: { name: string }): Editor;
     };
     await transaction(Publication, async () => {
-      // Rails' `publication.editors = [...]` persists the replacement at
-      // assignment; that needs `await` in JS, so the `=` setter throws
-      // (RFC 0068). Use the awaitable Rails-named replacement.
       await pub.editors.replace([pub.buildEditorInChief({ name: "Alex Black" })]);
       await publication.saveBang();
     });

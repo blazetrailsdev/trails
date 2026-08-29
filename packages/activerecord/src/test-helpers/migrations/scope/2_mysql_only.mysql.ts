@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/scope/2_mysql_only.mysql.rb
 import { Migration } from "../../../migration.js";
 
 export class MysqlOnly extends Migration {

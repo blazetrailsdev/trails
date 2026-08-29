@@ -11,11 +11,8 @@ import {
 } from "../sqlite-adapter.js";
 import { statementIsReader } from "./statement-reader.js";
 
-// Minimal subset of the expo-sqlite public API used by this driver.
-// Kept inline so typecheck passes without installing the optional package.
 /** @internal */
 interface ExpoSQLiteStatement {
-  // expo-sqlite accepts either positional array or named-param object
   executeAsync(params?: unknown[] | Record<string, unknown>): Promise<ExpoSQLiteExecuteResult>;
   finalizeAsync(): Promise<void>;
 }
@@ -40,17 +37,11 @@ interface ExpoSqliteModule {
   openDatabaseAsync(name: string, options?: Record<string, unknown>): Promise<ExpoSQLiteDatabase>;
 }
 
-// Soft-load: expo-sqlite is only available in Expo/React Native runtimes.
-// createRequire is needed because this package uses "type": "module" — bare
-// `require` is not defined in ESM, but createRequire(import.meta.url) works.
 let expoSqlite: ExpoSqliteModule | undefined;
 try {
   expoSqlite = createRequire(import.meta.url)("expo-sqlite") as ExpoSqliteModule;
-} catch {
-  /* not an Expo runtime */
-}
+} catch {}
 
-/** True when expo-sqlite loaded successfully; use as a describe.skipIf gate in tests. */
 export const isExpoSqliteAvailable = expoSqlite !== undefined;
 
 const NAMED_PREFIX = /^[$:@]/;
@@ -59,8 +50,6 @@ const NAMED_PREFIX = /^[$:@]/;
 function expandBinds(binds: SqliteBinds | undefined): unknown[] | Record<string, unknown> {
   if (binds === undefined) return [];
   if (Array.isArray(binds)) return binds as unknown[];
-  // expo-sqlite requires $name/:name/@name keys. SqliteBinds uses bare names,
-  // so prefix any key that doesn't already carry a sigil.
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(binds)) {
     out[NAMED_PREFIX.test(k) ? k : `$${k}`] = v;
@@ -105,13 +94,9 @@ class ExpoSqliteStatement implements SqliteStatement {
   }
 
   columns(): ColumnInfo[] {
-    // expo-sqlite does not expose column metadata on prepared statements;
-    // return an empty array as a best-effort fallback.
     return [];
   }
 
-  // expo-sqlite has no BigInt toggle API; this is a documented no-op.
-  // Integer columns will return JS number, not bigint, regardless of this flag.
   setReadBigInts(_on: boolean): void {}
 
   async finalize(): Promise<void> {
@@ -155,14 +140,6 @@ class ExpoSqliteConnection implements SqliteConnection {
     return this.raw.getAllAsync(`PRAGMA ${source}`);
   }
 
-  /**
-   * `sqlite3_changes()` / `sqlite3_last_insert_rowid()` — the ruby sqlite3
-   * gem's `Database#changes` / `#last_insert_row_id`, which Rails'
-   * `perform_query` reads after every statement. No driver here exposes them
-   * as an API, so they are read with the SQL functions of the same names: a
-   * pure read, which leaves both counters alone. The prepared statements are
-   * cached because `perform_query` reads them on EVERY statement.
-   */
   async changes(): Promise<number> {
     const row = (await this.raw.getFirstAsync("SELECT changes() AS v")) as { v: number };
     return row.v;
@@ -200,9 +177,6 @@ export const expoSqliteDriver: SqliteDriver = {
         "expo-sqlite is not available. This driver requires an Expo / React Native runtime.",
       );
     }
-    // readOnly, timeout, noMutex, strict are not exposed by expo-sqlite's
-    // openDatabaseAsync; pass driverOptions through for any driver-specific
-    // overrides.
     const db = await expoSqlite.openDatabaseAsync(config.database, {
       ...config.driverOptions,
     });

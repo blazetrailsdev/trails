@@ -73,11 +73,6 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     loadSchema.call(Ticket as never);
 
     expect((Ticket as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    // The base reflects too: generating a non-base class's attribute methods
-    // runs `superclass.define_attribute_methods unless base_class?`
-    // (attribute_methods.rb:111), and each ancestor's own body loads its own
-    // schema (:114). What is under test here is that the descendant memoizes on
-    // ITSELF — the base's own load is Rails' cascade, not a shared memo.
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
@@ -102,11 +97,6 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     expect(Object.keys(hash).sort()).toEqual(["id", "subject"]);
     expect(Object.prototype.hasOwnProperty.call(VipTicket, "_schemaLoaded")).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(VipTicket, "_columnsHash")).toBe(true);
-    // The base reflects too: generating a non-base class's attribute methods
-    // runs `superclass.define_attribute_methods unless base_class?`
-    // (attribute_methods.rb:111), and each ancestor's own body loads its own
-    // schema (:114). What is under test here is that the descendant memoizes on
-    // ITSELF — the base's own load is Rails' cascade, not a shared memo.
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
@@ -120,11 +110,6 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     expect(asked).not.toContain("tickets");
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
-    // The base reflects too: generating a non-base class's attribute methods
-    // runs `superclass.define_attribute_methods unless base_class?`
-    // (attribute_methods.rb:111), and each ancestor's own body loads its own
-    // schema (:114). What is under test here is that the descendant memoizes on
-    // ITSELF — the base's own load is Rails' cascade, not a shared memo.
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 });

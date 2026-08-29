@@ -1,11 +1,3 @@
-/**
- * Mirrors vendor/rails/activerecord/test/cases/associations/has_one_through_associations_test.rb
- *
- * Faithful word-for-word port onto the canonical `TEST_SCHEMA`, the official
- * Rails models (Member/Club/Membership/Sponsor/Organization/MemberDetail/
- * MemberType/Minivan/Dashboard/Speedometer/Category/Author/Essay/Owner/Cpk/…),
- * and the real fixtures. No bespoke tables, no `_tableName` hacks.
- */
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
@@ -49,12 +41,10 @@ import {
   CpkOrderAgreement,
 } from "../test-helpers/models/cpk.js";
 
-/** Load and return a singular association's target (Rails sync reader). */
 async function readHasOne(owner: any, name: string): Promise<any> {
   return await owner.association(name).loadTarget();
 }
 
-/** The in-memory target of an association (Rails' cached reader), untyped. */
 function tgt(owner: any, name: string): any {
   return owner.association(name).target;
 }
@@ -210,36 +200,21 @@ describe("HasOneThroughAssociationsTest", () => {
     const newClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
 
-    // Rebuilding before save must re-point the deferred reconcile at the
-    // latest club (Rails runs `through_record.update` synchronously every
-    // call, so the last build wins) — not persist the first one on save.
     const finalClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(finalClub);
 
-    // Rails' create_through_record reconciles against the persisted join row
-    // (`through_record.update(attributes)`) instead of building a duplicate: on
-    // save the existing membership is updated to point at the new club, no
-    // second membership row is inserted. Count is scoped to this member so a
-    // parallel fork's Membership rows can't perturb the delta (global-count
-    // shared-DB flake, cf. member_details, PR #4480).
     const countForMember = () => Membership.where({ member_id: newMember.id }).count();
     const before = await countForMember();
     expect(await newMember.save()).toBe(true);
     expect(await countForMember()).toBe(before);
     expect(finalClub.isPersisted()).toBe(true);
     const reloaded = await Membership.find(membership.id);
-    // club_id round-trips as BigInt on PG/MariaDB but finalClub.id is a number;
-    // compare numerically rather than by Object.is identity.
     expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
   it("building with a loaded join row preserves unrelated in-memory changes on it", async () => {
     const newMember = await Member.create({ name: "Joe" });
     const membership = await (newMember.association("currentMembership") as any).create();
-    // An unrelated in-memory mutation on the *loaded* join row must survive the
-    // build reconcile: Rails' `load_target` returns the same memoized object and
-    // merges the FK attrs onto it, so the dirty `favorite` is saved too. (A
-    // forced through-proxy reset would re-read a fresh row and drop it.)
     membership.writeAttribute("favorite", true);
     const newClub = (newMember.association("club") as any).build();
     expect(await newMember.save()).toBe(true);
@@ -255,10 +230,6 @@ describe("HasOneThroughAssociationsTest", () => {
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
-    // Re-fetch the member so the through (currentMembership) join row is
-    // UNLOADED. Rails' create_through_record calls through_proxy.load_target,
-    // which queries the DB and `update`s the existing row rather than inserting
-    // a duplicate.
     const refetched = await Member.find(newMember.id);
     const newClub = (refetched.association("club") as any).build();
 
@@ -277,17 +248,10 @@ describe("HasOneThroughAssociationsTest", () => {
     await newMember.save();
 
     const refetched = await Member.find(newMember.id);
-    (refetched.association("club") as any).build(); // unloaded reconcile → sets the sentinel
+    (refetched.association("club") as any).build();
     expect(await refetched.save()).toBe(true);
 
-    // The suppression sentinel set on the through proxy during the reconcile must
-    // be cleared afterward: a later independent write to `currentMembership` on
-    // the SAME instance must still autosave, not be silently skipped forever.
     const laterClub = await Club.create({ name: "Later Club" });
-    // `currentMembership`'s target is loaded and persisted here, so `build`
-    // displaces it: Rails' `set_new_record` → `replace(record, false)` runs
-    // `remove_target!` inline, and our `build` returns the record wrapped in
-    // that removal's promise.
     const newMembership = await (refetched.association("currentMembership") as any).build({
       club: laterClub,
     });
@@ -302,9 +266,6 @@ describe("HasOneThroughAssociationsTest", () => {
     await newMember.save();
     const membershipId = (await readHasOne(newMember, "currentMembership")).id;
 
-    // The async `create` path (unlike `build`) is exercised here on a re-fetched
-    // owner whose through join row is UNLOADED: it must reconcile the existing
-    // row, not insert a duplicate.
     const refetched = await Member.find(newMember.id);
     const countForMember = () => Membership.where({ member_id: refetched.id }).count();
     const before = await countForMember();
@@ -368,9 +329,6 @@ describe("HasOneThroughAssociationsTest", () => {
     (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
     await newMember.save();
 
-    // Registering (without loading) the through proxy before the build makes
-    // `flushPendingReplaces` reach it before the has_one_through association.
-    // The reconcile must still update the single existing row, not double-write.
     const refetched = await Member.find(newMember.id);
     refetched.association("currentMembership");
     const newClub = (refetched.association("club") as any).build();
@@ -497,7 +455,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("has one through with conditions eager loading", async () => {
     const member = members("groucho");
-    // conditions on the through table
     expect(
       ((await Member.all().includes(":favoriteClub").find(member.id)) as any).association(
         "favoriteClub",
@@ -508,7 +465,6 @@ describe("HasOneThroughAssociationsTest", () => {
     await refetched.reload();
     expect(refetched.association("favoriteClub").target).toBeNull();
 
-    // conditions on the source table
     expect(
       ((await Member.all().includes(":hairyClub").find(member.id)) as any).association("hairyClub")
         .target?.id,
@@ -529,7 +485,6 @@ describe("HasOneThroughAssociationsTest", () => {
     const loaded = await Club.all()
       .includes(":sponsoredMember")
       .where("name = ?", "Moustache and Eyebrow Fancier Club");
-    // Only the eyebrow fanciers club has a sponsored_member
     await assertQueriesCount(0, false, () => {
       expect(loaded[0].association("sponsoredMember").target).not.toBeNull();
     });
@@ -542,7 +497,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .includes(":club")
         .where("members.name = ?", "Groucho Marx")
         .order("clubs.name")
-        .references("clubs"); // force fallback
+        .references("clubs");
     });
     expect(loaded.length).toBe(1);
     await assertQueriesCount(0, false, () => {
@@ -557,7 +512,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .includes(":sponsorClub")
         .where("members.name = ?", "Groucho Marx")
         .order("clubs.name")
-        .references("clubs"); // force fallback
+        .references("clubs");
     });
     expect(loaded.length).toBe(1);
     await assertQueriesCount(0, false, () => {
@@ -574,7 +529,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .includes(":sponsorClub")
         .where("members.name = ?", "Groucho Marx")
         .order("clubs.name DESC")
-        .references("clubs"); // force fallback
+        .references("clubs");
     });
     expect(loaded.length).toBe(1);
     await assertQueriesCount(0, false, () => {
@@ -596,19 +551,12 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it.skip("has one through proxy should not respond to private methods", () => {
     // PERMANENT-SKIP: Ruby private-method visibility (NoMethodError when a private
-    // method is called publicly) has no TypeScript runtime equivalent.
   });
 
   it.skip("has one through proxy should respond to private methods via send", () => {
     // PERMANENT-SKIP: Ruby private-method dispatch via `send` has no TypeScript
-    // runtime equivalent.
   });
 
-  // Rails' `assert_difference "MemberDetail.count", 1` runs serially in a txn;
-  // trails runs parallel forks against a shared DB, so a global count races
-  // against concurrent member_details fixture reloads. Scope the delta to this
-  // member — the invariant Rails asserts (exactly one new join row for the
-  // member) — which still catches a genuine double-write for this member.
   const memberDetailCount = async (member: any): Promise<number> =>
     (await MemberDetail.where({ member_id: member.id }).count()) as number;
 
@@ -617,10 +565,6 @@ describe("HasOneThroughAssociationsTest", () => {
     const organization = organizations("nsa");
     const before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    // `writer` on a persisted owner returns the immediate-persist `persistReplace`
-    // promise (has-one-association.ts:52-57); it MUST be awaited (per its JSDoc)
-    // or the floating write races member.save()'s own has_one autosave — the
-    // exact double-write the `_pendingReplace` skip guard is meant to prevent.
     await (member.association("memberDetail") as any).writer(memberDetail);
     await (member.association("organization") as any).writer(organization);
     await member.save();
@@ -636,8 +580,6 @@ describe("HasOneThroughAssociationsTest", () => {
     const organization = organizations("nsa");
     const newOrganization = organizations("discordians");
 
-    // Rails' `@organization.members` re-reads the collection on each access; the
-    // trails proxy caches its loaded target, so reload before each membership check.
     const includesMember = async (o: any): Promise<boolean> => {
       await o.association("members").reload();
       return (o.association("members").target as any[]).some((m: any) => m.id === member.id);
@@ -702,10 +644,6 @@ describe("HasOneThroughAssociationsTest", () => {
   it("through belongs to after destroy", async () => {
     const member = members("groucho");
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    // Rails `@member.member_detail = @member_detail` is a synchronous assignment;
-    // our writer is awaitable on a persisted owner. Un-awaited it floats a
-    // persistReplace that races member.save's has_one autosave and drops the
-    // child row on PG/MariaDB (see member_details double-write). Await to match.
     await (member.association("memberDetail") as any).writer(memberDetail);
     await member.save();
 
@@ -725,7 +663,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("value is properly quoted", async () => {
     const minivan = await Minivan.find("m1");
-    // The point of the Rails test: loading must not raise (string PK quoting).
     await readHasOne(minivan, "dashboard");
   });
 

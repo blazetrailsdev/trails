@@ -1,11 +1,3 @@
-/**
- * Trails-specific unit coverage for Serialized change detection.
- *
- * Rails' Type::Value#changed? compares old/new with Ruby `!=`, which for Hash
- * is the order-insensitive Hash#==. canonicalKey drives that comparison here,
- * so two content-equal hashes built with keys in a different insertion order
- * must not report as changed.
- */
 import { describe, it, expect } from "vitest";
 import { StringType } from "@blazetrails/activemodel";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
@@ -42,8 +34,6 @@ describe("Serialized#isChanged", () => {
   });
 
   it("dispatches to an explicit equals method, honoring cross-class value equality", () => {
-    // Mirrors ActiveSupport::TimeWithZone#== comparing by UTC instant across
-    // Date/Time-like kinds via its own equality method.
     class Instant {
       constructor(readonly ms: number) {}
       equals(other: unknown) {
@@ -71,40 +61,25 @@ describe("Serialized#isChanged", () => {
   });
 
   it("distinguishes NaN, undefined, and null Hash values, matching Ruby Hash#==", () => {
-    // JSON.stringify collapses NaN/undefined to null (and drops undefined
-    // object keys), which would make these compare equal; the sentinel encoding
-    // keeps them distinct, mirroring Ruby where nil, Float::NAN, and a missing
-    // key are all unequal.
     expect(type.isChanged({ a: NaN }, { a: null })).toBe(true);
     expect(type.isChanged({ a: undefined }, { a: null })).toBe(true);
     expect(type.isChanged({ a: NaN }, { a: undefined })).toBe(true);
     expect(type.isChanged({ a: Infinity }, { a: null })).toBe(true);
     expect(type.isChanged([NaN], [null])).toBe(true);
-    // A dropped undefined key must not collapse onto an object missing that key.
     expect(type.isChanged({ a: undefined }, {})).toBe(true);
-    // Same distinct value on both sides still compares equal.
     expect(type.isChanged({ a: undefined }, { a: undefined })).toBe(false);
   });
 
   it("reports changed for two distinct NaN Hash values, matching Ruby NaN non-reflexivity", () => {
-    // Ruby's Float::NAN == Float::NAN is false, so {a: Float::NAN} == {a:
-    // Float::NAN} is false and reports changed. Structural deep-equal compares
-    // leaf primitives with ===, so NaN is never equal to itself. Only manifests
-    // in-memory since JSON coders cannot round-trip NaN.
     expect(type.isChanged({ a: NaN }, { a: NaN })).toBe(true);
     expect(type.isChanged([NaN], [NaN])).toBe(true);
     expect(type.isChanged({ a: { b: NaN } }, { a: { b: NaN } })).toBe(true);
-    // A finite number at the same key is still order-insensitively equal.
     expect(type.isChanged({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(false);
   });
 
   it("compares nested value objects by their own equality, not JSON canonicalization", () => {
-    // Ruby's Hash#==/Array#== compare each element with its own ==, so a value
-    // object nested inside a serialized Hash gets the same dispatch a top-level
-    // one does. Two equal Dates at the same key are unchanged; unequal changed.
     expect(type.isChanged({ at: new Date(100) }, { at: new Date(100) })).toBe(false);
     expect(type.isChanged({ at: new Date(100) }, { at: new Date(200) })).toBe(true);
-    // A nested explicit `equals` honors cross-class value equality.
     class Instant {
       constructor(readonly ms: number) {}
       equals(other: unknown) {

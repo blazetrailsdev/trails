@@ -9,31 +9,15 @@ import type { SchemeOptions } from "./scheme.js";
 
 type DeclarationListener = (klass: any, name: string) => void;
 
-// Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
-// (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
 let _listeners: DeclarationListener[] | undefined;
 
 let _config: Config | undefined;
 
-/**
- * Configuration API for ActiveRecord::Encryption. Manages the shared
- * Config instance and encrypted attribute declaration callbacks.
- *
- * Mirrors: ActiveRecord::Encryption::Configurable
- */
 export class Configurable {
-  /**
-   * Mirrors Rails' `mattr_reader :config, default: Config.new`
-   * (configurable.rb:9). Built on first read rather than at module eval so the
-   * singleton does not depend on where in the import graph this module lands.
-   */
   static get config(): Config {
     return (_config ??= new Config());
   }
 
-  // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
-  // (configurable.rb:11). The listeners are invoked when an encrypted
-  // attribute is declared; see onEncryptedAttributeDeclared.
   static get encryptedAttributeDeclarationListeners(): DeclarationListener[] | undefined {
     return _listeners;
   }
@@ -42,18 +26,6 @@ export class Configurable {
     _listeners = value;
   }
 
-  /**
-   * Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
-   * (configurable.rb:16-19), written out one reader per property.
-   *
-   * The loop cannot survive: it runs while this module's body does, and on a
-   * graph entered at `context.ts` — which imports this module for
-   * `build_default_key_provider` — `Context` is still in TDZ then, a
-   * `ReferenceError` rather than a stale read. Only a hoisted function is
-   * readable there, and that function was the shim this story deletes. The set
-   * is held to `Context::PROPERTIES` at compile time instead, by
-   * {@link DelegatedProperty} below.
-   */
   static get keyProvider(): unknown {
     return Contexts.context.keyProvider;
   }
@@ -78,23 +50,6 @@ export class Configurable {
     return Contexts.context.frozenEncryption;
   }
 
-  /**
-   * Mirrors `Configurable.configure`
-   * (activerecord/lib/active_record/encryption/configurable.rb:20-36).
-   *
-   * `primary_key:`, `deterministic_key:` and `key_derivation_salt:` are kwargs
-   * defaulting to `nil` and assigned unconditionally (configurable.rb:21-23),
-   * so a call that omits one *clears* the credential it had rather than keeping
-   * it. Callers that want the previous value pass it explicitly.
-   *
-   * The remaining properties are applied twice, as Rails applies them: once to
-   * `config` (configurable.rb:29-31), then again to the freshly-reset default
-   * `Context` (configurable.rb:35-37), which is how a `Context`-only property —
-   * `encryptor`, `cipher`, `frozenEncryption` — reaches the context at all.
-   * The `reset_default_context` between them is also the only key-provider
-   * invalidation Rails has: `Context` memoizes its default key provider
-   * (context.rb:25-27), so a fresh `Context` is a fresh provider.
-   */
   static configure(options: {
     primaryKey?: string | string[];
     deterministicKey?: string;
@@ -108,8 +63,6 @@ export class Configurable {
     config.keyDerivationSalt = options.keyDerivationSalt;
 
     const properties: Record<string, unknown> = { ...options };
-    // Set the default for this property here instead of in +Config#set_defaults+ as this needs
-    // to happen *after* the keys have been set.
     properties.supportSha1ForNonDeterministicEncryption ??= true;
 
     for (const [key, value] of Object.entries(properties)) {
@@ -139,15 +92,8 @@ export class Configurable {
     }
   }
 
-  /**
-   * @missingRailsCall new — PERMANENT: `Concurrent::Array.new` (configurable.rb:48): the
-   *   lazily-allocated listener list is `_listeners ??= []` in TS, an array
-   *   literal with no constructor call, and Concurrent:: collections have no
-   *   analogue on a single-threaded event loop.
-   */
+  /** @missingRailsCall new — PERMANENT */
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
-    // Mirrors Rails' `self.encrypted_attribute_declaration_listeners ||= ...`
-    // (configurable.rb:48) — lazily allocate on first registration.
     const listeners = (_listeners ??= []);
     listeners.push(callback);
     return () => {
@@ -157,8 +103,6 @@ export class Configurable {
   }
 
   static encryptedAttributeWasDeclared(klass: any, name: string): void {
-    // Mirrors Rails' `&.each` safe-navigation (configurable.rb:53) — no-op
-    // when no listeners have ever been registered (accessor still nil).
     if (!_listeners) return;
     for (const listener of [..._listeners]) {
       listener(klass, name);
@@ -168,12 +112,8 @@ export class Configurable {
 
 _setConfigurable(Configurable);
 
-/** @internal One `Context::PROPERTIES` name (context.rb:13). */
+/** @internal */
 type DelegatedProperty = (typeof Context.PROPERTIES)[number];
 
-/**
- * @internal Type-only, erased at emit: `Pick` stops compiling the moment a
- * `Context::PROPERTIES` name has no reader on `Configurable` — the drift the
- * `PROPERTIES.each` loop prevented by construction.
- */
+/** @internal */
 declare const _contextPropertiesAreDelegated: Pick<typeof Configurable, DelegatedProperty>;

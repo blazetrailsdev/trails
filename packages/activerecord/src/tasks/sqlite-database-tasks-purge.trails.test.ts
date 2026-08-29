@@ -1,15 +1,3 @@
-/**
- * Trails-only cover for `SQLiteDatabaseTasks#purge`
- * (`sqlite_database_tasks.rb:30-37`). Rails' own `sqlite_rake_test.rb` is not
- * in the vendored tree, so there is no test to port; what is pinned here is the
- * single behavior the rescue clause decides. Ruby rescues `NoDatabaseError` and
- * nothing else, so a `drop` that fails for any other reason propagates, and the
- * `ensure` runs `create` on that path too.
- *
- * `drop` and `create` are stubbed so the assertions land on the rescue clause
- * rather than on file I/O; `create` is counted because Ruby's `ensure` runs it
- * on every path, including the raising one.
- */
 import { describe, it, expect } from "vitest";
 import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { NoDatabaseError } from "../errors.js";

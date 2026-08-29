@@ -1,10 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Middleware::DatabaseSelector
- *
- * Provides automatic primary/replica switching based on request type and
- * recency of writes, using pluggable resolver and context classes.
- */
-
 import { Notifications } from "@blazetrails/activesupport";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";

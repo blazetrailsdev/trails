@@ -1,5 +1,4 @@
 import type { Attachment } from "./attachment.js";
-// vendor/rails/activerecord/test/models/translation.rb
 import { Base } from "../../base.js";
 
 export class Translation extends Base {

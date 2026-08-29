@@ -1,14 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Mirrors associations/eager_singularization_test.rb. The tables under test
- * (viri/octopi/passes/buses/crises_messes/messes/crises/successes/analyses/
- * dresses/compresses) are deliberately irregular plurals with no schema.rb
- * analog; Rails creates them dynamically in setup and drops them in teardown.
- * We mirror that with the adapter's createTable/dropTable — the model table
- * names derive from the inflector exactly as in Rails (no _tableName hacks).
- */
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";

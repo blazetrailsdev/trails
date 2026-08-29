@@ -1,20 +1,10 @@
-/**
- * Model-level bigint round-trip tests (all adapters).
- *
- * Tests the full AR stack (create, find, update, dirty tracking,
- * JSON.stringify, where) with big_integer attributes. Runs on SQLite3
- * by default (no DB); runs on PG/MySQL when *_TEST_URL env vars are set.
- */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 
-const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
+const BIG = 2n ** 62n;
 fixtures([]);
 
-// `metrics` is a trails-only scratch table (no Rails counterpart). Build it via
-// the migration API and drop it afterward rather than seeding it into the
-// canonical schema, which mirrors only Rails' schema.rb fixture tables.
 beforeAll(async () => {
   await Base.connection.createTable("metrics", { force: true }, (t) => {
     t.bigint("score");
@@ -88,8 +78,6 @@ describe("bigint model round-trip (all adapters)", () => {
   });
 
   it("queryAttribute returns false for 0n, true for non-zero bigint", async () => {
-    // Mirrors Rails query_attribute which uses value.zero? for numeric types.
-    // Mirrors activerecord/lib/active_record/attribute_methods/query.rb
     const Metric = makeModel();
     const zero = await Metric.create({ score: 0n, label: "zero" });
     const nonzero = await Metric.create({ score: BIG, label: "nonzero" });

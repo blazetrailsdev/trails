@@ -6,32 +6,11 @@ import {
 } from "./extended-deterministic-queries.js";
 import { Contexts } from "./contexts.js";
 
-/**
- * Extends uniqueness validation for deterministic encrypted attributes.
- * When validating uniqueness, also checks against values encrypted with
- * previous schemes to prevent duplicates across migration periods.
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator
- */
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
   private static _originalValidateEach: ((...args: any[]) => unknown) | undefined;
 
-  /**
-   * Wraps UniquenessValidator#validateEach so uniqueness checks also cover
-   * values encrypted with previous schemes. Validates the target is callable
-   * before patching and saves the original for restoration via resetSupport().
-   *
-   * Mirrors: Rails' ExtendedDeterministicUniquenessValidator.install_support which
-   * prepends EncryptedUniquenessValidator into ActiveRecord::Validations::UniquenessValidator.
-   *
-   * @missingRailsCall prepend — PERMANENT: Rails prepends `EncryptedUniquenessValidator`
-   *   into the validator class
-   *   (extended_deterministic_uniqueness_validator.rb:7); trails swaps
-   *   `validateEach` on the prototype directly because `resetSupport` has to
-   *   hand the original method back for test teardown, which the `prepend()`
-   *   shim's wrapper cannot expose.
-   */
+  /** @missingRailsCall prepend — PERMANENT */
   static installSupport({
     UniquenessValidator,
     EncryptedUniquenessValidator: EUV,
@@ -51,15 +30,7 @@ export class ExtendedDeterministicUniquenessValidator {
     this._originalValidateEach = original;
     this._installed = true;
 
-    // When ExtendedDeterministicQueries is also installed it already expands
-    // WHERE clauses to cover all previous-scheme ciphertexts, so
-    // EncryptedUniquenessValidator skips the extra previous-scheme query in
-    // that case to avoid duplicate errors and redundant DB round-trips.
     const validator = new EUV();
-    // `original` (UniquenessValidator#validateEach) is async — it awaits the
-    // `SELECT 1 ... WHERE attr = ?` round-trip. The wrapper must return that
-    // promise so the validation chain awaits it; dropping it leaves the query
-    // in flight and its errors land on the record at an arbitrary later tick.
     UniquenessValidator.prototype.validateEach = function (
       this: unknown,
       record: any,
@@ -70,7 +41,6 @@ export class ExtendedDeterministicUniquenessValidator {
     };
   }
 
-  /** Restores the original validateEach — for use in test teardown. */
   static resetSupport(UniquenessValidator: {
     prototype: { validateEach: (...args: any[]) => unknown };
   }): void {
@@ -85,13 +55,6 @@ export class ExtendedDeterministicUniquenessValidator {
   }
 }
 
-/**
- * Performs uniqueness validation across all encryption scheme versions.
- * Computes ciphertexts for current and previous schemes and checks
- * uniqueness against all of them in a single query using IN (...).
- *
- * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator::EncryptedUniquenessValidator
- */
 export class EncryptedUniquenessValidator {
   async validateEach(
     originalValidateEach: (record: any, attribute: string, value: unknown) => unknown,
@@ -108,10 +71,6 @@ export class EncryptedUniquenessValidator {
     const encryptedType = encryptedTypeOf(klass.typeForAttribute(attribute));
     if (!encryptedType) return;
 
-    // When ExtendedDeterministicQueries is installed it already expands the
-    // WHERE clause to cover all previous-scheme ciphertexts, and buildRelation
-    // uses hash-style WHERE for supportUnencryptedData attributes so the plain-
-    // text variant is included in the IN list. No extra per-scheme query needed.
     if (!ExtendedDeterministicQueries.installed) {
       const prevCiphertexts = encryptedType.previousTypes.map((pt) => pt.serialize(value));
       if (prevCiphertexts.length > 0) {
@@ -122,19 +81,7 @@ export class EncryptedUniquenessValidator {
     }
   }
 
-  /**
-   * Returns the query candidates for a value across current and previous
-   * encryption schemes: the raw plaintext (current scheme, encrypted
-   * downstream by the PredicateBuilder) plus an AdditionalValue per previous
-   * scheme. Used by uniqueness validation to check for duplicates across
-   * scheme migrations.
-   */
   static allCiphertextsFor(klass: any, attribute: string, value: unknown): unknown[] {
-    // The current-scheme candidate stays as raw plaintext at index 0 — the
-    // PredicateBuilder serializes it through the attribute's resolved type;
-    // only previous-scheme candidates are AdditionalValue-wrapped. Gating
-    // reaches the inner type via encryptedTypeOf (Rails' DelegateClass
-    // delegation).
     const fullType = klass.typeForAttribute(attribute) as SerializableType | undefined;
     const type = encryptedTypeOf(fullType);
     if (!fullType || !type?.deterministic) {

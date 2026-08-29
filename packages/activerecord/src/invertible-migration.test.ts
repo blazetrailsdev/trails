@@ -1,13 +1,3 @@
-/**
- * Faithful port of:
- *   activerecord/test/cases/invertible_migration_test.rb
- *
- * Test names mirror the Rails `test_*` methods so `parity:test` can map them.
- * Migrations and the `Horse` model both lease the shared worker connection,
- * exactly as Rails routes everything through
- * `ActiveRecord::Base.lease_connection`. The scratch tables (`horses`,
- * `new_horses`) are Rails' own — created and dropped per test, never canonical.
- */
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { Migration, IrreversibleMigration, type MigrationClass } from "./migration.js";
@@ -24,10 +14,7 @@ class Horse extends Base {
   }
 }
 
-// -- Migration class hierarchy (mirrors the Rails nested classes) --
-
 class SilentMigration extends Migration {
-  // sssshhhhh!!
   write(): void {}
 }
 
@@ -53,8 +40,6 @@ class InvertibleChangeTableMigration extends SilentMigration {
 
 class InvertibleTransactionMigration extends InvertibleMigration {
   async change(): Promise<void> {
-    // Rails has no `Migration#transaction`: the Ruby's bare `transaction do`
-    // reaches the connection through `method_missing` (migration.rb:1044-1057).
     await this.methodMissing("transaction", async () => {
       await super.change();
     });
@@ -75,7 +60,6 @@ class InvertibleRevertMigration extends SilentMigration {
 class InvertibleByPartsMigration extends SilentMigration {
   test?: (dir: symbol) => void;
   async change(): Promise<void> {
-    // Torn down by the suite afterEach (drops horses + new_horses).
     // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("new_horses", (t) => {
       t.column("breed", "string");
@@ -279,8 +263,6 @@ class RevertCheckConstraintWithInvalidOption extends SilentMigration {
   }
 }
 
-// Mirrors Rails' `Horse.reset_column_information` followed by the lazy schema
-// reload its next attribute access triggers.
 async function resetHorse(): Promise<void> {
   void Horse.resetColumnInformation();
   await loadSchemaFromAdapter.call(Horse);
@@ -303,9 +285,6 @@ describe("InvertibleMigrationTest", () => {
     await expect(migration.migrate("down")).rejects.toThrow(IrreversibleMigration);
   });
 
-  // trails' changeTable `removeIndex` records no `column` info, so the migrate
-  // reverse path throws "Cannot reverse removeIndex without column info".
-  // Tracked-pending-convergence in the activerecord-surfaced-deviations bucket.
   it("exception on removing index without column option", async () => {
     const indexDefinition: [string, string[]] = ["horses", ["name", "color"]];
     const migration1 = new RemoveIndexMigration1();
@@ -333,11 +312,6 @@ describe("InvertibleMigrationTest", () => {
     expect(await migration.connection.tableExists("horses")).toBe(false);
   });
 
-  // trails' `revert(fn)` always reverses the recorded ops regardless of the
-  // migration's own direction, so a migration reverting a `revert` block (and
-  // its `dropTable` reverse) is not yet direction-aware. Tracked-pending-
-  // convergence in the activerecord-surfaced-deviations bucket
-  // (revert-direction semantics).
   it("migrate revert", async () => {
     const migration = new InvertibleMigration();
     const revert = new InvertibleRevertMigration();
@@ -481,8 +455,6 @@ describe("InvertibleMigrationTest", () => {
     await (connection as any).enableExtension("hstore");
   });
 
-  // Rails' drop_table accepts a block (the table definition) so the migrate
-  // path can recreate the table on reversal.
   it("migrate revert drop table", async () => {
     const connection = await Base.leaseConnection();
     const migration1 = new InvertibleMigration();
@@ -497,9 +469,6 @@ describe("InvertibleMigrationTest", () => {
     expect(await connection.tableExists("horses")).toBe(true);
   });
 
-  // Rails asserts the exact CommandRecorder#commands triples ([sym, args,
-  // block]); the trails recorder folds the block into the trailing arg of
-  // each {cmd, args} entry, so the assertion below matches that shape.
   it("revert order", async () => {
     const block = (t: any) => t.string("name");
     const recorder = new CommandRecorder(await Base.leaseConnection());
@@ -563,10 +532,6 @@ describe("InvertibleMigrationTest", () => {
     }
   });
 
-  // Reverting `change_table { t.references }` records addReference, but trails'
-  // CommandRecorder change_table proxy has no `references`, and SQLite's
-  // removeColumn rebuild can't drop a column an index still references.
-  // Tracked-pending-convergence in the activerecord-surfaced-deviations bucket.
   it("migrations can handle foreign keys to specific tables", async () => {
     const migration = new RevertCustomForeignKeyTable();
     await new InvertibleMigration().migrate("up");
@@ -588,7 +553,6 @@ describe("InvertibleMigrationTest", () => {
     expect(await connection.indexExists("horses", ["remind_at", "place_id"])).toBe(false);
   });
 
-  // MySQL/Oracle disallow duplicate indexes on the same columns.
   it.skipIf(adapterType === "mysql")("migrate revert add index with name", async () => {
     await new RevertNamedIndexMigration1().migrate("up");
     await new RevertNamedIndexMigration2().migrate("up");
@@ -604,16 +568,15 @@ describe("InvertibleMigrationTest", () => {
   it("up only", async () => {
     await new InvertibleMigration().migrate("up");
     const horse1 = await Horse.create();
-    // populates existing horses with oldie = 1 but new ones have default 0
     await new UpOnlyMigration().migrate("up");
     void Horse.resetColumnInformation();
     await horse1.reload();
     const horse2 = await Horse.create();
 
-    expect(horse1.readAttribute("oldie")).toBe(1); // created before migration
-    expect(horse2.readAttribute("oldie")).toBe(0); // created after migration
+    expect(horse1.readAttribute("oldie")).toBe(1);
+    expect(horse2.readAttribute("oldie")).toBe(0);
 
-    await new UpOnlyMigration().migrate("down"); // should be no error
+    await new UpOnlyMigration().migrate("down");
     const connection = await Base.leaseConnection();
     expect(await connection.columnExists("horses", "oldie")).toBe(false);
     void Horse.resetColumnInformation();
@@ -634,11 +597,6 @@ describe("InvertibleMigrationTest", () => {
     },
   );
 
-  // trails diverges on every adapter: SQLite emits `ALTER TABLE ... ADD
-  // CONSTRAINT` (rejected; needs table recreation), and on PG/MariaDB the
-  // reverse names the constraint `fk_horses_parent_id`, which doesn't match the
-  // hashed name addForeignKey created. Tracked-pending-convergence in the
-  // activerecord-surfaced-deviations bucket.
   it("migrate revert add foreign key with invalid option", async () => {
     await new InvertibleMigration().migrate("up");
     await new RevertForeignKeyWithInvalidOption().migrate("up");

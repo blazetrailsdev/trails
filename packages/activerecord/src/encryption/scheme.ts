@@ -1,9 +1,3 @@
-/**
- * Encryption scheme — binds configuration to an encryptor instance.
- *
- * Mirrors: ActiveRecord::Encryption::Scheme
- */
-
 import {
   Encryptor,
   LegacyEncryptorShim,
@@ -64,12 +58,9 @@ export class Scheme {
   previousSchemes: Scheme[];
   private compress: boolean;
   private compressor?: Compressor;
-  /** Rails' `@context_properties` — the leftover `**` kwargs (scheme.rb:13). */
   private _contextProperties: Partial<Context>;
 
   constructor(options: SchemeOptions = {}) {
-    // Initializing all attributes to +undefined+ as we want to allow a "not set" semantics so that we
-    // can merge schemes without overriding values with defaults. See +#merge+
     this._keyProviderParam = options.keyProvider;
     this.key = options.key;
     this.deterministic = options.deterministic;
@@ -115,7 +106,6 @@ export class Scheme {
   }
 
   isFixed(): boolean {
-    // by default deterministic encryption is fixed
     return (this._fixed ??=
       this.deterministic != null &&
       this.deterministic !== false &&
@@ -138,7 +128,6 @@ export class Scheme {
     return this.isDeterministic() === other.isDeterministic();
   }
 
-  /** Mirrors: ActiveRecord::Encryption::Scheme#to_h (scheme.rb:65-68). */
   toH(): SchemeOptions {
     const h: SchemeOptions = {
       keyProvider: this._keyProviderParam,

@@ -8,8 +8,6 @@ export { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
 export * as Type from "./type.js";
 
-// Wire ExecutorHooks to lazily resolve Base.connectionHandler at call time,
-// matching Rails' ActiveRecord::Base.connection_handler late binding.
 import { ExecutorHooks } from "./connection-adapters/abstract/connection-pool.js";
 import { Base as _Base } from "./base.js";
 ExecutorHooks.setConnectionHandlerResolver(() => _Base.connectionHandler);
@@ -21,17 +19,9 @@ export { QueryAttribute } from "./relation/query-attribute.js";
 export { InsertAll, Builder as InsertAllBuilder } from "./insert-all.js";
 export type { InsertAllOptions } from "./insert-all.js";
 export type { AdapterName } from "./connection-adapters/abstract-adapter.js";
-// Public alias kept for downstream consumers (trailties, dx-tests); the
-// underlying type is now AbstractAdapter, which is a superset of the
-// retired `DatabaseAdapter` interface (RFC 0010).
 export type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 export type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-/**
- * Mirrors: `ActiveRecord::ConnectionAdapters` (`connection_adapters.rb:9-27`) —
- * `register` / `resolve` point `db_config.adapter` at an adapter class Rails
- * would otherwise `require`.
- */
 export * as ConnectionAdapters from "./connection-adapters.js";
 export { Migration, MigrationContext } from "./migration.js";
 export {
@@ -64,33 +54,22 @@ export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
 export type { AssociationOptions } from "./associations.js";
-// Public Rails-facing Transaction wrapper. The internal transaction
-// class lives at connection-adapters/abstract/transaction.ts and is
-// intentionally NOT re-exported at the top level — Rails doesn't
-// expose ConnectionAdapters::Transaction as part of the
-// ActiveRecord:: surface either.
 export { Transaction } from "./transaction.js";
 export {
   LogSubscriber,
-  /** @noRailsEquivalent PERMANENT Ruby names the ActiveRecord::Base constant at call time (log_subscriber.rb:110); a TS import would close a module cycle. */
+  /** @noRailsEquivalent PERMANENT */
   setBaseResolver as setLogSubscriberBaseResolver,
 } from "./log-subscriber.js";
 export { ExplainSubscriber } from "./explain-subscriber.js";
 export { ExplainRegistry } from "./explain-registry.js";
 export { collectingQueriesForExplain, execExplain } from "./explain.js";
 
-// Same wiring for Migrator#execute_migration_in_transaction's "Migrating to"
-// log line (migration.rb:1532), which names Base at call time in Ruby.
 import { _registerBase as _registerBaseWithMigration } from "./migration.js";
 _registerBaseWithMigration(_Base);
 
-// Auto-attach LogSubscriber to :active_record, matching Rails'
-// `ActiveRecord::LogSubscriber.attach_to :active_record`.
 import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";
 _LogSubscriber.attachTo("active_record");
 
-// Auto-subscribe ExplainSubscriber to sql.active_record, matching Rails'
-// `ActiveSupport::Notifications.subscribe("sql.active_record", new)`.
 import { Notifications as _Notifications } from "@blazetrails/activesupport";
 import { ExplainSubscriber as _ExplainSubscriber } from "./explain-subscriber.js";
 const _explainSub = new _ExplainSubscriber();
@@ -115,23 +94,7 @@ export { ActiveRecord, isSchemaCacheIgnoredTable } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";
-// hasSecurePassword is ActiveModel's (secure_password.rb:7, `include
-// ActiveModel::SecurePassword`) — use subpath: @blazetrails/activerecord/secure-password
-// CounterCache, ReadonlyAttributes, Timestamp, Locking::Pessimistic, and
-// Translation are consumed via the Base mixins — class methods like
-// `User.incrementCounter(...)`, `User.touchAll(...)`, `User.attrReadonly(...)`,
-// and instance methods like `user.touch()`, `user.lockBang()`,
-// `user.withLock(cb)`. They are no longer exported as standalone free
-// functions — their `this:`-typed signatures are only callable on a Base
-// subclass (statics) or a Base instance (instance methods).
-// establishConnection requires node:fs — use subpath: @blazetrails/activerecord/connection-handling
-// signedId requires MessageVerifier (node:crypto) — use subpath: @blazetrails/activerecord/signed-id
 export { LockingType } from "./locking/optimistic.js";
-// ModelSchema is consumed via the Base mixins — `User.columnNames()`,
-// `User.columnsHash()`, `User.contentColumns()`, etc.
-// (mixed in via activesupport `extend()`). The underlying functions are
-// no longer exported as standalone free functions — their `this:`-typed
-// signatures are only callable on a Base subclass.
 export {
   storedAttributes,
   HashAccessor,
@@ -139,8 +102,6 @@ export {
   StringKeyedHashAccessor,
 } from "./store.js";
 export { QueryCache } from "./query-cache.js";
-// `QueryCache::Store` in Rails; exported under a qualified TS name
-// so the package-level surface isn't shadowed by the generic `Store`.
 export { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
@@ -274,16 +235,8 @@ export {
   REJECT_ALL_BLANK_PROC,
   TooManyRecords,
 } from "./nested-attributes.js";
-// hasSecureToken / generateUniqueSecureToken are class methods on Base
-// (secure_token.rb:11 `include SecureToken`); MinimumLengthError is exported
-// from the @blazetrails/activerecord/secure-token subpath.
 export { composedOf } from "./aggregations.js";
 export { ColumnNotSerializableError } from "./attribute-methods/serialization.js";
-// Encryption is server-only. Import `@blazetrails/activerecord/encryption` BEFORE
-// calling Base.encrypts() — omitting it throws at declaration time.
-// Boot-time installer: `@blazetrails/activerecord/encryption/install.js`.
-// generatesTokenFor / findByTokenFor / findByTokenForBang are class methods on
-// Base (base.rb:328 `include TokenFor`); generateTokenFor is an instance method.
 export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";
 export type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
@@ -292,8 +245,6 @@ export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { PoolConfig as _PoolConfig } from "./connection-adapters/pool-config.js";
-// Mirrors ActiveRecord.disconnect_all! (lib/active_record.rb): explicitly
-// closes all active connections known to this process.
 export async function disconnectAllBang(): Promise<void> {
   await _PoolConfig.disconnectAllBang();
 }
@@ -333,16 +284,10 @@ export { Connection as TypeCasterConnection } from "./type-caster/connection.js"
 export { Map as TypeCasterMap } from "./type-caster/map.js";
 
 export { Trailtie } from "./trailtie.js";
-// deprecator.ts is Node-only (MigrationProxy uses node:module) — not in the main bundle.
-// Import directly: import { deprecator, gemVersion, version, MigrationProxy } from "@blazetrails/activerecord/deprecator"
 export { JobRuntime } from "./trailties/job-runtime.js";
 export { Resolver as DatabaseSelectorResolver } from "./middleware/database-selector/resolver.js";
 export { Session as DatabaseSelectorSession } from "./middleware/database-selector/resolver/session.js";
 export { DatabaseSelector } from "./middleware/database-selector.js";
 export { ShardSelector } from "./middleware/shard-selector.js";
 
-// No exported name, but it must be loaded so it registers its scope builder into
-// `associations/_scope-slots.ts` (Zeitwerk autoloads it when `Association#scope`
-// names it). `associations.ts` cannot load it: it extends `Relation`, closing
-// the relation<->associations cycle. CLAUDE.md, "Call-time constant resolution".
 import "./associations/disable-joins-association-scope.js";

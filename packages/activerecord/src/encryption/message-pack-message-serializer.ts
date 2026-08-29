@@ -1,16 +1,3 @@
-/**
- * MessagePack serialization of encrypted messages.
- *
- * Mirrors: ActiveRecord::Encryption::MessagePackMessageSerializer
- *
- * The message is converted to the hash `{ "p" => payload, "h" => headers }`
- * and packed with MessagePack, byte-for-byte like MRI's
- * `ActiveSupport::MessagePack.dump` (a `128` signature value followed by the
- * packed hash). Binary payload/iv/at travel as msgpack `bin`, text headers as
- * `str`. The packed bytes are carried as a latin1 string (one char per byte)
- * so the binary form survives a string-typed serializer interface losslessly.
- */
-
 import { MessagePack, MessagePackError } from "@blazetrails/activesupport/message-pack";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
@@ -33,8 +20,6 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     try {
       data = MessagePack.load(Buffer.from(serializedContent, "latin1"));
     } catch (e) {
-      // ActiveSupport::MessagePack raises MessagePackError on a missing/wrong
-      // signature or malformed bytes — both mean an undecodable message.
       if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
       throw e;
     }

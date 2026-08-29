@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/accounts.yml
-// Belongs to Company (firm_id FK).
 export const accountFixtureData = {
   signals37: {
     id: 1,

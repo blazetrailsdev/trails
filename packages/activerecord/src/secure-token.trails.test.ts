@@ -1,8 +1,3 @@
-/**
- * TS-only cover for `has_secure_token`'s dispatch through
- * `self.class.generate_unique_secure_token` (secure_token.rb:51,54) — a model
- * override has to win over the `ClassMethods` member `Base` carries.
- */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
 import { Base } from "./index.js";

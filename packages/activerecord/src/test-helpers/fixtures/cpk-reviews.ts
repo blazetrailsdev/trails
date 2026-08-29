@@ -1,11 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/cpk_reviews.yml
-//
-// Rails YAML uses the `book:` belongs_to shorthand; Cpk::Review declares
-// `belongs_to :book, foreign_key: [:author_id, :number]`, so Rails populates
-// the composite FK columns `author_id` + `number` (no `book_id` column
-// exists). Mirror that here directly.
 export const cpkReviewFixtureData = {
   first_book_review: {
     number: ref("cpk_books", "cpk_book_with_generated_pk"),

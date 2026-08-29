@@ -16,20 +16,10 @@ import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods, isDangerousAttributeMethod } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
-// The synchronous schema reflector (warm-cache path), NOT the async
-// `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
-/** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
 
-/**
- * Infer the storage subtype from the mapping values (nulls ignored): uniform
- * numbers mean an integer-backed column, uniform booleans a boolean-backed one,
- * anything else a string-backed one. Mirrors Rails resolving the subtype from
- * the underlying attribute type — trails falls back to the mapping shape when
- * the schema-derived attribute definition isn't available yet.
- */
 function inferSubtype(values: Iterable<EnumValue>): string {
   let sawValue = false;
   let allNumbers = true;
@@ -46,13 +36,6 @@ function inferSubtype(values: Iterable<EnumValue>): string {
   return "string";
 }
 
-/**
- * Build the ValueType instance backing an enum subtype's cast/serialize.
- * Mirrors Rails passing the column's real `Type::Value` into `EnumType.new`:
- * resolve the declared subtype name through ActiveRecord's registry so
- * float/decimal/datetime/etc. columns delegate to their actual type. Falls
- * back to IntegerType only for names the registry doesn't know.
- */
 function subtypeInstance(subtype: string): ValueType<unknown> {
   try {
     return arTypeLookup(subtype) as ValueType<unknown>;
@@ -61,34 +44,6 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
   }
 }
 
-/**
- * Resolve the enum's storage subtype from the reflected attribute type — the
- * single source of truth, mirroring Rails' `decorate_attributes` block
- * (`subtype = subtype.subtype if EnumType === subtype; EnumType.new(name,
- * enum_values, subtype, ...)`, enum.rb:239-246). The `reflected` type is
- * whatever the attribute currently resolves to when the pending decorator
- * replays: after the schema is loaded that is the column's real `Type::Value`,
- * so the EnumType always delegates cast/serialize/deserialize to the actual
- * column type.
- *
- * trails' column-seed-then-replay now seeds the override attribute with the
- * reflected `type_for_column` in phase 1 of `_defaultAttributes`
- * (attributes.ts), so the `reflected` argument the decorator receives at replay
- * time is already the column's real `Type::Value` — no per-def stash needed,
- * mirroring Rails' block verbatim (`subtype = subtype.subtype if EnumType ===
- * subtype`).
- *
- * Two fallbacks mirror the surrounding replay machinery rather than Rails
- * directly: an already-decorated EnumType is unwrapped to its own subtype (a
- * re-replay), and — because trails' decorator also runs eagerly at
- * class-definition time, before the schema is reflected — a still-default
- * `value` type falls back to inferring the subtype from the mapping's value
- * shapes so pre-reflection casts are not identity no-ops.
- *
- * The mapping is a `HashWithIndifferentAccess` because that is what Rails'
- * `enum_values` is (enum.rb:226) and what `EnumType` reads with `fetch` /
- * `has_key?` (enum.rb:181,195,199).
- */
 function enumTypeFrom(
   name: string,
   mapping: Record<string, EnumValue>,
@@ -111,12 +66,6 @@ function enumTypeFrom(
 }
 
 /**
- * Enum definition — maps symbolic names to integer values.
- *
- * Mirrors: ActiveRecord::Enum
- */
-
-/**
  * Register an EnumType in the attribute set and install the label-returning
  * accessor, the single Rails-faithful storage model used by the `Base.enum`
  * macro (`_enum`). After this, the attribute
@@ -136,32 +85,11 @@ export function installEnumAttribute(
   raiseOnInvalidValues: boolean,
   attributeOptions?: { default?: unknown },
 ): void {
-  // Rails' _enum uses `attribute(name)` (bare) + `decorate_attributes`, layering
-  // the EnumType on top of the column-seeded FromDatabase attribute so the enum
-  // default flows through `deserialize` for free (enum.rb:238-247). trails'
-  // `_defaultAttributes` now mirrors Rails' column-seed-then-replay
-  // (attributes.ts): phase 1 seeds the real DB column via `fromDatabase` with the
-  // column's raw default, phase 2 replays the bare `attribute` (a PendingType that
-  // keeps the FromDatabase wrapper) and this `decorateAttributes` (which swaps the
-  // type to the EnumType). cast(0) on an EnumType yields null; deserialize(0)
-  // yields the "default" label — so the column-default path is exactly what makes
-  // the enum default work, recovered here without any special-casing.
-  // Rails' `_enum` forwards its leftover kwargs (e.g. `default:`) into
-  // `attribute(name, **options)` (enum.rb:237), so the macro-level `default:`
-  // seeds the attribute default and flows through the EnumType on read. Pass a
-  // bare `attribute(name)` when there are no options to preserve the
-  // column-seeded FromDatabase attribute.
-  // The deferred-type-check marker below keys off the same name `attribute` /
-  // `decorate_attributes` register under (attribute_registration.rb:13,24).
   if (attributeOptions && "default" in attributeOptions) {
     klass.attribute(name, { default: attributeOptions.default });
   } else {
     klass.attribute(name);
   }
-  // Rails resolves the subtype lazily inside the decorate block from the
-  // reflected column type (enum.rb:239-246); the decorator re-runs on every
-  // _defaultAttributes replay, so once the schema is loaded `reflected` is the
-  // column's real Type::Value and the EnumType delegates to it.
   klass.decorateAttributes([name], (_name: string, subtype: Type) => {
     if (subtype === defaultValue()) {
       throw new Error(
@@ -173,29 +101,17 @@ export function installEnumAttribute(
     return enumTypeFrom(name, mapping, subtype, raiseOnInvalidValues);
   });
 
-  // Define the getter after attribute() so the EnumType is already in the
-  // pending-type queue when we overwrite whatever accessor attribute()
-  // installed.
   Object.defineProperty(klass.prototype, name, {
     get(this: Base) {
-      // `readAttribute`, not a direct `_attributes` read: an aliased enum is
-      // stored under the resolved backing column.
       return (this as unknown as EnumInstanceHost).readAttribute(name);
     },
     set(this: Base, value: unknown) {
-      // Custom setter only because the paired custom getter would otherwise make
-      // the property read-only. Validation is NOT done here: Rails' enum has no
-      // custom writer — `EnumType#assert_valid_value` is invoked by the attribute
-      // write pipeline (ActiveModel::Attribute#with_value_from_user), which our
-      // writeAttribute → withValueFromUser mirrors. So `record.status = "angry"`
-      // still raises ArgumentError, via the type, on every write path.
       (this as unknown as EnumInstanceHost).writeAttribute(name, value);
     },
     configurable: true,
   });
 }
 
-/** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
   updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
   readAttribute(name: string): unknown;
@@ -203,13 +119,6 @@ interface EnumInstanceHost {
   writeAttribute(name: string, value: unknown): void;
 }
 
-/**
- * Standalone `defineEnum(modelClass, …)` — retained as a thin re-export alias
- * of the `Base.enum` / `_enum` macro so the historical call sites and the
- * `declare` synthesize emitter keep one import. All enum surface generation,
- * the EnumType registration, and the `_enums` registry now live in `_enum`;
- * this just forwards with the class as the receiver.
- */
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
@@ -219,11 +128,6 @@ export function defineEnum(
   _enum.call(modelClass, attribute, valuesInput, options);
 }
 
-/**
- * EnumType — wraps an underlying type to handle enum cast/serialize/deserialize.
- *
- * Mirrors: ActiveRecord::Enum::EnumType
- */
 export class EnumType extends ValueType<string> {
   /** @internal */
   override readonly name: string;
@@ -243,21 +147,13 @@ export class EnumType extends ValueType<string> {
     this._mapping = mapping;
     const reverse = new Map<EnumValue, string>();
     for (const [k, v] of mapping.entries()) {
-      // Keep the first label for a given value — mirrors Ruby Hash#key, so an
-      // aliased value (e.g. aliased_field: "happy") deserializes to the
-      // canonical label ("happy"), not the alias.
       if (!reverse.has(v)) reverse.set(v, k);
     }
     this._reverseMapping = reverse;
     this._raiseOnInvalidValues = raiseOnInvalidValues;
-    // Rails passes the column's real `Type::Value` instance into `EnumType.new`
-    // and stores it as `subtype`; cast/serialize/deserialize delegate to it.
     this._subtypeType = subtype;
   }
 
-  // Rails' EnumType does `delegate :type, to: :subtype` — callers that ask what
-  // an enum column's storage type is want the underlying column type (e.g.
-  // "integer"), so delegate to the subtype's own `type()`.
   get subtype(): string | undefined {
     return this._subtypeType.type();
   }
@@ -266,20 +162,10 @@ export class EnumType extends ValueType<string> {
     return this.subtype;
   }
 
-  /**
-   * The underlying value type this enum wraps (Rails' `subtype` Type object).
-   * Calculations unwrap the EnumType to its subtype before casting an aggregate
-   * value (`type = type.subtype if Enum::EnumType === type`), so min/max/sum
-   * return the raw integer (0), not the enum label ("easy").
-   */
   subtypeType(): ValueType<unknown> {
     return this._subtypeType;
   }
 
-  // Mirrors Rails EnumType#cast:
-  //   if mapping.has_key?(value)   -> value.to_s   (value is a label)
-  //   elsif mapping.has_value?(value) -> mapping.key(value)  (return the label)
-  //   else value.presence
   cast(value: unknown): string | null {
     if (this._mapping.hasKey(value as string)) {
       return value as string;
@@ -287,22 +173,14 @@ export class EnumType extends ValueType<string> {
     if (this._reverseMapping.has(value as EnumValue)) {
       return this._reverseMapping.get(value as EnumValue)!;
     }
-    // Rails `value.presence` — blank values (nil, false, blank strings) become
-    // nil; anything else passes through unchanged (e.g. the string "true" so a
-    // later `serialize` can type-cast it against the boolean subtype).
     return isBlank(value) ? null : (value as string);
   }
 
-  // Mirrors Rails: `mapping.key(subtype.deserialize(value))` — coerce the raw
-  // database value through the storage subtype, then reverse-map to the label.
   deserialize(value: unknown): string | null {
     const sub = this._subtypeType.deserialize(value) as EnumValue;
     return this._reverseMapping.get(sub) ?? null;
   }
 
-  // Mirrors Rails: `subtype.serialize(mapping.fetch(value, value))` — a label
-  // maps to its stored value, anything else passes through the subtype's cast
-  // (so e.g. the string "true" type-casts to boolean `true` for a query).
   serialize(value: unknown): number | string | boolean | null {
     return this._subtypeType.serialize(this._mapping.fetch(value as string, value as EnumValue)) as
       | number
@@ -311,16 +189,10 @@ export class EnumType extends ValueType<string> {
       | null;
   }
 
-  // The in-memory value is the label string; the database value is the mapped
-  // integer/string/boolean. Callers that prefer serializeCastValue (e.g.
-  // insertAll/upsertAll bulk paths) must still get the mapping value, not the
-  // identity label — so delegate to serialize rather than inheriting the
-  // identity default from ValueType.
   serializeCastValue(value: unknown): number | string | boolean | null {
     return this.serialize(value);
   }
 
-  // Mirrors Rails: `subtype.serializable?(mapping.fetch(value, value))`.
   isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
     return this._subtypeType.isSerializable(
       this._mapping.fetch(value as string, value as EnumValue),
@@ -330,9 +202,6 @@ export class EnumType extends ValueType<string> {
 
   assertValidValue(value: unknown): void {
     if (!this._raiseOnInvalidValues) return;
-    // Rails: `unless value.blank? || mapping.has_key?(value) || mapping.has_value?(value)`
-    // — a blank value (nil, false, or a whitespace-only string) is always
-    // allowed and casts to nil.
     if (isBlank(value)) return;
     if (this._mapping.hasKey(value as string)) return;
     if (this._reverseMapping.has(value as EnumValue)) return;
@@ -345,15 +214,6 @@ export class EnumType extends ValueType<string> {
   }
 }
 
-/**
- * Derive the generated method names for a single enum value from its trails
- * camelCase value method name (e.g. `draft`, `apiKey`). The predicate and
- * negative scope capitalize the value name via a plain first-char upcase
- * (`cap`), NOT `camelize(x, true)` (upper-first) — the two diverge on acronym
- * labels (`apiKey` → `isApiKey` vs. `isAPIKey`). Both the conflict-detection
- * pass and `defineEnumMethods` route through this single helper so the name a
- * method is defined under always matches the name conflict detection records.
- */
 function enumMethodNamesFor(valueMethodName: string): {
   predicateName: string;
   bangName: string;
@@ -367,16 +227,6 @@ function enumMethodNamesFor(valueMethodName: string): {
   };
 }
 
-/**
- * Module that holds enum instance/scope methods generated by `_enum`.
- * Rails defines this as a private inner class and mixes it into the model.
- *
- * Mirrors: ActiveRecord::Enum::EnumMethods
- */
-/**
- * Per-class memo of the interposed enum carrier, keyed independently of the
- * store carrier so the two mechanisms stack rather than share.
- */
 const _enumCarriers = new WeakMap<typeof import("./base.js").Base, object>();
 
 export class EnumMethods {
@@ -393,17 +243,7 @@ export class EnumMethods {
 
   /**
    * @internal
-   * The per-class prototype carrier that holds generated enum methods,
-   * interposed between the model prototype and its parent — the runtime
-   * analogue of Rails' anonymous `_enum_methods_module` `include`d into the
-   * class (enum.rb:251). Generated methods live BELOW the class body in the
-   * ancestor chain, so a class-body method of the same name shadows the
-   * generated one and reaches it via `super` (the interposed prototype is what
-   * `super.<method>()` resolves to from a method whose home object is the model
-   * prototype). Installing directly on `klass.prototype` instead would clobber
-   * (or be clobbered by) class-body methods with no `super` chain between them.
-   * Created lazily and once per class; all of a class's enums share it.
-   * @noRailsEquivalent PERMANENT Ruby includes an anonymous _enum_methods_module into the class (enum.rb:326); JS needs an explicit interposed prototype.
+   * @noRailsEquivalent PERMANENT
    */
   carrier(): object {
     return getOrCreateModuleCarrier(this._klass, _enumCarriers);
@@ -411,20 +251,7 @@ export class EnumMethods {
 
   /**
    * @internal
-   * Define predicate, bang, and scope methods for a single enum value.
-   *
-   * `valueMethodName` is the trails camelCase value method name (e.g. `draft`,
-   * `americanBobtail`); the generated surface is the trails idiom of Rails'
-   * `#{value_method_name}?` / `#{value_method_name}!` / scope / `not_...`:
-   * the predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
-   * scope `{name}`, and the auto negative scope `not{Name}`.
-   *
-   * @missingRailsCall define_method — PERMANENT. enum.rb:306,310 emit the predicate and
-   * bang with `define_method`. A generated member has to be installed with
-   * `Object.defineProperty` in trails: it carries a descriptor, and the reader
-   * half of the enum surface is a property, not a callable (see CLAUDE.md,
-   * "Generated attribute readers are properties"). `Object.defineProperty` IS
-   * the JS `define_method`; there is no other spelling.
+   * @missingRailsCall define_method — PERMANENT
    */
   defineEnumMethods(
     name: string,
@@ -435,30 +262,10 @@ export class EnumMethods {
   ): void {
     const klass = this.klass;
     const { predicateName, bangName, notScopeName: notName } = enumMethodNamesFor(valueMethodName);
-    // Conflict detection lives in `_enum`'s dedicated pre-generation pass (it
-    // consults trails-specific state — the per-class `_enumMethodsModuleNames`
-    // set and the dangerous-method set — and runs before any method is defined,
-    // so it can't be routed through the interleaved Rails-style
-    // `detect_enum_conflict!` here without false-positiving on a prior value's
-    // auto `not*` scope). This generator only defines the surface.
     if (instanceMethods) {
-      // Install on the interposed carrier (not `klass.prototype`) so a
-      // class-body method of the same name shadows the generated one and can
-      // delegate to it via `super`. Mirrors Rails' `_enum_methods_module`.
       const carrier = this.carrier();
       Object.defineProperty(carrier, predicateName, {
         value: function (this: EnumInstanceHost) {
-          // Rails compares `#{name}_for_database == value`; trails stores the
-          // label, so serialize the stored label back to its database value
-          // (via castEnumValue) and compare. Robust on fresh/unsaved records
-          // where the raw `valueForDatabase` attribute path isn't wired yet.
-          //
-          // Resolve against the record's runtime class, not the captured
-          // declaring `klass`: an enum declared on an abstract parent (e.g.
-          // `Cat.enum :gender`) must serialize against the concrete subclass's
-          // columns (`Lion`), mirroring Rails' `type_for_attribute` on the
-          // record's own class. Keying off `klass` would send an abstract
-          // parent through `columnForAttribute`, raising `TableNotSpecified`.
           const recordClass = (this as unknown as { constructor: typeof Base }).constructor;
           return castEnumValue(recordClass, name, this.readAttribute(name)) === value;
         },
@@ -467,7 +274,6 @@ export class EnumMethods {
       });
       Object.defineProperty(carrier, bangName, {
         value: function (this: EnumInstanceHost) {
-          // Returns update!'s result (true), mirroring Rails' bang setter.
           return this.updateBang({ [name]: value });
         },
         writable: true,
@@ -485,14 +291,6 @@ export class EnumMethods {
   }
 }
 
-/**
- * Options accepted by the `enum` macro and its `defineEnum` alias.
- *
- * Mirrors the keyword arguments of `ActiveRecord::Enum#enum`
- * (`prefix:`, `suffix:`, `scopes:`, `instance_methods:`, `validate:`,
- * `default:`). Shared by `enumMethod`, `_enum`, and `defineEnum` so the three
- * entry points cannot drift out of sync.
- */
 export interface EnumMacroOptions {
   prefix?: boolean | string;
   suffix?: boolean | string;
@@ -502,17 +300,6 @@ export interface EnumMacroOptions {
   default?: unknown;
 }
 
-/**
- * Public `enum` macro. Validates then delegates to the private `_enum` impl.
- *
- * `_enum` is the single enum entry point: it defines `is{Name}()` predicates,
- * persisting `{name}Bang()` setters, per-value scopes plus auto `not*` scopes,
- * friendly-name/original-form variants for special-char labels, and a static
- * `pluralize(attribute)` mapping accessor (e.g. `status` → `statuses`). The
- * standalone `defineEnum(klass, …)` is a thin re-export alias of this.
- *
- * Mirrors: ActiveRecord::Enum.enum (the ClassMethods macro).
- */
 export function enumMethod(
   this: typeof Base,
   name: string,
@@ -522,23 +309,10 @@ export function enumMethod(
   _enum.call(this, name, values, options);
 }
 
-// Alias the Base.enum implementation under the Rails-idiomatic name so
-// parity:api can match `ActiveRecord::Enum#enum` to this file. The runtime
-// binding wired onto Base uses the real (un-reserved-word) internal name.
 export { enumMethod as enum };
 
 /**
- * Private implementation backing the `enum` macro.
- * Validates values/options, registers the type, and defines all enum methods.
- *
- * Mirrors: ActiveRecord::Enum#_enum (private)
- *
- * @missingRailsCall define_method — PERMANENT. enum.rb:232
- * `singleton_class.define_method(name.pluralize) { enum_values }` defines the
- * class-level values reader. trails installs it with `Object.defineProperty` on
- * the class object, the JS spelling of `singleton_class.define_method` (see
- * CLAUDE.md, "Generated attribute readers are properties").
- *
+ * @missingRailsCall define_method — PERMANENT
  * @internal
  */
 export function _enum(
@@ -555,22 +329,6 @@ export function _enum(
     ? Object.fromEntries(values.map((v, i) => [v, i]))
     : (values as Record<string, EnumValue>);
 
-  // Rails resolves an `alias_attribute` target inside `attribute(name)` /
-  // `decorate_attributes([name])` (enum.rb:237-238 → attribute_registration.rb:13,24
-  // → attribute_methods.rb:396-398), never in `_enum`'s own body. `alias_attribute`
-  // must therefore precede `enum`, as it does in Rails' own suite: the alias is
-  // baked into the pending modification at declaration time and never
-  // re-evaluated, so the reverse order raises `Undeclared attribute type for
-  // enum` on first use (enum.rb:240-245).
-
-  // Rails guards the enum *name* itself against reserved Active Record methods
-  // before generating any value methods: the pluralized mapping accessor
-  // (`name.pluralize`, e.g. `column` → `columns`) as a class method, and the
-  // reader/writer (`name`, `name=`) as instance methods. The store the mapping
-  // lands in is built first (`enum_values = HashWithIndifferentAccess.new`,
-  // enum.rb:227) and `defined_enums[name] = enum_values` lands between the
-  // guards (enum.rb:231-236), so a conflict on the reader/writer leaves the
-  // mapping registered, as it does in Rails.
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
     this._enums = new Map(this._enums);
   }
@@ -595,16 +353,6 @@ export function _enum(
   };
   const toCamel = (s: string) => camelize(s, false);
 
-  // Register the EnumType so typeForAttribute() returns it for predicate-builder
-  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
-  // install the label-returning accessor via the shared installEnumAttribute.
-  // The subtype is NOT resolved here: installEnumAttribute wires a
-  // `decorateAttributes` decorator that builds the EnumType lazily from the
-  // reflected column type on each replay (Rails' `decorate_attributes` model),
-  // so we never eagerly guess it from the mapping shape.
-  // Mirrors Rails `EnumType.new(..., raise_on_invalid_values: !validate)`: with
-  // `validate:` set, an invalid assignment is caught by the inclusion validator
-  // rather than raising on write, so the type must not raise.
   const validate = options?.validate ?? false;
   installEnumAttribute(
     this,
@@ -614,43 +362,10 @@ export function _enum(
     options && "default" in options ? { default: options.default } : undefined,
   );
 
-  // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
-  // defaults; `scopes: false` suppresses per-value scope generation and
-  // `instance_methods: false` suppresses predicate/bang generation.
   const scopes = options?.scopes !== false;
   const instanceMethods = options?.instanceMethods !== false;
 
-  // Conflict-detection pass, then the generation pass — both ported from the
-  // former standalone `defineEnum`, now folded in so `_enum` is the single enum
-  // entry point. Generates camelCase predicate (`isDraft`), bang setter
-  // (`draftBang`), per-value scope + auto `not*` scope, plus friendly-name and
-  // original-form variants for labels containing special characters. Rails has
-  // no plain in-memory setter, so none is generated.
-  //
-  // `definedNames` tracks positive method names only (predicate / bang / scope).
-  // The auto-generated `not*` scope names are deliberately excluded: a value
-  // literally named like `notActive` colliding with the `not*` scope of `active`
-  // is NOT a hard conflict \u2014 Rails only *warns* about it (via
-  // detectNegativeEnumConditionsBang below). Folding negative-scope names back
-  // into this set would resurrect the pre-empting ArgumentError.
   const dangerousMethods = dangerousAttributeMethods();
-  // Mirror Rails' `_enum_methods_module`: the second `detect_enum_conflict!`
-  // instance-method branch (enum.rb:383-384) raises "...already defined by
-  // another enum" when a *different* enum on the same class already generated a
-  // value method with this name. `dangerousAttributeMethods()` covers only
-  // framework methods, so we track enum-generated predicate/bang names and
-  // consult them here. Within one `_enum` an intra-enum collision is caught by
-  // `definedNames` first, which raises the same "already defined by another
-  // enum" error, so recording into this set as each label is generated —
-  // Rails' own interleaving — changes no message.
-  //
-  // Crucially the set is per-class and NOT inherited: Rails' `_enum_methods_module`
-  // is a class-instance variable (enum.rb:326-332) that Ruby does not inherit, so
-  // a subclass gets a fresh, empty module on first use — a subclass enum reusing a
-  // *parent* enum's value-method name does not conflict (the child's method just
-  // shadows via MRO). We therefore seed a fresh empty set per class rather than
-  // copying the parent's, while `hasOwnProperty` still lets multiple enums on the
-  // *same* class accumulate into one set.
   const enumMethodsHost = this as unknown as { _enumMethodsModuleNames?: Set<string> };
   if (!Object.prototype.hasOwnProperty.call(this, "_enumMethodsModuleNames")) {
     enumMethodsHost._enumMethodsModuleNames = new Set<string>();
@@ -658,23 +373,12 @@ export function _enum(
   const enumMethodNames = enumMethodsHost._enumMethodsModuleNames!;
   const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
-  // Rails generates the per-value methods inside `_enum_methods_module`
-  // (enum.rb:252); route trails' generation through the same module so
-  // `EnumMethods.defineEnumMethods` is the single generator.
   const methodsModule = this._enumMethodsModule();
   for (const [n, value] of Object.entries(mapping)) {
     const valueMethodName = toCamel(methodName(n));
     const { predicateName, bangName, notScopeName } = enumMethodNamesFor(valueMethodName);
     const valueMethodAlias = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    // Rails feeds both the value method name and its special-char-stripped
-    // friendly alias into detect_negative_enum_conditions! (enum.rb:266-279),
-    // pushing the alias only when it differs and isn't already present. The
-    // same guard also gates the alias's define_enum_methods call (enum.rb:273):
-    // two labels mangling to one alias (e.g. "Etc/GMT+1" / "Etc/GMT-1") is NOT
-    // a conflict — the alias sticks to the first label and the second label
-    // simply doesn't get one, and its `define_enum_methods` call is skipped
-    // with it.
     valueMethodNames.push(valueMethodName);
     const aliasIsNew =
       valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias);
@@ -682,31 +386,13 @@ export function _enum(
       valueMethodNames.push(valueMethodAlias);
     }
 
-    // Rails runs `detect_enum_conflict!` for the `?`/`!` methods *only* inside
-    // `if instance_methods` and for the value/`not_` scopes *only* inside
-    // `if scopes` (enum.rb:302-321). Gate each family the same way so an enum
-    // opting out of a surface also opts out of its conflict checks — e.g.
-    // `instance_methods: false` must not raise on a predicate-name collision it
-    // will never generate.
     if (instanceMethods) {
-      // `definedNames` models Rails' `_enum_methods_module`: every
-      // `define_enum_methods` call within a single `_enum` defines into that one
-      // module, so an intra-enum collision (a later label reusing an earlier
-      // label's predicate/bang — including its friendly alias) hits
-      // `method_defined_within?(method_name, _enum_methods_module, Module)` and
-      // reports `source: "another enum"` (enum.rb:302-310, 388-395), not the
-      // default "Active Record".
       if (definedNames.has(predicateName))
         raiseConflictError.call(this, name, predicateName, { source: "another enum" });
       if (definedNames.has(bangName))
         raiseConflictError.call(this, name, bangName, { source: "another enum" });
       definedNames.add(predicateName);
       definedNames.add(bangName);
-      // Instance value methods (predicate/bang) only conflict with *dangerous*
-      // Active Record instance methods — a plain user override (`def published!;
-      // super; end`) is allowed and simply wins over the generated method, so we
-      // must not raise merely because the name exists on the prototype.
-      // Mirrors enum.rb's `dangerous_attribute_method?` gate.
       if (dangerousMethods.has(predicateName)) raiseConflictError.call(this, name, predicateName);
       if (enumMethodNames.has(predicateName))
         raiseConflictError.call(this, name, predicateName, { source: "another enum" });
@@ -718,13 +404,6 @@ export function _enum(
       if (definedNames.has(valueMethodName))
         raiseConflictError.call(this, name, valueMethodName, { type: "class" });
       definedNames.add(valueMethodName);
-      // The value/`not*` scope names are class methods, so route them through
-      // the class-method conflict detector, which consults all three Rails
-      // sub-branches (a *dangerous* class method — RESTRICTED_CLASS_METHODS plus
-      // methods `Base` itself defines; a Relation instance method; and the `id`
-      // special-case), each raising with the correct type/source rather than the
-      // generic scope error. A scope inherited from a parent enum or a plain
-      // user static on the model/an ancestor is NOT a conflict.
       detectEnumConflictBang.call(this, name, valueMethodName, true);
       detectEnumConflictBang.call(this, name, notScopeName, true);
     }
@@ -735,13 +414,6 @@ export function _enum(
         notScopeName: notFriendlyName,
       } = enumMethodNamesFor(valueMethodAlias);
       if (instanceMethods) {
-        // Rails defines each friendly alias immediately through
-        // `_enum_methods_module`, so `detect_enum_conflict!` catches an
-        // already-defined method within the *same* enum (enum.rb:273-275,
-        // 302-310, 381-384). Mirror the main-label branch: check and record
-        // `fp`/`friendlyBang` in `definedNames` so one label's friendly alias
-        // colliding with a sibling label's generated predicate/bang raises with
-        // `source: "another enum"` (module membership, per the main-label note).
         if (definedNames.has(fp))
           raiseConflictError.call(this, name, fp, { source: "another enum" });
         if (definedNames.has(friendlyBang))
@@ -761,19 +433,11 @@ export function _enum(
       }
     }
 
-    // Route the value method name — and, when it differs, its special-char
-    // friendly alias — through the single generator, mirroring Rails' two
-    // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
-    // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
-    // scope `{name}`, and the auto negative scope `not{Name}`.
     methodsModule.defineEnumMethods(name, valueMethodName, value, scopes, instanceMethods);
     if (aliasIsNew) {
       methodsModule.defineEnumMethods(name, valueMethodAlias, value, scopes, instanceMethods);
     }
 
-    // Original-form predicate/bang for labels with special chars (spaces,
-    // hyphens). Rails: define_method("American Bobtail?"), reachable via
-    // bracket notation only.
     const originalName = methodName(n);
     if (instanceMethods && /[^\w\x80-\uffff]/.test(originalName)) {
       const carrier = methodsModule.carrier();
@@ -793,12 +457,6 @@ export function _enum(
       });
     }
 
-    // Record the generated instance-method names so a later enum on this class
-    // (or a subclass) that would generate the same predicate/bang raises
-    // "already defined by another enum" — mirroring membership in Rails'
-    // `_enum_methods_module`. Only record when the predicate/bang were actually
-    // defined (`instance_methods: false` defines neither, so a later enum reusing
-    // the name must not conflict).
     if (instanceMethods) {
       const names = enumMethodNamesFor(valueMethodName);
       enumMethodNames.add(names.predicateName);
@@ -811,33 +469,15 @@ export function _enum(
     }
   }
 
-  // Rails only warns (never raises) when an enum element's auto-generated
-  // negative scope (`not*`) would clash with a positively-named element, and
-  // skips the check entirely when scopes are disabled.
-  // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`
-  // (enum.rb:262), after the generation loop.
   if (scopes) {
     detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
-  // Mirrors Rails:
-  //   if validate
-  //     validate = {} unless Hash === validate
-  //     validates_inclusion_of name, in: enum_values.keys, **validate
-  //   end
-  // A truthy `validate` adds an inclusion validation over the enum labels; a
-  // hash form forwards its options (e.g. `{ allowNil: true }`) to the validator.
   if (validate) {
     const validateOptions = typeof validate === "object" ? validate : {};
     this.validatesInclusionOf(name, { in: Object.keys(mapping), ...validateOptions });
   }
 
-  // Mapping accessor under the pluralized attribute name (e.g. User.statuses
-  // for `status`). Rails: `singleton_class.define_method(name.to_s.pluralize)`.
-  // Rails returns the frozen `pairs` hash (enum.rb) so callers can't mutate the
-  // canonical mapping — `Book.statuses["bad"] = 40` raises "can't modify frozen".
-  // Freeze once and hand back the same object so mutation attempts throw a
-  // TypeError in strict mode.
   const frozenMapping = Object.freeze({ ...mapping });
   Object.defineProperty(this, pluralize(name), {
     get() {
@@ -847,24 +487,11 @@ export function _enum(
   });
 }
 
-/** Cache of per-class EnumMethods modules.
- * JS-idiomatic equivalent of Rails' per-class `@_enum_methods_module` ivar.
- * @internal */
+/** @internal */
 const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, EnumMethods>();
 
 /**
- * Lazily create and cache the EnumMethods module for this class.
- *
- * Mirrors: ActiveRecord::Enum#_enum_methods_module (private)
- *
- * @missingRailsCall include — PERMANENT. enum.rb:329 `include mod` splices the freshly
- * built module into the class's ancestors. trails does that splice with
- * `getOrCreateModuleCarrier` (from `EnumMethods.carrier()`), which interposes a
- * prototype between the model prototype and its parent — the JS spelling of the
- * same ancestor insertion. activesupport's `include()` copies a module's
- * members at call time, so it cannot stand in here: the carrier is populated
- * later, once per enum value, as `defineEnumMethods` runs.
- *
+ * @missingRailsCall include — PERMANENT
  * @internal
  */
 export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumMethods {
@@ -877,20 +504,7 @@ export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumM
 }
 
 /**
- * Raise if the proposed enum method name would conflict with an existing method.
- *
- * Mirrors: ActiveRecord::Enum#detect_enum_conflict! (private)
- *
- * @missingRailsCall method_defined_within? — PERMANENT. enum.rb:377 and enum.rb:383 both
- * spell their check as `method_defined_within?`. Neither arm can route through
- * the port of it: `isMethodDefinedWithin` resolves a method's owner by walking
- * the CONSTRUCTOR chain (`instanceMethodOwner`), which never reaches
- * `Object.prototype`, so `method_defined_within?("toString", Relation)` answers
- * true where Ruby's owner comparison answers false — it would reject a scope
- * Rails accepts. The second arm (`_enum_methods_module`, "another enum") needs
- * a `klass.prototype` and trails' enum methods module is an interposed carrier
- * object, not a class, so it consults `_enumMethodsModuleNames` instead.
- *
+ * @missingRailsCall method_defined_within? — PERMANENT
  * @internal
  */
 export function detectEnumConflictBang(
@@ -899,36 +513,16 @@ export function detectEnumConflictBang(
   methodName: string,
   _klassMethod = false,
 ): void {
-  // Rails splits the two: a class method is dangerous per `dangerous_class_method?`
-  // (a fixed set plus anything `Base` — not a subclass — responds to), an
-  // instance method per `dangerous_attribute_method?` (membership in the
-  // precomputed `Base.instance_methods` set). The instance branch consults that
-  // single curated set rather than walking the model's prototype chain, so a
-  // user override or an `alias_attribute` reader on the model (or an ancestor)
-  // is NOT treated as a conflict — only genuine framework methods are.
   if (_klassMethod) {
-    // Rails' `dangerous_class_method?` is a fixed RESTRICTED_CLASS_METHODS list
-    // plus the methods `Base` itself defines (never a subclass or intermediate
-    // ancestor). `isDangerousClassMethod` walks statics from `Base`, so a
-    // user/scope class method on the model or an intermediate ancestor whose
-    // name matches an enum's `pluralize(name)` no longer false-positives — while
-    // reserved names like `columns` (defined on `Base`) still raise.
     if (isDangerousClassMethod(methodName)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
     }
-    // Sub-branch 2 (enum.rb:377-378): a class method that `Relation` defines as
-    // an instance method — e.g. `records`, `to_ary`, `scope_for_create` — is a
-    // conflict because the generated scope shadows it. Rails reports
-    // `source: Relation.name` ("ActiveRecord::Relation").
     if (isRelationInstanceMethod(methodName)) {
       raiseConflictError.call(this, enumName, methodName, {
         type: "class",
         source: "ActiveRecord::Relation",
       });
     }
-    // Sub-branch 3 (enum.rb:379-380): a scope literally named `id` conflicts
-    // with AR querying. Rails raises the *instance*-type message here (default
-    // type/source), matching `method_name.to_sym == :id`.
     if (methodName === "id") {
       raiseConflictError.call(this, enumName, methodName);
     }
@@ -939,13 +533,7 @@ export function detectEnumConflictBang(
   }
 }
 
-/**
- * Raise an ArgumentError describing the method conflict.
- *
- * Mirrors: ActiveRecord::Enum#raise_conflict_error (private)
- *
- * @internal
- */
+/** @internal */
 export function raiseConflictError(
   this: typeof import("./base.js").Base,
   enumName: string,
@@ -978,43 +566,24 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
     attributeAliases?: Record<string, string>;
     _defaultAttributes(): { getAttribute(n: string): { type: Type } };
   };
-  // Reflect synchronously from the warm schema cache FIRST — the SAME path
-  // `Base.typeForAttribute` uses (base.ts). The public `Base.loadSchema()` is
-  // async and would fire-and-forget, letting a caller read the pre-reflection
-  // (mapping-inferred) EnumType; this sync reflection seeds the reflected column
-  // type and rebuilds `_defaultAttributes` before either the guard or the read
-  // below, so the reflected subtype is already in place.
   reflectSchemaSync.call(klass);
-  // `defined_enums` is keyed by the *declared* enum name, alias or not
-  // (enum.rb:232); only the attribute-set lookup resolves the alias.
   if (!host._enums?.has(attribute)) return null;
   const resolved = host.attributeAliases?.[attribute] ?? attribute;
   const type = host._defaultAttributes().getAttribute(resolved).type;
   return type instanceof EnumType ? type : null;
 }
 
-/**
- * Get the human-readable enum value for an attribute.
- * Delegates to EnumType.deserialize for the mapping lookup.
- */
 export function readEnumValue(record: Base, attribute: string): string | null {
   const ctor = record.constructor as typeof Base;
   const mapping = ctor._enums?.get(attribute);
   if (!mapping) return null;
 
-  // Storage is now label-based (EnumType cast runs on write), so the stored
-  // value is usually the label string itself. Fall back to deserialize for any
-  // raw storage value (e.g. an integer read straight off the database row).
   const stored = record.readAttribute(attribute);
   if (typeof stored === "string" && Object.prototype.hasOwnProperty.call(mapping, stored))
     return stored;
   return enumTypeOf(ctor, attribute)?.deserialize(stored) ?? null;
 }
 
-/**
- * Cast an enum value (string name or number) to its storage value (integer or string,
- * depending on the attribute subtype). Delegates to EnumType.serialize for the mapping lookup.
- */
 export function castEnumValue(
   modelClass: typeof Base,
   attribute: string,
@@ -1023,16 +592,7 @@ export function castEnumValue(
   return enumTypeOf(modelClass, attribute)?.serialize(value) ?? null;
 }
 
-/**
- * Validate enum values are non-empty array or hash with proper types.
- * Mirrors: ActiveRecord::Enum#assert_valid_enum_definition_values (private)
- *
- * Accepts both strings and symbols in arrays (Rails parity). A Ruby Symbol is
- * spelled as a leading-colon string here (`:draft` is `":draft"`), so the
- * blank-name guard tests the name after the colon.
- *
- * @internal
- */
+/** @internal */
 export function assertValidEnumDefinitionValues(
   values: any,
 ): Record<string, string | number | boolean | null> | string[] {
@@ -1040,9 +600,6 @@ export function assertValidEnumDefinitionValues(
     if (values.length === 0) {
       throw new ArgumentError("Enum values must not be empty.");
     }
-    // Rails' `values.all?(Symbol) || values.all?(String)` (enum.rb:349): the
-    // array must be homogeneous. A Ruby Symbol is a leading-colon string here,
-    // so `[":draft", "published"]` is the mixed array Rails rejects.
     const allValid =
       values.every((v) => typeof v === "string" && v.startsWith(":")) ||
       values.every((v) => typeof v === "string" && !v.startsWith(":"));
@@ -1091,58 +648,37 @@ export function assertValidEnumDefinitionValues(
   throw new ArgumentError("Enum values must be either a non-empty hash or an array.");
 }
 
-/** True for plain JS objects (Object.prototype or null proto), matching Ruby Hash semantics. */
 function isPlainHash(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * Validate enum options: reject underscore-prefixed variants.
- * Mirrors: ActiveRecord::Enum#assert_valid_enum_options (private)
- *
- * @internal
- */
+/** @internal */
 export function assertValidEnumOptions(options: unknown): void {
   if (!options || !isPlainHash(options)) return;
 
-  // Rails: options.keys & %i[_prefix _suffix _scopes _default _instance_methods]
-  // Note: _validate is NOT in this list — it is rejected at the enum definition
-  // level, not as an option key (enum.rb:361-365).
   const invalidKeys = ["_prefix", "_suffix", "_scopes", "_default", "_instance_methods"];
   const found = Object.keys(options).filter((k) => invalidKeys.includes(k));
 
   if (found.length > 0) {
-    // Rails: invalid_keys.map(&:inspect) — inspect on a Ruby symbol produces ":key"
     throw new ArgumentError(
       `invalid option(s): ${found.map((k) => `:${k}`).join(", ")}. Valid options are: :prefix, :suffix, :scopes, :default, :instance_methods, and :validate.`,
     );
   }
 }
 
-/** Default warn sink — overridable via setEnumWarn so hosts can route warnings. */
 let _enumWarn: (msg: string) => void = (msg) => console.warn(msg);
 
 /**
- * Trails-only seam with no Rails counterpart. Rails writes the `not_`-prefix
- * conflict warning through `logger.warn` (enum.rb:404), where the logger is
- * already a swappable global; trails has no equivalent ambient logger at this
- * layer, so the sink is injected instead. Not a writer for any Ruby attribute.
- *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby writes the conflict warning through the ambient logger (enum.rb:404); trails has no ambient logger at this layer.
+ * @noRailsEquivalent PERMANENT
  */
 export function setEnumWarn(fn: (msg: string) => void): void {
   _enumWarn = fn;
 }
 
-/**
- * Warn on negative enum condition conflicts (e.g., both "notDraft" and "draft").
- * Mirrors: ActiveRecord::Enum#detect_negative_enum_conditions! (private)
- *
- * @internal
- */
+/** @internal */
 export function detectNegativeEnumConditionsBang(methodNames: string[]): void {
   const methodNameSet = new Set(methodNames);
   for (const notMethod of methodNames) {
@@ -1166,9 +702,6 @@ function normalizeNegativeEnumPositiveForm(
     if (rest.length === 0) return null;
     return { prefix: "not_", positiveForm: rest.charAt(0).toLowerCase() + rest.slice(1) };
   }
-  // Match camelCase generated form: "notDraft" — next char must be uppercase
-  // (so unrelated identifiers like "notebook" / "notify" don't get treated
-  // as negative scopes for "ebook" / "ify").
   if (methodName.startsWith("not") && methodName.length > 3) {
     const next = methodName.charAt(3);
     if (next !== next.toUpperCase() || next === next.toLowerCase()) return null;

@@ -1,10 +1,3 @@
-/**
- * Wraps a model class and its arel table to provide metadata for
- * query building — column lookups, association traversal, and
- * predicate builder access.
- *
- * Mirrors: ActiveRecord::TableMetadata
- */
 import { Table } from "@blazetrails/arel";
 import { singularize } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -62,18 +55,10 @@ export class TableMetadata {
         associationKlass = reflection.klass;
       }
     } else if (fallback) {
-      // Rails passes lookup_table_klass_from_join_dependencies here so a key
-      // that is a join's table name (not a direct reflection) still resolves.
       associationKlass = fallback(tableName);
     }
 
     if (associationKlass) {
-      // Mirrors Rails table_metadata.rb associated_table: always alias the
-      // resolved association table to the hash key when the names differ, for
-      // both the reflection and the join-dependency fallback branch. The
-      // where-hash key auto-adds itself to references_values (build_where_clause)
-      // as a SqlLiteral, so make_constraints re-aliases the join to that same
-      // name and WHERE/JOIN stay in sync.
       let arelTable = (associationKlass as any).arelTable;
       if (arelTable && arelTable.name !== tableName) {
         arelTable = arelTable.alias(tableName);
@@ -99,7 +84,6 @@ export class TableMetadata {
   }
 
   reflectOnAggregation(aggregationName: string): any {
-    // Rails: `klass&.reflect_on_aggregation(aggregation_name)` (table_metadata.rb:66).
     return this._klass?.reflectOnAggregation(aggregationName) ?? null;
   }
 
@@ -134,11 +118,6 @@ export class TableMetadata {
     return this._reflection;
   }
 
-  /**
-   * Mirrors: `delegate :join_primary_key, ... to: :reflection`
-   * (table_metadata.rb:5) — a method, and one that forwards the klass its
-   * polymorphic callers pass (predicate_builder/polymorphic_array_value.rb:33).
-   */
   joinPrimaryKey(klass?: typeof Base): string | string[] | null {
     return this._reflection?.joinPrimaryKey(klass) ?? null;
   }

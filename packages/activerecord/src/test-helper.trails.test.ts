@@ -23,7 +23,7 @@ describe("withTimezoneConfig", () => {
     const paris = TimeZone.find("Europe/Paris")!;
     setZoneDefault(paris);
     setZone(null);
-    expect(zone()).toBe(paris); // reads zone_default
+    expect(zone()).toBe(paris);
 
     await withTimezoneConfig({ zone: "UTC" }, () => {
       expect(zone()?.name).toBe("UTC");

@@ -7,11 +7,6 @@ import {
   Logger,
 } from "@blazetrails/activesupport";
 
-// Trails-only: integer binds type-cast to BigInt (so SQLite binds them as
-// SQLITE_INTEGER). Rails renders a bound Integer bare via `binds.inspect`,
-// while a JSON serializer would quote it. These tests pin that a BigInt bind
-// logs as bare digits AND that a string bind which resembles the internal
-// bigint marker is never corrupted into a bare number.
 class CapturingLogger extends Logger {
   messages: string[] = [];
   constructor() {
@@ -50,17 +45,10 @@ describe("LogSubscriber nil payload name (trails)", () => {
 
   afterEach(() => {
     TestSubscriber.logger = null;
-    // The colorization arm below flips this global on; leaving it on would
-    // bleed ANSI escapes into every later file sharing the worker.
     BaseLogSubscriber.colorizeLogging = false;
     LogSubscriber.colorizeLogging = false;
   });
 
-  // A nameless `select_all` now reaches the subscriber with `name: nil` rather
-  // than the `"SQL"` default, so pin the two places log_subscriber.rb:18-30
-  // reads it: `"#{payload[:name]} (…)"` interpolates nil to the empty string,
-  // and `colorize_payload_name`'s `payload_name.blank?` arm takes nil down the
-  // same MAGENTA branch as `"SQL"`. IGNORE_PAYLOAD_NAMES must not swallow it.
   it("renders a nil name as the empty string and still logs", () => {
     subscriber.sql(makeEvent({ sql: "select 1", name: null }));
     expect(logger.messages.length).toBe(1);

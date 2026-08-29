@@ -1,15 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/reserved_word_test.rb
- *
- * The table and column names here are SQL reserved words (group, select,
- * values, distinct, order), so they exercise identifier quoting throughout AR.
- * Rails' counterpart sets `use_transactional_tests = false` and builds the
- * five tables in `setup` via `create_table` (not from schema.rb) — the
- * schema-mutating tests (create/rename/change) need a fresh schema per test.
- * We mirror that with a `beforeEach` that recreates the tables and an
- * `afterAll` teardown, plus a `createTestFixtures` helper mirroring Rails'
- * private per-test fixture loader.
- */
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
@@ -24,7 +12,6 @@ import { reservedWordsValuesFixtureData } from "./test-helpers/fixtures/reserved
 import { reservedWordsDistinctFixtureData } from "./test-helpers/fixtures/reserved-words/distinct.js";
 import { reservedWordsDistinctSelectFixtureData } from "./test-helpers/fixtures/reserved-words/distinct-select.js";
 
-// Test-file-local classes mirror Rails' `ReservedWordTest::Group` etc.
 class Group extends Base {
   static tableName = "group";
 }
@@ -42,30 +29,20 @@ registerModel(Group);
 registerModel(Select);
 registerModel(Values);
 registerModel(Distinct);
-// Mirrors the `belongs_to`/`has_one`/`has_many`/`has_and_belongs_to_many`
-// declarations in the Rails class bodies.
 Associations.belongsTo.call(Group, "select");
 Associations.hasOne.call(Group, "values");
 Associations.hasMany.call(Select, "groups");
 Associations.hasAndBelongsToMany.call(Distinct, "selects");
-// Rails' Distinct also declares `has_many :values, through: :groups`. It's
-// dangling even in Rails — Distinct has no `:groups` association and no test
-// exercises it. trails resolves `through:` lazily (verified: no throw at
-// declare time), so we mirror it verbatim for class-body parity.
 Associations.hasMany.call(Distinct, "values", { through: "groups" });
 
 fixtures({}, { useTransactionalTests: false });
 
-// Rails' `include SchemaStatements` puts these bodies on the adapter itself.
 function schema(): SchemaStatements {
   return Base.connection as unknown as SchemaStatements;
 }
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
 
-// Mirrors Rails `setup`: rebuild the five reserved-word tables before each
-// test via `create_table`. `references` adds the `*_id` column and the
-// `index_<table>_on_<col>` index that `introspect` asserts on.
 beforeEach(async () => {
   const conn = schema();
   for (const t of RESERVED_TABLES) await conn.dropTable(t, { ifExists: true });
@@ -90,10 +67,6 @@ beforeEach(async () => {
   ]);
 });
 
-// Mirrors Rails teardown: drop the tables so the bespoke per-test shapes don't
-// leak into sibling files sharing the worker DB. Like Rails, these six names are
-// this file's own — none of them is in schema.rb or TEST_SCHEMA — so dropping
-// them hands nothing back short.
 afterAll(async () => {
   const conn = schema();
   await conn.dropTable("values", "group", "distinct_select", "distinct", "select", "order", {
@@ -101,8 +74,6 @@ afterAll(async () => {
   });
 });
 
-// Mirrors the Rails private `create_test_fixtures` loader: seed only the named
-// reserved-word fixture sets, like Rails' per-test `create_test_fixtures :group`.
 const fixtureLoaders = {
   select: () => defineFixtures(Base.connection, Select, reservedWordsSelectFixtureData),
   group: () => defineFixtures(Base.connection, Group, reservedWordsGroupFixtureData),
@@ -134,10 +105,6 @@ describe("ReservedWordTest", () => {
   });
 
   it("change columns", async () => {
-    // Mirrors Rails' `@connection.change_column*` — schema mutations dispatch
-    // through the connection adapter (the SQLite copy-table `alterTable` path),
-    // not the generic SchemaStatements helper which emits Postgres-style
-    // `ALTER TABLE ... ALTER COLUMN`.
     const conn = Base.connection as unknown as {
       changeColumnDefault(t: string, c: string, d: unknown): Promise<void>;
       changeColumn(t: string, c: string, ty: string, o?: Record<string, unknown>): Promise<void>;
@@ -214,7 +181,6 @@ describe("ReservedWordTest", () => {
   it("associations work with reserved words", async () => {
     await createTestFixtures("select", "group");
     const selects = await Select.all().includes(":groups");
-    // Rails asserts the eager-loaded `groups` trigger zero queries here.
     await assertNoQueries(false, async () => {
       for (const s of selects) {
         await (s as unknown as { groups: { toArray(): Promise<Group[]> } }).groups.toArray();

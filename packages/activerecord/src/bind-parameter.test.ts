@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/bind_parameter_test.rb
- */
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
@@ -17,8 +12,6 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 
-// Captures `sql.active_record` notification events, mirroring Rails'
-// LogListener subscribed in the test's `setup`.
 class LogListener {
   events: Event[] = [];
   call(event: Event): void {
@@ -26,8 +19,6 @@ class LogListener {
   }
 }
 
-// Test-only LogSubscriber subclass that captures rendered debug lines,
-// mirroring the anonymous LogSubscriber subclass in Rails' assert_logs_binds.
 class CaptureLogger extends Logger {
   debugs: string[] = [];
   constructor() {
@@ -51,9 +42,6 @@ async function logBinds(
   sql = "select * from topics where id = ?",
 ): Promise<string> {
   const subscriber = new DebugLogSubscriber();
-  // Rails' assert_logs_binds helpers build the payload with
-  // `@connection.send(:type_casted_binds, binds)` — use the connection's real
-  // type_casted_binds (abstract/quoting.ts) rather than hand-casting.
   const conn = (await Topic.leaseConnection()) as any;
   const event = new Event("sql.active_record", null, null, "id", {
     name: "SQL",
@@ -65,17 +53,7 @@ async function logBinds(
   return subscriber.capture.debugs[0] ?? "";
 }
 
-// Rails wraps the entire class in `if Base.lease_connection.prepared_statements`
-// (bind_parameter_test.rb:9), so on adapters with prepared statements off (MySQL/
-// MariaDB default) NONE of these run. Deliberate deviation: we keep the
-// prepared-statement-INDEPENDENT cases (too many binds, the log-render tests —
-// all adapter-agnostic) running on every backend for broader coverage, and gate
-// the prepared-statement-SPECIFIC cases (`find one uses binds`, `bind from join
-// in subquery`, `nested unprepared statements`) via ctx.skip below — the first
-// because `find` now routes through the inlined StatementCache path when
-// unprepared, logging no binds (matching Rails).
 describe("BindParameterTest", () => {
-  // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
   fixtures(["topics", "authors", "authorAddresses", "posts"]);
 
   beforeAll(async () => {
@@ -88,24 +66,13 @@ describe("BindParameterTest", () => {
     Base.filterAttributes = [];
   });
 
-  // Rails' private helpers (bind_parameter_test.rb ll. 260-274):
-  //   statement_cache → @connection.instance_variable_get(:@statements).send(:cache)
-  //   to_sql_key(arel) → sql = @connection.to_sql(arel);
-  //                      @connection.respond_to?(:sql_key) ? sql_key(sql) : sql
-  // statement_cache → the connection statement pool's keys (`StatementPool#cache`).
   function statementCacheKeys(conn: any): string[] {
-    // Rails' `@statements` (abstract_adapter.rb:156), on every adapter.
     return conn._statements.keys;
   }
-  // to_sql_key(arel) → bind_parameter_test.rb:261-264.
   function toSqlKey(conn: any, arel: unknown): string {
     const sql = conn.toSql(arel);
     return typeof conn.sqlKey === "function" ? conn.sqlKey(sql) : sql;
   }
-  // cached_statement(klass, key) → bind_parameter_test.rb:266-271. Rails keys
-  // the find-by cache on the column-name array itself; cachedFindBy serializes
-  // that array (core.ts, `JSON.stringify(keys)`), so the key is serialized here
-  // too.
   function cachedStatement(conn: any, klass: any, key: string[]): string {
     const cache = klass.cachedFindByStatement(conn, JSON.stringify(key), () => {
       throw new Error(`${klass.name} has no cached statement by ${JSON.stringify(key)}`);
@@ -114,10 +81,6 @@ describe("BindParameterTest", () => {
   }
 
   it("statement cache", async (ctx) => {
-    // Rails wraps the whole BindParameterTest in `if prepared_statements`
-    // (bind_parameter_test.rb:9); MySQL/MariaDB default it off, so mirror the
-    // class-level guard here (the statement pool is only populated when prepared
-    // statements are enabled).
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
@@ -128,8 +91,6 @@ describe("BindParameterTest", () => {
     const key = toSqlKey(conn, topics.arel());
     expect(statementCacheKeys(conn)).toContain(key);
 
-    // Rails' second half (bind_parameter_test.rb): a fresh `clear_cache!` evicts
-    // the entry, proving the pool is writable in both directions.
     conn.clearCache();
     expect(statementCacheKeys(conn)).not.toContain(key);
   });
@@ -158,12 +119,6 @@ describe("BindParameterTest", () => {
     const topicSql = cachedStatement(conn, Topic, [Topic.primaryKey as string]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
-    // Rails then runs `assert_raises(RecordNotFound) { SillyReply.find(2) }` and
-    // asserts the *raising* model's statement is still cached — proving the
-    // prepared statement is pooled even when the SELECT returns no row, and that
-    // a second, distinct model gets its own pool entry. SillyReply isn't in the
-    // canonical schema, so use Author (a distinct model/table this suite already
-    // loads) to cover both invariants.
     await expect(Author.find(999999)).rejects.toBeInstanceOf(RecordNotFound);
     const authorSql = cachedStatement(conn, Author, [Author.primaryKey as string]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
@@ -181,11 +136,6 @@ describe("BindParameterTest", () => {
     const topicSql = cachedStatement(conn, Topic, ["id"]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
-    // Rails: `assert_raises(RecordNotFound) { SillyReply.find_by!(id: 2) }`, then
-    // asserts the raising model's statement is still cached. SillyReply isn't in
-    // the canonical schema, so use Author (a distinct loaded model) to cover both
-    // the RecordNotFound-still-cached and second-pool-entry invariants for
-    // find_by! the same way the find test does for find.
     await expect(Author.findByBang({ id: 999999 })).rejects.toBeInstanceOf(RecordNotFound);
     const authorSql = cachedStatement(conn, Author, ["id"]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
@@ -204,10 +154,6 @@ describe("BindParameterTest", () => {
       (await topics).map((t: any) => Number(t.id)).sort((a: number, b: number) => a - b),
     ).toEqual([1, 3]);
 
-    // An IN-clause array is not preparable: trails inlines it (no binds), so the
-    // query runs on a fresh statement and never enters the pool. assert_not_includes
-    // passes for the right reason — the inlined SQL key is genuinely absent, not
-    // because the pool is empty (the prior tests prove it populates).
     expect(statementCacheKeys(conn)).not.toContain(toSqlKey(conn, topics.arel()));
   });
 
@@ -216,9 +162,6 @@ describe("BindParameterTest", () => {
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
-    // Rails: `Topic.where("topics.id = ?", 1)` — the `?` fragment routes through
-    // BoundSqlLiteral (preparable), so the statement IS pooled (assert_includes,
-    // bind_parameter_test.rb:100-107).
     const topics = Topic.where("topics.id = ?", 1);
     expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
 
@@ -256,12 +199,6 @@ describe("BindParameterTest", () => {
     }
   });
 
-  // Trails-specific coverage for the over-limit inline fallback on paths beyond
-  // count(): Rails funnels every arel compile through `to_sql_and_binds`
-  // (database_statements.rb:36-38), but trails compiles the main SELECT through
-  // its own helper, which must apply the same fallback. A large multi-value `IN`
-  // now builds a real-bind `HomogeneousIn`, so without the fallback these
-  // overflow the adapter's bind-params cap.
   it("materializes a record load whose IN exceeds the bind-params cap", async () => {
     const conn = (await Topic.leaseConnection()) as any;
     const ids = Array.from({ length: conn.bindParamsLength() + 1 }, (_, i) => i + 1);
@@ -270,36 +207,18 @@ describe("BindParameterTest", () => {
   });
 
   it("bind from join in subquery", async (ctx) => {
-    // Rails wraps the whole BindParameterTest in `if prepared_statements`
-    // (bind_parameter_test.rb:9), so this case is gated too; mirror that guard.
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
 
-    // Rails: `joins(:thinking_posts)` — a bare association name resolved to an
-    // INNER JOIN. trails resolves association joins through the model registry;
-    // Author/Post are registered in `beforeAll` (their fixtures load but don't
-    // auto-register the classes).
     const subquery = Author.joins(":thinkingPosts").where({ name: "David" });
     const scope = Author.from(subquery, "authors").where({ id: 1 });
     expect(await scope.count()).toBe(1);
   });
 
   it("binds are logged", async (ctx) => {
-    // Rails gates the whole BindParameterTest on `if prepared_statements`
-    // (bind_parameter_test.rb:9); mirror that class wrapper.
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
 
-    // Rails (bind_parameter_test.rb:137-145):
-    //   sub   = Arel::Nodes::BindParam.new(1)
-    //   binds = [Relation::QueryAttribute.new("id", 1, Type::Value.new)]
-    //   sql   = "select * from topics where id = #{sub.to_sql}"   # => "... = ?"
-    //   @connection.exec_query(sql, "SQL", binds)
-    //   assert_equal binds, message[4][:binds]
-    // The `sql.active_record` payload must preserve the SAME QueryAttribute
-    // objects passed to exec_query (payload.binds), distinct from the driver
-    // primitives in payload.type_casted_binds.
-    // Arel::Nodes::BindParam#to_sql renders the placeholder "?".
     const sql = `select * from topics where id = ${new Nodes.BindParam(1).toSql()}`;
     const binds = [new QueryAttribute("id", 1, new ValueType())];
 
@@ -307,10 +226,6 @@ describe("BindParameterTest", () => {
     const handle = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
     try {
       await conn.execQuery(sql, "SQL", binds);
-      // Rails finds the message by `args[4][:sql] == sql`, but adapters that
-      // rewrite the placeholder (PostgreSQL turns "?" into "$1" in
-      // preprocessQuery) put the rewritten SQL on the payload, so match on the
-      // bind objects we passed — the thing actually under test — instead.
       const message = subscriber.events.find((e) => e.payload.binds === binds);
       expect(message?.payload.binds).toBe(binds);
     } finally {
@@ -319,12 +234,6 @@ describe("BindParameterTest", () => {
   });
 
   it("find one uses binds", async (ctx) => {
-    // Rails gates the whole BindParameterTest on `if prepared_statements`
-    // (bind_parameter_test.rb:9). Under an unprepared connection (MySQL/MariaDB
-    // default), `find` routes through the StatementCache PartialQuery path,
-    // which inlines its bind values into the SQL and logs no bind payload —
-    // the same shape Rails emits — so there is no `[1]` to assert. Mirror the
-    // Rails guard.
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
 
@@ -343,14 +252,11 @@ describe("BindParameterTest", () => {
 
   it("logs binds after type cast", async () => {
     const binds = [new QueryAttribute("id", "10", new IntegerType())];
-    // Rails anchors the binds render to end-of-line: %r(\[\["id", 10\]\]\z)
-    // (bind_parameter_test.rb:309). trails' safeJsonStringify drops the space.
     expect(await logBinds(binds)).toMatch(/\["id",10\]\]$/);
   });
 
   it("logs unnamed binds", async () => {
     const binds = ["abcd"];
-    // Rails: %r(\[\[nil, "abcd"\]\]\z) (bind_parameter_test.rb:340), end-anchored.
     expect(await logBinds(binds, "select * from topics where title = $1")).toMatch(
       /\[null,"abcd"\]\]$/,
     );
@@ -364,9 +270,6 @@ describe("BindParameterTest", () => {
     );
   });
 
-  // Mirrors Rails' `bind_params(ids)` helper (bind_parameter_test.rb:254): build
-  // a list of BindParam nodes and compile them through a single shared collector
-  // (`@connection.send(:collector)` + `visitor.compile(bind_params, collector)`).
   function bindParams(conn: any, ids: (number | string)[]): string {
     const collector = conn.collector();
     const compiled = conn.visitor.compile(
@@ -391,9 +294,6 @@ describe("BindParameterTest", () => {
     expect(conn.toSql(authors.arel())).toBe(sql);
     expect((await authors).length).toBe(3);
 
-    // Rails (bind_parameter_test.rb:240-246): "With MySQL integers are casted as
-    // string for security" — `mysql/quoting.rb#cast_bound_value`, which
-    // `visit_Arel_Nodes_BoundSqlLiteral` applies to every array element.
     const params = currentAdapter("Mysql2Adapter", "TrilogyAdapter")
       ? bindParams(conn, ["1", "2", "3"])
       : bindParams(conn, [1, 2, 3]);
@@ -408,8 +308,6 @@ describe("BindParameterTest", () => {
   }
 
   it("bind params to sql with prepared statements", async (ctx) => {
-    // Rails wraps the whole BindParameterTest in `if prepared_statements`;
-    // MySQL/MariaDB default it off, so mirror that class-level guard here.
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     await assertBindParamsToSql(conn);
@@ -425,10 +323,6 @@ describe("BindParameterTest", () => {
 
   it("nested unprepared statements", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
-    // Rails wraps the whole BindParameterTest in
-    // `if lease_connection.prepared_statements`. MySQL/MariaDB default prepared
-    // statements off, so this prepared-statement toggle behavior isn't exercised
-    // there — mirror the gate instead of asserting an adapter-specific default.
     ctx.skip(!conn.preparedStatements);
     expect(conn.preparedStatements).toBe(true);
 

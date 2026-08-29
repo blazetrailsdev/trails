@@ -1,7 +1,5 @@
 import { ref, type FixtureRef } from "../../fixtures.js";
 
-// activerecord/test/fixtures/edges.yml
-// Rails YAML uses ERB to generate edge_1..edge_4 with source/sink ids 1..4 / 2..5.
 export const edgeFixtureData: Record<string, { source_id: FixtureRef; sink_id: FixtureRef }> =
   (() => {
     const out: Record<string, { source_id: FixtureRef; sink_id: FixtureRef }> = {};

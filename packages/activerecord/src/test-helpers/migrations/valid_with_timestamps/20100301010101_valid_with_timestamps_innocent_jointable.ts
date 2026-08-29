@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/valid_with_timestamps/20100301010101_valid_with_timestamps_innocent_jointable.rb
 import { Migration } from "../../../migration.js";
 
 export class ValidWithTimestampsInnocentJointable extends Migration {

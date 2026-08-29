@@ -29,9 +29,7 @@ describe("HabtmDestroyOrderTest", () => {
   });
 
   it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
-    // test a normal before_destroy doesn't destroy the habtm joins
     await resetCallbacks(Student, "destroy", async () => {
-      // add a before destroy to student
       Student.beforeDestroy(async (r: any) => {
         if (!(await association(r, "lessons").isEmpty())) throw new Rollback();
       });
@@ -46,7 +44,6 @@ describe("HabtmDestroyOrderTest", () => {
   });
 
   it("not destroying a lesson with students leaves student<=>lesson association intact", async () => {
-    // test a more aggressive before_destroy doesn't destroy the habtm joins and still throws the exception
     const sicp = await Lesson.create({ name: "SICP" });
     const ben = await Student.create({ name: "Ben Bitdiddle" });
     await association(sicp, "students").push(ben);

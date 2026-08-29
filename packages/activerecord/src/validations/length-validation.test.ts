@@ -1,8 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/validations/length_validation_test.rb
- *
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Range } from "@blazetrails/activesupport";
 import "../index.js";
@@ -12,10 +7,6 @@ import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 
 describe("LengthValidationTest", () => {
-  // Mirrors Rails `fixtures :owners` — transactional fixtures (per-test
-  // BEGIN/ROLLBACK). The owner rows themselves are never read by these tests;
-  // every case builds fresh records, exactly like the Rails counterpart's
-  // `@owner = Class.new(Owner)` + `@owner.new`.
   fixtures([]);
 
   beforeAll(async () => {
@@ -23,16 +14,6 @@ describe("LengthValidationTest", () => {
     registerModel("Pet", Pet);
   });
 
-  // The canonical schema builds a single named PK (`owner_id` / `pet_id`) as a
-  // composite-style PK constraint, not an AUTO_INCREMENT column (only the
-  // default `id` PK auto-increments). SQLite masks this — an INTEGER PRIMARY
-  // KEY auto-fills via rowid — but MySQL/Postgres reject an INSERT that omits
-  // the PK. The persisting tests below therefore supply explicit surrogate
-  // keys; Rails' DB auto-increments them. Per-test ROLLBACK keeps id=1 free.
-
-  // Rails `setup { @owner = Class.new(Owner) { def self.name; "Owner"; end } }`.
-  // A fresh anonymous subclass per test so the `validates_size_of` declaration
-  // does not leak across tests (Rails relies on the per-test class for this).
   function ownerClass(): typeof Owner {
     return class extends Owner {
       static name = "Owner";
@@ -77,7 +58,7 @@ describe("LengthValidationTest", () => {
   it("validates size of respects records marked for destruction", async () => {
     const owner = ownerClass();
     owner.validatesSizeOf("pets", { minimum: 1 });
-    const o = new owner({ owner_id: 1 }); // explicit surrogate key — see note above
+    const o = new owner({ owner_id: 1 });
     expect(await o.save()).toBe(false);
     expect(o.errors.messagesFor("pets").length).toBeGreaterThan(0);
     const pet = association(o, "pets").build({ pet_id: 1 });
@@ -92,10 +73,6 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of virtual attribute on model", async () => {
-    // Rails `Pet.attr_accessor(:nickname)` — an in-memory, non-column attribute.
-    // The TS mirror is `attribute(...)`: it installs the
-    // name accessor and is read for validation like any attribute, but is
-    // excluded from `column_names` so it is never persisted.
     const pet = class extends Pet {
       static name = "Pet";
       static {
@@ -105,11 +82,7 @@ describe("LengthValidationTest", () => {
       }
     };
     registerModel("Pet", pet);
-    // Mirrors Rails `repair_validations(Pet) do ... end` — restore the canonical
-    // Pet in the registry afterward so the subclass (carrying the extra
-    // validations + virtual attr) can't leak into another suite in this worker.
     try {
-      // pet_id is an explicit surrogate key — see the note above beforeAll.
       const p = await pet.create({ pet_id: 1, name: "Fancy Pants", nickname: "Fancy" });
       expect(await p.isValid()).toBe(true);
       (p as unknown as { nickname: string }).nickname = "";

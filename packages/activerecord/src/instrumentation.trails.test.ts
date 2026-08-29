@@ -1,9 +1,3 @@
-/**
- * trails-only coverage: the `sql.active_record` payload carries the exception
- * keys on a failed query. Rails gets these from Instrumenter#instrument's
- * `rescue Exception` arm; the adapters used to hand-roll them at each call
- * site. This pins that the inherited arm still covers the adapter paths.
- */
 import { describe, it, expect, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
@@ -30,7 +24,6 @@ describe("Instrumentation exception payload (trails)", () => {
 
     const failed = payloads.filter((p) => p.exception_object !== undefined);
     expect(failed).toHaveLength(1);
-    // Rails' arm records [class name, message] alongside the error itself.
     const [className, message] = failed[0].exception as [string, string];
     expect(className).toBe("StatementInvalid");
     expect(message).toMatch(/definitely_not_a_table/);

@@ -1,18 +1,7 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Trails-internal HABTM harness — no 1:1 Rails counterpart. Rides the canonical
- * `developers` / `projects` / `developers_projects` tables and the canonical
- * `Developer` / `Project` models that drive `has_and_belongs_to_many` in Rails.
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
-// Opt into the canonical-model autoload index so the `Developer`/`Project`
-// association targets resolve by name on first reference — no manual
-// `registerModel`.
 import "../support/canonical-model-index.js";
 import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";
 import { Project as CanonicalProject } from "../test-helpers/models/project.js";
@@ -21,7 +10,6 @@ describe("has_and_belongs_to_many", () => {
   const { developers, projects } = fixtures(["developers", "projects", "developersProjects"]);
 
   it("loads associated records through a join table", async () => {
-    // `david` joins both projects via the `developers_projects` join table.
     const david = developers("david");
     const projectList = await association<CanonicalProject>(david, "projects");
     expect(projectList).toHaveLength(2);
@@ -30,9 +18,6 @@ describe("has_and_belongs_to_many", () => {
   });
 
   it("uses default join table name (alphabetical)", async () => {
-    // `Project.has_and_belongs_to_many :developers` declares no explicit
-    // join table, so it resolves to the alphabetical default
-    // ("developers" + "projects" -> "developers_projects").
     const activeRecord = projects("active_record");
     const devs = await association<CanonicalDeveloper>(activeRecord, "developers");
     expect(devs.length).toBeGreaterThan(0);

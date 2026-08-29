@@ -1,6 +1,3 @@
-/**
- * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
- */
 import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
@@ -9,10 +6,6 @@ import { classAttribute, included } from "@blazetrails/activesupport";
 import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
-/**
- * The `Helpers::TimeValue` member Rails reaches on the wrapped subtype through
- * `DelegateClass(Type::Value)` — `user_input_in_time_zone` (time_value.rb:42-44).
- */
 interface TimeValueSubtype extends Type {
   userInputInTimeZone(value: unknown): unknown;
 }
@@ -23,20 +16,10 @@ export interface TimeZoneConversion {
   timeZoneAwareTypes: string[];
 }
 
-/** The host `include ActiveRecord::AttributeMethods::TimeZoneConversion` needs. */
 interface TimeZoneConversionIncludeHost {
   name: string;
 }
 
-/**
- * `ActiveRecord::AttributeMethods::TimeZoneConversion` — the module
- * `attribute_methods.rb:18` includes. It defines no instance methods; the
- * module object carries its `included do` block (time_zone_conversion.rb:59-63),
- * and its private `ClassMethods#hook_attribute_type` is the `this`-typed
- * {@link hookAttributeType} below (CLAUDE.md, "Module mixins").
- *
- * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion (time_zone_conversion.rb:7-82)
- */
 export const TimeZoneConversion = {
   [included](base: TimeZoneConversionIncludeHost): void {
     classAttribute.call(base, "timeZoneAwareAttributes", {
@@ -54,15 +37,6 @@ export const TimeZoneConversion = {
   },
 };
 
-/**
- * Time zone converter type — wraps a time type to apply zone conversion.
- *
- * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter
- * Rails uses `DelegateClass(Type::Value)` to auto-delegate all methods; we extend
- * ValueType and explicitly delegate type/cast/deserialize/serialize/serializeCastValue
- * to the wrapped subtype. `isChanged` is also overridden to compare instants by value
- * at the subtype's column precision (matching Rails' `TimeWithZone#==` semantics).
- */
 export class TimeZoneConverter extends ValueType<unknown> {
   private readonly _subtype: Type;
   override readonly name: string;
@@ -73,7 +47,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
     this.name = subtype.name;
   }
 
-  /** Idempotent factory — mirrors Rails' `self.new` guard. */
   static wrap(subtype: Type): TimeZoneConverter {
     return subtype instanceof TimeZoneConverter ? subtype : new TimeZoneConverter(subtype);
   }
@@ -86,40 +59,20 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return resolveIsUtc(this._subtype);
   }
 
-  /**
-   * Mirrors: `TimeZoneConverter#cast` (time_zone_conversion.rb:19-32).
-   *
-   * Rails gives `String` an `in_time_zone` through CoreExt, so a string takes
-   * the `respond_to?(:in_time_zone)` arm — `super(user_input_in_time_zone(value))
-   * || super` (`:24`), whose `user_input_in_time_zone` is
-   * `Helpers::TimeValue`'s (time_value.rb:42-44), reached through the
-   * `DelegateClass` hop to the subtype. That `||` falls through on `nil` and
-   * `false` only, so it is spelled as the explicit falsy check rather than a
-   * `??` (which keeps a `false`) or a bare truthiness test (which drops a `0`).
-   */
   override cast(value: unknown): unknown {
     if (value == null) return null;
-    // Hash (multiparameter attributes): cast via subtype, then treat wall-clock
-    // components as local time in the current zone (set_time_zone_without_conversion).
     if (isPlainObject(value)) {
       return setTimeZoneWithoutConversion(this._subtype.cast(value), this._subtypeIsUtc);
     }
-    // TimeWithZone: move to current zone.
     if (value instanceof TimeWithZone) {
       return this.convertTimeToTimeZone(value);
     }
-    // ZonedDateTime: extract instant, wrap in current zone.
     if (value instanceof Temporal.ZonedDateTime) {
       return this.convertTimeToTimeZone(value.toInstant());
     }
-    // Instant: Ruby's Time responds to in_time_zone, so it takes the
-    // `super(user_input_in_time_zone(value)) || super` arm rather than the
-    // `map` else-branch (time_zone_conversion.rb:21-27).
     if (value instanceof Temporal.Instant) {
       return this.convertTimeToTimeZone(this._subtype.cast(value));
     }
-    // PlainDateTime: wall-clock components from multiparameter assembly (no timezone).
-    // Mirrors Rails' Hash branch: set_time_zone_without_conversion(super).
     if (value instanceof Temporal.PlainDateTime) {
       const instant = value.toZonedDateTime(zoneForIsUtc(this._subtypeIsUtc)).toInstant();
       return setTimeZoneWithoutConversion(instant, this._subtypeIsUtc);
@@ -130,9 +83,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
       );
       return casted != null && casted !== false ? casted : this._subtype.cast(value);
     }
-    // Rails: `map(super) { |v| cast(v) }` (time_zone_conversion.rb:31) — the
-    // DelegateClass hop to the subtype's own `map` hook, which rebuilds an
-    // Array or a Range from its cast elements (oid/array.rb:67, oid/range.rb:50).
     return this.map(this._subtype.cast(value), (v) => this.cast(v));
   }
 
@@ -140,23 +90,10 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return this.convertTimeToTimeZone(this._subtype.deserialize(value));
   }
 
-  /**
-   * Rails defines no `serialize` on `TimeZoneConverter`: `DelegateClass(Type::Value)`
-   * forwards it to the subtype untouched (time_zone_conversion.rb:8-52), which
-   * handles a `TimeWithZone` because it `acts_like?(:time)`. TS has no
-   * `method_missing`, so the forward is spelled out — but it stays a forward.
-   */
   override serialize(value: unknown): unknown {
     return this._subtype.serialize(value);
   }
 
-  /**
-   * Rails' `SerializeCastValue.serialize` deliberately refuses the fast path for
-   * a DelegateClass instance — `type.equal?(type.itself_if_serialize_cast_value_compatible)`
-   * is false because the delegator forwards the message to the subtype
-   * (serialize_cast_value.rb:25-33) — so the subtype decides between its own
-   * `serialize_cast_value` and `serialize`.
-   */
   override serializeCastValue(value: unknown): unknown {
     const sub = this._subtype as ValueTypeInstance;
     if (typeof sub.itselfIfSerializeCastValueCompatible === "function") {
@@ -167,9 +104,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return this._subtype.serialize(value);
   }
 
-  // Rails' DelegateClass(Type::Value) auto-forwards these to the subtype; the
-  // eager assert at write_from_user time is how MultiparameterAssignmentErrors
-  // surface at assignment for zone-aware attributes.
   override assertValidValue(value: unknown): void {
     this._subtype.assertValidValue(value);
   }
@@ -200,8 +134,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return oldValue !== newValue;
   }
 
-  // Same floor-style truncation as DateTimeType._nsAtPrecision / applySecondsPrecision.
-  // Uses the wrapped subtype's precision so behavior matches the column's serialize output.
   private _nsAtPrecision(ns: bigint): bigint {
     const raw = this._subtype.precision ?? 6;
     const p = Number.isInteger(raw) && raw >= 0 && raw <= 9 ? raw : 6;
@@ -220,27 +152,18 @@ export class TimeZoneConverter extends ValueType<unknown> {
       : this._subtype === other._subtype;
   }
 
-  /**
-   * Rails' `DelegateClass(Type::Value)` forwards `map` to the wrapped subtype,
-   * so `map` is the SUBTYPE's hook: `Type::Value#map` returns the value
-   * untouched (value.rb:117-119), while OID::Range and OID::Array rebuild
-   * their value from the mapped elements (oid/range.rb:50-54, oid/array.rb:67-69).
-   */
   override map(value: unknown, block: (value: unknown) => unknown): unknown {
     return (this._subtype as ValueTypeInstance).map(value as never, block);
   }
 
-  /** Mirrors: TimeZoneConverter#convert_time_to_time_zone (time_zone_conversion.rb:38-48) */
   private convertTimeToTimeZone(value: unknown): unknown {
     if (value == null) return null;
 
-    // acts_like?(:time)
     if (value instanceof TimeWithZone || value instanceof Temporal.Instant) {
       const zone = timeZone();
       if (!zone) return value;
       return value instanceof TimeWithZone ? value.inTimeZone(zone) : new TimeWithZone(value, zone);
     }
-    // value.respond_to?(:infinite?) && value.infinite?
     if (typeof value === "number" && !Number.isFinite(value)) return value;
 
     return this.map(value, (v) => this.convertTimeToTimeZone(v));
@@ -252,14 +175,7 @@ function zoneForIsUtc(subtypeIsUtc?: boolean): string {
   return (subtypeIsUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId();
 }
 
-/**
- * Walks the `subtype` chain the way Rails' OID::Range / OID::Array delegate to
- * their subtype (range.rb:8-10, array.rb:12-13), so a wrapped
- * ActiveRecord::Type::DateTime still supplies the `is_utc?` that
- * Internal::Timezone gives it.
- *
- * @internal
- */
+/** @internal */
 function resolveIsUtc(type: unknown): boolean | undefined {
   let current = type as { isUtc?: unknown; subtype?: unknown } | null | undefined;
   const seen = new Set<unknown>();
@@ -277,15 +193,8 @@ function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): u
   const zone = timeZone();
   if (!zone) return value;
   if (value instanceof Temporal.Instant) {
-    // AcceptsMultiparameterTime builds the instant by interpreting components
-    // in the is_utc? zone (UTC when default_timezone is :utc, host-local
-    // when :local). Extract wall-clock components using the SAME timezone so
-    // we get the original component values, then re-interpret them as local
-    // time in the current zone (mirrors Time.zone.local_to_utc(t).in_time_zone).
     const zoned = value.toZonedDateTimeISO(zoneForIsUtc(subtypeIsUtc));
     const pdt = zoned.toPlainDateTime();
-    // zone.local() takes milliseconds; get the ms-level result with correct DST
-    // disambiguation, then add back sub-millisecond precision from the original.
     const base = zone.local(
       pdt.year,
       pdt.month,
@@ -322,10 +231,7 @@ interface TimeZoneConversionHost {
   _hookAttributeType?(name: string, castType: unknown): unknown;
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion::ClassMethods#hook_attribute_type
- */
+/** @internal */
 export function hookAttributeType(
   this: TimeZoneConversionHost,
   name: string,

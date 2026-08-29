@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/activejob/destroy_association_async_job_test.rb
 import { NameError, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { afterAll, describe, expect, it } from "vitest";
 import { Base } from "./base.js";

@@ -1,9 +1,3 @@
-/**
- * Key provider — manages encryption/decryption keys.
- *
- * Mirrors: ActiveRecord::Encryption::KeyProvider
- */
-
 import { groupBy } from "@blazetrails/activesupport";
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
@@ -19,11 +13,7 @@ export class KeyProvider {
     this._keys = Array.isArray(keys) ? keys : [keys];
   }
 
-  /**
-   * @missingRailsCall last — PERMANENT: `@keys.last` (key_provider.rb:21) on a plain Array
-   *   — the faithful port is index access, which emits no call name
-   *   (compare.ts's `first`/`last` note).
-   */
+  /** @missingRailsCall last — PERMANENT */
   encryptionKey(): Key {
     if (!this._encryptionKey) {
       const key = this._keys[this._keys.length - 1];
@@ -36,7 +26,6 @@ export class KeyProvider {
   }
 
   decryptionKeys(message: Message): Key[] {
-    // Ruby truthiness: nil and false fall back to @keys; anything else is a reference.
     const rawKeyId = message.headers.encryptedDataKeyId as unknown;
     if (rawKeyId != null && rawKeyId !== false) {
       return this.keysGroupedById().get(headerString(rawKeyId)!) ?? [];

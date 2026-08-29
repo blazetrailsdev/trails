@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/image.rb
 import { Base } from "../../base.js";
 
 export class Image extends Base {

@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/other_posts.yml
-// Rails sets `_fixture: model_class: Post`.
 export const otherPostFixtureData = {
   second_welcome: {
     author_id: ref("authors", "david"),

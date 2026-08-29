@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/old_and_new_versions/20210716122844_add_people_description.rb
 import { Migration } from "../../../migration.js";
 
 export class AddPeopleDescription extends Migration {

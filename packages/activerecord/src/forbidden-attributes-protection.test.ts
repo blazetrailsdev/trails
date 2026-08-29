@@ -1,22 +1,6 @@
-/**
- * Mirrors: activerecord/test/cases/forbidden_attributes_protection_test.rb
- *
- * Strong-parameters protection: mass assignment, create_with, where, and
- * where.not all reject an un-permitted params object and unwrap a permitted
- * one. Uses the ProtectedParams stub (support/stubs/strong-parameters.ts),
- * mirroring Rails' test/support/stubs/strong_parameters.rb.
- *
- * Uses the canonical `Person` / `Company` models + `people`/`companies`
- * fixtures (Rails reads `Person`/`Company` directly here) so this handler-suite
- * file no longer writes a bespoke reduced `people` shape into the shared worker
- * DB — eliminating the cross-file collision that `locking.test.ts` guards
- * against with `dropExisting`.
- */
 import { describe, it, expect } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
-// Side-effect: registers the Relation constructor on Base (the canonical models
-// import only base.js, which doesn't load relation.ts on its own).
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Company, Client } from "./test-helpers/models/company.js";
@@ -27,8 +11,6 @@ import { registerModel } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 
-// ShipPart's nested associations resolve `Ship` / `Treasure` from the model
-// registry at build time; ship.ts and treasure.ts don't self-register.
 registerModel(ShipPart);
 registerModel(Ship);
 registerModel(Treasure);

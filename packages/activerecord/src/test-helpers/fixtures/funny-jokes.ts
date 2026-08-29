@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/funny_jokes.yml
 export const funnyJokeFixtureData = {
   a_joke: {
     id: 1,

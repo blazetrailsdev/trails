@@ -1,14 +1,3 @@
-/**
- * Convergence guard: `Association#target=` (association.rb:100-103) is the
- * ivar write AND `loaded!`, so an assigned target is loaded and carries the
- * `@stale_state` snapshot `loaded!` takes (association.rb:86-89). trails' base
- * setter wrote the ivar only, leaving `@loaded` false and the snapshot unset,
- * so `stale_target?` could never fire for an assigned target.
- *
- * Rails has no dedicated test for the setter — its contract is exercised
- * through every `self.target =` caller — so this pins it directly, on the
- * canonical `Post` → `author` belongs_to.
- */
 import { describe, it, expect } from "vitest";
 
 import { Author } from "../test-helpers/models/author.js";

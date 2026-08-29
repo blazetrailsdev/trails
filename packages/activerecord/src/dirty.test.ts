@@ -1,25 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/dirty_test.rb
- *
- * Faithful port of Rails' DirtyTest. Rides the canonical schema + models
- * (Pirate / Parrot / Person / Topic / Aircraft / NumericData / LiveParrot)
- * via the handler suite + transactional fixtures, so it issues no per-test DDL
- * (every table it touches is already in the preloaded canonical schema). This
- * removes the divergent `people`/`posts`/`pirates` shapes the old version wrote
- * per-test into the shared worker DB.
- *
- * A single `beforeAll` canonical rebuild of the rode tables is still required as
- * a shield: sibling files DROP+CREATE these same shared tables with reduced
- * shapes, and the signature cache makes a plain schema load a no-op that
- * wouldn't restore the canonical columns. See the `beforeAll` comment and
- * `locking.test.ts` for the same pattern.
- *
- * Test names mirror the Ruby method names verbatim (`parity:test` matches on
- * them). Tests blocked by a JS-language impossibility (immutable strings, Ruby
- * symbol coercion, sync side-effecting getters over async persistence) are
- * reclassified in scripts/api-compare/unported-files.ts rather than kept as
- * counted `it.skip` stubs.
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -44,26 +22,13 @@ import {
   assertQueriesMatch,
 } from "./testing/query-assertions.js";
 
-// trails generates column accessors (`pirate.catchphrase`) at runtime, so they
-// aren't visible to TS on the model classes. This alias keeps the inherited
-// dirty/persistence methods strongly typed while exposing column reads/writes
-// as `unknown` — letting the test bodies read like Rails without `any`.
 type Rec = Base & Record<string, unknown>;
 
-/**
- * `isSavedChanges` / `idInDatabase` are wired onto Base.prototype at runtime
- * (not on its static type), so on a {@link Rec} they read back as `unknown`.
- * Invoke them through their receiver (preserving `this`) with a typed return.
- */
-// A generated dirty method declared `parameters: false` (dirty.rb:242-243) is a
-// zero-arg reader, which trails emits as an accessor property; the `**options`
-// ones stay methods.
 const call = <T>(recv: object, name: string): T => {
   const member = (recv as Record<string, unknown>)[name];
   return (typeof member === "function" ? (member as () => T).call(recv) : member) as T;
 };
 
-/** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(
   klass: typeof Base,
   on: boolean,
@@ -81,7 +46,6 @@ async function withPartialWrites(
   }
 }
 
-/** Mirrors Rails' `travel(duration) { ... }` — advances the system clock by `offsetMs`. */
 async function withTravel(offsetMs: number, fn: () => Promise<void>): Promise<void> {
   vi.useFakeTimers({ now: Date.now() + offsetMs });
   try {
@@ -91,7 +55,6 @@ async function withTravel(offsetMs: number, fn: () => Promise<void>): Promise<vo
   }
 }
 
-/** Mirrors Rails' private `check_pirate_after_save_failure(pirate)`. */
 function checkPirateAfterSaveFailure(pirate: Rec): void {
   expect(pirate.isChanged).toBe(true);
   expect(pirate.attributeChanged("parrot_id")).toBe(true);
@@ -100,14 +63,8 @@ function checkPirateAfterSaveFailure(pirate: Rec): void {
 }
 
 describe("DirtyTest", () => {
-  // "field named field" issues DDL (create/drop of `testings`, mirroring
-  // Rails' in-test create_table); run it outside the wrapping transaction so
-  // MySQL's DDL implicit-commit can't break the fixture rollback.
   fixtures([], { usesTransaction: ["field named field"] });
   beforeAll(async () => {
-    // Force schema reflection ONCE per worker: trails reflects columns lazily on
-    // first query, and in-memory dirty tracking (`new Model()` then assign) needs
-    // the attribute accessors to already exist.
     await Promise.all(
       [Person, Pirate, Parrot, Topic, NumericData, Aircraft, LiveParrot].map((m) =>
         m.first().catch(() => null),
@@ -115,9 +72,6 @@ describe("DirtyTest", () => {
     );
   });
 
-  // Rails: `def setup; Person.create first_name: "foo"; end` (and teardown
-  // delete_by). A dummy row so the `Person.select(:id).first` tests have a row.
-  // Transactional rollback cleans it up — no explicit teardown needed.
   beforeEach(async () => {
     await Person.create({ first_name: "foo" });
   });
@@ -127,23 +81,19 @@ describe("DirtyTest", () => {
   });
 
   it("attribute changes", async () => {
-    // New record - no changes.
     const pirate = new Pirate() as Rec;
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
     expect(pirate.attributeChanged("non_validated_parrot_id")).toBe(false);
 
-    // Change catchphrase.
     pirate.catchphrase = "arrr";
     expect(pirate.attributeChanged("catchphrase")).toBe(true);
     expect(pirate.attributeWas("catchphrase")).toBeNull();
     expect(pirate.attributeChange("catchphrase")).toEqual([null, "arrr"]);
 
-    // Saved - no changes.
     await pirate.saveBang();
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
     expect(pirate.attributeChange("catchphrase")).toBeNull();
 
-    // Same value - no changes.
     pirate.catchphrase = "arrr";
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
     expect(pirate.attributeChange("catchphrase")).toBeNull();
@@ -151,10 +101,6 @@ describe("DirtyTest", () => {
 
   it("time attributes changes with time zone", async () => {
     await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-      // Declare the datetime explicitly so it is registered as a time-zone-aware
-      // attribute (Rails gets this from schema reflection on the anonymous
-      // `Class.new`; trails' reflected anonymous class doesn't TZ-wrap the
-      // auto-set timestamp, so `attribute_was` would come back a bare Instant).
       const Target = class extends Base {
         static tableName = "pirates";
         static {
@@ -164,18 +110,15 @@ describe("DirtyTest", () => {
       };
       const zone = timeZone()!;
 
-      // New record - no changes.
       const pirate = new Target() as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      // Saved - no changes.
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      // Change created_on.
       const oldCreatedOn = pirate.created_on as TimeWithZone;
       pirate.created_on = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 24 }), zone);
       expect(pirate.attributeChanged("created_on")).toBe(true);
@@ -194,7 +137,6 @@ describe("DirtyTest", () => {
         static tableName = "pirates";
       };
       const pirate = (await Target.create({})) as Rec;
-      // Rails asserts assigning the value to itself is not a change.
       // eslint-disable-next-line no-self-assign
       pirate.created_on = pirate.created_on;
       expect(pirate.attributeChanged("created_on")).toBe(false);
@@ -208,22 +150,18 @@ describe("DirtyTest", () => {
         static skipTimeZoneConversionForAttributes = ["created_on"];
       };
 
-      // New record - no changes.
       const pirate = new Target() as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      // Saved - no changes.
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      // Change created_on.
       const oldCreatedOn = pirate.created_on;
       pirate.created_on = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       expect(pirate.attributeChanged("created_on")).toBe(true);
-      // kind_of does not work because ActiveSupport::TimeWithZone.name == 'Time'.
       expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
       expect(pirate.attributeWas("created_on")).toEqual(oldCreatedOn);
     });
@@ -235,30 +173,24 @@ describe("DirtyTest", () => {
         static tableName = "pirates";
       };
 
-      // New record - no changes.
       const pirate = new Target() as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      // Saved - no changes.
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      // Change created_on.
       const oldCreatedOn = pirate.created_on;
       pirate.created_on = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       expect(pirate.attributeChanged("created_on")).toBe(true);
-      // kind_of does not work because ActiveSupport::TimeWithZone.name == 'Time'.
       expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
       expect(pirate.attributeWas("created_on")).toEqual(oldCreatedOn);
     });
   });
 
   it("aliased attribute changes", () => {
-    // the actual attribute here is name, title is an
-    // alias setup via alias_attribute
     const parrot = new Parrot() as Rec;
     expect(call<boolean>(parrot, "titleChanged")).toBe(false);
     expect(call<unknown>(parrot, "titleChange")).toBeNull();
@@ -392,21 +324,18 @@ describe("DirtyTest", () => {
     pirate.parrot_id = 1;
     await pirate.save();
 
-    // check the change from 1 to ''
     pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
     pirate.parrot_id = "";
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
     expect(pirate.attributeChange("parrot_id")).toEqual([1, null]);
     await pirate.save();
 
-    // check the change from nil to 0
     pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
     pirate.parrot_id = 0;
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
     expect(pirate.attributeChange("parrot_id")).toEqual([null, 0]);
     await pirate.save();
 
-    // check the change from 0 to ''
     pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
     pirate.parrot_id = "";
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
@@ -439,9 +368,6 @@ describe("DirtyTest", () => {
     expect(pirate.attributeChanged("catchphrase")).toBe(true);
     expect(pirate.attributeChange("catchphrase")).toEqual(["arr", "arr"]);
 
-    // Rails mutates the string in place (`catchphrase << " matey!"`); JS strings
-    // are immutable, so reassign the concatenated value. The will_change! force
-    // above pins the original at "arr", so the observable change is identical.
     pirate.catchphrase = `${pirate.catchphrase} matey!`;
     expect(pirate.attributeChanged("catchphrase")).toBe(true);
     expect(pirate.attributeChange("catchphrase")).toEqual(["arr", "arr matey!"]);
@@ -466,8 +392,6 @@ describe("DirtyTest", () => {
     expect((topic as any).approved).toBe(true);
     expect(topic.attributeChanged("approved")).toBe(false);
 
-    // Coming from a web form: assigning 1 type-casts to true, same as the
-    // schema default, so the attribute is still not dirty.
     (topic as any).assignAttributes({ approved: 1 });
     expect((topic as any).approved).toBe(true);
     expect(topic.attributeChanged("approved")).toBe(false);
@@ -478,26 +402,19 @@ describe("DirtyTest", () => {
     pirate.catchphrase = "foo";
 
     await withPartialWrites(Pirate, false, async () => {
-      // Mirrors: assert_queries_count(6) { 2.times { pirate.save! } }
-      // SAVEPOINT+INSERT+RELEASE for save1 + SAVEPOINT+UPDATE+RELEASE for save2 = 6.
       await assertQueriesCount(6, false, async () => {
         await pirate.saveBang();
         await pirate.saveBang();
       });
-      // Rails: Pirate.where(id: pirate.id).update_all(updated_on: old_updated_on)
       await Pirate.where({ id: pirate.id }).updateAll({
         updated_on: Temporal.Instant.from("2020-01-01T00:00:00Z"),
       });
     });
 
-    // Reload so the in-memory snapshot reflects the DB reset; this is the
-    // known baseline that no-op saves must not advance.
     await (pirate as unknown as Pirate).reload();
     const oldUpdatedOn = pirate.updated_on;
 
     await withPartialWrites(Pirate, true, async () => {
-      // No-op saves with partialUpdates=true: lazy SAVEPOINT never materializes → 0 events.
-      // Mirrors: assert_no_queries { 2.times { pirate.save! } }
       await assertNoQueries(false, async () => {
         await pirate.saveBang();
         await pirate.saveBang();
@@ -506,8 +423,6 @@ describe("DirtyTest", () => {
         oldUpdatedOn,
       );
 
-      // A real attribute change: SAVEPOINT+UPDATE+RELEASE = 3.
-      // Mirrors: assert_queries_count(3) { pirate.catchphrase = "bar"; pirate.save! }
       await assertQueriesCount(3, false, async () => {
         pirate.catchphrase = "bar";
         await pirate.saveBang();
@@ -523,24 +438,16 @@ describe("DirtyTest", () => {
     (person as any).first_name = "foo";
 
     await withPartialWrites(Person, false, async () => {
-      // Mirrors: assert_queries_count(6) { 2.times { person.save! } }
-      // SAVEPOINT+INSERT+RELEASE for save1 + SAVEPOINT+UPDATE+RELEASE for save2 = 6.
-      // The force-UPDATE in save2 increments lock_version (0→1).
       await assertQueriesCount(6, false, async () => {
         await person.saveBang();
         await person.saveBang();
       });
-      // Rails: Person.where(id: person.id).update_all(first_name: "baz")
       await Person.where({ id: person.id }).updateAll({ first_name: "baz" });
     });
 
-    // Mirrors: old_lock_version = person.lock_version + 1
-    // updateAll bumped the DB lock_version by 1; in-memory is still 1, so DB = 2.
     const savedLockVersion = (person as any).lock_version + 1;
 
     await withPartialWrites(Person, true, async () => {
-      // No-op saves: lazy SAVEPOINT never materializes → 0 events, lock_version unchanged.
-      // Mirrors: assert_no_queries { 2.times { person.save! } }
       await assertNoQueries(false, async () => {
         await person.saveBang();
         await person.saveBang();
@@ -549,8 +456,6 @@ describe("DirtyTest", () => {
         savedLockVersion,
       );
 
-      // A real attribute change: SAVEPOINT+UPDATE+RELEASE = 3, lock_version incremented.
-      // Mirrors: assert_queries_count(3) { person.first_name = "bar"; person.save! }
       await assertQueriesCount(3, false, async () => {
         (person as any).first_name = "bar";
         await person.saveBang();
@@ -785,9 +690,6 @@ describe("DirtyTest", () => {
   });
 
   it("field named field", async () => {
-    // Rails builds `testings` with in-test DDL (dirty_test.rb:610) — it is not
-    // a schema.rb fixture table, so mirroring that DDL here is the faithful
-    // port, not an invented bespoke table.
     const Testings = class extends Base {
       static tableName = "testings";
     };
@@ -866,14 +768,6 @@ describe("DirtyTest", () => {
   });
 
   it("changes is correct for subclass", async () => {
-    // Rails overrides only the reader (`def catchphrase; super.upcase; end`),
-    // keeping the generated writer. `declare catchphrase: string` on Pirate
-    // forbids overriding it as an accessor pair via TS syntax (TS2611), so
-    // shadow it on the subclass prototype with `Object.defineProperty` — the
-    // runtime effect Ruby's `def catchphrase` has. Both accessors delegate to
-    // `readAttribute`/`writeAttribute` (the trails analog of `super`) for a
-    // functionally reader-only override. Dirty tracking reads the raw stored
-    // value (not the public reader), so `changes` is unaffected.
     const Foo = class extends Pirate {};
     Object.defineProperty(Foo.prototype, "catchphrase", {
       configurable: true,
@@ -898,11 +792,6 @@ describe("DirtyTest", () => {
   });
 
   it("changes is correct if override attribute reader", async () => {
-    // Rails defines a singleton reader on one instance (`def pirate.catchphrase;
-    // super.upcase; end`), keeping the class writer. The JS analogue is an own
-    // accessor pair on that instance shadowing the prototype accessor — reader
-    // upcases, writer delegates. Same functionally-reader-only-override shape as
-    // "changes is correct for subclass", scoped to a single instance.
     const pirate = (await Pirate.createBang({ catchphrase: "arrrr" })) as Rec;
     Object.defineProperty(pirate, "catchphrase", {
       configurable: true,
@@ -950,9 +839,6 @@ describe("DirtyTest", () => {
         this.attribute("nonPersistedAttribute", "string");
       }
     };
-    // trails reflects a model's real columns asynchronously; Rails does so
-    // lazily/synchronously. Reflect "people" up front so the anonymous class
-    // knows `first_name` is a real column and `non_persisted_attribute` is not.
     await klass.loadSchema();
 
     const record = new klass({ first_name: "Sean" }) as Rec;
@@ -970,7 +856,6 @@ describe("DirtyTest", () => {
           this.attribute("nonPersistedAttribute", "string");
         }
       };
-      // See note above: reflect "people" up front (async in trails).
       await klass.loadSchema();
 
       const record = new klass({ first_name: "Sean" }) as Rec;
@@ -1148,8 +1033,6 @@ describe("DirtyTest", () => {
   });
 
   it("attribute_changed? properly type casts enum values", async () => {
-    // breed: 0 = "african". EnumType.cast(0) maps the integer to the label, so
-    // passing the integer directly is equivalent to passing the label string.
     const parrot = await LiveParrot.createBang({ name: "Scipio", breed: 0 });
 
     (parrot as any).breed = "australian";
@@ -1160,11 +1043,6 @@ describe("DirtyTest", () => {
   });
 });
 
-// ==========================================================================
-// DirtyTest — PostgreSQL-specific: composite IDENTITY primary key
-// Mirrors: activerecord/test/cases/dirty_test.rb
-//   if current_adapter?(:PostgreSQLAdapter) && supports_identity_columns?
-// ==========================================================================
 describeIfPostgresqlAdapter("DirtyTest", () => {
   fixtures([], { useTransactionalTests: false });
 

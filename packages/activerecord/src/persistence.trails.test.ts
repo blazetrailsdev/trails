@@ -1,13 +1,3 @@
-/**
- * Trails-specific cases relocated out of persistence.test.ts (RFC 0048
- * one-schema convergence). These exercise trails-only extensions with no
- * counterpart in activerecord/test/cases/persistence_test.rb: the array forms
- * of `create`/`create!`/`new`/`build` (Rails ports `create_many`/`build_many`
- * separately), block-yielding on `create`, the `:all`-default and
- * parallel-array forms of class-level `update`, the Base-instance guard on
- * `update`, the `save!` validation-before-destroyed-guard ordering, and the
- * `destroyBy`/`deleteBy` shorthands. Test names are kept verbatim per CLAUDE.md.
- */
 import { describe, it, expect } from "vitest";
 import { RecordInvalid, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -28,7 +18,6 @@ describe("PersistenceTest (trails)", () => {
   const Topic = CanonicalTopic;
   fixtures(["topics", "developers"]);
 
-  // Rails: Model.update([ids], [attrs]) — parallel arrays, index-aligned.
   it("update with parallel ids + attrs arrays updates each record", async () => {
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
@@ -38,7 +27,6 @@ describe("PersistenceTest (trails)", () => {
     expect((await Topic.find(t2.id)).title).toBe("y");
   });
 
-  // Rails: Model.update(attrs) — :all-sentinel default applies attrs to every record.
   it("update with just attrs applies to every record in scope (:all default)", async () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
@@ -48,8 +36,6 @@ describe("PersistenceTest (trails)", () => {
     expect(all.every((t) => t.title === "same")).toBe(true);
   });
 
-  // Rails: Base.create([{...}, {...}]) recurses and returns an array of
-  // persisted records. Same for new() and createBang().
   it("create with an array recurses and returns an array of records", async () => {
     const result = await Topic.create([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);
@@ -63,7 +49,6 @@ describe("PersistenceTest (trails)", () => {
     expect(result.every((t) => t.isPersisted())).toBe(true);
   });
 
-  // Rails 7.2+: `Base.build` is an alias for `Base.new`.
   it("build is an alias for new and supports array + block", () => {
     const single = Topic.build({ title: "a" }, (r) => {
       r.title = "mutated";
@@ -82,8 +67,6 @@ describe("PersistenceTest (trails)", () => {
     expect(result.every((t) => t.isNewRecord())).toBe(true);
   });
 
-  // Rails: Base.create(attrs, &block) yields each record to the block
-  // before save, so the block can mutate it.
   it("create yields to block before save", async () => {
     const t = await Topic.create({ title: "a" }, (record) => {
       record.title = "mutated-by-block";
@@ -94,8 +77,6 @@ describe("PersistenceTest (trails)", () => {
     expect(reloaded.title).toBe("mutated-by-block");
   });
 
-  // Rails: create! stops at the first exception, so records after the
-  // failed element are not persisted.
   it("createBang with an array stops at the first invalid record", async () => {
     await repairValidations(Topic, async () => {
       Topic.validatesPresenceOf("title");
@@ -104,9 +85,7 @@ describe("PersistenceTest (trails)", () => {
         Topic.createBang([{ title: "first" }, { title: "" }, { title: "third" }]),
       ).rejects.toThrow();
 
-      // First element committed before the failure.
       expect(await Topic.all().where({ title: "first" }).exists()).toBe(true);
-      // Third element never attempted.
       expect(await Topic.all().where({ title: "third" }).exists()).toBe(false);
     });
   });
@@ -119,20 +98,12 @@ describe("PersistenceTest (trails)", () => {
     expect(calls).toBe(2);
   });
 
-  // Rails: passing an AR instance raises ArgumentError.
   it("update rejects a Base instance", async () => {
     const t = await Topic.create({ title: "a" });
-    // Cast the static to a loose signature to bypass the overloads — we're
-    // verifying the runtime guard rejects a Base instance, not a supported form.
     const update = Topic.update as (ids: unknown, attrs: unknown) => Promise<unknown>;
     await expect(update(t, { title: "x" })).rejects.toThrow(/ActiveRecord::Base/);
   });
 
-  // Mirrors the Rails module layering: ActiveRecord::Validations#save! runs
-  // perform_validations before super → Persistence#create_or_update (where the
-  // destroyed guard lives). A record that is both destroyed and invalid must
-  // therefore raise RecordInvalid (validations first), not the
-  // RecordNotSaved("Failed to save the record") the destroyed guard would yield.
   it("save! runs validations before the destroyed guard", async () => {
     const developer = CanonicalDeveloper.new({ name: "DC", salary: 1_000_000 });
     (developer as unknown as { _destroyed: boolean })._destroyed = true;
@@ -170,11 +141,6 @@ describe("PersistenceTest (trails)", () => {
 describe("PersistenceTest (trails)", () => {
   const { clothingItems } = fixtures(["clothingItems"]);
 
-  // Regression guard: like save/delete, `updateColumns` must locate the row via
-  // `_query_constraints_hash` (Rails persistence.rb:615-624/852-858), so a model
-  // declaring `query_constraints` updates by those columns rather than the
-  // primary key alone. `ClothingItem` declares `query_constraints :clothing_type,
-  // :color`.
   it("updateColumns targets query_constraints columns in the WHERE", async () => {
     const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
@@ -192,19 +158,7 @@ describe("PersistenceTest (trails)", () => {
 describe("PersistenceTest (trails)", () => {
   fixtures(["topics"]);
 
-  // Trails-only edge with no Rails counterpart (Rails keys attribute methods
-  // per-class off the class's own `table_name`, model_schema.rb): the residual
-  // case PR #4680 left uncovered. A non-STI subclass that overrides
-  // `_tableName` AND declares an `attribute()` before its first reflection
-  // forks its own pending-modification queue, copying the ancestor's foreign
-  // schema defs. `ensureSchemaLoaded` must still reflect the subclass's own
-  // table rather than trusting those copied defs and silently dropping writes.
-  // Mirrors `persist inherited class with different table name` (the Rails
-  // test in persistence.test.ts) plus a predeclared virtual attribute.
   it("persist inherited class with different table name and predeclared attribute", async () => {
-    // Reflect the ancestor first so its `columnsHash` holds
-    // schema-sourced defs for the `minimalistics` table — the state the
-    // subclass's map is forked from.
     await Minimalistic.create({});
 
     class MinimalisticAircraft extends Minimalistic {
@@ -215,10 +169,6 @@ describe("PersistenceTest (trails)", () => {
     }
     registerModel(MinimalisticAircraft);
 
-    // Evict `aircraft` from the adapter schema cache so the sync reconcile path
-    // cannot find its columns — the cold-cache condition under which the bug
-    // bites (otherwise a warm cross-file cache masks it). Only clears the
-    // sibling `Aircraft`'s reflection, not the subclass's copied foreign defs.
     void Aircraft.resetColumnInformation();
 
     const before = (await Aircraft.count()) as number;
@@ -231,13 +181,8 @@ describe("PersistenceTest (trails)", () => {
     await aircraft.save();
     expect(await Aircraft.count()).toBe(before + 1);
 
-    // The subclass reflected its own `aircraft` table: the write persisted
-    // (without the fix, `reconcileVirtualAttributes` never learns `name` and the
-    // insert silently drops it, reading back `null`).
     const last = (await Aircraft.last()) as unknown as { name: string | null } | null;
     expect(last?.name).toBe("Wright Glider");
-    // The foreign `expires_at` column (copied from the `minimalistics` map) is
-    // gone, and the predeclared virtual attribute survives the reflection.
     expect(MinimalisticAircraft.columnNames()).not.toContain("expires_at");
     expect(MinimalisticAircraft.columnNames()).toContain("name");
     expect(aircraft.wingspan).toBeNull();
@@ -247,13 +192,6 @@ describe("PersistenceTest (trails)", () => {
 describe("PersistenceTest (trails)", () => {
   fixtures(["companies"]);
 
-  // Rails' becomes allocates with `klass.allocate` (persistence.rb:487), which
-  // never enters Inheritance::ClassMethods#new — so the abstract-class guard
-  // `new` raises NotImplementedError from (inheritance.rb:56-59) must not fire
-  // for becomes(). The guard's other half, `self == Base`, is not reachable
-  // through becomes in Rails either: `allocate.send(:initialize)` seeds
-  // `@attributes` from `_default_attributes`, which loads the schema and
-  // raises TableNotSpecified for table-less Base.
   it("becomes bypasses the abstract-instantiation guard", async () => {
     class AbstractFirm extends Company {
       static {
@@ -270,11 +208,6 @@ describe("PersistenceTest (trails)", () => {
 describe("PersistenceTest (trails)", () => {
   fixtures(["posts"]);
 
-  // persistence.rb:243-246 — the prefetch arm re-casts the sequence value
-  // through `_default_attributes[primary_key]` before it reaches the INSERT.
-  // `PostWithPrefetchedPk` returns an already-cast Integer, so a raw-value
-  // assignment is indistinguishable there; a String-returning sequence is what
-  // separates `with_cast_value` from a bare write.
   it("prefetched pk is re-cast through the primary key's default attribute", async () => {
     class PostWithStringSequence extends (CanonicalPost as unknown as typeof Base) {
       static _tableName = "posts";
@@ -302,14 +235,8 @@ describe("PersistenceTest (trails)", () => {
       Notifications.unsubscribe(sub);
     }
 
-    // Fails loudly rather than passing vacuously if the INSERT is ever emitted
-    // under a shape this subscriber does not match.
     expect(insertSql).not.toBeNull();
 
-    // SQLite and PostgreSQL bind the value; MySQL and MariaDB inline it into
-    // the statement. Render both channels with strings quoted the way the
-    // inlined form quotes them, so one pair of assertions covers every adapter:
-    // the cast Integer appears bare, the raw String would appear quoted.
     const emitted = [
       insertSql ?? "",
       ...insertBinds.map((b) => (typeof b === "string" ? `'${b}'` : String(b))),

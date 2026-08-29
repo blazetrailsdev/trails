@@ -1,5 +1,4 @@
 import type { Customer } from "./customer.js";
-// vendor/rails/activerecord/test/models/order.rb
 import { Base } from "../../base.js";
 
 export class Order extends Base {

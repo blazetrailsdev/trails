@@ -9,27 +9,6 @@ import {
   EncryptedUniquenessValidator,
 } from "./extended-deterministic-uniqueness-validator.js";
 
-/**
- * Boot-time entrypoint. Installs the deterministic-encryption query
- * patches against the real `Relation`, `Base`, and `EncryptedAttributeType`
- * classes if `Configurable.config.extendQueries` is true.
- *
- * Also installs `EncryptedUniquenessValidator` into `UniquenessValidator`
- * so uniqueness checks cover all previous encryption schemes.
- *
- * Mirrors: railtie.rb:349-355 — the `on_load(:active_record)` block that calls
- * `ActiveRecord::Encryption::ExtendedDeterministicQueries.install_support`
- * and `ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator.install_support`
- * when `config.active_record.encryption.extend_queries` is set.
- *
- * Safe to call multiple times — both installers are idempotent. Returns
- * whether `ExtendedDeterministicQueries` patches are currently installed,
- * regardless of the current `extendQueries` flag (i.e. returns `true`
- * even if patches were installed in a prior call before the flag was cleared).
- * Note: `ExtendedDeterministicUniquenessValidator` is installed at the same
- * time; call `ExtendedDeterministicUniquenessValidator.resetSupport()` in
- * test teardown to undo the `UniquenessValidator#validateEach` patch.
- */
 export function installExtendedQueriesIfConfigured(): boolean {
   if (!Configurable.config.extendQueries) return ExtendedDeterministicQueries.installed;
   ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });

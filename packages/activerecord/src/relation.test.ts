@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/relation_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Relation } from "./index.js";
@@ -12,8 +7,6 @@ import { registerModel } from "./associations.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { quoteTableName as canonicalQuoteTableName } from "./support/quote-regex.js";
-// Aliased so the canonical models read clearly alongside the merge-block usage
-// below and so the `parity:test` `RelationTest` matcher stays unambiguous.
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
   Comment as CanonComment,
@@ -24,14 +17,8 @@ import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
 
-// Mirrors relation_test.rb's `EnsureRoundTripTypeCasting` / `UpdateAllTestModel`
-// (relation_test.rb:381-406): a custom type whose cast/serialize/deserialize each
-// assert their input, so the `update_all` round trip is verifiable. The model
-// rides the canonical `posts` table (Rails: `self.table_name = "posts"`).
 class EnsureRoundTripTypeCasting extends ValueType {
   override readonly name = "string" as unknown as "value";
-  // nil passes through (Rails `Type::Value` maps nil→nil); trails reads the
-  // column default eagerly during model construction, where Rails would not.
   override cast(value: unknown): unknown {
     if (value == null) return value;
     if (value !== "value from user") throw new Error(String(value));
@@ -56,20 +43,6 @@ class UpdateAllTestModel extends Base {
   }
 }
 
-// ==========================================================================
-// RelationTest — targets relation_test.rb
-//
-// Converged onto the canonical schema (RFC 0019): rows come from canonical
-// fixtures via `fixtures`, never `defineSchema`. Rails'
-// `fixtures :posts, :comments, :authors, :author_addresses, :ratings,
-// :categorizations` maps to the registry-name array below.
-//
-// Tests whose names have no relation_test.rb counterpart (e.g. `reload`,
-// `count`, `build`, `last`) are trails-only smoke tests retained per RFC 0019;
-// their bodies ride the canonical `posts` table. Because the canonical `posts`
-// fixtures preload rows, trails-only count/id assertions measure a delta or
-// scope to records they create under the rolled-back transactional fixture.
-// ==========================================================================
 describe("RelationTest", () => {
   fixtures(["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"]);
 
@@ -115,7 +88,6 @@ describe("RelationTest", () => {
   });
 
   it("multiple selects", () => {
-    // reselect replaces previous select
     const sql = CanonPost.select("title").reselect("body").toSql();
     expect(sql).toContain("body");
   });
@@ -158,7 +130,7 @@ describe("RelationTest", () => {
   });
 
   it("update all goes through normal type casting", async () => {
-    await UpdateAllTestModel.updateAll({ body: "value from user", type: null }); // No STI
+    await UpdateAllTestModel.updateAll({ body: "value from user", type: null });
 
     const first = await UpdateAllTestModel.first();
     expect((first as any).body).toBe("type cast from database");
@@ -209,7 +181,6 @@ describe("RelationTest", () => {
   });
 
   it("finding with subquery", () => {
-    // Subquery in where
     const subquery = CanonPost.where({ title: "a" }).select("id");
     const sql = CanonPost.where({ id: subquery }).toSql();
     expect(sql).toContain("IN");
@@ -302,9 +273,6 @@ describe("RelationTest", () => {
   });
 
   it("bad constants raise errors", () => {
-    // Rails asserts `ActiveRecord::Relation::HelloWorld` raises `NameError`
-    // (relation_test.rb:122-125). TypeScript has no constant-resolution / NameError;
-    // the faithful analogue is that no such member exists on `Relation`.
     expect((Relation as any).HelloWorld).toBeUndefined();
   });
 
@@ -334,15 +302,10 @@ describe("RelationTest", () => {
   });
 
   it("merging an empty hash into a relation", () => {
-    // merge()'s type only accepts a Relation; Rails accepts a hash, so cast the
-    // empty hash to exercise the HashMerger empty-hash path (relation_test.rb:160).
     const merged = CanonPost.all().merge({} as any);
     expect(merged.whereClause).toEqual(WhereClause.empty());
   });
 
-  // Rails `Relation::HashMerger#initialize` validates keys with
-  // `assert_valid_keys(*Relation::VALUE_METHODS)`, so `merge(omg: "lol")` raises
-  // ArgumentError (merger.rb:7-12, relation_test.rb:164-166).
   it("merging a hash with unknown keys raises", () => {
     expect(() => CanonPost.all().merge({ omg: "lol" } as any)).toThrow();
     let error: unknown;
@@ -374,7 +337,6 @@ describe("RelationTest", () => {
   it("merging readonly false", () => {
     const relation = CanonPost.all();
     const readonlyFalseRelation = CanonPost.all().readonly(false);
-    // test merging in both directions
     expect(relation.merge(readonlyFalseRelation).isReadonly).toBe(false);
     expect(readonlyFalseRelation.merge(relation).isReadonly).toBe(false);
   });
@@ -397,10 +359,6 @@ describe("RelationTest", () => {
 
   it("respond to for non selected element", async () => {
     const post: any = await CanonPost.select("title").first();
-    // Rails: a partially-selected record does not respond to unloaded attributes
-    // "since invoking it raises exception" (relation_test.rb:284-289). trails has
-    // no `respond_to?`, but enforces the same contract — invoking the unselected
-    // attribute raises MissingAttributeError.
     expect(() => post.body).toThrow();
   });
 
@@ -450,8 +408,6 @@ describe("RelationTest", () => {
   });
 
   it("skip preloading after arel has been generated", () => {
-    // Rails (relation_test.rb:414-419): build a Comment relation, generate its
-    // arel, then `skip_preloading!` without raising.
     expect(() => {
       const relation = CanonComment.all();
       relation.arel();
@@ -484,7 +440,7 @@ describe("RelationTest", () => {
     const vals1 = rel.whereValuesHash();
     const vals2 = rel.whereValuesHash();
     expect(vals1).toEqual(vals2);
-    expect(vals1).not.toBe(vals2); // should be a copy
+    expect(vals1).not.toBe(vals2);
   });
 
   it("does not duplicate optimizer hints on merge", () => {
@@ -507,10 +463,6 @@ describe("RelationTest", () => {
   });
 });
 
-// Canonical-model coverage for RelationTest cross-model merge — kept in a
-// dedicated describe so it can run on the canonical schema/fixtures. Same
-// describe name so `parity:test` matches it to Ruby's `RelationTest` in
-// relation_test.rb.
 describe("RelationTest", () => {
   const { authors } = fixtures([
     "authors",
@@ -530,11 +482,6 @@ describe("RelationTest", () => {
     registerModel(CanonCategorization);
   });
 
-  // Mirrors Rails Merger#merge_joins (merger.rb): a cross-model merge partitions
-  // the source relation's joins_values into `associations` (a cross-klass
-  // InnerJoin JoinDependency) and `others` (raw SQL strings / Arel nodes),
-  // threaded together via `relation.joins!(join_dependency, *others)` so the raw
-  // `others` join clause survives alongside the association join.
   it("relation merging with merged joins as strings", async () => {
     const joinString = `LEFT OUTER JOIN ${canonicalQuoteTableName("ratings")} ON ${canonicalQuoteTableName(
       "comments",
@@ -545,8 +492,6 @@ describe("RelationTest", () => {
       .merge(specialCommentsWithRatings);
     const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
 
-    // The raw `others` join clause from the cross-model source survives verbatim
-    // alongside the association join (special_comments → comments).
     const sql = merged.toSql();
     expect(sql).toContain(`INNER JOIN ${canonicalQuoteTableName("comments")}`);
     expect(sql).toContain(joinString);
@@ -584,7 +529,6 @@ describe("RelationTest", () => {
   });
 
   it("relation merging with merged symbol joins has correct size and count", async () => {
-    // Has one entry per comment
     const mergedAuthorsWithCommentedPostsRelation = CanonAuthor.joins(":posts").merge(
       CanonPost.joins(":comments"),
     );
@@ -602,10 +546,6 @@ describe("RelationTest", () => {
     );
   });
 
-  // A cross-model `merge` that joins an already-joined table aliases the child
-  // INNER JOIN (`authors_categorizations`) via a shared AliasTracker re-aligned
-  // across the merged JoinDependencies (Rails build_joins,
-  // query_methods.rb:1894).
   it("relation merging with merged symbol joins is aliased", async () => {
     const categorizationsWithAuthors = CanonCategorization.joins(":author");
     const queries = await captureSql(async () => {
@@ -620,7 +560,6 @@ describe("RelationTest", () => {
     );
     expect(nbInnerJoin).toBe(3);
 
-    // using `\W` as the column separator
     const aliasPattern = new RegExp(
       `INNER\\s+JOIN\\s+${canonicalQuoteTableName("authors")}\\s+\\Wauthors_categorizations\\W`,
       "i",
@@ -628,9 +567,6 @@ describe("RelationTest", () => {
     expect(queries.some((sql) => aliasPattern.test(sql))).toBe(true);
   });
 
-  // The same cross-model merge join, now aliased, no longer raises
-  // `ambiguous column name: authors.id` at runtime. See the sibling
-  // `is aliased` test above.
   it("relation with merged joins aliased works", async () => {
     const categorizationsWithAuthors = CanonCategorization.joins(":author");
     const postsWithJoinsAndMerges = CanonPost.joins(":author", ":categorizations")

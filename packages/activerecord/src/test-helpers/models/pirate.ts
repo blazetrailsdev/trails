@@ -10,7 +10,6 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { throwAbort } from "@blazetrails/activesupport";
-// vendor/rails/activerecord/test/models/pirate.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
@@ -49,13 +48,6 @@ export class Pirate extends Base {
   declare parrot_id: number;
   declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
 
-  /**
-   * Rails: `module PostTreasuresExtension; def build(attributes = {})`
-   * `super({ name: "from extension" }.merge(attributes)); end; end`.
-   * Ruby's `super` reaches the CollectionProxy's own `build`; trails installs
-   * extension methods on the proxy instance (not a prototype layer), so the
-   * "super" call is expressed as `CollectionProxy.prototype.build.call`.
-   */
   static postTreasuresExtension = {
     build(this: CollectionProxy<Base>, ...args: unknown[]): Base {
       const attributes = (args[0] as Record<string, unknown>) ?? {};
@@ -67,7 +59,6 @@ export class Pirate extends Base {
   };
 
   static {
-    // Rails: `attr_accessor :cancel_save_from_callback, :parrots_limit`
     this.attribute("parrotsLimit", "integer");
 
     this.belongsTo("parrot", { validate: true });
@@ -162,12 +153,6 @@ export class Pirate extends Base {
   }
 }
 
-// vendor/rails/activerecord/test/models/pirate.rb:53-54 —
-// `accepts_nested_attributes_for :parrots_with_method_callbacks, ...,
-// :birds_with_method_callbacks, :birds_with_proc_callbacks, allow_destroy: true`.
-// This flips `autosave: true` on the reflections so a marked-for-destruction
-// child is routed through the collection destroy on owner save.
-// `proc(&:empty?)` — reject when the attributes hash is empty.
 const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
 
 acceptsNestedAttributesFor(Pirate, "parrots", { allowDestroy: true, rejectIf: rejectIfEmpty });

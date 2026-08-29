@@ -1,9 +1,3 @@
-// Trails-only SchemaDumper cases with no 1:1 in Rails'
-// schema_dumper_test.rb. These unit-test trails-invented exported helpers
-// (formatColspec / indexParts), the adapter-introspection dump path
-// (SchemaDumperAdapterTest), async header ordering, and DSL-helper
-// round-trips. Kept out of the Rails-mirrored schema-dumper.test.ts so
-// parity:test maps cleanly.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { Base } from "./base.js";
@@ -27,9 +21,6 @@ describe("SchemaDumper trails-only cases", () => {
       tables: async () => ["gen_defaults"],
       columns: async () => [
         { name: "id", type: "integer", primaryKey: true },
-        // A function default reflects as `default: null` + `defaultFunction`
-        // (the literal default is null; the expression rides defaultFunction),
-        // which schemaDefault routes through schemaExpression to the arrow form.
         {
           name: "token",
           type: "string",
@@ -88,12 +79,6 @@ describe("SchemaDumper trails-only cases", () => {
         { name: "n1", type: "inet" },
         { name: "n2", type: "cidr" },
         { name: "n3", type: "macaddr" },
-        // camelCase dsl name re-fed as a SQL type — previously fell through to
-        // the `enum` catch-all and was emitted via the generic
-        // `t.column("bv", "bitvarying")` path; must now resolve back to the
-        // bitVarying helper. This `bv` row is the one assertion that actually
-        // pins this PR's behavioral change — the range/network types below are
-        // SQL_TYPE_MAP keys and emit helpers before and after this change.
         { name: "bv", type: "bitVarying" },
       ],
       indexes: async () => [],
@@ -114,7 +99,6 @@ describe("SchemaDumper trails-only cases", () => {
     ]) {
       expect(output).toContain(`t.${helper}(`);
     }
-    // The fix specifically: `bv` must NOT take the generic column fallback.
     expect(output).toContain('t.bitVarying("bv")');
     expect(output).not.toContain('t.column("bv"');
     expect(output).not.toContain("t.enum(");
@@ -137,14 +121,8 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (await TopLevelDumper.dump(source)).join("\n");
-    // Regression guard against collapsing to the `enum` fallback. timestamptz/
-    // interval/oid resolve to their TableDefinition helpers (`t.timestamptz`/
-    // `t.interval`/`t.oid`); uuid has no helper and round-trips through the
-    // generic `t.column(name, sqlType)` path, keeping its own type name.
     expect(output).toContain('t.timestamptz("ts"');
     expect(output).toContain('t.column("guid", "uuid"');
-    // interval/oid resolve to their TableDefinition helpers (Rails emits
-    // `t.interval`/`t.oid`, not `t.column`).
     expect(output).toContain('t.interval("span"');
     expect(output).toContain('t.oid("obj_id"');
     expect(output).not.toContain("t.enum(");
@@ -244,12 +222,10 @@ describe("SchemaDumper trails-only cases", () => {
         },
       ],
     });
-    // auto-generated Rails name → name: omitted (export_name_on_schema_dump? == false)
     const autoName = "fk_rails_abc123def4";
     const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).join("\n");
     expect(autoOutput).toContain("addForeignKey");
     expect(autoOutput).not.toContain(`"${autoName}"`);
-    // custom name → name: included
     const customName = "fk_books_author_id";
     const customOutput = (await SchemaDumper.dump(mkSource(customName) as any)).join("\n");
     expect(customOutput).toContain(`name: "${customName}"`);
@@ -273,8 +249,6 @@ describe("SchemaDumper trails-only cases", () => {
 });
 
 describe("SchemaDumperAdapterTest", () => {
-  // Ride the primary schema-loaded pool (`Base.connection`) instead of the
-  // sidecar test pool.
   fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
@@ -319,10 +293,6 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
-    // Guards the U2 type/sqlType split: emitTable resolves the limit from the
-    // dsl/raw type carried by AdapterSchemaSource. A live introspected column's
-    // limit must survive the round-trip on the adapter path (not just the
-    // in-memory schema-statements path).
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("barcodes", {}, (t) => {
@@ -349,8 +319,6 @@ describe("SchemaDumperAdapterTest", () => {
   }, 60000);
 
   it("emitTable forwards comment from tableOptions into createTable options", async () => {
-    // Subclasses the ConnectionAdapters dumper directly — that's where emitTable
-    // (the single column_spec dispatch) lives; the bare base delegates to it.
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
@@ -409,15 +377,9 @@ describe("SchemaDumperAdapterTest", () => {
     const lines: string[] = [];
     await (dumper as any).table("t", lines);
     expect(lines[0]).toContain(`primaryKey: ["id","account_id"]`);
-    // Rails' Array case emits only `primary_key: [...]` (schema_dumper.rb:182);
-    // `id: false` would skip set_primary_key's guard on round-trip.
     expect(lines[0]).not.toContain(`id: false`);
   });
 
-  // Drop the real tables these adapter-backed tests create on the shared
-  // per-worker DB so they don't collide with sibling files under parallel forks.
-  // Nothing drops them between tests, so drop them per test (not just in
-  // afterAll) to keep the shared-DB exposure window one test wide.
   afterEach(async () => {
     const o = { ifExists: true } as const;
     await Base.connection.dropTable("barcodes", o);

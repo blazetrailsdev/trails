@@ -26,7 +26,6 @@ import type { Tagging } from "./tagging.js";
 import type { Topic } from "./topic.js";
 import type { VerySpecialComment } from "./comment.js";
 import { throwAbort } from "@blazetrails/activesupport";
-// vendor/rails/activerecord/test/models/author.rb
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { FirstPost } from "./post.js";
@@ -337,7 +336,6 @@ export class Author extends Base {
     });
 
     this.hasMany("thinkingPosts", (q: any) => q.where({ title: "So I was thinking" }), {
-      // Rails: dependent: :delete_all — not yet supported, using "delete" as closest equivalent
       dependent: "delete",
       className: "Post",
     });

@@ -1,6 +1,5 @@
 import type { DestroyAsyncParent } from "./destroy-async-parent.js";
 import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
-// vendor/rails/activerecord/test/models/dl_keyed_join.rb
 import { Base } from "../../base.js";
 
 export class DlKeyedJoin extends Base {

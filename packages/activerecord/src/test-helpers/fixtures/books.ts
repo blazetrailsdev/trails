@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/books.yml
 export const bookFixtureData = {
   awdr: {
     id: 1,
@@ -14,10 +13,6 @@ export const bookFixtureData = {
     illustrator_visibility: 0,
     font_size: 1,
     difficulty: 1,
-    // Rails YAML carries `boolean_status: :enabled`; the Book enum maps
-    // `{ enabled: true, disabled: false }`, so the stored value is a real
-    // boolean. PG/MariaDB reject an integer literal in a boolean column
-    // (SQLite's dynamic typing tolerated the prior `1`).
     boolean_status: true,
     cover: "soft",
   },
@@ -35,9 +30,6 @@ export const bookFixtureData = {
     name: "Domain-Driven Design",
     format: "hardcover",
     status: 2,
-    // Rails YAML carries `last_read: "forgotten"`; the Book enum maps
-    // `forgotten` to nil (`enum :last_read, { …, forgotten: nil }`), so the
-    // stored value is NULL.
     last_read: null,
   },
   tlg: {

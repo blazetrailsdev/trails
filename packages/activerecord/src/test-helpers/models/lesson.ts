@@ -1,6 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Student } from "./student.js";
-// vendor/rails/activerecord/test/models/lesson.rb
 import { Base } from "../../base.js";
 
 export class LessonError extends Error {}

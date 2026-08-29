@@ -33,7 +33,6 @@ export class AdapterNotSpecified extends ActiveRecordError {
   }
 }
 
-// Raised when a model makes a query but it has not specified an associated table.
 export class TableNotSpecified extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -61,12 +60,6 @@ export class AdapterError extends ActiveRecordError {
     this._connectionPool = options?.connectionPool;
   }
 
-  /**
-   * Attach the originating pool to a translated exception, mirroring Rails'
-   * `AbstractAdapter#translate_exception`, which assigns `connection_pool` to
-   * every exception it builds. Idempotent: an explicitly-constructed pool is
-   * never overwritten.
-   */
   setConnectionPool(connectionPool: unknown): this {
     if (this._connectionPool === undefined) {
       this._connectionPool = connectionPool;
@@ -78,11 +71,6 @@ export class AdapterError extends ActiveRecordError {
 export class ConnectionNotEstablished extends AdapterError {
   private _poolSet: boolean;
 
-  /**
-   * Rails builds this one from the driver exception rather than a message string
-   * (`sqlite3_adapter.rb:704`); Ruby's `Exception.new` takes any object and
-   * `to_s`es it, so an Error is accepted here and kept as the cause.
-   */
   constructor(message?: string | Error, options?: { connectionPool?: unknown; cause?: unknown }) {
     const cause = options?.cause ?? (message instanceof Error ? message : undefined);
     super(message instanceof Error ? message.message : message, { ...options, cause });
@@ -106,13 +94,6 @@ export class ConnectionTimeoutError extends ConnectionNotEstablished {
   }
 }
 
-/**
- * Raised by `ConnectionPool#with_exclusively_acquired_all_connections` when
- * the pool can't take ownership of every existing connection within the
- * configured timeout.
- *
- * Mirrors: ActiveRecord::ExclusiveConnectionTimeoutError
- */
 export class ExclusiveConnectionTimeoutError extends ConnectionTimeoutError {
   constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
     super(message, options);
@@ -193,20 +174,6 @@ export class RecordNotFound extends ActiveRecordError {
   }
 }
 
-/**
- * Raised when an association's target is replaced while a load for that same
- * association is still in flight.
- *
- * **trails-only — no Rails analogue, deliberately.** Rails cannot reach this
- * state: `Association#find_target`
- * (activerecord/lib/active_record/associations/association.rb:248) is
- * synchronous, so nothing can touch the holder between issuing the query and
- * assigning its result. Our loader awaits, which opens a window in which an
- * assignment and a load both claim the target. There is no correct silent
- * winner — discarding the assignment loses a caller's explicit intent, and
- * discarding the load hides that a query was wasted — so trails refuses the
- * race instead of resolving it. Await the load before assigning.
- */
 export class AssociationTargetReplacedDuringLoad extends ActiveRecordError {
   constructor(message?: string) {
     super(message);
@@ -234,15 +201,9 @@ export class RecordNotDestroyed extends ActiveRecordError {
   }
 }
 
-// RecordInvalid is defined in validations.ts (matching Rails' validations.rb).
-// Type-only re-export: a runtime re-export would create a circular dependency
-// (errors.ts → validations.ts → errors.ts). The public API exports
-// RecordInvalid from index.ts which imports from validations.ts.
 export type { RecordInvalid } from "./validations.js";
 
 export class SoleRecordExceeded extends ActiveRecordError {
-  // Rails names this reader `record` even though `sole`/`find_sole_by`
-  // pass the model class (see finder_methods.rb#sole). Match Rails.
   readonly record?: { name?: string };
 
   constructor(record?: { name?: string }) {
@@ -265,9 +226,6 @@ export class StatementInvalid extends AdapterError {
     this.name = "StatementInvalid";
     this.sql = options?.sql;
     this.binds = options?.binds;
-    // Mirrors Rails set_query's `unless @sql` guard: a later setQuery only
-    // fills in sql/binds when none were supplied at construction. translate_exception
-    // builds the error with sql: null, so the log() rescue can still attach them.
     this._querySet = options?.sql != null;
   }
 
@@ -281,7 +239,6 @@ export class StatementInvalid extends AdapterError {
   }
 }
 
-/** Mirrors `ActiveRecord::QueryAborted`. */
 export class QueryAborted extends StatementInvalid {
   constructor(
     message?: string,
@@ -292,14 +249,7 @@ export class QueryAborted extends StatementInvalid {
   }
 }
 
-/** Mirrors `ActiveRecord::ConnectionFailed`. */
 export class ConnectionFailed extends QueryAborted {
-  /**
-   * Rails' PG translator builds this one from the driver exception rather than a
-   * message string (`postgresql_adapter.rb:815`); Ruby's `Exception.new` takes
-   * any object and `to_s`es it, so an Error is accepted here and kept as the
-   * cause.
-   */
   constructor(
     message?: string | Error,
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
@@ -310,7 +260,6 @@ export class ConnectionFailed extends QueryAborted {
   }
 }
 
-/** Mirrors `ActiveRecord::TransactionRollbackError`. */
 export class TransactionRollbackError extends StatementInvalid {
   constructor(
     message?: string,
@@ -321,8 +270,6 @@ export class TransactionRollbackError extends StatementInvalid {
   }
 }
 
-// AsynchronousQueryInsideTransactionError will be raised when attempting
-// to perform an asynchronous query from inside a transaction.
 export class AsynchronousQueryInsideTransactionError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -330,7 +277,6 @@ export class AsynchronousQueryInsideTransactionError extends ActiveRecordError {
   }
 }
 
-/** Mirrors `ActiveRecord::SerializationFailure`. */
 export class SerializationFailure extends TransactionRollbackError {
   constructor(
     message?: string,
@@ -341,7 +287,6 @@ export class SerializationFailure extends TransactionRollbackError {
   }
 }
 
-/** Mirrors `ActiveRecord::Deadlocked`. */
 export class Deadlocked extends TransactionRollbackError {
   constructor(
     message?: string,
@@ -352,7 +297,6 @@ export class Deadlocked extends TransactionRollbackError {
   }
 }
 
-/** Mirrors `ActiveRecord::LockWaitTimeout`. */
 export class LockWaitTimeout extends StatementInvalid {
   constructor(
     message?: string,
@@ -363,7 +307,6 @@ export class LockWaitTimeout extends StatementInvalid {
   }
 }
 
-/** Mirrors `ActiveRecord::StatementTimeout`. */
 export class StatementTimeout extends QueryAborted {
   constructor(
     message?: string,
@@ -374,7 +317,6 @@ export class StatementTimeout extends QueryAborted {
   }
 }
 
-/** Mirrors `ActiveRecord::AdapterTimeout`. */
 export class AdapterTimeout extends QueryAborted {
   constructor(
     message?: string,
@@ -385,7 +327,6 @@ export class AdapterTimeout extends QueryAborted {
   }
 }
 
-/** Mirrors `ActiveRecord::QueryCanceled`. */
 export class QueryCanceled extends QueryAborted {
   constructor(
     message?: string,
@@ -426,26 +367,15 @@ export class InvalidForeignKey extends WrappedDatabaseException {
   }
 }
 
-/**
- * Normalize a MySQL SQL column type to its Rails migration type keyword.
- * E.g. `int(11)` → `integer`, `bigint(20)` → `bigint`, `varchar(255)` → `string`,
- * `text` → `text`, `tinyint(1)` → `boolean`.
- *
- * Used by both MismatchedForeignKey (error construction) and
- * _enrichMismatchedForeignKey (adapter enrichment) to keep suggestion
- * messages consistent.
- */
 export function sqlTypeToMigrationKeyword(sqlType: string): string {
   const normalized = sqlType.trim().toLowerCase();
 
   if (/^tinyint\s*\(\s*1\s*\)$/.test(normalized)) return "boolean";
 
-  // Strip size/precision (e.g. `int(11)`, `varchar(255)`) and modifiers
-  // (e.g. `int unsigned`) to get the bare base type.
   const base = normalized.split("(")[0].trim().split(/\s+/)[0];
 
   if (base === "bigint") return "bigint";
-  if (base.endsWith("int")) return "integer"; // int, tinyint, smallint, mediumint
+  if (base.endsWith("int")) return "integer";
   if (base === "varchar" || base === "char") return "string";
   if (base === "text" || base === "tinytext" || base === "mediumtext" || base === "longtext") {
     return "text";
@@ -469,19 +399,7 @@ export interface MismatchedForeignKeyOptions {
   queryParser?: (sql: string) => Partial<MismatchedForeignKeyOptions>;
 }
 
-/**
- * Raised when a FK column type doesn't match the referenced PK column type.
- *
- * Mirrors: ActiveRecord::MismatchedForeignKey (errors.rb:238)
- *
- * Intentionally extends StatementInvalid (not InvalidForeignKey) — matches
- * Rails where MismatchedForeignKey < StatementInvalid, not < InvalidForeignKey.
- *
- * Provides a human-readable message describing the mismatch and suggesting
- * the correct column type to use.
- */
 export class MismatchedForeignKey extends StatementInvalid {
-  /** Parsed FK details for async enrichment after construction. */
   readonly fkDetails: Omit<
     MismatchedForeignKeyOptions,
     "message" | "sql" | "binds" | "connectionPool" | "cause"
@@ -579,22 +497,6 @@ export class PreparedStatementInvalid extends ActiveRecordError {
   }
 }
 
-/**
- * Raised when the server tells us a cached prepared plan is no longer
- * valid (usually after DDL on a referenced object) AND we're inside a
- * transaction so we can't transparently retry — subsequent commands
- * would raise InFailedSqlTransaction. Callers (typically the
- * transaction machinery) can catch this and retry the whole
- * transaction.
- *
- * Extends `StatementInvalid` so handlers that rescue generic statement
- * failures catch this too — matching Rails' class hierarchy
- * (`activerecord/lib/active_record/errors.rb:362`,
- * `PreparedStatementCacheExpired < StatementInvalid`).
- *
- * Mirrors: ActiveRecord::PreparedStatementCacheExpired
- * (raised from postgresql/database_statements.rb:147).
- */
 export class PreparedStatementCacheExpired extends StatementInvalid {
   constructor(
     message?: string,
@@ -628,7 +530,6 @@ export class DatabaseVersionError extends ActiveRecordError {
   }
 }
 
-/** Mirrors `ActiveRecord::RangeError`. */
 export class RangeError extends StatementInvalid {
   constructor(
     message?: string,
@@ -747,25 +648,13 @@ export class UnknownAttributeError extends ActiveRecordError {
   }
 }
 
-// Ruby's NameError is a core class, not an Active Record one: it is what
-// constant resolution (so Inflector.constantize) raises. Re-exported from
-// Active Support's core-ext port so `rescue NameError` sites catch the same
-// class whether the constant was resolved here or by the inflector.
 export { NameError } from "@blazetrails/activesupport";
 
 export class SQLWarning extends AdapterError {
   readonly code: string | null;
   readonly level: string | null;
-  // `handle_warnings` assigns whatever its caller passes: the PG::Result on
-  // PostgreSQL (postgresql/database_statements.rb:166, :220) and the SQL string
-  // on MySQL, so Rails' `sql` is not a String on every adapter.
   sql?: unknown;
 
-  /**
-   * `connectionPool` is inherited via {@link AdapterError}'s accessor; we
-   * accept it as a constructor argument mirroring Rails'
-   * `SQLWarning.new(message, code, level, sql, pool)`.
-   */
   constructor(
     message?: string,
     code?: string | null,
@@ -781,12 +670,6 @@ export class SQLWarning extends AdapterError {
   }
 }
 
-/**
- * Raised when a query method is called with a non-attribute argument that
- * would be used as raw SQL without sanitization.
- *
- * Mirrors: ActiveRecord::UnknownAttributeReference
- */
 export class UnknownAttributeReference extends ActiveRecordError {
   constructor(message?: string) {
     super(
@@ -812,8 +695,6 @@ export class UnknownPrimaryKey extends ActiveRecordError {
   constructor(model?: UnknownPrimaryKeyModel | null, description?: string) {
     let msg: string;
     if (model) {
-      // Ruby's `#{model}` (errors.rb:477) — a Class interpolates as its name,
-      // anything else as its own `to_s`; JS stringifies a class as its source.
       msg = `Unknown primary key for table ${model.tableName} in model ${String(model.name ?? model)}.`;
       if (description) msg += `\n${description}`;
     } else {

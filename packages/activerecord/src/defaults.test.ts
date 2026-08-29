@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/defaults_test.rb
- */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -20,11 +15,6 @@ import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
-// Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-// sidecar `_pool` lease; `fixtures({})` wires the handler for every block (empty
-// map → no seed rows). The bespoke per-test tables are recreated in each block's
-// hooks, so opt out of transactional fixtures — the per-test DDL must commit,
-// not roll back inside a wrapping (PG-poisoning) transaction.
 fixtures({}, { useTransactionalTests: false });
 
 beforeAll(() => {
@@ -34,25 +24,12 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// Most suites below build their adapter-specific tables dynamically in
-// `beforeEach` (mirroring Rails' `setup` `@connection.create_table ...`): these
-// tables are not in `schema.rb` and have no canonical home, so they are created
-// per-test through the migration DSL on `Base.connection` and dropped in
-// `afterEach`. Building in `beforeEach` (not `beforeAll`) because the shared
-// per-worker DB is reset by the global `beforeEach` in cases/helper.ts.
-
-// Rails asserts string equality on binary-column defaults; a binary column
-// deserializes to bytes in trails (BinaryType → Uint8Array), so decode the
-// faithful analog of Ruby's binary string before comparing.
 function decodeBinaryDefault(value: unknown): string {
   if (typeof value === "string") return value;
   return new TextDecoder().decode(value as Uint8Array);
 }
 
 describe("DefaultTest", () => {
-  // Rails: `require "models/entrant"` + `fixtures` not needed — the test only
-  // reads `Entrant.columns_hash`. Wire the canonical `entrants` table so the
-  // shared model resolves regardless of any bespoke `entrants` a sibling left.
   fixtures(["entrants"]);
 
   it("nil defaults for not null columns", async () => {
@@ -66,10 +43,6 @@ describe("DefaultTest", () => {
   });
 });
 
-// Rails gates `test_multiline_default_text` to
-// `current_adapter?(:PostgreSQLAdapter) || current_adapter?(:SQLite3Adapter)`.
-// The `multiline_default` column comes from the adapter-specific `defaults`
-// table (postgresql_specific_schema.rb / sqlite_specific_schema.rb).
 describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
   it("multiline default text", async () => {
     const adapter = Base.connection;
@@ -78,9 +51,6 @@ describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
     }
     Default.adapter = adapter;
     await Default.loadSchema();
-    // Rails: assert("--- []\n\n" == record.multiline_default ||
-    //               "--- []\\012\\012" == record.multiline_default)
-    // Older PostgreSQL versions reflect the default with escaped newlines.
     const multiline = (new Default() as any).multiline_default;
     expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
   });
@@ -159,7 +129,6 @@ describe("DefaultStringsTest", () => {
   });
 });
 
-// Rails gates the whole class to `current_adapter?(:SQLite3Adapter, :PostgreSQLAdapter)`.
 describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   let adapter: DatabaseAdapter;
   let DefaultBinary: typeof Base;
@@ -182,27 +151,13 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
     await adapter.dropTable("default_binaries", { ifExists: true });
   });
 
-  // Rails asserts string equality; a binary column deserializes to bytes in
-  // trails (BinaryType → Uint8Array), so decode the faithful analog of Ruby's
-  // binary string before comparing.
   it("default varbinary string", () => {
     expect(decodeBinaryDefault((new DefaultBinary() as any).varbinary_col)).toBe(
       "varbinary_default",
     );
   });
 
-  // Rails nests `test_default_binary_string` under a further
-  // `current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !mariadb?` guard
-  // *inside* the sqlite/pg gate — a combination that can never hold — and
-  // `binary_col` is declared in no schema, so the test is dead on every adapter.
-  // Ported under the same compound guard for name parity (De-Morgan'd into the
-  // standard skip form); it never runs. Inlined (not hoisted) so the gate
-  // extractor sees the terms: the positive mysql term mixed with the guard is
-  // dropped as unsound and only the `mariadb` guard is kept — the same gate
-  // the Ruby extractor derives from Rails' compound `current_adapter? &&
-  // !mariadb?`.
   it.skipIf(adapterType !== "mysql" || isMariaDb)("default binary string", () => {
-    // Rails: assert_equal "binary_default", DefaultBinary.new.binary_col
     expect(decodeBinaryDefault((new DefaultBinary() as any).binary_col)).toBe("binary_default");
   });
 
@@ -244,9 +199,6 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
   });
 });
 
-// Mirrors `PostgresqlDefaultExpressionTest` (defaults_test.rb), gated to the
-// PostgreSQLAdapter. The `defaults` table comes from postgresql_specific_schema.rb
-// and is laid at boot by the adapter-specific arm of loadSchema.
 describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -276,9 +228,6 @@ describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
   });
 });
 
-// Mirrors `MysqlDefaultExpressionTest` (defaults_test.rb), gated to the
-// Mysql2Adapter. The three tables come from mysql2_specific_schema.rb and are
-// laid at boot by the adapter-specific arm of loadSchema.
 describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -286,10 +235,6 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
     adapter = Base.connection;
   });
 
-  // The `uuid()`/`concat()` function defaults reflect on both MySQL 8 (via the
-  // DEFAULT_GENERATED extra) and MariaDB (via bare-expression detection in
-  // columns(); see mysql/schema-statements.ts), so the dumper emits
-  // `default: () => "..."` on both lanes.
   itIfSupports("default_expression", "schema dump includes default expression", async () => {
     const output = await SchemaDumper.dumpTableSchema(
       adapter as unknown as SchemaSource,
@@ -383,19 +328,11 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   });
 });
 
-// Mirrors `DefaultsTestWithoutTransactionalFixtures` (defaults_test.rb), gated
-// to the Mysql2Adapter. Rails toggles strict mode via
-// `establish_connection(..., strict:)`; our Mysql2Adapter accepts the same
-// `strict` config key, so `using_strict` becomes a fresh adapter per block.
 describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
-  // Mirrors `with_mysql_not_null_table`: build the NOT NULL table on a
-  // strict/non-strict connection, yield the model, then drop it.
   async function withMysqlNotNullTable(
     strict: boolean,
     fn: (klass: typeof Base) => Promise<void>,
   ): Promise<void> {
-    // Stays self-built: `strict` is the config under test, and a non-strict
-    // sql_mode must not leak onto the shared leased connection.
     const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict });
     try {
       await adapter.createTable("test_mysql_not_null_defaults", { force: true }, (t: any) => {
@@ -430,10 +367,6 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
       expect((record as any).non_null_integer).toBe(0);
       expect((record as any).non_null_string).toBe("");
       expect((record as any).non_null_text).toBe("");
-      // Rails: `assert_equal "", record.non_null_blob`. A binary column
-      // deserializes to bytes in trails (BinaryType → Uint8Array), so the
-      // faithful analog of Ruby's empty binary string is the exact empty byte
-      // array — and its decoded text is `""`.
       expect(new Uint8Array((record as any).non_null_blob)).toEqual(new Uint8Array(0));
       expect(decodeBinaryDefault((record as any).non_null_blob)).toBe("");
     });
@@ -452,10 +385,6 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
   });
 });
 
-// Mirrors `Sqlite3DefaultExpressionTest` (defaults_test.rb), gated to the
-// SQLite3Adapter. The `defaults` table comes from sqlite_specific_schema.rb and
-// is laid at boot by the adapter-specific arm of loadSchema; expression defaults
-// reflect via column.defaultFunction (newColumnFromField/_extractDefaultFunction).
 describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 

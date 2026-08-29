@@ -1,6 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Type::Date
- */
 import { DateType as ActiveModelDate } from "@blazetrails/activemodel";
 import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 

@@ -4,9 +4,6 @@ import type { Content } from "./content.js";
 import type { EssayDestroyAsync } from "./essay-destroy-async.js";
 import type { Tag } from "./tag.js";
 import type { Tagging } from "./tagging.js";
-// vendor/rails/activerecord/test/models/book_destroy_async.rb
-// Rails uses dependent: :destroy_async. The runtime accepts "destroyAsync" but
-// AssociationOptions.dependent type union doesn't include it yet; using "destroy" until the type is widened.
 import { Base } from "../../base.js";
 
 export class BookDestroyAsync extends Base {

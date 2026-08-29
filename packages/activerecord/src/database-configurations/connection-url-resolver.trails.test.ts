@@ -65,8 +65,6 @@ describe("ConnectionUrlResolver", () => {
   });
 
   it("lets opaque-URI structural fields win over query params", () => {
-    // Rails: raw_config opaque branch is query_hash.merge(adapter:, database:),
-    // so structural fields override any same-named query params.
     const hash = new ConnectionUrlResolver(
       "sqlite3:foo.db?database=ignored&adapter=ignored&pool=5",
     ).toHash();
@@ -87,7 +85,6 @@ describe("ConnectionUrlResolver", () => {
   });
 
   it("redacts credentials from error messages", () => {
-    // @ is reserved — this should fail to parse but not leak the password
     expect(() => new ConnectionUrlResolver("postgres://user:secret@[invalid]:99/db")).toThrow(
       /\*\*\*@/,
     );
@@ -100,8 +97,6 @@ describe("ConnectionUrlResolver", () => {
     });
 
     it("resolves through a mapping replaced via setProtocolAdapters", () => {
-      // Mirrors Rails' `ActiveRecord.protocol_adapters = { ... }` (full assignment
-      // via the module writer) — the resolver must read the replaced mapping.
       ActiveRecord.protocolAdapters = { custom: "postgresql" };
       const hash = new ConnectionUrlResolver("custom://localhost/db").toHash();
       expect(hash.adapter).toBe("postgresql");

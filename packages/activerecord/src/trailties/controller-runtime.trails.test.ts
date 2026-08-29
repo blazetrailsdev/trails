@@ -99,7 +99,6 @@ describe("ControllerRuntimeTest", () => {
 
       cleanupViewRuntime.call(host);
 
-      // pre-render SQL time (6.0) is added to existing dbRuntime (1.0)
       expect(host.dbRuntime).toBe(7.0);
     });
 
@@ -118,8 +117,6 @@ describe("ControllerRuntimeTest", () => {
 
       const result = cleanupViewRuntime.call(host);
 
-      // Without ActionView super(), no queries run between the two resets so
-      // queriesRt = 0 and the return value is viewRenderTime(0) - queriesRt(0) = 0.
       expect(result).toBe(0);
     });
   });

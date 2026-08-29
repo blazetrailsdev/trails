@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import { describe, it, expect, vi } from "vitest";
@@ -37,15 +33,6 @@ function defineBehaviourTopic() {
   };
 }
 
-// Rails `fixtures :topics, :owners, :pets`. The canonical tables come from the
-// template clone.
-//
-// Rails marks CallbacksOnDestroyUpdateActionRaceTest and
-// CallbacksOnActionAndConditionTest with `use_transactional_tests = false`
-// because their after_commit / after_rollback assertions need real transaction
-// boundaries (the destroy/update-after-delete race and the commit-time :if
-// condition only resolve at an actual commit, not a nested fixture savepoint).
-// Opt those tests out of the shared transaction by name so they commit for real.
 fixtures(["topics", "owners", "pets"], {
   usesTransaction: [
     "trigger once on multiple deletion within transaction",
@@ -54,10 +41,6 @@ fixtures(["topics", "owners", "pets"], {
     "rollback on multiple deletions",
     "trigger on update where row was deleted",
     "callback on action with condition",
-    // SetCallbackTest is also `use_transactional_tests = false` in Rails
-    // (transaction_callbacks_test.rb:1038): after_commit needs a real commit
-    // boundary. It passes under the fixture savepoint on sqlite but PG's
-    // savepoint semantics differ, so opt out for parity.
     "set callback with on",
   ],
 });
@@ -176,13 +159,11 @@ describe("TransactionCallbacksTest", () => {
       called.push("after_commit");
     });
     const t = await Topic.create({ title: "test" });
-    // First transaction: update triggers after_commit
     await transaction(Topic, async () => {
       await t.update({ title: "updated" });
     });
     expect(called).toEqual(["after_commit", "after_commit"]);
     called.length = 0;
-    // Second transaction: destroy should only fire its own callback, not leak from previous
     await transaction(Topic, async () => {
       await t.destroy();
     });
@@ -203,7 +184,7 @@ describe("TransactionCallbacksTest", () => {
     });
     await transaction(Topic, async () => {
       await Topic.create({ title: "test" });
-      expect(called).toEqual([]); // not fired yet
+      expect(called).toEqual([]);
     });
     expect(called).toEqual(["after_commit"]);
   });
@@ -250,8 +231,6 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on create after transaction commits for new record if create succeeds creating through association", async () => {
-    // Mirrors Rails: TopicWithCallbacks.create! + topic.replies.create (no content)
-    // → validates_presence_of :content fails → afterCreateCommit never fires.
     const commitHistory: string[] = [];
     class ReplyForAssoc extends Base {
       declare title: string;
@@ -286,7 +265,6 @@ describe("TransactionCallbacksTest", () => {
     registerModel(TopicForAssoc);
 
     const topic = (await TopicForAssoc.create({ title: "Parent" })) as any;
-    // Create with no title → validation fails → afterCreateCommit does NOT fire
     await topic.assocReplies.create({});
     expect(commitHistory).toEqual([]);
   });
@@ -306,7 +284,6 @@ describe("TransactionCallbacksTest", () => {
       const t = new Topic({ title: "unsaved" });
       await t.destroy();
     });
-    // New record that was never saved shouldn't trigger after_commit on destroy
     expect(called).toEqual([]);
   });
 
@@ -375,7 +352,6 @@ describe("TransactionCallbacksTest", () => {
         },
         { requiresNew: true },
       );
-      // The savepoint commit must NOT fire after_commit — only the outermost does.
       expect(called).toEqual([]);
     });
     expect(called).toEqual(["after_commit"]);
@@ -507,9 +483,6 @@ describe("TransactionCallbacksTest", () => {
       afterHistory.push("after_rollback");
     });
 
-    // The test suite wraps each test in a SAVEPOINT, so `Topic.transaction()`
-    // creates a nested SavepointTransaction whose commit calls releaseSavepoint.
-    // Throwing there exercises the rollback-on-failed-commit path.
     const adapter = Topic.connection as any;
     const spy = vi.spyOn(adapter, "releaseSavepoint").mockImplementationOnce(async () => {
       throw new Error("commit failed");
@@ -535,9 +508,6 @@ describe("TransactionCallbacksTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Pre-create the records before registering callbacks so their create
-    // commits are not counted (mirrors Rails using fixture records + per-record
-    // instance blocks registered after the records already exist).
     const first = (await Topic.create({ title: "first" })) as any;
     const second = (await Topic.create({ title: "second" })) as any;
     Topic.afterRollback(function (record: any) {
@@ -713,9 +683,6 @@ describe("TransactionCallbacksTest", () => {
         throw new Rollback();
       });
     } catch (e) {
-      // Mirror Rails' `rescue error_class`: only swallow the error the rollback
-      // callback raised. Re-throw anything else so a failure in the state-restore
-      // path can't hide behind a blanket catch.
       if (!(e instanceof ErrorClass)) throw e;
     }
     expect(first.id).toBeNull();
@@ -769,9 +736,6 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", async () => {
-    // Rails: pet = Pet.first; owner = pet.owner; owner.on_after_commit { flag = true }
-    // pet.name = "Fluffy the Third"; pet.save → belongs_to(touch: true) touches the
-    // owner, firing its after_commit blocks.
     registerModel(Owner);
     registerModel(Pet);
     const pet = (await Pet.first()) as Pet;
@@ -839,9 +803,7 @@ describe("TransactionCallbacksTest", () => {
         this.attribute("title", "string");
       }
     }
-    Topic.afterCommit(function () {
-      /* noop */
-    });
+    Topic.afterCommit(function () {});
     await transaction(Topic, async () => {
       await Topic.create({ title: "test" });
     });
@@ -950,13 +912,6 @@ describe("TransactionCallbacksTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Full mirror of Rails' add_transaction_execution_blocks: all six
-    // commit/rollback blocks. Only the create + update commit blocks fire in
-    // this all-commit path; the destroy/rollback blocks are inert here.
-    // Rails dispatches both create-commit blocks (commit_on_create, then the
-    // re-save) inside a single after_create_commit via do_after_commit(:create),
-    // so they run in registration order regardless of the global
-    // after-transaction callback ordering. Mirror that with one callback.
     Topic.afterCreateCommit(async function (record: any) {
       (record.history ??= []).push("commit_on_create");
       await record.saveBang();
@@ -1042,8 +997,6 @@ describe("TransactionCallbacksTest", () => {
 
   describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
     it("after commit callbacks with optimistic locking", async () => {
-      // Rails: PersonWithCallbacks(self.table_name = :people) with
-      // after_*_commit appending to history; people has lock_version.
       const history: string[] = [];
       class PersonWithCallbacks extends Base {
         declare first_name: string;
@@ -1068,7 +1021,7 @@ describe("TransactionCallbacksTest", () => {
 
       expect(history).toEqual(["commit_on_create", "commit_on_update", "commit_on_destroy"]);
     });
-  }); // TransactionAfterCommitCallbacksWithOptimisticLockingTest
+  });
 
   describe("CallbacksOnMultipleActionsTest", () => {
     it("after commit on multiple actions", async () => {
@@ -1155,7 +1108,7 @@ describe("TransactionCallbacksTest", () => {
       await topic.reload();
       expect(topic.title).toBe("before commit title");
     });
-  }); // CallbacksOnMultipleActionsTest
+  });
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
@@ -1188,14 +1141,9 @@ describe("TransactionCallbacksTest", () => {
       await topic.destroy();
       expect(topic.history).toEqual([1, 2, 3, 4, "destroy"]);
     });
-  }); // CallbackOrderTest
+  });
 
   describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
-    // Rails keys history off a class-var on TopicWithHistory shared by the STI
-    // subclasses; only one subclass is exercised per test, so each factory keeps
-    // its own history array. `beforeDestroyForTransaction` /
-    // `beforeSaveForTransaction` default to no-ops on the prototype and are
-    // overridden per-instance to mirror Rails' `define_singleton_method`.
     const makeTopicWithCallbacksOnDestroy = (history: string[]) =>
       class TopicWithCallbacksOnDestroy extends Base {
         declare title: string;
@@ -1318,7 +1266,7 @@ describe("TransactionCallbacksTest", () => {
 
       expect(history).toEqual([]);
     });
-  }); // CallbacksOnDestroyUpdateActionRaceTest
+  });
 
   describe("CallbacksOnActionAndConditionTest", () => {
     it("callback on action with condition", async () => {
@@ -1327,8 +1275,6 @@ describe("TransactionCallbacksTest", () => {
         declare approved: boolean;
         history: any[] = [];
 
-        // Rails' `run_callback?` pushes itself to history then returns true,
-        // proving the :if condition runs (and in which order) at commit time.
         runCallback(): boolean {
           this.history.push("run_callback?");
           return true;
@@ -1358,14 +1304,9 @@ describe("TransactionCallbacksTest", () => {
       await topic.destroy();
       expect(topic.history).toEqual([]);
     });
-  }); // CallbacksOnActionAndConditionTest
+  });
 
   describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
-    // Mirrors Rails' TopicWithTitleHistory: after_*_commit callbacks that append
-    // to a per-class history array, used to assert which instance of a logical
-    // row runs the transactional commit callbacks. The `firstSaved` flag mirrors
-    // `run_commit_callbacks_on_first_saved_instances_in_transaction` — true keeps
-    // the first saved instance (old configuration), false the last.
     const makeTopicWithTitleHistory = (history: string[], firstSaved: boolean) =>
       class TopicWithTitleHistory extends Base {
         static {
@@ -1491,14 +1432,10 @@ describe("TransactionCallbacksTest", () => {
 
       expect(history).toEqual(['Destroyed (title = "one")']);
     });
-  }); // CallbacksOnMultipleInstancesInATransactionTest
+  });
 
   describe("SetCallbackTest", () => {
     it("set callback with on", async () => {
-      // Rails registers `after_commit :after_commit_on_update_1, on: :update`
-      // then `after_update_commit :after_commit_on_update_2` as named methods on
-      // a class-var history. Here the callbacks are function references so
-      // skipCallback / setCallback can match them by identity.
       const history: string[] = [];
       const afterCommitOnUpdate1 = () => history.push("after_commit_on_update_1");
       const afterCommitOnUpdate2 = () => history.push("after_commit_on_update_2");
@@ -1533,8 +1470,8 @@ describe("TransactionCallbacksTest", () => {
       expectedHistory.push("after_commit_on_update_1");
       expect(history).toEqual(expectedHistory);
     });
-  }); // SetCallbackTest
-}); // TransactionCallbacksTest
+  });
+});
 
 describe("hasTransactionalCallbacks regression", () => {
   it("returns true for a model with only beforeCommit callbacks", () => {

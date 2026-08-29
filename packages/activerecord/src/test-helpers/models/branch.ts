@@ -1,5 +1,4 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-// vendor/rails/activerecord/test/models/branch.rb
 import { Base } from "../../base.js";
 
 export class Branch extends Base {

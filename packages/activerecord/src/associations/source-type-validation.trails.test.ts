@@ -1,50 +1,12 @@
-/**
- * ThroughReflection#checkValidityBang at first use (tasks #18 + #23).
- *
- * Rails' `Association#initialize` runs `reflection.check_validity!`
- * (reflection.rb:1140-1178) so every misconfiguration surfaces
- * loudly the first time the association is touched. We mirror that
- * via `validateThroughReflection`, called from
- * `Association#constructor`, `association(record, name)`, and the
- * loader entry points (`findTarget` / `loadHasOne`).
- *
- * Coverage in this suite:
- *   - polymorphic source without `source_type`
- *     → `HasManyThroughAssociationPolymorphicSourceError`
- *   - `source_type` with a non-polymorphic source
- *     → `HasManyThroughAssociationPointlessSourceTypeError`
- *   - missing source association
- *     → `HasManyThroughSourceAssociationNotFoundError`
- *   - `has_one :through` collection
- *     → `HasOneThroughCantAssociateThroughCollection`
- *   - the loader entry point so direct callers surface the same
- *     errors as the proxy
- *   - the cached-error re-throw contract (a caught failure on call
- *     N still raises on call N+1 — no silent bypass)
- *   - the valid-shape happy path (polymorphic + sourceType)
- *
- * Without this check the misconfigurations silently produce invalid
- * SQL downstream (e.g. polymorphic-source-without-source_type:
- * reflection.ts injects a `PolymorphicReflection` whose `foreignType`
- * resolves to null, the chain walker has no type filter, ids mix
- * across polymorphic targets).
- */
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association } from "../associations.js";
 import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { fixtures } from "../test-fixtures.js";
 
-// Local model classes for testing invalid through-association configurations.
-// These classes are used ONLY for reflection validation (no DB queries happen
-// in the error path), so they need no real table backing — the validation
-// fires synchronously before any SQL is emitted.
-
 class StvAuthor extends Base {
   static {
     this._tableName = "stv_authors";
-    // No real table — strict _writeAttribute needs a declared slot for the
-    // dummy `id = 1` assignment below.
     this.attribute("id", "integer");
   }
 }
@@ -75,7 +37,6 @@ function freshAssociations() {
   (StvPost as any)._reflections = {};
 }
 
-// Dummy record — validation errors throw synchronously before any DB query.
 function author() {
   return Object.assign(new StvAuthor(), { id: 1 });
 }
@@ -94,8 +55,6 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       foreignKey: "origin_id",
       polymorphic: true,
     });
-    // Missing sourceType — the chain walker has no type filter to
-    // disambiguate the polymorphic target.
     Associations.hasMany.call(StvAuthor, "originFromComments", {
       className: "StvMember",
       through: "stvComments",
@@ -108,9 +67,6 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
 
   it("raises PointlessSourceTypeError when sourceType is set but source is not polymorphic", () => {
     freshAssociations();
-    // Non-polymorphic belongsTo source + sourceType is meaningless
-    // (and would inject a PolymorphicReflection whose foreignType
-    // resolves to null downstream).
     Associations.hasMany.call(StvAuthor, "stvPosts", {
       className: "StvPost",
       foreignKey: "stv_author_id",
@@ -130,11 +86,6 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
 
   it("fires at the loadHasMany entry point too (not just association() / Association#ctor)", async () => {
     freshAssociations();
-    // findTarget is the loader path direct callers (preloader,
-    // tests) hit without going through `association()`. The
-    // validation has to surface there too — matching Rails'
-    // Association#initialize check_validity! which runs on every
-    // first use regardless of entry point.
     Associations.hasMany.call(StvAuthor, "stvComments", {
       className: "StvComment",
       foreignKey: "stv_author_id",
@@ -160,9 +111,6 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       className: "StvComment",
       foreignKey: "stv_author_id",
     });
-    // No `origin` / `origins` association on StvComment — the
-    // full checkValidityBang surfaces this at first use rather
-    // than silently failing deep in the chain walk.
     Associations.hasMany.call(StvAuthor, "missingSource", {
       className: "StvMember",
       through: "stvComments",
@@ -190,10 +138,7 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "origin",
     });
     const a = author();
-    // First call: error surfaces.
     expect(() => association(a, "originFromComments")).toThrow(/polymorphic association 'origin'/);
-    // Second call (caller may swallow the first): same error must
-    // re-throw. Cached on the reflection, never silently passed.
     expect(() => association(a, "originFromComments")).toThrow(/polymorphic association 'origin'/);
   });
 
@@ -207,8 +152,6 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       className: "StvMember",
       foreignKey: "origin_id",
     });
-    // has_one :through a has_many is Rails-invalid — the through
-    // association must be singular.
     Associations.hasOne.call(StvAuthor, "singularThroughCollection", {
       className: "StvMember",
       through: "stvComments",

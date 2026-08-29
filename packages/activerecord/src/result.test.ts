@@ -2,11 +2,6 @@ import { describe, it, expect } from "vitest";
 import { assert, assertNot } from "@blazetrails/activesupport";
 import { Result, type ColumnTypes } from "./result.js";
 
-/**
- * Minitest's `assert_kind_of Integer, index` (result_test.rb:73). JS numbers are
- * primitives and there is no Integer class to test with `instanceof`, so the
- * kind check is `Number.isInteger`; Rails' argument order is kept.
- */
 function assertKindOf(klass: NumberConstructor, actual: unknown): void {
   assert(
     klass === Number && Number.isInteger(actual),

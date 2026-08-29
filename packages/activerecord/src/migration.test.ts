@@ -1,8 +1,3 @@
-/**
- * Migration tests.
- * Mirrors: activerecord/test/cases/migration_test.rb
- *          activerecord/test/cases/invertible_migration_test.rb
- */
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal, Logger } from "@blazetrails/activesupport";
@@ -26,9 +21,6 @@ import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/s
 function emitTableSql(td: TableDefinition): Promise<string> {
   const adapter = (td as any).conn;
   const typeRegistryKey = adapter.typeRegistryKey;
-  // Every visitor takes its connection for identifier/default quoting (and, on MySQL,
-  // the `supports*` / isMariadb() flags), so thread the table definition's through —
-  // matching the real adapter call sites and the production `*.toSql()` overrides.
   if (typeRegistryKey === "postgres") return new PgSchemaCreation(adapter).accept(td);
   if (typeRegistryKey === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation(adapter).accept(td);
@@ -43,25 +35,12 @@ import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 
-// Mirrors `MIGRATIONS_ROOT` from cases/helper.rb:14 — the directory the
-// versioned migration fixtures live under.
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
-// The migration-on-`people` tests (Rails runs `add_column/remove_column
-// "people", "last_name"` through a `Migrator`) need the canonical `people`
-// table materialized before the migrator runs. `fixtures()` establishes
-// the schema-loaded primary pool, so `Base.connection` already carries the
-// canonical `people` table — no hand-built shape required. The afterEach strips
-// the scratch `last_name` column so sibling files see the pristine shape.
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
   return Base.connection;
 }
 
-// Build a MigrationProxy whose `up` runs `body` (e.g. `add_column "people", …`)
-// — the trails equivalent of Rails' anonymous `Class.new(Migration) { def
-// migrate(x); … end }` migrations that the people-migration tests feed to a
-// `Migrator`.
-/** Mirrors migration_test.rb:1165's private `env_name(pool)` helper. */
 function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
 }
@@ -80,9 +59,6 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
   };
 }
 
-// Mirrors migration_test.rb's `assert_column Person` / `assert_no_column
-// Person`: re-read Person's columns after the migrator ran, then reset its
-// column cache so the scratch `last_name` doesn't linger in reflection state.
 async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
   const original = (Person as any)._adapter;
   try {
@@ -96,55 +72,27 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
   }
 }
 
-// Rails runs every migration test on `ActiveRecord::Base.connection`; ride the
-// schema-loaded primary pool established by `fixtures()` rather than a
-// sidecar `_pool` lease (RFC 0059). Nothing clears tables between tests, so
-// this file owns the per-test cleanup of the bespoke tables its DDL
-// sub-describes create — see the afterEach/afterAll below
-// and each test's own `finally`.
 fixtures({}, { useTransactionalTests: false });
 
-// Mirrors migration_test.rb's teardown, which strips the scratch columns the
-// people-migration tests add back off the shared canonical `people` table and
-// clears recorded versions — so sibling files see the pristine canonical shape.
 afterEach(async () => {
   const adapter = Base.connection;
   try {
     if (await (adapter as any).columnExists("people", "last_name")) {
       await adapter.removeColumn("people", "last_name");
     }
-  } catch {
-    /* column absent / adapter without the column — nothing to strip */
-  }
-  // migration_test.rb's setup and teardown both drop the tables the
-  // `MIGRATIONS_ROOT + "/valid"` migrations create, so a run that stopped part
-  // way through cannot poison the next test.
+  } catch {}
   for (const table of ["reminders", "people_reminders"]) {
     await adapter.dropTable(table, { ifExists: true });
   }
   try {
     await new SchemaMigration(adapter.pool).deleteAllVersions();
-  } catch {
-    /* schema_migrations may not exist yet */
-  }
+  } catch {}
   try {
-    // ar_internal_metadata is not a canonical table, so the one-schema
-    // truncate-only reset never clears it; the InternalMetadata tests below
-    // each build it fresh and assert on its rows/existence, so drop it between
-    // tests (Rails' teardown does the same) to keep them independent.
     await adapter.dropTable("ar_internal_metadata", { ifExists: true });
-  } catch {
-    /* nothing to strip */
-  }
+  } catch {}
   void (Person as any).resetColumnInformation();
 });
 
-// Migration tests legitimately create ad-hoc tables (Rails' migration_test.rb
-// does too); nothing clears them between tests, so they leak into the shared
-// per-worker DB. Drop each BESPOKE table by name — mirroring Rails' teardown — to avoid
-// collisions with sibling files. Canonical tables (`people`, `books`,
-// `memberships`, `values`, …) are deliberately NOT in this list: dropping a
-// canonical table would corrupt siblings that ride it.
 afterAll(async () => {
   const adapter = Base.connection;
   const o = { ifExists: true } as const;
@@ -188,15 +136,8 @@ function internalMetadataExistsSql(kind: typeof adapterType): string {
   return byAdapter[kind];
 }
 
-// ==========================================================================
-// MigrationTest
-// ==========================================================================
-
 describe("MigrationTest", () => {
   it("add column with if not exists not set", async () => {
-    // Rails migration_a adds `last_name` on `people`; migration_b re-adds it
-    // with if_not_exists unset and must raise. Ride the canonical `people`
-    // table via a Migrator, exactly as migration_test.rb does.
     const adapter = await freshAdapterWithPeople();
     await new Migrator(
       "up",
@@ -223,12 +164,8 @@ describe("MigrationTest", () => {
     const migration = anonymousMigration();
     Base.tableNamePrefix = "pre_";
     Base.tableNameSuffix = "_suf";
-    // Own the scratch tables for the whole test: nothing clears tables between
-    // tests, so a leaked `pre_old_suf`/`pre_new_suf` would break the
-    // create/rename below, so clear any leak up front and drop in the finally.
     await adapter.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     try {
-      // Dropped in the finally under its prefixed/suffixed name.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await migration.createTable("old", {}, (t) => {
         t.string("content");
@@ -260,14 +197,7 @@ describe("MigrationTest", () => {
   });
 
   describeIfPostgresqlAdapter("IndexForTableWithSchemaMigrationTest", () => {
-    // Schema-qualified `my_schema.values`: Rails' PG `index_name` strips the
-    // schema (postgresql/schema_statements.rb) → `index_values_on_value`,
-    // created in `my_schema` via the schema-qualified table, and `remove_index`
-    // re-qualifies the DROP with the table's schema so add/remove stay symmetric.
     it("add and remove index", async () => {
-      // PG-only, mirrors migration_test.rb: create a dedicated `my_schema`
-      // Postgres schema and drive add/remove index on `my_schema.values`,
-      // dropping the schema in the ensure — no canonical table involved.
       const adapter = (await freshAdapter()) as DatabaseAdapter & {
         createSchema(name: string): Promise<void>;
         dropSchema(name: string): Promise<void>;
@@ -275,17 +205,11 @@ describe("MigrationTest", () => {
       };
       await adapter.createSchema("my_schema");
       try {
-        // Torn down via dropSchema("my_schema") in the finally below (which
-        // drops the schema and its tables); the lint rule only tracks dropTable.
         // eslint-disable-next-line blazetrails/require-table-teardown
         await adapter.createTable("my_schema.values", { force: true }, (t) => {
           t.integer("value");
         });
 
-        // Assert through the adapter's live `index_exists?` (Rails uses
-        // `connection.index_exists?`), not any in-memory
-        // bookkeeping, so a schema-qualified adapter bug can't slip past a
-        // stale-but-correct cache.
         await adapter.addIndex("my_schema.values", "value");
         expect(await adapter.indexExists("my_schema.values", "value")).toBe(true);
 
@@ -298,21 +222,10 @@ describe("MigrationTest", () => {
   });
 });
 
-// ==========================================================================
-// InvertibleMigrationTest
-// ==========================================================================
-
-// -- Helpers --
 async function freshAdapter(): Promise<DatabaseAdapter> {
   return Base.connection;
 }
 
-// ==========================================================================
-// MigrationTest — targets migration_test.rb
-// ==========================================================================
-// D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
-// (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithPeople() isolation.
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -321,8 +234,6 @@ describe("MigrationTest", () => {
   });
 
   it("migration version matches component version", () => {
-    // In our TS implementation there is no separate migration version constant,
-    // but we can verify the adapter is instantiable (structural smoke test).
     expect(adapter).toBeDefined();
   });
 
@@ -343,9 +254,6 @@ describe("MigrationTest", () => {
   });
 
   it("add column with if not exists set to true", async () => {
-    // Rails: migration_a adds `last_name` on `people`; migration_b re-adds it
-    // with if_not_exists: true and asserts it does not raise. Ride the canonical
-    // `people` table via a Migrator, as migration_test.rb does.
     const adapter = await freshAdapterWithPeople();
     await new Migrator(
       "up",
@@ -356,7 +264,6 @@ describe("MigrationTest", () => {
     ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
-    // if_not_exists: true must not raise even though the column already exists.
     await new Migrator(
       "up",
       [
@@ -372,13 +279,8 @@ describe("MigrationTest", () => {
   });
 
   it("add table with decimals", async () => {
-    // Mirrors test_add_table_with_decimals: GiveMeBigNumbers.up creates
-    // `big_numbers` with decimal columns carrying explicit precision/scale, then
-    // a BigNumber row is persisted and read back to assert the per-adapter
-    // value/type semantics (the part the old columnsHash() stub dropped).
     const adapter = Base.connection;
     await adapter.dropTable("big_numbers", { ifExists: true });
-    // GiveMeBigNumbers.up
     await adapter.createTable("big_numbers", {}, (t) => {
       t.column("bank_balance", "decimal", { precision: 10, scale: 2 });
       t.column("big_bank_balance", "decimal", { precision: 15, scale: 2 });
@@ -387,7 +289,6 @@ describe("MigrationTest", () => {
       t.column("value_of_e", "decimal");
     });
 
-    // The persisted column precision/scale survive the create_table path.
     const cols = await adapter.columns("big_numbers");
     const byName = (n: string) => cols.find((c) => c.name === n)!;
     expect(byName("bank_balance").precision).toBe(10);
@@ -398,13 +299,6 @@ describe("MigrationTest", () => {
     expect(byName("my_house_population").precision).toBe(2);
 
     try {
-      // Mirrors the inline BigNumber model in migration_test.rb: value_of_e is
-      // declared :integer only on adapters other than PG/SQLite (i.e. MySQL);
-      // my_house_population is always :integer. world_population carries NO
-      // override — Rails reads the scale-0 decimal column back as an exact
-      // Integer, and trails matches now that DecimalWithoutScale inherits
-      // BigIntegerType's arbitrary-precision cast (2**62 round-trips without
-      // JS-number precision loss).
       const typeRegistryKey = adapter.typeRegistryKey;
       const isPgOrSqlite = typeRegistryKey === "postgres" || typeRegistryKey === "sqlite";
       class BigNumber extends Base {
@@ -435,35 +329,24 @@ describe("MigrationTest", () => {
       expect((b as any).my_house_population).not.toBeNull();
       expect((b as any).value_of_e).not.toBeNull();
 
-      // world_population round-trips exactly (no precision loss) as Rails' 2**62.
-      // 2**62 exceeds float64's exact-integer range, so DecimalWithoutScale
-      // carries it as a bigint (Rails' unbounded Integer).
       expect(typeof (b as any).world_population).toBe("bigint");
       expect((b as any).world_population).toBe(2n ** 62n);
       expect((b as any).my_house_population).toBe(3);
-      // The scaled decimals round-trip exactly through the BigDecimal type —
-      // this is the decimal-serialization coverage the columnsHash() stub lacked.
       expect((b as any).bank_balance).toBeInstanceOf(BigDecimal);
       expect(((b as any).bank_balance as BigDecimal).toString("F")).toBe("1586.43");
       expect((b as any).big_bank_balance).toBeInstanceOf(BigDecimal);
       expect(((b as any).big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
 
-      // value_of_e is DECIMAL with precision/scale left out; by the SQL standard
-      // it should truncate to an Integer, but adapters diverge (see Rails'
-      // per-adapter branch):
       const valueOfE = (b as any).value_of_e;
       if (typeRegistryKey === "postgres") {
-        // PG promotes bare `decimal` to full compile-time precision/scale.
         expect(valueOfE).toBeInstanceOf(BigDecimal);
         expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
       } else if (typeRegistryKey === "sqlite") {
-        // SQLite3 stores a float, read back as a BigDecimal within 1e-14.
         expect(valueOfE).toBeInstanceOf(BigDecimal);
         expect(
           Math.abs(Number((valueOfE as BigDecimal).toString("F")) - 2.71828182845905),
         ).toBeLessThan(0.00000000000001);
       } else {
-        // SQL standard: an Integer (2), via the :integer attribute override.
         expect(valueOfE).toBe(2);
       }
     } finally {
@@ -471,8 +354,6 @@ describe("MigrationTest", () => {
     }
   });
 
-  // Rails' MockMigration flips went_up/went_down when migrate(:up)/migrate(:down)
-  // drives the corresponding hook — no table or DDL involved.
   class MockMigration extends Migration {
     wentUp = false;
     wentDown = false;
@@ -530,7 +411,6 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment", () => {
-    // Structural: adapter maintains internal state
     expect(adapter).toBeDefined();
     expect(typeof adapter.execute).toBe("function");
   });
@@ -548,9 +428,6 @@ describe("MigrationTest", () => {
   });
 
   it("create table with binary column", async () => {
-    // Rails creates `binary_testings` with a `t.column "data", :binary,
-    // null: false` and asserts the persisted column's default is nil. Drive the
-    // live create_table path and introspect the column.
     const adapter = Base.connection;
     await adapter.dropTable("binary_testings", { ifExists: true });
     await adapter.createTable("binary_testings", {}, (t) => {
@@ -565,21 +442,15 @@ describe("MigrationTest", () => {
   });
 
   it("proper table name on migration", () => {
-    // Rails exercises Migration#proper_table_name with string/symbol names and a
-    // model, honoring the model's own table_name_prefix/suffix and falling back
-    // to ActiveRecord::Base's prefix/suffix (via table_name_options) otherwise.
     class Reminder extends Base {}
     const savedPrefix = Base.tableNamePrefix;
     const savedSuffix = Base.tableNameSuffix;
     try {
-      // A bare string/symbol with no options keeps its name unchanged.
       expect(Migration.properTableName("table")).toBe("table");
-      // Given a model, the model's own table_name wins.
       expect(Migration.properTableName(Reminder)).toBe("reminders");
       Reminder.resetTableName();
       expect(Migration.properTableName(Reminder)).toBe(Reminder.tableName);
 
-      // Use the model's own prefix/suffix when a model is given.
       Base.tableNamePrefix = "ARprefix_";
       Base.tableNameSuffix = "_ARsuffix";
       Reminder.tableNamePrefix = "prefix_";
@@ -590,7 +461,6 @@ describe("MigrationTest", () => {
       Reminder.tableNameSuffix = "";
       Reminder.resetTableName();
 
-      // Use AR::Base's prefix/suffix when a string/symbol is given with options.
       Base.tableNamePrefix = "prefix_";
       Base.tableNameSuffix = "_suffix";
       Reminder.resetTableName();
@@ -604,10 +474,6 @@ describe("MigrationTest", () => {
   });
 
   it("remove column with if not exists not set", async () => {
-    // Rails migration_a adds `last_name` on `people`, migration_b removes it,
-    // migration_c removes it again with if_not_exists unset: SQLite tolerates
-    // the missing column, other adapters raise. Ride the canonical `people`
-    // table via a Migrator, as migration_test.rb does.
     const adapter = await freshAdapterWithPeople();
     await new Migrator(
       "up",
@@ -627,10 +493,6 @@ describe("MigrationTest", () => {
     ).migrate();
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
-    // Removing a missing column with if_not_exists unset: SQLite removes
-    // columns via a table rebuild — copying every column except the dropped one
-    // — so a missing column is a no-op (`assert_nothing_raised`). PG and MySQL
-    // raise.
     const error: unknown = await new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name"))],
@@ -647,11 +509,6 @@ describe("MigrationTest", () => {
     );
   });
 
-  // The point of this case is the argument-less constructor: Rails lets
-  // `MigrationContext` default `schema_migration` / `internal_metadata` off the
-  // connection pool (migration.rb:1214-1218), which is the only thing
-  // separating it from `migrator versions`, where both are passed explicitly
-  // (migration_test.rb:107).
   it("migration context with default schema migration", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
@@ -702,9 +559,6 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate();
 
-    // Rails' `assert_column Person, :last_name`. Person rides the same
-    // canonical connection the migration ran against, so it only needs its
-    // column cache re-read; the afterEach strips `last_name` again.
     void Person.resetColumnInformation();
     await loadSchemaFromAdapter.call(Person as any);
     expect(Person.columnNames()).toContain("last_name");
@@ -778,9 +632,6 @@ describe("MigrationTest", () => {
 
   it("create table with if not exists true", async () => {
     const adapter = Base.connection;
-    // Nothing clears tables between tests, so a leaked `things` from
-    // a sibling file would make the first, non-ifNotExists create raise; clear
-    // any leak up front and drop in the finally so DDL stays confined here.
     await adapter.dropTable("things", { ifExists: true });
     try {
       await adapter.createTable("things", {}, (t) => {
@@ -803,8 +654,6 @@ describe("MigrationTest", () => {
 
   it("create table with force and if not exists", async () => {
     const adapter = Base.connection;
-    // Rails raises ArgumentError here (schema_statements.rb:297-299), which is
-    // what migration_test.rb:207 rescues.
     await expect(adapter.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
       ArgumentError,
     );
@@ -815,10 +664,6 @@ describe("MigrationTest", () => {
 
   it("create table with indexes and if not exists true", async () => {
     const adapter = Base.connection;
-    // Own the scratch table for the whole test: nothing clears tables between
-    // tests, so a leaked `things`
-    // would make the first, non-ifNotExists create raise. Clear any leak up
-    // front and drop in the finally so DDL stays confined to this test.
     await adapter.dropTable("things", { ifExists: true });
     try {
       await adapter.createTable("things", {}, (t) => {
@@ -844,9 +689,6 @@ describe("MigrationTest", () => {
   });
 
   it("remove column with if exists set", async () => {
-    // Rails migration_a adds `last_name` on `people`, migration_b removes it,
-    // migration_c removes it again with if_exists: true and asserts nothing
-    // raised. Ride the canonical `people` table via a Migrator.
     const adapter = await freshAdapterWithPeople();
     await new Migrator(
       "up",
@@ -866,7 +708,6 @@ describe("MigrationTest", () => {
     ).migrate();
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
-    // if_exists: true must not raise even though the column is already gone.
     await new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true }))],
@@ -878,11 +719,6 @@ describe("MigrationTest", () => {
   });
 
   it("add column with casted type if not exists set to true", async () => {
-    // Rails migration_a adds `last_name` on `people` with a casted type (:char
-    // on PG, :blob elsewhere); migration_b re-adds the same casted type with
-    // if_not_exists: true and asserts nothing raised. Ride canonical `people`.
-    // trails maps :blob → "binary"; PG resolves "char" via typeToSql's raw-name
-    // fallback, mirroring Rails' :char.
     const type = adapterType === "postgres" ? "char" : "binary";
     const adapter = await freshAdapterWithPeople();
     await new Migrator(
@@ -905,9 +741,6 @@ describe("MigrationTest", () => {
   });
 
   it("add column with if not exists set to true does not raise if type is different", async () => {
-    // Rails migration_a adds `last_name` :string on `people`; migration_b re-adds
-    // it as :boolean with if_not_exists: true and asserts nothing raised (a
-    // differing type is still a no-op). Ride canonical `people`.
     const adapter = await freshAdapterWithPeople();
     await new Migrator(
       "up",
@@ -959,8 +792,6 @@ describe("MigrationTest", () => {
     await migrator.migrate(null, nameFilter);
 
     expect(await adapter.columnExists("people", "last_name")).toBe(true);
-    // Rails asserts `Reminder.first` raises StatementInvalid — the filtered-out
-    // `WeNeedReminders` never ran, so the table is not there.
     expect(await adapter.tableExists("reminders")).toBe(false);
 
     await migrator.down(null, nameFilter);
@@ -993,7 +824,6 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
     );
     await expect(migrator.migrate()).rejects.toThrow("Something broke");
-    // Migration should not be recorded as applied
     const versions = [...(await migrator.migrated())];
     expect(versions).not.toContain(100);
   });
@@ -1068,13 +898,10 @@ describe("MigrationTest", () => {
       err = e as Error;
     }
     expect(err).toBeInstanceOf(Error);
-    // Without a DDL transaction, the column is not rolled back
     expect(columnAdded).toBe(true);
     expect(err.message).toBe(
       "An error has occurred, all later migrations canceled:\n\nSomething broke",
     );
-    // The failed no-transaction migration leaves `wtx_test` behind (that is the
-    // point of the test); drop it so it does not leak past the shielded reset.
     await adapter.dropTable("wtx_test", { ifExists: true });
   });
 
@@ -1098,9 +925,6 @@ describe("MigrationTest", () => {
     } catch (e) {
       err = e as Error;
     }
-    // Rails' rescue calls use_transaction? -> MigrationProxy#disable_ddl_transaction,
-    // which re-runs the failed load and raises out of the rescue itself, so the
-    // "all later migrations canceled" wrapper never gets built.
     expect(err).toBe(loadError);
     const versions = [...(await migrator.migrated())];
     expect(versions).not.toContain(102);
@@ -1155,9 +979,6 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate().catch(() => {});
     const env = await im.get("environment");
-    // Rails stamps the environment in `record_environment` BEFORE running the
-    // migrations, so a failing migration still leaves it recorded
-    // (migration_test.rb:697-711).
     expect(env).toBe(envName(adapter));
   });
 
@@ -1188,8 +1009,6 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
 
-    // migration_test.rb:727-730 — drop the table, then swap
-    // `use_metadata_table: false` into the pool's db_config configuration_hash.
     const im = new InternalMetadata(adapter.pool);
     await im.dropTable();
 
@@ -1216,9 +1035,6 @@ describe("MigrationTest", () => {
     try {
       await migrator.migrate();
 
-      // im.get() short-circuits to null when disabled, so use a catalog query to
-      // verify the table was physically not created (catalog tables always exist,
-      // so this doesn't trigger the test-adapter's auto-schema).
       const rows = await adapter.execute(internalMetadataExistsSql(adapterType));
       expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
     } finally {
@@ -1251,15 +1067,10 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata create table wont be affected by schema cache", async () => {
-    // Rails' version uses transaction+rollback to prove the schema cache is
-    // invalidated after DDL rollback. Our tableExists() queries live (no cache),
-    // so we verify the idempotent commit path instead — the underlying invariant
-    // (no stale cache blocking re-creation) holds trivially in our implementation.
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter.pool);
 
-    // First transaction: create + write + commit
     await adapter.beginTransaction();
     try {
       await im.createTable();
@@ -1272,7 +1083,6 @@ describe("MigrationTest", () => {
       throw e;
     }
 
-    // Second transaction: createTable is idempotent (IF NOT EXISTS), write again
     await adapter.beginTransaction();
     try {
       await im.createTable();
@@ -1287,13 +1097,9 @@ describe("MigrationTest", () => {
   });
 
   it("schema migration create table wont be affected by schema cache", async () => {
-    // tableExists() queries live (no schema cache), so create_table is always
-    // re-entrant across transactions. Verify that successive createTable() +
-    // createVersion() pairs work correctly — the IF NOT EXISTS guard is idempotent.
     const adapter = Base.connection;
     const sm = new SchemaMigration(adapter.pool);
 
-    // First transaction: create + write + commit
     await adapter.beginTransaction();
     try {
       await sm.createTable();
@@ -1308,7 +1114,6 @@ describe("MigrationTest", () => {
     const versionsAfterFirst = await sm.allVersions();
     expect(versionsAfterFirst).toContain("foo");
 
-    // Second transaction: createTable is idempotent (IF NOT EXISTS), write again
     await adapter.beginTransaction();
     try {
       await sm.createTable();
@@ -1341,8 +1146,6 @@ describe("MigrationTest", () => {
         await this.dropTable("reminders");
       }
     }
-    // Exercises addColumn + renameTable (both args prefixed per Rails method_missing)
-    // and change()-based reversal without double-applying prefix/suffix.
     class ChangeBased extends Migration {
       async change() {
         await this.createTable("widgets", (t) => t.string("name"));
@@ -1358,7 +1161,6 @@ describe("MigrationTest", () => {
     };
     try {
       await runMigration(m, "up");
-      // Use adapter quoting so MySQL (no ANSI_QUOTES) works alongside PG/SQLite.
       const qt = adapter.quoteTableName("prefix_reminders_suffix");
       const qc = adapter.quoteColumnName("content");
       await adapter.executeMutation(`INSERT INTO ${qt} (${qc}) VALUES ('hello')`);
@@ -1375,11 +1177,6 @@ describe("MigrationTest", () => {
       expect(await cb.tableExists("gadgets")).toBe(false);
       expect(await cb.tableExists("widgets")).toBe(false);
     } finally {
-      // An assertion above skips the migrations' own `down`, and the file's
-      // afterAll drops the UNPREFIXED names — nothing there would reach
-      // `prefix_reminders_suffix` / `prefix_widgets_suffix`. Migration#dropTable
-      // applies the prefix and suffix (still set at this point) exactly as the
-      // migrations did, so these drops name the physical tables.
       await m.dropTable("reminders", { ifExists: true });
       await cb.dropTable("widgets", "gadgets", { ifExists: true });
       Base.tableNamePrefix = savedPrefix;
@@ -1392,8 +1189,6 @@ describe("MigrationTest", () => {
     await adapter.createTable("people_src", {}, (t) => {
       t.integer("person_id");
     });
-    // Unquoted lowercase identifiers parse identically on PG/SQLite/MySQL;
-    // Rails-style `"…"` quoting is a string literal on MySQL.
     await adapter.executeMutation(`INSERT INTO people_src (person_id) VALUES (1)`);
 
     await adapter.createTable("table_from_query_testings", {
@@ -1403,9 +1198,6 @@ describe("MigrationTest", () => {
     expect(rows).toHaveLength(1);
     expect(await adapter.columnExists("table_from_query_testings", "person_id")).toBe(true);
 
-    // The CTAS column derivation reads back through the adapter's own
-    // `columns()` (Rails `new_column_from_field`), so the persisted type is the
-    // Rails-canonical name (not the raw catalog string).
     const cols = await adapter.columns("table_from_query_testings");
     const pid = cols.find((c) => c.name === "person_id");
     expect(pid?.type).toBe("integer");
@@ -1420,8 +1212,6 @@ describe("MigrationTest", () => {
     });
     await adapter.executeMutation(`INSERT INTO people_src2 (person_id) VALUES (1)`);
 
-    // Build a relation SQL string directly (mirrors Rails `Person.select(:id).where(id: 1).to_sql`).
-    // Quote identifiers with the adapter's own quoting so it is valid on MySQL too.
     const t = adapter.quoteTableName("people_src2");
     const c = `${t}.${adapter.quoteColumnName("person_id")}`;
     const sql = `SELECT ${c} FROM ${t} WHERE ${c} = 1`;
@@ -1471,7 +1261,6 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
-    // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
     const testAdapter = Base.connection;
     const migrator = new Migrator(
       "up",
@@ -1480,7 +1269,6 @@ describe("MigrationTest", () => {
       new InternalMetadata(testAdapter.pool),
     );
     const lockId = await migrator.generateMigratorAdvisoryLockId();
-    // Must fit in a signed 63-bit integer
     expect(lockId).toBeGreaterThanOrEqual(0n);
     expect(lockId.toString(2).length).toBeLessThanOrEqual(63);
   });
@@ -1552,13 +1340,6 @@ describe("MigrationTest", () => {
     "advisory_locks",
     "with advisory lock closes connection",
     async () => {
-      // PG-specific: mirrors Rails test_with_advisory_lock_closes_connection.
-      // Rails queries pg_stat_activity for lingering lock queries; in JS we
-      // check that acquire/release are called symmetrically with the same
-      // lock id. After the Phase D-X collapse the advisory lock lives on
-      // the adapter's single persistent pg.Client (no separate pinned
-      // pool client), so releaseAdvisoryLock firing pg_advisory_unlock on
-      // the same session is the closure proof.
       const realAdapter = Base.connection;
       const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
       const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
@@ -1589,9 +1370,6 @@ describe("MigrationTest", () => {
     "advisory_locks",
     "with advisory lock raises the right error when it fails to release lock",
     async () => {
-      // Rails runs this against the real connection and provokes the release
-      // failure by releasing the lock from inside the block, so the migrator's
-      // own release finds nothing to release (migration_test.rb:1107-1124).
       const realAdapter = Base.connection;
       const proxy: MigrationProxy = {
         version: 100,
@@ -1655,11 +1433,6 @@ describe("MigrationTest", () => {
   });
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {
-      // Mirrors migration_test.rb's ReservedWordsMigrationTest verbatim: `values`
-      // is a SQL reserved word, so Rails builds its own bespoke `values(value)`
-      // table (default PK, not the canonical `as`/`group_id` shape), exercises
-      // add_index/remove_index on the `value` column, and drops the table in an
-      // `ensure` (our `finally`) so nothing leaks into the shared worker DB.
       const connection = Base.connection;
       await connection.createTable("values", { force: true }, (t) => {
         t.integer("value");
@@ -1677,10 +1450,6 @@ describe("MigrationTest", () => {
 
   describe("ExplicitlyNamedIndexMigrationTest", () => {
     it("drop index by name", async () => {
-      // Mirrors migration_test.rb's ExplicitlyNamedIndexMigrationTest verbatim:
-      // same bespoke `values(value)` table as the ReservedWords test above, but
-      // adds/removes an explicitly named index and drops the table in `finally`
-      // (Rails' `ensure`).
       const connection = Base.connection;
       await connection.createTable("values", { force: true }, (t) => {
         t.integer("value");
@@ -1697,10 +1466,6 @@ describe("MigrationTest", () => {
   });
 
   describe("IndexTest", () => {
-    // Mirrors ActiveRecord::Migration::IndexTest — drives the Migration-class
-    // index twins (indexExists/removeIndex) so the `valid`/`ifExists` option
-    // widenings forward to the adapter. Rails' bespoke `testings(foo, bar)`
-    // table is dropped in `finally` (Rails' `teardown`) so nothing leaks.
     async function withTestings(body: () => Promise<void>): Promise<void> {
       await Base.connection.createTable("testings", { force: true }, (t) => {
         t.string("foo", { limit: 100 });
@@ -1754,9 +1519,6 @@ describe("MigrationTest", () => {
   });
 
   describeIfPostgresqlAdapter("PostgresqlIndexTest", () => {
-    // Mirrors PostgreSQLAdapterTest#test_invalid_index — a failed CONCURRENTLY
-    // unique index is left behind marked invalid; Migration#indexExists must
-    // forward `valid` to distinguish it, matching the adapter twin.
     it("test_invalid_index", async () => {
       const conn = Base.connection;
       await conn.dropTable("ex", { ifExists: true });
@@ -1793,14 +1555,10 @@ describe("MigrationTest", () => {
   });
 
   describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
-    // Helper for bulk alter table tests — fresh adapter per test via beforeEach
     let bulkAdapter: DatabaseAdapter;
     beforeEach(async () => {
       bulkAdapter = await freshAdapter();
     });
-    // Each test creates its own uniquely-named `bk*` table; with the global
-    // reset shielded by fixtures() they would persist across tests and into
-    // sibling files, so drop them here (Rails' teardown drops the ad-hoc table).
     afterEach(async () => {
       const o = { ifExists: true } as const;
       await bulkAdapter.dropTable("bk1", o);
@@ -1837,7 +1595,6 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Verify table exists and columns work by inserting data
       await bulkAdapter.executeMutation(
         `INSERT INTO "bk1" ("name", "age", "email") VALUES ('test', 25, 'a@b.c')`,
       );
@@ -1866,7 +1623,6 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Verify rename worked by inserting with new column name
       await bulkAdapter.executeMutation(`INSERT INTO "bk2" ("new_c") VALUES ('test')`);
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk2"`);
       expect(rows.length).toBe(1);
@@ -1893,7 +1649,6 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Verify column removal - migration ran without error
       await bulkAdapter.executeMutation(`INSERT INTO "bk3" ("a") VALUES ('test')`);
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk3"`);
       expect(rows.length).toBe(1);
@@ -1918,14 +1673,12 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Verify timestamps were added by inserting with those columns
       await bulkAdapter.executeMutation(
         `INSERT INTO "bk4" ("x", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
       );
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk4"`);
       expect(rows.length).toBe(1);
       const createdAt = rows[0].created_at;
-      // PlainDateTime.toString() gives 'YYYY-MM-DDTHH:MM:SS'; take the date portion.
       const dateStr =
         createdAt instanceof Date
           ? createdAt.toISOString().slice(0, 10)
@@ -1954,7 +1707,6 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Verify remove timestamps ran without error
       await bulkAdapter.executeMutation(`INSERT INTO "bk5" ("x") VALUES ('test')`);
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk5"`);
       expect(rows.length).toBe(1);
@@ -1979,7 +1731,6 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Index was created without error
       await bulkAdapter.executeMutation(`INSERT INTO "bk6" ("email") VALUES ('test@test.com')`);
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk6"`);
       expect(rows.length).toBe(1);
@@ -2005,19 +1756,12 @@ describe("MigrationTest", () => {
           async down() {}
         })(),
       ).up();
-      // Index removal ran without error
       await bulkAdapter.executeMutation(`INSERT INTO "bk7" ("email") VALUES ('test@test.com')`);
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk7"`);
       expect(rows.length).toBe(1);
     });
 
-    // "changing columns", "changing column null with default", "default
-    // functions on columns" and "updating auto increment" (MySQL) target the
-    // ad-hoc delete_me table; they live in the BulkAlterTableMigrationsTest
-    // blocks at the end of this file.
-
     it("changing index", async () => {
-      // Create table with a non-unique index, then swap to a unique index
       await makeBulkMig(
         new (class extends Migration {
           async up() {
@@ -2043,7 +1787,7 @@ describe("MigrationTest", () => {
         bulkAdapter.executeMutation(`INSERT INTO "bk_idx" ("username") VALUES ('alice')`),
       ).rejects.toThrow();
     });
-  }); // BulkAlterTableMigrationsTest
+  });
 
   describeIfSupports("bulk_alter", "RevertBulkAlterTableMigrationsTest", () => {
     it("bulk revert", async () => {
@@ -2052,7 +1796,6 @@ describe("MigrationTest", () => {
         (m as any).adapter = rvAdapter;
         return m;
       }
-      // Create a table, add a column, then revert (down) both
       class BulkMig extends Migration {
         async change() {
           await this.createTable("rv_bulk", (t) => {
@@ -2063,24 +1806,19 @@ describe("MigrationTest", () => {
       }
       const m = makeRvMig(new BulkMig());
       await m.up();
-      // Verify table was created with the extra column
       await rvAdapter.executeMutation(
         `INSERT INTO "rv_bulk" ("name", "extra") VALUES ('test', 'val')`,
       );
       const rows = await rvAdapter.execute(`SELECT * FROM "rv_bulk"`);
       expect(rows.length).toBe(1);
       expect(rows[0].extra).toBe("val");
-      // Revert should drop the table
       await m.down();
-      // Table should be gone - selecting from it should return empty or throw
       try {
         const after = await rvAdapter.execute(`SELECT * FROM "rv_bulk"`);
         expect(after.length).toBe(0);
-      } catch {
-        // Table doesn't exist, which is expected
-      }
+      } catch {}
     });
-  }); // RevertBulkAlterTableMigrationsTest
+  });
 
   describe("CopyMigrationsTest", () => {
     it("copying migrations without timestamps", () => {
@@ -2128,17 +1866,14 @@ describe("MigrationTest", () => {
       const dst = path.join(root, "dst");
       fs.mkdirSync(src, { recursive: true });
       fs.mkdirSync(dst, { recursive: true });
-      // Destination already has a migration stamped far in the future.
       const futureVersion = "99991231235959";
       fs.writeFileSync(path.join(dst, `${futureVersion}_future_table.ts`), "// future\n");
       fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
       try {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
-        // Copied version must be renumbered past the future destination version.
         expect(BigInt(copied[0].version) > BigInt(futureVersion)).toBe(true);
         expect(fs.existsSync(copied[0].filename!)).toBe(true);
-        // Second copy must detect the renumbered migration as a duplicate.
         const copied2 = await Migration.copy(dst, { bukkits: src });
         expect(copied2).toHaveLength(0);
       } finally {
@@ -2155,8 +1890,6 @@ describe("MigrationTest", () => {
       const dst = path.join(root, "dst");
       fs.mkdirSync(src, { recursive: true });
       fs.mkdirSync(dst, { recursive: true });
-      // Source migration opens with a magic-comment directive followed by a
-      // blank line — mirrors Rails' "# frozen_string_literal: true\n\n" pattern.
       fs.writeFileSync(
         path.join(src, "1_create_horses.ts"),
         "// @ts-nocheck\n\nexport class CreateHorses {}\n",
@@ -2165,9 +1898,7 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         const body = fs.readFileSync(copied[0].filename!, "utf8");
-        // Expected layout: directive + blank line + provenance + rest
         expect(body).toMatch(/^\/\/ @ts-nocheck\n\n\/\/ This migration comes from/);
-        // Second copy must find the file as a duplicate and return nothing.
         const copied2 = await Migration.copy(dst, { bukkits: src });
         expect(copied2).toHaveLength(0);
       } finally {
@@ -2193,13 +1924,11 @@ describe("MigrationTest", () => {
       fs.mkdirSync(src, { recursive: true });
       fs.mkdirSync(dst, { recursive: true });
       fs.writeFileSync(path.join(src, "1_create_articles.ts"), "// source\n");
-      // Destination already has the same migration under the same scope.
       fs.writeFileSync(path.join(dst, "20100101000000_create_articles.bukkits.ts"), "// dst\n");
       try {
         const onSkip = vi.fn();
         const copied = await Migration.copy(dst, { bukkits: src }, { onSkip });
         expect(copied).toHaveLength(0);
-        // onSkip must NOT fire when the duplicate is from the same plugin.
         expect(onSkip).not.toHaveBeenCalled();
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -2250,8 +1979,6 @@ describe("MigrationTest", () => {
     });
 
     it("check pending with stdlib logger", async () => {
-      // `Logger.new($stdout)` (`migration_test.rb:1797`); `quietly` is the
-      // stdout capture, which vitest already gives the run.
       const old = Base.logger;
       Base.logger = new Logger() as unknown as typeof Base.logger;
       try {
@@ -2267,7 +1994,6 @@ describe("MigrationTest", () => {
 
     describe("MigrationValidationTest", () => {
       it("migration raises if timestamp greater than 14 digits", () => {
-        // Version strings longer than 14 chars are still stored as-is
         class LongV extends Migration {
           async change() {}
         }
@@ -2278,10 +2004,6 @@ describe("MigrationTest", () => {
         const savedValidate = ActiveRecord.validateMigrationTimestamps;
         try {
           ActiveRecord.validateMigrationTimestamps = true;
-          // Rails validates the timestamp at migration *load* time
-          // (MigrationContext#migrations), so exercise the fromPath loader
-          // rather than the Migrator constructor. The fixture's version
-          // (year 9999) is definitely > tomorrow.
           const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
             .pathname;
           expect(
@@ -2336,9 +2058,6 @@ describe("MigrationTest", () => {
         ]) {
           fs.writeFileSync(path.join(src, f), "// temp migration\n");
         }
-        // Rails travel_to(Time.utc(2023, 12, 1, 10, 10, 59)): freeze the clock
-        // so next_migration_number renumbers past the seconds boundary
-        // (…101059, …101060, …101061).
         const nowSpy = vi
           .spyOn(Temporal.Now, "instant")
           .mockReturnValue(Temporal.Instant.from("2023-12-01T10:10:59Z"));
@@ -2359,18 +2078,11 @@ describe("MigrationTest", () => {
           fs.rmSync(root, { recursive: true, force: true });
         }
       });
-    }); // MigrationValidationTest
-  }); // CopyMigrationsTest
+    });
+  });
 });
 
-// BulkAlterTableMigrationsTest cases whose bodies run on every bulk_alter
-// backend (pg + mysql), mirroring Rails' `if supports_bulk_alter?` class gate
-// (migration_test.rb:1222): the delete_me table is created through the
-// adapter-generic createTable/changeTable surface, exactly like Rails'
-// `@connection.create_table(:delete_me, force: true)` + with_bulk_change_table.
 describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
-  // Mirrors the tests' `{ "Mysql2Adapter" => …, … }.fetch(classname) { raise … }`
-  // expected-query-count hashes (migration_test.rb:1236 et al.).
   function expectedBulkAlterQueryCount(counts: { mysql: number; postgres: number }): number {
     if (adapterType !== "mysql" && adapterType !== "postgres") {
       throw new Error(`need an expected query count for ${adapterType}`);
@@ -2436,20 +2148,6 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
   });
 });
 
-// Rails gates this `if supports_bulk_alter?` (class) ▸ `if supports_text_column_with_default?`
-// (migration_test.rb:1457) → features=[bulk_alter,text_column_with_default] with no adapter
-// restriction. mysql:8 lacks text_column_with_default and sqlite lacks bulk_alter, so the
-// compound feature guard runs it on Postgres only — where the PG-specific body (gen_random_uuid)
-// belongs. Kept out of describeIfPg so the gate carries no adapter restriction, matching Rails.
-//
-// Latent gap (now closed): by Rails' own feature definitions the gate also admits MariaDB ≥ 10.2.1
-// (supports_bulk_alter? is true for MySQL adapters per abstract_mysql_adapter.rb:96, and
-// supports_text_column_with_default? is true for any non-MySQL/Trilogy adapter per
-// adapter_helper.rb:42 — which includes MariaDB). Rails branches in-body (migration_test.rb:1460)
-// to `UUID()` on the non-Postgres path. Our CI matrix is mysql:8 (not MariaDB), so at runtime this
-// only ever runs on Postgres today, but the body branches like Rails: `gen_random_uuid()` on
-// Postgres / `UUID()` otherwise (default_function `uuid()`), so the test is correct if MariaDB
-// ever joins the matrix.
 describe("BulkAlterTableMigrationsTest", () => {
   itIfSupports("bulk_alter,text_column_with_default", "default functions on columns", async () => {
     const isPg = adapterType === "postgres";
@@ -2530,13 +2228,6 @@ function mockMigration(): { migration: Migration; sql: string[] } {
   return { migration, sql };
 }
 
-// ==========================================================================
-// proper_table_name + Migration.copy (migration_test.rb counterparts)
-// ==========================================================================
-
-// Connection-fallback tests need a live Base connection pool (Rails leases the
-// migration connection from ActiveRecord::Base), so they run under
-// fixtures() rather than the await freshAdapter()-per-test MigrationTest block.
 describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
 

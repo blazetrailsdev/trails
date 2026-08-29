@@ -1,10 +1,3 @@
-/**
- * The default strategy for executing migrations. Delegates method calls
- * to the connection adapter.
- *
- * Mirrors: ActiveRecord::Migration::DefaultStrategy
- */
-
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ExecutionStrategy } from "./execution-strategy.js";
 

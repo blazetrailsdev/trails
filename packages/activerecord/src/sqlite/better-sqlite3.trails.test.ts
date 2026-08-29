@@ -108,10 +108,6 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
   });
 
   it("databaseExists() treats a relative file: URI as a literal filename", async () => {
-    // better-sqlite3's build doesn't set SQLITE_OPEN_URI, so open() creates a
-    // literal file named "file:name.db" (not the cwd-relative "name.db" a
-    // URI-aware driver would). databaseExists() must check that same literal
-    // string rather than anchoring the URI body at "/".
     const relName = `bs3-rel-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
     const literal = `file:${relName}`;
     try {
@@ -126,9 +122,7 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
       for (const p of [literal, `${literal}-wal`, `${literal}-shm`]) {
         try {
           getFs().unlinkSync(p);
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     }
   });
@@ -144,8 +138,6 @@ describe("SqliteDriver — better-sqlite3 restoreFromPath", () => {
   const templatePath = `${getOs().tmpdir()}/bs3-restore-template-${process.pid}.sqlite`;
   const destPath = `${getOs().tmpdir()}/bs3-restore-dest-${process.pid}.sqlite`;
 
-  // All temp DB files this suite touches (main + WAL sidecars), so setup can
-  // pre-clean and teardown can remove every artifact.
   const tempFiles = [
     templatePath,
     `${templatePath}-wal`,
@@ -158,20 +150,14 @@ describe("SqliteDriver — better-sqlite3 restoreFromPath", () => {
     for (const p of tempFiles) {
       try {
         getFs().unlinkSync(p);
-      } catch {
-        /* best effort */
-      }
+      } catch {}
     }
   };
 
   beforeAll(async () => {
-    // Pre-clean so a prior interrupted run's leftover template (same pid path)
-    // can't make CREATE TABLE throw "table gadgets already exists".
     removeTempFiles();
     const tpl = await betterSqlite3Driver.open({ database: templatePath });
     await tpl.exec(
-      // The table lives in this suite's own temp template file, which
-      // afterAll deletes wholesale — there is no shared database to leak into.
       // eslint-disable-next-line blazetrails/require-table-teardown
       "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
         "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
@@ -184,7 +170,6 @@ describe("SqliteDriver — better-sqlite3 restoreFromPath", () => {
   it("restores a template DB into a fresh destination via the backup primitive", async () => {
     await betterSqlite3Driver.restoreFromPath!(templatePath, destPath);
 
-    // A fresh connection to the restored destination sees the template's rows.
     const probe = await betterSqlite3Driver.open({ database: destPath });
     const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
       c: number;

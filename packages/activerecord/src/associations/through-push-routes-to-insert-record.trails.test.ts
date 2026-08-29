@@ -1,11 +1,3 @@
-/**
- * Trails-only: Rails' `CollectionProxy#<<` is `proxy_association.concat(records)`,
- * so every through-collection write lands on
- * `HasManyThroughAssociation#concat_records` → `#insert_record`. Trails carried a
- * second, proxy-local implementation (`_pushThrough`) that wrote the join row
- * itself, so the OO `insert_record` was dead for user-facing pushes. These tests
- * pin the delegation. Rails has no equivalent test: it never had two paths.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -31,7 +23,6 @@ interface AuthorWithCategories {
   association(name: string): ThroughAssociationLike;
 }
 
-/** Record every `insertRecord` the association object receives, then delegate. */
 function spyOnInsertRecord(assoc: ThroughAssociationLike): Base[] {
   const seen: Base[] = [];
   const original = assoc.insertRecord.bind(assoc);
@@ -61,7 +52,6 @@ describe("through-collection writes route onto the association's insertRecord", 
     await author.categories.push(category);
 
     expect(inserted).toEqual([category]);
-    // The join row is the association's work now, not the proxy's.
     expect(
       await Categorization.where({
         author_id: author.id,
@@ -94,11 +84,6 @@ describe("through-collection writes route onto the association's insertRecord", 
   });
 
   it("createBang rolls the target row back when the join insert returns false", async () => {
-    // `_create_record`'s `raise ActiveRecord::Rollback unless result`
-    // (collection_association.rb:368) — the NON-raising failure arm, whose
-    // return value the proxy's own `insert_record` call used to discard.
-    // `Rollback` is swallowed by the transaction, so `create!` still returns
-    // the (now unpersisted) record.
     const author = (await Author.find(authors("david").id)) as unknown as AuthorWithCategories;
     const assoc = author.association("categories");
     assoc.insertRecord = () => Promise.resolve(false);

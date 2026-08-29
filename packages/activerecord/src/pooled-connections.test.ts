@@ -18,10 +18,6 @@ function establishConnection(poolSize: number, checkoutTimeout: number): Connect
 }
 
 describe("PooledConnectionsTest", () => {
-  // Mirrors Rails' checkout_checkin_connections — each thread checks out a
-  // connection, then checks it back in. Rails joins each thread before
-  // spawning the next, so the checkouts are effectively serialized; the JS
-  // port runs the same sequence single-threaded.
   async function checkoutCheckinConnections(
     poolSize: number,
     iterations: number,
@@ -54,11 +50,6 @@ describe("PooledConnectionsTest", () => {
         const conn = await pool.checkout();
         pool.checkin(conn);
         connectionCount += 1;
-        // Rails calls `lease_connection.data_sources` here; the leasing side
-        // effect — not the query — is what the test depends on: a held lease
-        // keeps a second connection out of the pool so `connections` grows to
-        // 2. We omit `data_sources` because exercising it would force an async
-        // round-trip to a real DB, irrelevant to the pool-size assertion.
         await pool.leaseConnection();
       } catch (err) {
         if (err instanceof ConnectionTimeoutError) timedOut += 1;

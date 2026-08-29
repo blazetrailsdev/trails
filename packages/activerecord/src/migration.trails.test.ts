@@ -1,13 +1,3 @@
-/**
- * Migration tests — trails-specific invariants.
- *
- * These guard trails-internal implementation details (the `_connectionOverride`
- * / `_poolOverride` connection routing, the async `migration()` proxy, and the
- * adapter-backed schema introspection) that have no counterpart in Rails'
- * migration_test.rb. Relocated here
- * verbatim from migration.test.ts under RFC 0043 so the convention file tracks
- * Rails 1:1 while the invariants stay covered.
- */
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -27,14 +17,8 @@ import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 describe("MigrationTest", () => {
-  // Ride the primary schema-loaded pool (`Base.connection`); `checkoutRawTestAdapter`
-  // supplies the *distinct* adapter objects the override-routing identity checks
-  // need (Rails builds a second connection from the primary config rather than
-  // leasing a standing sidecar pool).
   fixtures({}, { useTransactionalTests: false });
 
-  // `respond_to?(direction)` (migration.rb:965) is answered by Migration's own
-  // instance `up`/`down` (migration.rb:951, 957), so this still runs both ways.
   it("migrate runs a change-only migration in both directions", async () => {
     class ChangeOnly extends Migration {
       directions: string[] = [];
@@ -59,9 +43,6 @@ describe("MigrationTest", () => {
       _connectionOverride?: DatabaseAdapter;
       _poolOverride?: unknown;
     };
-    // Both readers' second arm is DatabaseTasks.migration_connection /
-    // migration_connection_pool (migration.rb:1036-1042), which resolve off
-    // ActiveRecord::Base — so with no ivar set they answer Base's own.
     const baseAdapter = Base.connection;
     const basePool = Base.connectionPool();
     const { adapter: override, pool: overridePool } = await checkoutRawTestAdapter();
@@ -70,13 +51,11 @@ describe("MigrationTest", () => {
       expect(m.connection).toBe(baseAdapter);
       internals._connectionOverride = override;
       expect(m.connection).toBe(override);
-      // connectionPool is independent — _connectionOverride must not affect it
       expect(m.connectionPool).toBe(basePool);
       delete internals._connectionOverride;
       expect(m.connection).toBe(baseAdapter);
       internals._poolOverride = poolOverride;
       expect(m.connectionPool).toBe(poolOverride);
-      // connection is independent — _poolOverride must not affect it
       expect(m.connection).toBe(baseAdapter);
       delete internals._poolOverride;
       expect(m.connectionPool).toBe(basePool);
@@ -90,8 +69,6 @@ describe("MigrationTest", () => {
 
   it("migration context with async migration() proxy", async () => {
     const adapter = Base.connection;
-    // Nothing drops schema_migrations between tests, so start from a clean
-    // versions table to assert currentVersion === 1.
     await new SchemaMigration(adapter.pool).dropTable();
     const migrations: MigrationProxy[] = [
       {
@@ -111,12 +88,6 @@ describe("MigrationTest", () => {
   });
 
   it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {
-    // Regression: `column_exists?` is the live adapter-backed introspection
-    // path, so it must expose Rails' full
-    // `column_exists?(table, column, type = nil, **options)` surface and forward
-    // `type` + the columnOptionsKeys (schema_statements.rb:132-141) rather than
-    // matching on name alone. Ride the canonical `people` table
-    // (`first_name` string, null: false — schema.rb:933).
     const conn = Base.connection;
     expect(await conn.columnExists("people", "first_name")).toBe(true);
     expect(await conn.columnExists("people", "first_name", "string")).toBe(true);
@@ -125,10 +96,6 @@ describe("MigrationTest", () => {
     expect(await conn.columnExists("people", "first_name", "string", { null: true })).toBe(false);
   });
 
-  // Rails' IllegalMigrationNameError message carries an explanatory suffix
-  // (migration.rb: "…\n\t(only lower case letters, numbers, and '_' allowed).")
-  // and a distinct no-name variant. No Rails test asserts the message text, so
-  // this fidelity check lives in the trails-only sibling.
   it("IllegalMigrationNameError message matches Rails", () => {
     expect(new IllegalMigrationNameError("bad name!").message).toBe(
       "Illegal name for migration file: bad name!\n\t(only lower case letters, numbers, and '_' allowed).",
@@ -136,10 +103,6 @@ describe("MigrationTest", () => {
     expect(new IllegalMigrationNameError().message).toBe("Illegal name for migration.");
   });
 
-  // Rails' `verbose` is a cattr_accessor (`migration.rb:797`), so the class and
-  // instance readers share one variable and `suppress_messages` toggling it on
-  // an instance is visible class-wide. No Rails test asserts that coupling
-  // directly, so it lives in the trails-only sibling.
   it("verbose is shared between the class and its instances", async () => {
     const verboseWas = Migration.verbose;
     try {
@@ -168,10 +131,6 @@ describe("MigrationTest", () => {
     const seen: unknown[] = [];
     class M extends Migration {}
     const m = new M();
-    // Rails has no `Migration#change_table`: `method_missing` forwards to the
-    // adapter, whose `change_table` yields `update_table_definition(table_name,
-    // base)` — the ADAPTER by default, not the migration
-    // (abstract/schema_statements.rb:510-518).
     const connection = {
       quoteColumnName: (n: string) => n,
       quoteTableName: (n: string) => n,
@@ -198,10 +157,6 @@ describe("MigrationTest", () => {
 
 describe("Migration#createTable id option type", () => {
   it("accepts every Rails-valid id type the schema dumper emits", () => {
-    // The dumper emits `createTable("int_defaults", { id: "bigint", ... })`
-    // (primary-keys.test.ts asserts that string), so the public signature has to
-    // admit any ColumnType — not just "uuid". This is a compile-time guard: on a
-    // narrowed signature the assignments below fail `tsc`, not the assertion.
     type CreateTableOptions = Extract<Parameters<Migration["createTable"]>[1], { id?: unknown }>;
 
     const bigint: CreateTableOptions = { id: "bigint" };
@@ -401,21 +356,13 @@ describe("Schema.verbose", () => {
 
 describe("createTable force + ifNotExists key presence", () => {
   it("raises when ifNotExists is present but false", async () => {
-    // Rails guards on `options.key?(:if_not_exists)`, not on the value
-    // (schema_statements.rb:297-299), so `if_not_exists: false` raises too.
     const adapter = Base.connection;
-    // The guard raises before any DDL runs, so no table is created.
     // eslint-disable-next-line blazetrails/require-table-teardown
     const create = adapter.createTable("things", { force: true, ifNotExists: false });
     await expect(create).rejects.toThrow(ArgumentError);
   });
 });
 
-// Rails' Migration has no `remove_columns` of its own: `method_missing` forwards
-// to `connection.send(:remove_columns, ...)`, so a migration emits the single
-// combined `ALTER TABLE` the connection builds
-// (abstract/schema_statements.rb:675-682). Query-count shape mirrors
-// `test_remove_columns_single_statement` (test/cases/migration/columns_test.rb:402-419).
 describe("Migration#removeColumns forwards to the connection", () => {
   it("emits the same single statement the connection path does", async () => {
     const connection = Base.connection;
@@ -441,9 +388,6 @@ describe("Migration#removeColumns forwards to the connection", () => {
     }
   });
 
-  // `run` takes migration CLASSES (migration.rb:937-949) and constructs each;
-  // `revert` forwards them reversed (migration.rb:853). No Rails test covers the
-  // multi-class arms directly, so the ordering contract is pinned here.
   it("run constructs each migration class in order and revert reverses them", async () => {
     const order: string[] = [];
     class RunOrderA extends Migration {

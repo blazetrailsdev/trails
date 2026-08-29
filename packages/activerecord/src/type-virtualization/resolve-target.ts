@@ -1,9 +1,3 @@
-// Shared helper for resolving the target class name of an association
-// call. Used by both `synthesize.ts` (to emit `declare` types) and
-// `tsc-wrapper/auto-import.ts` (to decide which `import type` lines to
-// inject). Keeping the logic in one place ensures the emitted declares
-// and the auto-imports can't drift.
-
 import { classify, singularize } from "@blazetrails/activesupport";
 import type { AssociationCall } from "./walker.js";
 
@@ -13,19 +7,8 @@ export function resolveAssociationTarget(call: AssociationCall): string {
   return classify(call.name);
 }
 
-/** A model's association calls by class name (cross-file model registry). */
 export type ModelAssociationLookup = (className: string) => readonly AssociationCall[] | undefined;
 
-/**
- * Whether a resolved plain (non-`through`) association target class NAME can be
- * emitted as a bare reference in a synthesized `declare` — i.e. it is `Base`, a
- * registered model (an `import type` will be added for it), or lexically visible
- * from the declaring class. A name that is none of these — e.g.
- * `classify("otherThing")` → `OtherThing` with no backing `OtherThing` model —
- * is unresolvable; the caller pins it to `Base` so the synthesizer never emits
- * a dangling reference (TS2304). Mirrors the `?? "Base"` fallback that
- * `resolveThroughTarget` already gets for `through:` targets.
- */
 export function isEmittableTargetName(
   name: string,
   isRegistered: (name: string) => boolean,
@@ -34,12 +17,6 @@ export function isEmittableTargetName(
   return name === "Base" || isRegistered(name) || isVisible(name);
 }
 
-/**
- * Resolve a `has_many`/`has_one :x, through: :y` target by following Rails'
- * through→source reflection chain — the element type is the SOURCE class on the
- * through model (`Comment`), not `classify(name)` (`CommentsWithOrder`). `lookup`
- * resolves other models by class name. `undefined` when unresolvable.
- */
 export function resolveThroughTarget(
   definingAssocs: readonly AssociationCall[],
   call: AssociationCall,
@@ -50,13 +27,10 @@ export function resolveThroughTarget(
   const throughRaw = call.options["through"];
   if (!throughRaw) return undefined;
   const throughName = stripQuotes(throughRaw);
-  // Guard against a self-referential through chain so recursion terminates.
   const guard = `${throughName}\u0000${call.name}`;
   if (seen.has(guard)) return undefined;
   seen.add(guard);
 
-  // Rails reflection.rb#derive_class_name: `source_type:` (disambiguating a
-  // polymorphic source) wins over the source class, so honor it first.
   const sourceType = call.options["sourceType"];
   if (sourceType) return resolveAlias(stripQuotes(sourceType), aliases);
 
@@ -67,8 +41,6 @@ export function resolveThroughTarget(
   const throughModelAssocs = lookup(throughModel);
   if (!throughModelAssocs) return undefined;
 
-  // Rails source-reflection name (reflection.rb#source_reflection_names):
-  // `source:` if given, else the singularized then plural association name.
   const sourceRaw = call.options["source"];
   const candidates = sourceRaw ? [stripQuotes(sourceRaw)] : [singularize(call.name), call.name];
   for (const candidate of candidates) {
@@ -78,11 +50,6 @@ export function resolveThroughTarget(
   return undefined;
 }
 
-/**
- * The target class of a single association — explicit `className`, a nested
- * `through` (recursed), or `classify(name)` — mapped through the in-file
- * `registerModel` alias map.
- */
 function targetClassOf(
   definingAssocs: readonly AssociationCall[],
   assoc: AssociationCall,
@@ -90,7 +57,6 @@ function targetClassOf(
   aliases: ReadonlyMap<string, string> | undefined,
   seen: Set<string>,
 ): string | undefined {
-  // A polymorphic source has no single class — `Base` fallback.
   if (assoc.options["polymorphic"] === "true") return "Base";
   const explicit = assoc.options["className"];
   if (explicit) return resolveAlias(stripQuotes(explicit), aliases);

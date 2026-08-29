@@ -1,9 +1,5 @@
-// Faithful port of vendor/rails/activerecord/test/cases/query_cache_test.rb.
-// Rides the canonical TEST_SCHEMA + official test-helpers/models + real
-// fixtures (tasks, topics, categories, posts, categories_posts), mirroring the
-// Rails test names and assertions as closely as TypeScript allows.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { registerModel } from "./index.js"; // also eager-loads CollectionProxy for association()
+import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
@@ -28,10 +24,6 @@ import { inMemoryDb } from "./support/adapter-helper.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
-// Mirrors the Rails private `middleware(&app)` helper (query_cache_test.rb:841-845).
-// Rails is `executor.wrap { app.call(env) }`; `app` is async here and `wrap` is
-// synchronous (Ruby's block is), so the bracket is spelled out the way
-// `ActionDispatch::Executor` spells it (executor.rb:13-31).
 function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> {
   const executor = class extends Executor {};
   QueryCache.installExecutorHooks(executor);
@@ -45,9 +37,6 @@ function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> 
   };
 }
 
-// Mirrors the Rails private `assert_cache(state, connection)` helper. Rails
-// reads the per-connection query-cache flags; trails routes them through the
-// pool, so the pool is the equivalent "connection".
 function assertCache(
   state: "off" | "clean" | "dirty",
   pool: ConnectionPool = Base.connectionPool(),
@@ -68,20 +57,11 @@ function assertCache(
   }
 }
 
-// Reads the pool-level query-cache max size — the trails analogue of Rails'
-// `pool.query_cache.instance_variable_get(:@max_size)`. Rails reads it off the
-// per-connection `Store`; trails' `Store` coalesces a disabled pool's `nil`
-// size to `0`, so the faithful value lives on the pool's cache config
-// (`@query_cache_max_size` in Rails). `false`/`0` → `null`, an Integer → that
-// integer, `nil` → the default size (100). Rails' fall-through for a raw string
-// like "unlimited" leaves it `nil` (unbounded), same as `false`/`0`.
 function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
   return (pool as unknown as { _cacheConfig: { _queryCacheMaxSize: number | null } })._cacheConfig
     ._queryCacheMaxSize;
 }
 
-// Mirrors ActiveRecord::TestCase#clean_up_connection_handler: drop every
-// non-default (e.g. :reading) role a test established, leaving the writing pool.
 function cleanUpConnectionHandler(): void {
   const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
     Base.connectionHandler as unknown as {
@@ -96,12 +76,6 @@ function cleanUpConnectionHandler(): void {
 }
 
 describe("QueryCacheTest", () => {
-  // Rails sets `self.use_transactional_tests = false` for this whole file
-  // (query_cache_test.rb:11) so the multi-role tests keep genuinely separate
-  // :reading/:writing pools against committed fixture rows — a transactional
-  // (savepoint-pinned) run would swap the reading pool onto the writing config
-  // (test_fixtures.rb:183-199) and break both the `@max_size` assertions and
-  // the "cleared on all connections" guarantee.
   fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
     useTransactionalTests: false,
   });
@@ -197,9 +171,6 @@ describe("QueryCacheTest", () => {
 
     const mw = middleware(async () => {
       for (const pool of Base.connectionHandler.connectionPoolList("all")) {
-        // Mirrors `assert_predicate pool.lease_connection, :query_cache_enabled`:
-        // the connection-level flag (proving checkout_and_verify wired the Store
-        // onto the connection), not the pool-level flag.
         expect((await pool.leaseConnection()).queryCacheEnabled).toBe(true);
       }
     });
@@ -264,7 +235,6 @@ describe("QueryCacheTest", () => {
     const mw = middleware(async () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         assertCache("clean");
-        // Rails ConnectionAdapters::QueryCache::DEFAULT_SIZE.
         expect(poolQueryCacheMaxSize(Base.connectionPool())).toBe(100);
       });
     });
@@ -437,15 +407,6 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache notifications can be overridden", async () => {
-    // Rails dups the connection and defines a singleton
-    // `connection.cache_notification_info(sql, name, binds)` that merges
-    // `neat: true` into `super`, then asserts the cached event carries it.
-    // trails dispatches the payload through the per-connection
-    // `cacheNotificationInfo` method, so an own-property override on the
-    // connection instance shadows the mixed-in one. trails has no connection
-    // `dup`, so instead of Rails' throwaway copy we patch the shared leased
-    // connection and delete the own property in `finally` — the save/restore
-    // stands in for `dup`.
     const events: NotificationEvent[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
 
@@ -477,9 +438,6 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache does not raise exceptions", async () => {
-    // Rails subscribes a ShouldNotHaveExceptionsLogger (a LogSubscriber that
-    // rescues into `@exception` while handling the event) and asserts it did
-    // not raise while processing the cached sql.active_record event.
     class ShouldNotHaveExceptionsLogger extends LogSubscriber {
       events: NotificationEvent[] = [];
       exception = false;
@@ -494,8 +452,6 @@ describe("QueryCacheTest", () => {
     }
 
     const savedLogger = Base.logger;
-    // A sink logger (Rails' `Logger.new(File::NULL)`) so `sql` runs its full
-    // formatting path instead of short-circuiting on a null logger.
     Base.logger = new Logger({ write: () => {} }) as never;
     const logger = new ShouldNotHaveExceptionsLogger();
     const sub = Notifications.subscribe("sql.active_record", (e) => logger.sql(e));
@@ -516,8 +472,6 @@ describe("QueryCacheTest", () => {
 
   it.skip("query cache does not allow sql key mutation", () => {
     // BLOCKED: relies on Ruby FrozenError when a subscriber mutates the frozen
-    // sql payload key in place; trails payloads are plain JS strings (immutable
-    // by value), so there is no equivalent frozen-string mutation to raise.
   });
 
   it("cache is flat", async () => {
@@ -630,9 +584,7 @@ describe("QueryCacheTest", () => {
         expect((await Post.where({ title: "rollback" })).length).toBe(1);
         throw new Error("broken");
       });
-    } catch {
-      // Rails: `rescue Exception` — swallow the non-Rollback error.
-    }
+    } catch {}
 
     expect((await Post.where({ title: "rollback" })).length).toBe(0);
 
@@ -656,9 +608,7 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache does not establish connection if unconnected", async () => {
-    const mw = middleware(async () => {
-      // The block runs without forcing a new connection beyond the executor's.
-    });
+    const mw = middleware(async () => {});
     await mw();
   });
 
@@ -681,12 +631,7 @@ describe("QueryCacheTest", () => {
     await mw();
   });
 
-  // Rails guards this with `unless in_memory_db?`: a separate :reading
-  // connection cannot see the :writing connection's committed rows on an
-  // in-memory SQLite database, so the cross-pool clear is unobservable there.
   it.skipIf(inMemoryDb())("clear query cache is called on all connections", async () => {
-    // Establish a separate :reading pool against the same config, mirroring
-    // Rails' `establish_connection(db_config)` under `connected_to(:reading)`.
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
       await Base.establishConnection(dbConfig);
@@ -812,14 +757,9 @@ describe("QueryCacheTest", () => {
 describe("QueryCacheMutableParamTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  // Mirrors Rails' `class JsonObj; self.table_name = "json_objs"; attribute
-  // :payload, :json; end` — a scratch table Rails creates in `setup` (not a
-  // canonical table), so naming it `json_objs` matches Rails, not a hack.
   class JsonObj extends Base {
     static {
       this._tableName = "json_objs";
-      // Declared `payload` suppresses reflection of the scratch table, so the
-      // post-INSERT id write-back needs `id` declared for strict _writeAttribute.
       this.attribute("id", "integer");
       this.attribute("payload", "json");
     }
@@ -827,9 +767,6 @@ describe("QueryCacheMutableParamTest", () => {
   registerModel(JsonObj);
 
   beforeEach(async () => {
-    // Rails: `t.jsonb` on PostgreSQL (the `json` type has no `=` operator), else
-    // `t.json`. Mirror that so the `WHERE payload = $1` equality the test issues
-    // is valid on every adapter.
     const columnType = Base.connection.typeRegistryKey === "postgres" ? "jsonb" : "json";
     await Base.connection.createTable("json_objs", { force: true }, (t) => {
       (t as unknown as { column(name: string, type: string): void }).column("payload", columnType);
@@ -846,7 +783,7 @@ describe("QueryCacheMutableParamTest", () => {
     await JsonObj.create({ payload: { a: 1 } });
 
     const search: { a: number; b?: number } = { a: 1 };
-    await JsonObj.where({ payload: search }).first(); // populate the cache
+    await JsonObj.where({ payload: search }).first();
 
     search.b = 2;
     expect(await JsonObj.where({ payload: search }).first()).toBeNull();
@@ -856,13 +793,10 @@ describe("QueryCacheMutableParamTest", () => {
 describe("QuerySerializedParamTest", () => {
   it.skip("query serialized active record", () => {
     // BLOCKED: serializes a hash containing an ActiveRecord instance through a
-    // YAML coder and round-trips it via `use_yaml_unsafe_load`; trails has no
-    // YAML AR-record (un)safe-load equivalent.
   });
 
   it.skip("query serialized string", () => {
     // BLOCKED: depends on the Ruby YAML `serialize` coder round-trip used by the
-    // sibling AR-record case above; not portable without YAML serialization.
   });
 });
 
@@ -880,8 +814,6 @@ describe("QueryCacheExpiryTest", () => {
     await (await Post.leaseConnection()).changeColumn("posts", "title", "string");
   });
 
-  // Rails uses `assert_called(query_cache, :clear, times: 1)`; trails counts
-  // clears by spying on the pool's query-cache `clear`.
   async function assertClears(times: number, fn: () => Promise<void>): Promise<void> {
     const store = Base.connectionPool().queryCache as never as { clear(): void };
     const real = store.clear.bind(store);
@@ -928,14 +860,6 @@ describe("QueryCacheExpiryTest", () => {
     });
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-  // query-cache-dirties-wiring-incomplete): Rails wires `dirties_query_cache`
-  // on the public write methods (`:create, :insert, :update, :delete, ...`) so
-  // each logical write clears the query cache exactly once. trails wires it on
-  // the low-level `executeMutation`, through which a single write funnels at
-  // several nested layers (insert → insertStatement → execInsert), clearing 2–3
-  // times. These `assert_called(query_cache, :clear, times: 1)` tests stay
-  // skipped until the dirties wiring moves to the public-method layer.
   it("update", async () => {
     await Task.cache(async () => {
       await assertClears(1, async () => {

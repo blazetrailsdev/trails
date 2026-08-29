@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/jobs.yml
 export const jobFixtureData = {
   unicyclist: {
     id: 1,

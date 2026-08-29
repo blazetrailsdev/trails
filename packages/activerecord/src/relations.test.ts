@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/cases/relations_test.rb
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import {
   Relation,
@@ -17,7 +16,6 @@ import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "./testing/sql-capture.js";
 
-// Canonical models
 import {
   Post,
   PostWithPreloadDefaultScope,
@@ -84,11 +82,6 @@ describe("RelationTest", () => {
     "cpkBooks",
     "subscribers",
   ]);
-  // "finding with subquery without select does not change the select"
-  // deliberately raises a DB error that aborts the PG transaction; it still runs
-  // transactionally because the fixture teardown skips its redundant DELETEs
-  // while the pinned transaction is open, so the abort no longer poisons the
-  // rollback.
 
   beforeAll(() => {
     registerModel(Post);
@@ -140,10 +133,6 @@ describe("RelationTest", () => {
   });
 
   it("two scopes with includes should not drop any include", () => {
-    // Chaining two scopes that each add a different include must keep both, so
-    // the loaded record answers `tyres`/`engines` without another query (Rails'
-    // Car.incl_engines.incl_tyres). Rails' includes! unions (`|=`), so a repeat
-    // of the SAME include folds to one — only distinct ones accumulate.
     const relation = (Car.inclEngines() as any).inclTyres();
     expect(relation.includesValues.map(String)).toEqual([":engines", ":tyres"]);
   });
@@ -179,7 +168,6 @@ describe("RelationTest", () => {
   });
 
   it("to xml", async () => {
-    // assert_nothing_raised { Bird.all.to_xml } / { Bird.all.to_a.to_xml }
     let relationXml: string | undefined;
     try {
       relationXml = await Bird.all().toXml();
@@ -360,10 +348,6 @@ describe("RelationTest", () => {
     const subquery = Comment.from(relation, `grouped_${Comment.tableName}`)
       .group("type")
       .average("post_count");
-    // Rails reads the select alias via `&:post_count`; trails exposes the same
-    // dynamic reader on the loaded record. COUNT() is a bigint on PG/MariaDB
-    // while average() yields a number, so coerce both to Number for comparison
-    // (Rails compares BigDecimal == Integer loosely).
     const relCounts = (await relation).map((r: any) => Number(r.post_count)).sort();
     const subValues = [...((await subquery) as Map<unknown, number>).values()].map(Number).sort();
     expect(subValues).toEqual(relCounts);
@@ -397,20 +381,9 @@ describe("RelationTest", () => {
     expect((await Comment.select("a.*").from(relation, "a")).map((c) => c.id)).toEqual(expected);
   });
 
-  // trails-specific SQL-shape lock. Rails `build_from` (query_methods.rb:1783)
-  // resolves an eager-loading `from(relation)` via `apply_join_dependency` and
-  // then wraps `opts.arel.as(name)`. That `arel` is the plain `build_arel` — it
-  // does NOT run `JoinDependency#apply_column_aliases`, which Rails only applies
-  // in the `exec_queries`/`to_sql`/`pluck` paths when the OUTER relation is
-  // eager. So the folded subquery projects the qualified table star
-  // (`"comments".*`), NOT the `t0_r0…` aliased column list a standalone eager
-  // `toSql()` emits. This is Rails-correct, and shared with the where-subquery
-  // path (`relation-handler`); converging to `t0_r*` here would diverge.
   it("eager from() subquery projects the table star, not column aliases", async () => {
     const relation = Comment.includes(":post").where({ "posts.type": "Post" }).order(":id");
     const sql = await (Comment.select("*").from(relation) as any).toSql();
-    // Adapter-agnostic: strip identifier quoting (`"` on sqlite/postgres,
-    // backticks on mysql) so the shape assertion holds on every CI adapter.
     const unquoted = sql.replace(/["`]/g, "");
     expect(unquoted).toContain("comments.* FROM comments LEFT OUTER JOIN posts");
     expect(unquoted).not.toMatch(/t0_r0/);
@@ -477,10 +450,6 @@ describe("RelationTest", () => {
   });
 
   it("reverse arel assoc order with function", async () => {
-    // Rails: `Topic.order(Arel.sql("lower(title)") => :asc)`. JS object keys
-    // can't be Arel nodes, so a Map is the faithful analog of a node-keyed
-    // order hash — preprocessOrderArgs sends the direction to the node itself
-    // rather than resolving it as a column name.
     const topicsRel = Topic.order(new Map([[arelSql("lower(title)"), "asc"]])).reverseOrder();
     expect((await topicsRel.first())!.title).toBe(topics("third").title);
   });
@@ -518,14 +487,8 @@ describe("RelationTest", () => {
   });
 
   it("reverse arel assoc order with multiargument function", () => {
-    // JS object keys can't be Arel nodes, so a Map is the faithful analog of Rails'
-    // `order(Arel.sql("REPLACE(title, '', '')") => :asc)`: the SqlLiteral key carries
-    // explicit direction, so reverseOrder flips it (Ascending→Descending) rather than
-    // routing through the raw-SQL reverse path that raises IrreversibleOrderError.
     const order = new Map([[arelSql("REPLACE(title, '', '')"), "asc" as const]]);
     expect(() => Topic.order(order).reverseOrder().toSql()).not.toThrow();
-    // The direction-carrying key is reversed by flipping ASC→DESC on the node,
-    // not by re-parsing raw SQL — so the multi-argument function survives intact.
     expect(Topic.order(order).reverseOrder().toSql()).toContain(
       "ORDER BY REPLACE(title, '', '') DESC",
     );
@@ -675,9 +638,6 @@ describe("RelationTest", () => {
     expect(sql).toContain("body");
   });
 
-  // Mirrors Rails' inline `current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`
-  // branch (relations_test.rb:476); kept out of the test body so
-  // vitest/no-conditional-in-test stays happy.
   const sanitizedOrderRe =
     adapterType === "mysql" ? /field\(id, '1',\s*'3',\s*'2'\)/ : /field\(id, 1,\s*3,\s*2\)/;
 
@@ -778,9 +738,6 @@ describe("RelationTest", () => {
     expect(() => (Topic as any).annotate([])).not.toThrow();
   });
 
-  // order/reorder mirror Rails' `args.flatten!` + `args.compact_blank!`
-  // (query_methods.rb:656-660/752-756): a nested blank argument flattens then
-  // compacts away rather than reaching the bang variant as an array and raising.
   it("order and reorder flatten and compact blank nested arguments", () => {
     expect(() => (Topic as any).order([null])).not.toThrow();
     expect(() => (Topic as any).reorder([{}])).not.toThrow();
@@ -788,8 +745,6 @@ describe("RelationTest", () => {
     expect((Topic.order("title") as any).reorder([{}]).toSql()).not.toContain("ORDER BY");
   });
 
-  // Rails compact_blank!s blank join specs before joins!/left_outer_joins!, so a
-  // blank hash/array must not linger in relation state (query_methods.rb:868-890).
   it("blank join arguments are not retained in relation state", () => {
     expect((Topic as any).joins({}).joinsValues).toEqual([]);
     expect((Topic as any).leftJoins({}).leftOuterJoinsValues).toEqual([]);
@@ -905,16 +860,9 @@ describe("RelationTest", () => {
     expect(readersAssoc2.isLoaded()).toBe(true);
     expect(readersAssoc2.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
 
-    // Rails merges :eager_load as a NORMAL_VALUE (merger.rb) — a straight union
-    // via eager_load!, never gated on model equality nor nested under a
-    // reflection, so it crosses the model boundary untouched.
     const merged = Comment.joins(":post").merge(Post.eagerLoad(":readers")) as any;
     expect(merged.eagerLoadValues).toContain(":readers");
 
-    // merge! (in-place) shares Merger#merge in Rails; trails routes both through
-    // the same foldMerge* helpers, so the cross-model reflection-nesting applies
-    // identically — the bang path must nest `{ post: [:readers] }`, not ask
-    // Comment to preload `:readers` directly.
     const bang = Comment.joins(":post") as any;
     bang.mergeBang(Post.preload(":readers").where({ title: "Uhuu" }));
     expect(bang.preloadValues).toEqual([{ ":post": [":readers"] }]);
@@ -937,7 +885,6 @@ describe("RelationTest", () => {
     expect(preloadedReaders).toHaveLength(1);
     expect(Number(preloadedReaders[0].post_id)).toBe(Number(post.id));
 
-    // includes branch: PostWithIncludesDefaultScope
     const postRel2 = PostWithIncludesDefaultScope.includes(":readers").where({ title: "Uhuu" });
     const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2);
     expect(resultPosts2).toHaveLength(1);
@@ -1268,7 +1215,6 @@ describe("RelationTest", () => {
   });
 
   it("count explicit columns", async () => {
-    // Count on a specific column
     const count = await Post.count("id");
     expect(typeof count).toBe("number");
     expect(count).toBeGreaterThan(0);
@@ -1362,7 +1308,7 @@ describe("RelationTest", () => {
     const postsRel = Post.all();
 
     await assertQueriesCount(3, false, async () => {
-      expect(await postsRel.isAny()).toBe(true); // Uses COUNT()
+      expect(await postsRel.isAny()).toBe(true);
       expect(await postsRel.where({ id: null }).isAny()).toBe(false);
 
       expect(await postsRel.isAny((p) => (p.id as number) > 0)).toBe(true);
@@ -1379,7 +1325,7 @@ describe("RelationTest", () => {
     const postsRel = Post.all();
 
     await assertQueriesCount(2, false, async () => {
-      expect(await postsRel.isMany()).toBe(true); // Uses COUNT()
+      expect(await postsRel.isMany()).toBe(true);
       expect(await postsRel.isMany((p) => (p.id as number) > 0)).toBe(true);
       expect(await postsRel.isMany((p) => (p.id as number) < 2)).toBe(false);
     });
@@ -1399,7 +1345,7 @@ describe("RelationTest", () => {
   it("none?", async () => {
     const postsRel = Post.all();
     await assertQueriesCount(1, false, async () => {
-      expect(await postsRel.isNone()).toBe(false); // Uses COUNT()
+      expect(await postsRel.isNone()).toBe(false);
     });
 
     expect(postsRel.isLoaded).toBe(false);
@@ -1418,7 +1364,7 @@ describe("RelationTest", () => {
   it("one", async () => {
     const postsRel = Post.all();
     await assertQueriesCount(1, false, async () => {
-      expect(await postsRel.isOne()).toBe(false); // Uses COUNT()
+      expect(await postsRel.isOne()).toBe(false);
     });
 
     expect(postsRel.isLoaded).toBe(false);
@@ -1711,12 +1657,7 @@ describe("RelationTest", () => {
       expect(results.length).toBeGreaterThan(0);
       return results.shift();
     };
-    // Rails stubs find_by/find_by! on `relation` and the stub survives the
-    // retry's `where(attributes).lock` because Ruby's spawn is `clone` (the
-    // singleton class rides along); trails spawns a fresh Relation, so the
-    // stub lives on the prototype to cover the spawned retry relation too.
     vi.spyOn(Relation.prototype as any, "findBy").mockImplementation(findByMock as any);
-    // create_or_find_by always call find_by! on retry
     vi.spyOn(Relation.prototype as any, "findByBang").mockImplementation(findByMock as any);
 
     expect((await relation.findOrCreateBy({ nick: "bob" })).id).toBe(bob.id);
@@ -1836,7 +1777,6 @@ describe("RelationTest", () => {
     await CpkBook.createBang({ id: [2, 1], order: order1 });
     const book = await CpkBook.findOrInitializeBy({ order: order2 });
     const loadedOrder = await (book as any).loadBelongsTo("order");
-    // Rails: assert_equal order2, book.order (AR == compares by class + PK)
     expect(loadedOrder.shop_id).toBe((order2 as any).shop_id);
     expect(loadedOrder.id_value).toBe((order2 as any).id_value);
   });
@@ -1872,8 +1812,6 @@ describe("RelationTest", () => {
     const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
     const baseline = (await relation).map((p) => p.id);
 
-    // Rails' `values.except(*skips)` silently ignores unknown keys; the widened
-    // skip type lets `except("bogus")` typecheck without a cast.
     const unchanged = relation.except("bogus");
     expect((await unchanged).map((p) => p.id)).toEqual(baseline);
   });
@@ -1899,14 +1837,10 @@ describe("RelationTest", () => {
   it("only does not replay unscope on merge", () => {
     const stripped = Post.where({ author_id: 1 }).order("id ASC").limit(1).only("where");
 
-    // Unlike delegating to unscope, only records no unscope_values: merging the
-    // result must NOT erase the receiver's order/limit (mirrors except).
     const merged = Post.order("title").limit(5).merge(stripped);
     expect(merged.toSql()).toContain("ORDER BY");
     expect(merged.toSql()).toContain("LIMIT");
 
-    // only keeps value keys with no unscope equivalent when named, and resets
-    // the rest (Rails VALUE_METHODS complement of values.slice).
     expect(Post.all().distinct().only("distinct").toSql()).toContain("DISTINCT");
     expect(Post.all().distinct().only("where").toSql()).not.toContain("DISTINCT");
   });
@@ -1978,10 +1912,6 @@ describe("RelationTest", () => {
   });
 
   it("doesnt add having values if options are blank", () => {
-    // Mirrors Rails: a blank `having` argument is a no-op leaving the having
-    // clause empty (relations_test.rb:1806). trails routes `{}` through the
-    // same `opts.blank?` guard as `""` / `[]`, so the empty hash never reaches
-    // PredicateBuilder's empty-hash `1=0` expansion.
     expect(Post.having("").havingClause.isEmpty()).toBe(true);
     expect(Post.having([] as any).havingClause.isEmpty()).toBe(true);
     expect(Post.having({}).havingClause.isEmpty()).toBe(true);
@@ -2052,9 +1982,6 @@ describe("RelationTest", () => {
   });
 
   it("automatically added where references", () => {
-    // `PredicateBuilder.references` yields `Arel.sql(...)`, and Ruby's
-    // SqlLiteral IS a String — so `assert_equal ["comments"]` passes there.
-    // TypeScript has no String subclass, hence the explicit `String()`.
     const scope1 = Post.where({ comments: { body: "Bla" } });
     expect((scope1 as any).referencesValues.map(String)).toEqual(["comments"]);
     const scope2 = Post.where({ "comments.body": "Bla" });
@@ -2211,7 +2138,6 @@ describe("RelationTest", () => {
     await rel.load();
     expect(rel.isLoaded).toBe(true);
     const filtered = rel.where({ approved: false });
-    // Original relation should still be loaded
     expect(rel.isLoaded).toBe(true);
     expect(await rel).not.toHaveLength(0);
     const filteredRecords = await filtered;
@@ -2356,8 +2282,6 @@ describe("RelationTest", () => {
   it("#load", async () => {
     const relation = Post.all();
     const loaded = await relation.load();
-    // Rails asserts `assert_equal relation, relation.load` (relations_test.rb:2193) —
-    // equality, not identity. `load` returns a then-less view of the same relation.
     expect(loaded).toEqual(relation);
     const arr = await relation;
     expect(arr).toHaveLength(11);
@@ -2596,11 +2520,6 @@ describe("RelationTest", () => {
     expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
   });
 
-  // Mirrors the parametrized `test_no_arguments_to_#{method}_raise_errors`
-  // block in relations_test.rb: every query method guarded by
-  // check_if_method_has_arguments! raises ArgumentError when called with no
-  // arguments. The display name is the Rails method (so parity:test matches),
-  // while the invoker uses the trails camelCase port.
   const noArgGuardedMethods: Array<[string, (rel: any) => unknown]> = [
     ["references", (rel) => rel.references()],
     ["includes", (rel) => rel.includes()],
@@ -2624,7 +2543,6 @@ describe("RelationTest", () => {
     });
   }
 
-  // Rails gates CreateOrFindByWithinTransactions `unless current_adapter?(:SQLite3Adapter)`
   describe.skipIf(adapterType === "sqlite")("CreateOrFindByWithinTransactions", () => {
     it("multiple find or create by within transactions", async () => {
       await Subscriber.deleteAll();

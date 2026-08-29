@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/dead_parrots.yml
-// STI rows for the parrots table.
 export const deadParrotFixtureData = {
   deadbird: {
     name: "Dusty DeadBird",

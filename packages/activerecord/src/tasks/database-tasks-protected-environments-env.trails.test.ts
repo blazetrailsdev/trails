@@ -110,11 +110,6 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 
-  /**
-   * Lays out one sqlite file database and returns its config: `versions`
-   * seeds `schema_migrations`, `storedEnv` (when given) stamps
-   * `ar_internal_metadata`.
-   */
   async function seededConfig({
     versions = ["1"],
     storedEnv,
@@ -200,8 +195,6 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   it.skipIf(skipUnlessFileSqlite)(
     "passes at version 0 even when the environment is stamped protected",
     async () => {
-      // last_stored_environment short-circuits on current_version == 0, so a
-      // stamped-but-unmigrated database never trips the guard.
       const config = await seededConfig({ versions: [], storedEnv: "production" });
       await expect(checkCurrentProtectedEnvironmentBang(config)).resolves.toBeUndefined();
     },

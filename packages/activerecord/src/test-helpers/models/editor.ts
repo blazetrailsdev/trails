@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Editorship } from "./editorship.js";
 import type { Publication } from "./publication.js";
-// vendor/rails/activerecord/test/models/editor.rb
 import { Base } from "../../base.js";
 
 export class Editor extends Base {

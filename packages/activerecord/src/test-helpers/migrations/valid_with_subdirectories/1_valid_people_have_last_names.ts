@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/valid_with_subdirectories/1_valid_people_have_last_names.rb
 import { Migration } from "../../../migration.js";
 
 export class ValidPeopleHaveLastNames extends Migration {

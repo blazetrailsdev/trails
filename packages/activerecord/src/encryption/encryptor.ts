@@ -1,9 +1,3 @@
-/**
- * Main encryptor — encrypts/decrypts using cipher + message serializer.
- *
- * Mirrors: ActiveRecord::Encryption::Encryptor
- */
-
 import { Message } from "./message.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -12,7 +6,6 @@ import { type Compressor } from "./config.js";
 import { Configurable } from "./configurable-slot.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
-// Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
 const THRESHOLD_TO_JUSTIFY_COMPRESSION = 140;
 
 export interface EncryptorOptions {
@@ -20,13 +13,6 @@ export interface EncryptorOptions {
   compressor?: Compressor;
 }
 
-/**
- * Structural encryptor surface accepted by `Scheme.encryptor`. The
- * concrete `Encryptor` class satisfies this interface. Keeps the
- * scheme decoupled from any one implementation so a compatible
- * subtype (or test double) can be passed in without casting through
- * `never`.
- */
 export interface EncryptorLike {
   encrypt(clearText: string, options?: Record<string, unknown>): string;
   decrypt(encryptedText: string, options?: Record<string, unknown>): string;
@@ -131,11 +117,6 @@ export class Encryptor {
     }
     this.validatePayloadType(clearText);
     if (options?.deterministic) clearText = this.forceEncodingIfNeeded(clearText);
-    // Resolve key provider: explicit keyProvider > raw key shortcut > default.
-    // Raw key is wrapped in a minimal inline provider so buildEncryptedMessage
-    // has a uniform interface (mirrors Rails' key_provider keyword arg).
-    // Use !== undefined so an empty-string key is treated as explicitly provided
-    // and let the cipher reject it rather than silently falling back.
     const keyProvider: KeyProviderLike | undefined =
       options?.keyProvider ??
       (options?.key !== undefined
@@ -153,8 +134,6 @@ export class Encryptor {
     options?: {
       keyProvider?: KeyProviderLike;
       key?: string | string[];
-      // cipher_options is accepted for API symmetry with encrypt() but unused today —
-      // deterministic IV is read from message headers rather than cipher_options on decrypt.
       cipherOptions?: Record<string, unknown>;
     },
   ): string {
@@ -169,8 +148,6 @@ export class Encryptor {
 
     const message = this.deserializeMessage(encryptedText);
 
-    // Collect all candidate secrets then delegate key-rotation to Cipher#decrypt,
-    // mirroring Rails: cipher.decrypt(message, key: keys.collect(&:secret), **cipher_options)
     let keys: string[];
     if (options?.keyProvider) {
       keys = options.keyProvider.decryptionKeys(message).map((k) => k.secret);
@@ -248,7 +225,6 @@ export class Encryptor {
 
   /** @internal */
   private deserializeMessage(message: string): Message {
-    // Mirrors Rails: rescue ArgumentError, TypeError, Errors::ForbiddenClass => Errors::Encoding
     try {
       return this.serializer().load(message);
     } catch (e) {
@@ -297,8 +273,6 @@ export class Encryptor {
   /** @internal */
   private compress(data: string): Buffer {
     const result = this._compressor.deflate(data);
-    // TS Buffer has no encoding tag; Rails calls force_encoding(data.encoding) here.
-    // This is a no-op for the utf-8 round-trip that the cipher/serializer use today.
     return Buffer.isBuffer(result) ? result : Buffer.from(result);
   }
 
@@ -312,8 +286,6 @@ export class Encryptor {
 
   /** @internal */
   private uncompress(data: Buffer | Uint8Array): string {
-    // TS Buffer has no encoding tag; Rails calls force_encoding(data.encoding) here.
-    // Callers decode the result as utf-8 consistently so no encoding is lost in practice.
     return this._compressor.inflate(data);
   }
 

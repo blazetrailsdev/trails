@@ -1,14 +1,3 @@
-/**
- * trails-only coverage for `ActiveRecord::Migration.load_schema_if_pending!`
- * (`vendor/rails/activerecord/lib/active_record/migration.rb:730-736`). Rails has
- * no test for it — its `load_schema!` shells out to `bin/rails db:test:prepare`,
- * so there is nothing to assert in-process there. trails calls the code that
- * Rake task reaches directly, which makes the repair arm observable.
- *
- * `DatabaseTasks` is stubbed so the arms are observable without a schema dump on
- * disk; the connection handler is only proxied for `clearAllConnectionsBang`,
- * since `checkPendingMigrations` opens a temporary pool through that same handler.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { Migration } from "../migration.js";

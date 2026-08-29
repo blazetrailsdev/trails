@@ -1,11 +1,5 @@
-// vendor/rails/activerecord/test/cases/callbacks_test.rb (ContextualCallbacksDeveloper)
 import { Base } from "../../base.js";
 
-/**
- * Rails `ContextualCallbacksDeveloper < ActiveRecord::Base` from
- * callbacks_test.rb: rides the `developers` table and records a per-instance
- * callback `history`, asserting validation-context-aware ordering.
- */
 export class ContextualCallbacksDeveloper extends Base {
   declare name: string;
   declare salary: number;

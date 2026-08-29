@@ -1,7 +1,6 @@
 import type { Author } from "./author.js";
 import type { Category } from "./category.js";
 import type { Owner } from "./owner.js";
-// vendor/rails/activerecord/test/models/essay.rb
 import { Base } from "../../base.js";
 
 export class Essay extends Base {

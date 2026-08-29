@@ -58,10 +58,6 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
     super();
     this._connection = this;
   }
-  // This double has no real raw connection; report active so checkout's
-  // verify! is a no-op (mirroring Rails, where the pinned connection is
-  // active and verify! returns without reconnecting). Backed by a mutable
-  // field so a test can simulate the connection dying mid-session.
   activeFlag = true;
   override async active(): Promise<boolean> {
     return this.activeFlag;
@@ -134,7 +130,6 @@ it("checkout after close", async () => {
 
   await pool.disconnectBang();
 
-  // After disconnect, leaseConnection creates a fresh connection
   const conn2 = await pool.leaseConnection();
   expect(conn2).toBeTruthy();
   expect(conn2).not.toBe(conn);
@@ -190,9 +185,6 @@ it("active connection in use", async () => {
 it("full pool exception", async () => {
   const pool = makePool(1);
   await pool.checkout();
-  // `checkout` is async now (it awaits per-checkout verifyBang), so a saturated
-  // pool rejects with ConnectionTimeoutError after the checkout timeout rather
-  // than throwing synchronously.
   await expect(pool.checkout(0.05)).rejects.toThrow(/could not obtain a connection/i);
 });
 
@@ -223,13 +215,11 @@ it("reap and active", async () => {
   await pool.checkout();
   const count = pool.connections.length;
   pool.reap();
-  // In single-threaded JS, no connections have dead owners, so reap is a no-op
   expect(pool.connections.length).toBe(count);
   await pool.disconnect();
 });
 
 it("idle timeout configuration", async () => {
-  // High idleTimeout: flush() with no args keeps connections
   const keepPool = makeAmbientPool({ idleTimeout: 9999 });
   const keepConn = await keepPool.checkout();
   keepPool.checkin(keepConn);
@@ -237,17 +227,14 @@ it("idle timeout configuration", async () => {
   await keepPool.flush();
   expect(keepPool.stat().connections).toBe(1);
 
-  // Small idleTimeout: flush() with no args removes expired idle connections
   const flushPool = makeAmbientPool({ idleTimeout: 1 });
   vi.useFakeTimers();
   try {
     const flushConn = await flushPool.checkout();
     flushPool.checkin(flushConn);
     expect(flushPool.stat().connections).toBe(1);
-    // Not yet expired
     await flushPool.flush();
     expect(flushPool.stat().connections).toBe(1);
-    // Advance past the 1-second idleTimeout
     vi.advanceTimersByTime(2000);
     await flushPool.flush();
     expect(flushPool.stat().connections).toBe(0);
@@ -260,7 +247,6 @@ it("disable flush", async () => {
   const pool = makeAmbientPool({ idleTimeout: null });
   const conn = await pool.checkout();
   pool.checkin(conn);
-  // flush is a no-op when idleTimeout is null
   await pool.flush();
   expect(pool.stat().connections).toBe(1);
 });
@@ -271,10 +257,8 @@ it("flush", async () => {
   pool.checkin(conn);
   expect(pool.stat().connections).toBe(1);
   expect(pool.stat().idle).toBe(1);
-  // Flush with high idle threshold — nothing removed
   await pool.flush(9999);
   expect(pool.stat().connections).toBe(1);
-  // Flush with 0 threshold — removes all idle
   await pool.flush(0);
   expect(pool.stat().connections).toBe(0);
 });
@@ -333,7 +317,6 @@ it("automatic reconnect restores after disconnect", async () => {
   pool.releaseConnection();
 
   await pool.disconnectBang();
-  // With automaticReconnect=true (default), new connections are created
   expect(await pool.leaseConnection()).toBeTruthy();
   pool.releaseConnection();
 });
@@ -355,8 +338,6 @@ it("pool sets connection visitor", async () => {
 });
 
 it("anonymous class exception", async () => {
-  // Anonymous class (no name) cannot establish a connection — mirrors Rails
-  // `raise "Anonymous class is not allowed." unless name`
   const makeAnon = (): typeof Base => class extends Base {} as unknown as typeof Base;
   const Anon = makeAnon();
   await expect(Anon.establishConnection()).rejects.toThrow("Anonymous class is not allowed.");
@@ -420,11 +401,9 @@ it("sets pool schema reflection", async () => {
 
 it("pool sets connection schema cache", async () => {
   const pool = makeTransactionAwarePool(5);
-  // Two simultaneous checkouts return distinct connections.
   const conn1 = await pool.checkout();
   const conn2 = await pool.checkout();
   expect(conn1).not.toBe(conn2);
-  // Both connections share the same raw SchemaCache instance via poolConfig.
   const cache1 = (conn1 as unknown as { internalSchemaCache: SchemaCache }).internalSchemaCache;
   const cache2 = (conn2 as unknown as { internalSchemaCache: SchemaCache }).internalSchemaCache;
   expect(cache1).toBeInstanceOf(SchemaCache);
@@ -469,9 +448,6 @@ it("pin connection connected?", async () => {
 it("isConnected probes each pooled connection's connected state", async () => {
   const pool = makePool();
   const conn = await pool.checkout();
-  // Rails' checkout is lazy for non-pinned connections (checkout_and_verify
-  // only runs clean!); verify! is the Rails-named way to establish the raw
-  // connection so connected? flips true, as the pinned paths do.
   await conn.verifyBang();
   expect(pool.isConnected()).toBe(true);
   pool.checkin(conn);
@@ -493,12 +469,10 @@ it("pin connection opens a transaction", async () => {
 it("unpin connection returns whether transaction has been rolledback", async () => {
   const pool = makeTransactionAwarePool(5);
 
-  // Clean unpin — transaction is still open, rollback happens → clean = true
   await pool.pinConnectionBang();
   const clean = await pool.unpinConnectionBang();
   expect(clean).toBe(true);
 
-  // Dirty unpin — manually commit the transaction before unpin
   await pool.pinConnectionBang();
   const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
   await conn.transactionManager.commitTransaction();
@@ -513,31 +487,22 @@ it("pin connection nesting", async () => {
   expect(conn1.transactionManager.openTransactions).toBe(1);
   expect(conn1.transactionManager.currentTransaction.joinable).toBe(false);
 
-  // Nested pin opens a second transaction (savepoint-level in Rails)
   await pool.pinConnectionBang();
   const conn2 = await pool.checkout();
   expect(conn1).toBe(conn2);
   expect(conn1.transactionManager.openTransactions).toBe(2);
 
-  // First unpin rolls back the inner transaction but keeps connection pinned
   await pool.unpinConnectionBang();
   expect(conn1.transactionManager.openTransactions).toBe(1);
   expect(conn1.transactionManager.currentTransaction.open).toBe(true);
   const conn3 = await pool.checkout();
   expect(conn3).toBe(conn1);
 
-  // Second unpin rolls back the outer transaction and checks in
   await pool.unpinConnectionBang();
   expect(conn1.transactionManager.openTransactions).toBe(0);
 });
 
 it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
-  // Rails re-runs verify! on every pinned checkout (connection_pool.rb:554), and
-  // verify! self-heals via reconnect!(restore_transactions: true) when the
-  // connection is no longer active? (abstract_adapter.rb:759). trails' checkout()
-  // is async and awaits the async verifyBang on every pinned handout, so this
-  // must hold for a *subsequent* (non-establishment) checkout too — not just the
-  // immediate one after pinConnectionBang — when the connection drops mid-session.
   const pool = makeTransactionAwarePool(5);
   await pool.pinConnectionBang();
 
@@ -547,14 +512,10 @@ it("subsequent pinned checkout verifies and reconnects a connection that died mi
     conn.activeFlag = true;
   });
 
-  // Establishment already happened above; the connection is still healthy, so a
-  // re-checkout here verifies but does NOT reconnect.
   expect(await pool.checkout()).toBe(conn);
   expect(verify).toHaveBeenCalledTimes(1);
   expect(reconnect).not.toHaveBeenCalled();
 
-  // Now the pinned connection dies mid-session. The *next* (subsequent, non-
-  // establishment) pinned checkout must await verifyBang and self-heal.
   conn.activeFlag = false;
   const again = (await pool.checkout()) as TransactionAwareTestAdapter;
   expect(again).toBe(conn);
@@ -576,7 +537,6 @@ it("inspect does not show secrets", async () => {
   expect(str).not.toMatch(/password/);
   expect(str).not.toContain(String(ambientPoolConfiguration().adapter));
 
-  // With non-default shard
   const pool2 = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
   expect(pool2.inspect()).toMatch(/shard="shard_one"/);
   expect(pool2.inspect()).toMatch(/role="reading"/);
@@ -588,11 +548,6 @@ it("adapter proxy treats a probe name as the send it is, with no carve-out set",
     pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
   )._getAdapterProxy();
 
-  // `abstract/connection_pool.rb` gives the proxy no name set to consult: what
-  // an adapter answers is what its class defines. None of these is an
-  // AbstractAdapter method, and `abstract_adapter.rb` overrides no
-  // `method_missing`, so each raises rather than answering — before a checkout
-  // as well as after, since the base class stands in for the sample connection.
   for (const key of [
     "then",
     "toJSON",
@@ -604,20 +559,10 @@ it("adapter proxy treats a probe name as the send it is, with no carve-out set",
   ]) {
     expect(() => proxy[key]).toThrow(NoMethodError);
   }
-  // What Ruby *does* answer, it answers through the ancestor chain — the same
-  // reason `NullPool` lets `to_s` arrive as `Object.prototype.toString`.
   expect(typeof proxy.hasOwnProperty).toBe("function");
-  // `constructor` is object plumbing, not a send: a walker reads it to name the
-  // value's class, so it answers the adapter class rather than a dispatcher
-  // that would call that class without `new`.
   expect(proxy.constructor).toBe(AbstractAdapter);
-  // A JS `Symbol` cannot spell a Ruby send — the one carve-out the language
-  // forces, as on `NullPool`.
   expect(proxy[Symbol.iterator]).toBeUndefined();
 
-  // A deliberately failing assertion whose subject holds the proxy must report
-  // its own failure, not an error from the reporter — the guard
-  // `connection-pool.trails.test.ts` carries for `NullPool`.
   expect(() => expect({ adapter: proxy, n: 1 }).toEqual({ adapter: proxy, n: 2 })).toThrow(
     /expected/i,
   );
@@ -634,19 +579,14 @@ it("adapter proxy still dispatches genuine adapter methods to the connection", a
     }
   )._getAdapterProxy();
 
-  // typeRegistryKey is served directly off the proxy (no checkout).
   expect(typeof proxy.typeRegistryKey).toBe("string");
 
-  // A real adapter method fabricates a callable and dispatches through the pool.
   const quoted = await proxy.quoteTableName("people");
   expect(quoted).toContain("people");
 });
 
 it("adapter proxy does not fabricate a method for an unknown probe key once a connection exists", async () => {
   const pool = makePool();
-  // Materialise a connection (as when a query is mid-flight and an error is
-  // translated). An arbitrary probe key must raise, since the live connection
-  // has no such method and Ruby's adapter overrides no `method_missing`.
   await pool.checkout();
   const proxy = (
     pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }

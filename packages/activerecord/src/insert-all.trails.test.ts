@@ -1,7 +1,3 @@
-/**
- * Trails-specific InsertAll tests — no like-named test exists in
- * vendor/rails/activerecord/test/cases/insert_all_test.rb.
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
@@ -29,13 +25,6 @@ async function withRecordTimestamps(
 describe("InsertAll verify_attributes", () => {
   fixtures([]);
 
-  // Rails' verify_attributes (insert_all.rb:206-210) compares against
-  // `keys_including_timestamps`, and map_key_with_value reverse_merges
-  // `timestamps_for_create` into every row BEFORE calling it. So a batch whose
-  // rows disagree only about whether they spell out a magic timestamp column
-  // is accepted: both sides of the comparison carry created_at/updated_at.
-  // Comparing raw row keys against `@keys` instead raises a spurious
-  // ArgumentError here.
   it("accepts rows that differ only in explicitly-given timestamp columns", async () => {
     await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
       const now = new Date();
@@ -63,11 +52,6 @@ describe("InsertAll verify_attributes", () => {
 describe("InsertAll build_insert_sql raw alias syntax", () => {
   fixtures([]);
 
-  // abstract_mysql_adapter.rb:638-682 has two arms: MySQL >= 8.0.19 emits the
-  // row-alias form (`... AS ships_values` + `ships.col<=>ships_values.col`),
-  // everything older — and MariaDB, which `supports_insert_raw_alias_syntax?`
-  // excludes outright (rb:892-894) — keeps the `VALUES(<expr>)` form MySQL
-  // 8.0.20 deprecates.
   it.skipIf(adapterType !== "mysql")("selects the alias arm on MySQL >= 8.0.19", async () => {
     const connection = Ship.connection as unknown as {
       supportsInsertRawAliasSyntax(): Promise<boolean>;
@@ -88,10 +72,6 @@ describe("InsertAll build_insert_sql raw alias syntax", () => {
 describe("InsertAll configure_on_duplicate_update_logic", () => {
   fixtures([]);
 
-  // insert_all.rb:134 branches on `update_only.present?`, and `[].present?` is
-  // false, so an empty :update_only falls through to the auto-generated
-  // updatable-columns path (rb:140) rather than pinning the update list to []
-  // and coercing :update into :skip.
   itIfSupports(
     "insert_on_duplicate_update",
     "upsert all with an empty update only still updates the auto-generated columns",

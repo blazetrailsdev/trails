@@ -1,12 +1,3 @@
-/**
- * PostgreSQLAdapter#execQuery + #lookupCastTypeFromColumn.
- *
- * Uses a mocked pg.Client-like connection so the tests don't require a
- * live PostgreSQL; they verify that each field's dataTypeID resolves
- * through the adapter's type_map, that the resulting Result has
- * columnTypes populated, and that iterating those types actually casts
- * cell values through the right OID::Type.
- */
 import { ValueType } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,9 +11,6 @@ const UUID_OID = 2950;
 
 function makeAdapter(queryImpl: (...args: unknown[]) => Promise<unknown>): PostgreSQLAdapter {
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-  // Preset the persistent connection so withRawConnection yields it directly
-  // (the loop yields `_connection`); mark verified so the verify/reconnect
-  // preamble is skipped, and stub the acquire as a safety net.
   const fakeClient = { query: queryImpl, release: () => {} };
   (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
   adapter.verifiedBang();
@@ -30,10 +18,6 @@ function makeAdapter(queryImpl: (...args: unknown[]) => Promise<unknown>): Postg
     adapter as unknown as { _acquireFreshClient: () => unknown },
     "_acquireFreshClient",
   ).mockResolvedValue(fakeClient);
-  // In a live PG adapter, loadAdditionalTypes queries pg_type and
-  // aliases numeric OIDs → typnames registered in the static map.
-  // Pre-register the known base OIDs so execQuery's miss path resolves
-  // them without needing a DB.
   adapter.typeMap.aliasType(UUID_OID, "uuid");
   adapter.typeMap.aliasType(23, "int4");
   return adapter;
@@ -51,7 +35,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
     adapter = makeAdapter(async () => ({
       rows: [[1, "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"]],
       fields: [
-        { name: "id", dataTypeID: 23 /* int4 */ },
+        { name: "id", dataTypeID: 23 },
         { name: "guid", dataTypeID: UUID_OID },
       ],
     }));
@@ -71,8 +55,6 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("preserves duplicate column names via positional rows", async () => {
-    // Query with duplicate column names (e.g. SELECT guid, guid FROM users)
-    // would collide under hash-keyed rows. rowMode: "array" keeps both.
     adapter = makeAdapter(async () => ({
       rows: [["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22"]],
       fields: [
@@ -84,7 +66,6 @@ describe("PostgreSQLAdapter#execQuery", () => {
     expect(result.rows[0]).toHaveLength(2);
     expect(result.rows[0][0]).toBe("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
     expect(result.rows[0][1]).toBe("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22");
-    // columnTypes keyed by numeric index so positional lookup still works.
     expect((result.columnTypes as Record<number, unknown>)[0]).toBeInstanceOf(Uuid);
     expect((result.columnTypes as Record<number, unknown>)[1]).toBeInstanceOf(Uuid);
   });
@@ -94,7 +75,6 @@ describe("PostgreSQLAdapter#execQuery", () => {
     const result = await adapter.execQuery("CREATE TABLE x (id int)");
     expect(result).toBeInstanceOf(Result);
     expect(result.length).toBe(0);
-    // Balances require-table-teardown; the mock driver makes this a no-op.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await adapter.execQuery("DROP TABLE IF EXISTS x");
   });
@@ -110,10 +90,6 @@ describe("PostgreSQLAdapter#execQuery", () => {
   });
 
   it("materializes a pending lazy transaction", async () => {
-    // Mirrors Rails' raw_execute (materialize_transactions defaults true): the
-    // general read path materializes any pending lazy transaction so a SELECT
-    // inside `transaction { }` emits BEGIN. Only SCHEMA/transaction-control
-    // internal calls opt out.
     adapter = makeAdapter(async () => ({ rows: [], fields: [] }));
     const materializeSpy = vi
       .spyOn(
@@ -131,8 +107,6 @@ describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
 
   beforeEach(() => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-    // Stub loadAdditionalTypes to avoid a DB roundtrip on miss. Tests
-    // that need the miss→resolve path register the OID manually.
     vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
     adapter.typeMap.aliasType(UUID_OID, "uuid");
   });
@@ -215,7 +189,6 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
       await adapter.execQuery("SELECT 1", "SQL", [42], { prepare: false });
       const payload = payloads.find((p) => p["sql"] === "SELECT 1");
       expect(payload?.["statement_name"]).toBeUndefined();
-      // non-prepared path: query arg is an object with text (not a named statement)
       expect((capturedQueryArg as any)?.name).toBeUndefined();
     } finally {
       Notifications.unsubscribe(sub);
@@ -275,15 +248,12 @@ describe("PostgreSQLAdapter#sqlKey", () => {
     expect(pool.keys).toContain("schema_b, public-SELECT * FROM widgets");
     expect(pool.length).toBe(2);
 
-    // Re-keying under the original path reuses the original entry — no stale leak.
     setMemo("schema_a, public");
     expect(await preparedNameFor(fakeClient, "SELECT * FROM widgets")).toBe(nameA);
     expect(pool.length).toBe(2);
   });
 
   it("setSchemaSearchPath re-scopes the key so no stale statement is reused", async () => {
-    // Drive the real setSchemaSearchPath path (which issues SET search_path and
-    // updates the memo) and confirm sqlKey tracks the active path end-to-end.
     vi.spyOn(adapter, "internalExecute").mockResolvedValue(undefined as never);
 
     await adapter.setSchemaSearchPath("schema_a, public");
@@ -307,12 +277,6 @@ describe("PostgreSQLAdapter#executeMutation", () => {
   });
 
   it("savepoint nesting does not re-enter withRawConnection (_lockQueue)", async () => {
-    // executeMutation runs its RETURNING-retry savepoints via client.query()
-    // on the yielded conn — it does NOT call this.createSavepoint(), which
-    // would re-acquire withRawConnection. Verify the savepoint statements hit
-    // the yielded connection directly and that the outer lock is released
-    // cleanly (a second withRawConnection call queued immediately after must
-    // succeed without hanging).
     const queries: string[] = [];
     const fakeClient = {
       query: async (arg: unknown) => {
@@ -327,12 +291,6 @@ describe("PostgreSQLAdapter#executeMutation", () => {
       adapter as unknown as { _acquireFreshClient: () => unknown },
       "_acquireFreshClient",
     ).mockResolvedValue(fakeClient);
-    // Mark verified so withRawConnection's verify/reconnect preamble is
-    // skipped — reconnect() would otherwise reset _inTransaction (the mock
-    // leaves _rawConnection null, which a live in-transaction adapter never
-    // does). Inside a transaction the bare-INSERT RETURNING-append path wraps
-    // the attempt in a SAVEPOINT so a RETURNING failure can roll back without
-    // poisoning the outer transaction (postgresql-adapter.ts:1405).
     adapter.verifiedBang();
     (adapter as unknown as { _inTransaction: boolean })._inTransaction = true;
 
@@ -342,13 +300,9 @@ describe("PostgreSQLAdapter#executeMutation", () => {
       "SQL",
     );
     expect(typeof result).toBe("number");
-    // The savepoint dance ran on the yielded connection (not a nested
-    // withRawConnection): SAVEPOINT … then RELEASE SAVEPOINT bracket the insert.
     expect(queries.some((q) => q.startsWith("SAVEPOINT "))).toBe(true);
     expect(queries.some((q) => q.startsWith("RELEASE SAVEPOINT "))).toBe(true);
 
-    // A second withRawConnection call must complete immediately — if the first
-    // call deadlocked on _lockQueue the second would never resolve.
     let secondCallRan = false;
     await adapter.withRawConnection({ materializeTransactions: false }, async () => {
       secondCallRan = true;
@@ -365,13 +319,6 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
     if (adapter) await adapter.close().catch(() => undefined);
   });
 
-  // Rails' exec_insert runs the INSERT and `last_insert_id_result`'s
-  // `SELECT currval(...)` on the connection it already holds
-  // (postgresql/database_statements.rb:48-59, :204-206). `currval()` is
-  // session-scoped AND session-mutable, so a second INSERT landing between one
-  // call's INSERT and its own probe hands back the wrong id. The fake session
-  // below models exactly that: `currval` answers with whatever the session
-  // inserted last.
   it("reads currval on the session that ran its own INSERT", async () => {
     let sequence = 0;
     let currval = 0;
@@ -420,11 +367,6 @@ describe("PostgreSQLAdapter#execInsert query cache", () => {
     return qc;
   }
 
-  // Rails wires `dirties_query_cache` on the PUBLIC `insert`/`create`
-  // (query_cache.rb:13-15), which sits above both arms of PostgreSQL's
-  // `exec_insert` override (postgresql/database_statements.rb:46-59). The
-  // wrapper clears before delegating; the delegated read-back has no live
-  // connection and rejects, but the cache is already cleared by then.
   it("clears the query cache on a multi-column RETURNING insert", async () => {
     const qc = adapterWithPrimedCache(true);
     await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);
@@ -439,10 +381,6 @@ describe("PostgreSQLAdapter#execInsert query cache", () => {
     expect(qc.empty).toBe(true);
   });
 
-  // The `use_insert_returning? == false` arm calls `internal_exec_query`
-  // directly (postgresql/database_statements.rb:48-59) and never reaches
-  // `AbstractAdapter#exec_insert`, so wiring the clear on `exec_insert` leaves
-  // this arm uncleared. Rails clears on `insert`, above both arms.
   it("clears the query cache on a non-returning insert", async () => {
     const qc = adapterWithPrimedCache(false);
     await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);

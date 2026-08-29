@@ -1,34 +1,3 @@
-/**
- * D-Y vitest setupFile for the activerecord project: calls `ARTest.connect`'s
- * port (`support/connection.ts`) and loads the canonical fixture schema once
- * per worker through `support/load-schema-helper.ts`'s `loadSchema`.
- *
- * The pool it opens lives for the whole worker, as Rails' does for the whole
- * process (`cases/helper.rb` calls `ARTest.connect` at load and never
- * disconnects — `vendor/rails/activerecord/test/support/connection.rb:22-38`).
- *
- * Must run AFTER cases/helper.ts so better-sqlite3 is registered and
- * Base.establishConnection can open the pool.
- *
- * What Rails has no counterpart for is the step *before* the load: this
- * database is not freshly created, so it has to be emptied first. Which form
- * that takes is the driver gate (RFC 0002 §Design):
- *   - already laid by this run (`canonicalSchemaUpToDate`) → purge back to the
- *     canonical tables, skipping the canonical DDL only. All three lanes reach
- *     it: globalSetup stamps what
- *     it lays (a PG slot cloned from the stamped template, the sqlite template
- *     file each worker clones, each MySQL slot DB), and this arm re-stamps, so
- *     a worker recycled onto a database an earlier worker used takes it too.
- *   - sqlite file → purge (per-worker isolated file; drop+create is safe — no
- *     other worker shares this file path).
- *   - PG/MySQL worker-owned DB (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set
- *     by test-setup-worker-db.ts) → purge; the worker owns its own database
- *     (activerecord_unittest_<runToken>_N), so drop+create is safe. Every slot
- *     qualifies once globalSetup stamps a run token — slot 1 included.
- *   - otherwise (sqlite `:memory:`, or an unstamped PG/MySQL slot 1) → drop
- *     every table. Without a run token slot 1 *is* the shared base database,
- *     which other consumers point at too, so it must not be dropped.
- */
 import { connect } from "./support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
@@ -49,38 +18,15 @@ const { canonicalSchemaUpToDate, stampCanonicalSchema, adapterSpecificTables } =
 const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
 if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
-  // No truncate ahead of the purge: `purgeToCanonicalTables` already truncates
-  // every non-empty canonical table and drops everything else, so a
-  // `DatabaseTasks.truncateTables` here emptied the same tables a second time.
-  //
-  // The adapter-specific arm is skipped when the stamp's snapshot of what it
-  // laid is still intact on the database: the purge protects those tables by
-  // name and truncates them rather than dropping them, so there is nothing to
-  // re-lay. The snapshot is read first because the purge drops
-  // `ar_internal_metadata` with the other bookkeeping tables.
-  //
-  // A table missing from the database puts this boot back on the old behaviour
-  // — the arm re-lays the adapter-specific half — which is what a test file
-  // that drops one (`support/drop-all-tables.trails.test.ts`) relies on. The snapshot
-  // is carried forward rather than re-taken for the same reason: re-taking it
-  // here would record the shrunken set as authoritative.
   const conn = await Base.leaseConnection();
   const laid = await adapterSpecificTables(conn);
   await purgeToCanonicalTables(conn, laid ?? []);
   const present = new Set(await conn.tables());
   const intact = laid !== null && laid.every((name) => present.has(name));
   if (!intact) await loadAdapterSpecificSchema(conn);
-  // Re-stamp: the purge drops `ar_internal_metadata` along with the
-  // other bookkeeping tables, so the stamp this boot consumed is gone. What is
-  // left behind is the same state the full-load arm below stamps — canonical
-  // plus adapter-specific, laid and empty — so the next worker recycled onto
-  // this database is entitled to the same fast path. Without this the stamp is
-  // single-use per database and every recycle pays the full purge+reload.
   await stampCanonicalSchema(conn, undefined, intact ? laid : undefined);
   await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
-  // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,
-  // so the connection has to be leased after it, not before.
   if (ownsDatabase) {
     await DatabaseTasks.purge(envConfig);
   } else {
@@ -92,11 +38,6 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   await recordBootOutcome("fullLoad", await canonicalSchemaUpToDate(canonicalConn));
 }
 
-// Permanent worker-startup assertion: a broken arm of the load path fails here
-// rather than as a per-file "relation does not exist". `defaults` is the one
-// table all three `<adapter>_specific_schema.rb` arms lay, so it covers the
-// second arm. Cast because tableExists is on the concrete adapter class, not
-// the DatabaseAdapter interface.
 const _conn = (await Base.leaseConnection()) as unknown as {
   tableExists(n: string): Promise<boolean>;
 };
@@ -112,17 +53,8 @@ if (missingTables.length > 0) {
 
 await recordBootLaidTables(await Base.leaseConnection());
 
-// `schema.rb:1444-1462` — the arunit2 tables Rails creates through
-// `Course.lease_connection`. Imported lazily so the second-database models load
-// after the canonical schema is in place.
 const { provisionSecondDatabase } = await import("./support/setup-second-pool.js");
 await provisionSecondDatabase();
 
-// Last thing this file does, and this is the last AR setupFile: everything the
-// suite's boot opens (Base above, ARUnit2Model via `provisionSecondDatabase`)
-// is now in the writing list, and the test file has not been imported yet. So
-// this is the point at which "pools that exist because the suite booted" is
-// exactly the writing list — which is what the leaked-pool guard in
-// `cases/helper.ts` needs as its baseline.
 const { captureWritingPoolBaseline } = await import("./cases/helper.js");
 captureWritingPoolBaseline();

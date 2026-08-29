@@ -1,9 +1,3 @@
-/**
- * Read-only null encryptor — can decrypt but not encrypt.
- *
- * Mirrors: ActiveRecord::Encryption::ReadOnlyNullEncryptor
- */
-
 import { Encryption } from "./errors.js";
 
 export class ReadOnlyNullEncryptor {

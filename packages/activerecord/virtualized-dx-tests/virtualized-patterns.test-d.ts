@@ -1,17 +1,3 @@
-/**
- * DX (virtualized form): the SAME patterns as `declare-patterns.test-d.ts`,
- * but authored with ZERO `declare` lines and ZERO association-target
- * imports. `trails-tsc` injects the declares and `import type { ... }`
- * lines at compile time, so the authored source stays Rails-fidelity —
- * a pure static block with `this.attribute(...)` / `this.hasMany(...)`
- * etc., matching `class Post < ApplicationRecord; has_many :comments; end`.
- *
- * Run with `pnpm test:types:virtualized` (which invokes `trails-tsc
- * --noEmit` against this directory). Plain `tsc` would fail against
- * these files — that's by design; the declares only exist after
- * virtualization.
- */
-
 import { describe, it, expectTypeOf } from "vitest";
 import {
   Base,
@@ -21,13 +7,6 @@ import {
   association,
   defineEnum,
 } from "@blazetrails/activerecord";
-// `Comment` is intentionally NOT imported here — it lives in
-// `comment.ts` and is referenced as the `Author.hasMany("comments")`
-// target. `trails-tsc`'s auto-import pass must inject
-// `import type { Comment } from "./comment.js"` so BOTH the injected
-// `declare comments: AssociationProxy<Comment>` on Author AND the
-// `expectTypeOf(...)<AssociationProxy<Comment>>()` assertions below
-// resolve. If the auto-import pass regresses, this file fails CI.
 
 class User extends Base {
   static {

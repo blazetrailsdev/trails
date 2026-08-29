@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, beforeEach, afterEach, expect } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -11,11 +7,6 @@ import { itIfSupports } from "./support/supports.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 
 describe("CommentTest", () => {
-  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
-  // rows). The bespoke comment tables are recreated per-test, so opt out of
-  // transactional fixtures — the per-test DDL must commit, not roll back inside
-  // a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
 
@@ -134,10 +125,6 @@ describe("CommentTest", () => {
     expect(col.comment).toBe("I am running out of imagination");
   });
 
-  // The three dump tests carry a 60s timeout (matching #4250's enum.test fix):
-  // on the shared PG worker DB the dump can legitimately exceed vitest's 5s
-  // default under parallel forks. Rails' counterpart is plain minitest with no
-  // per-test budget — the 5s ceiling is a harness artifact, not Rails behavior.
   itIfSupports(
     "comments",
     "schema dump with comments",
@@ -149,8 +136,6 @@ describe("CommentTest", () => {
         comment: "Whoa, content describes itself!",
       });
       await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
-      // Scope to the table under assertion so the dump stays cheap on a cold
-      // schema cache (the truncate-reset leaves the ~330 canonical tables in place).
       const output = await SchemaDumper.dumpTableSchema(adapter, "commenteds");
       expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
       expect(output).toMatch(
@@ -222,9 +207,6 @@ describe("CommentTest", () => {
     "schema dump with primary key comment",
     async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "pk_commenteds");
-      // Tight: the id hash must carry ONLY the comment (no limit/precision/scale/autoIncrement
-      // leak), and the table comment must be separate. Catches the columnSpecForPrimaryKey
-      // wrapping regression.
       expect(output).toMatch(
         /createTable.*"pk_commenteds".*id:\s*\{\s*comment:\s*"Primary key comment"\s*\}.*comment:\s*"Table comment"/,
       );

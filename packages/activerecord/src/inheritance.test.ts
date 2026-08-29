@@ -83,8 +83,6 @@ describe("InheritanceTest", () => {
   });
 
   it("compute type success", () => {
-    // registerModel is trails' analog of Rails' autoload — make the Author
-    // constant resolvable so compute_type's namespace walk can find it.
     registerModel(Author);
     expect(Company.computeType("Author")).toBe(Author);
   });
@@ -95,17 +93,14 @@ describe("InheritanceTest", () => {
 
   it.skip("compute type no method error", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
-    // Rails uses Object.autoload to trigger NoMethodError during require. JS has no autoload.
   });
 
   it.skip("compute type on undefined method", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
-    // Rails uses Object.autoload to trigger NameError during require. JS has no autoload.
   });
 
   it.skip("compute type argument error", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
-    // Rails uses Object.autoload to trigger ArgumentError during require. JS has no autoload.
   });
 
   it("should store demodulized class name with store full sti class option disabled", () => {
@@ -128,9 +123,6 @@ describe("InheritanceTest", () => {
   });
 
   it("descends from active record", async () => {
-    // TRACKED-PENDING-CONVERGENCE: Base.isDescendsFromActiveRecord() returns true in trails
-    // (no type attr → !_hasAttribute). AbstractStiPost/SubAbstractStiPost assertions also
-    // require schema loaded. Story: descends-from-active-record-base (RFC 0019).
     expect(LoosePerson.isDescendsFromActiveRecord()).toBe(true);
     expect(LooseDescendant.isDescendsFromActiveRecord()).toBe(true);
     expect(TightPerson.isDescendsFromActiveRecord()).toBe(true);
@@ -144,12 +136,8 @@ describe("InheritanceTest", () => {
   });
 
   it("company descends from active record", async () => {
-    // TRACKED-PENDING-CONVERGENCE: Base.isDescendsFromActiveRecord() returns true in trails
-    // (no type attr → !_hasAttribute); Story: descends-from-active-record-base (RFC 0019).
     expect(AbstractCompany.isDescendsFromActiveRecord()).toBe(true);
     expect(Company.isDescendsFromActiveRecord()).toBe(true);
-    // Rails: assert_not Class.new(Company).descends_from_active_record? — an anonymous
-    // subclass of Company is NOT a direct AR descendant once Company has the type col.
     await Company.loadSchema();
     class LocalCompanySubclass extends Company {}
     expect(LocalCompanySubclass.isDescendsFromActiveRecord()).toBe(false);
@@ -187,8 +175,6 @@ describe("InheritanceTest", () => {
 
   it.skip("base class activerecord error", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
-    // Rails tests that `Class.new { include ActiveRecord::Inheritance }` raises ActiveRecordError.
-    // JS has no equivalent of Ruby's module-inclusion hooks on an arbitrary class.
   });
 
   it("a bad type column", async () => {
@@ -313,8 +299,6 @@ describe("InheritanceTest", () => {
 
   it("new with ar base", () => {
     expect(() => Base.new()).toThrow(NotImplementedError);
-    // Rails: "ActiveRecord::Base is an abstract class..." — trails has no Ruby
-    // namespace, so the class reads as "Base".
     expect(() => Base.new()).toThrow("Base is an abstract class and cannot be instantiated.");
   });
 
@@ -375,7 +359,6 @@ describe("InheritanceTest", () => {
 
   it.skip("new with autoload paths", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
-    // Rails tests Zeitwerk autoloading of AR models at runtime. JS has no equivalent autoload hook.
   });
 
   it("inheritance condition", async () => {
@@ -531,10 +514,6 @@ describe("InheritanceComputeTypeTest", () => {
 
   it.skip("instantiation doesnt try to require corresponding file", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
-    // Rails tests Ruby's constant-lookup / autoload integration: a type stored in the DB without
-    // a matching top-level constant raises RecordNotFound (WHERE type IN omits it), then after
-    // `self.class.const_set` raises SubclassNotFound, then `Firm.const_set` resolves correctly.
-    // JS has no equivalent of Ruby's const_missing / autoload hooks.
   });
 
   it("sti type from attributes disabled in non sti class", async () => {
@@ -557,11 +536,11 @@ describe("InheritanceComputeTypeTest", () => {
       void (Company as any).resetColumnInformation();
       await Company.loadSchema();
 
-      let firm = Company.new(); // without arguments
+      let firm = Company.new();
       expect((firm as any).type).toBe("Firm");
       expect(firm).toBeInstanceOf(Firm);
 
-      firm = Company.new({ firm_name: "Shri Hans Plastic" }); // with arguments
+      firm = Company.new({ firm_name: "Shri Hans Plastic" });
       expect((firm as any).type).toBe("Firm");
       expect(firm).toBeInstanceOf(Firm);
 
@@ -569,7 +548,7 @@ describe("InheritanceComputeTypeTest", () => {
       expect((client as any).type).toBe("Client");
       expect(client).toBeInstanceOf(Client);
 
-      firm = Company.new({ type: "Client" }); // overwrite the default type
+      firm = Company.new({ type: "Client" });
       expect((firm as any).type).toBe("Client");
       expect(firm).toBeInstanceOf(Client);
     } finally {
@@ -583,9 +562,6 @@ describe("InheritanceComputeTypeTest", () => {
 describe("InheritanceAttributeTest", () => {
   fixtures(["companies"]);
 
-  // Local test classes mapping to the companies table with a type-attribute default.
-  // Rails uses module-scoped class names ("InheritanceAttributeTest::Startup"); trails uses
-  // JS class names since there is no Ruby module nesting in TypeScript.
   class AttrTestCompany extends Base {
     static {
       this.tableName = "companies";
@@ -613,8 +589,6 @@ describe("InheritanceAttributeTest", () => {
 describe("InheritanceAttributeMappingTest", () => {
   fixtures(["companies", "sponsors"]);
 
-  // Rails: ActiveRecord::Type::String subclass that round-trips type names through
-  // "omg_<underscored>" serialization. Registered once at module evaluation time.
   class OmgStiType extends StringType {
     protected override castValue(value: unknown): string | null {
       if (typeof value === "string") {

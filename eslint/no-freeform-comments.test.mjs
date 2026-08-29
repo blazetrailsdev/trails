@@ -17,6 +17,15 @@ tester.run("no-freeform-comments", rule, {
     { code: `/** @internal */\nconst x = 1;\n` },
     { code: `/** @noRailsEquivalent PERMANENT */\nexport const x = 1;\n` },
     { code: `/** @noRailsEquivalent CONVERGEABLE */\nexport const x = 1;\n` },
+    // A `CONVERGEABLE` claim with no story id cannot be reduced: trimming it to
+    // the bare token is the half-receipt `lint-missing-rails-call-reasons`
+    // fails on, so the comment is left for a human to name the story.
+    {
+      code: `/**\n * Prose.\n * @internal\n * @noRailsEquivalent CONVERGEABLE — a reason.\n */\nconst x = 1;\n`,
+    },
+    {
+      code: `/**\n * Prose.\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE: not yet ported.\n */\nconst x = 1;\n`,
+    },
     { code: `/** @missingRailsCall PERMANENT */\nconst x = 1;\n` },
     { code: `/** @missingRailsArgs CONVERGEABLE */\nconst x = 1;\n` },
     { code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT\n */\nconst x = 1;\n` },
@@ -142,13 +151,15 @@ tester.run("no-freeform-comments (tag documents keep data, not prose)", rule, {
       errors: prose,
       output: `/** @internal */\nconst x = 1;\n`,
     },
-    {
-      code: `/**\n * Prose.\n * @internal\n * @noRailsEquivalent CONVERGEABLE — a reason.\n */\nconst x = 1;\n`,
-      errors: prose,
-      output: `/**\n * @internal\n * @noRailsEquivalent CONVERGEABLE\n */\nconst x = 1;\n`,
-    },
     // A `CONVERGEABLE` receipt's story id is the receipt: it survives, and the
     // prose after it does not.
+    // A `MOVED-BY-SHORT-NAME:` clause is read by `extra-surface.ts`, so it is an
+    // argument and survives with the permanence token.
+    {
+      code: `/**\n * @noRailsEquivalent PERMANENT — a reason. MOVED-BY-SHORT-NAME: open, close.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: open, close. */\nconst x = 1;\n`,
+    },
     {
       code: `/**\n * @noRailsEquivalent CONVERGEABLE some-story-slug: the reason.\n */\nconst x = 1;\n`,
       errors: prose,
@@ -283,9 +294,9 @@ tester.run("no-freeform-comments (tag arguments are data)", rule, {
     },
     // Several tags in one block each keep their own data.
     {
-      code: `/**\n * Prose.\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE: not yet ported.\n */\nconst x = 1;\n`,
+      code: `/**\n * Prose.\n * @internal\n * @missingRailsCall merge! — PERMANENT: not yet ported.\n */\nconst x = 1;\n`,
       errors: prose,
-      output: `/**\n * @internal\n * @missingRailsCall merge! — CONVERGEABLE\n */\nconst x = 1;\n`,
+      output: `/**\n * @internal\n * @missingRailsCall merge! — PERMANENT\n */\nconst x = 1;\n`,
     },
   ],
 });

@@ -3,22 +3,11 @@ import { Base } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies, typeFor } from "./relation/calculations.js";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so the `topics` association target
-// (`Topic`) resolves by name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 
-// ==========================================================================
-// lookupCastTypeFromJoinDependencies unit tests
-//
-// trails-specific invariant: lookupCastTypeFromJoinDependencies is an
-// `@internal` helper with no Rails counterpart. These unit tests guard its
-// behaviour and were relocated verbatim out of calculations.test.ts as part
-// of the extra-test burndown (RFC 0043).
-// ==========================================================================
+// @internal
 
 describe("lookupCastTypeFromJoinDependencies", () => {
-  // A JoinDependency exposes its nodes through `each`, which is what
-  // `each_join_dependencies` (calculations.rb:595) walks them with.
   const fakeJoinDependency = (nodes: unknown[]): JoinDependency =>
     ({ each: (fn: (node: unknown) => void) => nodes.forEach(fn) }) as unknown as JoinDependency;
 
@@ -92,20 +81,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
   });
 });
 
-// ==========================================================================
-// lookupCastTypeFromJoinDependencies integration test
-//
-// trails-specific invariant (no Rails counterpart): an end-to-end check that
-// joining a real model resolves a joined column's concrete cast type through
-// the join-dependency walk — complementing the mock-based unit tests above.
-// Relocated verbatim out of calculations.test.ts (RFC 0043).
-// ==========================================================================
-
 describe("lookupCastTypeFromJoinDependencies integration", () => {
-  // Rails' Author `has_many :topics, primary_key: "name", foreign_key:
-  // "author_name"`. Defined locally under a distinct class name (not the
-  // canonical Author model) so importing it does not perturb the shared model
-  // registry / name-disambiguation counter used by other describe blocks.
   class CalcAuthor extends Base {
     static {
       this._tableName = "authors";
@@ -120,15 +96,8 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
 
   fixtures(["topics", "authors"]);
 
-  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via joins_values),
-  // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
-  // through the join-dependency walk — the joined klass is recovered from the
-  // join dependency, never from a pre-resolved sidecar store.
   it("resolves joined column cast type through the join-dependency walk", () => {
     const rel = CalcAuthor.joins(":topics");
-    // `written_on` is a datetime attribute that lives only on the joined Topic;
-    // it resolves to Topic's Time cast type via the join-dependency walk (the
-    // base CalcAuthor has no such attribute).
     const castType = lookupCastTypeFromJoinDependencies(
       rel as unknown as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "written_on",
@@ -136,22 +105,9 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
       constructor: { name: string };
     } | null;
     expect(castType).toBeTruthy();
-    // The joined Topic's concrete datetime type (e.g. SQLite3DateTime), not
-    // the default ValueType the base CalcAuthor returns for unknown columns.
     expect(castType?.constructor.name).not.toBe("ValueType");
   });
 });
-
-// ==========================================================================
-// Grouped-calculation key typing via an Arel attribute's type caster
-//
-// trails-specific regression (no verbatim Rails test): Rails resolves each
-// group column's key type as `col_name.try(:type_caster) || type_for(col_name)`
-// (calculations.rb:567-570), so grouping by an Arel attribute keys the result
-// by the attribute's own decorated type — an enum keys by its labels, not the
-// raw stored integers. Guards the `groupNode instanceof Nodes.Attribute`
-// branch in executeGroupedCalculation.
-// ==========================================================================
 
 describe("grouped calculation keyed via Arel attribute type caster", () => {
   fixtures(["books"]);
@@ -168,24 +124,12 @@ describe("grouped calculation keyed via Arel attribute type caster", () => {
   });
 });
 
-// ==========================================================================
-// Multi-field grouped-calculation key shape
-//
-// trails-specific regression (no verbatim Rails test asserts these two rules
-// in isolation): Rails uniqs group_fields only when there is more than one
-// (calculations.rb:516), and unwraps the key tuple to a scalar only when a
-// single group field survives (calculations.rb:583-584). Guards against a
-// regression to the old single-field collapse, where every non-association
-// grouped calculation reduced to `groupValues[0]`.
-// ==========================================================================
-
 describe("multi-field grouped calculation key shape", () => {
   fixtures(["companies", "accounts"]);
 
   it("uniqs repeated group fields and keys by a scalar", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const result = (await Account.group("firm_id", "firm_id").count()) as Map<unknown, number>;
-    // Both fields collapse to one, so keys stay scalar rather than [n, n].
     expect([...result.keys()].every((k) => !Array.isArray(k))).toBe(true);
     expect(result.get(6)).toBe(2);
   });
@@ -195,22 +139,11 @@ describe("multi-field grouped calculation key shape", () => {
     const single = (await Account.group("firm_id").count()) as Map<unknown, number>;
     const multi = (await Account.group("firm_id", "credit_limit").count()) as Map<unknown, number>;
     expect(single.get(6)).toBe(2);
-    // firm 6's two accounts have distinct credit limits, so they split in two.
     const firmSix = [...multi.entries()].filter(([k]) => (k as unknown[])[0] === 6);
     expect(firmSix.map(([, v]) => v)).toEqual([1, 1]);
     expect(firmSix.map(([k]) => (k as unknown[])[1]).sort()).toEqual([50, 55]);
   });
 });
-
-// ==========================================================================
-// Multi-field grouped SUM over a bigint column
-//
-// trails-specific regression (no Rails analogue — Ruby has no Number
-// precision cliff): SQLite returns a large SUM as a lossy double, so
-// executeGroupedCalculation wraps the query in a CAST(... AS TEXT) that must re-project
-// EVERY group key alias. Guards wrapBigintAgg's grouped branch against
-// dropping the trailing keys once there is more than one group field.
-// ==========================================================================
 
 describe("multi-field grouped bigint sum", () => {
   fixtures([]);
@@ -226,26 +159,11 @@ describe("multi-field grouped bigint sum", () => {
 
     const keys = [...result.keys()] as unknown[][];
     expect(keys).toHaveLength(2);
-    // Both key components survive the wrap — the old single-alias wrap would
-    // have dropped world_population and collapsed the tuple.
     expect(keys.every((k) => Array.isArray(k) && k.length === 2)).toBe(true);
-    // BigIntegerType only widens to bigint past the safe-integer range, so the
-    // small key stays a Number while the 2^62 key comes back as a bigint.
     expect(keys.map((k) => k[0]).sort()).toEqual([1, 2]);
     expect(keys.every((k) => k[1] === 2n ** 62n)).toBe(true);
   });
 });
-
-// ==========================================================================
-// Grouped calculation HAVING — composite-FK belongs_to arm
-//
-// Rails routes every grouped calculation through `execute_grouped_calculation`,
-// which builds from the relation's own arel so `having_clause` rides along
-// regardless of key arity (calculations.rb:553-556). trails splits the
-// composite-FK belongs_to case into its own `groupedCompositeAssoc` arm, which
-// has no Rails counterpart to port a test from — this guards that the arm keeps
-// emitting HAVING.
-// ==========================================================================
 
 describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
   fixtures([]);
@@ -271,24 +189,11 @@ describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
   });
 });
 
-// ==========================================================================
-// Ungrouped calculation HAVING
-//
-// `execute_simple_calculation` runs the relation's own arel (calculations.rb:485)
-// and `build_arel` emits `arel.having(having_clause.ast) unless
-// having_clause.empty?` with no GROUP BY guard (query_methods.rb:1756), so an
-// ungrouped `having(...)` reaches the SQL. Rails has no test for it — trails
-// projects explicitly instead of reusing `build_arel`, so the clause has to be
-// re-applied by hand and needs a guard.
-// ==========================================================================
-
 describe("ungrouped calculation HAVING", () => {
   fixtures(["companies", "accounts"]);
 
   it("emits HAVING with no GROUP BY and filters the single aggregate row", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    // The whole-table sum survives the satisfied predicate; the unsatisfied one
-    // drops the only row, leaving sum-of-no-rows.
     const total = (await Account.sum("credit_limit")) as number;
     expect(total).toBeGreaterThan(100);
     expect(await Account.having("sum(credit_limit) > 100").sum("credit_limit")).toBe(total);
@@ -313,16 +218,6 @@ describe("ungrouped calculation HAVING", () => {
   });
 });
 
-// ==========================================================================
-// type_for unit tests
-//
-// `typeFor` is the port of Rails' private `Calculations#type_for`
-// (calculations.rb:597-600), which has no dedicated Rails test: it resolves a
-// field to the model's own attribute type, taking the last dot-segment of a
-// qualified name and the `name` of an Arel node. These tests pin that shape so
-// it cannot drift back into the broader trails-invented `resolveColType`.
-// ==========================================================================
-
 describe("typeFor", () => {
   it("resolves a bare, qualified and node-shaped field through the model's attribute type", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
@@ -336,35 +231,12 @@ describe("typeFor", () => {
 
   it("returns the model's own type for an enum attribute without unwrapping the subtype", async () => {
     const { Book } = await import("./test-helpers/models/book.js");
-    // `resolveColType` (the aggregate-cast helper) unwraps an EnumType to its
-    // subtype; Rails' `type_for` does not — it is a plain
-    // `model.type_for_attribute` lookup.
     expect(Book.typeForAttribute("status")).toHaveProperty("subtypeType");
     expect(typeFor(Book.all() as unknown as Parameters<typeof typeFor>[0], "status")).toBe(
       Book.typeForAttribute("status"),
     );
   });
 });
-
-// ==========================================================================
-// Empty-scope aggregate identities
-//
-// trails-specific guard. Rails' `sum`/`average`/`minimum`/`maximum`
-// (calculations.rb:118-208) are bare `calculate(...)` calls, so the empty-scope
-// answer has to come out of `calculate`'s `@none` arm (calculations.rb:220-230)
-// and `execute_simple_calculation`'s `where_clause.contradiction?` arm
-// (calculations.rb:487-497) — not from a guard bolted on top of each aggregate.
-// The two arms answer an empty bigint sum differently in Rails, and both land
-// on a plain zero. `@none` hard-codes the literal `0` (calculations.rb:222),
-// ignoring the column type entirely. The contradiction arm goes through
-// `type_cast_calculated_value`'s `type.deserialize(value || 0)`
-// (calculations.rb:629) — and `ActiveModel::Type::BigInteger < Integer`
-// (big_integer.rb:25) casts `0` to Ruby's one Integer, so Rails cannot produce a
-// distinct bignum zero there either. trails' `BigIntegerType` narrows
-// safe-range values to a JS `number` by the same documented contract, which is
-// what a POPULATED bigint sum already returns through `castAggValue`. Both
-// assertions below pin that equivalence.
-// ==========================================================================
 
 describe("empty-scope aggregate identities", () => {
   fixtures(["companies", "accounts"]);
@@ -378,9 +250,6 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.none().sum("firm_id")).toBe(0);
   });
 
-  // Rails' `sum(initial_value_or_column = 0)` (calculations.rb:171-177) sends the
-  // identity through `calculate`, where `arel_column`'s `field.to_s`
-  // (query_methods.rb:1993) turns it into the literal summed over.
   it("sums the identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const rows = (await Account.count()) as number;
@@ -391,9 +260,6 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.asyncSum(1000)).toBe(1000 * rows);
   });
 
-  // Measured on MRI (activerecord 8.0.2, sqlite3): `Person.sum` => 0, while
-  // `Person.async_sum` raises `ActiveRecord::StatementInvalid:
-  // SQLite3::SQLException: wrong number of arguments to function SUM()`.
   it("async sums the nil identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const { captureSql } = await import("./testing/sql-capture.js");
@@ -405,8 +271,6 @@ describe("empty-scope aggregate identities", () => {
     expect(queries[1]).toMatch(/SELECT SUM\(\) AS ["`]?sum["`]?/);
   });
 
-  // `Person.sum { |person| person.age }` / `Person.sum(1000) { |person| person.age }`,
-  // the two doc examples of the block arm (calculations.rb:167-168, :172-173).
   it("sums the block return values onto the initial value", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const creditLimits = await Account.sum("credit_limit");
@@ -418,9 +282,6 @@ describe("empty-scope aggregate identities", () => {
     ).toBe(1000 + Number(creditLimits));
   });
 
-  // Ruby folds Integer and Bignum block results together (`Array#sum`), where
-  // JS `0 + 1n` is a TypeError — so the default `0` seed must still take a
-  // `bigint`-returning block.
   it("sums bigint block return values onto the default identity", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const rows = BigInt((await Account.count()) as number);
@@ -428,10 +289,6 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.sum(1000, () => 1n)).toBe(1000n + rows);
   });
 
-  // A column name is not an initial value for the block arm: the overloads
-  // reject it at compile time, and for an untyped caller Ruby raises from
-  // `String#+` at the first addition — so `[1].sum("age")` raises while
-  // `[].sum("age")` answers `"age"`.
   it("rejects a non-numeric initial value for the block arm", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const sum = Account.sum as unknown as (
@@ -447,9 +304,6 @@ describe("empty-scope aggregate identities", () => {
     expect(await empty.sum("credit_limit", () => 1)).toBe("credit_limit");
   });
 
-  // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
-  // `sum(initial_value_or_column = 0)`, so the strict-loading override must not
-  // narrow it away.
   it("sums the identity value through a collection proxy", async () => {
     const { Firm } = await import("./test-helpers/models/company.js");
     const firm = (await Firm.firstBang()) as unknown as {
@@ -469,9 +323,6 @@ describe("empty-scope aggregate identities", () => {
     expect(await empty.minimum("credit_limit")).toBeNull();
     expect(await empty.maximum("credit_limit")).toBeNull();
   });
-  // Rails' `ids` (calculations.rb:371-405) has no `@none` arm — unlike `pluck`
-  // (:292) — so a `none` relation falls through to the third arm and issues the
-  // `WHERE 1=0` that `none!` seeded (query_methods.rb:1285).
   it("returns no ids for a none relation", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     expect(await Account.none().ids()).toEqual([]);

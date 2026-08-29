@@ -1,12 +1,3 @@
-/**
- * Trails-only cover for `SQLiteDatabaseTasks#establish_connection`
- * (`sqlite_database_tasks.rb:72-75`). Rails' own `sqlite_rake_test.rb` is not in
- * the vendored tree, so there is no test to port; what is pinned here is the
- * pair of calls the method is, in order — `Base.establish_connection` installs
- * the pool lazily and opens nothing, and the trailing `connection.connect!` is
- * what forces the database file open for callers (`reconnect`/`purge`) that do
- * not separately lease a connection.
- */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";

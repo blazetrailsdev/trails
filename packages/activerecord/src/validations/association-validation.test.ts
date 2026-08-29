@@ -1,23 +1,5 @@
-/**
- * Mirrors: activerecord/test/cases/validations/association_validation_test.rb
- *
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Rails uses `repair_validations(Topic, Reply)` to add validators to the
- * canonical models inside a test body and clear them afterward; we mirror that
- * with `clearValidatorsBang()` in `afterEach` (Topic, Reply, Interest) and
- * `repairValidations(...)` for the block-form cases.
- *
- * Where Rails appends in-memory associated records (`t.replies << r`) we build
- * them through the real association (no insert on an unsaved/just-built
- * target) — the behavior under test is the cascading `valid?`, not collection
- * persistence.
- */
 import { afterEach, describe, expect, it } from "vitest";
 import { association } from "../associations.js";
-// Opt into the canonical-model autoload index so association targets
-// (`Human`/`Interest`) resolve by name on first reference — no manual
-// `registerModel`.
 import "../support/canonical-model-index.js";
 import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
@@ -27,12 +9,8 @@ import { Human } from "../test-helpers/models/human.js";
 import { Interest } from "../test-helpers/models/interest.js";
 
 describe("AssociationValidationTest", () => {
-  // Rails `fixtures :topics` — needed by test_validates_associated_missing's
-  // `Topic.first`. Loading the set also registers Topic/Reply (STI).
   fixtures(["topics"]);
 
-  // Rails `repair_validations(Topic, Reply)` — clear validators added to the
-  // canonical models so per-test `validates_*` calls do not leak.
   afterEach(() => {
     Topic.clearValidatorsBang();
     Reply.clearValidatorsBang();
@@ -43,9 +21,6 @@ describe("AssociationValidationTest", () => {
     Topic.validatesAssociated("replies");
     Reply.validatesPresenceOf("content");
     const t = await Topic.create({ title: "uhohuhoh", content: "whatever" });
-    // Rails `t.replies << [r, r2, r3, r4]`. On a persisted owner `<<` saves the
-    // valid replies; the cascading `valid?` is what's under test, so we build
-    // them in-memory through the real association instead.
     const r = association(t, "replies").build({ title: "A reply" }) as Reply;
     const r2 = association(t, "replies").build({
       title: "Another reply",
@@ -59,7 +34,7 @@ describe("AssociationValidationTest", () => {
 
     expect(await t.isValid()).toBe(false);
     expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
-    expect(r.errors.count).toBe(1); // make sure all associated objects have been validated
+    expect(r.errors.count).toBe(1);
     expect(r2.errors.count).toBe(0);
     expect(r3.errors.count).toBe(1);
     expect(r4.errors.count).toBe(0);
@@ -69,8 +44,6 @@ describe("AssociationValidationTest", () => {
   });
 
   it("validates associated one", async () => {
-    // Rails `Reply.validates :topic, associated: true` — the `associated: true`
-    // form registers the same AssociatedValidator as `validates_associated`.
     Reply.validatesAssociated("topic");
     Topic.validatesPresenceOf("content");
     const r = new Reply({ title: "A reply", content: "with content!" });
@@ -83,8 +56,6 @@ describe("AssociationValidationTest", () => {
   });
 
   it("validates associated with multiple attributes and array forms", async () => {
-    // Rails' `validates_associated(*attr_names)` arity: `_merge_attributes`
-    // flattens nested arrays and supports several association names in one call.
     Topic.validatesAssociated(["replies"], "openReplies");
     Reply.validatesPresenceOf("content");
     const t = new Topic();
@@ -106,8 +77,6 @@ describe("AssociationValidationTest", () => {
   });
 
   it("validates associated without marked for destruction", async () => {
-    // Rails stubs `t.replies` to return one always-valid record; with no
-    // validator registered on Reply, a built reply IS that record.
     Topic.validatesAssociated("replies");
     const t = new Topic();
     association(t, "replies").build({ title: "A reply" });
@@ -139,7 +108,6 @@ describe("AssociationValidationTest", () => {
   });
 
   it("validates presence of belongs to association  parent is new record", async () => {
-    // Note that Interest and Human have the :inverse_of option set
     await repairValidations(Interest, async () => {
       Interest.validatesPresenceOf("human");
       const human = new Human({ name: "John" });
@@ -173,9 +141,8 @@ describe("AssociationValidationTest", () => {
     Topic.validatesPresenceOf("content", { on: "create" });
     const t = await Topic.create({ title: "uhoh", content: "stuff" });
     t.writeAttribute("content", null);
-    expect(await t.save()).toBe(true); // update! succeeds: presence is validated on :create only
+    expect(await t.save()).toBe(true);
     const r = await Reply.create({ title: "A reply", content: "with content!" });
-    // NOTE: Does not pass along :create context from reply to Topic validation.
     r.topic = t;
 
     expect(await t.isValid()).toBe(true);

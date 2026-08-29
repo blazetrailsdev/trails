@@ -13,20 +13,9 @@ import { AttributeMethods as AMAttributeMethods } from "@blazetrails/activemodel
 fixtures({});
 
 describe("ReadTest", () => {
-  // Mirrors read_test.rb's synthetic `@klass` (attribute_names %w{one two
-  // three}, empty attribute_types): a minimal AttributeMethods host whose
-  // accessors are NOT eagerly generated, so we can observe lazy generation
-  // via `define_attribute_methods`. A real Base subclass generates accessors
-  // eagerly at `attribute()` declaration, which would mask the gate. Rails' fake
-  // klass does `include ActiveRecord::AttributeMethods` (read_test.rb:20); the
-  // statics below are that include.
   function buildKlass() {
     class Klass {
       static _attributeMethodsGenerated = false;
-      // read_test.rb:18's `def self.load_schema; end` — the fake klass has no
-      // table, so the `load_schema` `define_attribute_methods` calls
-      // (attribute_methods.rb:114) must be a no-op. trails' sync `loadSchema`
-      // returns immediately once the class is marked loaded.
       static _schemaLoaded = true;
       static attributeMethodPatterns = Base.attributeMethodPatterns;
       static attributeAliases = {};

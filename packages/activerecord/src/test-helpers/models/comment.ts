@@ -9,16 +9,11 @@ import type { Post } from "./post.js";
 import type { PostThatLoadsCommentsInAnAfterSaveHook } from "./post.js";
 import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
-// vendor/rails/activerecord/test/models/comment.rb
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
-// Rails: `class OopsError < RuntimeError; end` — raised by the OopsExtension
-// `destroy_all` override that the `oops_comments` scope extends onto its
-// relation.
 export class OopsError extends Error {}
 
-// Rails: `module OopsExtension; def destroy_all; raise OopsError; end; end`.
 const OopsExtension = {
   destroyAll(): never {
     throw new OopsError("oops");
@@ -105,7 +100,6 @@ export class Comment extends Base {
     this.scope("allAsScope", function (this: any) {
       return this.all();
     });
-    // Rails: `scope :oops_comments, -> { extending OopsExtension }`.
     this.scope(
       "oopsComments",
       function (this: any) {
@@ -113,7 +107,6 @@ export class Comment extends Base {
       },
       OopsExtension,
     );
-    // Rails: `default_scope { extending OopsExtension }`.
     this.defaultScope((q: any) => q.extending(OopsExtension));
 
     this.belongsTo("post", { counterCache: true });
@@ -141,8 +134,6 @@ export class Comment extends Base {
     return "a comment...";
   }
 
-  // Rails: `all.where("#{QUOTED_TYPE} = ?", q)`. QUOTED_TYPE is the inheritance
-  // column (`type`), so the hash form emits the identical `type = ?` predicate.
   static searchByType(q: string) {
     return this.all().where({ type: q });
   }
@@ -218,8 +209,6 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
       foreignKey: "post_id",
     });
     this.afterSave(async function (this: any) {
-      // Rails: `comment.post.update(...)`. trails belongsTo readers are async,
-      // so await the target before updating it.
       const post = await this.post;
       if (post) await post.update({ body: "Automatically altered" });
     });
@@ -263,8 +252,6 @@ export class CommentWithAfterCreateUpdate extends Comment {
   }
 }
 
-// Track the STI subtree on the `comments` table so registry-safe row-path
-// resolution finds these through Comment's own subtree.
 for (const klass of [
   SpecialComment,
   SubSpecialComment,

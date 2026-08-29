@@ -13,13 +13,6 @@ import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 
-// Rails' `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` arm of
-// `test_check_constraints` calls `json_schema_valid()`, which MySQL only ships
-// from 8.0.17 and MariaDB does not have at all — and the CI mysql lane runs
-// mariadb:11 (ci.yml:1186). Rails' own mysql lane is MySQL 8, so the adapter
-// check alone is enough there; here the function's availability has to be read
-// off the server the way every other version-keyed gate in
-// support/mysql-server-version.ts does.
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
 
 const supportsCheckConstraints = adapterSupports("check_constraints");
@@ -132,7 +125,6 @@ describe("Migration", () => {
       // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:PostgreSQLAdapter)` (check_constraint_test.rb:72-83)
       if (adapterType === "postgres") {
         try {
-          // Test that complex expression is correctly parsed from the database
           await connection.addCheckConstraint(
             "trades",
             "CASE WHEN price IS NOT NULL THEN true ELSE false END",
@@ -342,7 +334,6 @@ describe("Migration", () => {
       );
     });
 
-    // Check constraint should still be created, but should not be invalid
     it.skipIf(adapterSupports("validate_constraints"))("add invalid check constraint", async () => {
       const connection = await ambientConnection();
       await connection.addCheckConstraint("trades", "quantity > 0", {
@@ -468,12 +459,6 @@ describe("Migration", () => {
     });
   });
 
-  // Rails' `else` arm of the file-level `if
-  // ActiveRecord::Base.lease_connection.supports_check_constraints?`
-  // (check_constraint_test.rb:317-341). Held in a const so the `skipIf` call
-  // site carries no feature literal: the gate extractor drops the negation, and
-  // an inline `adapterSupports("check_constraints")` would tag the else-arm
-  // cases with the very feature that excludes them.
   describe.skipIf(supportsCheckConstraints)("NoCheckConstraintSupportTest", () => {
     it("add check constraint should be noop", async () => {
       const connection = await ambientConnection();

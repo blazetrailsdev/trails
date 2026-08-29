@@ -1,18 +1,3 @@
-/**
- * Port of the `add_foreign_key`, `remove_foreign_key` and `SchemaDumpingHelper`
- * halves of `ActiveRecord::Migration::ForeignKeyTest`
- * (vendor/rails/activerecord/test/cases/migration/foreign_key_test.rb:209-330,
- * :336-391, :393-451, :453-535, :536-619, :621-747, :749-773 and :775-823) plus
- * all of its sibling
- * `ActiveRecord::Migration::CompositeForeignKeyTest` (:824-912), plus
- * `ForeignKeyInCreateTest` (:9-21) and `ForeignKeyChangeColumnTest` (:23-143)
- * with its `WithPrefix`/`WithSuffix` subclasses (:145-163).
- *
- * Driven by the ambient connection, mirroring Rails'
- * `@connection = ActiveRecord::Base.lease_connection`. The rockets/astronauts
- * setup/teardown is shared with schema-statements-on-adapter.test.ts via
- * `withRocketTables`.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
@@ -36,30 +21,14 @@ import { Base } from "../base.js";
 import { Migration } from "../migration.js";
 import { SchemaDumper } from "../schema-dumper.js";
 
-// Rails' `unless current_adapter?(:SQLite3Adapter)` guard on the `fk.name`
-// assertions: PRAGMA foreign_key_list exposes no constraint name, so SQLite
-// has no name to compare.
 const unlessSqlite3Adapter = adapterType !== "sqlite";
 
-// Rails' `else` arm of `if supports_validate_constraints?`. Held in a const so
-// the `it.skipIf(...)` call site carries no feature literal: the gate extractor
-// drops the negation, and an inline `adapterSupports("validate_constraints")`
-// would tag the else-arm case with the very feature it excludes — colliding
-// with the `if` arm, which shares the test name.
 const supportsValidateConstraints = adapterSupports("validate_constraints");
 
-/**
- * `validate_foreign_key` / `validate_constraint` live on
- * PostgreSQL::SchemaStatements only, so they are absent from the
- * `AbstractAdapter` type the shared rocket-tables helper hands back. Every
- * caller below is gated on `validate_constraints` (PostgreSQL-only), so the
- * downcast holds wherever it is used.
- */
 function validating(conn: AbstractAdapter): PostgreSQLAdapter {
   return conn as PostgreSQLAdapter;
 }
 
-/** Rails' `silence_stream($stdout) { migration.migrate(...) }`. */
 class SilentMigration extends Migration {
   write(): void {}
 }
@@ -73,7 +42,6 @@ class CreateCitiesAndHousesMigration extends SilentMigration {
     });
     await this.addForeignKey("houses", "cities", { column: "city_id" });
 
-    // remove and re-add to test that schema is updated and not accidentally cached
     await this.removeForeignKey("houses", "cities");
     await this.addForeignKey("houses", "cities", { column: "city_id", onDelete: "cascade" });
   }
@@ -81,8 +49,6 @@ class CreateCitiesAndHousesMigration extends SilentMigration {
 
 class CreateSchoolsAndClassesMigration extends SilentMigration {
   async change(): Promise<void> {
-    // Both tables are dropped by the migration's own `migrate("down")` in each
-    // case's ensure block, which the rule can't see from here.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("schools");
 
@@ -129,9 +95,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
   });
 
   describe("ForeignKeyTest", () => {
-    // DDL can't run inside the transactional-fixtures wrapper (PG aborts the
-    // outer transaction on a failed statement), matching the schema-statements
-    // suite's setup.
     fixtures([], { useTransactionalTests: false });
 
     it("add foreign key inferes column", async () => {
@@ -231,7 +194,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         const fk = foreignKeys[0];
         if (adapterType === "mysql") {
-          // ON DELETE RESTRICT is the default on MySQL
           expect(fk.onDelete).toBeUndefined();
         } else {
           expect(fk.onDelete).toBe("restrict");
@@ -303,8 +265,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("add foreign key with non existent from table raises", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        // Rails asserts twice on ONE raise (`e = assert_raises ...`), so the
-        // error is captured rather than the call repeated.
         const e = await conn.addForeignKey("missions", "rockets").then(
           () => undefined,
           (err: unknown) => err,
@@ -317,8 +277,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("add foreign key with non existent to table raises", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        // Rails asserts twice on ONE raise (`e = assert_raises ...`), so the
-        // error is captured rather than the call repeated.
         const e = await conn.addForeignKey("missions", "rockets").then(
           () => undefined,
           (err: unknown) => err,
@@ -540,8 +498,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
       });
     });
 
-    // Ruby's `column: :rocket_id` symbol has no TS analogue; the string form of
-    // the previous case is the only spelling available here.
     itIfSupports("validate_constraints", "validate foreign key by symbol column", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
@@ -632,8 +588,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
       });
     });
 
-    // Rails' `else` arm: without `supports_validate_constraints?` the foreign
-    // key is still created, but is never reported as invalid.
     it.skipIf(supportsValidateConstraints)("add invalid foreign key", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
@@ -685,9 +639,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const connection = await pool.checkout();
 
       try {
-        // These live in this test's own `:memory:` connection, disconnected in
-        // the finally below — nothing to collide with a sibling fork.
-
         await connection.createTable("rockets", { force: true }, (t) => {
           t.string("name");
         });
@@ -775,11 +726,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("schema dumping with options", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        // Rails' SQLite3 branch expects no `name:` because its `foreign_keys`
-        // reads PRAGMA foreign_key_list, which drops the CONSTRAINT name
-        // (sqlite3_adapter.rb:417-451). trails' SQLite `foreignKeys` additionally
-        // parses the CREATE TABLE DDL and recovers the real name, so the dump
-        // carries `name: "fk_name"` on every adapter and the branch collapses.
         const output = await dumpTableSchema(conn as unknown as SchemaSource, "fk_test_has_fk");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id", name: "fk_name" \}\);$/m,
@@ -1201,13 +1147,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
         } else if (adapterType === "sqlite") {
           expect(message).toMatch(/foreign key mismatch - "astronauts" referencing "rockets"/);
         }
-        // Rails' MySQL/MariaDB branch builds an `.any?` over three message
-        // patterns and then discards the result — it is passed to no assertion
-        // (foreign_key_test.rb:850-856), deliberately, because "MariaDB and
-        // different versions of MySQL generate different error messages". Only
-        // the raise itself is asserted there, so there is nothing to port: an
-        // `expect` here would be a stronger pass condition than Rails', failing
-        // on any MySQL/MariaDB build whose wording is not one of the three.
       });
     });
 
@@ -1303,9 +1242,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
 
-        // Deviation: Rails asserts the Ruby DSL line `add_foreign_key "astronauts",
-        // "rockets", column: [...], primary_key: [...]`. The TS dumper emits the
-        // equivalent `ctx.addForeignKey(...)` call with JSON-formatted arrays.
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: \["rocket_tenant_id","rocket_id"\], primaryKey: \["tenant_id","id"\] \}\);$/m,
         );

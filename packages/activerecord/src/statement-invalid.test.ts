@@ -8,12 +8,6 @@ import { adapterType } from "./test-adapter.js";
 
 class MockDatabaseError extends Error {}
 
-// Rails' MockDatabaseError defines `result` (PG) and `error_number` (MySQL) so
-// each adapter's translate_exception recognizes it as a driver error and wraps
-// it in StatementInvalid. trails' adapters key off driver-native shapes instead:
-// PG wraps a pg.DatabaseError, MySQL wraps a positive errno, SQLite wraps any
-// error. Build the shape the active adapter recognizes so the translation path
-// is exercised on every adapter, exactly as in Rails.
 function mockDatabaseError(): Error {
   if (adapterType === "postgres") return new pg.DatabaseError("MockDatabaseError", 0, "error");
   if (adapterType === "mysql") return Object.assign(new MockDatabaseError(), { errno: 1 });

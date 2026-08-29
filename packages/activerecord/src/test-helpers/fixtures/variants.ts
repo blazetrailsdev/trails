@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/variants.yml
 export const variantFixtureData = {
   variant_1: {
     id: 1,

@@ -1,6 +1,5 @@
 import type { Job } from "./job.js";
 import type { Person } from "./person.js";
-// vendor/rails/activerecord/test/models/friendship.rb
 import { Base } from "../../base.js";
 
 export class Friendship extends Base {

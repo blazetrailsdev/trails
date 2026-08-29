@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/sharded/blog_post.rb
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 
@@ -14,7 +13,6 @@ export class ShardedBlogPost extends Base {
       className: "ShardedComment",
       foreignKey: ["blog_id", "blog_post_id"],
     });
-    // Rails: dependent: :delete_all — "deleteAll" not yet in AssociationOptions.dependent type
     this.hasMany("deleteComments", {
       className: "ShardedComment",
       foreignKey: ["blog_id", "blog_post_id"],
