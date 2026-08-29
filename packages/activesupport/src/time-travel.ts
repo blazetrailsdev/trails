@@ -7,10 +7,10 @@
  *
  * @boundary-file: `currentTime()` returns a JS `Date` because most consumers
  *   (legacy Rails-port code in `time-ext`, `duration`, etc.) are Date-typed.
- *   The clock source is `Temporal.Now.instant()`; the offset is stored in
+ *   The clock source is `systemEpochNs()`; the offset is stored in
  *   nanoseconds so sub-millisecond travel is preserved on the
  *   `currentTimeInstant()` path. Callers that want Temporal use
- *   `currentTimeInstant()` (or `Temporal.Now.instant()` directly).
+ *   `currentTimeInstant()`.
  */
 
 import { Temporal } from "@blazetrails/date";
@@ -22,7 +22,7 @@ let _timeOffsetNs: bigint = 0n;
  * The named clock method trails production code reads the current time through.
  * `travel_to` stubs the receivers Rails stubs — `Time.now`, `Date.today` and
  * `DateTime.now` — and this holder's `now` alongside them, because reading
- * `Time.now` here instead would cost ~70x a bare `Temporal.Now.instant()` on
+ * `Time.now` here instead would cost ~70x a bare `performance.now()` read on
  * every `TimeWithZone` construction.
  *
  * @noRailsEquivalent CONVERGEABLE — Ruby's only clock is `Time.now`, so this
@@ -34,12 +34,28 @@ let _timeOffsetNs: bigint = 0n;
 export const clock = {
   now(): Temporal.Instant {
     if (_frozenInstant) return _frozenInstant;
-    if (_timeOffsetNs === 0n) return Temporal.Now.instant();
-    return Temporal.Instant.fromEpochNanoseconds(
-      Temporal.Now.instant().epochNanoseconds + _timeOffsetNs,
-    );
+    if (_timeOffsetNs === 0n) return Temporal.Instant.fromEpochNanoseconds(systemEpochNs());
+    return Temporal.Instant.fromEpochNanoseconds(systemEpochNs() + _timeOffsetNs);
   },
 };
+
+/**
+ * `Temporal.Now.instant()` is `Date.now()` scaled to nanoseconds plus a
+ * sub-millisecond term itself derived from `Date.now()`, so two reads inside
+ * one millisecond are all but always the same instant (measured: 9 of 979
+ * pairs differed, and then only by 1ns); Ruby's `Time.now` reads
+ * `CLOCK_REALTIME` and does not collide. A record created and updated inside
+ * one millisecond would otherwise keep its `updated_at` and drop the column
+ * from `saved_changes`.
+ *
+ * The floor is a microsecond, not the nanosecond the return type can carry: an
+ * epoch millisecond is ~1.8e12, so a double runs out of integer precision well
+ * before `* 1e6`. That matches the precision Rails' own `datetime` columns
+ * default to, and is finer than any collision this guards against.
+ */
+function systemEpochNs(): bigint {
+  return BigInt(Math.round((performance.timeOrigin + performance.now()) * 1_000)) * 1_000n;
+}
 
 export function setFrozenTime(time: Date | null): void {
   if (time === null) {
