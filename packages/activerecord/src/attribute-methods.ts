@@ -55,8 +55,8 @@ interface InstanceMethodHost {
   _writeAttribute(name: string, value: unknown): void;
 }
 
-export function hasAttribute(this: AttributeRecord, name: string): boolean {
-  let attrName = String(name);
+export function hasAttribute(this: AttributeRecord, attrName: string): boolean {
+  attrName = String(attrName);
   attrName =
     (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
       attrName
@@ -64,8 +64,8 @@ export function hasAttribute(this: AttributeRecord, name: string): boolean {
   return this._attributes.isKey(attrName);
 }
 
-export function attributePresent(this: AttributeRecord, name: string): boolean {
-  let attrName = String(name);
+export function attributePresent(this: AttributeRecord, attrName: string): boolean {
+  attrName = String(attrName);
   attrName =
     (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
       attrName
@@ -476,8 +476,8 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
 }
 
 /** @internal */
-export function formatForInspect(this: InstanceMethodHost, attr: string, value: unknown): string {
-  return _formatForInspect.call(this as any, attr, value);
+export function formatForInspect(this: InstanceMethodHost, name: string, value: unknown): string {
+  return _formatForInspect.call(this as any, name, value);
 }
 
 /** @internal */
@@ -525,8 +525,8 @@ export const ClassMethods = {
   _hasAttribute: classHasAttribute,
 };
 
-export function attributeForInspect(this: InstanceMethodHost, attr: string): string {
-  return _attrForInspect.call(this as any, attr);
+export function attributeForInspect(this: InstanceMethodHost, attrName: string): string {
+  return _attrForInspect.call(this as any, attrName);
 }
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {
@@ -542,8 +542,8 @@ export function set(this: InstanceMethodHost, attrName: string, value: unknown):
   this.writeAttribute(attrName, value);
 }
 
-export function queryAttribute(this: InstanceMethodHost, name: string): boolean {
-  return _queryAttribute.call(this as any, name);
+export function queryAttribute(this: InstanceMethodHost, attrName: string): boolean {
+  return _queryAttribute.call(this as any, attrName);
 }
 
 export function toKey(this: InstanceMethodHost): unknown[] | null {
@@ -611,8 +611,8 @@ import {
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
 } from "./attribute-methods/dirty.js";
 
-export function readAttributeBeforeTypeCast(this: InstanceMethodHost, name: string): unknown {
-  return _readAttributeBeforeTypeCast(this as any, name);
+export function readAttributeBeforeTypeCast(this: InstanceMethodHost, attrName: string): unknown {
+  return _readAttributeBeforeTypeCast(this as any, attrName);
 }
 export function readAttributeForDatabase(this: InstanceMethodHost, attrName: string): unknown {
   return _readAttributeForDatabase(this as any, attrName);
@@ -641,38 +641,38 @@ export function queryCastAttribute(
 }
 export function isSavedChangeToAttribute(
   this: InstanceMethodHost,
-  attr: string,
+  attrName: string,
   options?: DirtyOptions,
 ): boolean {
-  return _isSavedChangeToAttribute(this as any, attr, options);
+  return _isSavedChangeToAttribute(this as any, attrName, options);
 }
 export function savedChangeToAttribute(
   this: InstanceMethodHost,
-  attr: string,
+  attrName: string,
 ): [unknown, unknown] | null {
-  return _savedChangeToAttribute(this as any, attr);
+  return _savedChangeToAttribute(this as any, attrName);
 }
-export function attributeBeforeLastSave(this: InstanceMethodHost, attr: string): unknown {
-  return _attributeBeforeLastSave(this as any, attr);
+export function attributeBeforeLastSave(this: InstanceMethodHost, attrName: string): unknown {
+  return _attributeBeforeLastSave(this as any, attrName);
 }
 export function isSavedChanges(this: InstanceMethodHost): boolean {
   return _isSavedChanges(this as any);
 }
 export function isWillSaveChangeToAttribute(
   this: InstanceMethodHost,
-  attr: string,
+  attrName: string,
   options?: DirtyOptions,
 ): boolean {
-  return _isWillSaveChangeToAttribute(this as any, attr, options);
+  return _isWillSaveChangeToAttribute(this as any, attrName, options);
 }
 export function attributeChangeToBeSaved(
   this: InstanceMethodHost,
-  attr: string,
+  attrName: string,
 ): [unknown, unknown] | null {
-  return _attributeChangeToBeSaved(this as any, attr);
+  return _attributeChangeToBeSaved(this as any, attrName);
 }
-export function attributeInDatabase(this: InstanceMethodHost, attr: string): unknown {
-  return _attributeInDatabase(this as any, attr);
+export function attributeInDatabase(this: InstanceMethodHost, attrName: string): unknown {
+  return _attributeInDatabase(this as any, attrName);
 }
 export function attributeNamesForPartialUpdates(this: InstanceMethodHost): string[] {
   return _attributeNamesForPartialUpdates.call(this as any);

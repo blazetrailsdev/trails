@@ -21,21 +21,21 @@ interface DirtyRecord {
 
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
-  attr: string,
+  attrName: string,
   options?: DirtyOptions,
 ): boolean {
-  return record.mutationsBeforeLastSave.isChanged(attr, options);
+  return record.mutationsBeforeLastSave.isChanged(attrName, options);
 }
 
 export function savedChangeToAttribute(
   record: DirtyRecord,
-  attr: string,
+  attrName: string,
 ): [unknown, unknown] | null {
-  return record.mutationsBeforeLastSave.changeToAttribute(attr);
+  return record.mutationsBeforeLastSave.changeToAttribute(attrName);
 }
 
-export function attributeBeforeLastSave(record: DirtyRecord, attr: string): unknown {
-  return record.mutationsBeforeLastSave.originalValue(attr);
+export function attributeBeforeLastSave(record: DirtyRecord, attrName: string): unknown {
+  return record.mutationsBeforeLastSave.originalValue(attrName);
 }
 
 export function isSavedChanges(record: DirtyRecord): boolean {
@@ -44,21 +44,21 @@ export function isSavedChanges(record: DirtyRecord): boolean {
 
 export function isWillSaveChangeToAttribute(
   record: DirtyRecord,
-  attr: string,
+  attrName: string,
   options?: DirtyOptions,
 ): boolean {
-  return record.mutationsFromDatabase.isChanged(attr, options);
+  return record.mutationsFromDatabase.isChanged(attrName, options);
 }
 
 export function attributeChangeToBeSaved(
   record: DirtyRecord,
-  attr: string,
+  attrName: string,
 ): [unknown, unknown] | null {
-  return record.mutationsFromDatabase.changeToAttribute(attr);
+  return record.mutationsFromDatabase.changeToAttribute(attrName);
 }
 
-export function attributeInDatabase(record: DirtyRecord, attr: string): unknown {
-  return record.mutationsFromDatabase.originalValue(attr);
+export function attributeInDatabase(record: DirtyRecord, attrName: string): unknown {
+  return record.mutationsFromDatabase.originalValue(attrName);
 }
 
 interface DirtyIncludeHost {

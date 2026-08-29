@@ -212,8 +212,8 @@ export function isInstanceMethodAlreadyImplemented(
   );
 }
 
-export function isDangerousAttributeMethod(this: PrimaryKeyHost, name: string): boolean {
-  return dangerousAttributeMethods().has(name) && !ID_ATTRIBUTE_METHODS.has(name);
+export function isDangerousAttributeMethod(this: PrimaryKeyHost, methodName: string): boolean {
+  return dangerousAttributeMethods().has(methodName) && !ID_ATTRIBUTE_METHODS.has(methodName);
 }
 
 export function quotedPrimaryKey(this: PrimaryKeyHost & { connection?: DatabaseAdapter }): string {

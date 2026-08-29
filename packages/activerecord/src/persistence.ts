@@ -49,18 +49,18 @@ interface PersistenceHost {
 
 export async function create(
   this: PersistenceHost,
-  attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
   block?: (record: any) => void,
 ): Promise<any> {
-  if (Array.isArray(attrs)) {
+  if (Array.isArray(attributes)) {
     const records: any[] = [];
-    for (const a of attrs) {
+    for (const a of attributes) {
       records.push(await (this as any).create(a, block));
     }
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
+  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   const record = new this(mergedAttrs);
   if (block) block(record);
   await record.save();
@@ -69,18 +69,18 @@ export async function create(
 
 export async function createBang(
   this: PersistenceHost,
-  attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
   block?: (record: any) => void,
 ): Promise<any> {
-  if (Array.isArray(attrs)) {
+  if (Array.isArray(attributes)) {
     const records: any[] = [];
-    for (const a of attrs) {
+    for (const a of attributes) {
       records.push(await (this as any).createBang(a, block));
     }
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
+  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   const record = new this(mergedAttrs);
   if (block) block(record);
   await record.saveBang();
@@ -89,13 +89,13 @@ export async function createBang(
 
 export function build(
   this: PersistenceHost,
-  attrs?: Record<string, unknown> | Record<string, unknown>[],
+  attributes?: Record<string, unknown> | Record<string, unknown>[],
   block?: (record: any) => void,
 ): any {
-  if (Array.isArray(attrs)) {
-    return attrs.map((a) => build.call(this, a, block));
+  if (Array.isArray(attributes)) {
+    return attributes.map((a) => build.call(this, a, block));
   }
-  const record = new this(attrs ?? {});
+  const record = new this(attributes ?? {});
   if (block) block(record);
   return record;
 }
@@ -118,11 +118,11 @@ export function instantiate(
   );
 }
 
-export function queryConstraints(this: PersistenceHost, ...columns: string[]): void {
-  if (columns.length === 0) {
+export function queryConstraints(this: PersistenceHost, ...columnsList: string[]): void {
+  if (columnsList.length === 0) {
     throw new ArgumentError("You must specify at least one column to be used in querying");
   }
-  this._queryConstraintsList = columns.map(String);
+  this._queryConstraintsList = columnsList.map(String);
   this._hasQueryConstraints = true;
 }
 
@@ -645,7 +645,7 @@ export async function updateColumn<T extends UpdateColumnsRecord>(
 
 export async function updateColumns<T extends UpdateColumnsRecord>(
   this: T,
-  attrs: Record<string, unknown>,
+  attributes: Record<string, unknown>,
 ): Promise<boolean> {
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
@@ -654,7 +654,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     throw new Error("Cannot update columns on a new or destroyed record");
   }
 
-  if (Object.keys(attrs).length === 0) {
+  if (Object.keys(attributes).length === 0) {
     return true;
   }
 
@@ -672,7 +672,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
         attributeAliases?: Record<string, string>;
       }
     ).attributeAliases ?? {};
-  const resolvedEntries = Object.entries(attrs).map(
+  const resolvedEntries = Object.entries(attributes).map(
     ([rawKey, value]) => [aliases[rawKey] ?? rawKey, value] as const,
   );
   for (const [key] of resolvedEntries) {
