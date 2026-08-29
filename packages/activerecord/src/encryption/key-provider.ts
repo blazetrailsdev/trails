@@ -25,8 +25,8 @@ export class KeyProvider {
     return this._encryptionKey;
   }
 
-  decryptionKeys(message: Message): Key[] {
-    const rawKeyId = message.headers.encryptedDataKeyId as unknown;
+  decryptionKeys(encryptedMessage: Message): Key[] {
+    const rawKeyId = encryptedMessage.headers.encryptedDataKeyId as unknown;
     if (rawKeyId != null && rawKeyId !== false) {
       return this.keysGroupedById().get(headerString(rawKeyId)!) ?? [];
     }

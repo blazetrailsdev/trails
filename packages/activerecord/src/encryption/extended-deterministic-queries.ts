@@ -3,7 +3,7 @@ import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attr
 import { encryptedTypeOf } from "./encryptable-record.js";
 
 export interface SerializableType {
-  serialize(value: unknown): unknown;
+  serialize(data: unknown): unknown;
 }
 
 export class ExtendedDeterministicQueries {

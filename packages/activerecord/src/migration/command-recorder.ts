@@ -70,11 +70,15 @@ export class CommandRecorder {
     }
   }
 
-  async inverseOf(cmd: string, args: unknown[], block?: MigrationBlock): Promise<MigrationCommand> {
-    const method = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
+  async inverseOf(
+    command: string,
+    args: unknown[],
+    block?: MigrationBlock,
+  ): Promise<MigrationCommand> {
+    const method = `invert${command.charAt(0).toUpperCase()}${command.slice(1)}` as keyof this;
     if (!(method in this)) {
       throw new IrreversibleMigration(
-        `This migration uses ${cmd}, which is not automatically reversible.\n` +
+        `This migration uses ${command}, which is not automatically reversible.\n` +
           `To make the migration reversible you can either:\n` +
           `1. Define #up and #down methods in place of the #change method.\n` +
           `2. Use the #reversible method to define reversible behavior.\n`,
@@ -90,11 +94,10 @@ export class CommandRecorder {
 
   async changeTable(
     tableName: string,
-    fnOrOptions: ((t: Table) => Promise<void> | void) | Record<string, unknown>,
+    options: ((t: Table) => Promise<void> | void) | Record<string, unknown>,
     fn?: (t: Table) => Promise<void> | void,
   ): Promise<void> {
-    const options: Record<string, unknown> = typeof fnOrOptions === "function" ? {} : fnOrOptions;
-    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
+    const callback = typeof options === "function" ? options : fn;
     if (!callback) {
       throw new TypeError(
         "changeTable requires a callback. Rails change_table always takes a block.",
@@ -107,7 +110,7 @@ export class CommandRecorder {
     const supportsBulk =
       typeof delegate?.supportsBulkAlter === "function" && delegate.supportsBulkAlter() === true;
 
-    if (options["bulk"] && supportsBulk) {
+    if (typeof options !== "function" && options["bulk"] && supportsBulk) {
       const recorder = new CommandRecorder(this._delegate);
       recorder.reverting = this._reverting;
       await callback(delegate.updateTableDefinition(tableName, recorder));

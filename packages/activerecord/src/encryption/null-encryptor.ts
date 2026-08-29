@@ -1,6 +1,6 @@
 export class NullEncryptor {
-  encrypt(clearText: string, _options?: Record<string, unknown>): string {
-    return clearText;
+  encrypt(cleanText: string, _options?: Record<string, unknown>): string {
+    return cleanText;
   }
 
   decrypt(encryptedText: string, _options?: Record<string, unknown>): string {

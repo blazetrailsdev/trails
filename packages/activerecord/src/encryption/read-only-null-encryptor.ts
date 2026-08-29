@@ -1,7 +1,7 @@
 import { Encryption } from "./errors.js";
 
 export class ReadOnlyNullEncryptor {
-  encrypt(_clearText: string, _options?: Record<string, unknown>): never {
+  encrypt(_cleanText: string, _options?: Record<string, unknown>): never {
     throw new Encryption("The ReadOnlyNullEncryptor does not support encryption");
   }
 

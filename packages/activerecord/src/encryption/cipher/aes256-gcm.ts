@@ -67,9 +67,9 @@ export class Aes256Gcm {
     return message;
   }
 
-  decrypt(message: Message): Buffer {
-    const iv = message.headers.get("iv");
-    const authTag = message.headers.get("at");
+  decrypt(encryptedMessage: Message): Buffer {
+    const iv = encryptedMessage.headers.get("iv");
+    const authTag = encryptedMessage.headers.get("at");
     if (!isBytes(iv) || !isBytes(authTag)) throw new EncryptedContentIntegrity();
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
 
@@ -84,7 +84,7 @@ export class Aes256Gcm {
         throw new Configuration("Crypto adapter does not support GCM auth tags (setAuthTag)");
       }
       decipher.setAuthTag(authTagBuf);
-      const encryptedData = toBytes(message.payload);
+      const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
         encryptedData.length === 0
           ? Buffer.from(encryptedData)

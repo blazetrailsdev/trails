@@ -276,14 +276,14 @@ export function isRejectNewRecord(
 
 /** @internal */
 export function assignToOrMarkForDestruction(
-  childRecord: Base,
+  record: Base,
   attributes: Record<string, unknown>,
   allowDestroy: boolean,
 ): Promise<void> | void {
-  const pending = childRecord.assignAttributes(except(attributes, ...UNASSIGNABLE_KEYS));
+  const pending = record.assignAttributes(except(attributes, ...UNASSIGNABLE_KEYS));
   const markIfRequested = (): void => {
     if (hasDestroyFlag(attributes) && allowDestroy) {
-      childRecord.markForDestruction();
+      record.markForDestruction();
     }
   };
   return pending ? pending.then(markIfRequested) : markIfRequested();

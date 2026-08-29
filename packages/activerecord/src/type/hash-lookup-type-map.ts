@@ -92,9 +92,9 @@ export class HashLookupTypeMap {
     this._cache.clear();
   }
 
-  aliasType(type: string | number, targetType: string | number): void {
+  aliasType(type: string | number, aliasType: string | number): void {
     this.registerType(type, undefined, (_lookupKey, ...args: unknown[]) =>
-      this.lookup(targetType, ...args),
+      this.lookup(aliasType, ...args),
     );
   }
 

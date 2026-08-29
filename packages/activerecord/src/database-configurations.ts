@@ -146,13 +146,13 @@ export class DatabaseConfigurations {
     return configs;
   }
 
-  findDbConfig(envName: string): DatabaseConfig | undefined {
-    const envStr = String(envName);
+  findDbConfig(env: string): DatabaseConfig | undefined {
+    env = String(env);
     const matching = this._configurations.find(
-      (c) => c.forCurrentEnv && (c.envName === envStr || c.name === envStr),
+      (c) => c.forCurrentEnv && (c.envName === env || c.name === env),
     );
     if (matching) return matching;
-    return this._configurations.find((c) => c.envName === envStr);
+    return this._configurations.find((c) => c.envName === env);
   }
 
   isPrimary(name: string): boolean {

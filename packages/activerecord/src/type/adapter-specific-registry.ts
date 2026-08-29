@@ -35,18 +35,14 @@ export class Registration {
     this._override = options?.override ?? null;
   }
 
-  call(
-    _registry: AdapterSpecificRegistry,
-    symbol: string,
-    options?: Record<string, unknown>,
-  ): Type {
-    if (!options) return this._block(symbol);
+  call(_registry: AdapterSpecificRegistry, args: string, options?: Record<string, unknown>): Type {
+    if (!options) return this._block(args);
     const { adapter: _adapter, ...rest } = options;
-    return Object.keys(rest).length > 0 ? this._block(symbol, rest) : this._block(symbol);
+    return Object.keys(rest).length > 0 ? this._block(args, rest) : this._block(args);
   }
 
   matches(typeName: string, _options?: { adapter?: string }): boolean {
-    return typeName === this.name && this.isMatchesAdapter(_options?.adapter);
+    return typeName === this.name && this.isMatchesAdapter(_options);
   }
 
   get priority(): number {
@@ -71,8 +67,8 @@ export class Registration {
   }
 
   /** @internal */
-  protected isMatchesAdapter(adapter?: string): boolean {
-    return this.adapter === undefined || adapter === this.adapter;
+  protected isMatchesAdapter(options?: { adapter?: string }): boolean {
+    return this.adapter === undefined || options?.adapter === this.adapter;
   }
 
   /** @internal */
@@ -117,20 +113,17 @@ export class DecorationRegistration extends Registration {
     this._klass = klass;
   }
 
-  call(registry: AdapterSpecificRegistry, symbol: string, options?: Record<string, unknown>): Type {
+  call(registry: AdapterSpecificRegistry, args: string, options?: Record<string, unknown>): Type {
     const filtered: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(options ?? {})) {
       if (!(k in this._options)) filtered[k] = v;
     }
-    const subtype = registry.lookup(
-      symbol,
-      Object.keys(filtered).length > 0 ? filtered : undefined,
-    );
+    const subtype = registry.lookup(args, Object.keys(filtered).length > 0 ? filtered : undefined);
     return new this._klass(subtype);
   }
 
   matches(_typeName: string, options?: { adapter?: string; [key: string]: unknown }): boolean {
-    return this.isMatchesAdapter(options?.adapter) && this.isMatchesOptions(options);
+    return this.isMatchesAdapter(options) && this.isMatchesOptions(options);
   }
 
   get priority(): number {
@@ -154,9 +147,9 @@ export class AdapterSpecificRegistry {
   addModifier(
     options: Record<string, unknown>,
     klass: new (subtype: Type) => Type,
-    registrationOptions?: { adapter?: string },
+    args?: { adapter?: string },
   ): void {
-    this._registrations.push(new DecorationRegistration(options, klass, registrationOptions));
+    this._registrations.push(new DecorationRegistration(options, klass, args));
   }
 
   register(

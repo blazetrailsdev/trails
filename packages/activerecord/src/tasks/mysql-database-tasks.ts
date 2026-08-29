@@ -177,9 +177,10 @@ export class MySQLDatabaseTasks {
   }
 
   /** @internal */
-  private async establishConnection(configHash?: Record<string, unknown>): Promise<void> {
-    const config: Record<string, unknown> = { ...(configHash ?? this.dbConfig.configuration) };
-    await Base.establishConnection(config as { adapter?: string; [key: string]: unknown });
+  private async establishConnection(
+    config: Record<string, unknown> = this.dbConfig.configuration,
+  ): Promise<void> {
+    await Base.establishConnection({ ...config } as { adapter?: string; [key: string]: unknown });
   }
 
   /**

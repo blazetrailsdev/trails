@@ -1891,25 +1891,27 @@ export function clearReflectionsCache(modelClass: typeof Base): void {
 
 export function _reflectOnAssociation(
   modelClass: typeof Base,
-  name: string,
+  association: string,
 ): AssociationReflection | ThroughReflection | null {
   const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
-  return (rawReflections[name] as AssociationReflection | ThroughReflection | undefined) ?? null;
+  return (
+    (rawReflections[association] as AssociationReflection | ThroughReflection | undefined) ?? null
+  );
 }
 
 export function _reflectOnAssociationClassMethod(
   this: typeof Base,
-  name: string,
+  association: string,
 ): AssociationReflection | ThroughReflection | null {
-  return _reflectOnAssociation(this, name);
+  return _reflectOnAssociation(this, association);
 }
 
 export function reflectOnAssociation(
   modelClass: typeof Base,
-  name: string,
+  association: string,
 ): AssociationReflection | ThroughReflection | null {
   const normalized = normalizedReflections(modelClass);
-  return normalized[name] ?? null;
+  return normalized[association] ?? null;
 }
 
 export function reflectOnAllAssociations(
@@ -1935,9 +1937,9 @@ export function reflectOnAllAggregations(modelClass: typeof Base): AggregateRefl
 
 export function reflectOnAggregation(
   modelClass: typeof Base,
-  name: string,
+  aggregation: string,
 ): AggregateReflection | null {
-  return modelClass.aggregateReflections[name] ?? null;
+  return modelClass.aggregateReflections[aggregation] ?? null;
 }
 
 export function reflectOnAllAutosaveAssociations(
@@ -1964,9 +1966,9 @@ export const ClassMethods = {
   },
   reflectOnAssociation(
     this: typeof Base,
-    name: string,
+    association: string,
   ): AssociationReflection | ThroughReflection | null {
-    return reflectOnAssociation(this, name);
+    return reflectOnAssociation(this, association);
   },
   reflectOnAllAssociations(
     this: typeof Base,
@@ -1977,8 +1979,8 @@ export const ClassMethods = {
   reflectOnAllAggregations(this: typeof Base): AggregateReflection[] {
     return reflectOnAllAggregations(this);
   },
-  reflectOnAggregation(this: typeof Base, name: string): AggregateReflection | null {
-    return reflectOnAggregation(this, name);
+  reflectOnAggregation(this: typeof Base, aggregation: string): AggregateReflection | null {
+    return reflectOnAggregation(this, aggregation);
   },
   reflectOnAllAutosaveAssociations(this: typeof Base): AssociationLikeReflection[] {
     return reflectOnAllAutosaveAssociations(this);

@@ -366,8 +366,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createTable(
-    name: string,
-    optionsOrFn?:
+    tableName: string,
+    options?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
@@ -383,11 +383,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       | ((t: TableDefinitionOf<A>) => void),
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
-    const tname = this._pt(name);
+    const tname = this._pt(tableName);
     if (fn !== undefined) {
-      await this.connection.createTable(tname, optionsOrFn, fn);
-    } else if (optionsOrFn !== undefined) {
-      await this.connection.createTable(tname, optionsOrFn);
+      await this.connection.createTable(tname, options, fn);
+    } else if (options !== undefined) {
+      await this.connection.createTable(tname, options);
     } else {
       await this.connection.createTable(tname);
     }
@@ -811,13 +811,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   /** @missingRailsCall compatible_table_definition — PERMANENT */
   async changeTable(
     tableName: string,
-    fnOrOptions?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
     if (fn !== undefined) {
-      await this.connection.changeTable(this._pt(tableName), fnOrOptions, fn);
-    } else if (fnOrOptions !== undefined) {
-      await this.connection.changeTable(this._pt(tableName), fnOrOptions);
+      await this.connection.changeTable(this._pt(tableName), options, fn);
+    } else if (options !== undefined) {
+      await this.connection.changeTable(this._pt(tableName), options);
     } else {
       await this.connection.changeTable(this._pt(tableName));
     }
@@ -1073,9 +1073,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/;
 
-  static isValidVersionFormat(version: string): boolean {
+  static isValidVersionFormat(versionString: string): boolean {
     return [Migration.MigrationFilenameRegexp, /^\d(_?\d)*$/].some((pattern) =>
-      pattern.test(version),
+      pattern.test(versionString),
     );
   }
 
@@ -1299,9 +1299,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   /** @internal */
-  formatArguments(args: unknown[]): string {
-    const argList = args.slice(0, -1).map((a) => rubyInspect(a));
-    const last = args[args.length - 1];
+  formatArguments(arguments_: unknown[]): string {
+    const argList = arguments_.slice(0, -1).map((a) => rubyInspect(a));
+    const last = arguments_[arguments_.length - 1];
     if (isPlainObject(last)) {
       const filtered = Object.fromEntries(
         Object.entries(last).filter(([k]) => !this.isInternalOption(k)),
@@ -1856,9 +1856,9 @@ export class Migrator {
   }
 
   /** @internal */
-  async isRan(proxy: MigrationProxy): Promise<boolean> {
+  async isRan(migration: MigrationProxy): Promise<boolean> {
     const applied = await this.migrated();
-    return applied.has(proxy.version);
+    return applied.has(migration.version);
   }
 
   /** @internal */

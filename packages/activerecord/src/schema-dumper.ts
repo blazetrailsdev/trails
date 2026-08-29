@@ -847,11 +847,11 @@ export abstract class SchemaDumper {
    * @missingRailsCall any? — PERMANENT
    * @missingRailsCall order:foreignKeyColumnFor,removePrefixAndSuffix — PERMANENT
    */
-  async foreignKeys(tableName: string, stream: string[]): Promise<void> {
+  async foreignKeys(table: string, stream: string[]): Promise<void> {
     const host = this._hookHost("foreignKeys");
     if (!host) return;
     const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
-    const fks = (await fn.call(host, tableName)) ?? [];
+    const fks = (await fn.call(host, table)) ?? [];
     if (fks.length === 0) return;
     type Fk = {
       fromTable?: string;
@@ -869,7 +869,7 @@ export abstract class SchemaDumper {
       .foreignKeyColumnFor;
     const statements: string[] = [];
     for (const fk of fks as Fk[]) {
-      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName));
+      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? table));
       const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
       const opts: string[] = [];
       const inferredColumn = columnFor ? columnFor.call(host, fk.toTable, "id") : undefined;

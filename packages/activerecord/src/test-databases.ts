@@ -16,7 +16,7 @@ function isInMemorySqlite(name: string): boolean {
 }
 
 export async function createAndLoadSchema(
-  index: number,
+  i: number,
   { envName }: { envName: string } = { envName: "test" },
 ): Promise<void> {
   const old = process.env.VERBOSE;
@@ -33,7 +33,7 @@ export async function createAndLoadSchema(
         );
       }
       if (!isInMemorySqlite(baseName)) {
-        dbConfig._database = `${baseName}-${index}`;
+        dbConfig._database = `${baseName}-${i}`;
       }
       await DatabaseTasks.reconstructFromSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
     }

@@ -41,10 +41,10 @@ export class QueryCache {
     return pools;
   }
 
-  static complete(targets: QueryCacheCompleteTarget[]): void {
-    for (const target of targets) {
-      target.disableQueryCacheBang();
-      target.clearQueryCache();
+  static complete(pools: QueryCacheCompleteTarget[]): void {
+    for (const pool of pools) {
+      pool.disableQueryCacheBang();
+      pool.clearQueryCache();
     }
   }
 
