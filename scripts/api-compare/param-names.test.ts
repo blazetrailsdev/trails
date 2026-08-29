@@ -91,6 +91,23 @@ describe("compareParamNames", () => {
     );
   });
 
+  it("does not read a rename off a RECEIVER-stripped form", () => {
+    // relation.rb:125 `Relation#new(attributes, &block)` — aliased `build` on
+    // :133, so the conventions score the alias a second time against a
+    // constructor, and the only candidate that lines up is
+    // `ExplainProxy#initialize(relation, options)` (relation.rb:7) minus its
+    // receiver. Both signatures spell their own Rails identifiers.
+    expect(
+      compareParamNames([req("attributes")], [req("relation", "Relation"), req("options")]),
+    ).toEqual([]);
+    expect(
+      matchParamNamesAgainst(
+        [req("attributes")],
+        [[req("relation", "Relation"), req("options")]],
+      ),
+    ).toEqual({ aligned: false, rows: [] });
+  });
+
   it("skips a trailing callback ported from a bare yield", () => {
     expect(compareParamNames([req("value")], [req("value"), req("block")])).toEqual([]);
   });

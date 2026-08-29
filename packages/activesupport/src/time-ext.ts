@@ -326,14 +326,14 @@ export function advance(
   options = { ...options };
 
   if (options.weeks != null) {
-    const partialWeeks = options.weeks - Math.trunc(options.weeks);
-    options.weeks = Math.trunc(options.weeks);
+    const partialWeeks = options.weeks - Math.floor(options.weeks);
+    options.weeks = Math.floor(options.weeks);
     options.days = (options.days ?? 0) + 7 * partialWeeks;
   }
 
   if (options.days != null) {
-    const partialDays = options.days - Math.trunc(options.days);
-    options.days = Math.trunc(options.days);
+    const partialDays = options.days - Math.floor(options.days);
+    options.days = Math.floor(options.days);
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 

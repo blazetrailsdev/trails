@@ -157,21 +157,39 @@ function widenAnonymousSplat(rubyList: ParamInfo[], length: number): ParamInfo[]
 /** Every TS candidate form that lines up with `rubyList` position-for-position.
  *  Empty when none does — a length disagreement is arity's finding. */
 export function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): ParamInfo[][] {
+  return alignedTsFormsWithProvenance(rubyList, ts).map((f) => f.params);
+}
+
+/** A TS candidate form, and whether reaching it required DROPPING a parameter —
+ *  a leading receiver or a trailing ported `&block`. */
+interface TsForm {
+  params: ParamInfo[];
+  stripped: boolean;
+}
+
+function alignedTsFormsWithProvenance(rubyList: ParamInfo[], ts: ParamInfo[]): TsForm[] {
   if (rubyList.length === 0) return [];
   return tsForms(ts).filter(
-    (f) => f.length === rubyList.length || widenAnonymousSplat(rubyList, f.length) !== null,
+    (f) =>
+      f.params.length === rubyList.length ||
+      widenAnonymousSplat(rubyList, f.params.length) !== null,
   );
 }
 
 /** The TS candidate forms, in the order arity.ts tries them. */
-function tsForms(ts: ParamInfo[]): ParamInfo[][] {
+function tsForms(ts: ParamInfo[]): TsForm[] {
   const base = stripThis(ts);
   const noReceiver = base.length > 0 && isReceiverParam(base[0]) ? base.slice(1) : base;
   const stripCallback = (list: ParamInfo[]): ParamInfo[] =>
     list.length > 0 && TRAILING_CALLBACK_NAMES.has(list[list.length - 1].name)
       ? list.slice(0, -1)
       : list;
-  return [base, noReceiver, stripCallback(base), stripCallback(noReceiver)];
+  return [
+    { params: base, stripped: false },
+    { params: noReceiver, stripped: noReceiver !== base },
+    { params: stripCallback(base), stripped: false },
+    { params: stripCallback(noReceiver), stripped: noReceiver !== base },
+  ];
 }
 
 /**
@@ -181,30 +199,60 @@ function tsForms(ts: ParamInfo[]): ParamInfo[][] {
  * arity's finding, and reporting it twice would double-charge one divergence.
  */
 export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamNameMismatch[] {
+  return compareParamNamesWithProvenance(ruby, ts).rows;
+}
+
+/**
+ * As {@link compareParamNames}, plus whether a form that kept its LEADING
+ * parameter lined up at all. The receiver strip exists to ABSORB a port
+ * convention, and arity.ts states the contract it buys that with: a strip "can
+ * only ever gain a match, never manufacture a mismatch". Reading the surviving
+ * names off a receiver-stripped form breaks it, because that strip also SHIFTS
+ * every remaining position: `Relation#new(attributes)`
+ * (`relation.rb:125`) scored against `ExplainProxy#initialize(relation, options)`
+ * (`relation.rb:7`) — a different method, reachable only because dropping the
+ * `relation` receiver leaves a one-length form — reported `attributes` renamed
+ * to `options` while both signatures spell their own Rails identifiers.
+ *
+ * So a receiver-stripped form may still CLEAR a pair (its names match, which is
+ * the convention being absorbed), but never supplies the reported rows: with no
+ * receiver-keeping form aligned, the pair is left out of the parameter-name
+ * population entirely, the same way arity leaves out a pair that lines up under
+ * no form. The trailing-`&block` strip drops a TAIL and shifts nothing, so it
+ * reports like any other form.
+ */
+export function compareParamNamesWithProvenance(
+  ruby: ParamInfo[],
+  ts: ParamInfo[],
+): { aligned: boolean; rows: ParamNameMismatch[] } {
   let best: ParamNameMismatch[] | null = null;
+  let alignedUnstripped = false;
   // Several forms can align — `with_node(node)` against `withNode(node, block)`
   // lines up both as receiver-stripped `(block)` and as callback-stripped
   // `(node)`. The strips exist to ABSORB the port's conventions, so the reading
   // that absorbs the most is the honest one; taking the first would invent a
   // rename out of the very convention the strip is there to recognise.
   for (const base of rubyForms(ruby)) {
-    for (const form of alignedTsForms(base, ts)) {
-      const rubyList = form.length === base.length ? base : widenAnonymousSplat(base, form.length)!;
+    for (const form of alignedTsFormsWithProvenance(base, ts)) {
+      const rubyList =
+        form.params.length === base.length ? base : widenAnonymousSplat(base, form.params.length)!;
       const mismatches: ParamNameMismatch[] = [];
       for (let position = 0; position < rubyList.length; position++) {
         const rubyParam = rubyList[position];
-        const tsParam = form[position];
+        const tsParam = form.params[position];
         const expected = bareIdentifier(snakeToCamel(rubyParam.name));
         const actual = bareIdentifier(tsParam.name);
         if (expected === actual) continue;
         if (isLegitimateDifference(rubyParam, tsParam)) continue;
         mismatches.push({ position, ruby: expected, ts: actual });
       }
-      if (mismatches.length === 0) return [];
+      if (mismatches.length === 0) return { aligned: true, rows: [] };
+      if (form.stripped) continue;
+      alignedUnstripped = true;
       if (best === null || mismatches.length < best.length) best = mismatches;
     }
   }
-  return best ?? [];
+  return { aligned: alignedUnstripped, rows: best ?? [] };
 }
 
 export interface ParamNameVerdict {
@@ -232,9 +280,10 @@ export function matchParamNamesAgainst(
     // all (a 0-arg re-export binding sharing the name); letting it count as
     // clean would clear a real rename on the implementation beside it.
     if (forms.every((rl) => alignedTsForms(rl, c).length === 0)) continue;
-    const rows = compareParamNames(ruby, c);
-    if (rows.length === 0) return { aligned: true, rows: [] };
-    if (best === null || rows.length < best.length) best = rows;
+    const verdict = compareParamNamesWithProvenance(ruby, c);
+    if (!verdict.aligned) continue;
+    if (verdict.rows.length === 0) return { aligned: true, rows: [] };
+    if (best === null || verdict.rows.length < best.length) best = verdict.rows;
   }
   return best === null ? { aligned: false, rows: [] } : { aligned: true, rows: best };
 }
