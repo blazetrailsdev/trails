@@ -18,7 +18,6 @@ import {
   attributesForUpdate,
   attributesWithValues,
 } from "./attribute-methods.js";
-import { attributeNamesForPartialUpdates } from "./attribute-methods/dirty.js";
 import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isSuppressed } from "./suppressor.js";
@@ -1056,10 +1055,10 @@ export function _updateRow(
 /** @internal */
 async function instanceUpdateRecord(
   this: PersistenceInstanceChainHost,
+  attributeNames?: string[],
   block?: (record: any) => void,
 ): Promise<boolean> {
-  let attributeNames = attributeNamesForPartialUpdates.call(this as any);
-  attributeNames = attributesForUpdate.call(this as any, attributeNames);
+  attributeNames = attributesForUpdate.call(this as any, attributeNames ?? this.attributeNames());
 
   if (attributeNames.length === 0) {
     (this as any)._triggerUpdateCallback = true;

@@ -76,13 +76,17 @@ export async function _createRecord(
 }
 
 /** @internal */
-export async function _updateRecord(this: any, block?: (record: any) => void): Promise<boolean> {
+export async function _updateRecord(
+  this: any,
+  attributeNames?: string[],
+  block?: (record: any) => void,
+): Promise<boolean> {
   const ctor = this.constructor;
   return (
     (await runCallbacks(this, "update", () =>
       recordUpdateTimestamps.call(this, () =>
-        dirtyUpdateRecord.call(this, () =>
-          PersistenceInstanceMethods._updateRecord.call(this, block),
+        dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
+          PersistenceInstanceMethods._updateRecord.call(this, names, block),
         ),
       ),
     )) !== false
