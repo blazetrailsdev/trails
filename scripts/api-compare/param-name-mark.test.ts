@@ -14,23 +14,20 @@ import {
 
 const row = (pkg: string, rubyFile: string) => ({ package: pkg, rubyFile });
 
+const zeroed = (): ParamNameMarks =>
+  Object.fromEntries(GATED_PACKAGES.map((pkg) => [pkg, { total: 0, byFile: {} }]));
+
 describe("measure", () => {
   it("counts rows per gated package and per file", () => {
     expect(measure([row("arel", "a.rb"), row("arel", "a.rb"), row("arel", "b.rb")])).toEqual({
-      activemodel: { total: 0, byFile: {} },
-      activesupport: { total: 0, byFile: {} },
+      ...zeroed(),
       arel: { total: 3, byFile: { "a.rb": 2, "b.rb": 1 } },
     });
   });
 
   it("ignores rows from an ungated package, and reports zero with none", () => {
-    const empty = {
-      activemodel: { total: 0, byFile: {} },
-      activesupport: { total: 0, byFile: {} },
-      arel: { total: 0, byFile: {} },
-    };
-    expect(measure([])).toEqual(empty);
-    expect(measure([row("activerecord", "a.rb")])).toEqual(empty);
+    expect(measure([])).toEqual(zeroed());
+    expect(measure([row("activerecord", "a.rb")])).toEqual(zeroed());
   });
 });
 
