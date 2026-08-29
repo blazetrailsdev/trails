@@ -72,10 +72,6 @@ export function quoteString(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-export function quoteBinaryColumn(value: Buffer): string {
-  return `'\\x${value.toString("hex")}'`;
-}
-
 export function quoteTableNameForAssignment(_table: string, attr: string): string {
   return quoteColumnName(attr);
 }
