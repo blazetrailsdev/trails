@@ -187,11 +187,8 @@ export class DebugExceptions {
   logArray(logger: Logger, lines: string[], request: RackEnv): void {
     if (lines.length === 0) return;
     const level =
-      (request["action_dispatch.debug_exception_log_level"] as
-        | "error"
-        | "warn"
-        | "info"
-        | undefined) ?? this.logLevel;
+      (request["action_dispatch.debug_exception_log_level"] as typeof this.logLevel | undefined) ??
+      this.logLevel;
     const message = lines.join("\n");
     const fn =
       level === "warn"

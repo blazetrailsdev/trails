@@ -372,10 +372,10 @@ export class Mapper {
 
   namespace(
     path: string,
-    options: NamespaceOptions | MapperCallback = {},
+    options: (ScopeOptions & { path?: string }) | MapperCallback = {},
     callback?: MapperCallback,
   ): void {
-    const opts: NamespaceOptions = typeof options === "function" ? {} : options;
+    const opts = typeof options === "function" ? {} : options;
     const cb = typeof options === "function" ? options : callback;
     if (!cb) throw new Error("no block given (yield)");
     // Rails mapper.rb:1626-1632: inside a resource scope, namespace must go
@@ -386,8 +386,7 @@ export class Mapper {
       this.nested(() => this.namespace(path, opts, cb));
       return;
     }
-    // Rails mapper.rb:961-974 — `:path` names the URL segment, `:as` the
-    // name prefix, `:module` the controller namespace; each defaults to `path`.
+    // Rails mapper.rb:961-974 — `:path`, `:as` and `:module` each default to `path`.
     this.scopeStack.push({
       path: this.currentPrefix() + "/" + (opts.path ?? path),
       namePrefix: opts.as ?? path,
@@ -1543,10 +1542,6 @@ interface ScopeFrame {
 interface ScopeOptions {
   as?: string;
   module?: string;
-}
-
-interface NamespaceOptions extends ScopeOptions {
-  path?: string;
 }
 
 interface MountOptions extends RouteOptions {

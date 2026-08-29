@@ -14,8 +14,7 @@ import {
 
 const row = (pkg: string, rubyFile: string) => ({ package: pkg, rubyFile });
 
-const zeroed = (): ParamNameMarks =>
-  Object.fromEntries(GATED_PACKAGES.map((pkg) => [pkg, { total: 0, byFile: {} }]));
+const zeroed = () => Object.fromEntries(GATED_PACKAGES.map((p) => [p, { total: 0, byFile: {} }]));
 
 describe("measure", () => {
   it("counts rows per gated package and per file", () => {
