@@ -101,10 +101,7 @@ describe("compareParamNames", () => {
       compareParamNames([req("attributes")], [req("relation", "Relation"), req("options")]),
     ).toEqual([]);
     expect(
-      matchParamNamesAgainst(
-        [req("attributes")],
-        [[req("relation", "Relation"), req("options")]],
-      ),
+      matchParamNamesAgainst([req("attributes")], [[req("relation", "Relation"), req("options")]]),
     ).toEqual({ aligned: false, rows: [] });
   });
 
