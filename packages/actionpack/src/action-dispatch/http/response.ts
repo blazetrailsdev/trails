@@ -69,11 +69,11 @@ export class ResponseBuffer {
     return this.strBody;
   }
 
-  write(value: string): void {
+  write(string: string): void {
     if (this.closed) throw new Error("closed stream");
     this.strBody = null;
     this.response.commitBang();
-    this.buf.push(value);
+    this.buf.push(string);
   }
 
   *each(): IterableIterator<unknown> {
@@ -181,7 +181,7 @@ export class Response {
     return undefined;
   }
 
-  setHeader(key: string, value: string): void {
+  setHeader(key: string, v: string): void {
     // Headers are logically case-insensitive (Rack response semantics).
     // Clear any other-case entry so reads through `getHeader` / accessors
     // can't return a stale value written under a different case.
@@ -190,7 +190,7 @@ export class Response {
     for (const k of Object.keys(this._headers)) {
       if (k !== key && k.toLowerCase() === lower) delete this._headers[k];
     }
-    this._headers[key] = value;
+    this._headers[key] = v;
   }
 
   deleteHeader(key: string): void {
@@ -534,9 +534,9 @@ export class Response {
   // --- Content-type parsing (private in Rails) ---
 
   /** @internal Rails: `parse_content_type(str)`. */
-  parseContentType(value: string | undefined): ContentTypeHeader {
-    if (!value) return NULL_CONTENT_TYPE_HEADER;
-    const match = CONTENT_TYPE_PARSER.exec(value);
+  parseContentType(contentType: string | undefined): ContentTypeHeader {
+    if (!contentType) return NULL_CONTENT_TYPE_HEADER;
+    const match = CONTENT_TYPE_PARSER.exec(contentType);
     if (!match) return NULL_CONTENT_TYPE_HEADER;
     return {
       mimeType: match.groups?.["mime_type"]?.trim() || undefined,

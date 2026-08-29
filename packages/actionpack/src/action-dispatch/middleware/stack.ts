@@ -81,30 +81,28 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(index, 0, { klass, args });
   }
 
-  insertBefore(target: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
-    const idx = this.findIndex(target);
+  insertBefore(index: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
+    const idx = this.findIndex(index);
     if (idx === -1) throw new Error("No such middleware to insert before");
     this.entries.splice(idx, 0, { klass, args });
   }
 
-  insertAfter(
-    target: MiddlewareFactory | number,
-    klass: MiddlewareFactory,
-    ...args: unknown[]
-  ): void {
-    if (typeof target === "number") {
-      this.entries.splice(target + 1, 0, { klass, args });
+  insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
+    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
+    if (typeof index === "number") {
+      this.entries.splice(index + 1, 0, { klass, args: rest });
     } else {
-      const idx = this.findIndex(target);
+      const idx = this.findIndex(index);
       if (idx === -1) throw new Error("No such middleware to insert after");
-      this.entries.splice(idx + 1, 0, { klass, args });
+      this.entries.splice(idx + 1, 0, { klass, args: rest });
     }
   }
 
-  swap(target: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
+  swap(target: MiddlewareFactory, ...args: unknown[]): void {
+    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
     const idx = this.findIndex(target);
     if (idx === -1) throw new Error("No such middleware to swap");
-    this.entries[idx] = { klass, args };
+    this.entries[idx] = { klass, args: rest };
   }
 
   delete(target: MiddlewareFactory): void {

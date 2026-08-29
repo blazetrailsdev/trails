@@ -23,19 +23,19 @@ export class UploadedFile {
   private _content: Buffer | null;
   private _closed: boolean = false;
 
-  constructor(options: UploadedFileOptions = {}) {
-    if (!options.tempfile && options.content == null) {
+  constructor(hash: UploadedFileOptions = {}) {
+    if (!hash.tempfile && hash.content == null) {
       throw new Error("ArgumentError: either :tempfile or :content is required");
     }
-    this.originalFilename = options.filename ?? "";
-    this.contentType = options.type ?? "application/octet-stream";
-    this.headers = options.head ?? "";
-    this._tempfile = options.tempfile ?? null;
+    this.originalFilename = hash.filename ?? "";
+    this.contentType = hash.type ?? "application/octet-stream";
+    this.headers = hash.head ?? "";
+    this._tempfile = hash.tempfile ?? null;
     this._content =
-      options.content != null
-        ? Buffer.isBuffer(options.content)
-          ? options.content
-          : Buffer.from(options.content)
+      hash.content != null
+        ? Buffer.isBuffer(hash.content)
+          ? hash.content
+          : Buffer.from(hash.content)
         : null;
   }
 
@@ -87,8 +87,8 @@ export class UploadedFile {
   }
 
   /** Close the file handle. */
-  close(unlink?: boolean): void {
-    if (unlink && this._tempfile) {
+  close(unlinkNow = false): void {
+    if (unlinkNow && this._tempfile) {
       const tempPath = this._tempfile;
       try {
         getFs().unlinkSync(tempPath);

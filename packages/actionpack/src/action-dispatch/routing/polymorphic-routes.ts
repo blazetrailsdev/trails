@@ -217,10 +217,10 @@ export function polymorphicPathForAction(
 
 /** @internal Rails-private helper. */
 export function polymorphicMapping(
-  host: PolymorphicHost,
+  target: PolymorphicHost,
   record: unknown,
 ): PolymorphicMappingEntry | undefined {
-  const mappings = host._routes.polymorphicMappings;
+  const mappings = target._routes.polymorphicMappings;
   if (!mappings) return undefined;
   if (isToModel(record)) {
     return mappings.get(record.toModel().modelName.name);

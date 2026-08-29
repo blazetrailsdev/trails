@@ -268,8 +268,8 @@ export class ExceptionWrapper {
     return STATUS_MAP[exceptionName] ?? 500;
   }
 
-  static statusCodeForException(exceptionName: string): number {
-    return ExceptionWrapper.statusCodeFor(exceptionName);
+  static statusCodeForException(className: string): number {
+    return ExceptionWrapper.statusCodeFor(className);
   }
 
   static rescueResponse(exceptionName: string): boolean {
@@ -354,12 +354,12 @@ export class ExceptionWrapper {
    * trace getters stay distinct, then let the cleaner post-process the slice.
    * @internal
    */
-  cleanBacktrace(kind: "silent" | "noise" | "all"): string[] {
+  cleanBacktrace(args: "silent" | "noise" | "all"): string[] {
     const lines = this.backtrace();
     const partitioned =
-      kind === "silent"
+      args === "silent"
         ? lines.filter((l) => !l.includes("node_modules"))
-        : kind === "noise"
+        : args === "noise"
           ? lines.filter((l) => l.includes("node_modules"))
           : lines;
     return this.backtraceCleaner ? this.backtraceCleaner.clean(partitioned) : partitioned;
@@ -383,8 +383,8 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  sourceFragment(file: string, line: number): Record<number, string> | null {
-    const full = getPath().resolve(getFs().cwd(), file);
+  sourceFragment(path: string, line: number): Record<number, string> | null {
+    const full = getPath().resolve(getFs().cwd(), path);
     if (!getFs().existsSync(full)) return null;
     try {
       const lines = getFs().readFileSync(full, "utf8").split(/\r?\n/);

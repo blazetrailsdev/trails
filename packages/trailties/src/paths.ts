@@ -114,8 +114,8 @@ export class Path {
     return this._eagerLoad;
   }
 
-  push(p: string): void {
-    this._paths.push(p);
+  push(path: string): void {
+    this._paths.push(path);
   }
   toAry(): string[] {
     return this._paths;

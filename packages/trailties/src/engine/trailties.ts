@@ -14,8 +14,8 @@ export class Trailties implements Iterable<Trailtie> {
     return this.all[Symbol.iterator]();
   }
   /** Mirrors Ruby `Enumerable#each`. */
-  each(fn: (t: Trailtie) => void): this {
-    for (const t of this.all) fn(t);
+  each(args: (t: Trailtie) => void): this {
+    for (const t of this.all) args(t);
     return this;
   }
   /** Mirrors Ruby `Array#-`. */

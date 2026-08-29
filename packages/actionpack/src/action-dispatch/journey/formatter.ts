@@ -25,7 +25,7 @@ export class RouteWithParams {
   ) {}
 
   /** Rails `path(_)` — argument unused, kept for parity with MissingRoute. */
-  path(_methodName?: string): string {
+  path(_?: string): string {
     return this._route.format(this._parameterizedParts);
   }
 }

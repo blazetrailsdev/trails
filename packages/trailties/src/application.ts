@@ -245,8 +245,8 @@ export class Application extends Engine {
 
   /** Raw 64-byte derived key — Rails feeds `generate_key(salt)` bytes to
    * HMAC, not hex; required for signed-cookie compatibility. */
-  messageVerifier(name: string): MessageVerifier {
-    return new MessageVerifier(this.keyGenerator().generateKey(name));
+  messageVerifier(verifierName: string): MessageVerifier {
+    return new MessageVerifier(this.keyGenerator().generateKey(verifierName));
   }
 
   async credentials(): Promise<EncryptedFile> {
@@ -258,16 +258,16 @@ export class Application extends Engine {
     }));
   }
 
-  /** `contentPath` matches Rails' `encrypted(path, ...)` arg — absolute or
-   * root-relative; both flow through Rails.root.join / path.resolve. */
+  /** `path` is absolute or root-relative; both flow through
+   * Rails.root.join / path.resolve. */
   async encrypted(
-    contentPath: string,
+    path: string,
     opts: { keyPath?: string; envKey?: string } = {},
   ): Promise<EncryptedFile> {
     const p = await getPathAsync();
     const root = await this.resolvedRoot();
     return new EncryptedFile({
-      contentPath: p.resolve(root, contentPath),
+      contentPath: p.resolve(root, path),
       keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
       envKey: opts.envKey ?? "RAILS_MASTER_KEY",
       raiseIfMissingKey: this.config.requireMasterKey,

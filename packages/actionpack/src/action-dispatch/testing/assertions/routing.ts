@@ -39,15 +39,15 @@ export function setup(this: RoutingAssertionsHost): void {
  */
 export function withRouting<T>(
   this: RoutingAssertionsHost,
-  configOrBlock: unknown,
+  config: unknown,
   block?: (routes: RouteSet) => T,
 ): T {
   let cb: (routes: RouteSet) => T;
-  let config: unknown;
-  if (typeof configOrBlock === "function") {
-    cb = configOrBlock as (routes: RouteSet) => T;
+  let configHash: unknown;
+  if (typeof config === "function") {
+    cb = config as (routes: RouteSet) => T;
   } else {
-    config = configOrBlock;
+    configHash = config;
     if (typeof block !== "function") {
       throw new TypeError("withRouting requires a callback block");
     }
@@ -65,7 +65,7 @@ export function withRouting<T>(
     result = createRoutes.call<RoutingAssertionsHost, [(r: RouteSet) => T, unknown], T>(
       this,
       cb,
-      config,
+      configHash,
     );
   } catch (e) {
     restore();
@@ -282,14 +282,14 @@ export function resetRoutes(
  * the caller-supplied `message` (or the original message when omitted).
  */
 export function failOn<T>(
-  ExceptionClass: new (...args: never[]) => Error,
+  exceptionClass: new (...args: never[]) => Error,
   message: string | undefined,
   block: () => T,
 ): T {
   try {
     return block();
   } catch (e) {
-    if (e instanceof ExceptionClass) {
+    if (e instanceof exceptionClass) {
       throw new Error(message ?? e.message, { cause: e });
     }
     throw e;

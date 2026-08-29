@@ -43,8 +43,9 @@ export function normalizeModelName(
 
 const isPlural = (n: string): boolean => n === pluralize(n) && singularize(n) !== pluralize(n);
 const isIrregular = (n: string): boolean => singularize(n) !== singularize(pluralize(n));
-const isInflectionImpossible = (n: string): boolean =>
-  n !== underscore(n) && underscore(singularize(n)) !== singularize(underscore(pluralize(n)));
+const isInflectionImpossible = (name: string): boolean =>
+  name !== underscore(name) &&
+  underscore(singularize(name)) !== singularize(underscore(pluralize(name)));
 const fmt = (t: string, ...a: string[]): string => {
   let i = 0;
   return t.replace(/%s/g, () => a[i++] ?? "");

@@ -71,33 +71,33 @@ export function rake(
 
 function executeCommand(
   host: ActionsHost,
-  name: string,
+  executor: string,
   command: string,
-  opts: RakeOptions,
+  options: RakeOptions,
 ): string | undefined {
   // Mirrors Rails' RAILS_ENV resolution but defaults from TRAILS_ENV
   // (the trailties runtime convention, see database.ts:resolveEnv). Set
   // both vars in the spawned env: TRAILS_ENV for trails children, plus
   // RAILS_ENV so a literal `rake` task that reads RAILS_ENV still works.
-  const envName = opts.env ?? processEnv.TRAILS_ENV ?? processEnv.RAILS_ENV ?? "development";
+  const envName = options.env ?? processEnv.TRAILS_ENV ?? processEnv.RAILS_ENV ?? "development";
   const parts: string[] = [];
-  if (opts.sudo) parts.push("sudo");
-  parts.push(name, ...splitArgs(command));
+  if (options.sudo) parts.push("sudo");
+  parts.push(executor, ...splitArgs(command));
   const [bin, ...args] = parts;
-  host.output(`          ${name}  ${command}`);
+  host.output(`          ${executor}  ${command}`);
   const result = getChildProcess().spawnSync(bin, args, {
     cwd: host.cwd,
     env: { ...processEnv, TRAILS_ENV: envName, RAILS_ENV: envName } as NodeJS.ProcessEnv,
   });
-  if (opts.abortOnFailure && (result.status !== 0 || result.error)) {
+  if (options.abortOnFailure && (result.status !== 0 || result.error)) {
     const detail = result.error
       ? `: ${result.error.message}`
       : result.signal
         ? ` signal ${result.signal}`
         : ` exit status ${result.status}`;
-    throw new Error(`${name} ${command} aborted${detail}`);
+    throw new Error(`${executor} ${command} aborted${detail}`);
   }
-  if (opts.capture) return result.stdout;
+  if (options.capture) return result.stdout;
   return undefined;
 }
 

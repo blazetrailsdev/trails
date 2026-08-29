@@ -30,7 +30,8 @@ let tags: string[] = [...DEFAULT_TAGS];
 let extensions: Array<{ test: RegExp; builder: ExtensionBuilder }> = [];
 
 export const registerDirectories = (...dirs: string[]): void => void directories.push(...dirs);
-export const registerTags = (...t: string[]): void => void tags.push(...t);
+export const registerTags = (...additionalTags: string[]): void =>
+  void tags.push(...additionalTags);
 export const registerExtensions = (exts: string[], builder: ExtensionBuilder): void =>
   void extensions.push({ test: new RegExp(`\\.(${exts.join("|")})$`), builder });
 

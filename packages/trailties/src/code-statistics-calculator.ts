@@ -77,11 +77,11 @@ export class CodeStatisticsCalculator {
     public methods = 0,
   ) {}
 
-  add(other: CodeStatisticsCalculator): void {
-    this.lines += other.lines;
-    this.codeLines += other.codeLines;
-    this.classes += other.classes;
-    this.methods += other.methods;
+  add(codeStatisticsCalculator: CodeStatisticsCalculator): void {
+    this.lines += codeStatisticsCalculator.lines;
+    this.codeLines += codeStatisticsCalculator.codeLines;
+    this.classes += codeStatisticsCalculator.classes;
+    this.methods += codeStatisticsCalculator.methods;
   }
 
   async addByFilePath(filePath: string, readFile: (p: string) => Promise<string>): Promise<void> {

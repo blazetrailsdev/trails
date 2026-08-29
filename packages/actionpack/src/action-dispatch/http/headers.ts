@@ -68,8 +68,8 @@ export class Headers {
   }
 
   /** Rails `merge!(other)` — mutating merge. Alias of `mergeInPlace`. */
-  mergeBang(other: Record<string, unknown>): this {
-    return this.mergeInPlace(other);
+  mergeBang(headersOrEnv: Record<string, unknown>): this {
+    return this.mergeInPlace(headersOrEnv);
   }
 
   /**
@@ -93,11 +93,11 @@ export class Headers {
     }
   }
 
-  fetch(key: string, ...args: unknown[]): unknown {
+  fetch(key: string, ...defaultValue: unknown[]): unknown {
     const envKey = envName(String(key));
     if (envKey in this._env) return this._env[envKey];
-    if (args.length > 0) {
-      const fallback = args[0];
+    if (defaultValue.length > 0) {
+      const fallback = defaultValue[0];
       if (typeof fallback === "function") return (fallback as () => unknown)();
       return fallback;
     }
@@ -110,9 +110,9 @@ export class Headers {
     }
   }
 
-  merge(other: Record<string, unknown>): Headers {
+  merge(headersOrEnv: Record<string, unknown>): Headers {
     const newEnv = { ...this._env };
-    for (const [key, value] of Object.entries(other)) {
+    for (const [key, value] of Object.entries(headersOrEnv)) {
       newEnv[envName(String(key))] = value;
     }
     return new Headers(newEnv);

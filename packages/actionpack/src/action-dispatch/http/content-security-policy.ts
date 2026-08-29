@@ -141,33 +141,33 @@ export class ContentSecurityPolicy {
   navigateTo(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("navigate-to", sources);
   }
-  sandbox(...sources: CSPSourceOrClear[]): this {
+  sandbox(...values: CSPSourceOrClear[]): this {
     // Rails: empty `*values` → bare directive (stored as `true`); `values.first`
     // nil/false → delete. Ruby truthiness only treats nil/false as falsy —
     // empty strings stay truthy.
-    if (sources.length === 0) {
+    if (values.length === 0) {
       this.directives.set("sandbox", true);
       return this;
     }
-    const first = sources[0];
+    const first = values[0];
     if (first === false || first == null) {
       this.directives.delete("sandbox");
       return this;
     }
-    return this.setDirective("sandbox", sources as CSPSource[]);
+    return this.setDirective("sandbox", values as CSPSource[]);
   }
-  pluginTypes(...sources: CSPSourceOrClear[]): this {
+  pluginTypes(...types: CSPSourceOrClear[]): this {
     // Rails: `if types.first` — only nil/false delete (Ruby truthiness, so
     // empty string stays truthy and is passed through to the directive).
-    const first = sources[0];
+    const first = types[0];
     if (first === false || first == null) {
       this.directives.delete("plugin-types");
       return this;
     }
-    return this.setDirective("plugin-types", sources as CSPSource[]);
+    return this.setDirective("plugin-types", types as CSPSource[]);
   }
-  reportUri(...sources: CSPSourceOrClear[]): this {
-    return this.setDirective("report-uri", sources);
+  reportUri(uri: CSPSource): this {
+    return this.setDirective("report-uri", [uri]);
   }
   reportTo(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("report-to", sources);
@@ -190,8 +190,8 @@ export class ContentSecurityPolicy {
     this.directives.set("upgrade-insecure-requests", true);
     return this;
   }
-  requireSriFor(...sources: CSPSourceOrClear[]): this {
-    return this.setDirective("require-sri-for", sources);
+  requireSriFor(...types: CSPSourceOrClear[]): this {
+    return this.setDirective("require-sri-for", types);
   }
   requireTrustedTypesFor(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("require-trusted-types-for", sources);
@@ -222,9 +222,9 @@ export class ContentSecurityPolicy {
 
   // --- Build ---
 
-  build(request?: unknown, nonce?: string, nonceDirectives?: readonly string[]): string {
+  build(context?: unknown, nonce?: string, nonceDirectives?: readonly string[]): string {
     const nonceDirs = nonceDirectives ?? DEFAULT_NONCE_DIRECTIVES;
-    return this.buildDirectives(request, nonce, nonceDirs)
+    return this.buildDirectives(context, nonce, nonceDirs)
       .filter((p): p is string => p != null)
       .join("; ");
   }

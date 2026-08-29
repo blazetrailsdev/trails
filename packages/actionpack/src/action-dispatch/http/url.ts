@@ -63,7 +63,7 @@ function extractSubdomainsFrom(host: string, tldLength: number): string[] {
 }
 
 /** @internal */
-function addParams(parts: string[], params: unknown): void {
+function addParams(path: string[], params: unknown): void {
   let hash: Record<string, unknown>;
   if (params && typeof params === "object" && !Array.isArray(params)) {
     hash = { ...(params as Record<string, unknown>) };
@@ -74,14 +74,14 @@ function addParams(parts: string[], params: unknown): void {
     if (toParam(hash[k]) === null) delete hash[k];
   }
   const query = toQuery(hash);
-  if (query.length > 0) parts.push(`?${query}`);
+  if (query.length > 0) path.push(`?${query}`);
 }
 
 /** @internal */
-function addAnchor(parts: string[], anchor: unknown): void {
+function addAnchor(path: string[], anchor: unknown): void {
   if (anchor !== null && anchor !== undefined && anchor !== false) {
     const p = toParam(anchor);
-    parts.push(`#${escapeFragment(String(p ?? ""))}`);
+    path.push(`#${escapeFragment(String(p ?? ""))}`);
   }
 }
 
@@ -99,8 +99,8 @@ function normalizeProtocol(protocol: string | false | null | undefined): string 
 }
 
 /** @internal */
-function normalizeHost(rawHost: string, options: UrlOptions): string {
-  if (!namedHost(rawHost)) return rawHost;
+function normalizeHost(_host: string, options: UrlOptions): string {
+  if (!namedHost(_host)) return _host;
 
   const tldLength = options.tldLength ?? URL.tldLength;
   const subdomain = options.subdomain ?? true;
@@ -108,13 +108,13 @@ function normalizeHost(rawHost: string, options: UrlOptions): string {
 
   let host = "";
   if (subdomain === true) {
-    if (domain === null || domain === undefined) return rawHost;
-    host += extractSubdomainsFrom(rawHost, tldLength).join(".");
+    if (domain === null || domain === undefined) return _host;
+    host += extractSubdomainsFrom(_host, tldLength).join(".");
   } else if (subdomain) {
     host += String(toParam(subdomain) ?? "");
   }
   if (host.length > 0) host += ".";
-  host += domain ?? extractDomainFrom(rawHost, tldLength);
+  host += domain ?? extractDomainFrom(_host, tldLength);
   return host;
 }
 
@@ -132,16 +132,12 @@ function normalizePort(
 
 /** @internal */
 function buildHostUrl(
-  hostIn: string,
-  portIn: number | string | null | undefined,
-  protocolIn: string | false | null | undefined,
+  host: string,
+  port: number | string | null | undefined,
+  protocol: string | false | null | undefined,
   options: UrlOptions,
   path: string,
 ): string {
-  let host = hostIn;
-  let port = portIn;
-  let protocol = protocolIn;
-
   const match = host.match(HOST_REGEXP);
   if (match) {
     if (protocol !== false && (protocol === null || protocol === undefined)) {

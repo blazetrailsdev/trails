@@ -117,11 +117,10 @@ export class FlashHash {
   private _keep: Set<string> = new Set();
   private _now: Map<string, unknown> = new Map();
 
-  constructor(flashes?: Record<string, unknown>) {
-    if (flashes) {
-      for (const [k, v] of Object.entries(flashes)) {
-        this._flashes.set(k, v);
-      }
+  constructor(flashes: Record<string, unknown> = {}, discard: readonly string[] = []) {
+    for (const k of discard) this._discard.add(k);
+    for (const [k, v] of Object.entries(flashes)) {
+      this._flashes.set(k, v);
     }
   }
 
@@ -192,10 +191,10 @@ export class FlashHash {
     this._now.set(key, value);
   }
 
-  keep(key?: string): Record<string, unknown> {
-    if (key) {
-      this._keep.add(key);
-      this._discard.delete(key);
+  keep(k?: string): Record<string, unknown> {
+    if (k) {
+      this._keep.add(k);
+      this._discard.delete(k);
     } else {
       for (const k of this._flashes.keys()) {
         this._keep.add(k);
@@ -205,10 +204,10 @@ export class FlashHash {
     return this.toHash();
   }
 
-  discard(key?: string): Record<string, unknown> {
-    if (key) {
-      this._discard.add(key);
-      this._keep.delete(key);
+  discard(k?: string): Record<string, unknown> {
+    if (k) {
+      this._discard.add(k);
+      this._keep.delete(k);
     } else {
       for (const k of this._flashes.keys()) {
         this._discard.add(k);
@@ -241,15 +240,15 @@ export class FlashHash {
     this._now.clear();
   }
 
-  replace(hash: Record<string, unknown>): void {
+  replace(h: Record<string, unknown>): void {
     this._flashes.clear();
-    for (const [k, v] of Object.entries(hash)) {
+    for (const [k, v] of Object.entries(h)) {
       this._flashes.set(k, v);
     }
   }
 
-  update(hash: Record<string, unknown>): void {
-    for (const [k, v] of Object.entries(hash)) {
+  update(h: Record<string, unknown>): void {
+    for (const [k, v] of Object.entries(h)) {
       this.set(k, v);
     }
   }

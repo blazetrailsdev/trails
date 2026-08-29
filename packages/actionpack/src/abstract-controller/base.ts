@@ -334,8 +334,8 @@ export class AbstractController {
 
   /** Rails `available_action?` — `action` is a real method or covered by
    * `actionMissing`. */
-  isAvailableAction(action: string): boolean {
-    return this._findActionName(action) !== undefined;
+  isAvailableAction(actionName: string): boolean {
+    return this._findActionName(actionName) !== undefined;
   }
 
   /**

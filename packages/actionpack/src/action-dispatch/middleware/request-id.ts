@@ -24,7 +24,8 @@ export class RequestId {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const requestId = this.makeRequestId(env);
+    const headerKey = `HTTP_${this.header.toUpperCase().replace(/-/g, "_")}`;
+    const requestId = this.makeRequestId(env[headerKey] as string | undefined);
     env["action_dispatch.request_id"] = requestId;
 
     const [status, headers, body] = await this.app(env);
@@ -32,11 +33,9 @@ export class RequestId {
     return [status, headers, body];
   }
 
-  private makeRequestId(env: RackEnv): string {
-    const headerKey = `HTTP_${this.header.toUpperCase().replace(/-/g, "_")}`;
-    const existing = env[headerKey] as string | undefined;
-    if (existing != null && existing !== "") {
-      return existing.replace(/[^\w\-@]/g, "").slice(0, 255);
+  private makeRequestId(requestId: string | undefined): string {
+    if (requestId != null && requestId !== "") {
+      return requestId.replace(/[^\w\-@]/g, "").slice(0, 255);
     }
     return this.internalRequestId();
   }

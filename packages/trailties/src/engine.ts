@@ -56,7 +56,7 @@ export class Engine extends Trailtie {
   static async findRootWithFlag(
     flag: string,
     rootPath: string | undefined,
-    fallback?: string,
+    defaultValue?: string,
   ): Promise<string> {
     const p = await getPathAsync();
     const fs = await getFsAsync();
@@ -68,7 +68,7 @@ export class Engine extends Trailtie {
       const parent = p.dirname(rootPath);
       rootPath = parent !== rootPath ? parent : undefined;
     }
-    const found = rootPath && (await fs.exists(p.join(rootPath, flag))) ? rootPath : fallback;
+    const found = rootPath && (await fs.exists(p.join(rootPath, flag))) ? rootPath : defaultValue;
     if (!found) throw new Error(`Could not find root path for ${this.name}`);
     return await realpathOr(fs, found);
   }

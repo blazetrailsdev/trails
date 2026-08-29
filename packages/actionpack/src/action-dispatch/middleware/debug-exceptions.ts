@@ -58,8 +58,8 @@ export class DebugExceptions {
    * Append an interceptor to the class-level registry. Mirrors Rails'
    * `DebugExceptions.register_interceptor`.
    */
-  static registerInterceptor(interceptor: Interceptor): void {
-    DebugExceptions.interceptors.push(interceptor);
+  static registerInterceptor(object: Interceptor): void {
+    DebugExceptions.interceptors.push(object);
   }
 
   private app: RackApp;
@@ -90,12 +90,12 @@ export class DebugExceptions {
    *
    * @internal
    */
-  invokeInterceptors(env: RackEnv, exception: Error, wrapper: ExceptionWrapper): void {
+  invokeInterceptors(request: RackEnv, exception: Error, wrapper: ExceptionWrapper): void {
     for (const interceptor of this.interceptors) {
       try {
-        interceptor(env, exception);
+        interceptor(request, exception);
       } catch {
-        this.logError(env, wrapper);
+        this.logError(request, wrapper);
       }
     }
   }
@@ -143,18 +143,18 @@ export class DebugExceptions {
    *
    * @internal
    */
-  logError(env: RackEnv, wrapper: ExceptionWrapper): void {
+  logError(request: RackEnv, wrapper: ExceptionWrapper): void {
     // Rails: `request.logger || ActionView::Base.logger || stderr_logger`.
     // trails' `request.logger` reads `action_dispatch.logger` then
     // `rack.logger` (http/request.ts:480) — mirror that here, then fall
     // back to the constructor option, then the stderr logger so errors
     // are never silently swallowed.
     const logger =
-      (env["action_dispatch.logger"] as Logger | undefined) ??
-      (env["rack.logger"] as Logger | undefined) ??
+      (request["action_dispatch.logger"] as Logger | undefined) ??
+      (request["rack.logger"] as Logger | undefined) ??
       this.logger ??
       this.stderrLogger();
-    if (!this.isLogRescuedResponses(env) && wrapper.statusCode < 500) return;
+    if (!this.isLogRescuedResponses(request) && wrapper.statusCode < 500) return;
 
     const lines: string[] = ["  "];
     if (wrapper.hasCause()) {
@@ -175,7 +175,7 @@ export class DebugExceptions {
       lines.push("  ");
       lines.push(...cause.exceptionTrace());
     }
-    this.logArray(logger, lines, env);
+    this.logArray(logger, lines, request);
   }
 
   /**
@@ -184,10 +184,10 @@ export class DebugExceptions {
    *
    * @internal
    */
-  logArray(logger: Logger, lines: string[], env: RackEnv): void {
+  logArray(logger: Logger, lines: string[], request: RackEnv): void {
     if (lines.length === 0) return;
     const level =
-      (env["action_dispatch.debug_exception_log_level"] as "error" | "warn" | "info" | undefined) ??
+      (request["action_dispatch.debug_exception_log_level"] as typeof this.logLevel | undefined) ??
       this.logLevel;
     const message = lines.join("\n");
     const fn =
@@ -222,7 +222,7 @@ export class DebugExceptions {
    *
    * @internal
    */
-  routesInspector(_wrapper: ExceptionWrapper): unknown {
+  routesInspector(_exception: ExceptionWrapper): unknown {
     // The `@routes_app` constructor argument from Rails isn't plumbed
     // through trails' DebugExceptions yet — there is no routes_app to
     // ask for `.routes`. Return null until the wiring lands.
@@ -242,8 +242,8 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  isLogRescuedResponses(env: RackEnv): boolean {
-    const flag = env["action_dispatch.log_rescued_responses"];
+  isLogRescuedResponses(request: RackEnv): boolean {
+    const flag = request["action_dispatch.log_rescued_responses"];
     return flag === undefined ? this.logRescuedResponses : Boolean(flag);
   }
 

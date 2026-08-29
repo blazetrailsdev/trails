@@ -1,4 +1,16 @@
 {
+  "abstractcontroller": {
+    "total": 0,
+    "byFile": {}
+  },
+  "actiondispatch": {
+    "total": 5,
+    "byFile": {
+      "http/headers.rb": 1,
+      "http/request.rb": 1,
+      "middleware/stack.rb": 3
+    }
+  },
   "activemodel": {
     "total": 0,
     "byFile": {}
@@ -8,6 +20,18 @@
     "byFile": {}
   },
   "arel": {
+    "total": 0,
+    "byFile": {}
+  },
+  "did-you-mean": {
+    "total": 0,
+    "byFile": {}
+  },
+  "globalid": {
+    "total": 0,
+    "byFile": {}
+  },
+  "trailties": {
     "total": 0,
     "byFile": {}
   }

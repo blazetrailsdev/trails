@@ -9,8 +9,8 @@ export interface SpellCheckerOptions {
 }
 
 /** @internal */
-function normalize(input: string): string {
-  return input.toLowerCase().replaceAll("@", "");
+function normalize(strOrSymbol: string): string {
+  return strOrSymbol.toLowerCase().replaceAll("@", "");
 }
 
 /** @internal */

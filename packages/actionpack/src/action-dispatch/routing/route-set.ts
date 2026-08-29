@@ -289,31 +289,35 @@ export class UrlHelpersModule {
     return this._proxy.routeFor(name, ...args);
   }
   /** Rails singleton: `def polymorphic_url(record_or_hash_or_array, options = {})`. */
-  polymorphicUrl(record: PolymorphicArg, options: PolymorphicOptions = {}): string {
-    return polymorphicUrlFn.call(this._proxy as unknown as PolymorphicHost, record, options);
+  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
+    return polymorphicUrlFn.call(
+      this._proxy as unknown as PolymorphicHost,
+      recordOrHashOrArray,
+      options,
+    );
   }
   /** Rails singleton: `def polymorphic_path(record_or_hash_or_array, options = {})`. */
-  polymorphicPath(record: PolymorphicArg, options: PolymorphicOptions = {}): string {
-    return polymorphicUrlFn.call(this._proxy as unknown as PolymorphicHost, record, {
+  polymorphicPath(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
+    return polymorphicUrlFn.call(this._proxy as unknown as PolymorphicHost, recordOrHashOrArray, {
       ...options,
       onlyPath: true,
     });
   }
   /** @internal Rails-private polymorphic helper exposed through the proxy. */
   polymorphicUrlForAction(
-    record: PolymorphicArg,
     action: string,
+    recordOrHash: PolymorphicArg,
     options: PolymorphicOptions = {},
   ): string {
-    return this.polymorphicUrl(record, { ...options, action });
+    return this.polymorphicUrl(recordOrHash, { ...options, action });
   }
   /** @internal Rails-private polymorphic helper exposed through the proxy. */
   polymorphicPathForAction(
-    record: PolymorphicArg,
     action: string,
+    recordOrHash: PolymorphicArg,
     options: PolymorphicOptions = {},
   ): string {
-    return this.polymorphicPath(record, { ...options, action });
+    return this.polymorphicPath(recordOrHash, { ...options, action });
   }
   /**
    * @internal Rails-private polymorphic helper — delegates to the shared
@@ -694,14 +698,14 @@ export class RouteSet {
    * Rails: `add_route(mapping, name)`. Trails' Mapper builds {@link Route}
    * instances directly, so the first argument here is a Route.
    */
-  addRoute(route: Route, name?: string | null): Route {
+  addRoute(mapping: Route, name?: string | null): Route {
     if (name && !ROUTE_NAME_RE.test(name)) {
       throw new Error(`Invalid route name: '${name}'`);
     }
-    this.routes.push(route);
-    if (name) this.namedRoutes.set(name, route);
+    this.routes.push(mapping);
+    if (name) this.namedRoutes.set(name, mapping);
     this._journeyRouter = null;
-    return route;
+    return mapping;
   }
 
   /** Rails: `add_polymorphic_mapping(klass, options, &block)`. */
@@ -793,8 +797,8 @@ export class RouteSet {
     return routeForFn.call(this as unknown as UrlForHost, name, ...args);
   }
 
-  polymorphicUrl(record: PolymorphicArg, options: PolymorphicOptions = {}): string {
-    return polymorphicUrlFn.call(this as unknown as PolymorphicHost, record, options);
+  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
+    return polymorphicUrlFn.call(this as unknown as PolymorphicHost, recordOrHashOrArray, options);
   }
 
   /** @internal Rails: `private def _with_routes(routes)`. Sync only. */
@@ -867,9 +871,9 @@ export class RouteSet {
   /** Mirrors Rails' `RouteSet#recognize_path` shape for `assert_recognizes`. */
   recognizePath(
     path: string,
-    options: { method?: string | null; extras?: Record<string, unknown> } = {},
+    environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
-    const method = String(options.method ?? "GET").toUpperCase();
+    const method = String(environment.method ?? "GET").toUpperCase();
     const matched = this.recognize(method, path);
     if (!matched) {
       throw new RoutingError(`No route matches [${method}] ${JSON.stringify(path)}`);
@@ -881,7 +885,7 @@ export class RouteSet {
       controller: matched.route.controller,
       action: matched.route.action,
       ...matched.params,
-      ...(options.extras ?? {}),
+      ...(environment.extras ?? {}),
     };
   }
 
@@ -894,7 +898,7 @@ export class RouteSet {
    */
   generateExtras(
     options: Record<string, unknown>,
-    defaults: Record<string, unknown> = {},
+    recall: Record<string, unknown> = {},
   ): [string, string[]] {
     // Rails: `route_key = options.delete :use_route` — when present, look
     // the route up by its named-route key, mirroring `RouteSet#generate`.
@@ -926,7 +930,7 @@ export class RouteSet {
     const path = route.pathFor(captureParams as Record<string, string | number>);
     // Mirrors Rails' `generate_extras`: extras are the keys of `options`
     // not consumed by the route. Keys present in the route's `defaults`
-    // (and the caller-supplied `defaults`/recall hash) are consumed too,
+    // (and the caller-supplied `recall` hash) are consumed too,
     // so callers can pass e.g. `format: "json"` without it surfacing as a
     // query-string extra when the route already pins it.
     const routeDefaults = route.defaults as Record<string, unknown>;
@@ -939,7 +943,7 @@ export class RouteSet {
       // path can't represent the conflicting value.
       const v = options[k];
       if (Object.hasOwn(routeDefaults, k) && routeDefaults[k] === v) continue;
-      if (Object.hasOwn(defaults, k) && defaults[k] === v) continue;
+      if (Object.hasOwn(recall, k) && recall[k] === v) continue;
       extras.push(k);
     }
     return [path, extras];
