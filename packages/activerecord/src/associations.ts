@@ -500,9 +500,9 @@ export class Associations {
   }
 }
 
-export function isAssociationCached(record: Base, assocName: string): boolean {
-  if (record._associationInstances.has(assocName)) return true;
-  return record._collectionProxies.has(assocName);
+export function isAssociationCached(record: Base, name: string): boolean {
+  if (record._associationInstances.has(name)) return true;
+  return record._collectionProxies.has(name);
 }
 
 export function _canRouteThroughViaAssociationScope(

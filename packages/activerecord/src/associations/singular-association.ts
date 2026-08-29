@@ -194,7 +194,7 @@ export class SingularAssociation extends Association {
 
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    raise = false,
+    raiseError = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     const record = this.buildRecord(attributes, block);
@@ -206,7 +206,7 @@ export class SingularAssociation extends Association {
     const removal = this.detachDisplacedOnBuild(record);
     if (removal) await removal;
     this.setNewRecord(record);
-    if (!saved && raise) {
+    if (!saved && raiseError) {
       throw new RecordInvalid(record);
     }
     return record;

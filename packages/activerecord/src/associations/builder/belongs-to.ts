@@ -115,7 +115,7 @@ export class BelongsTo extends SingularAssociation {
 
   /** @missingRailsCall first — PERMANENT */
   static async touchRecord(
-    record: any,
+    o: any,
     changes: Record<string, unknown>,
     foreignKey: string | string[],
     name: string,
@@ -126,15 +126,14 @@ export class BelongsTo extends SingularAssociation {
     const oldFkValues = fkColumns.map((col) => {
       const change = changes[col] as [unknown, unknown] | undefined;
       if (change) return change[0];
-      return typeof record._readAttribute === "function" ? record._readAttribute(col) : record[col];
+      return typeof o._readAttribute === "function" ? o._readAttribute(col) : o[col];
     });
     const foreignTypeCol = `${underscore(name)}_type`;
     const hasOldFk =
       fkColumns.some((col) => changes[col] != null) || changes[foreignTypeCol] != null;
 
     if (hasOldFk) {
-      const association =
-        typeof record.association === "function" ? record.association(name) : null;
+      const association = typeof o.association === "function" ? o.association(name) : null;
       if (association) {
         const reflection = association.reflection;
         let klass: any;
@@ -148,14 +147,14 @@ export class BelongsTo extends SingularAssociation {
             `${underscore(name)}_type`;
           klass =
             (changes[foreignType] as [unknown, unknown] | undefined)?.[0] ??
-            (typeof record._readAttribute === "function"
-              ? record._readAttribute(foreignType)
-              : record[foreignType]);
+            (typeof o._readAttribute === "function"
+              ? o._readAttribute(foreignType)
+              : o[foreignType]);
           try {
             klass = klass
-              ? (
-                  record.constructor as { polymorphicClassFor(name: string): any }
-                ).polymorphicClassFor(klass)
+              ? (o.constructor as { polymorphicClassFor(name: string): any }).polymorphicClassFor(
+                  klass,
+                )
               : null;
           } catch {
             klass = null;
@@ -175,7 +174,7 @@ export class BelongsTo extends SingularAssociation {
       }
     }
 
-    const association = typeof record.association === "function" ? record.association(name) : null;
+    const association = typeof o.association === "function" ? o.association(name) : null;
     if (association && typeof association.loadTarget === "function") {
       const parent = await association.loadTarget();
       if (parent && !Array.isArray(parent) && parent.isPersisted?.()) {

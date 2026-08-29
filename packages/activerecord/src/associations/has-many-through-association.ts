@@ -18,8 +18,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   _throughScope?: unknown;
 
-  constructor(owner: Base, definition: AssociationDefinition) {
-    super(owner, definition);
+  constructor(owner: Base, reflection: AssociationDefinition) {
+    super(owner, reflection);
   }
 
   /** @internal */
@@ -89,7 +89,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /** @internal */
-  protected override concatRecords(records: Base[], _raise = false): Promise<Base[]> | Base[] {
+  protected override concatRecords(records: Base[]): Promise<Base[]> | Base[] {
     this.ensureNotNested();
     const concatenated = super.concatRecords(records, true);
     const buildThroughRecords = (added: Base[]): Base[] => {

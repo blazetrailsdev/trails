@@ -484,13 +484,13 @@ export class AssociationScope {
   /** @internal */
   protected evalScope(
     reflection: AbstractReflection | ReflectionProxy,
-    scopeFn: (...args: unknown[]) => unknown,
+    scope: (...args: unknown[]) => unknown,
     owner: Base,
   ): unknown {
     const relation = (reflection as unknown as ScopeBuilder).buildScope(
       (reflection as ReflectionProxy).aliasedTable,
     );
-    const evaluated = invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
+    const evaluated = invokeScopeLambda(scope as ScopeLambda<unknown>, relation, owner);
     return evaluated != null && evaluated !== false ? evaluated : relation;
   }
 
