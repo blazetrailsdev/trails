@@ -341,11 +341,13 @@ export class Relation<T extends Base> {
     model: typeof Base,
     table?: Table | Nodes.TableAlias,
     predicateBuilder?: PredicateBuilder,
+    values: ValuesHash = {},
   ) {
     this._model = model;
     if (table) {
       this._table = table as Table;
     }
+    this._values = values;
     if (predicateBuilder) {
       this._predicateBuilder = predicateBuilder;
     }
@@ -429,58 +431,58 @@ export class Relation<T extends Base> {
     return this;
   }
 
-  build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
+  build(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
   build(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    if (Array.isArray(attrs)) {
-      return attrs.map((a) => this.build(a, block));
+    if (Array.isArray(attributes)) {
+      return attributes.map((a) => this.build(a, block));
     }
     const restoring = block ? this.currentScopeRestoringBlock(block) : undefined;
     const modelClass = this._model as any;
     const prev = ScopeRegistry.currentScope(modelClass);
     modelClass.setCurrentScope(this as any);
     try {
-      return this._new(attrs, restoring);
+      return this._new(attributes, restoring);
     } finally {
       modelClass.setCurrentScope(prev);
     }
   }
 
-  async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async create(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async create(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (Array.isArray(attrs)) {
+    if (Array.isArray(attributes)) {
       const records: T[] = [];
-      for (const a of attrs) {
+      for (const a of attributes) {
         records.push(await this.create(a, block));
       }
       return records;
     }
     const restoring = this.currentScopeRestoringBlock(block);
-    return await this.scoping(() => this._create(attrs, restoring));
+    return await this.scoping(() => this._create(attributes, restoring));
   }
 
-  async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async createBang(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async createBang(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (Array.isArray(attrs)) {
+    if (Array.isArray(attributes)) {
       const records: T[] = [];
-      for (const a of attrs) {
+      for (const a of attributes) {
         records.push(await this.createBang(a, block));
       }
       return records;
     }
     const restoring = this.currentScopeRestoringBlock(block);
-    return await this.scoping(() => this._createBang(attrs, restoring));
+    return await this.scoping(() => this._createBang(attributes, restoring));
   }
 
   async size(): Promise<number> {
@@ -493,13 +495,13 @@ export class Relation<T extends Base> {
     return !(await this.exists());
   }
 
-  async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
+  async isAny(args?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (pattern !== undefined) {
+    if (args !== undefined) {
       const matches = (record: T): boolean =>
-        (pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (pattern as new (...args: never[]) => Base)
-          : (pattern as (record: T) => boolean)(record);
+        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
+          ? record instanceof (args as new (...args: never[]) => Base)
+          : (args as (record: T) => boolean)(record);
       return (await this.toArray()).some(matches);
     }
     return !(await this.isEmpty());
@@ -518,13 +520,13 @@ export class Relation<T extends Base> {
     return (await this.limitedCount()) > 1;
   }
 
-  async isOne(pattern?: EnumerablePattern<T>): Promise<boolean> {
+  async isOne(args?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (pattern !== undefined) {
+    if (args !== undefined) {
       const matches = (record: T): boolean =>
-        (pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (pattern as new (...args: never[]) => Base)
-          : (pattern as (record: T) => boolean)(record);
+        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
+          ? record instanceof (args as new (...args: never[]) => Base)
+          : (args as (record: T) => boolean)(record);
       let count = 0;
       for (const record of await this.toArray()) {
         if (matches(record) && ++count === 2) break;
@@ -656,15 +658,11 @@ export class Relation<T extends Base> {
 
   /** @missingRailsCall empty? — PERMANENT */
   private referencesEagerLoadedTables(): boolean {
-    const arel = new SelectManager(this.table);
-    this.buildJoins(arel);
-    const joinedTables = arel
-      .joinSources()
-      .flatMap((join: Nodes.Join) =>
-        join instanceof Nodes.StringJoin
-          ? this.tablesInString(join.left as Nodes.Node)
-          : [(join.left as unknown as { name: string }).name],
-      );
+    const joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
+      join instanceof Nodes.StringJoin
+        ? this.tablesInString(join.left as Nodes.Node)
+        : [(join.left as unknown as { name: string }).name],
+    );
 
     joinedTables.push(String(this.table.name));
 
@@ -846,16 +844,16 @@ export class Relation<T extends Base> {
     });
   }
 
-  async firstOrCreate(extra?: Record<string, unknown>): Promise<T> {
+  async firstOrCreate(attributes?: Record<string, unknown>): Promise<T> {
     const first = await this.first();
     if (first) return first;
-    return this.create(extra);
+    return this.create(attributes);
   }
 
-  async firstOrCreateBang(extra?: Record<string, unknown>): Promise<T> {
+  async firstOrCreateBang(attributes?: Record<string, unknown>): Promise<T> {
     const first = await this.first();
     if (first) return first;
-    return this.createBang(extra);
+    return this.createBang(attributes);
   }
 
   async firstOrInitialize(
@@ -1035,17 +1033,17 @@ export class Relation<T extends Base> {
     }) as string;
   }
 
-  private instantiateRecords(result: Result): T[] {
-    if (result.isEmpty()) return [];
+  private instantiateRecords(rows: Result): T[] {
+    if (rows.isEmpty()) return [];
     const block = this._instantiateBlock;
 
     const joinDependency = this._joinDependency;
     if (joinDependency) {
       this._joinDependency = null;
-      return joinDependency.instantiate(result, this.strictLoadingValue, block) as T[];
+      return joinDependency.instantiate(rows, this.strictLoadingValue, block) as T[];
     }
 
-    return this._model._loadFromSql(result, block as never) as T[];
+    return this._model._loadFromSql(rows, block as never) as T[];
   }
 
   private _applyEagerJoinDependency(
@@ -1332,13 +1330,13 @@ export class Relation<T extends Base> {
     return this.updateAll(updates);
   }
 
-  async delete(id: unknown): Promise<number> {
-    if (id == null) return 0;
-    if (Array.isArray(id) && id.length === 0) return 0;
+  async delete(idOrArray: unknown): Promise<number> {
+    if (idOrArray == null) return 0;
+    if (Array.isArray(idOrArray) && idOrArray.length === 0) return 0;
 
     const primaryKey = this.model.primaryKey;
     if (Array.isArray(primaryKey)) {
-      const idArr = Array.isArray(id) ? id : [id];
+      const idArr = Array.isArray(idOrArray) ? idOrArray : [idOrArray];
       if (idArr.length !== primaryKey.length) return 0;
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < primaryKey.length; i++) {
@@ -1347,7 +1345,7 @@ export class Relation<T extends Base> {
       return this.where(conditions).deleteAll();
     }
 
-    return this.where({ [primaryKey]: id }).deleteAll();
+    return this.where({ [primaryKey]: idOrArray }).deleteAll();
   }
 
   async destroy(id: unknown): Promise<T> {
@@ -1356,12 +1354,12 @@ export class Relation<T extends Base> {
     return record;
   }
 
-  async destroyBy(conditions: Record<string, unknown> = {}): Promise<T[]> {
-    return this.where(conditions).destroyAll();
+  async destroyBy(args: Record<string, unknown> = {}): Promise<T[]> {
+    return this.where(args).destroyAll();
   }
 
-  async deleteBy(conditions: Record<string, unknown> = {}): Promise<number> {
-    return this.where(conditions).deleteAll();
+  async deleteBy(args: Record<string, unknown> = {}): Promise<number> {
+    return this.where(args).deleteAll();
   }
 
   async equals(other: unknown): Promise<boolean | undefined> {
@@ -1408,13 +1406,13 @@ export class Relation<T extends Base> {
     return this._loaded;
   }
 
-  async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
+  async isNone(args?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return true;
-    if (pattern !== undefined) {
+    if (args !== undefined) {
       const matches = (record: T): boolean =>
-        (pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (pattern as new (...args: never[]) => Base)
-          : (pattern as (record: T) => boolean)(record);
+        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
+          ? record instanceof (args as new (...args: never[]) => Base)
+          : (args as (record: T) => boolean)(record);
       return !(await this.toArray()).some(matches);
     }
     return this.isEmpty();
@@ -1872,8 +1870,8 @@ export interface Relation<T extends Base>
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
-  findBy(conditions: Record<string, unknown>): Promise<T | null>;
-  findByBang(conditions: Record<string, unknown>): Promise<T>;
+  findBy(arg: Record<string, unknown>): Promise<T | null>;
+  findByBang(arg: Record<string, unknown>): Promise<T>;
   findSoleBy(...conditions: unknown[]): Promise<T>;
   first(): Promise<T | null>;
   first(n: number): Promise<T[]>;
@@ -1975,11 +1973,11 @@ export interface Relation<T extends Base>
   inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T>;
   reorder(...args: OrderArg[]): Relation<T>;
   where(): WhereChain<Relation<T>>;
-  where(conditions: undefined): WhereChain<Relation<T>>;
-  where(conditions: Record<string, unknown> | null): Relation<T>;
+  where(args: undefined): WhereChain<Relation<T>>;
+  where(args: Record<string, unknown> | null): Relation<T>;
   where(sql: string, ...binds: unknown[]): Relation<T>;
-  where(node: Nodes.Node): Relation<T>;
-  where(conditions: unknown[]): Relation<T>;
+  where(args: Nodes.Node): Relation<T>;
+  where(args: unknown[]): Relation<T>;
   where(cols: string[], tuples: unknown[][]): Relation<T>;
   rewhere(conditions: Record<string, unknown> | null): Relation<T>;
   invertWhere(): Relation<T>;
