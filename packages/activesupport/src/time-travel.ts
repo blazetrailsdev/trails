@@ -34,12 +34,21 @@ let _timeOffsetNs: bigint = 0n;
 export const clock = {
   now(): Temporal.Instant {
     if (_frozenInstant) return _frozenInstant;
-    if (_timeOffsetNs === 0n) return Temporal.Now.instant();
-    return Temporal.Instant.fromEpochNanoseconds(
-      Temporal.Now.instant().epochNanoseconds + _timeOffsetNs,
-    );
+    if (_timeOffsetNs === 0n) return Temporal.Instant.fromEpochNanoseconds(systemEpochNs());
+    return Temporal.Instant.fromEpochNanoseconds(systemEpochNs() + _timeOffsetNs);
   },
 };
+
+/**
+ * `Temporal.Now.instant()` is `Date.now()` scaled to nanoseconds, so every read
+ * inside one millisecond returns the same instant; Ruby's `Time.now` reads
+ * `CLOCK_REALTIME` and does not. A record created and updated inside one
+ * millisecond would otherwise keep its `updated_at` and drop the column from
+ * `saved_changes`.
+ */
+function systemEpochNs(): bigint {
+  return BigInt(Math.round((performance.timeOrigin + performance.now()) * 1_000)) * 1_000n;
+}
 
 export function setFrozenTime(time: Date | null): void {
   if (time === null) {
