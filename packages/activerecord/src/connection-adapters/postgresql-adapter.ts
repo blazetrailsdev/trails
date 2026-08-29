@@ -2244,19 +2244,8 @@ export class PostgreSQLAdapter
       | string
       | string[],
   ): string {
-    const [, table] = this.extractSchemaQualifiedName(tableName);
-    if (typeof options !== "string" && !Array.isArray(options)) {
-      if (options.column != null) {
-        if (options._usesLegacyIndexName) {
-          const cols = Array.isArray(options.column) ? options.column : [options.column];
-          return `index_${table}_on_${cols.join("_and_")}`;
-        }
-        return this.generateIndexName(table, options.column);
-      }
-      if (options.name != null) return options.name;
-      throw new ArgumentError("You must specify the index name");
-    }
-    return this.indexName(table, this.indexNameOptions(options));
+    const [, table] = this.extractSchemaQualifiedName(String(tableName));
+    return super.indexName(table, options);
   }
 
   async addIndexOptions(

@@ -5,10 +5,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import {
-  DatabaseConfig,
-  _setConfigurationHash,
-} from "./database-configurations/database-config.js";
+import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
 import { adapterNameFromUrl } from "./connection-adapters/adapter-args.js";
 import { AdapterNotSpecified, NotImplementedError, ActiveRecordError } from "./errors.js";
@@ -626,15 +623,7 @@ async function establishWithDbConfig(
     );
   }
 
-  let configForConnect = config;
-  if (!dbConfig.adapter) {
-    configForConnect = _setConfigurationHash(dbConfig, {
-      ...config,
-      adapter: adapterName,
-    }) as Record<string, unknown>;
-  }
-
-  await establishWithConfig(modelClass, adapterName, connectUrl, configForConnect, dbConfig);
+  await establishWithConfig(modelClass, adapterName, connectUrl, config, dbConfig);
   if (tz) ActiveRecord.defaultTimezone = tz;
 }
 

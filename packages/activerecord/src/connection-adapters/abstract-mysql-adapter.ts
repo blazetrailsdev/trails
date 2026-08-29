@@ -1028,7 +1028,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @missingRailsCall column_for — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
+   * @missingRailsCall column_for — CONVERGEABLE mysql-mismatched-fk-details-omits-primary-key-column
    */
   protected mismatchedForeignKeyDetails({
     message,
@@ -1443,16 +1443,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return new StatementPool(
       AbstractMysqlAdapter.typeCastConfigToInteger(this._statementLimit) as number,
     );
-  }
-
-  /** @internal */
-  protected extractPrecision(sqlType: string): number | null {
-    const match = /\((\d+)(?:,\d+)?\)/.exec(sqlType);
-    const parsed = match ? parseInt(match[1], 10) : null;
-    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) {
-      return parsed ?? 0;
-    }
-    return parsed;
   }
 }
 

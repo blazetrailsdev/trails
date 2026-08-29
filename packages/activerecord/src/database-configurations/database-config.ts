@@ -60,28 +60,10 @@ export function _setAdapterClassResolver(
   _validateAdapterName = nameValidator;
 }
 
-let writeConfigurationHash!: (config: DatabaseConfig, hash: DatabaseConfigOptions) => void;
-
-/** @internal */
-export function _setConfigurationHash(
-  config: DatabaseConfig,
-  hash: DatabaseConfigOptions,
-): DatabaseConfigOptions {
-  const frozen = Object.freeze({ ...hash });
-  writeConfigurationHash(config, frozen);
-  return frozen;
-}
-
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
   #configuration: DatabaseConfigOptions;
-
-  static {
-    writeConfigurationHash = (config, hash) => {
-      config.#configuration = hash;
-    };
-  }
 
   constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
     this.envName = envName;
@@ -95,6 +77,12 @@ export class DatabaseConfig {
 
   get configurationHash(): DatabaseConfigOptions {
     return this.configuration;
+  }
+
+  /** @internal */
+  protected setConfigurationHash(hash: DatabaseConfigOptions): DatabaseConfigOptions {
+    this.#configuration = Object.freeze({ ...hash });
+    return this.#configuration;
   }
 
   inspect(): string {

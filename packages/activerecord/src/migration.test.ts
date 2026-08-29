@@ -1012,11 +1012,14 @@ describe("MigrationTest", () => {
     const im = new InternalMetadata(adapter.pool);
     await im.dropTable();
 
-    const { _setConfigurationHash } = await import("./database-configurations/database-config.js");
+    const { HashConfig } = await import("./database-configurations/hash-config.js");
     type Cfg = import("./database-configurations/database-config.js").DatabaseConfig;
-    const dbConfig = (adapter.pool as { dbConfig: Cfg }).dbConfig;
-    const originalConfig = dbConfig.configuration;
-    _setConfigurationHash(dbConfig, { ...originalConfig, useMetadataTable: false });
+    const pool = adapter.pool as { dbConfig: Cfg };
+    const originalDbConfig = pool.dbConfig;
+    pool.dbConfig = new HashConfig(originalDbConfig.envName, originalDbConfig.name, {
+      ...originalDbConfig.configuration,
+      useMetadataTable: false,
+    });
 
     expect(im.enabled).toBe(false);
     expect(await im.tableExists()).toBe(false);
@@ -1038,7 +1041,7 @@ describe("MigrationTest", () => {
       const rows = await adapter.execute(internalMetadataExistsSql(adapterType));
       expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
     } finally {
-      _setConfigurationHash(dbConfig, originalConfig);
+      pool.dbConfig = originalDbConfig;
       await im.createTable();
     }
   });

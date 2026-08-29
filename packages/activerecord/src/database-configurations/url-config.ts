@@ -1,5 +1,5 @@
 import { HashConfig } from "./hash-config.js";
-import { _setConfigurationHash, type DatabaseConfigOptions } from "./database-config.js";
+import { type DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
 import { inferAdapterNameFromUrl } from "../connection-adapters/adapter-args.js";
 
@@ -33,7 +33,7 @@ export class UrlConfig extends HashConfig {
     toBooleanBang(hash, "replica");
     toBooleanBang(hash, "databaseTasks");
 
-    _setConfigurationHash(this, hash as DatabaseConfigOptions);
+    this.setConfigurationHash(hash as DatabaseConfigOptions);
   }
 
   /** @internal */
