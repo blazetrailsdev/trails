@@ -1454,6 +1454,81 @@ describe("extractFromProgram — include() detection", () => {
     expect(info.classes["node.ts:Node"].extends).toContain("Math");
   });
 
+  it("harvests every section of a defineModule() mixin onto the host", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `export class Relation {}`,
+      "relation/query-methods.ts": `
+        export function where() {}
+        export function buildWhereClause() {}
+        export function arelColumns() {}
+        export function buildArel() {}
+        export const QueryMethodsPublicInstanceMethods = { where } as const;
+        export const QueryMethodsProtectedInstanceMethods = {
+          buildWhereClause,
+          buildHavingClause: buildWhereClause,
+          arelColumns,
+        } as const;
+        export const QueryMethodsPrivateInstanceMethods = { buildArel } as const;
+        export const QueryMethods = defineModule(
+          QueryMethodsPublicInstanceMethods,
+          QueryMethodsProtectedInstanceMethods,
+          QueryMethodsPrivateInstanceMethods,
+        );
+      `,
+      "wire.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Relation } from "./relation.js";
+        import { QueryMethods } from "./relation/query-methods.js";
+        include(Relation, QueryMethods);
+      `,
+    });
+    const host = info.classes["relation.ts:Relation"];
+    expect(host.instanceMethods.map((m) => m.name).sort()).toEqual([
+      "arelColumns",
+      "buildArel",
+      "buildHavingClause",
+      "buildWhereClause",
+      "where",
+    ]);
+  });
+
+  it("harvests a defineModule() mixin given only its public section", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `export class Relation {}`,
+      "relation/spawn-methods.ts": `
+        export function spawn() {}
+        export const SpawnMethodsPublicInstanceMethods = { spawn } as const;
+        export const SpawnMethods = defineModule(SpawnMethodsPublicInstanceMethods);
+      `,
+      "wire.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Relation } from "./relation.js";
+        import { SpawnMethods } from "./relation/spawn-methods.js";
+        include(Relation, SpawnMethods);
+      `,
+    });
+    expect(info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name)).toEqual([
+      "spawn",
+    ]);
+  });
+
+  it("harvests an inline object-literal section of a defineModule() mixin", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `export class Relation {}`,
+      "mod.ts": `export const Mod = defineModule({ pub() {} }, undefined, { priv() {} });`,
+      "wire.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Relation } from "./relation.js";
+        import { Mod } from "./mod.js";
+        include(Relation, Mod);
+      `,
+    });
+    expect(info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name).sort()).toEqual([
+      "priv",
+      "pub",
+    ]);
+  });
+
   it("records the mod's declaration file on host.extendsFiles", () => {
     // Two modules share the short name `SchemaStatements` (abstract/ and
     // postgresql/); only the declaration file separates them, so the edge

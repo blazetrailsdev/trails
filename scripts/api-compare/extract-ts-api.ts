@@ -1277,12 +1277,14 @@ export function extractFromProgram(
       //     Imports may rebind (`import { Math as MathMixin }`), so follow
       //     the alias to the original symbol's name.
       //
-      // (b) Mod is a `const` object literal (e.g. `export const QueryMethodBangs
+      // (b) Mod is a `const` object literal (e.g. `export const QueryMethods
       //     = { foo, bar } as const`). The extractor never creates a class/module
       //     entry for plain objects, so pushing the name to extends would leave
       //     it unresolvable. Instead, harvest the object's method keys directly
       //     onto the host — same treatment as the inline-object and
       //     property-access branches above.
+      //     `defineModule(...)` (activesupport/include.ts) composes one such
+      //     module out of its sections, so its arguments are harvested instead.
       if (ts.isIdentifier(modArg)) {
         const sym0 = checker.getSymbolAtLocation(modArg);
         const sym =
@@ -1290,16 +1292,8 @@ export function extractFromProgram(
 
         // (b): const object literal → harvest directly, then fall through to
         // also push the name onto extends for compare.ts resolution.
-        const valDecl = sym?.valueDeclaration ?? sym?.declarations?.[0];
-        if (valDecl && ts.isVariableDeclaration(valDecl) && valDecl.initializer) {
-          // Strip `as const` / other type assertions to reach the raw literal.
-          let init = valDecl.initializer;
-          while (ts.isAsExpression(init) || ts.isSatisfiesExpression(init)) {
-            init = init.expression;
-          }
-          if (ts.isObjectLiteralExpression(init)) {
-            pushMethods(harvestObjectLiteralMethods(init, checker, hostInfo.file ?? ""));
-          }
+        for (const literal of moduleObjectLiterals(sym, checker)) {
+          pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
         }
 
         // (a): class / interface / module — push name for later resolution.
@@ -2132,6 +2126,38 @@ export function factoryClassMembers(
  */
 export function isConstantCaseName(name: string): boolean {
   return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
+}
+
+function moduleObjectLiterals(
+  sym: ts.Symbol | undefined,
+  checker: ts.TypeChecker,
+): ts.ObjectLiteralExpression[] {
+  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+  if (!decl || !ts.isVariableDeclaration(decl) || !decl.initializer) return [];
+  const init = unwrapAssertions(decl.initializer);
+  if (ts.isObjectLiteralExpression(init)) return [init];
+  if (!ts.isCallExpression(init)) return [];
+  if (!ts.isIdentifier(init.expression) || init.expression.text !== "defineModule") return [];
+  const out: ts.ObjectLiteralExpression[] = [];
+  for (const arg of init.arguments) {
+    const section = unwrapAssertions(arg);
+    if (ts.isObjectLiteralExpression(section)) {
+      out.push(section);
+      continue;
+    }
+    if (!ts.isIdentifier(section)) continue;
+    const argSym0 = checker.getSymbolAtLocation(section);
+    const argSym =
+      argSym0 && argSym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(argSym0) : argSym0;
+    out.push(...moduleObjectLiterals(argSym, checker));
+  }
+  return out;
+}
+
+function unwrapAssertions(expr: ts.Expression): ts.Expression {
+  let cur = expr;
+  while (ts.isAsExpression(cur) || ts.isSatisfiesExpression(cur)) cur = cur.expression;
+  return cur;
 }
 
 export function harvestObjectLiteralMethods(

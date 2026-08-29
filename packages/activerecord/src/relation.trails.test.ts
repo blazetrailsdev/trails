@@ -3,7 +3,7 @@ import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 import { performMerge, SpawnMethods } from "./relation/spawn-methods.js";
-import { reverseSqlOrder, QueryMethodBangs } from "./relation/query-methods.js";
+import { reverseSqlOrder, QueryMethods } from "./relation/query-methods.js";
 import { Relation } from "./relation.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { Calculations } from "./relation/calculations.js";
@@ -777,7 +777,7 @@ describe("relation.rb:68 mixin ancestry", () => {
     ["FinderMethods", FinderMethods as unknown as Record<string, unknown>],
     ["Calculations", Calculations as unknown as Record<string, unknown>],
     ["SpawnMethods", SpawnMethods as unknown as Record<string, unknown>],
-    ["QueryMethods", QueryMethodBangs as unknown as Record<string, unknown>],
+    ["QueryMethods", QueryMethods as unknown as Record<string, unknown>],
     ["Batches", Batches as unknown as Record<string, unknown>],
     ["Explain", Explain as unknown as Record<string, unknown>],
     ["Delegation", DelegationMethods as unknown as Record<string, unknown>],
