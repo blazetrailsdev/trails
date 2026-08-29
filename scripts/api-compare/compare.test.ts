@@ -29,7 +29,6 @@ import {
   reorderedCalls,
   ORDER_PREFIX,
   resolvePortedWithArgsSigs,
-  widenRailsPrivateTsCalls,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
@@ -3218,34 +3217,6 @@ describe("misplacedClusterVerdict", () => {
   });
 });
 
-describe("widenRailsPrivateTsCalls", () => {
-  it("lets a Rails-private `_foo` port answer for Rails' `foo` call", () => {
-    // connection_pool.rb:711 — `connection_lease` is private, ported as
-    // `_connectionLease`, and every caller spells `this._connectionLease()`.
-    const widened = widenRailsPrivateTsCalls(new Set(["_connectionLease"]), ["connection_lease"]);
-    expect(widened.has("connectionLease")).toBe(true);
-    expect(widened.has("_connectionLease")).toBe(true);
-  });
-
-  it("leaves a call-set with no `_`-prefixed call alone", () => {
-    const calls = new Set(["save", "reload"]);
-    expect([...widenRailsPrivateTsCalls(calls, ["save", "reload"])].sort()).toEqual([
-      "reload",
-      "save",
-    ]);
-  });
-
-  it("does not let a TS `_foo` answer for `foo` when the body also calls Ruby `_foo`", () => {
-    // A Rails method genuinely NAMED `_read_attribute` is distinct from
-    // `read_attribute`; one `_readAttribute` must not satisfy both.
-    const widened = widenRailsPrivateTsCalls(new Set(["_readAttribute"]), [
-      "read_attribute",
-      "_read_attribute",
-    ]);
-    expect(widened.has("readAttribute")).toBe(false);
-  });
-});
-
 describe("resolvePortedWithArgsSigs (Rails-private prefix)", () => {
   const sig = (n: number): ParamInfo[] =>
     Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }) as ParamInfo);
@@ -3256,6 +3227,17 @@ describe("resolvePortedWithArgsSigs (Rails-private prefix)", () => {
     expect(
       resolvePortedWithArgsSigs(byFileName, byNameInPkg, "connection-pool.ts", "connectionLease"),
     ).toEqual([sig(1)]);
+  });
+
+  it("prefers the file's own `_`-prefixed member over the package pool's bare one", () => {
+    const byFileName = new Map([["resolver.ts", new Map([["_query", [sig(0)]]])]]);
+    const byNameInPkg = new Map([
+      ["_query", [sig(0)]],
+      ["query", [sig(4)]],
+    ]);
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "resolver.ts", "query")).toEqual([
+      sig(0),
+    ]);
   });
 
   it("prefers the unprefixed name when the file declares both", () => {

@@ -185,8 +185,6 @@ describe("normalizeConstantSpelling", () => {
   });
 
   it("is a closed table — a constant that differs in VALUE is not folded", () => {
-    // Float::MAX (1.7976931348623157e308) and Number.MAX_VALUE happen to agree,
-    // but Float::MIN and Number.MIN_VALUE do NOT, so neither family is listed.
     for (const name of ["MAX", "MAX_VALUE", "MIN", "MIN_VALUE", "EPSILON", "PI"]) {
       expect(normalizeConstantSpelling(name)).toBeNull();
     }

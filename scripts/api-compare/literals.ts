@@ -156,14 +156,15 @@ export function compareDefaults(
  * descriptor, which is opaque on that side, so only the TS half of that pair can
  * ever be looked up — it is listed for the same reason the positive one is, not
  * because a Ruby row is waiting for it.
+ *
+ * `INFINITY` and `NAN` are the Ruby spellings, which the extractor records
+ * without the `Float::` namespace; the rest are the TS ones, which
+ * extract-ts-api.ts#describeArg records as `const:` whether they are written as
+ * the bare global or as a `Number` property.
  */
 const CONSTANT_SPELLINGS: Record<string, string> = {
-  // Ruby `Float::INFINITY` / `Float::NAN`, which the extractor records without
-  // the namespace.
   INFINITY: "num:Infinity",
   NAN: "num:NaN",
-  // TS: the bare globals and the `Number` properties, which the extractor
-  // records as `const:` either way (extract-ts-api.ts#describeArg).
   Infinity: "num:Infinity",
   POSITIVE_INFINITY: "num:Infinity",
   NEGATIVE_INFINITY: "num:-Infinity",

@@ -1064,8 +1064,6 @@ describe("comparableRubySites", () => {
 
 describe("normalizeArg (value-equivalent constant spellings)", () => {
   it("compares Ruby Float::INFINITY equal to JS Infinity", () => {
-    // cache/coder.rb:17 `dump_compressed(entry, Float::INFINITY)` against the
-    // port's `dumpCompressed(entry, Infinity)`.
     expect(normalizeArg("const:INFINITY")).toBe(normalizeArg("const:Infinity"));
     expect(normalizeArg("const:INFINITY")).toBe(normalizeArg("const:POSITIVE_INFINITY"));
   });
