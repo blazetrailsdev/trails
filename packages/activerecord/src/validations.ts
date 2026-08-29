@@ -10,6 +10,7 @@ import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { UniquenessValidator, validatesUniquenessOf } from "./validations/uniqueness.js";
 import { associationInstanceGet } from "./associations.js";
+import type { Association } from "./associations/association.js";
 import type { Base } from "./base.js";
 
 export {
@@ -139,12 +140,10 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   }
   const cached = this._associationCache?.(attribute)?.target;
   if (cached !== undefined) return cached;
-  const holder = associationInstanceGet.call(this as unknown as Base, attribute) as {
-    isLoaded(): boolean;
-    isStaleTarget(): boolean;
-    _staleStateIsSnapshotted: boolean;
-    target?: Base | Base[] | null;
-  } | null;
+  const holder = associationInstanceGet.call(
+    this as unknown as Base,
+    attribute,
+  ) as Association | null;
   if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
     return holder.target ?? null;
   }

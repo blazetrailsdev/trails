@@ -105,7 +105,7 @@ describe("StatementPoolTest", () => {
     expect(pool.isKey("c")).toBe(true);
   });
 
-  it("isKey is an alias for has", async () => {
+  it("key? reports membership", async () => {
     const pool = new StatementPool<string>();
     await pool.set("a", "1");
     expect(pool.isKey("a")).toBe(true);

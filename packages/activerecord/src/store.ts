@@ -26,7 +26,7 @@ export class IndifferentCoder {
   }
 
   load(yaml: unknown): HashWithIndifferentAccess<unknown> {
-    return asIndifferentHash(this.coder.load(yaml ?? ""));
+    return asIndifferentHash(this.coder.load(yaml == null || yaml === false ? "" : yaml));
   }
 
   /**
