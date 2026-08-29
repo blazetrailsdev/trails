@@ -13,8 +13,8 @@ export class Verifier extends MessageVerifier {
     return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
   }
 
-  protected override decode(encoded: string): Buffer {
-    let str = encoded;
+  protected override decode(data: string): Buffer {
+    let str = data;
     if (!str.endsWith("=") && str.length % 4 !== 0) {
       str = str.padEnd((str.length + 3) & ~3, "=");
     }
