@@ -1,6 +1,7 @@
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { ValueType } from "@blazetrails/activemodel";
 import { ActiveRecord } from "../../ar-config.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
@@ -1253,6 +1254,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.lookupCastType("timestamptz").constructor.name).toBe(
         adapter.lookupCastType("timestamp with time zone").constructor.name,
       );
+    });
+
+    it("resolves every native database type name", async () => {
+      await adapter.exec("SELECT 1");
+
+      const unresolved: string[] = [];
+      for (const [key, type] of Object.entries(adapter.nativeDatabaseTypes())) {
+        if (key === "primary_key") continue;
+        const name = typeof type === "string" ? type : (type as { name?: string })?.name;
+        if (name == null) continue;
+        if (adapter.lookupCastType(name).constructor === ValueType) unresolved.push(name);
+      }
+      expect(unresolved).toEqual([]);
     });
 
     it("quotes an array default whose sqlType carries an aliased element type", async () => {
