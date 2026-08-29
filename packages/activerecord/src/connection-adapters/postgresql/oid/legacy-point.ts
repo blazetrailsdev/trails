@@ -22,7 +22,7 @@ export class LegacyPoint extends ValueType<[number, number]> {
   serialize(value: unknown): string | null {
     if (value == null) return null;
     if (globalThis.Array.isArray(value) && value.length === 2) {
-      return `(${value[0]},${value[1]})`;
+      return `(${this.numberForPoint(value[0])},${this.numberForPoint(value[1])})`;
     }
     if (typeof value === "string") return value;
     return null;
@@ -30,6 +30,11 @@ export class LegacyPoint extends ValueType<[number, number]> {
 
   deserialize(value: unknown): [number, number] | null {
     return this.cast(value);
+  }
+
+  private numberForPoint(number: unknown): string {
+    const s = String(number);
+    return s.endsWith(".0") ? s.slice(0, -2) : s;
   }
 
   private parsePoint(str: string): [number, number] | null {
@@ -41,10 +46,4 @@ export class LegacyPoint extends ValueType<[number, number]> {
     if (isNaN(x) || isNaN(y)) return null;
     return [x, y];
   }
-}
-
-/** @internal */
-function numberForPoint(number: number): string {
-  const s = number.toString();
-  return s.endsWith(".0") ? s.slice(0, -2) : s;
 }

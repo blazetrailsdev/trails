@@ -4,6 +4,7 @@ import { Result, type ColumnTypes } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
 import type { StatementPool } from "../statement-pool.js";
+import { ActiveRecord } from "../../ar-config.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -69,6 +70,7 @@ export function buildColumnTypes(
 
 /** @internal */
 interface PerformQueryHost {
+  _databaseTimezone?: "utc" | "local";
   _affectedRowsBeforeWarnings?: number;
   _lastId?: number;
   _statements?: StatementPool | null;
@@ -192,6 +194,8 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Mysql2RawResult> {
+  this._databaseTimezone = ActiveRecord.defaultTimezone;
+
   const hasBinds = binds != null && binds.length > 0;
 
   if (prepare) this._trackPrepared?.(rawConnection, sql);
