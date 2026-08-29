@@ -158,6 +158,8 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractMysqlAdapter {
   /**
+   * drift-ok: concrete adapters only — `text_type?` is defined by
+   * `mysql2_adapter.rb:140-142`, not by `abstract_mysql_adapter.rb`.
    * @internal
    * @noRailsEquivalent PERMANENT
    */

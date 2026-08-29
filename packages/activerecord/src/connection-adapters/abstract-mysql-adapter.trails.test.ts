@@ -196,8 +196,8 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
   }
 
   async function makeAdapter(column: Column) {
-    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
-    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const { Mysql2Adapter } = await import("./mysql2-adapter.js");
+    const adapter = Object.create(Mysql2Adapter.prototype);
     adapter.columnFor = async (_t: string, _c: string) => column;
     return adapter;
   }
