@@ -59,16 +59,16 @@ export const ExecutionContext = {
     _afterChangeCallbacks.push(fn);
   },
 
-  set<T = void>(attrs: Record<string, unknown>, fn?: () => T): T | void {
+  set<T = void>(options: Record<string, unknown>, fn?: () => T): T | void {
     if (!fn) {
-      for (const key of Object.keys(attrs)) {
-        store().set(key, attrs[key]);
+      for (const key of Object.keys(options)) {
+        store().set(key, options[key]);
       }
       runAfterChange();
       return;
     }
 
-    const saved = saveAndApply(attrs);
+    const saved = saveAndApply(options);
     runAfterChange();
     let result: T;
     try {

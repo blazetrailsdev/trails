@@ -622,8 +622,8 @@ export class Timezone {
 
   readonly identifier: string;
 
-  constructor(identifier: string) {
-    this.identifier = identifier;
+  constructor(name: string) {
+    this.identifier = name;
   }
 
   /** `TZInfo::Timezone#name`, which `encode_with` reads (time_zone.rb:579). */

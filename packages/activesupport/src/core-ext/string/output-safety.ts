@@ -49,35 +49,35 @@ export class SafeBuffer {
   }
 
   /** concat — appends another string/SafeBuffer. Unsafe strings are escaped. */
-  concat(other: string | SafeBuffer): SafeBuffer {
+  concat(value: string | SafeBuffer): SafeBuffer {
     if (!this._safe) {
       // If this buffer is not safe, just append as-is
-      const otherStr = other instanceof SafeBuffer ? other.toString() : String(other);
-      return new SafeBuffer(this._value + otherStr, false);
+      const valueStr = value instanceof SafeBuffer ? value.toString() : String(value);
+      return new SafeBuffer(this._value + valueStr, false);
     }
 
-    if (other instanceof SafeBuffer) {
-      if (other.htmlSafe) {
-        return new SafeBuffer(this._value + other.toString(), true);
+    if (value instanceof SafeBuffer) {
+      if (value.htmlSafe) {
+        return new SafeBuffer(this._value + value.toString(), true);
       } else {
         // Escape unsafe buffer
-        const escaped = other.toString().replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
+        const escaped = value.toString().replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
         return new SafeBuffer(this._value + escaped, true);
       }
     }
 
     // Escape raw string before appending to safe buffer
-    const escaped = String(other).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
+    const escaped = String(value).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
     return new SafeBuffer(this._value + escaped, true);
   }
 
   /** safeConcat — appends without escaping. Raises if this buffer is not safe. */
-  safeConcat(other: string | SafeBuffer): SafeBuffer {
+  safeConcat(value: string | SafeBuffer): SafeBuffer {
     if (!isHtmlSafe(this)) {
       throw new SafeConcatError();
     }
-    const otherStr = other instanceof SafeBuffer ? other.toString() : String(other);
-    return new SafeBuffer(this._value + otherStr, true);
+    const valueStr = value instanceof SafeBuffer ? value.toString() : String(value);
+    return new SafeBuffer(this._value + valueStr, true);
   }
 
   /** Returns a new SafeBuffer that is marked as safe. */

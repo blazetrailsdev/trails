@@ -827,18 +827,18 @@ export class CallbackSequence {
     return sequence;
   }
 
-  isSkip(env: FilterEnvironment): boolean {
-    if (env.halted) return true;
+  isSkip(arg: FilterEnvironment): boolean {
+    if (arg.halted) return true;
     if (!this.userConditions) return false;
-    return !this.userConditions.every((c) => c(env.target, env.value));
+    return !this.userConditions.every((c) => c(arg.target, arg.value));
   }
 
   isFinal(): boolean {
     return !this.callTemplate;
   }
 
-  expandCallTemplate(env: FilterEnvironment, block: (() => unknown) | null): unknown[] {
-    return this.callTemplate!.expand(env.target, env.value, block);
+  expandCallTemplate(arg: FilterEnvironment, block: (() => unknown) | null): unknown[] {
+    return this.callTemplate!.expand(arg.target, arg.value, block);
   }
 
   /**
@@ -1146,20 +1146,20 @@ export class CallbackChain {
     this.chain.forEach(fn);
   }
 
-  index(cb: Callback): number {
-    return this.chain.indexOf(cb);
+  index(o: Callback): number {
+    return this.chain.indexOf(o);
   }
 
-  insert(idx: number, cb: Callback): void {
+  insert(index: number, o: Callback): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
-    this.chain.splice(idx, 0, cb);
+    this.chain.splice(index, 0, o);
   }
 
-  delete(cb: Callback): void {
+  delete(o: Callback): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
-    const i = this.chain.indexOf(cb);
+    const i = this.chain.indexOf(o);
     if (i !== -1) this.chain.splice(i, 1);
   }
 

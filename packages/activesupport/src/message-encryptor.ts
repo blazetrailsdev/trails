@@ -67,20 +67,16 @@ export class MessageEncryptor extends Codec {
 
   constructor(
     secret: string | Buffer,
-    signSecretOrOptions?: string | Buffer | MessageEncryptorOptions,
+    signSecret?: string | Buffer | MessageEncryptorOptions,
     options?: MessageEncryptorOptions,
   ) {
-    let signSecret: string | Buffer | undefined;
+    let resolvedSignSecret: string | Buffer | undefined;
     let opts: MessageEncryptorOptions;
 
-    if (
-      signSecretOrOptions &&
-      typeof signSecretOrOptions === "object" &&
-      !Buffer.isBuffer(signSecretOrOptions)
-    ) {
-      opts = signSecretOrOptions;
+    if (signSecret && typeof signSecret === "object" && !Buffer.isBuffer(signSecret)) {
+      opts = signSecret;
     } else {
-      signSecret = signSecretOrOptions;
+      resolvedSignSecret = signSecret;
       opts = options ?? {};
     }
 
@@ -94,12 +90,12 @@ export class MessageEncryptor extends Codec {
     this.cipher = opts.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
     this.aeadMode = this.newCipher().authenticated;
     this.verifier = !this.aeadMode
-      ? new MessageVerifier(signSecret ?? secret, { ...opts, serializer: NullSerializer })
+      ? new MessageVerifier(resolvedSignSecret ?? secret, { ...opts, serializer: NullSerializer })
       : undefined;
 
     initializeRotator(
       this,
-      signSecret === undefined ? [secret] : [secret, signSecret],
+      resolvedSignSecret === undefined ? [secret] : [secret, resolvedSignSecret],
       opts as Record<string, unknown>,
     );
   }

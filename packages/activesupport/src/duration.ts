@@ -348,16 +348,16 @@ export class Duration {
     return this.since();
   }
 
-  until(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
-    return this.ago(date);
+  until(time: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+    return this.ago(time);
   }
 
-  after(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
-    return this.since(date);
+  after(time: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+    return this.since(time);
   }
 
-  before(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
-    return this.ago(date);
+  before(time: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+    return this.ago(time);
   }
 
   // ---------------------------------------------------------------------------

@@ -40,34 +40,34 @@ export function valuesAt(
 
 /**
  * Deep merge two objects recursively. When both values are objects, they are
- * merged recursively. Otherwise the source value wins.
+ * merged recursively. Otherwise the other value wins.
  */
-export function deepMerge<T extends AnyObject>(target: T, source: AnyObject): T {
+export function deepMerge<T extends AnyObject>(target: T, other: AnyObject): T {
   const result = { ...target } as AnyObject;
-  for (const key of Object.keys(source)) {
-    const targetVal = result[key];
-    const sourceVal = source[key];
-    if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
-      result[key] = deepMerge(targetVal, sourceVal);
+  for (const key of Object.keys(other)) {
+    const thisVal = result[key];
+    const otherVal = other[key];
+    if (isPlainObject(thisVal) && isPlainObject(otherVal)) {
+      result[key] = deepMerge(thisVal, otherVal);
     } else {
-      result[key] = sourceVal;
+      result[key] = otherVal;
     }
   }
   return result as T;
 }
 
 /**
- * Deep merge `source` into `target` in place (mutating `target`).
+ * Deep merge `other` into `target` in place (mutating `target`).
  * Mirrors Ruby's Hash#deep_merge!.
  */
-export function deepMergeBang<T extends AnyObject>(target: T, source: AnyObject): T {
-  for (const key of Object.keys(source)) {
-    const targetVal = target[key as keyof T];
-    const sourceVal = source[key];
-    if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
-      deepMergeBang(targetVal as AnyObject, sourceVal);
+export function deepMergeBang<T extends AnyObject>(target: T, other: AnyObject): T {
+  for (const key of Object.keys(other)) {
+    const thisVal = target[key as keyof T];
+    const otherVal = other[key];
+    if (isPlainObject(thisVal) && isPlainObject(otherVal)) {
+      deepMergeBang(thisVal as AnyObject, otherVal);
     } else {
-      (target as AnyObject)[key] = sourceVal;
+      (target as AnyObject)[key] = otherVal;
     }
   }
   return target;

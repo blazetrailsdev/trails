@@ -3,6 +3,10 @@
     "total": 0,
     "byFile": {}
   },
+  "activesupport": {
+    "total": 0,
+    "byFile": {}
+  },
   "arel": {
     "total": 0,
     "byFile": {}

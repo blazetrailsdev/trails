@@ -78,7 +78,7 @@ export abstract class CurrentAttributes {
    * `Delegation.generate(singleton_class, …, to: :instance)` calls (:138-139).
    */
   static attribute(...names: string[]): void;
-  static attribute(name: string, options: AttributeDefinition): void;
+  static attribute(...names: [...string[], AttributeDefinition]): void;
   /**
    * @missingRailsCall generate — PERMANENT: current_attributes.rb:136-137
    *   `Delegation.generate(singleton_class, names, to: :instance, ...)` — Rails
