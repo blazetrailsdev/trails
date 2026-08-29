@@ -13,16 +13,26 @@ const resolvedSyncCache = new Map<string, AdapterClass>();
 const resolveErrors = new Map<string, unknown>();
 
 /**
+ * Synchronous companion to `resolve(name)`. Returns the adapter class if it
+ * has been resolved at least once (via `resolve()`), or null. Used by
+ * `db_config.new_connection`, which is synchronous as Rails' is.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE Ruby's ConnectionAdapters.resolve (connection_adapters.rb:34-39) is synchronous because `require` is; retires with the pool async convergence.
  */
 export function resolveSync(adapterName: string): AdapterClass | null {
   return resolvedSyncCache.get(adapterName) ?? null;
 }
 
 /**
+ * Returns the rejection from a prior `resolve()` call for this adapter
+ * name, or null if no failure was recorded. Lets sync entry points
+ * (`ConnectionPool.newConnection` → `dbConfig.newConnection`) surface the
+ * original failure cause (AdapterNotFound, import error, etc.) instead of
+ * a generic "not pre-resolved" message.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE surfaces the failure Ruby's synchronous resolve raises in place (connection_adapters.rb:34-39); retires with the same convergence.
  */
 export function resolveSyncError(adapterName: string): unknown | null {
   return resolveErrors.get(adapterName) ?? null;
@@ -36,8 +46,12 @@ export function register(name: string, loader: AdapterLoader): void {
 }
 
 /**
+ * Synchronous half of `resolve(name)` — Rails does this check inline, but
+ * trails' sync callers can't await the dynamic import. Raises the same
+ * AdapterNotFound `resolve` raises (connection_adapters.rb:34-39).
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the AdapterNotFound check Ruby writes inline in resolve (connection_adapters.rb:34-39), split out for the sync callers.
  */
 export function validateAdapterName(adapterName: string): void {
   if (adapters.has(adapterName)) return;
@@ -132,8 +146,12 @@ export {
 } from "./connection-adapters/abstract/schema-definitions.js";
 
 /**
+ * Returns the default primary key name used when creating tables.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#default_primary_key (private)
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE TableDefinition#default_primary_key (abstract/schema_definitions.rb:170) hoisted to a free function; the port splits that file.
  */
 export function defaultPrimaryKey(): string {
   return "id";

@@ -505,8 +505,8 @@ export abstract class SchemaDumper {
   }
 
   /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @internal Used by `dumpTableSchema` and external callers.
+   * @noRailsEquivalent CONVERGEABLE the per-table body of SchemaDumper#tables (schema_dumper.rb:134), extracted so dumpTableSchema shares it.
    */
   async dumpTable(stream: string[], tableName: string): Promise<void> {
     await this.table(tableName, stream);

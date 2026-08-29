@@ -53,14 +53,14 @@ export function getBase(): any {
 let _verboseQueryLogs = false;
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE reads ActiveRecord.verbose_query_logs (active_record.rb:329) through the lazily-wired resolver.
  */
 export function getVerboseQueryLogs(): boolean {
   return _verboseQueryLogs;
 }
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE writes ActiveRecord.verbose_query_logs (active_record.rb:329) through the same resolver.
  */
 export function setVerboseQueryLogs(value: boolean): void {
   _verboseQueryLogs = value;

@@ -45,8 +45,11 @@ export class EncryptableRecord {
   }
 
   /**
+   * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
+   * re-runs its bookkeeping on every `_defaultAttributes` rebuild. The `scheme`
+   * is kept in each entry for `encryptFixtureRows` (define-fixtures.ts).
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE bookkeeping for the decorate_attributes block Ruby replays lazily (encryption/encryptable_record.rb:87-92).
    */
   static registerPendingEncryption(modelClass: any, pending: PendingEncryption): void {
     if (!Object.prototype.hasOwnProperty.call(modelClass, "_pendingEncryptions")) {
@@ -56,8 +59,20 @@ export class EncryptableRecord {
   }
 
   /**
+   * Push the durable encryption PendingDecorator, exactly once per `encrypts`
+   * declaration — mirroring Rails' `decorate_attributes([name]) { ... }` in
+   * encryptable_record.rb:87-92. Pushing at declaration time (not on the first
+   * post-reflection rebuild, as before) keeps the decorator's queue position —
+   * and therefore the resolved nesting relative to `serialize` — in declaration
+   * order, and bounds the queue: repeated `_defaultAttributes` rebuilds never
+   * re-push.
+   *
+   * The column default is resolved inside the decorator at replay time
+   * (mirrors Rails' `default: columns_hash[name.to_s]&.default`, evaluated in
+   * the block), so a replay after schema reflection picks up the authoritative
+   * DB default without any re-push.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the decorate_attributes([name]) push of encrypts (encryption/encryptable_record.rb:87-92), made explicit so queue position is stable.
    */
   static pushEncryptionDecorator(modelClass: any, name: string, pending: PendingEncryption): void {
     modelClass.decorateAttributes([name], (attrName: string, castType: Type) => {
@@ -70,8 +85,16 @@ export class EncryptableRecord {
   }
 
   /**
+   * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
+   * is absent and `supportUnencryptedData` is false — mirrors Rails
+   * encryptable_record.rb:101–103. Checked at declaration time against the
+   * columns known then. Rails' `column_names` forces a schema load so the set is
+   * always complete; ours can be empty at Base.encrypts static-init (the adapter
+   * isn't connected yet), so an empty list means "unknown" and we defer rather
+   * than raise a false positive — the same fail-open-when-unknown behavior the
+   * scheme-based path shipped with.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the missing-original-column raise of encrypts (encryption/encryptable_record.rb:101-103), split out for the deferred re-check.
    */
   static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
     if (Configurable.config.supportUnencryptedData) return;
@@ -83,8 +106,16 @@ export class EncryptableRecord {
   }
 
   /**
+   * Re-run the `original_<name>` missing-column requirement for every
+   * ignoreCase-preserved attribute against the authoritative column set
+   * reflected from the real adapter schema. Driven from schema reflection
+   * (`applyColumnsHash`), which runs only once the DB columns are known — so
+   * unlike the eager `columnNames()` partial-load path, `reflectedColumnNames`
+   * distinguishes "schema reflected, column absent" (fail-closed, raise) from
+   * "declaration in progress" (never reaches here). Mirrors Rails' fail-closed
+   * `preserve_original_encrypted`, whose `column_names` is always complete.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE re-runs that same raise once the schema is reflected (encryption/encryptable_record.rb:101-103); Ruby's column_names is always complete.
    */
   static requireOriginalColumnsAfterReflection(
     modelClass: any,

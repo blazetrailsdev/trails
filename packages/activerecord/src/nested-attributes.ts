@@ -378,7 +378,7 @@ export function generateAssociationWriter(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the `reflection.polymorphic?` guard Ruby writes inline in assign_nested_attributes (nested_attributes.rb:434).
  */
 export function isPolymorphicBelongsTo(record: Base, associationName: string): boolean {
   const assocDef = (record.constructor as any)._reflectOnAssociation?.(associationName);

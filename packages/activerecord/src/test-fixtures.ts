@@ -77,8 +77,23 @@ export interface FixturesConnectionOpts {
 }
 
 /**
+ * Resolves fixture-set names through the registry into the `[Model, data]` map shape.
+ * Model classes are dynamic-imported (see {@link FixtureRegistryEntry}), so this is async.
+ *
+ * Two requested sets backed by the same table (e.g. `deadParrots`/`liveParrots`
+ * → `parrots`, `dogs`/`otherDogs` → `dogs`) load together in one call: the
+ * loader prepares every set, MERGES their rows per table, and issues a single
+ * `insertFixturesSet` that deletes each table once and inserts all rows together
+ * (see {@link insertPreparedFixtureSets}), mirroring how Rails loads multiple
+ * same-table fixture files (fixtures.rb groups by table then unshifts all rows).
+ * The only rejected case is genuinely-conflicting rows: two same-table sets whose
+ * rows resolve to the same primary key. A row's key is resolved the way the loader
+ * derives it — an explicit pin on the model's real primary-key column, else the
+ * label-derived CRC32 id — in one keyspace, so a pinned id and a colliding derived
+ * id are both caught. Join-table sets (no model) concatenate and are not guarded.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE FixtureSet.create_fixtures' name-to-model resolution (fixtures.rb:595), async because model classes load by dynamic import.
  */
 export async function resolveFixtureNames(
   names: readonly FixtureName[],

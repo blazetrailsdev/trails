@@ -223,16 +223,30 @@ export function registerSubclass(klass: typeof Base): void {
 }
 
 /**
+ * True when STI was explicitly enabled on this class or an ancestor (the
+ * inherited `_inheritanceColumn` sentinel). Distinct from `inheritanceColumn`,
+ * which resolves to a name (default "type") for any model that hasn't disabled
+ * STI: the column merely names where STI *would* read the type; this reports
+ * whether the model actually participates in STI.
+ *
+ * Used to gate the database-row dispatch paths (instantiate, association build),
+ * which resolve through the ambiguous global registry and so must stay scoped to
+ * explicitly-modeled hierarchies. The `new`-from-attributes path resolves within
+ * the class's own subtree and instead gates on the column-aware
+ * `_has_attribute?`.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE distinguishes an STI-participating class from one that merely names an inheritance_column (inheritance.rb:311); Ruby reads _has_attribute? instead.
  */
 export function stiEnabled(modelClass: object): boolean {
   return (modelClass as any)._inheritanceColumn != null;
 }
 
 /**
+ * Check if a model class is an STI subclass (not the base STI class).
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the `self != base_class` test Ruby writes inline (inheritance.rb:119).
  */
 export function isStiSubclass(modelClass: object): boolean {
   let current = Object.getPrototypeOf(modelClass);
@@ -261,8 +275,10 @@ export class ClassMethods {
 }
 
 /**
+ * Get the STI base class for a model.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE Inheritance::ClassMethods#base_class (inheritance.rb:119) as a free function so callers without a Base-typed receiver can reach it.
  */
 export function getStiBase(modelClass: object): typeof Base {
   let current = modelClass as typeof Base;
@@ -356,15 +372,21 @@ export function __resetPrimaryAbstractClass(): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE resolves the ApplicationRecord constant Ruby names directly (core.rb:121).
  */
 export function getApplicationRecordClass(): typeof Base | null {
   return ActiveRecord.applicationRecordClass as typeof Base | null;
 }
 
 /**
+ * Returns true if this class is the designated application-record base class.
+ * When a primary abstract class has been explicitly set via `primaryAbstractClass`,
+ * this compares against that class. Otherwise it falls back to checking whether
+ * the class is registered on `globalThis` as `"ApplicationRecord"`.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
+ * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) as a free function; it also exists on Base, and one of the two should go.
  */
 export function applicationRecordClassQ(modelClass: typeof Base): boolean {
   if (ActiveRecord.applicationRecordClass) {
@@ -557,8 +579,40 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
 }
 
 /**
- * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * Resolve the subclass to construct for `new modelClass(attrs)`.
+ *
+ * Mirrors the dispatch in ActiveRecord::Inheritance::ClassMethods#new, which
+ * tries three attribute sources in order — the explicit `attrs`, the
+ * `current_scope`'s create attributes, then (for a base class) the table's
+ * `column_defaults` — stopping at the first that names a subclass. We resolve
+ * each through {@link findStiClassInHierarchy} (registry-safe) instead of
+ * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
+ * resolves to a name (default `"type"`), and the dispatch is gated on the
+ * column-aware `_has_attribute?` — or, for a
+ * receiver that is explicitly STI-enabled ({@link stiEnabled}), on that
+ * assignment, which is the same structural fact Rails reads off
+ * `_has_attribute?`. Rails reads `_has_attribute?` alone because
+ * `attribute_types` loads the schema synchronously on first touch; trails
+ * cannot query the database from a synchronous constructor, so reflection can
+ * still be cold at `new` and the `stiEnabled` arm covers exactly that window
+ * (an STI *leaf* whose `type` column had not reflected yet otherwise built
+ * as-is where Rails raises). Returns null (no dispatch) when no source names
+ * an inheritance value at all.
+ *
+ * Matching Rails' `subclass_from_attributes` → `find_sti_class`: a receiver
+ * carrying a *present* inheritance value that names no subclass of it raises
+ * {@link SubclassNotFound} (e.g. `Company.new(type: "Account")` or an unknown
+ * `"InvalidType"`) rather than silently building the receiver as-is. All three
+ * sources resolve identically — `find_sti_class`'s valid set is
+ * `self || descendants` (`inheritance.rb:242-265`), so a scope naming an STI
+ * *ancestor* of the receiver raises just as an explicit attribute does. The
+ * subtree walk resolves in-hierarchy types registry-safely first, then defers
+ * to the global `find_sti_class`, which also resolves a registered subclass not
+ * tracked as a descendant and raises for a genuine out-of-hierarchy/unknown
+ * type.
+ *
+ * @internal Used by Base's constructor to dispatch `new` to a subclass.
+ * @noRailsEquivalent CONVERGEABLE Inheritance::ClassMethods#subclass_from_attributes (inheritance.rb:331-265) split out of `new` because our reflection can be cold.
  */
 export function subclassFromAttributesForNew(
   modelClass: typeof Base,

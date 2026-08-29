@@ -29,7 +29,15 @@ export interface SchemeOptions {
   messageSerializer?: MessageSerializerLike;
 }
 
-/** @noRailsEquivalent CONVERGEABLE */
+/**
+ * The `{ encrypt, decrypt }` pair `Base.encrypts`' `encryptor:` option has
+ * always accepted needs adapting to the full contract. Rails has no such step
+ * and no such call — it lives here, off `initialize`, so the two
+ * `Encryptor.new` calls in the constructor stay the two scheme.rb:32-33 makes.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-encryption-simple-encryptor-onto-encryptor-like) — dies with the shim.
+ */
 function shimUnlessFullEncryptor(encryptor: EncryptorOptionLike): EncryptorLike {
   return typeof encryptor.isEncrypted === "function" && typeof encryptor.isBinary === "function"
     ? (encryptor as EncryptorLike)

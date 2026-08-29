@@ -240,7 +240,17 @@ export async function _updateRecord(
   return adapter.executeMutation(sql);
 }
 
-/** @missingRailsCall with_connection — CONVERGEABLE */
+/**
+ * Builds and executes a DELETE with the given constraints.
+ *
+ * Mirrors: ActiveRecord::Persistence::ClassMethods#_delete_record
+ *
+ * @missingRailsCall with_connection — CONVERGEABLE: persistence.rb:294-296 `with_connection {
+ *   |c| c.delete(dm, ...) }` — trails resolves the adapter through
+ *   `threadedConnectionFor(...) ?? this.connection` (persistence.ts:366) rather
+ *   than the block form; converging the whole package onto `withConnection` is
+ *   RFC 0073's permanent-connection-checkout flip, tracked there.
+ */
 export async function _deleteRecord(
   this: PersistenceHost,
   constraints: Record<string, unknown>,
@@ -1204,8 +1214,11 @@ function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown
 }
 
 /**
+ * Append the default constraint and the global-current-scope WHERE clause
+ * (if any) to an Arel UpdateManager or DeleteManager. Mirrors the constraint
+ * stacking in Rails `persistence.rb` `_update_record` / `_delete_record`.
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the constraint stacking Ruby writes inline in _update_record / _delete_record (persistence.rb:263).
  */
 export function applyDefaultAndGlobalConstraints(
   manager: { where(node: unknown): unknown },

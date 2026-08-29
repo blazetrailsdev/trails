@@ -42,7 +42,7 @@ export class IndifferentCoder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE Store::ClassMethods#store_accessor's accessor lookup (store.rb:112); Ruby reads the constant inline.
    */
   accessor(): typeof IndifferentHashAccessor {
     return IndifferentHashAccessor;

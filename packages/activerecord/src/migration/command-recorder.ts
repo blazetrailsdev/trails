@@ -176,8 +176,8 @@ export class CommandRecorder {
   }
 
   /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @internal Straight reversion — `execute_block: :execute_block` (command_recorder.rb:158).
+   * @noRailsEquivalent CONVERGEABLE the `execute_block: :execute_block` entry of CommandRecorder's inverse table (command_recorder.rb:158) as a method.
    */
   invertExecuteBlock(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["executeBlock", args, block];
@@ -185,7 +185,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_create_join_table (command_recorder.rb:176).
    */
   invertCreateJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropJoinTable", args, block];
@@ -193,7 +193,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `drop_join_table: :create_join_table` inverse entry (command_recorder.rb:160) as a method.
    */
   invertDropJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["createJoinTable", args, block];
@@ -201,7 +201,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `add_column: :remove_column` inverse entry (command_recorder.rb:161) as a method.
    */
   invertAddColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeColumn", args, block];
@@ -217,7 +217,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `add_index: :remove_index` inverse entry (command_recorder.rb:162) as a method.
    */
   invertAddIndex(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeIndex", args, block];
@@ -252,7 +252,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `add_timestamps: :remove_timestamps` inverse entry (command_recorder.rb:163) as a method.
    */
   invertAddTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeTimestamps", args, block];
@@ -260,7 +260,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `remove_timestamps: :add_timestamps` inverse entry (command_recorder.rb:163) as a method.
    */
   invertRemoveTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["addTimestamps", args, block];
@@ -268,7 +268,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `add_reference: :remove_reference` inverse entry (command_recorder.rb:164) as a method.
    */
   invertAddReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeReference", args, block];
@@ -281,7 +281,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_remove_reference (command_recorder.rb:176).
    */
   invertRemoveReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["addReference", args, block];
@@ -365,7 +365,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `add_exclusion_constraint: :remove_exclusion_constraint` inverse entry (command_recorder.rb:167) as a method.
    */
   invertAddExclusionConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeExclusionConstraint", args, block];
@@ -431,7 +431,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_change_column, which Ruby defines only to raise IrreversibleMigration (command_recorder.rb:53).
    */
   invertChangeColumn(_args: unknown[]): [string, unknown[]] {
     throw new IrreversibleMigration(
@@ -466,7 +466,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `[:add_columns, args]` return of CommandRecorder#invert_remove_columns (command_recorder.rb:233), which Ruby reaches by inversion rather than a named method.
    */
   invertAddColumns(args: unknown[]): [string, unknown[]] {
     return ["removeColumns", args];
@@ -544,7 +544,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `create_enum: :drop_enum` inverse entry (command_recorder.rb:170) as a method.
    */
   invertCreateEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropEnum", args, block];
@@ -552,7 +552,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `enable_extension: :disable_extension` inverse entry (command_recorder.rb:169) as a method.
    */
   invertEnableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["disableExtension", args, block];
@@ -560,7 +560,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `disable_extension: :enable_extension` inverse entry (command_recorder.rb:169) as a method.
    */
   invertDisableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["enableExtension", args, block];
@@ -568,7 +568,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `create_schema: :drop_schema` inverse entry (command_recorder.rb:171) as a method.
    */
   invertCreateSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropSchema", args, block];
@@ -576,7 +576,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `drop_schema: :create_schema` inverse entry (command_recorder.rb:171) as a method.
    */
   invertDropSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["createSchema", args, block];
@@ -584,7 +584,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `create_virtual_table: :drop_virtual_table` inverse entry (command_recorder.rb:172) as a method.
    */
   invertCreateVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropVirtualTable", args, block];

@@ -63,8 +63,20 @@ async function replaySchemaCacheDump(
 }
 
 /**
+ * Register the once-per-file eager warm as a `beforeEach` guard.
+ *
+ * It cannot run in a `beforeAll`: callers register their schema-setup
+ * `beforeAll` *after* calling the helper, so the schema does not yet exist when
+ * ours would fire. Shared with the non-transactional path (`fixtures(...,
+ * { useTransactionalTests: false })`), which skips
+ * {@link withTransactionalFixtures} entirely and would otherwise leave the
+ * cache cold — a model whose only declaration is `tableName` then reflects no
+ * columns at all, because the sync `load_schema` can only answer from the cache
+ * (`model-schema.ts` `loadSchemaFromCacheSync`), where Ruby loads lazily on
+ * first attribute access.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the eager schema warm Ruby gets free from lazy synchronous load_schema (model_schema.rb:587).
  */
 export function warmSchemaCacheBeforeFirstTest(
   getAdapter: () => TransactionalFixturesAdapter,

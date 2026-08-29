@@ -66,8 +66,17 @@ function enumTypeFrom(
 }
 
 /**
+ * Register an EnumType in the attribute set and install the label-returning
+ * accessor, the single Rails-faithful storage model used by the `Base.enum`
+ * macro (`_enum`). After this, the attribute
+ * stores the label string (via EnumType.cast on write), the getter returns it,
+ * and assignment runs `assertValidValue`.
+ *
+ * Mirrors: ActiveRecord::Enum#_enum calling `attribute(name, **options)` then
+ * `decorate_attributes([name]) { |_n, subtype| EnumType.new(...) }` (enum.rb:238-247).
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the attribute(...) + decorate_attributes pair of Enum#_enum (enum.rb:222-247), extracted from the macro body.
  */
 export function installEnumAttribute(
   klass: typeof Base,
@@ -540,8 +549,16 @@ export function raiseConflictError(
 }
 
 /**
+ * Fetch the single registered EnumType for an enum attribute — the one source
+ * of truth built lazily from the reflected column type via the
+ * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
+ * (`_defaultAttributes`), NOT the pending `PendingType` the declaration pushed:
+ * that type is the pre-reflection (mapping-shape-inferred) EnumType, whereas the
+ * replayed decorator rebuilds the EnumType from the reflected column subtype.
+ * Returns null when the attribute isn't an enum on this class.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE reads the EnumType off the replayed attribute set the way Ruby reads attribute_types[name] (enum.rb:222-247).
  */
 export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
   const host = klass as unknown as {

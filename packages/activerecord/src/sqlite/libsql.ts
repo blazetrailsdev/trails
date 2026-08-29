@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "libsql";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import { ConfigurationError } from "../errors.js";

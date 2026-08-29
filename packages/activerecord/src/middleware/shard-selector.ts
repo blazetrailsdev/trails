@@ -24,7 +24,17 @@ export class ShardSelector {
     this.options = options;
   }
 
-  /** @missingRailsCall new — CONVERGEABLE */
+  /**
+   * @missingRailsCall new — CONVERGEABLE: `ActionDispatch::Request.new(env)`
+   *   (`shard_selector.rb:41`) wraps the rack env before the resolver sees it.
+   *   `ActionDispatch::Request` lives in `@blazetrails/actionpack`, so `call()` is handed the
+   *   request object itself and constructs nothing. Ruby resolves the constant
+   *   when `call` runs, so activerecord takes no load-time dependency on
+   *   actionpack — `activerecord.gemspec` declares no actionpack dependency. An
+   *   ESM `import` is eager, so naming the constant here would make actionpack a
+   *   hard dependency of activerecord that Rails does not have. Convergeable once
+   *   the constant can be reached at call time (RFC 0106).
+   */
   async call(request: ShardRequest): Promise<unknown> {
     const shard = this.selectedShard(request);
     return this.setShard(shard, () => this.app(request));
@@ -32,7 +42,7 @@ export class ShardSelector {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE mirrors Resolver#instrumenter (middleware/database_selector/resolver.rb:33), which ShardSelector has no counterpart for.
    */
   instrumenter(): typeof Notifications {
     return Notifications;
@@ -40,7 +50,7 @@ export class ShardSelector {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE ShardSelector#resolver (middleware/shard_selector.rb:38) under a longer name; the Rails spelling is the convergence.
    */
   shardResolver(): ShardResolverFn {
     return this.resolver;
@@ -48,7 +58,7 @@ export class ShardSelector {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the `lock` read off ShardSelector#options (middleware/shard_selector.rb:38), which Ruby indexes inline at its use site.
    */
   shardSelectorStrategy(): { lock: boolean } {
     return { lock: this.options.lock ?? true };

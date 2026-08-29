@@ -40,7 +40,7 @@ let _configurations: DatabaseConfigurations | undefined;
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE reads the configurations slot ActiveRecord::Base.configurations names directly (core.rb:77).
  */
 export function configurationsStore(): DatabaseConfigurations {
   _configurations ??= new DatabaseConfigurations({});
@@ -49,7 +49,7 @@ export function configurationsStore(): DatabaseConfigurations {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE writes that same configurations slot (core.rb:71); Ruby assigns through the Base accessor.
  */
 export function setConfigurationsStore(configs: DatabaseConfigurations): void {
   _configurations = configs;

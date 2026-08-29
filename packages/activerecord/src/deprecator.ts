@@ -62,7 +62,7 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE MigrationProxy#migration (migration.rb:1190) made async because the migration file loads through a dynamic import.
    */
   migration(): Promise<Migration> {
     this._migrationPromise ??= this.loadMigrationAsync().then((m) => (this._migration = m));
@@ -71,7 +71,7 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE MigrationProxy#load_migration (migration.rb:1194); the sync arm kept for CJS migrations.
    */
   loadMigration(): Migration {
     const req = createRequire(import.meta.url);

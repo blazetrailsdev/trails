@@ -77,8 +77,10 @@ function containedTableNamePrefix(this: typeof Base): string {
 }
 
 /**
+ * Build a WHERE clause string for the primary key of a given record.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the primary-key predicate Ruby builds through predicate_builder in _update_record (persistence.rb:263).
  */
 export function buildPkWhere(this: typeof Base, idValue: unknown): string {
   const pk = this.primaryKey;
@@ -98,8 +100,10 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
 }
 
 /**
+ * Build an Arel node for a primary key WHERE condition.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the Arel form of that same predicate_builder call (persistence.rb:263).
  */
 export function buildPkWhereNode(
   this: typeof Base,
@@ -125,8 +129,25 @@ export function buildPkWhereNode(
 }
 
 /**
+ * Build an Arel node for a WHERE condition from a `_query_constraints_hash`
+ * (column name → value). A single entry yields a bare predicate node and
+ * multiple entries an `And` of predicates — for the simple single-PK and
+ * composite-PK cases this reproduces the non-null `buildPkWhereNode` output,
+ * while a `query_constraints` model maps each declared constraint column to its
+ * value.
+ *
+ * A null/undefined value produces an `IS NULL` predicate (not a dead `1=0`),
+ * mirroring Rails' `_update_record`/`_delete_record`, which route every
+ * `{name, value}` pair through `predicate_builder[name, value]` — and
+ * `predicate_builder[name, nil]` builds `name IS NULL`. This matters for
+ * `query_constraints` columns that are legitimately null in the DB: a `1=0`
+ * predicate would silently update/delete zero rows.
+ *
+ * Mirrors: how `ActiveRecord::Persistence#_update_record` / `#_delete_record`
+ * turn `_query_constraints_hash` into the predicate WHERE.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE turns _query_constraints_hash into the predicate WHERE Ruby builds inline (persistence.rb:263).
  */
 export function buildWhereNodeFromConstraints(
   this: typeof Base,
@@ -205,8 +226,26 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
 type DatabaseAdapterLike = { internalSchemaCache?: unknown };
 
 /**
+ * Connection-safe read of the cached column hash for `klass`'s table.
+ *
+ * Used by `_defaultAttributes` to seed schema columns via `Attribute.fromDatabase`
+ * (Rails' `columns_hash.transform_values { Attribute.from_database(...) }`) without
+ * ever touching `.connection` — which under the default `permanentConnectionCheckout`
+ * would permanently lease a connection on every record construction. Reads the warm
+ * schema cache off an already-available connection only: the threaded (in-query)
+ * connection, else a connection the pool has already leased. Returns `undefined`
+ * when the cache has no entry for the table — no connection was available (a bare
+ * `new Model()`), or the table has not been reflected yet — as distinct from a `{}`
+ * entry for a table that reflected and genuinely has no columns. Callers that only
+ * need to look a column up can `?? {}`; the one that must tell "not reflected yet"
+ * from "no such column" — `_defaultAttributes`' seed, feeding decorators that
+ * branch on `subtype == Type.default_value` — depends on the difference. Any real
+ * DB column whose default matters here has already pinned a connection via the
+ * `!_schemaLoaded` reflection in `_defaultAttributes`, so a miss is only reached
+ * for columns that carry no client-side default anyway.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE connection-free read of ModelSchema#columns_hash (model_schema.rb:427-441); retires with RFC 0073.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
   const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
@@ -269,8 +308,14 @@ export interface SchemaHost {
 }
 
 /**
+ * Drop the memoized class-level `attributeNames` and `columnNames` on `host`
+ * and its descendants — Rails' `reload_schema_from_cache` nils
+ * `@attribute_names` and `@column_names` recursively (model_schema.rb:553-568).
+ * Used by every invalidation path (`attribute`, `table_name=`,
+ * `ignored_columns=`, `reload_schema_from_cache`, `load_schema!`).
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the recursive the recursive attribute-name and column-name memo nil-out of reload_schema_from_cache (model_schema.rb:553-568).
  */
 export function clearAttributeNamesMemo(host: SchemaHost): void {
   const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
@@ -590,8 +635,35 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
 }
 
 /**
+ * Register attribute definitions from the adapter's schema cache.
+ *
+ * Mirrors: ActiveRecord::ModelSchema#load_schema! — walks `columns_hash`
+ * and calls `define_attribute(..., user_provided_default: false)` for each
+ * column so the cast type comes from the adapter (e.g. PG OID map) rather
+ * than the generic ActiveModel type registry.
+ *
+ * Populates the schema cache if needed (async). User-declared attributes —
+ * the ones carrying a pending `attribute(...)` modification — are NEVER
+ * overwritten, matching Rails where the pending replay runs after the column
+ * seed so `attribute :foo, :bar` always wins over the reflected type.
+ *
+ * This is the async half of `schema_cache.columns_hash` (schema_cache.rb):
+ * it warms the cache and then enters the single `load_schema!` body, so the
+ * concern overrides (counter_cache.rb:186-195, encryptable_record.rb:126-130)
+ * run over a real anchor.
+ *
+ * Rails' `schema_cache` is a POOL read (`load_schema!`, model_schema.rb:591) and
+ * never checks a connection out permanently, so the warm runs inside a
+ * `with_connection` scope: `reflectionAdapter`'s last resort is
+ * `leaseConnectionSync`, whose lease is permanent and trips
+ * `permanent_connection_checkout = :deprecated | :disallowed` on every save. The
+ * re-entry is the scope — inside it the connection is threaded, so the guard is
+ * false and the body runs once. A model with a directly-assigned adapter has no
+ * pool to scope against and skips it, as does a pool-less model, whose
+ * `connection_pool` throws where Ruby's always answers.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
@@ -747,8 +819,13 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
 }
 
 /**
+ * Synchronous, cache-only view of `tableExists`: `false` only when the schema
+ * cache has already resolved this table as absent, `undefined` when unknown
+ * (cold cache / no adapter). Sync callers of Rails' `table_exists?` guard
+ * (class-level `attribute_names`) use this since `tableExists` is async.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:416) for the sync callers; retires with RFC 0073.
  */
 export function cachedTableExists(this: SchemaHost): boolean | undefined {
   let conn: any;

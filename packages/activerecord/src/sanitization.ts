@@ -117,7 +117,6 @@ export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): strin
   return value.replace(/[%_]/g, (c) => escapeChar + c);
 }
 
-/** @internal */
 export function sanitizeSql(
   this: { sanitizeSqlArray(template: string, ...binds: unknown[]): string },
   input: string | [string, ...unknown[]] | null | undefined,

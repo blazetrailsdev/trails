@@ -28,16 +28,34 @@ const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 const QUERY_CONNECTION_KEY = Symbol.for("ar_query_connection");
 
 /**
+ * The connection yielded by the enclosing internal `with_connection` wrap
+ * ({@link withConnection}), or `null` outside one. Internal query and
+ * transaction code reads this *threaded* connection instead of the deprecated
+ * `Model.connection` getter, so it never flips the lease permanent — mirroring
+ * Rails, which threads the `with_connection` block's `connection` parameter
+ * through its query/transaction code rather than re-resolving `.connection`.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE reads the connection Ruby threads as with_connection's block parameter (connection_handling.rb:309).
  */
 export function currentQueryConnection(): DatabaseAdapter | null {
   return IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY) ?? null;
 }
 
 /**
+ * The threaded {@link currentQueryConnection}, but only when it belongs to
+ * `modelClass`'s *own* pool — otherwise `null`. Internal reads use this so a
+ * statement for model B that runs while only an outer wrap for a *different-pool*
+ * model A is active (cross-database eager-load, or `update_columns` issued inside
+ * another model's `transaction` block) resolves against B's pool rather than
+ * adopting A's connection. The pool-identity check mirrors the `connection`
+ * getter's guard; it returns `null` (so callers fall back to `.connection`) for a
+ * directly-assigned adapter or a model whose `connectionPool()` throws (e.g. a
+ * HABTM join model with no registered pool), preserving those models' existing
+ * resolution, so such a model still raises `ConnectionNotEstablished`.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the same threaded connection narrowed to the model's own pool, which Ruby gets from per-pool lease state (connection_handling.rb:309).
  */
 export function threadedConnectionFor(modelClass: typeof Base): DatabaseAdapter | null {
   const threaded = currentQueryConnection();

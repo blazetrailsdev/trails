@@ -465,7 +465,17 @@ function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   return ctor.isScopeAttributes();
 }
 
-/** @noRailsEquivalent CONVERGEABLE */
+/**
+ * Source-text of every `before`/`around` callback registered for `event` whose
+ * filter is a plain function (so it can be introspected via
+ * `Function.prototype.toString`). `opaque` is true when any before/around entry
+ * is an object/method-name filter whose body cannot be read from here.
+ *
+ * @noRailsEquivalent CONVERGEABLE: Rails loads a `belongs_to` target lazily, at
+ *   the moment a callback body dereferences it; trails has to decide up front
+ *   which targets to await, and reads the registered filter bodies to narrow
+ *   that set. See `_preloadBelongsToForDestroyCallbacks`. Not exported.
+ */
 function beforeOrAroundCallbackSources(
   proto: object,
   event: string,
@@ -931,8 +941,19 @@ export class Base extends Model {
   }
 
   /**
+   * Reflect the schema from the configured adapter the first time the
+   * query/persistence path needs it — the async analogue of Rails' synchronous
+   * `method_missing` schema load (activemodel/attribute_methods.rb:474-486).
+   * Every declaration reaching here is a user `attribute()`; whether it also
+   * names a real column is decided by `columns_hash`, which is DB-sourced
+   * (model_schema.rb:437-441), so nothing has to be classified first.
+   *
+   * The residual gap is attribute access on a record that was never queried and
+   * never loaded (e.g. `new User().handle` before any DB hit), which a getter
+   * can't await without wrapping instances in a `Proxy`.
+   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * @noRailsEquivalent CONVERGEABLE the schema load Ruby performs synchronously from method_missing (active_model/attribute_methods.rb:507-486); async here, so callers must await it.
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
     return this.loadSchema();
@@ -1109,7 +1130,8 @@ export class Base extends Model {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE
+   * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
+   * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) surfaced on Base as well as in inheritance.ts; one of the two should go.
    */
   static applicationRecordClassQ(): boolean {
     return _applicationRecordClassQ(this);

@@ -91,8 +91,16 @@ function resolveDeclaredPk(
 }
 
 /**
+ * The primary-key value a fixture row will land on, as a stable string usable for
+ * collision detection across sets that share a table — computed exactly the way
+ * {@link prepareModelFixtures} derives it, so an explicit pin and a label-derived
+ * CRC32 id share ONE keyspace (a row pinning `id: 42` collides with an unpinned
+ * row whose label hashes to 42). Uses the model's declared `primaryKey`, so a
+ * custom-PK model (e.g. Subscriber's `nick`, Dashboard's `dashboard_id`) is keyed
+ * on its real column, not a hardcoded `id`. Composite-PK models fold their key
+ * columns (present values, else `compositeIdentify`) into the string.
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the primary-key derivation Ruby performs inline in FixtureSet#table_rows (fixtures.rb:742).
  */
 export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
   const pk = model.primaryKey;
@@ -169,7 +177,7 @@ async function ensureStaticDeclaredIds(): Promise<void> {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE FixtureSet.identify (fixtures.rb:619) applied to a resolved reference, extracted from the row-building loop.
  */
 export function resolveFixtureId(
   adapter: DatabaseAdapter,
@@ -183,8 +191,15 @@ export function resolveFixtureId(
 }
 
 /**
+ * Resolves a belongs_to `ref()` to a single key column of a composite-PK target,
+ * honoring the association's `primaryKey` (e.g. `cpk_order_agreements.order_id`
+ * → the referenced order's `id` column). Prefers the loaded target's registered
+ * key map; when the target set hasn't been loaded yet, derives the same value the
+ * target row would generate from its label via `compositeIdentify` — position of
+ * `targetColumn` within `targetPkCols` matters, since `compositeIdentify` shifts
+ * each successive key column (Rails' `composite_identify`).
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the composite arm of FixtureSet.composite_identify (fixtures.rb:633) for a belongs_to reference column.
  */
 export function resolveCompositeRefColumn(
   adapter: DatabaseAdapter,
@@ -219,7 +234,7 @@ export function clearTableRegistry(adapter: DatabaseAdapter): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE FixtureSet#model_class (fixtures.rb:754) reached by table name because our registry is keyed that way.
  */
 export function resolveModelForTable(
   adapter: DatabaseAdapter,
@@ -413,8 +428,21 @@ async function resetPkSequence(
 }
 
 /**
+ * Inserts a whole load's worth of prepared fixture sets through a SINGLE
+ * `insertFixturesSet` call, mirroring Rails' `fixtures.rb` `insert`: it merges
+ * every set's `table_rows` into one `table_rows_for_connection` hash and calls
+ * `conn.insert_fixtures_set(table_rows_for_connection, keys)` exactly once per
+ * pool per load. That one call owns the sole `disable_referential_integrity`
+ * block and the sole `transaction(requires_new: true)` — so referential
+ * integrity is toggled once per load, not once per table (RFC 0060: the #4528
+ * profile pinned 96% of PG DDL time on per-table RI toggling).
+ *
+ * Sets are prepared in declaration order (so a later set's `ref()` resolves ids
+ * a prior set registered), then all rows land together with RI disabled, so
+ * cross-table FK order among them does not matter. Returns each set's reloaded
+ * result in the same order the sets were passed.
  * @internal
- * @noRailsEquivalent CONVERGEABLE
+ * @noRailsEquivalent CONVERGEABLE the single insert_fixtures_set call of FixtureSet.insert (fixtures.rb:665), extracted so the merge happens once per load.
  */
 export async function insertPreparedFixtureSets(
   adapter: DatabaseAdapter,

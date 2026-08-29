@@ -1353,8 +1353,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   /**
-   * @internal
-   * @missingRailsCall call — CONVERGEABLE
+   * @internal Mirrors: `ActiveRecord::Migration.env` (`migration.rb:771-773`).
+   *
+   * @missingRailsCall call — CONVERGEABLE: Rails invokes the
+   *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
+   *   (`DEFAULT_ENV.call`, migration.rb:772); trails has no ported
+   *   `DEFAULT_ENV` Proc yet and reads the env vars here directly. Convergence
+   *   is RFC 0023 story `port-connection-handling-default-env-proc`.
    */
   static env(): string {
     return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
@@ -1544,7 +1549,18 @@ export class MigrationContext<
     });
   }
 
-  /** @missingRailsCall call — CONVERGEABLE */
+  /**
+   * Mirrors: ActiveRecord::MigrationContext#current_environment
+   * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
+   * trails counterpart is {@link DatabaseConfigurations.defaultEnv}.
+   *
+   * @missingRailsCall call — CONVERGEABLE: Rails invokes the
+   *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
+   *   (`DEFAULT_ENV.call`, migration.rb:1341); trails has no ported
+   *   `DEFAULT_ENV` Proc yet, so this reads
+   *   `DatabaseConfigurations.defaultEnv` instead. Convergence is RFC 0023
+   *   story `port-connection-handling-default-env-proc`.
+   */
   get currentEnvironment(): string {
     return DatabaseConfigurations.defaultEnv;
   }
