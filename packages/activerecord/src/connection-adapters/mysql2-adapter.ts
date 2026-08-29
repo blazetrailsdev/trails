@@ -693,6 +693,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async exec(sql: string): Promise<void> {
+    this._databaseTimezone = ActiveRecord.defaultTimezone;
     const conn = await this.getConn();
     await conn.query(this.mysqlQuote(sql));
   }

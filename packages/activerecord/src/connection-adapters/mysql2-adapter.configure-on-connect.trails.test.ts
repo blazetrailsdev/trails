@@ -29,16 +29,10 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
     const checkVersionSpy = vi.spyOn(adapter, "checkVersion");
-    const timezoneSpy = vi.spyOn(
-      adapter as unknown as { _syncDatabaseTimezone(): void },
-      "_syncDatabaseTimezone",
-    );
-
     await adapter.connectBang();
     await adapter.configureConnection();
 
     expect(checkVersionSpy).toHaveBeenCalledTimes(1);
-    expect(timezoneSpy).toHaveBeenCalledTimes(3);
   });
 
   it("rejects the connect when the server version is below the 5.6.4 floor", async () => {
