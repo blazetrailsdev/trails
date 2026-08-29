@@ -29,7 +29,7 @@ export interface JSONSharedTestCasesHost {
 export class JsonDataType extends Base {
   static {
     this.tableName = "json_data_type";
-    this.storeAccessor("settings", { accessors: ["resolution"] });
+    this.storeAccessor("settings", "resolution");
   }
 }
 

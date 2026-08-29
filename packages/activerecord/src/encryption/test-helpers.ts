@@ -379,7 +379,7 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
       this.encrypts("state");
       // storeAccessorFor delegates to EncryptedAttributeType.accessor() which
       // forwards to JsonType.accessor(), so no separate store() call is needed.
-      this.storeAccessor("state", { accessors: ["color"] });
+      this.storeAccessor("state", "color");
     }
   } as any;
 }

@@ -366,7 +366,7 @@ import {
 import { authenticateBy as _authenticateBy } from "./secure-password.js";
 import {
   ClassMethods as _StoreClassMethods,
-  localStoredAttributesMethod as _localStoredAttributesMethod,
+  localStoredAttributes as _localStoredAttributes,
   storedAttributes as _storedAttributes,
   readStoreAttribute as _readStoreAttribute,
   writeStoreAttribute as _writeStoreAttribute,
@@ -1905,6 +1905,9 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::Store::ClassMethods#store_accessor */
   declare static storeAccessor: typeof _StoreClassMethods.storeAccessor;
 
+  /** Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module */
+  declare static _storeAccessorsModule: typeof _StoreClassMethods._storeAccessorsModule;
+
   /** Mirrors: ActiveRecord::SecurePassword::ClassMethods#authenticate_by (secure_password.rb:40). */
   static authenticateBy = _authenticateBy;
 
@@ -1949,7 +1952,7 @@ export class Base extends Model {
   ) => void;
 
   /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
-  declare static localStoredAttributes: typeof _localStoredAttributesMethod;
+  declare static localStoredAttributes: typeof _localStoredAttributes;
 
   /** Mirrors: ActiveRecord::Store::ClassMethods#stored_attributes */
   static storedAttributes = _storedAttributes;
@@ -4527,7 +4530,7 @@ extend(Base, {
   // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
   // (it's a standalone export, not in the ClassMethods object), so wire it here.
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
-  localStoredAttributes: _localStoredAttributesMethod,
+  localStoredAttributes: _localStoredAttributes,
 });
 
 // base.rb:326 — `include Store`, whose ClassMethods carry the two macros.

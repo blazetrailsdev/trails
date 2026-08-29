@@ -96,11 +96,11 @@ function getOrCreateStoreModuleProto(modelClass: typeof Base): object {
  * Returns (creating if needed) the store-accessor module for a model class.
  * Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module
  */
-export function storeAccessorsModule(modelClass: typeof Base): Set<string> {
-  if (!_storeAccessorsModules.has(modelClass)) {
-    _storeAccessorsModules.set(modelClass, new Set());
+function _storeAccessorsModule(this: typeof Base): Set<string> {
+  if (!_storeAccessorsModules.has(this)) {
+    _storeAccessorsModules.set(this, new Set());
   }
-  return _storeAccessorsModules.get(modelClass)!;
+  return _storeAccessorsModules.get(this)!;
 }
 
 /**
@@ -108,21 +108,8 @@ export function storeAccessorsModule(modelClass: typeof Base): Set<string> {
  *
  * Mirrors: ActiveRecord::Store#local_stored_attributes
  */
-export function localStoredAttributes(
-  modelClass: typeof Base,
-): Record<string, string[]> | undefined {
-  return _storedAttributes.get(modelClass);
-}
-
-/**
- * This-typed wrapper for wiring as a class method via extend(Base).
- *
- * Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes
- */
-export function localStoredAttributesMethod(
-  this: typeof Base,
-): Record<string, string[]> | undefined {
-  return localStoredAttributes(this);
+export function localStoredAttributes(this: typeof Base): Record<string, string[]> | undefined {
+  return _storedAttributes.get(this);
 }
 
 /**
@@ -137,7 +124,7 @@ export function storedAttributes(this: typeof Base): Record<string, string[]> {
   const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
   const parentAttrs =
     typeof parent?.storedAttributes === "function" ? parent.storedAttributes() : {};
-  const local = localStoredAttributes(modelClass);
+  const local = localStoredAttributes.call(modelClass);
   if (!local) return parentAttrs;
   const merged: Record<string, string[]> = { ...parentAttrs };
   for (const [store, keys] of Object.entries(local)) {
@@ -178,8 +165,8 @@ export class HashAccessor {
 
   static prepare(object: Base, attribute: string): void {
     const val = object.readAttribute(attribute);
-    if (val === null || val === undefined) {
-      object.writeAttribute(attribute, "{}");
+    if (val === null || val === undefined || val === false) {
+      object.writeAttribute(attribute, {});
     } else if (
       typeof val === "object" &&
       !Array.isArray(val) &&
@@ -251,21 +238,20 @@ export class StringKeyedHashAccessor extends HashAccessor {
   static override write(object: Base, attribute: string, key: unknown, value: unknown): void {
     super.write(object, attribute, String(key), value);
   }
-
-  /**
-   * TS-specific override: the base HashAccessor.prepare writes `"{}"` (a JSON
-   * string) for null values, which the hstore parser rejects as invalid hstore
-   * format. Write `{}` (plain object) instead. Rails' StringKeyedHashAccessor
-   * does not override prepare — it inherits HashAccessor.prepare which writes
-   * an empty Ruby Hash; TS needs this override because the base writes a string.
-   */
-  static override prepare(object: Base, attribute: string): void {
-    const val = object.readAttribute(attribute);
-    if (val === null || val === undefined || typeof val !== "object") {
-      object.writeAttribute(attribute, {});
-    }
-  }
 }
+
+interface StoreAccessorOptions {
+  prefix?: boolean | string;
+  suffix?: boolean | string;
+}
+
+/**
+ * `store_accessor(store_attribute, *keys, prefix: nil, suffix: nil)`
+ * (store.rb:117) — the keys are positional and the kwargs trail them.
+ */
+type StoreAccessorArgs =
+  | Array<string | string[]>
+  | [...keys: Array<string | string[]>, options: StoreAccessorOptions];
 
 export interface StoreOptions {
   accessors?: string[];
@@ -290,9 +276,17 @@ export interface StoreOptions {
 function storeAccessor(
   this: typeof Base,
   storeAttribute: string,
-  options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string } = {},
+  ...args: StoreAccessorArgs
 ): void {
-  const { accessors: keys = [], prefix = null, suffix = null } = options;
+  let prefix: boolean | string | null = null;
+  let suffix: boolean | string | null = null;
+  const last = args[args.length - 1];
+  if (last !== null && typeof last === "object" && !Array.isArray(last)) {
+    args.pop();
+    prefix = last.prefix ?? null;
+    suffix = last.suffix ?? null;
+  }
+  const keys = (args as Array<string | string[]>).flat(Infinity) as string[];
 
   const accessorPrefix =
     typeof prefix === "string" ? `${prefix}_` : prefix === true ? `${storeAttribute}_` : "";
@@ -305,7 +299,7 @@ function storeAccessor(
   const storeModuleProto = getOrCreateStoreModuleProto(this);
   for (const key of keys) {
     const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
-    storeAccessorsModule(this).add(accessorKey);
+    this._storeAccessorsModule().add(accessorKey);
 
     Object.defineProperty(storeModuleProto, accessorKey, {
       set: function (this: Base, value: unknown) {
@@ -364,7 +358,7 @@ function storeAccessor(
 
   // assign new store attribute and create new hash to ensure that each class in the hierarchy
   // has its own hash of stored attributes.
-  let localStored = localStoredAttributes(this);
+  let localStored = this.localStoredAttributes();
   if (!localStored) {
     localStored = {};
     _storedAttributes.set(this, localStored);
@@ -422,8 +416,7 @@ function store(this: typeof Base, storeAttribute: string, options: StoreOptions 
   });
 
   if (options.accessors !== undefined) {
-    this.storeAccessor(storeAttribute, {
-      accessors: options.accessors,
+    this.storeAccessor(storeAttribute, options.accessors, {
       prefix: options.prefix,
       suffix: options.suffix,
     });
@@ -436,6 +429,7 @@ function store(this: typeof Base, storeAttribute: string, options: StoreOptions 
 export const ClassMethods = {
   store,
   storeAccessor,
+  _storeAccessorsModule,
 };
 
 /**
@@ -516,12 +510,3 @@ export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unkno
   }
   return new HashWithIndifferentAccess();
 }
-
-/**
- * Returns (creating if needed) the store-accessor module for a model class.
- *
- * Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module
- *
- * @internal
- */
-export const _storeAccessorsModule = storeAccessorsModule;

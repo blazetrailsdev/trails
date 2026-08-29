@@ -89,8 +89,8 @@ class SafeCoder {
 
 /**
  * Coder that serializes/deserializes store columns using YAML. Selected by
- * `model.store(attr, { coder: "YAML" })` (the trails analog of Ruby's
- * `coder: YAML`).
+ * `model.store(attr, { coder: YAMLColumn })`, and the default coder
+ * (serialization.rb:213 — `coder == ::YAML || coder == Coders::YAMLColumn`).
  *
  * Mirrors: ActiveRecord::Coders::YAMLColumn (`:nodoc:`)
  *
