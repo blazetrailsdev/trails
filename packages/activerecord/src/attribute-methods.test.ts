@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeWithZone, TimeZone, toFs, zone } from "@blazetrails/activesupport";
@@ -12,9 +12,26 @@ import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
 import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
+import { Category } from "./test-helpers/models/category.js";
+import { Computer } from "./test-helpers/models/computer.js";
+import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 
 registerModel([Developer, AuditLog, AuditLogRequired]);
+
+class ToBeLoadedFirst extends Base {
+  static {
+    this.tableName = "topics";
+    this.aliasAttribute("subject", "author_name");
+  }
+}
+
+class ToBeLoadedSecond extends Base {
+  static {
+    this.tableName = "topics";
+    this.aliasAttribute("subject", "title");
+  }
+}
 
 describe("AttributeMethodsTest", () => {
   const { topics } = fixtures(["topics", "developers", "companies", "computers"]);
@@ -281,24 +298,37 @@ describe("AttributeMethodsTest", () => {
     expect(t.attributeForInspect("id")).toBe("1");
   });
   it("read_attribute raises ActiveModel::MissingAttributeError when the attribute isn't selected", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "sel_test" });
-    const result = await Post.select("title").first();
-    expect(() => (result as any).get("legacy_comments_count")).toThrow(
-      "missing attribute 'legacy_comments_count'",
-    );
-    expect((result as any).get("title")).toBe("sel_test");
-    expect((result as any).get("no_column_exists")).toBeNull();
+    const computer = (await Computer.select("id", "extendedWarranty").first()) as any;
+    expect(() => computer.get("developer")).toThrow(/attribute 'developer' for Computer/);
+    expect(() => computer.get("extendedWarranty")).not.toThrow();
+    expect(() => computer.get("no_column_exists")).not.toThrow();
   });
   it("user-defined time attribute predicate", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "time_pred" });
-    expect(p.title).toBe("time_pred");
+    class klass extends Base {
+      static {
+        this.tableName = CanonicalTopic.tableName;
+
+        this.attribute("user_defined_time", "time");
+      }
+    }
+
+    const topic = new klass({ user_defined_time: Temporal.Now.instant() } as any) as any;
+    expect(topic["user_defined_time?"]).toBe(true);
   });
   it("user-defined JSON attribute predicate", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "json_pred" });
-    expect(p.title).toBe("json_pred");
+    class klass extends Base {
+      static {
+        this.tableName = CanonicalTopic.tableName;
+
+        this.attribute("user_defined_json", "json");
+      }
+    }
+
+    let topic = new klass({ user_defined_json: { key: "value" } } as any) as any;
+    expect(topic["user_defined_json?"]).toBe(true);
+
+    topic = new klass({ user_defined_json: {} } as any) as any;
+    expect(topic["user_defined_json?"]).toBe(false);
   });
   it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
     class Target extends Base {
@@ -327,9 +357,10 @@ describe("AttributeMethodsTest", () => {
     expect(p.title).toBe("affixed");
   });
   it("should unserialize attributes for frozen records", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "frozen" });
-    expect(p.title).toBe("frozen");
+    const myobj = { value1: "value2" };
+    const topic = (await CanonicalTopic.create({ content: myobj } as any)) as any;
+    topic.freeze();
+    expect(topic.content).toEqual(myobj);
   });
   it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", () => {
     for (const method of ["save", "createOrUpdate", "dup", "isFrozen"]) {
@@ -435,10 +466,25 @@ describe("AttributeMethodsTest", () => {
     const p = await Post.create({ title: "undef_alias" });
     expect(p.title).toBe("undef_alias");
   });
-  it("#define_attribute_methods brings back undefined aliases", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "redef_alias" });
-    expect(p.title).toBe("redef_alias");
+  it("#define_attribute_methods brings back undefined aliases", () => {
+    class topicClass extends Base {
+      static {
+        this.tableName = "topics";
+
+        this.aliasAttribute("title_alias_to_be_undefined", "title");
+      }
+    }
+
+    const topic = new topicClass({ title: "New topic" }) as any;
+    expect(topic.title_alias_to_be_undefined).toBe("New topic");
+    topicClass.undefineAttributeMethods();
+
+    expect("title_alias_to_be_undefined" in topicClass.prototype).toBe(false);
+
+    topicClass.defineAttributeMethods();
+
+    expect("title_alias_to_be_undefined" in topicClass.prototype).toBe(true);
+    expect(topic.title_alias_to_be_undefined).toBe("New topic");
   });
   it("#method_missing define methods on the fly in a thread safe way", async () => {
     class TopicClass extends Base {
@@ -470,9 +516,27 @@ describe("AttributeMethodsTest", () => {
     expect(topic.title).toBe("title:New topic");
   });
   it("inherited custom accessors with reserved names", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "inherited_custom" });
-    expect(p.id).toBeDefined();
+    class klass extends Base {
+      static {
+        this.tableName = "computers";
+        this.abstractClass = true;
+      }
+      get system(): string {
+        return "omg";
+      }
+      set system(val: unknown) {
+        (this as any).developer = val;
+      }
+    }
+
+    class subklass extends klass {}
+    for (const k of [klass, subklass]) k.defineAttributeMethods();
+
+    const computer = (await subklass.find(1)) as any;
+    expect(computer.system).toBe("omg");
+
+    computer.developer = 99;
+    expect(computer.developer).toBe(99);
   });
   it("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", async () => {
     class Klass extends Base {
@@ -527,10 +591,13 @@ describe("AttributeMethodsTest", () => {
     obj.title = "hey";
     expect(obj.subject).toBe("hey");
   });
-  it("aliases to the same attribute name do not conflict with each other", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_conflict" });
-    expect(p.title).toBe("alias_conflict");
+  it("aliases to the same attribute name do not conflict with each other", () => {
+    const firstModelObject = new ToBeLoadedFirst({ author_name: "author 1" }) as any;
+    expect(firstModelObject.subject).toBe("author 1");
+    expect(firstModelObject.subjectChange).toEqual([null, "author 1"]);
+    const secondModelObject = new ToBeLoadedSecond({ title: "foo" }) as any;
+    expect(secondModelObject.subject).toBe("foo");
+    expect(secondModelObject.subjectChange).toEqual([null, "foo"]);
   });
   it("#alias_attribute with an overridden original method does not use the overridden original method", async () => {
     class ClassWithDeprecatedAliasAttributeBehavior extends Base {
@@ -667,23 +734,33 @@ describe("AttributeMethodsTest", () => {
     );
   });
   it("attribute_present", () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "present", score: null });
-    expect(p.attributePresent("title")).toBe(true);
-    expect(p.attributePresent("score")).toBe(false);
+    const t = CanonicalTopic.new() as any;
+    t.title = "hello there!";
+    t.written_on = Temporal.Now.instant();
+    t.author_name = "";
+    expect(t.attributePresent("title")).toBe(true);
+    expect(t.attributePresent("heading")).toBe(true);
+    expect(t.attributePresent("written_on")).toBe(true);
+    expect(t.attributePresent("content")).toBe(false);
+    expect(t.attributePresent("author_name")).toBe(false);
   });
   it("caching a nil primary key", () => {
-    const { Post } = makeModel();
-    const p = new Post({});
-    expect(p.id).toBeNull();
-    expect(p.id).toBeNull();
+    const klass = class extends Minimalistic {};
+    void klass.primaryKey;
+
+    const resetPrimaryKey = vi.spyOn(klass as any, "resetPrimaryKey");
+    void klass.primaryKey;
+    expect(resetPrimaryKey).not.toHaveBeenCalled();
+    resetPrimaryKey.mockRestore();
   });
-  it("respond_to?", () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "resp" });
-    expect(p.hasAttribute("title")).toBe(true);
-    expect(p.hasAttribute("score")).toBe(true);
-    expect(p.hasAttribute("nonexistent")).toBe(false);
+  it("respond_to?", async () => {
+    const topic = (await CanonicalTopic.find(1)) as any;
+    expect(topic.respondTo("title")).toBe(true);
+    expect(topic.respondTo("title?")).toBe(true);
+    expect(topic.respondTo("title=")).toBe(true);
+    expect(topic.respondTo("author_name")).toBe(true);
+    expect(topic.respondTo("attributeNames")).toBe(true);
+    expect(topic.respondTo("nothingness")).toBe(false);
   });
   it("respond_to? with a custom primary key", () => {
     class CustomPK extends Base {
@@ -710,11 +787,14 @@ describe("AttributeMethodsTest", () => {
     expect(p.custom_id).toBe(42);
   });
   it("read attributes_before_type_cast", () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "raw", score: "99" });
-    const raw = p.attributesBeforeTypeCast();
-    expect(raw.score).toBe("99");
-    expect(p.score).toBe(99);
+    const category = Category.new({ name: "Test category", type: null }) as any;
+    const categoryAttrs = {
+      name: "Test category",
+      id: null,
+      type: null,
+      categorizations_count: null,
+    };
+    expect(category.attributesBeforeTypeCast()).toEqual(categoryAttrs);
   });
   it.skipIf(adapterType !== "mysql")("read attributes_before_type_cast on a boolean", () => {
     class PostBool extends Base {
@@ -728,10 +808,13 @@ describe("AttributeMethodsTest", () => {
     expect(p.published).toBe(true);
   });
   it("read overridden attribute with predicate respects override", () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "overridden" });
-    expect(p.attributePresent("title")).toBe(true);
-    expect(p.title).toBe("overridden");
+    const topic = CanonicalTopic.new() as any;
+
+    topic.approved = true;
+
+    Object.defineProperty(topic, "approved", { value: false, configurable: true });
+
+    expect(topic["approved?"]).toBe(false);
   });
   it("write time to date attribute", () => {
     class Event extends Base {
@@ -760,11 +843,14 @@ describe("AttributeMethodsTest", () => {
     );
   });
   it("attribute_names on a new record", () => {
-    const { Post } = makeModel();
-    const p = new Post({});
-    const names = p.attributeNames();
-    expect(names).toContain("title");
-    expect(names).toContain("score");
+    class Target extends Base {
+      static {
+        this.tableName = "topics";
+      }
+    }
+    const model = Target.new() as any;
+
+    expect(model.attributeNames()).toEqual(Target.columnNames());
   });
 
   it("set attributes", async () => {
