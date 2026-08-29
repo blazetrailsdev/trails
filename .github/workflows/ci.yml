@@ -105,7 +105,7 @@ jobs:
           fi
           # Gate rationale: scripts/ci-suite-coverage.test.ts ("Gate reference").
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
-          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
+          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
           AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activemodel|activesupport|globalid|date|did-you-mean|trails-tsc)/'
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|date|did-you-mean)/'
@@ -147,7 +147,7 @@ jobs:
           # diff never touched.
           LINT_ALL_RE='^(eslint\.config\.mjs$|eslint/|package\.json$|pnpm-lock\.yaml$|tsconfig[^/]*\.json$|vendor/|packages/activerecord/src/support/stubbed-ddl-methods\.ts$)'
           LINTABLE_RE='\.(m|c)?(t|j)sx?$'
-          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
+          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "db_adapter_affected=true"   >> "$GITHUB_OUTPUT"
@@ -649,6 +649,7 @@ jobs:
           scripts/strip-asany.test.ts
           scripts/tasks-shim.test.ts
           scripts/rails-file-structure-mixins.test.ts
+          scripts/rails-file-structure-collisions.test.ts
           scripts/deprecated-manifest-diff.test.ts
           scripts/ci-suite-coverage.test.ts
           scripts/mixin-declaration-drift.test.ts

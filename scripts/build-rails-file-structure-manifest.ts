@@ -179,18 +179,13 @@ interface Bucket {
   seen: Set<string>;
 }
 
-// A last-segment collision (see rails-file-structure-collisions.ts) that has no
-// principled winner is a hard build failure rather than a warning — a dropped
-// bucket enforces nothing and reports nothing afterwards, which is exactly the
-// failure mode this replaces. The escape hatch is a reviewed
-// `<pkg>/<file>::<Segment>` row here.
+// Reviewed `<pkg>/<file>::<Segment>` rows for collisions resolveLastSegmentCollision
+// cannot decide; without a row such a collision fails the build below.
 const EXPECTED_UNRESOLVED_COLLISIONS: string[] = [];
 
 const unresolvedCollisions: string[] = [];
 const usedExpectedCollisions = new Set<string>();
 
-// Returns the fqn that owns `collKey`'s manifest slot, or undefined when the
-// collision has no principled winner (recorded for the terminal failure).
 const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): string | undefined => {
   const winner = resolveLastSegmentCollision(fqns);
   if (winner) return winner;
@@ -230,11 +225,9 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   };
 
   // Buckets are keyed by FQN, but the manifest the rule reads is keyed by the TS
-  // class NAME — the fqn's last segment. Two class entities in one file whose
-  // last segments collide (`ActionDispatch::Journey::Scanner` and its nested
-  // `...::Scanner::Scanner`, or `Foo::Builder` and `Bar::Builder`) therefore
-  // compete for one manifest key. Track fqns per (bucketFile, last-segment) so
-  // the collapse below can pick a winner; see resolveCollision.
+  // class NAME — the fqn's last segment. Track the fqns competing for each
+  // (bucketFile, last-segment) so the collapse below can pick a winner; see
+  // resolveLastSegmentCollision.
   const classFqnsByKey = new Map<string, Set<string>>();
   const noteClass = (bucketFile: string, className: string, fqn: string) => {
     const collKey = `${bucketFile}\0${className}`;
@@ -343,7 +336,6 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const winner = resolveCollision(pkg, collKey, fqns);
     if (winner) winnerByKey.set(collKey, winner);
   }
-  // A bucket belongs in the manifest only if its fqn won its (file, className).
   const owns = (rubyFile: string, fqn: string): boolean =>
     winnerByKey.get(`${rubyFile}\0${lastSegment(fqn)}`) === fqn;
 
@@ -361,9 +353,6 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const order = orderFor(rubyFile);
     const have = new Set(order.declarations);
     for (const fqn of fqns) {
-      // A declaration is emitted under its last segment, so only the fqn that
-      // owns that name may claim the slot — a losing nested class has no TS
-      // declaration of its own for the rule to place.
       if (!owns(rubyFile, fqn)) continue;
       const n = lastSegment(fqn);
       if (have.has(n)) continue;
@@ -375,8 +364,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   for (const [rubyFile, byKey] of byFile) {
     const order = orderFor(rubyFile);
     for (const [key, bucket] of byKey) {
-      // Buckets are keyed by fqn; the manifest key is the last segment. A losing
-      // fqn is dropped rather than blended into the winner's order.
+      // A losing fqn is dropped rather than blended into the winner's order.
       if (key !== FUNCTIONS_KEY && !owns(rubyFile, key as string)) continue;
       // Multiple Ruby files may map to the same TS file (rare); append novel
       // names in encounter order, existing order wins for dupes.
@@ -432,9 +420,8 @@ if (fileCount === 0) {
   );
 }
 
-// An unresolvable collision leaves the file's bucket unenforced, so it fails the
-// build rather than printing a line nobody reads. Fail after the manifest is
-// written, so the emitted order stays usable and the failure is purely signal.
+// Fail after the manifest is written, so the emitted order stays usable and the
+// failure is purely the signal.
 if (unresolvedCollisions.length > 0) {
   throw new Error(
     `[build-rails-file-structure-manifest] ${unresolvedCollisions.length} unresolvable ` +
