@@ -327,7 +327,7 @@ UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n arel].to_set
 # ---- AST walker ----
 
 class ApiExtractor
-  attr_reader :classes, :modules, :file_constants
+  attr_reader :classes, :modules, :file_constants, :file_hash_keys
 
   def initialize
     @classes = {}
@@ -340,6 +340,14 @@ class ApiExtractor
     # rel_path → Set of constant names whose RHS is an Array or Hash LITERAL,
     # whatever its elements are (see collection_constant_receiver?).
     @file_collection_constants = {}
+    # rel_path → Set of Ruby Hash KEY names declared in that file: the literal
+    # keys of a Hash-constant assignment (`PARSING`, xml_mini.rb:67-88) and the
+    # Symbol keys an options hash is read by in a method body (`@options.fetch(
+    # :escape_html_entities, …)`, json/encoding.rb:62). A key is a Ruby-side
+    # NAME even though it is not a declaration, so a faithful port spelling it
+    # as an object-literal key or an options-interface field is not invented
+    # surface — extra-surface unions this pool into the file's allowed set.
+    @file_hash_keys = {}
     # >0 while walking the body of a `module_eval` / `class_eval` /
     # `Module.new` block, where `self` is a Ruby Module (see
     # module_eval_self_call?).
@@ -778,6 +786,8 @@ class ApiExtractor
     method_info[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
+    record_file_hash_keys(opt_keys)
+    record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
     method_info[:bodyDigest] = digest if digest
 
@@ -836,6 +846,8 @@ class ApiExtractor
     method_info[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
+    record_file_hash_keys(opt_keys)
+    record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
     method_info[:bodyDigest] = digest if digest
 
@@ -2474,6 +2486,7 @@ class ApiExtractor
     rhs = unwrap_freeze(rhs)
     maybe_record_collection_constant(const[1], rhs)
     maybe_record_symbol_hash_keys(const[1], rhs)
+    record_file_hash_keys(literal_hash_keys(rhs))
     lit = literal_value(rhs)
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
@@ -2498,6 +2511,41 @@ class ApiExtractor
       keys << key
     end
     (@const_symbol_hash_keys[current_fqn] ||= {})[name] = keys
+  end
+
+  # Ruby ivars an options hash is conventionally held in, so the Symbol keys
+  # read off one are the method's option-key names even though no parameter
+  # carries them: `JSONGemEncoder#options` is `@options`, read as
+  # `@options.fetch(:escape_html_entities, …)` (json/encoding.rb:62).
+  OPTION_IVAR_NAMES = %w[@options @opts].to_set
+
+  def record_file_hash_keys(keys)
+    return if keys.nil? || keys.empty?
+    (@file_hash_keys[@current_file] ||= Set.new).merge(keys)
+  end
+
+  # Every literal key of a Hash literal, in EITHER Ruby spelling — a Symbol
+  # (`:date =>` / `date:`) or a String (`"base64Binary" =>`, xml_mini.rb:83).
+  # Unlike maybe_record_symbol_hash_keys, which needs the whole hash to be
+  # symbol-keyed before it can stand in for a constant's member list, this is
+  # per-KEY: a computed key is skipped and its literal siblings still count.
+  def literal_hash_keys(node)
+    return [] unless node.is_a?(Array) && node[0] == :hash
+    assocs = node[1]
+    assocs = assocs[1] if assocs.is_a?(Array) && assocs[0] == :assoclist_from_args
+    return [] unless assocs.is_a?(Array)
+    assocs.filter_map do |assoc|
+      next unless assoc.is_a?(Array) && assoc[0] == :assoc_new
+      key = assoc[1]
+      assoc_symbol_key(key) ||
+        (key.is_a?(Array) && key[0] == :string_literal ? string_literal_value(key) : nil)
+    end
+  end
+
+  def collect_ivar_option_keys(body)
+    keys = []
+    walk_for_option_keys(body, OPTION_IVAR_NAMES, {}, keys)
+    keys.uniq
   end
 
   # A Hash key that is a Ruby Symbol, in either spelling: `:language =>` parses
@@ -2598,9 +2646,14 @@ class ApiExtractor
     end
   end
 
+  # `options` / `opts` (a local or param, `:@ident`) and `@options` / `@opts`
+  # (an ivar) both read as `:var_ref`; the ivar arm carries its leading `@`, so
+  # the two name spaces cannot collide inside one `vars` set.
   def option_var?(node, vars)
     return false unless node.is_a?(Array) && node[0] == :var_ref
-    id = ident_name(node[1])
+    inner = node[1]
+    return false unless inner.is_a?(Array)
+    id = inner[0] == :@ivar ? inner[1] : ident_name(inner)
     !id.nil? && vars.include?(id)
   end
 
@@ -3494,6 +3547,7 @@ def run
       classes: classes,
       modules: modules,
       fileConstants: extractor.file_constants,
+      fileHashKeys: extractor.file_hash_keys.transform_values { |ks| ks.to_a.sort },
     }
   end
 

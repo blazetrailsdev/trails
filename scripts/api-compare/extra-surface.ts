@@ -402,6 +402,17 @@ function rubyConstantCandidates(name: string): string[] {
   return camel === name ? [name] : [name, camel];
 }
 
+/**
+ * Candidate TS spellings of a Ruby Hash KEY (RFC 0126). A key is written in the
+ * spelling the port must reproduce verbatim (`"base64Binary"`, xml_mini.rb:83),
+ * so the key itself is a candidate; a snake_case option key (`:skip_instruct`,
+ * `:escape_html_entities`) camelizes the same way a method name does.
+ */
+function rubyHashKeyCandidates(key: string): string[] {
+  const camel = snakeToCamel(key);
+  return camel === key ? [key] : [key, camel];
+}
+
 /** Get-or-init helper: replaces the `(get() ?? set([]).get()!).push(v)` idiom. */
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   const list = map.get(key);
@@ -1281,7 +1292,10 @@ export async function loadConcernHooks(
  * The matched file's `fileConstants` names join `allowed` too (see
  * `rubyConstantCandidates`): a faithfully-ported `ER_DUP_ENTRY` is not extra
  * surface. Constants have no mixin routing — they belong to the file, not to
- * an entity — so they're added once up front rather than per entity.
+ * an entity — so they're added once up front rather than per entity. The
+ * file's `fileHashKeys` join the same way (RFC 0126): a Ruby Hash key is a
+ * Ruby-side name that is not a declaration, so a port spelling it as an
+ * object-literal key or an options-interface field is not invented surface.
  *
  * Since `allowed` is a flat name set (instance vs class collapsed on the TS
  * side anyway), we simply union both `instanceMethods` and `classMethods`
@@ -1301,6 +1315,7 @@ function collectAllowedNames(
   crossPackagePkgByFqn: Record<string, string>,
   fileConstantNames: string[],
   rubyFile: string,
+  fileHashKeyNames: string[] = [],
 ): Set<string> {
   const allowed = new Set<string>();
   // File-level constants are declared per Ruby *file*, not per entity, so they
@@ -1308,6 +1323,10 @@ function collectAllowedNames(
   // entity/mixin walk below.
   for (const name of fileConstantNames) {
     for (const c of rubyConstantCandidates(name)) allowed.add(c);
+  }
+  // Hash keys are file-scoped for the same reason — see `fileHashKeys`.
+  for (const key of fileHashKeyNames) {
+    for (const c of rubyHashKeyCandidates(key)) allowed.add(c);
   }
   const visited = new Set<string>();
 
@@ -1883,6 +1902,7 @@ function buildPackageReport(
             crossPackagePkgByFqn,
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
             rubyFile,
+            rubyPkg.fileHashKeys?.[rubyFile] ?? [],
           );
 
     // A NAMED re-export (`export { buildQuoted } from "./casted.js"`) is a
@@ -1907,6 +1927,7 @@ function buildPackageReport(
           crossPackagePkgByFqn,
           Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
           sourceRuby,
+          rubyPkg.fileHashKeys?.[sourceRuby] ?? [],
         );
         if (sourceAllowed.has(fn.name)) allowed.add(fn.name);
       }

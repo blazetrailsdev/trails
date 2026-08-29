@@ -627,6 +627,36 @@ describe("buildReport — novel vs moved classification", () => {
     ]);
   });
 
+  it("allows a Hash key declared in the matched Ruby file, in either key spelling", () => {
+    const { ruby, ts } = makeManifests();
+    // `"base64Binary"` is a String key ported verbatim; `:skip_instruct` is a
+    // Symbol option key the port camelizes. A key is allowed only in the file
+    // that declares it — it never joins the GLOBAL candidate pool, so
+    // `moved_key` from baz.rb does not make `movedKey` moved here — and a TS
+    // key no Ruby key names (`stringify`) is still novel.
+    ruby.packages["activemodel"].fileHashKeys = {
+      "foo.rb": ["base64Binary", "skip_instruct"],
+      "baz.rb": ["moved_key"],
+    };
+    ts.packages["activemodel"].classes["Foo"].instanceMethods = [
+      method("base64Binary"),
+      method("skipInstruct"),
+      method("movedKey"),
+      method("stringify"),
+    ];
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles[0];
+    expect(f.extras.map((e) => [e.name, e.kind])).toEqual([
+      ["movedKey", "novel"],
+      ["stringify", "novel"],
+    ]);
+  });
+
   it("a Ruby class nested in the matched file contributes its constant and methods to the allow-set", () => {
     const ruby: ApiManifest = {
       source: "ruby",

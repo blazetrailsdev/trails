@@ -503,12 +503,6 @@ export interface ToXmlOptions extends Omit<ToTagOptions, "builder"> {
   indent?: number;
   root?: string;
   builder?: XmlBuilder;
-  /**
-   * @noRailsEquivalent PERMANENT — Ruby's `:skip_instruct` option key is a Hash
-   * key, not a method, so it has no Ruby member for `parity:api` to match. An
-   * options interface is how TS spells an options hash; there is no Ruby name
-   * for it to converge onto.
-   */
   skipInstruct?: boolean;
 }
 

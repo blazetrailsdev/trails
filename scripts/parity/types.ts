@@ -348,6 +348,15 @@ export interface PackageInfo {
   fileFunctions?: Record<string, MethodInfo[]>;
   fileConstants?: Record<string, Record<string, LiteralValue>>; // file → NAME → literal value
   /**
+   * Ruby-side only: file → the literal Hash KEY names declared in it — the keys
+   * of a Hash-constant assignment and the Symbol keys an options hash is read
+   * by in a method body. A key is a Ruby name that is not a declaration, so
+   * declaration extraction cannot see it; extra-surface.ts unions this pool
+   * into the file's allowed set so a faithfully ported object-literal key or
+   * options-interface field does not read as invented surface (RFC 0126).
+   */
+  fileHashKeys?: Record<string, string[]>;
+  /**
    * TS-side only: file → reason prose of a FILE-level `@noRailsEquivalent`
    * tag, written in a JSDoc block at the very top of the file (above the
    * imports) rather than on any one declaration. It claims the whole file has
