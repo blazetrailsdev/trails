@@ -1,7 +1,6 @@
 import { it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
-import type { Type } from "@blazetrails/activemodel";
 
 class TestMysqlAdapter extends Mysql2Adapter {
   constructor() {
@@ -20,7 +19,7 @@ beforeEach(() => {
 });
 
 function assertLookupType(expected: string, lookup: string) {
-  const castType = adapter.lookupCastType(lookup) as Type;
+  const castType = adapter.lookupCastType(lookup);
   expect(castType.type()).toBe(expected);
 }
 
