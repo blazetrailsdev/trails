@@ -26,7 +26,7 @@ describe("ConnectionHandlingTest", () => {
       "establish_connection with a url stores a UrlConfig with discrete fields",
       "remove_connection removes the pool",
       "remove_connection returns undefined when no pool exists",
-      "establishConnection backfills the adapter on an adapter-less HashConfig",
+      "establishConnection raises AdapterNotSpecified for an adapter-less HashConfig",
       "autoConnect honors an in-memory DatabaseConfigurations registry",
       "autoConnect reconnects via mutated configuration.database for UrlConfig",
     ],
@@ -531,26 +531,30 @@ describe("ConnectionHandlingTest", () => {
     }
   });
 
-  it("establishConnection backfills the adapter on an adapter-less HashConfig", async () => {
+  it("establishConnection raises AdapterNotSpecified for an adapter-less HashConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
     const env = DatabaseConfigurations.defaultEnv;
 
-    const dbConfig = new HashConfig(env, "primary", { url: "sqlite3:db/foo.sqlite3" });
-    expect(dbConfig.adapter).toBe("sqlite");
+    const { AdapterNotSpecified } = await import("./errors.js");
+    const configurationHash = { url: "sqlite3:db/foo.sqlite3" };
+    const dbConfig = new HashConfig(env, "primary", configurationHash);
+    expect(dbConfig.adapter).toBeUndefined();
 
     class BackfillModel extends Base {}
     try {
-      await BackfillModel.establishConnection(dbConfig as any);
+      await expect(BackfillModel.establishConnection(dbConfig as any)).rejects.toThrow(
+        AdapterNotSpecified,
+      );
 
-      expect(dbConfig.adapter).toBe("sqlite");
+      expect(dbConfig.configurationHash).toEqual(configurationHash);
       expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
-      const pool = BackfillModel.connectionPool();
-      expect(pool.dbConfig).toBe(dbConfig);
-      expect(pool.activeConnection).toBeNull();
     } finally {
       BackfillModel.removeConnection();
     }
+
+    const resolved = new DatabaseConfigurations({}).resolve(configurationHash as any);
+    expect(resolved.adapter).toBe("sqlite3");
   });
 });
 

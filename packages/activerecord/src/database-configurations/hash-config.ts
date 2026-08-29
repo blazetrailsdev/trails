@@ -1,18 +1,9 @@
 import { configurationsStore as configurations } from "../database-configurations.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
-import { inferAdapterNameFromUrl } from "../connection-adapters/adapter-args.js";
 
 export class HashConfig extends DatabaseConfig {
   constructor(envName: string, name: string, configurationHash: DatabaseConfigOptions = {}) {
     super(envName, name, configurationHash);
-
-    if (!this.adapter) {
-      const url = this.configuration.url;
-      const adapter = url ? inferAdapterNameFromUrl(url) : undefined;
-      if (adapter) {
-        this.setConfigurationHash({ ...this.configuration, adapter });
-      }
-    }
   }
 
   isPrimary(): boolean {
