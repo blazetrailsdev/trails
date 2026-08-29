@@ -12,13 +12,6 @@ import {
   replaceUnencodable as _replaceUnencodable,
 } from "./encoding-helpers.js";
 
-/**
- * An ActiveModel type that encrypts/decrypts attribute values. This is
- * the central piece connecting the encryption system with `encrypts`
- * declarations in model classes.
- *
- * Mirrors: ActiveRecord::Encryption::EncryptedAttributeType
- */
 export class EncryptedAttributeType extends ValueType {
   readonly name = "encrypted";
   readonly scheme: Scheme;
@@ -44,11 +37,6 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    // AdditionalValue instances must pass through cast unchanged so that
-    // serialize() can unwrap them to their pre-computed ciphertext via
-    // ExtendedEncryptableType. Without this, the default cast coerces
-    // the AV to a string (via toString), which then gets re-encrypted
-    // on serialize, producing a double-encrypted blob.
     if (isAdditionalValue(value)) return value;
     return this.castType.cast(value);
   }
@@ -64,8 +52,6 @@ export class EncryptedAttributeType extends ValueType {
     return this.serializeWithCurrent(value);
   }
 
-  // Encryption must always run through serialize, not the cast-value shortcut.
-  // insertAll prefers serializeCastValue; override so it always encrypts.
   override serializeCastValue(value: unknown): unknown {
     return this.serialize(value);
   }
@@ -77,15 +63,9 @@ export class EncryptedAttributeType extends ValueType {
 
   isEncrypted(value: unknown): boolean {
     if (typeof value !== "string") return false;
-    // Mirrors Rails encrypted?(value) → with_context { encryptor.encrypted? value }
-    // (encrypted_attribute_type.rb:48): the encryptor is resolved from the current
-    // context, so under a swapped NullEncryptor/EncryptingOnlyEncryptor this reports
-    // false — same as the decrypt/encrypt text paths.
     return this.scheme.withContext(() => this.encryptor.isEncrypted(value));
   }
 
-  // Delegate store accessor dispatch to the castType so store_accessor works
-  // with encrypted JSON/hstore columns without needing a separate store() call.
   accessor(): unknown {
     return typeof (this.castType as any).accessor === "function"
       ? (this.castType as any).accessor()
@@ -96,8 +76,6 @@ export class EncryptedAttributeType extends ValueType {
     return this.scheme.isDeterministic();
   }
 
-  // Mirrors Rails' `delegate :key_provider, :downcase?, :previous_schemes,
-  // :with_context, :fixed?, to: :scheme` (encrypted_attribute_type.rb:15).
   get keyProvider(): unknown {
     return this.scheme.keyProvider;
   }
@@ -126,7 +104,6 @@ export class EncryptedAttributeType extends ValueType {
     return this.castType.type();
   }
 
-  /** Memoizing on `support_unencrypted_data?` so that we can tweak it during tests. */
   get previousTypes(): EncryptedAttributeType[] {
     this._previousTypes ??= new Map();
     const supportUnencryptedData = this.supportUnencryptedData;
@@ -175,15 +152,8 @@ export class EncryptedAttributeType extends ValueType {
     try {
       return this.scheme.withContext(() => {
         if (value === null || value === undefined) return value;
-        // Rails' guard is `@default && @default == value` — a plain Ruby
-        // truthiness check, so a falsey default (`nil`/`false`) is treated as
-        // absent and does NOT short-circuit. Match that: only null/undefined/
-        // false are falsey (note `""`/`0` are truthy in Ruby, so they DO guard).
         if (isRubyTruthy(this._default) && this._default === value) return value;
 
-        // Adapters that use JSON/JSONB columns (e.g. PostgreSQL) return the stored value
-        // as a parsed JS object rather than a raw string. Re-stringify so the encryptor
-        // always receives the JSON string that was originally stored.
         let ciphertext: string;
         if (typeof value === "string") {
           ciphertext = value;
@@ -237,15 +207,9 @@ export class EncryptedAttributeType extends ValueType {
 
   /**
    * @internal
-   *
-   * @missingRailsCall first — PERMANENT: `previous_types.first`
-   *   (encrypted_attribute_type.rb:127) on a plain Array — the faithful port is
-   *   index access, which emits no call name (compare.ts's `first`/`last` note).
+   * @missingRailsCall first — PERMANENT
    */
   private serializeWithOldest(value: unknown): unknown {
-    // Mirrors Rails' previous_types.first — the first of the previous types (which are
-    // built from previousSchemesIncludingCleanText, so the clean-text entry, if any, is
-    // at the end and never selected here). Keeps ciphertexts stable across key rotations.
     return (this.previousTypes[0] ?? this).serialize(value);
   }
 
@@ -253,11 +217,6 @@ export class EncryptedAttributeType extends ValueType {
   private serializeWithCurrent(value: unknown): unknown {
     const casted = this.castType.serialize?.(value) ?? value;
     if (casted === null || casted === undefined) return null;
-    // Binary columns: convert each byte to the matching Latin-1 code point so
-    // the encryptor receives a valid string rather than "0,1,2,..." (Array#toString).
-    // `BinaryType#serialize` yields a `BinaryData` (binary.rb:31) — its `toString`
-    // UTF-8-decodes and would replace every byte >= 0x80 with U+FFFD, so unwrap to
-    // bytes and decode latin1, which maps bytes 1:1.
     const bytes =
       casted instanceof BinaryData ? casted.bytes : casted instanceof Uint8Array ? casted : null;
     const str = bytes
@@ -317,12 +276,9 @@ export class EncryptedAttributeType extends ValueType {
   private textToDatabaseType(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
       if (typeof value === "string") {
-        // Use Latin-1 so binary payload bytes > 127 round-trip correctly.
-        // UTF-8 (TextEncoder) would expand bytes 128–255 to two-byte sequences.
         return new BinaryData(new Uint8Array(Buffer.from(value, "latin1")));
       }
       if (value instanceof Uint8Array) return new BinaryData(value);
-      // Already a BinaryData wrapper (e.g. supportUnencryptedData pass-through).
       if (value instanceof BinaryData) return value;
       return new BinaryData(String(value));
     }
@@ -332,18 +288,11 @@ export class EncryptedAttributeType extends ValueType {
   /** @internal */
   private databaseTypeToText(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
-      // Rails: binary_cast_type = cast_type.serialized? ? cast_type.subtype : cast_type
-      // For Serialized binary types, deserialize through the subtype only — the coder
-      // (YAML/JSON) should not run on the raw binary ciphertext.
       const binaryCastType: Type =
         this.castType.isSerialized() && this.castType instanceof Serialized
           ? this.castType.subtype
           : this.castType;
       const raw = binaryCastType.deserialize?.(value) ?? value;
-      // Use Latin-1 (not UTF-8) so bytes 128–255 survive the round-trip. The
-      // ciphertext is always ASCII so Latin-1 == UTF-8 for that path; for
-      // supportUnencryptedData rows the plaintext bytes must also be Latin-1
-      // decoded or they'll be corrupted before textToDatabaseType re-wraps them.
       return raw instanceof Uint8Array ? Buffer.from(raw).toString("latin1") : raw;
     }
     return value;
@@ -358,12 +307,6 @@ export class EncryptedAttributeType extends ValueType {
   }
 }
 
-/**
- * Brand symbol set on every `AdditionalValue` instance. Checked by
- * `EncryptedAttributeType.cast` to let AVs pass through cast unchanged;
- * a direct `instanceof AdditionalValue` import would introduce a cycle
- * between this module and `extended-deterministic-queries.ts`.
- */
 export const ADDITIONAL_VALUE_BRAND: symbol = Symbol.for("activerecord.encryption.AdditionalValue");
 
 function isAdditionalValue(value: unknown): boolean {

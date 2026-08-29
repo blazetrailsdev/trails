@@ -1,20 +1,3 @@
-/**
- * The shapes the deleted DJAS routing gate used to reject.
- *
- * `_canRouteThroughViaDisableJoinsAssociationScope` demanded a through
- * reflection, a source reflection and a matched polymorphic-source/`source_type`
- * pairing, and sent everything else to the two-step loader.
- * `Association#scope` (association.rb:300-306) has no such gate — it branches on
- * `disable_joins` alone — so removing it widened what reaches
- * `DisableJoinsAssociationScope`.
- *
- * Nothing was actually widened, and these pin why: every shape the gate
- * rejected is refused earlier by Rails itself, so none of them can reach a
- * scope builder at all. Two are `check_validity!` raises
- * (reflection.rb:1157-1163); the third is refused by the macro
- * (has_many.rb:12, where `:disable_joins` is only a valid option under
- * `:through`).
- */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import type { TableDefinition } from "../connection-adapters/abstract/schema-definitions.js";

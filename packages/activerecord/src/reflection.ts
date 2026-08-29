@@ -51,15 +51,6 @@ import { Relation } from "./relation.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
-/**
- * The shape a concrete reflection exposes that `AbstractReflection`'s shared
- * methods reach for but cannot see on the base type. Reflection inherently
- * doesn't know its subclass shape statically (Rails-parity tax), so base-class
- * methods narrow `this` through this interface instead of `(this as any)`.
- *
- * `macro` is the discriminant: narrow to a single branch with
- * `ReflectionWithMacro<"hasMany">`.
- */
 export interface ConcreteReflection {
   readonly macro: MacroType;
   readonly name: string;
@@ -77,14 +68,8 @@ export interface ConcreteReflection {
   scopeFor(relation: any, owner?: any): any;
 }
 
-/** One branch of the `macro` discriminated union. */
 export type ReflectionWithMacro<M extends MacroType> = ConcreteReflection & { readonly macro: M };
 
-/**
- * Narrow a reflection to its concrete shape. Replaces `(reflection as any).X`
- * field access on values typed as the abstract base. Runtime-equivalent to the
- * cast it replaces — the interface only documents the expected fields.
- */
 function asConcrete(reflection: AbstractReflection): ConcreteReflection {
   return reflection as unknown as ConcreteReflection;
 }
@@ -94,12 +79,8 @@ function arrayLen(value: string | string[]): number {
 }
 
 /**
- * Extract the explicit counter-cache column from the `counterCache` option,
- * accepting its raw (`true` | `"<column>"`) or normalized (`{ column }`) form.
- * Returns null when no explicit column is configured.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the options[:counter_cache] normalization Ruby does inline in counter_cache_column (reflection.rb:244).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function counterCacheColumnOption(counterCache: unknown): string | null {
   if (typeof counterCache === "string") return counterCache;
@@ -110,51 +91,26 @@ export function counterCacheColumnOption(counterCache: unknown): string | null {
 }
 
 /**
- * Single source of truth for the belongs_to counter-cache column. Mirrors
- * Rails `ActiveRecord::Reflection#counter_cache_column` for `belongs_to?`:
- * the explicit column, else the pluralized owner model name + `_count`.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the belongs_to? arm of Reflection#counter_cache_column (reflection.rb:244) as a free function.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function belongsToCounterCacheColumn(
   counterCache: unknown,
   ownerName: string,
 ): string | null {
   if (!counterCache) return null;
-  // Rails derives `active_record.name.demodulize.underscore.pluralize` + `_count`
-  // (reflection.rb:250) — demodulize so a namespaced owner (`Admin::Post`)
-  // yields `posts_count`, not `admin/posts_count`.
   return (
     counterCacheColumnOption(counterCache) ||
     `${pluralize(underscore(demodulize(ownerName)))}_count`
   );
 }
 
-/**
- * Base class shared by all reflection types.
- *
- * Mirrors: ActiveRecord::Reflection::AbstractReflection
- */
 export class AbstractReflection {
-  /**
-   * @internal
-   * Memoized `counterCacheColumn()` result, keyed on the resolved target class
-   * identity (`_counterCacheColumnKlass`). Rails memoizes unconditionally
-   * (`@counter_cache_column ||=`), but trails resolves the target through the
-   * model registry (flat class names emulate demodulize), so a class re-defined
-   * between tests would otherwise return a stale column. Keying on identity
-   * means a re-registration invalidates the cache.
-   */
+  /** @internal */
   private _counterCacheColumn?: string | null;
   private _counterCacheColumnKlass?: typeof Base;
 
-  /**
-   * @internal
-   * Narrow `this` to the concrete reflection shape so shared base-class methods
-   * can read subclass fields (`name`, `options`, `macro`, …) without casting to
-   * `any`. See {@link ConcreteReflection}.
-   */
+  /** @internal */
   protected _concrete(): ConcreteReflection {
     return this as unknown as ConcreteReflection;
   }
@@ -240,13 +196,6 @@ export class AbstractReflection {
     return [this];
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::AbstractReflection#build_scope
-   * (reflection.rb:336-338). A genuinely bare relation: the default scope and
-   * the STI `type_condition` are layered on later by `klassJoinScope`
-   * (scope_for_association) and `joinScope`, so the chain scopes built here
-   * never carry a wrong-table STI predicate.
-   */
   buildScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any, klass?: typeof Base): any {
     return Relation.create(klass ?? this.klass, { table, predicateBuilder });
   }
@@ -285,10 +234,6 @@ export class AbstractReflection {
       scope = scope.where(table.get(primaryKeys[i]).eq(foreignTable.get(foreignKeys[i])));
     }
 
-    // Rails: `if klass.finder_needs_type_condition?; klass_scope.where!(klass.type_condition(table))`.
-    // The STI predicate lives here (qualified by the join's `table`, which may be
-    // an alias) rather than baked into `klassJoinScope`, so a self-referential
-    // STI join filters on the aliased table instead of the model's base table.
     const targetKlass = this.klass as any;
     if (targetKlass.isFinderNeedsTypeCondition()) {
       scope = scope.where(typeCondition(targetKlass, table));
@@ -310,9 +255,6 @@ export class AbstractReflection {
   }
 
   klassJoinScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any): any {
-    // Rails: `klass.scope_for_association(build_scope(table, predicate_builder))`.
-    // `build_scope` is a bare relation (no default scope, no STI); the STI
-    // `type_condition` is added by `joinScope`, qualified by the join's table.
     const relation = this.buildScope(table, predicateBuilder);
     const klass = this.klass as any;
     return klass.scopeForAssociation ? klass.scopeForAssociation(relation) : relation;
@@ -329,15 +271,8 @@ export class AbstractReflection {
       const explicit = counterCacheColumnOption(counterCache);
       if (explicit) return explicit;
       if (!counterCache) return null;
-      // Rails: `active_record.name.demodulize.underscore.pluralize + "_count"`.
-      // Trails class names are flat (CpkBook vs Cpk::Book), so demodulize is a
-      // no-op and produces cpk_books_count instead of books_count. Fall back to
-      // the inverse hasMany's name on the target, which is already the
-      // demodulized plural form (CpkOrder.books → books_count).
       try {
         const ownerName = self.activeRecord?.name ?? "";
-        // FK on the child table that points to the target (e.g. "dog_lover_id").
-        // CPK models normalize foreignKey into queryConstraints in the reflection.
         const btFk =
           self.options?.foreignKey ??
           self.options?.queryConstraints ??
@@ -345,45 +280,21 @@ export class AbstractReflection {
         const normFk = (fk: unknown): string[] =>
           Array.isArray(fk) ? fk.map(String) : [String(fk)];
         const btFkNorm = normFk(btFk);
-        // Use a live registry lookup (not self.klass): addCounterCacheCallbacks fires
-        // while the module is first loaded, potentially before the target class is
-        // properly registered, so resolving through the reflection here would seed its
-        // memo from a half-built registry. (`klass` memoizes with Rails' `||=`, so a
-        // failed resolve is retried rather than standing — this just avoids the
-        // needless early resolve.)
         const klassName = self.className;
         const resolvedKlass = modelRegistry.get(klassName);
         if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
-        // Rails memoizes `@counter_cache_column ||=`. Here the registry lookup
-        // above stays live (cheap, and required so a re-defined target is
-        // re-resolved — PR #3696), but we memoize the inverse-hasMany scan keyed
-        // on the resolved class identity. A re-registration yields a different
-        // class object, which misses the cache and recomputes.
         if (this._counterCacheColumnKlass === resolvedKlass) {
           return this._counterCacheColumn as string | null;
         }
         const targetAssocs = reflectOnAllAssociations(resolvedKlass, "hasMany");
-        // Match on both class name AND FK so that when a target declares multiple
-        // hasManyS to the same class with different FKs (e.g. DogLover has
-        // hasMany("trainedDogs") and hasMany("dogs")), we pick the one whose FK
-        // matches the belongsTo's FK rather than the first class-name match.
         const hmDefaultFk = `${underscore((resolvedKlass as any).name)}_id`;
         const inverseHm = targetAssocs.find((a) => {
           if (a.className !== ownerName) return false;
-          // Same `queryConstraints` fallback as `btFk` above: a composite
-          // `foreignKey:` is normalized off `options` and onto
-          // `options.queryConstraints` when the reflection is built.
           const hmFkNorm = normFk(
             a.options.foreignKey ?? a.options.queryConstraints ?? hmDefaultFk,
           );
           return hmFkNorm.length === btFkNorm.length && hmFkNorm.every((k, i) => k === btFkNorm[i]);
         });
-        // Only use the inverse hasMany's name when its singular camelCase form is
-        // a suffix of the owner class name. This covers CPK flat-prefix cases
-        // (CpkBook ends with "Book" ← singularize("books")) while correctly
-        // rejecting aliased hasManyS (Comment does NOT end with "LatestComment"
-        // ← singularize("latestComments")), for which Rails still derives from
-        // the child model name (comments_count, not latest_comments_count).
         const column =
           inverseHm && ownerName.endsWith(camelize(singularize(inverseHm.name)))
             ? `${underscore(inverseHm.name)}_count`
@@ -432,8 +343,6 @@ export class AbstractReflection {
     );
   }
 
-  // Rails: `alias inverse_updates_counter_cache? inverse_which_updates_counter_cache`
-  // — a truthy reflection (or null), not a strict boolean.
   isInverseUpdatesCounterCache(): AbstractReflection | null {
     return this.inverseWhichUpdatesCounterCache();
   }
@@ -476,20 +385,9 @@ export class AbstractReflection {
   }
 
   aliasCandidate(name: string): string {
-    // Rails' `plural_name` derives from the snake_case reflection name (Ruby
-    // associations are snake_case), so the generated table alias is snake_case
-    // (`primary_contacts_people`). trails association names are camelCase, so
-    // underscore the pluralized name to match Rails' alias SQL verbatim.
     return `${underscore(this._concrete().pluralName)}_${name}`;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::AbstractReflection#strict_loading_violation_message
-   * (reflection.rb:344-348). `owner` is the violating record's class, which
-   * Rails interpolates through `#{owner}` for its name; a bare string is
-   * accepted too. `klass` is read only on the non-polymorphic arm, as in Ruby —
-   * a polymorphic reflection has no klass to resolve.
-   */
   strictLoadingViolationMessage(owner: unknown): string {
     const ownerName =
       typeof owner === "string" ? owner : ((owner as { name?: string })?.name ?? "Record");
@@ -518,11 +416,7 @@ export class AbstractReflection {
     return [];
   }
 
-  /**
-   * @internal
-   * Raises if the given option was passed a class instead of a string.
-   * Mirrors: AbstractReflection#ensure_option_not_given_as_class!
-   */
+  /** @internal */
   protected ensureOptionNotGivenAsClassBang(optionName: string): void {
     const opts = this._concrete().options as Record<string, unknown> | undefined;
     const val = opts?.[optionName];
@@ -534,12 +428,6 @@ export class AbstractReflection {
   }
 }
 
-/**
- * Base class for AggregateReflection and AssociationReflection.
- * Holds name, scope, options, and the owning ActiveRecord class.
- *
- * Mirrors: ActiveRecord::Reflection::MacroReflection
- */
 export class MacroReflection extends AbstractReflection {
   readonly name: string;
   readonly options: Record<string, unknown>;
@@ -555,10 +443,6 @@ export class MacroReflection extends AbstractReflection {
     activeRecord: typeof Base,
   ) {
     super();
-    // Rails' `name` is a Symbol that callers always supply, but
-    // `Reflection.create` itself tolerates nil (reflection_test.rb:126). The
-    // field stays typed `string` because every real association path sets it;
-    // the nil case is confined to this assignment.
     this.name = name as string;
     this._scope = scope;
     this.options = this.normalizeOptions(options);
@@ -566,12 +450,6 @@ export class MacroReflection extends AbstractReflection {
     this.pluralName = activeRecord.pluralizeTableNames ? pluralize(name ?? "") : (name ?? "");
   }
 
-  /**
-   * Ruby's `name.to_s` — nil renders as "". Rails stores `@name = name` but
-   * every string derivation goes through interpolation or `to_s`
-   * (reflection.rb:453, :821-825, :829), so a nil name yields "" / "_id" /
-   * "_type" rather than the literal "null" JS template strings would produce.
-   */
   protected get nameString(): string {
     return this.name ?? "";
   }
@@ -605,10 +483,6 @@ export class MacroReflection extends AbstractReflection {
   }
 
   get klass(): typeof Base {
-    // Rails `@klass ||= compute_class(class_name)` (reflection.rb:422-423). The
-    // `||=` is load-bearing: a resolve that fails never writes a memo, so a
-    // lookup made against a still-incomplete model registry is retried rather
-    // than standing forever.
     if (this._klassCache) return this._klassCache;
     const resolved = this.options.anonymousClass
       ? (this.options.anonymousClass as typeof Base)
@@ -621,9 +495,6 @@ export class MacroReflection extends AbstractReflection {
   protected activeRecordRegistryName(): string {
     const ar = this.activeRecord as any;
     if (Object.prototype.hasOwnProperty.call(ar, "_registryKeys")) {
-      // Filter to keys that actually point to this class (not inherited superclass aliases),
-      // then prefer the most deeply namespaced key so that a model registered as both
-      // "Author" and "Admin::Author" resolves associations relative to "Admin::Author".
       const matching = (ar._registryKeys as string[]).filter(
         (k) => modelRegistry.get(k) === this.activeRecord,
       );
@@ -637,16 +508,12 @@ export class MacroReflection extends AbstractReflection {
   }
 
   _klass(className: string): typeof Base {
-    // Rails: when active_record.name.demodulize == class_name, try ::ClassName
-    // (absolute top-level) first, then fall back to namespace-relative lookup.
     const arName = this.activeRecordRegistryName();
     if (demodulize(arName) === className) {
       try {
         return this.computeClass(`::${className}`);
       } catch (e) {
-        // Rails: rescue NameError only — let ArgumentError (invalid subclass) propagate.
         if (e instanceof ArgumentError) throw e;
-        // fall through to namespace-relative lookup
       }
     }
     return this.computeClass(className);
@@ -659,8 +526,6 @@ export class MacroReflection extends AbstractReflection {
 
   scopeFor(relation: any, owner?: any): any {
     if (this._scope) {
-      // Match Rails instance_exec: 0-arity scopes run with this=relation,
-      // 1+-arity scopes receive relation as first arg
       if (this._scope.length === 0) {
         return this._scope.call(relation) || relation;
       }
@@ -669,19 +534,12 @@ export class MacroReflection extends AbstractReflection {
     return relation;
   }
 
-  /**
-   * @internal
-   * Derives class name from association name. Used by `className` getter.
-   */
+  /** @internal */
   protected deriveClassName(): string {
     return camelize(this.nameString);
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
-    // Rails coerces `class_name` with `.to_s` in AbstractReflection#class_name,
-    // so a Symbol works for every macro (belongs_to, has_many, …). JS has no
-    // Ruby symbol; the faithful analogue is a `Symbol("…")`, normalized to its
-    // description here so all reflection consumers see a string.
     if (typeof options.className === "symbol") {
       options = { ...options, className: options.className.description ?? "" };
     }
@@ -704,11 +562,6 @@ export class MacroReflection extends AbstractReflection {
   }
 }
 
-/**
- * Holds metadata about an aggregation (composed_of).
- *
- * Mirrors: ActiveRecord::Reflection::AggregateReflection
- */
 export class AggregateReflection extends MacroReflection {
   get macro(): MacroType {
     return "composedOf";
@@ -735,11 +588,6 @@ export class AggregateReflection extends MacroReflection {
   }
 }
 
-/**
- * Holds metadata about an association.
- *
- * Mirrors: ActiveRecord::Reflection::AssociationReflection
- */
 export class AssociationReflection extends MacroReflection {
   parentReflection: AssociationReflection | ThroughReflection | null = null;
   private _foreignKeyCache: string | string[] | null = null;
@@ -754,10 +602,6 @@ export class AssociationReflection extends MacroReflection {
     const opts = { ...options };
 
     if (opts.queryConstraints) {
-      // Mirrors Rails' ConfigurationError raised from AssociationReflection's
-      // constructor. `this` is unavailable before super(), so the macro is
-      // derived from new.target (the concrete subclass being constructed) to
-      // name the offending declaration (e.g. `Firm.hasMany :clients`).
       const macro = new.target.name.replace(/Reflection$/, "");
       const macroName = macro.charAt(0).toLowerCase() + macro.slice(1);
       throw new ConfigurationError(
@@ -831,10 +675,6 @@ export class AssociationReflection extends MacroReflection {
       );
     }
 
-    // Rails compares `owner_pk` against the constraints list unconditionally.
-    // When the owner has a composite PK, `owner_pk` is an array — never an
-    // element of the string-valued constraints list — so the guard always
-    // raises rather than being silently skipped.
     const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
     if (!ownerPkStr || !primaryQueryConstraints.includes(ownerPkStr)) {
       throw new ArgumentError(
@@ -897,8 +737,6 @@ export class AssociationReflection extends MacroReflection {
   }
 
   inverseOf(): AssociationReflection | ThroughReflection | null {
-    // Rails `return unless inverse_name; @inverse_of ||= klass._reflect_on_association
-    // inverse_name` (reflection.rb:258-261) — an unresolved inverse is not memoized.
     const name = this.inverseName();
     if (!name) return null;
     if (this._inverseOfCache) return this._inverseOfCache;
@@ -910,13 +748,8 @@ export class AssociationReflection extends MacroReflection {
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
   /**
-   * @internal Mirrors `inverse_name` (reflection.rb:749-755).
-   *
-   * @missingRailsCall fetch — PERMANENT: Equivalent (RFC 0106): `options.fetch(:inverse_of)
-   *   { automatic_inverse_of }` returns the STORED value whenever the key exists
-   *   (including `false`), and falls back to the block otherwise.
-   *   `options.inverseOf !== undefined` is exactly that key-presence test — not
-   *   a `??` nullish default — so the two arms match Ruby.
+   * @internal
+   * @missingRailsCall fetch — PERMANENT
    */
   override inverseName(): string | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
@@ -936,9 +769,6 @@ export class AssociationReflection extends MacroReflection {
     const snakeInverseName = this.options.as
       ? underscore(this.options.as as string)
       : underscore(demodulize(modelBaseName));
-    // Codebase convention is camelCase association names; Rails uses
-    // snake_case. Try both so automatic inverse detection works regardless
-    // of which form the user registered the inverse under.
     const camelInverseName = camelize(snakeInverseName, false);
     const candidateNames =
       camelInverseName === snakeInverseName
@@ -951,9 +781,6 @@ export class AssociationReflection extends MacroReflection {
       if (this.activeRecord.automaticallyInvertPluralAssociations) {
         for (const inverseName of candidateNames) lookupNames.push(pluralize(inverseName));
       }
-      // Pick the first candidate whose reflection is a valid inverse. A
-      // hit on an invalid candidate (e.g. inverseOf:false, mismatched FK,
-      // wrong target class) must not shadow a later valid one.
       for (const n of lookupNames) {
         const r = this.klass._reflectOnAssociation(n);
         if (r && this.validInverseReflection(r)) {
@@ -962,9 +789,6 @@ export class AssociationReflection extends MacroReflection {
         }
       }
     } catch (e: unknown) {
-      // Rails: `rescue NameError => error; raise unless error.name.to_s == class_name`
-      // (reflection.rb:769) — swallow only the miss for *this* reflection's own
-      // class name, re-raise anything else.
       if (e instanceof NameError && e.constantName === this.className) {
         reflection = false;
       } else {
@@ -1031,10 +855,6 @@ export class AssociationReflection extends MacroReflection {
     }
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::AssociationReflection#association_primary_key
-   * (reflection.rb:583-585).
-   */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
     return this.primaryKeyForModel(klass || this.klass);
   }
@@ -1050,11 +870,6 @@ export class AssociationReflection extends MacroReflection {
     return this.foreignType;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::AssociationReflection#join_primary_key
-   * (reflection.rb:606-608) — the klass argument is accepted and unused, as in
-   * Ruby.
-   */
   joinPrimaryKey(_klass?: typeof Base): string | string[] {
     return this.foreignKey;
   }
@@ -1092,12 +907,6 @@ export class AssociationReflection extends MacroReflection {
   }
 
   associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
-    // Rails (`reflection.rb` AssociationReflection#association_scope_cache):
-    //   key = self
-    //   key = [key, owner._read_attribute(@foreign_type)] if polymorphic?
-    //   klass.cached_find_by_statement(key, &block)
-    // The compiled statement is memoized on the *target* class, keyed by this
-    // reflection (plus the owner's polymorphic type when applicable).
     let key = `assocScope:${this.activeRecord.name}#${this.nameString}`;
     if (this.isPolymorphic()) {
       key += `:${owner?._readAttribute?.(this.foreignType)}`;
@@ -1127,9 +936,6 @@ export class AssociationReflection extends MacroReflection {
 
   checkEagerLoadableBang(): void {
     if (!this.scope) return;
-    // In our codebase scopes always receive the relation as first arg (arity 1).
-    // Instance-dependent scopes also receive the owner (arity >= 2).
-    // Rails checks scope.arity == 0 because it uses instance_exec for the relation.
     if (this.scope.length > 1) {
       throw new ArgumentError(
         `The association scope '${this.nameString}' is instance dependent (the scope ` +
@@ -1159,9 +965,7 @@ export class AssociationReflection extends MacroReflection {
     return [this];
   }
 
-  clearAssociationScopeCache(): void {
-    // Rails calls klass.initialize_find_by_cache — no-op until we have statement caching
-  }
+  clearAssociationScopeCache(): void {}
 
   isNested(): boolean {
     return false;
@@ -1227,12 +1031,6 @@ export class AssociationReflection extends MacroReflection {
     const simpleName = isAbsolute ? name.slice(2) : name;
 
     if (!isAbsolute) {
-      // Namespace-relative walk: mirrors Ruby's compute_type candidate list.
-      // For activeRecord registered as "A::B::C", tries "A::B::C::Name",
-      // "A::B::Name", "A::Name" before falling through to top-level "Name".
-      // When the registry name carries no namespace (e.g. an anonymous HABTM
-      // join model named "HABTM_Articles"), fall back to the model's Ruby
-      // `moduleName` so the owner's nesting still drives resolution.
       const arName = this.activeRecordRegistryName();
       const moduleName = (this.activeRecord as { moduleName?: string }).moduleName;
       const nestingSource = arName.includes("::") ? arName : moduleName;
@@ -1259,10 +1057,6 @@ export class AssociationReflection extends MacroReflection {
     try {
       resolved = constantize(simpleName) as typeof Base;
     } catch (error) {
-      // Rails re-raises compute_type's NameError as its own, carrying `name`
-      // (reflection.rb:494-503) — which is what lets automatic_inverse_of
-      // compare `error.name.to_s == class_name` at :769. A miss on an
-      // unrelated constant propagates untouched.
       if (!(error instanceof NameError)) throw error;
       if (!new RegExp(`(?:^|::)${simpleName}$`).test(error.constantName ?? "")) throw error;
       let message = `Missing model class ${simpleName} for the ${this.activeRecord.name}#${this.nameString} association.`;
@@ -1296,19 +1090,12 @@ export class AssociationReflection extends MacroReflection {
     return this;
   }
 
-  /**
-   * @internal
-   * Mirrors ActiveRecord::Reflection::AssociationReflection#derive_join_table:
-   * collapses a shared `[._]`-terminated prefix across the two table names.
-   */
+  /** @internal */
   protected deriveJoinTable(): string {
     return deriveJoinTableName(this.activeRecord.tableName, this.klass.tableName);
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection::HasManyReflection
- */
 export class HasManyReflection extends AssociationReflection {
   get macro(): MacroType {
     return "hasMany";
@@ -1323,9 +1110,6 @@ export class HasManyReflection extends AssociationReflection {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection::HasOneReflection
- */
 export class HasOneReflection extends AssociationReflection {
   get macro(): MacroType {
     return "hasOne";
@@ -1340,9 +1124,6 @@ export class HasOneReflection extends AssociationReflection {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection::BelongsToReflection
- */
 export class BelongsToReflection extends AssociationReflection {
   get macro(): MacroType {
     return "belongsTo";
@@ -1368,11 +1149,6 @@ export class BelongsToReflection extends AssociationReflection {
     return super.canFindInverseOfAutomatically(reflection, inverseReflection);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::BelongsToReflection#association_primary_key
-   * (reflection.rb:925-936). The klass option is necessary to support loading
-   * polymorphic associations.
-   */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
     const pk = this.options.primaryKey;
     if (pk !== undefined) {
@@ -1393,10 +1169,6 @@ export class BelongsToReflection extends AssociationReflection {
     return this.primaryKeyForModel(targetKlass);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::BelongsToReflection#join_primary_key
-   * (reflection.rb:944-946).
-   */
   joinPrimaryKey(klass?: typeof Base): string | string[] {
     return this.isPolymorphic() ? this.associationPrimaryKey(klass) : this.associationPrimaryKey();
   }
@@ -1414,9 +1186,6 @@ export class BelongsToReflection extends AssociationReflection {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection::HasAndBelongsToManyReflection
- */
 export class HasAndBelongsToManyReflection extends AssociationReflection {
   get macro(): MacroType {
     return "hasAndBelongsToMany";
@@ -1427,14 +1196,8 @@ export class HasAndBelongsToManyReflection extends AssociationReflection {
   }
 }
 
-/**
- * Wraps an AssociationReflection for :through associations.
- *
- * Mirrors: ActiveRecord::Reflection::ThroughReflection
- */
 export class ThroughReflection extends AbstractReflection {
   private _delegate: AssociationReflection;
-  /** `@association_primary_key` — memoized by {@link associationPrimaryKey}. */
   private _associationPrimaryKey?: string;
 
   /** @internal */
@@ -1454,7 +1217,6 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.name;
   }
 
-  /** Ruby's `name.to_s` — see MacroReflection#nameString. */
   private get nameString(): string {
     return this.name ?? "";
   }
@@ -1463,15 +1225,6 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.macro;
   }
 
-  /**
-   * Rails' ThroughReflection has no `association_scope_cache` of its own and
-   * doesn't inherit one (it extends `AbstractReflection`, not
-   * `AssociationReflection`); it reaches the method via the catch-all
-   * `delegate(*delegate_methods, to: :delegate_reflection)` at the tail of the
-   * class (reflection.rb:1221-1224). Mirror that single delegation so a through
-   * singular load statement-caches on the delegate reflection's key
-   * (`Association#find_target`, association.rb:262).
-   */
   associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
     return this.delegateReflection.associationScopeCache(klass, owner, block);
   }
@@ -1480,31 +1233,14 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.options;
   }
 
-  // `extensions` is in `AssociationReflection.public_instance_methods`, so
-  // ThroughReflection's blanket `delegate(*delegate_methods, to:
-  // :delegate_reflection)` (reflection.rb:1221-1225) routes it to the delegate.
-  // This is how a HABTM's `extend:` — forwarded onto the generated
-  // `has_many :through` (associations.rb:1900) — reaches
-  // `Association#extensions` (association.rb:170).
   extensions(): any[] {
     return this.delegateReflection.extensions();
   }
 
-  // Rails ThroughReflection delegates `autosave=` to the delegate reflection
-  // (delegate_methods), where the setter writes `options[:autosave]`. Mirror it
-  // so `accepts_nested_attributes_for` on a HABTM/through association flips
-  // autosave on the options the save path reads (delegateReflection.options).
   set autosave(value: boolean) {
     this.delegateReflection.autosave = value;
   }
 
-  // `parent_reflection` is an `attr_accessor` on AssociationReflection
-  // (reflection.rb:515) and ThroughReflection does not redefine it, so it lands
-  // in `delegate_methods` and both halves reach the delegate
-  // (reflection.rb:1222-1225). `autosave=` reads it off the same object, which
-  // is how `has_and_belongs_to_many`'s `_reflections[name].parent_reflection =
-  // habtm_reflection` (associations.rb:1905) makes nested attributes propagate
-  // autosave onto the HABTM reflection.
   get parentReflection(): AssociationReflection | ThroughReflection | null {
     return this.delegateReflection.parentReflection;
   }
@@ -1529,18 +1265,6 @@ export class ThroughReflection extends AbstractReflection {
     return this.sourceReflection?.foreignType ?? this.delegateReflection.foreignType;
   }
 
-  /**
-   * The polymorphic `*_type` column a through chain must filter on. Rails:
-   * `delegate :type, ..., to: :source_reflection` (reflection.rb:973-974).
-   * The source's own `type` already encodes the correct value: an `as:`
-   * has_many/has_one source yields `"#{as}_type"`, a `polymorphic:` belongs_to
-   * source yields `null` (BelongsToReflection#type override, reflection.ts:1313 —
-   * it carries its filter via a PolymorphicReflection chain entry instead), and
-   * a nested-through source delegates recursively through this same getter.
-   * Without it, `AssociationScope.nextChainScope` reads `undefined` for the
-   * through chain head and omits e.g. `taggings.taggable_type = 'Post'`, leaking
-   * rows whose FK collides across taggable types.
-   */
   get type(): string | null {
     return this.sourceReflection?.type ?? null;
   }
@@ -1550,22 +1274,6 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get className(): string {
-    // Rails AbstractReflection#class_name:
-    //   @class_name ||= options[:class_name] || derive_class_name
-    // and ThroughReflection#derive_class_name:
-    //   options[:source_type] || source_reflection.class_name
-    // i.e. an explicit class_name wins, else resolve via the source reflection
-    // rather than the through association's own name (`noJoinsComments` would
-    // otherwise singularize to a nonexistent `NoJoinsComment`, while its source
-    // is `Comment`).
-    //
-    // The trailing `delegateReflection.className` fallback is deliberately
-    // NON-Rails: when the source can't be resolved Rails raises (nil.class_name
-    // inside derive_class_name); we instead return the delegate's own
-    // singularized name so `_klass` produces the informative "Model
-    // 'NoJoinsComment' not found" error rather than "Model '' not found". This
-    // is a best-effort error-message path, not a resolution path — it only
-    // triggers when the source genuinely can't be resolved.
     return (
       (this.options.className as string | undefined) ||
       this.deriveClassName() ||
@@ -1574,9 +1282,6 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get klass(): typeof Base {
-    // Rails `@klass ||= delegate_reflection._klass(class_name)`
-    // (reflection.rb:989-990), where @klass is seeded with
-    // options[:anonymous_class] in the constructor.
     if (this._klassCache) return this._klassCache;
     const anonymousClass = this._delegate.options.anonymousClass as typeof Base | undefined;
     this._klassCache = anonymousClass ?? this._delegate._klass(this.className);
@@ -1615,10 +1320,6 @@ export class ThroughReflection extends AbstractReflection {
     return this.options.through as string;
   }
 
-  /**
-   * Mirrors: `source_reflection` (reflection.rb:1010-1014) — computed on every
-   * read, never memoized.
-   */
   get sourceReflection(): AssociationReflection | ThroughReflection | null {
     const srcName = this.sourceReflectionName();
     if (!srcName) return null;
@@ -1627,7 +1328,6 @@ export class ThroughReflection extends AbstractReflection {
     return throughRef.klass._reflectOnAssociation(srcName) ?? null;
   }
 
-  /** Mirrors: `through_reflection` (reflection.rb:1028-1030) — not memoized. */
   get throughReflection(): AssociationReflection | ThroughReflection | null {
     return this.activeRecord._reflectOnAssociation(this.through) ?? null;
   }
@@ -1636,12 +1336,6 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.joinTable;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::ThroughReflection#join_primary_key
-   * (reflection.rb:1093-1095) — `source_reflection.join_primary_key(klass)`.
-   * The klass matters when the source is a polymorphic belongsTo with a
-   * sourceType: the resolved class may use a different PK column (e.g. `uuid`).
-   */
   joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
     const src = this.sourceReflection;
     if (!src) this.checkValidityBang();
@@ -1700,20 +1394,7 @@ export class ThroughReflection extends AbstractReflection {
     );
   }
 
-  /**
-   * We want to use the klass from this reflection, rather than just delegate
-   * straight to the source_reflection, because the source_reflection may be
-   * polymorphic. We still need to respect the source_reflection's :primary_key
-   * option, though.
-   *
-   * Mirrors: ActiveRecord::Reflection::ThroughReflection#association_primary_key
-   * (reflection.rb:1083-1090). Unlike BelongsToReflection's (:928), this branch
-   * has no Array arm — it is `-primary_key.to_s` whatever the option holds, and
-   * Ruby's `Array#to_s` is an alias of `inspect`.
-   */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
-    // Get the "actual" source reflection if the immediate source reflection has a
-    // source reflection itself
     const primaryKey = (this.actualSourceReflection() as unknown as ConcreteReflection).options
       ?.primaryKey;
     if (primaryKey != null && primaryKey !== false) {
@@ -1725,11 +1406,6 @@ export class ThroughReflection extends AbstractReflection {
     }
   }
 
-  /**
-   * Rails: `delegate :active_record_primary_key, ..., to: :source_reflection`
-   * (reflection.rb:973-974). It pairs with #foreignKey, which delegates the
-   * same way, so a composite source edge yields matching arities.
-   */
   get activeRecordPrimaryKey(): string | string[] {
     return this.sourceReflection?.activeRecordPrimaryKey ?? this._delegate.activeRecordPrimaryKey;
   }
@@ -1743,13 +1419,6 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   inverseOf(): AssociationReflection | ThroughReflection | null {
-    // Rails resolves inverse_of via AbstractReflection#inverse_of, i.e.
-    // `klass._reflect_on_association(inverse_name)` against the through
-    // reflection's OWN klass (the source reflection's target). Delegating to
-    // the underlying reflection would resolve the inverse against the delegate's
-    // name-derived klass (`leadDeveloper` → nonexistent `LeadDeveloper`) instead
-    // of the source class (`Developer`).
-    // reflection.rb:258-261 — `return unless inverse_name` then `@inverse_of ||=`.
     const name = this.inverseName();
     if (!name) return null;
     if (this._inverseOfCache) return this._inverseOfCache;
@@ -1770,14 +1439,6 @@ export class ThroughReflection extends AbstractReflection {
     return [...new Set(names)];
   }
 
-  /**
-   * Mirrors: `source_reflection_name` (reflection.rb:1112-1130). The Ruby memo
-   * is `@source_reflection_name ||=`, so a run that finds no name writes
-   * nothing and the next read tries again — which is what makes a name resolved
-   * against a still-incomplete model registry recoverable. Rails has no rescue
-   * here: a NameError out of `through_reflection.klass` propagates naming the
-   * missing model, rather than resurfacing later as a missing source association.
-   */
   sourceReflectionName(): string | null {
     if (this._sourceReflectionNameCache) return this._sourceReflectionNameCache;
 
@@ -1914,12 +1575,7 @@ export class ThroughReflection extends AbstractReflection {
     return (this.options.sourceType as string) || (this.sourceReflection as any)?.className || "";
   }
 
-  /**
-   * @internal
-   * Mirrors `HasManyThroughAssociationNotFoundError#corrections`: feeds the
-   * owner's reflection names (minus the failing one) into the shared
-   * did_you_mean-compatible SpellChecker.
-   */
+  /** @internal */
   private _throughCorrections(): string[] {
     const rawReflections: Record<string, unknown> =
       (this.activeRecord as { _reflections?: Record<string, unknown> })._reflections ?? {};
@@ -1927,10 +1583,7 @@ export class ThroughReflection extends AbstractReflection {
     return _correctNames(dictionary, this.through);
   }
 
-  /**
-   * @internal
-   * Walks the through chain collecting all intermediate reflections.
-   */
+  /** @internal */
   private collectJoinReflections(seed: AbstractReflection[]): AbstractReflection[] {
     const src = this.sourceReflection;
     if (!src) return seed;
@@ -1944,11 +1597,6 @@ export class ThroughReflection extends AbstractReflection {
   }
 }
 
-/**
- * Wraps a reflection for polymorphic :through associations, adding a type constraint.
- *
- * Mirrors: ActiveRecord::Reflection::PolymorphicReflection
- */
 export class PolymorphicReflection extends AbstractReflection {
   private _reflection: AbstractReflection;
   private _previousReflection: AbstractReflection;
@@ -1975,11 +1623,6 @@ export class PolymorphicReflection extends AbstractReflection {
     return (this._reflection as any).type;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::PolymorphicReflection#join_primary_key
-   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`, whose
-   * default is `self.klass`.
-   */
   joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
     return (this._reflection as AssociationReflection).joinPrimaryKey(klass);
   }
@@ -2032,12 +1675,6 @@ export class PolymorphicReflection extends AbstractReflection {
   }
 }
 
-/**
- * A runtime reflection that delegates to an actual reflection but can resolve
- * the klass from an association instance.
- *
- * Mirrors: ActiveRecord::Reflection::RuntimeReflection
- */
 export class RuntimeReflection extends AbstractReflection {
   private _reflection: AbstractReflection;
   private _association: any;
@@ -2084,13 +1721,6 @@ export class RuntimeReflection extends AbstractReflection {
     return (this.klass as any).arelTable;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::RuntimeReflection#join_primary_key
-   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`. The
-   * head's klass is the RUNTIME one (`association.klass`), which is the whole
-   * point of RuntimeReflection: a polymorphic belongs_to cannot compute its
-   * target class from the reflection alone.
-   */
   joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
     return (this._reflection as AssociationReflection).joinPrimaryKey(klass);
   }
@@ -2098,12 +1728,6 @@ export class RuntimeReflection extends AbstractReflection {
   allIncludes(callback: () => any): any {
     return callback();
   }
-
-  // Ruby's RuntimeReflection is a SimpleDelegator-ish subclass: the members it
-  // doesn't define reach the wrapped reflection. TS has no such fallback, and
-  // AbstractReflection's defaults are hard-coded (`is_collection?` → false), so
-  // the members AssociationScope reads off the chain head are forwarded here —
-  // the same explicit forwarding ReflectionProxy uses.
 
   get options(): Record<string, unknown> {
     return asConcrete(this._reflection).options;
@@ -2137,10 +1761,6 @@ export class RuntimeReflection extends AbstractReflection {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Factory & public API
-// ---------------------------------------------------------------------------
-
 /** @internal */
 function reflectionClassFor(
   macro: string,
@@ -2166,9 +1786,6 @@ function reflectionClassFor(
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection.create
- */
 export function create(
   macro: Exclude<MacroType, "composedOf">,
   name: string | null,
@@ -2197,27 +1814,13 @@ export function create(
     : (reflection as AssociationReflection | AggregateReflection);
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection.add_reflection
- *
- * @missingRailsCall merge! — PERMANENT: Equivalent (RFC 0106): the `.merge!(name =>
- *   reflection)` half of `_reflections.except(name).merge!(...)` is a
- *   single-pair in-place merge; `except` is now the Rails call and the pair is
- *   assigned onto the returned hash, which is what `Hash#merge!` does here.
- */
+/** @missingRailsCall merge! — PERMANENT */
 export function addReflection(
   ar: typeof Base,
   name: string,
   reflection: AssociationReflection | ThroughReflection,
 ): void {
   clearReflectionsCache(ar);
-  // Rails: `ar._reflections = ar._reflections.except(name).merge!(name => reflection)`
-  // (reflection.rb:23). `_reflections` is a `class_attribute` (reflection.rb:11),
-  // so the reassignment is what makes the registry per-class: the read walks the
-  // constructor chain, the write lands here. `except` drops an existing entry so
-  // the new reflection is re-appended at the end, preserving the subclass's
-  // declaration order (the has_many :through order check in checkValidityBang
-  // depends on it).
   const reflections: Record<string, unknown> = except(
     (ar as any)._reflections as Record<string, unknown>,
     name,
@@ -2226,12 +1829,6 @@ export function addReflection(
   (ar as any)._reflections = reflections;
 }
 
-/**
- * Mirrors: ActiveRecord::Reflection.add_aggregate_reflection
- * (reflection.rb:29-31). `aggregate_reflections` is a `class_attribute`
- * (reflection.rb:12), so the reassignment is the whole per-class mechanism:
- * the read walks the constructor chain, the write lands on `ar`.
- */
 export function addAggregateReflection(
   ar: typeof Base,
   name: string,
@@ -2240,26 +1837,13 @@ export function addAggregateReflection(
   ar.aggregateReflections = merge(ar.aggregateReflections, { [name]: reflection });
 }
 
-// ---------------------------------------------------------------------------
-// ClassMethods — standalone functions mirroring ActiveRecord::Reflection::ClassMethods.
-// In Rails these are mixed into the model class; here they are module-level
-// functions that take the model class as the first argument.
-// ---------------------------------------------------------------------------
-
 export function reflections(
   modelClass: typeof Base,
 ): Readonly<Record<string, AssociationReflection | ThroughReflection>> {
   return normalizedReflections(modelClass);
 }
 
-/**
- * Minimal shape of values stored in `Base._reflections`. They are always
- * `AssociationReflection | ThroughReflection`, but `normalizedReflections`
- * only consumes the `name` and `parentReflection` fields — captured here so
- * the lookup loop stays free of `as any` casts.
- *
- * @internal
- */
+/** @internal */
 type RawReflection = (AssociationReflection | ThroughReflection) & {
   readonly parentReflection?: AssociationReflection | ThroughReflection | null;
 };
@@ -2297,10 +1881,6 @@ export function clearReflectionsCache(modelClass: typeof Base): void {
   _normalizedReflectionsCache.delete(modelClass);
 }
 
-// ---------------------------------------------------------------------------
-// Public helper functions
-// ---------------------------------------------------------------------------
-
 export function _reflectOnAssociation(
   modelClass: typeof Base,
   name: string,
@@ -2309,13 +1889,6 @@ export function _reflectOnAssociation(
   return (rawReflections[name] as AssociationReflection | ThroughReflection | undefined) ?? null;
 }
 
-/**
- * `this`-typed class-method variant of {@link _reflectOnAssociation} for
- * wiring onto Base via `extend()`. Same behavior — reads the raw
- * `_reflections` registry without normalization.
- *
- * Mirrors: ActiveRecord::Reflection::ClassMethods#_reflect_on_association
- */
 export function _reflectOnAssociationClassMethod(
   this: typeof Base,
   name: string,
@@ -2368,18 +1941,7 @@ export function reflectOnAllAutosaveAssociations(
   });
 }
 
-/**
- * Union type for reflections returned by the public API.
- */
 export type AssociationLikeReflection = AssociationReflection | ThroughReflection;
-
-// ---------------------------------------------------------------------------
-// `this`-typed wrappers for wiring onto Base via extend(). The module-level
-// functions above take `modelClass` as the first arg for internal callers;
-// these variants read `this` so user code can call them Rails-style:
-// `Post.reflectOnAssociation("comments")`.
-// Mirrors: ActiveRecord::Reflection::ClassMethods — methods on the class.
-// ---------------------------------------------------------------------------
 
 export const ClassMethods = {
   reflections(

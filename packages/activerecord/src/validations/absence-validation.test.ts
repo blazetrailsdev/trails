@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -32,8 +28,6 @@ describe("AbsenceValidationTest", () => {
     }
     Boy.validatesAbsenceOf("face");
 
-    // Rails `boy_klass.new(face: Face.new)` — the has_one writer, which on an
-    // unsaved owner only sets the target (has_one_association.rb:59-66).
     const boy = new Boy();
     const face = new Face();
     await (boy as unknown as { association(n: string): { writer(v: unknown): unknown } })

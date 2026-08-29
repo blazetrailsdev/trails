@@ -1,6 +1,3 @@
-// activerecord/test/fixtures/essays.yml
-// writer_id/category_id/author_id are string columns; values are literals,
-// not row-name refs (e.g. writer_id "David" is the Author#name, not a fixture label).
 export const essayFixtureData = {
   david_modest_proposal: {
     name: "A Modest Proposal",

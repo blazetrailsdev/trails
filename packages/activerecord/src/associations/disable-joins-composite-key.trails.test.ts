@@ -1,19 +1,3 @@
-/**
- * Composite-key support in DisableJoinsAssociationScope.
- *
- * DJAS delegates composite matching to the positional composite form
- * `where(columns, tuples)`, which routes through
- * `PredicateBuilder.buildComposite` (PR #647). That helper emits the
- * composite predicate (Arel `OR`-of-`AND` over per-column equalities,
- * matching `counter-cache.ts#buildPkPredicate`) so DJAS itself stays
- * a thin chain-walker — same layering as Rails'
- * `disable_joins_association_scope.rb:34` (`where(key => join_ids)`
- * with PredicateBuilder doing the composite work).
- *
- * This test covers the current composite-key path used for disable-
- * joins through associations: tuple-style matching across the
- * intermediate records, no JOIN in the generated query shape.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";

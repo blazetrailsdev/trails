@@ -1,9 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Mirrors: vendor/rails/activerecord/test/cases/serialization_test.rb
- */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Contact } from "./test-helpers/models/contact.js";
@@ -22,9 +16,6 @@ const { books } = fixtures({ books: [Book, bookFixtureData] });
 
 const FORMATS = ["json"] as const;
 
-// Mirrors Rails' `public_send("to_#{format}")` / `from_#{format}` dispatch.
-// `to_json` translates to `toJSON` (docs/ruby-ts-conventions.md), so the `to`
-// side upcases the whole format where the `from` side capitalizes it.
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const toFormat = (record: Contact, format: string, opts?: unknown) =>
   (record as unknown as Record<string, (o?: unknown) => string>)[`to${format.toUpperCase()}`](opts);
@@ -133,10 +124,6 @@ describe("SerializationTest", () => {
       author as unknown as { serializedPosts: { create(attrs: object): Promise<unknown> } }
     ).serializedPosts.create({ title: "Hello" });
 
-    // `title` is coderless-`serialize`-wrapped, so it persists as the default
-    // (YAML) coder's encoded form (`YAML.dump("Hello") == "Hello\n"`). trails'
-    // query layer does not re-serialize a serialized-attribute predicate, so the
-    // WHERE must use that pre-serialized string to match the stored value.
     const results = await Author.joins(":serializedPosts").where({
       name: "David",
       serialized_posts: { title: "Hello" },

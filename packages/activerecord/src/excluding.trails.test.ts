@@ -1,16 +1,3 @@
-/**
- * Trails-only: Rails materializes `relations.flat_map(&:ids)` eagerly inside
- * the synchronous `excluding!`, so it has a single arm and no deferred marker
- * to pin. trails defers unloaded relation args, and that arm must read the
- * primary-key attribute off the predicate builder's own table — Rails'
- * `predicate_builder[primary_key, records]` (predicate_builder.rb:53-55) — not
- * off the model's default arel table.
- *
- * A relation argument that is already `loaded?` needs no query for its ids —
- * `Relation#ids` maps its rows (calculations.rb:373-380) — so `excluding`
- * materializes that arm eagerly, where Rails materializes, and no marker is
- * recorded at all. Rails has no test for it because it has no other arm.
- */
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { Nodes } from "@blazetrails/arel";
@@ -45,9 +32,6 @@ describe("excluding deferred arm (trails)", () => {
     expect(sql).toContain(String((await loaded.records())[0].id));
   });
 
-  // `spawn.excluding!(...)` (query_methods.rb:1580) has no empty-argument
-  // short circuit: the result is always a distinct relation carrying the
-  // (vacuously true) inverted predicate.
   it("spawns and appends the inverted predicate with no arguments", () => {
     const all = Post.all();
     const excluded = all.excluding();

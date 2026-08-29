@@ -1,5 +1,4 @@
 import { Temporal } from "@blazetrails/date";
-// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
@@ -8,8 +7,6 @@ import { StatementInvalid } from "./errors.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so association targets resolve by
-// name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company, DependentFirm, Client } from "./test-helpers/models/company.js";
@@ -28,12 +25,7 @@ import { NeedQuoting } from "./test-helpers/models/need-quoting.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { Edge } from "./test-helpers/models/edge.js";
 
-// ==========================================================================
-// CalculationsTest — targets calculations_test.rb
-// ==========================================================================
 describe("CalculationsTest", () => {
-  // fixtures :companies, :accounts, :authors, :author_addresses, :topics,
-  //          :speedometers, :minivans, :books, :posts, :comments, :cpk_books
   const { companies, topics, cpkBooks, minivans } = fixtures([
     "companies",
     "accounts",
@@ -49,10 +41,6 @@ describe("CalculationsTest", () => {
     "cpkAuthors",
     "oneNeedQuoting",
   ] as const);
-  // Several tests intentionally trigger DB errors (invalid column/syntax) that
-  // abort the PG transaction; they still run transactionally because the
-  // fixture teardown skips its redundant DELETEs while the pinned transaction is
-  // open, so the abort no longer poisons the rollback.
 
   it("should sum field", async () => {
     expect(await Account.sum("credit_limit")).toBe(318);
@@ -194,10 +182,6 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by multiple fields when table name is too long", async () => {
-    // Rails: TooLongTableName — canonical Account stands in (the canonical schema
-    // has no toooooooo_long_* table). trails aliases group keys `group_key_<i>`
-    // rather than deriving them from the column, so table-name length can never
-    // overflow an alias; what survives porting is the tuple-keying assertion.
     const res = await Account.group("firm_id", "credit_limit").count();
     expect([...(res as Map<unknown, number>).entries()]).toContainEqual([[6, 50], 1]);
     expect([...(res as Map<unknown, number>).entries()]).toContainEqual([[6, 55], 1]);
@@ -260,8 +244,6 @@ describe("CalculationsTest", () => {
   });
 
   it("should not use alias for grouped field", async () => {
-    // Rails: asserts GROUP BY uses accounts.firm_id (not an alias) and order("accounts_firm_id") works.
-    // In trails, use the qualified column name for ORDER BY since auto-alias translation may not apply.
     const c = (await Account.group("firm_id").order("accounts.firm_id").sum("credit_limit")) as Map<
       unknown,
       number
@@ -312,13 +294,11 @@ describe("CalculationsTest", () => {
   });
 
   it("order should apply before count", async () => {
-    // Rails: Account.order(id: :desc).limit(4).count(:firm_id) == 4
     const accounts = Account.order({ id: "desc" }).limit(4);
     expect(await accounts.count()).toBe(4);
   });
 
   it("limit should apply before count", async () => {
-    // accounts 1..4: account 2 has null firm_id → count(:firm_id) = 3
     const accounts = Account.order("id").limit(4);
     expect(await accounts.count("firm_id")).toBe(3);
     expect(await accounts.select("firm_id").count()).toBe(3);
@@ -386,7 +366,6 @@ describe("CalculationsTest", () => {
   });
 
   it("count with eager loading and custom order", async () => {
-    // Rails: Post.includes(:comments).order("comments.id").count() == 11
     const count = await Post.includes(":comments").order("comments.id").count();
     expect(typeof count).toBe("number");
     expect(count).toBeGreaterThan(0);
@@ -405,8 +384,6 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct count all with custom select and order", async () => {
-    // Rails: Account.distinct.select("credit_limit % 10").order(...).count == 3
-    // (50%10=0, 53%10=3, 55%10=5, 60%10=0 → 3 distinct remainders)
     const count = await Account.distinct()
       .select("credit_limit % 10")
       .order(arelSql("credit_limit % 10"))
@@ -442,8 +419,6 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct joins count with group by", async () => {
-    // Rails: Post.left_joins(:comments).group(:post_id).distinct.count(:author_id)
-    // Groups by comments.post_id; posts with no comments get null key.
     const result = (await Post.leftJoins(":comments")
       .group("comments.post_id")
       .distinct()
@@ -453,10 +428,7 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct count with group by and order and limit", async () => {
-    // Rails: Account.group(:firm_id).distinct.order("1 DESC").limit(1).count == { 6 => 2 }
-    // firm_id=6 has 2 accounts (ids 3+5); it is the group with the highest count.
     const result = (await Account.group("firm_id").count()) as Map<unknown, number>;
-    // firm_id=6 should have count 2; all others have count 1
     expect(result.get(6)).toBe(2);
     expect([...result.values()].filter((v) => v === 1).length).toBeGreaterThan(0);
   });
@@ -486,17 +458,13 @@ describe("CalculationsTest", () => {
     const c = (await Account.group("firm_id")
       .having("sum(credit_limit) > 50")
       .sum("credit_limit")) as Map<unknown, number>;
-    // firm_id=6 sum=105 and firm_id=2 sum=60 satisfy sum > 50
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
     expect(c.get(9)).toBe(53);
-    // firm_id=1 (sum=50) and the NULL group (sum=50) fail sum > 50
     expect(c.has(1)).toBe(false);
     expect(c.has(null)).toBe(false);
   });
 
-  // Rails skips this on PG/Oracle: only MySQL and SQLite let HAVING reference a
-  // SELECT alias (calculations_test.rb:451).
   it.skipIf(adapterType === "postgres")(
     "should group by summed field having condition from select",
     async () => {
@@ -608,7 +576,6 @@ describe("CalculationsTest", () => {
     const sp = await Speedometer.create({ speedometer_id: "ABC", name: "test" });
     await Minivan.create({ minivan_id: "OMG", speedometer_id: sp.speedometer_id, name: "van" });
     const c = await Minivan.group("speedometer").count();
-    // Result is a Map<Speedometer|null, number>; find the entry for our new speedometer
     let found = false;
     for (const [key, value] of c as Map<Speedometer | null, number>) {
       if (key instanceof Speedometer && key.speedometer_id === "ABC") {
@@ -699,8 +666,6 @@ describe("CalculationsTest", () => {
 
   it("should count selected field with include", async () => {
     expect(await Account.includes(":firm").distinct().count()).toBe(6);
-    // Rails: Account.includes(:firm).distinct.select(:credit_limit).count == 4
-    // (4 distinct credit_limit values: 50, 53, 55, 60)
     expect(
       await Account.includes(":firm").distinct().select("credit_limit").count(),
     ).toBeGreaterThanOrEqual(4);
@@ -719,7 +684,6 @@ describe("CalculationsTest", () => {
 
   it("should count scoped select", async () => {
     await Account.updateAll({ credit_limit: null });
-    // After nulling all credit_limits, count(credit_limit) returns 0 (NULL not counted)
     expect(await Account.count("credit_limit")).toBe(0);
   });
 
@@ -735,13 +699,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count manual select with count all", async () => {
-    // DISTINCT accounts.firm_id → 5 non-null distinct firm_ids (null counts as 1 here)
-    // Rails uses COUNT(*) with a DISTINCT subquery
     expect(await Account.count("firm_id")).toBe(5);
   });
 
   it("should count with manual distinct select and distinct", async () => {
-    // Rails: Account.select("DISTINCT accounts.firm_id").distinct.count == 4 (4 distinct non-null)
     expect(await Account.distinct().count("firm_id")).toBe(4);
   });
 
@@ -769,8 +730,6 @@ describe("CalculationsTest", () => {
   });
 
   it.skipIf(adapterType !== "mysql")("count selected arel attributes", async () => {
-    // MySQL: COUNT(DISTINCT id, firm_id) excludes rows where firm_id IS NULL → 5.
-    // MariaDB handles NULLs differently in COUNT(DISTINCT ...) and returns 6.
     expect(
       await Account.distinct()
         .select(Account.arelTable.get("id"), Account.arelTable.get("firm_id"))
@@ -836,8 +795,6 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field of root table with conflicting group by column", async () => {
-    // Rails: Post.joins(:comments).group(:post_id).count == { 1=>2, 2=>1, 4=>5, 5=>3, 7=>1 }
-    // Also tests group("comments.post_id") which avoids the ambiguous column qualification.
     const expected = new Map([
       [1, 2],
       [2, 1],
@@ -855,7 +812,6 @@ describe("CalculationsTest", () => {
   });
 
   it("count with too many parameters raises", async () => {
-    // Rails raises ArgumentError when count is given more than 1 argument.
     await expect((Account as any).count(1, 2, 3)).rejects.toThrow();
   });
 
@@ -972,11 +928,8 @@ describe("CalculationsTest", () => {
   });
 
   it("sum with grouped calculation", async () => {
-    // Rails: Post.group(:tags_count).sum == { 0 => 0, 1 => 0, 3 => 0 }
-    // (posts have tags_count of 0, 1, or 3; sum without a column returns {group => 0})
     const result = (await Post.group("tags_count").count()) as Map<unknown, number>;
     expect(result).toBeInstanceOf(Map);
-    // tags_count values in fixtures: 0, 1, 3
     expect([...result.keys()]).toEqual(expect.arrayContaining([0, 1, 3]));
   });
 
@@ -1020,8 +973,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck without column names", async () => {
-    // Rails: pluck with no args returns all columns; trails may not support this.
-    // Skip the exact-format check; just verify it doesn't crash or returns a result.
     const count = await Company.order("id").limit(1).count();
     expect(count).toBe(1);
   });
@@ -1041,8 +992,6 @@ describe("CalculationsTest", () => {
       ["2004-04-15", "reading"],
       ["2004-04-15", "read"],
     ];
-    // Rails: AuthorAddress.joins(author: [:topics, :books])...pluck("topics.last_read", "books.last_read")
-    // We verify structure rather than exact values due to enum serialization.
     const rows = await Author.joins({ ":topics": [] }).limit(1).pluck("id");
     expect(Array.isArray(rows)).toBe(true);
     void expected;
@@ -1086,7 +1035,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck on aliased attribute", async () => {
-    // Rails: Topic.order(:id).pluck(:heading) uses aliasAttribute heading→title
     const first = await Topic.order("id")
       .pluck("title")
       .then((r) => r[0]);
@@ -1094,8 +1042,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with serialization", async () => {
-    // Rails: serialized columns are deserialized when plucked.
-    // Topic.content is serialized as YAML in Rails, JSON in trails.
     const t = await Topic.create({ content: "test content" });
     const result = await Topic.where({ id: t.id }).pluck("content");
     expect(result[0]).toBeDefined();
@@ -1125,7 +1071,6 @@ describe("CalculationsTest", () => {
   it("pluck not auto table name prefix if column joined", async () => {
     const c = await Company.create({ name: "test" });
     const contract = await Contract.create({ company_id: c.id, developer_id: 7 });
-    // When joining, the unqualified "developer_id" should pick from contracts.developer_id
     const result = await Company.where({ id: c.id })
       .joins(":contracts")
       .pluck("contracts.developer_id");
@@ -1145,8 +1090,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with hash argument", async () => {
-    // Rails: pluck("id", { topics: "title" }) uses hash form to qualify columns.
-    // Use explicit qualified column names instead.
     const expected = [
       [1, "The First Topic"],
       [2, "The Second Topic of the day"],
@@ -1159,9 +1102,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with hash argument with multiple tables", async () => {
-    // Rails: Post.joins(:comments).order(posts:{id:asc},comments:{id:asc}).limit(3).pluck(:id, comments:[:id,:body])
-    // == [[1,1,"Thank you for the welcome"],[1,2,"Thank you again for the welcome"],[2,3,"Don't think too hard"]]
-    // Verify the posts are returned in the right order by plucking posts.id.
     const postIds = (
       await Post.joins(":comments")
         .order("posts.id ASC, comments.id ASC")
@@ -1182,7 +1122,6 @@ describe("CalculationsTest", () => {
   });
 
   it("ids for a composite primary key", async () => {
-    // Rails: CpkBook.ids == CpkBook.pluck(*CpkBook.primary_key)
     const all = await CpkBook.all();
     const byPluck = ((await CpkBook.all().pluck("author_id", "id")) as [unknown, unknown][]).map(
       ([a, b]) => [Number(a), Number(b)],
@@ -1358,18 +1297,13 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with join", async () => {
-    // Rails: Reply.includes(:topic).order(:id).pluck(:id, { topics: :id }) == [[2,2],[4,4]]
-    // Reply is STI on the topics table; plucking id and topics.id (both are the reply's own id).
     const ids = (await Reply.order("id").pluck("id")).map(Number);
     expect(ids).toEqual([2, 4]);
-    // Verify includes(:topic) works (preloads parent topic via parent_id)
     const replies = await Reply.includes(":topic").order("id");
     expect(replies.map((r) => Number(r.id))).toEqual([2, 4]);
   });
 
   it("pluck with join alias", async () => {
-    // Rails: Reply.includes(:topic).order(:id).pluck(:id, { topic: :id }) == [[2,1],[4,3]]
-    // `topic` is the belongs_to (parent topic); parent_id holds the parent topic id.
     const result = ((await Reply.order("id").pluck("id", "parent_id")) as [unknown, unknown][]).map(
       ([a, b]) => [Number(a), Number(b)],
     );
@@ -1386,9 +1320,6 @@ describe("CalculationsTest", () => {
         ["SpecialPost", 1],
         ["StiPost", 2],
       ]);
-      // Rails `order(:count)`: the Symbol qualifies to `"posts"."count"`, which PG
-      // resolves via functional notation as `count(posts.*)` — the "virtual count
-      // attribute". A bare string would stay raw SQL and fail to parse.
       const actual = await (Post.group("type").order(":count" as any) as any)
         .limit(2)
         .maximum("comments_count");
@@ -1428,7 +1359,6 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with quoted count and order by alias", async () => {
-    // Rails: Post.group(:type).order("count_posts_id").count(Arel.sql('"posts"."id"'))
     const actual = (await Post.group("type").count("posts.id")) as Map<unknown, number>;
     expect(actual).toBeInstanceOf(Map);
     expect([...actual.keys()]).toEqual(expect.arrayContaining(["Post", "SpecialPost", "StiPost"]));
@@ -1501,7 +1431,6 @@ describe("CalculationsTest", () => {
   it("pluck with multiple columns and includes", async () => {
     const c = await Company.create({ name: "test" });
     await Contract.create({ company_id: c.id, developer_id: 7 });
-    // Use a join rather than includes to pick developer_id from contracts
     const rows = (
       (await Company.where({ id: c.id })
         .joins(":contracts")
@@ -1511,7 +1440,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with reserved words", async () => {
-    // Rails uses Possession model; we use NeedQuoting which has a quoted name column
     const names = await NeedQuoting.pluck("name");
     expect(Array.isArray(names)).toBe(true);
   });
@@ -1525,8 +1453,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with qualified name on loaded", async () => {
-    // Rails: Topic.joins(:replies).order(:id).pluck("topics.id", "replies_topics.id") == [[1,2],[3,4]]
-    // Topic 1 has reply 2; Topic 3 has reply 4.
     const t = Topic.joins(":replies").order("topics.id");
     expect(t.isLoaded).toBe(false);
     const before = (await t.pluck("topics.id")).map(Number);
@@ -1538,9 +1464,6 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck columns with same name", async () => {
-    // Rails: Topic.joins(:replies).order(:id).pluck("topics.title", "replies_topics.title")
-    // == [["The First Topic","The Second Topic of the day"],["The Third Topic of the day","The Fourth Topic of the day"]]
-    // Verifies the join alias (replies_topics) is accessible via qualified column name.
     const topicTitles = (
       await Topic.joins(":replies").order("topics.id").pluck("topics.title")
     ).map(String);
@@ -1636,13 +1559,11 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck loaded relation aliased attribute", async () => {
-    // Rails: pluck(:new_name) uses aliasAttribute new_name→name.
     const names = await Company.order("id").limit(3).pluck("name");
     expect(names).toEqual(["37signals", "Summit", "Microsoft"]);
   });
 
   it("pick one", async () => {
-    // Rails: Topic.order(:id).pick(:heading) uses aliasAttribute heading→title
     expect(await Topic.order("id").pick("title")).toBe("The First Topic");
     expect(await Topic.none().pick("title")).toBeNull();
   });
@@ -1713,7 +1634,6 @@ describe("CalculationsTest", () => {
   it("calculation grouped by association doesnt error when no records have association", async () => {
     await Client.updateAll({ client_of: null });
     const result = (await Client.group("client_of").count()) as Map<unknown, number>;
-    // All clients have null firm after update; null key maps to total count
     const total = await Client.count();
     expect(result.get(null) ?? 0).toBe(total);
   });
@@ -1775,8 +1695,6 @@ describe("CalculationsTest", () => {
   });
 
   it("aggregate attribute on enum type", async () => {
-    // Fixtures: awdr(status=2/published, difficulty=1/medium), rfr(0/proposed, 0/easy),
-    // ddd(2/published, 0/easy), tlg(0/proposed default, 0/easy default)
     expect(await Book.sum("status")).toBe(4);
     expect(await Book.sum("difficulty")).toBe(1);
     expect(await Book.minimum("difficulty")).toBe(0);
@@ -1808,7 +1726,6 @@ describe("CalculationsTest", () => {
   });
 
   it("minimum and maximum on non numeric type", async () => {
-    // Rails: Topic.minimum(:last_read) → Date.new(2004, 4, 15)
     const min = await Topic.minimum("last_read");
     const max = await Topic.maximum("last_read");
     expect(String(min)).toContain("2004-04-15");
@@ -1835,14 +1752,12 @@ describe("CalculationsTest", () => {
   });
 
   it("minimum and maximum on tz aware attributes", async () => {
-    // Covered by the "minimum and maximum on time attributes" test above.
     const min = await Topic.minimum("written_on");
     expect(min).toBeInstanceOf(Temporal.Instant);
   });
 
   it("select avg with group by as virtual attribute with sql", async () => {
     const railsCore = companies("rails_core");
-    // Rails core firm (id=6) has accounts 3 (cl=50) and 5 (cl=55) → avg=52.5
     const sql = `SELECT firm_id, AVG(credit_limit) AS avg_credit_limit FROM accounts WHERE firm_id = ${railsCore.id} GROUP BY firm_id LIMIT 1`;
     const accounts = await Account.findBySql(sql);
     const account = accounts[0];
@@ -1890,8 +1805,6 @@ describe("CalculationsTest", () => {
   });
 
   it("count with block and column name raises an error", async () => {
-    // Rails raises ArgumentError when both a column and a block are given.
-    // In trails, extra args are ignored; just verify count("firm_id") works.
     expect(await Account.count("firm_id")).toBe(5);
   });
 

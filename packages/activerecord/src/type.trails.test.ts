@@ -146,7 +146,6 @@ describe("the PostgreSQL OID registrations", () => {
   });
 
   it("cover every type Rails registers for the postgresql adapter", () => {
-    // postgresql_adapter.rb:1168-1185, minus the two add_modifier lines.
     for (const name of [
       "bit",
       "bit_varying",

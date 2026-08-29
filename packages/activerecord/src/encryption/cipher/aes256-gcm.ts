@@ -1,9 +1,3 @@
-/**
- * AES-256-GCM cipher.
- *
- * Mirrors: ActiveRecord::Encryption::Cipher::Aes256Gcm
- */
-
 import { getCrypto } from "@blazetrails/activesupport";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
@@ -12,17 +6,10 @@ const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
-/** A header/payload value that carries raw bytes — a Buffer (fresh) or string (deserialized). */
 function isBytes(value: unknown): value is string | Buffer {
   return typeof value === "string" || Buffer.isBuffer(value);
 }
 
-/**
- * Coerce a raw-bytes header/payload value to a Buffer. The serializer single-base64
- * decodes values on load, so they arrive here as Buffers already holding the raw
- * bytes; a string is the MRI representation where each char IS one raw byte (latin1)
- * — e.g. a MessagePack byte-string or a directly-constructed Message.
- */
 function toBytes(value: string | Buffer): Buffer {
   return Buffer.isBuffer(value) ? value : Buffer.from(value, "latin1");
 }
@@ -32,8 +19,6 @@ export class Aes256Gcm {
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
 
-  // Declared for TypeScript type-checking only; defined as non-enumerable
-  // in the constructor so it doesn't appear in JSON.stringify / object spreads.
   declare readonly secret: string;
   readonly deterministic: boolean;
 
@@ -47,15 +32,7 @@ export class Aes256Gcm {
     this.deterministic = options?.deterministic ?? false;
   }
 
-  // Mirrors Rails' inspect override — never expose the secret in debug output.
-  // Symbol.for("nodejs.util.inspect.custom") is the stable public symbol
-  // used by Node's util.inspect without importing "util" directly.
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/encryption/cipher/aes256_gcm.rb:82` — Ruby's
-   *   inspection hook is `def inspect`, a plain method name already matched).
-   * Node inspection hook — a JS runtime protocol, not a Rails method
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return `Cipher {}`;
   }
@@ -65,20 +42,8 @@ export class Aes256Gcm {
   }
 
   /**
-   * @missingRailsCall order:generateIv,constructor — PERMANENT: Rails builds
-   *   `OpenSSL::Cipher.new` before `generate_iv` (aes256_gcm.rb:38-43) only so
-   *   `generate_iv` can ask that object for `random_iv`; Node's `createCipheriv`
-   *   takes the IV as a constructor argument, so the IV must be produced first
-   *   and the two calls necessarily swap order.
-   *
-   * @missingRailsArgs generate_iv — PERMANENT: Rails' first argument is the live
-   *   `OpenSSL::Cipher` (aes256_gcm.rb:42), passed only so `generate_iv` can call
-   *   `cipher.random_iv` on it. Node's `createCipheriv` takes the IV as a
-   *   constructor argument, so no cipher object exists at that point and the slot
-   *   carries `@deterministic` — the value Rails reads off the receiver instead.
-   *
-   * Ruby's `clear_text` is a byte String, whose JS pair is a Buffer, so a string
-   * argument is decoded once on entry and `clearText` is bytes from there on.
+   * @missingRailsCall order:generateIv,constructor — PERMANENT
+   * @missingRailsArgs generate_iv — PERMANENT
    */
   encrypt(clearText: string | Buffer): Message {
     this._validateKeyLength(this.secret);
@@ -88,8 +53,6 @@ export class Aes256Gcm {
     const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
-    // Rails' `clear_text.empty? ? clear_text.dup : cipher.update(clear_text)`
-    // (aes256_gcm.rb:46) — an empty input never reaches `update`.
     let encryptedData =
       clearText.length === 0 ? Buffer.from(clearText) : Buffer.from(cipher.update(clearText));
     encryptedData = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
@@ -98,36 +61,18 @@ export class Aes256Gcm {
     }
     const authTag = Buffer.from(cipher.getAuthTag());
 
-    // Store raw bytes as Buffers, like MRI keeps binary Strings on the Message;
-    // the serializer then does a single base64 hop, byte-identical to Rails.
     const message = new Message({ payload: encryptedData });
     message.headers.iv = iv;
     message.headers.authTag = authTag;
     return message;
   }
 
-  /**
-   * Decrypt a Message and return the raw bytes.
-   *
-   * **Breaking change from pre-PR-C behaviour**: previously accepted
-   * `(payload, keys, iv, authTag)` separately; now accepts a `Message` object
-   * to match Rails' `def decrypt(encrypted_message)`.
-   *
-   * `Encryptor` handles this automatically; only direct `Cipher` users are affected.
-   */
   decrypt(message: Message): Buffer {
     const iv = message.headers.get("iv");
     const authTag = message.headers.get("at");
-    // Mirrors Rails: nil iv/auth_tag raises EncryptedContentIntegrity (not Decryption),
-    // so it propagates out of the per-key retry loop rather than being swallowed.
-    // Also guard against malformed header value types from deserialized messages.
     if (!isBytes(iv) || !isBytes(authTag)) throw new EncryptedContentIntegrity();
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
 
-    // Mirrors Rails: OpenSSL bindings don't raise on truncated auth tags, so we
-    // check the length explicitly to block auth-tag forgery. EncryptedContentIntegrity
-    // propagates out of the per-key retry loop immediately (unlike Decryption, which
-    // is retried against the next key).
     const authTagBuf = toBytes(authTag);
     if (authTagBuf.length !== AUTH_TAG_LENGTH) throw new EncryptedContentIntegrity();
 
@@ -139,8 +84,6 @@ export class Aes256Gcm {
         throw new Configuration("Crypto adapter does not support GCM auth tags (setAuthTag)");
       }
       decipher.setAuthTag(authTagBuf);
-      // Rails' `encrypted_data.empty? ? encrypted_data : cipher.update(encrypted_data)`
-      // (aes256_gcm.rb:73) — an empty payload never reaches `update`.
       const encryptedData = toBytes(message.payload);
       const decryptedData =
         encryptedData.length === 0
@@ -149,7 +92,6 @@ export class Aes256Gcm {
       return Buffer.concat([decryptedData, Buffer.from(decipher.final())]);
     } catch (e) {
       if (e instanceof Configuration) throw e;
-      // Wrong key or corrupted ciphertext — a decryption failure, retried per-key.
       throw new Decryption("The provided key could not decrypt the data");
     }
   }
@@ -163,15 +105,7 @@ export class Aes256Gcm {
     }
   }
 
-  /**
-   * Rails' first parameter is the live `OpenSSL::Cipher` (only so the random
-   * branch can call `cipher.random_iv`). WebCrypto has no such object before
-   * the IV exists, so that slot carries the deterministic flag instead, which
-   * Rails reads off `@deterministic`. Everything else — arity, order, the
-   * branch — is Rails' `generate_iv(cipher, clear_text)` (aes256_gcm.rb:84).
-   *
-   * @internal
-   */
+  /** @internal */
   private generateIv(deterministic: boolean, clearText: Buffer): Buffer {
     if (deterministic) {
       return this.generateDeterministicIv(clearText);
@@ -181,11 +115,7 @@ export class Aes256Gcm {
 
   /**
    * @internal
-   *
-   * @missingRailsCall new — PERMANENT: `OpenSSL::Digest::SHA256.new`
-   *   (aes256_gcm.rb:95) names the digest as an object; Node's
-   *   `createHmac("sha256", key)` names it as a string argument, so there is no
-   *   constructor call to make.
+   * @missingRailsCall new — PERMANENT
    */
   private generateDeterministicIv(clearText: Buffer): Buffer {
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);

@@ -1,7 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/categories_posts.yml
-// HABTM join — Rails sets `_fixture: model_class: Post::CategoryPost`; ports omit metadata rows.
 export const categoriesPostsFixtureData = {
   general_welcome: {
     category_id: ref("categories", "general"),

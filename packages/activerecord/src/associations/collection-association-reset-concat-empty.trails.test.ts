@@ -1,12 +1,3 @@
-/**
- * Trails-only: pins three `CollectionAssociation` bodies to their Rails
- * counterparts — `reset` (collection_association.rb:87-92) clearing
- * `@replaced_or_added_targets`, `insert_record`'s block
- * (collection_association.rb:438-454) capturing `@_was_loaded`, and `empty?`
- * (collection_association.rb:232-238) falling through to `scope.exists?`. Rails
- * covers these through the user-facing surfaces; these tests reach the OO
- * association directly because that is where the port had drifted.
- */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { registerModel } from "../index.js";
 import { resetCallbacks } from "../callbacks.js";
@@ -117,8 +108,6 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
 
     expect(assoc.isLoaded()).toBe(false);
     expect(assoc.target.length).toBe(0);
-    // The DB has posts for david, so `target.empty? && !scope.exists?` is false
-    // even though the in-memory target is empty.
     expect(await assoc.isEmpty()).toBe(false);
   });
 });

@@ -1,8 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/validations/numericality_validation_test.rb
- *
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
@@ -17,8 +12,6 @@ beforeAll(async () => {
 });
 
 describe("NumericalityValidationTest", () => {
-  // Rails: `@model_class = NumericData.dup`. A fresh subclass per test so the
-  // `validates_numericality_of` declaration does not leak across tests.
   function modelClass(): typeof NumericData {
     return class extends NumericData {
       static name = "NumericData";
@@ -125,9 +118,6 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 123.455 });
 
-    // BigDecimal's to_d behavior changed in BigDecimal 3.1.0, see
-    // https://github.com/ruby/bigdecimal/issues/70 — under 3.1.0+ this rounds
-    // away from the equal_to target and is therefore invalid.
     expect(await subject.isValid()).toBe(false);
   });
 

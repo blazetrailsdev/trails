@@ -1,12 +1,3 @@
-/**
- * Covers the Arel node construction in JoinDependency#build. Verifies that
- * `joinConstraints` returns a join (Nodes.OuterJoin) per tree node with the
- * correct ON predicate structure for polymorphic :as, STI subclass IN-list, and
- * basic foreign-key joins.
- *
- * Through-association Arel construction is covered by
- * join-dependency-through-aliasing.test.ts.
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
@@ -17,16 +8,10 @@ import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes, Table } from "@blazetrails/arel";
 import "../test-helpers/models/company.js";
 
-/** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
   return jd.nodes.find((n) => n.assocName === path)!;
 }
 
-/**
- * The join a node's own chain root contributed, picked out of what
- * `joinConstraints` returned — Rails' JoinAssociation keeps no back-reference to
- * it (join_dependency.rb:189-211 concatenates the joins into the arel).
- */
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
   return joins.find((join) => {
     const rel = join.left as Table | Nodes.TableAlias;
@@ -35,16 +20,10 @@ function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
 }
 
 describe("JoinDependency Arel node construction", () => {
-  // Ride the canonical schema `fixtures({})` warms: the join predicates below
-  // resolve against the real canonical keys (e.g. `owners.owner_id`), so no
-  // bespoke schema is declared.
   fixtures({});
 
   class Owner extends Base {
     static {
-      // Canonical `owners` has `primary_key: :owner_id` (schema.rb) — declare it
-      // so the hasMany/belongsTo join predicates resolve against `owners.owner_id`,
-      // matching the schema `fixtures({})` warms.
       this._primaryKey = "owner_id";
       this.attribute("owner_id", "integer");
       this.attribute("name", "string");
@@ -77,12 +56,10 @@ describe("JoinDependency Arel node construction", () => {
     const on = outerJoin.right as Nodes.On;
     expect(on).toBeInstanceOf(Nodes.On);
 
-    // ON predicate is And(type='Owner', fk=pk) — joinScope adds type first, FK second
     const and = on.expr as Nodes.And;
     expect(and).toBeInstanceOf(Nodes.And);
     expect(and.children).toHaveLength(2);
 
-    // First child: type equality (joinScope adds polymorphic type predicate first)
     const typeEq = and.children[0] as Nodes.Equality;
     expect(typeEq).toBeInstanceOf(Nodes.Equality);
     expect((typeEq.left as any).name).toBe("owner_type");
@@ -90,7 +67,6 @@ describe("JoinDependency Arel node construction", () => {
     const resolvedType = typeVal?.value?._valueBeforeTypeCast ?? typeVal?.value ?? typeVal?.val;
     expect(resolvedType).toBe("Owner");
 
-    // Second child: fk equality
     const eq = and.children[1] as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
     expect((eq.left as any).name).toBe("owner_id");
@@ -127,16 +103,10 @@ describe("JoinDependency Arel node construction", () => {
     expect((typeEq.left as any).name).toBe("owner_type");
     const typeVal = typeEq.right as any;
     const resolvedType = typeVal?.value?._valueBeforeTypeCast ?? typeVal?.value ?? typeVal?.val;
-    // Rails join_scope uses foreign_klass.polymorphic_name (= base_class.name),
-    // so an STI subclass owner stores the base class name, not "StiSubOwner".
     expect(resolvedType).toBe("StiOwner");
   });
 
   it("emits OuterJoin with STI subclass IN-list predicate", () => {
-    // Canonical `companies` STI: `SpecialClient < Client < Company`, all on the
-    // `type` column the schema really has (schema.rb `create_table :companies`).
-    // A `columns_hash` is a pure DB read (model_schema.rb:592-594), so the STI
-    // type_condition only fires for a model whose table carries the column.
     class ClientOwner extends Base {
       static {
         this._tableName = "owners";
@@ -158,23 +128,14 @@ describe("JoinDependency Arel node construction", () => {
     expect(and).toBeInstanceOf(Nodes.And);
     expect(and.children).toHaveLength(2);
 
-    // First child: FK equality. Rails' join_scope adds the pk/fk equality
-    // before the STI type_condition, so the FK predicate leads the AND.
     const eq = and.children[0] as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
     expect((eq.left as any).name).toBe("owner_id");
 
-    // Second child: STI IN-list (Client has descendants, so type_condition
-    // produces an IN over the subclass names). Rails builds this
-    // via `predicate_builder.build(sti_column, sti_names)` (inheritance.rb:326),
-    // whose multi-value array branch is an `Arel::Nodes::HomogeneousIn`.
     const inNode = and.children[1] as Nodes.HomogeneousIn;
     expect(inNode).toBeInstanceOf(Nodes.HomogeneousIn);
     expect((inNode.left as any).name).toBe("type");
 
-    // The STI predicate is qualified by the join's table — the same Arel table
-    // the FK equality references — rather than the model's own arel_table. This
-    // is what lets a self-referential / aliased STI join filter on the alias.
     expect((inNode.left as any).relation).toBe((eq.left as any).relation);
   });
 
@@ -191,9 +152,6 @@ describe("JoinDependency Arel node construction", () => {
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
-    // Both keys are named `owner_id` (canonical `owners.owner_id` PK + the
-    // `assets.owner_id` FK), so the join direction shows only in the relations:
-    // hasMany joins the child FK (assets) against the parent PK (owners).
     expect((eq.left as any).name).toBe("owner_id");
     expect((eq.left as any).relation.name).toBe("assets");
     expect((eq.right as any).name).toBe("owner_id");
@@ -213,10 +171,6 @@ describe("JoinDependency Arel node construction", () => {
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
-    // belongsTo: targetTable.pk = sourceTable.fk. Both keys are named `owner_id`
-    // (canonical `owners.owner_id` PK + the `assets.owner_id` FK), so direction
-    // shows in the relations: target PK (owners) on the left, source FK (assets)
-    // on the right.
     expect((eq.left as any).name).toBe("owner_id");
     expect((eq.left as any).relation.name).toBe("owners");
     expect((eq.right as any).name).toBe("owner_id");
@@ -265,24 +219,16 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
     Associations.belongsTo.call(Asset, "owner", { className: "Owner", foreignKey: "owner_id" });
 
-    // The base table is `assets`, so the nested `owner.assets` hop re-reaches
-    // it and collides. A JoinDependency builds its tree once, so the collision
-    // has to come from two distinct paths onto one table — the same shape
-    // Rails' `alias_candidate` handles.
     const jd = new JoinDependency(Asset, null, { owner: "assets" }, Nodes.OuterJoin);
-    // First join uses real table name
     const node1 = nodeAt(jd, "owner");
     expect(node1.effectiveSqlName).toBe("owners");
 
     const node2 = nodeAt(jd, "owner.assets");
 
-    // Aliasing is deferred to emit: resolve against the shared AliasTracker.
     const joins = jd.joinConstraints([]);
 
     const table1 = (joinFor(joins, node1) as Nodes.OuterJoin).left;
     expect((table1 as any).tableAlias).toBeNull();
-    // Rails names self-join collisions via reflection.alias_candidate —
-    // `{plural_name}_{parent_table}` (join_dependency.rb:204-206), not `t2`.
     expect(node2.effectiveSqlName).toBe("assets_owners");
     const table2 = (joinFor(joins, node2) as Nodes.OuterJoin).left;
     expect((table2 as any).tableAlias).toBe("assets_owners");

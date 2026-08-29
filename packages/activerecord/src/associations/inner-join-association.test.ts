@@ -1,13 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Mirrors associations/inner_join_association_test.rb — the canonical
- * Author/Post/Comment/Essay/Category/Categorization/Person/Tagging/Tag/Sharded/
- * Friendship inner-join suite. Rails declares one fixtures set for the whole
- * class; we mirror that with a single `fixtures` call seeding the
- * canonical association tables.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -340,7 +330,6 @@ describe("InnerJoinAssociationTest", () => {
     }).first();
 
     expect(firstPostComments.length).toBeGreaterThan(0);
-    // Rails: assert_equal(expected_blog_post.comments.to_a.sort, first_post_comments.sort).
     const expectedComments = await (expectedBlogPost as any).comments;
     const sortById = (a: any, b: any) => Number(a.id) - Number(b.id);
     expect([...firstPostComments].sort(sortById).map((c) => Number(c.id))).toEqual(
@@ -356,7 +345,6 @@ describe("InnerJoinAssociationTest", () => {
 
     const expectedComment = shardedComments("unique_comment_blog_post_one");
     expect(blogPosts.length).toBeGreaterThan(0);
-    // Rails: assert_equal(expected_comment.blog_post, blog_posts.first).
     const itsBlogPost = await (expectedComment as any).blogPost;
     expect(Number((blogPosts[0] as any).id)).toEqual(Number(itsBlogPost.id));
   });

@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
-// vendor/rails/activerecord/test/models/line_item.rb
 import { Base } from "../../base.js";
 
 export class LineItem extends Base {

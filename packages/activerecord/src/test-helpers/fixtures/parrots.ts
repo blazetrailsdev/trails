@@ -1,11 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/parrots.yml
-// Rails' `_fixture: ignore: DEAD_PARROT` skips DEAD_PARROT only; the DEFAULTS
-// anchor row is also a real fixture row (Rails inserts it). YAML anchors and
-// merges (`<<: *DEAD_PARROT`, `*DEFAULTS`) are expanded inline. `treasures:`
-// is a HABTM association declared in YAML — it doesn't map to a column on
-// parrots, so it's not represented here.
 export const parrotFixtureData = {
   george: {
     name: "Curious George",

@@ -3,9 +3,6 @@ import type { DlKeyedHasMany } from "./dl-keyed-has-many.js";
 import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
 import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { DlKeyedJoin } from "./dl-keyed-join.js";
-// vendor/rails/activerecord/test/models/destroy_async_parent.rb
-// Rails uses dependent: :destroy_async on all associations.
-// Using "destroy" until AssociationOptions.dependent includes "destroyAsync".
 import { Base } from "../../base.js";
 
 export class DestroyAsyncParent extends Base {

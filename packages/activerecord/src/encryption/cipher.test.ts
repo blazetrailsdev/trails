@@ -34,7 +34,6 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
 
   it("raises an ArgumentError when provided a key with the wrong length", () => {
     const cipher = new Cipher();
-    // 4 bytes encoded — well under the 32-byte minimum
     expect(() => cipher.encrypt("clean text", { key: Buffer.alloc(4).toString("base64") })).toThrow(
       Configuration,
     );

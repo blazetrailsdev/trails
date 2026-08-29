@@ -7,7 +7,6 @@ import {
   type RackResponse,
 } from "./connection-adapters/connection-management.js";
 
-// Mirrors the inner `App` test double in connection_management_test.rb.
 class App implements RackApp {
   calls: Record<string, unknown>[] = [];
 
@@ -17,7 +16,6 @@ class App implements RackApp {
   }
 }
 
-// Mirrors the `middleware(app)` helper: wraps the app in ConnectionManagement.
 function middleware(app: RackApp): ConnectionManagement {
   return new ConnectionManagement(app);
 }
@@ -32,7 +30,6 @@ describe("ConnectionManagementTest", () => {
     app = new App();
     management = middleware(app);
 
-    // make sure we have an active connection
     expect(await Base.leaseConnection()).toBeTruthy();
     expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(true);
   });
@@ -63,9 +60,6 @@ describe("ConnectionManagementTest", () => {
 
   it.skip("connections are cleared even if inside a non-joinable transaction", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — Thread
-    // Rails pins the connection on the MAIN thread then checks a SEPARATE thread's
-    // lease is cleared on body close. Node.js has no threads; the multi-thread
-    // lifecycle cannot be reproduced.
   });
 
   it("active connections are not cleared on body close during transaction", async () => {
@@ -102,8 +96,6 @@ describe("ConnectionManagementTest", () => {
 
   it.skip("cancel asynchronous queries if an exception is raised", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — FutureResult
-    // Rails uses `select_all async: true` / FutureResult (thread-based async queries).
-    // Node.js has no equivalent; async queries run on the JS event loop, not threads.
   });
 
   it("doesn't clear active connections when running in a test case", () => {

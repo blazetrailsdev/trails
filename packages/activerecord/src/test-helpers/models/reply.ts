@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/reply.rb
 import { Topic, WebTopic } from "./topic.js";
 import { registerSubclass } from "../../inheritance.js";
 
@@ -23,9 +22,6 @@ export class Reply extends Topic {
     });
     this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
 
-    // Rails: `scope :ordered, -> { Reply.order(:id) }` references the Reply
-    // class directly, so the relation is rebuilt from Reply and escapes any
-    // association scope (e.g. approved_replies' parent_id constraint).
     this.scope("ordered", () => Reply.order("id"));
 
     this.aliasAttribute("new_content", "content");
@@ -113,9 +109,6 @@ export class WebReply extends WebTopic {
   }
 }
 
-// Track the STI subtree on the `topics` table (Reply and friends share Topic's
-// table). WebReply rides WebTopic's separate hierarchy but the same `topics`
-// table; register it under WebTopic for descendants tracking.
 for (const klass of [Reply, SillyReply, UniqueReply, SillyUniqueReply, WrongReply, WebReply]) {
   registerSubclass(klass);
 }

@@ -1,16 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 
-/**
- * Covers the ActiveRecord half of the per-attribute dirty cascade —
- * `attribute_method_affix(prefix: "saved_change_to_", …)` and friends
- * (activerecord/lib/active_record/attribute_methods/dirty.rb:53-59). The
- * ActiveModel half is covered by
- * activemodel/src/dirty-generated-methods.test.ts.
- *
- * No Rails counterpart: Rails exercises these names through DirtyTest against
- * real models; this pins that the pattern declarations generate them at all.
- */
 interface Generated {
   name: string | null;
   changesApplied(): void;
@@ -65,13 +55,6 @@ describe("DirtyGeneratedMethods", () => {
   });
 });
 
-/**
- * The `saved_change_to_*` / `*_before_last_save` / `*_in_database` /
- * `will_save_change_to_*` generics are ActiveRecord's, not ActiveModel's —
- * `activerecord/lib/active_record/attribute_methods/dirty.rb:86-193` defines
- * them and `activemodel/lib/active_model/dirty.rb` does not. These cases moved
- * here from activemodel/src/dirty.test.ts with the methods.
- */
 describe("willSaveChangeToAttribute", () => {
   it("returns true when attribute has been changed", () => {
     class Widget extends Base {
@@ -175,10 +158,6 @@ describe("enum from/to through the generated predicates", () => {
     isWillSaveChangeToStatus(options?: { from?: unknown; to?: unknown }): boolean;
   }
 
-  // The generated predicates reach `AttributeMutationTracker#changed?` without
-  // passing through any `Base` body, so they are the path that proves the
-  // `from:`/`to:` cast lives in the tracker (attribute_mutation_tracker.rb:
-  // 41-51) rather than at a call site.
   it("attributeChanged casts a stored value through the attribute's EnumType", () => {
     const card = new Card({ status: "proposed" }) as unknown as GeneratedEnum;
     card.changesApplied();

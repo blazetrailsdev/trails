@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/clothing_items.yml
 export const clothingItemFixtureData = {
   green_pants: {
     color: "green",

@@ -1,9 +1,3 @@
-/**
- * Encapsulates a result returned from a database adapter's execQuery.
- *
- * Mirrors: ActiveRecord::Result
- */
-
 import { FutureResult, type Complete } from "./future-result.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
@@ -17,11 +11,6 @@ const IDENTITY_TYPE: ColumnType = {
   },
 };
 
-/**
- * Read-only hash-like view over a single result row.
- *
- * Mirrors: ActiveRecord::Result::IndexedRow
- */
 export class IndexedRow {
   readonly #columnIndexes: Record<string, number>;
   readonly #row: unknown[];
@@ -104,21 +93,12 @@ export class Result {
 
   static empty({ async = false }: { async?: boolean } = {}): Result {
     if (async) {
-      // Rails' async arm returns EMPTY_ASYNC, a `FutureResult::Complete`
-      // (result.rb:96,247). The cast keeps the common (sync) call sites — every
-      // one in the repo but `select_all`'s ::RangeError rescue — reading as
-      // `Result`, which is what Ruby's untyped return gives them.
       return emptyAsync() as unknown as Result;
     } else {
       return EMPTY;
     }
   }
 
-  /**
-   * Builds a Result from the row-hash shape returned by our driver-level
-   * `execute()` methods. Column order is taken from the keys of the first
-   * row; empty inputs produce an empty Result.
-   */
   static fromRowHashes(rows: Record<string, unknown>[]): Result {
     if (rows.length === 0) return new Result([], []);
     const columns = Object.keys(rows[0]);
@@ -126,11 +106,7 @@ export class Result {
     return new Result(columns, rowArrays);
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT (`use-site:vendor/rails/activerecord/lib/active_record/result.rb:37, :128`
-   *   — `include Enumerable` plus `def each`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): IterableIterator<Record<string, unknown>> {
     return this.hashRows()[Symbol.iterator]();
   }
@@ -168,15 +144,6 @@ export class Result {
     return this.hashRows();
   }
 
-  /**
-   * Extract one or more columns from each row.
-   *
-   * Mirrors: Enumerable#pluck (ActiveSupport) over the result's hash rows —
-   * a single key yields a flat array of values, multiple keys yield an array
-   * of value tuples. Reads positional `rows` via `columnIndexes` directly so
-   * no per-row hash is materialized; an unknown key resolves to `undefined`,
-   * matching `hashRow[key]`.
-   */
   pluck(key: string): unknown[];
   pluck(...keys: string[]): unknown[][];
   pluck(...keys: string[]): unknown[] {
@@ -221,16 +188,9 @@ export class Result {
   }
 
   /**
-   * @missingRailsCall first — PERMANENT: result.rb:170 `type_overrides.first` indexes an
-   *   Array; the faithful TS is `overridesArray[0]`, an index form with no call
-   *   name (RFC 0092 positional-idiom-analogues).
-   * @missingRailsCall new — PERMANENT: result.rb:186 `Array.new(values.size) { |i| ... }`
-   *   builds a same-length Array from each row; the faithful TS is
-   *   `row.map((value, i) => ...)` — one allocation, same order, no `new`.
-   * @missingRailsCall one? — PERMANENT: result.rb:166 `columns.one?` is a size test on a
-   *   plain Array; the faithful TS is `this.columns.length === 1`, a property
-   *   form with no call name (RFC 0092 positional-idiom-analogues routes these
-   *   to a reason).
+   * @missingRailsCall first — PERMANENT
+   * @missingRailsCall new — PERMANENT
+   * @missingRailsCall one? — PERMANENT
    */
   castValues(typeOverrides: ColumnTypes | ColumnType[] = {}): unknown[] {
     const overridesArray = Array.isArray(typeOverrides) ? typeOverrides : null;
@@ -287,14 +247,6 @@ const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
 const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
 
-/**
- * Rails holds `EMPTY_ASYNC = FutureResult.wrap(EMPTY).freeze` as a private
- * constant (result.rb:247). Built on first read rather than at module scope:
- * future-result.ts imports this module back (SelectAll rescues ::RangeError
- * into `Result.empty`), and a top-level `FutureResult.wrap` here would evaluate
- * that binding while it is still in TDZ when the cycle is entered from
- * future-result.ts.
- */
 let EMPTY_ASYNC: Complete | undefined;
 
 function emptyAsync(): Complete {
@@ -302,16 +254,8 @@ function emptyAsync(): Complete {
 }
 
 /**
- * Look up the column type for a given column name and index, with optional overrides.
- *
- * Mirrors: ActiveRecord::Result#column_type (private)
- *
  * @internal
- *
- * @missingRailsCall fetch — PERMANENT: Newly comparable (RFC 0072 arity sweep): Rails
- *   expresses the override/index/name lookup as nested `Hash#fetch` blocks; JS
- *   objects have no fetch-with-default, so the port uses `in` checks in the same
- *   order. Equivalent.
+ * @missingRailsCall fetch — PERMANENT
  */
 export function columnType(
   result: Result,

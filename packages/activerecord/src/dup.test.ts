@@ -1,8 +1,3 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/dup_test.rb — canonical
- * Topic/Car/Movie models + handler `topics`/`cars` fixtures and the canonical
- * `parrots_pirates` table, test names verbatim from the Ruby methods.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -12,8 +7,6 @@ import { DefaultScope } from "./scoping/default.js";
 import type { Relation } from "./relation.js";
 import { RecordInvalid } from "./validations.js";
 import { Topic } from "./test-helpers/models/topic.js";
-// Registers the Reply STI subclass so Topic#destroy can resolve the `replies`
-// association (vendor/rails/.../dup_test.rb requires "models/reply").
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Movie } from "./test-helpers/models/movie.js";
@@ -23,15 +16,9 @@ for (const klass of [Topic, Reply, SillyReply, UniqueReply, SillyUniqueReply]) {
 }
 
 describe("DupTest", () => {
-  // Mirrors Rails `fixtures :topics, :cars`.
   fixtures(["topics", "cars"]);
 
   beforeAll(async () => {
-    // Car declares `attribute :wheels_owned_at`, so its cold-cache `load_schema`
-    // synthesizes a minimal columns_hash (just the declared attr) and never
-    // re-reflects the real `cars` columns — leaving `lock_version` without an
-    // attribute accessor and `locking_enabled?` false. Register and warm it so
-    // the optimistic-locking column is real (mirrors locking_test.rb's setup).
     registerModel("Car", Car);
     void Car.resetColumnInformation();
     await Car.loadSchema();
@@ -97,10 +84,8 @@ describe("DupTest", () => {
     delete attrs.id;
     await topic.assignAttributes(attrs);
 
-    // duped has no timestamp values
     const duped = dbtopic!.dup();
 
-    // clear topic timestamp values
     clearTimestampAttributes.call(
       topic as unknown as ThisParameterType<typeof clearTimestampAttributes>,
     );
@@ -173,10 +158,6 @@ describe("DupTest", () => {
   });
 
   it("dup runs after_initialize against the duped attributes", async () => {
-    // core.rb:550-556 sets @attributes before _run_initialize_callbacks and
-    // `@new_record = true` after them, so the hook sees the duped attributes on
-    // a record that still reports `persisted?` and Topic#set_email_address
-    // (topic.rb:117-121) writes nothing. MRI-verified on the vendored Rails.
     const topic = await Topic.find(3);
     expect(topic.author_email_address).toBeFalsy();
     const duped = topic.dup();

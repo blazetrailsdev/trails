@@ -1,12 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Ports vendor/rails/activerecord/test/cases/callbacks_test.rb. Every model
- * below rides the canonical `developers` table (Rails `self.table_name =
- * "developers"`); rows come from the `developers` fixtures (`name(:david)` is
- * id 1).
- */
 import { describe, it, expect } from "vitest";
 import { Range, throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
@@ -15,12 +6,6 @@ import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-c
 
 type HistoryEntry = [string, string];
 
-// Rails' `ActiveRecord::Callbacks::CALLBACKS.each` loop, minus the `around_*`
-// hooks (Rails `next if callback_method.start_with?("around_")`) and
-// `after_touch` (no trails equivalent — it never fires in the asserted
-// histories below). For each hook, Rails registers four callbacks in order —
-// a method, a proc, a callback object, and a block — and each pushes its own
-// `[callback_method, kind]` pair onto the instance `history`.
 const CALLBACK_METHODS = [
   "afterInitialize",
   "afterFind",
@@ -55,9 +40,6 @@ function registerCallbackHistory(klass: typeof Base): void {
 class CallbackDeveloper extends Base {
   declare name: string;
   declare salary: number;
-  // `history` memoizes like Rails' `@history ||= []`; a `declare` field emits
-  // no initializer, so the `after_initialize` callbacks that fire inside the
-  // Base constructor aren't clobbered by a class-field reset.
   declare private _history?: HistoryEntry[];
   get history(): HistoryEntry[] {
     return (this._history ??= []);
@@ -176,10 +158,6 @@ class CallbackHaltedDeveloper extends Base {
   afterCreateCalled = false;
   afterUpdateCalled = false;
   afterDestroyCalled = false;
-  // `attr_accessor` ivars are undefined until assigned. `before_save` mirrors
-  // Rails' `defined?(@cancel_before_save)` (halts on ANY assignment, even
-  // `false`); the create/update/destroy guards mirror the truthy
-  // `@cancel_before_*` checks. (callbacks_test.rb:135-149)
   declare cancelBeforeSave?: boolean;
   cancelBeforeCreate?: boolean;
   cancelBeforeUpdate?: boolean;

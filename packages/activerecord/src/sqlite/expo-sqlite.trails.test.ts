@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { SqliteConnection } from "../sqlite-adapter.js";
 import { isExpoSqliteAvailable, expoSqliteDriver } from "./expo-sqlite.js";
 
-// Runs in all environments — verifies the soft-load didn't throw on import.
 it("expo-sqlite module import does not crash", () => {
   expect(typeof isExpoSqliteAvailable).toBe("boolean");
   expect(typeof expoSqliteDriver.open).toBe("function");

@@ -1,19 +1,3 @@
-// Materialize `declare` members into canonical test-helper model source.
-//
-// The trails-tsc type-virtualization transform (src/type-virtualization)
-// splices `declare` members into a model's class bodies at COMPILE TIME —
-// it never writes them to disk. AR test files therefore don't see typed
-// `topic.replies`, `dev.mentor`, columns, enums, or enum predicates, so
-// they reach for `as any` casts everywhere.
-//
-// This script runs the SAME virtualizer (plus the auto-import + schema
-// passes the trails-tsc CLI wires up) and writes the result back into the
-// model `.ts` files, baking the declares into source. The models then
-// carry their typed surface directly, so the casts can be dropped.
-//
-// Usage:  pnpm tsx packages/activerecord/scripts/materialize-model-declares.ts [model.ts ...]
-// With no args it processes the pilot set below.
-
 import ts from "typescript";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -34,32 +18,16 @@ import type { TableSchema, WrappedTableSchema } from "../src/support/schema-type
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
 
-// Default pilot set processed with no args. Bulk roll-out (baking declares
-// into every canonical model) is a separate story; the through-target and
-// subclass-loader gaps that broke post.ts/author.ts/comment.ts are fixed
-// (see `resolveThroughTarget` + ancestor-aware loader overloads), so those
-// three now materialize green when passed explicitly.
 const PILOT = ["topic.ts", "developer.ts"];
 
 type SchemaColumnsByTable = Record<string, Record<string, SchemaColumnValue>>;
 
-/**
- * Normalize the test `Schema` (legacy `Record<col, ColumnSpec>` and the
- * wrapped `{ columns, primaryKey }` shape) into the
- * `Record<table, Record<col, SchemaColumnValue>>` the virtualizer wants.
- * Array columns are rendered as `Element[]` via `arrayElementType`.
- */
 function normalizeSchema(
   schema: Record<string, TableSchema>,
   isWrappedSchema: (table: TableSchema) => table is WrappedTableSchema,
 ): SchemaColumnsByTable {
   const out: SchemaColumnsByTable = {};
   for (const [table, value] of Object.entries(schema)) {
-    // Discriminate the wrapped `{ columns, primaryKey?, indexes? }` shape from
-    // the legacy `Record<col, ColumnSpec>` map using the canonical helper. The
-    // earlier `"columns" in value && "primaryKey" in value` check missed
-    // wrappers that carry `indexes` but no `primaryKey` (e.g. `books`), so it
-    // fell through and emitted `columns`/`indexes` as bogus column names.
     const cols = isWrappedSchema(value) ? value.columns : value;
     const normalized: Record<string, SchemaColumnValue> = {};
     for (const [col, spec] of Object.entries(cols)) {
@@ -76,7 +44,6 @@ function normalizeSchema(
   return out;
 }
 
-/** className → absolute source path, for auto-importing association targets. */
 function buildModelRegistry(): Map<string, string> {
   const registry = new Map<string, string>();
   for (const entry of fs.readdirSync(MODELS_DIR)) {
@@ -97,12 +64,6 @@ function buildModelRegistry(): Map<string, string> {
   return registry;
 }
 
-/**
- * Build a map from Ruby-qualified class names ("Module::Class") to the TS
- * class identifier, by scanning model files for `static moduleName` and
- * `static _demodulizedName` on each class. Used to resolve namespaced
- * `className:` values like `"Namespaced::Client"` → `NamespacedClient`.
- */
 function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Map<string, string> {
   const out = new Map<string, string>();
   const seen = new Set<string>();
@@ -138,11 +99,6 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
   return out;
 }
 
-/**
- * Resolve a Ruby-style "Module::Class" className to the TS class identifier.
- * Tries exact match first, then a suffix match for relative namespaces
- * (e.g. "Nested::Firm" matches any qualified name ending "::Nested::Firm").
- */
 function resolveNamespacedClassName(
   name: string,
   namespacedRegistry: ReadonlyMap<string, string>,
@@ -156,12 +112,6 @@ function resolveNamespacedClassName(
   return undefined;
 }
 
-/**
- * Extend the per-file alias map with:
- *  - Gap A: resolutions for Ruby-namespaced `className:` values ("A::B" → TsName)
- *  - Gap B: classify-correction aliases when classify(assocName) isn't in the
- *    TS class registry (e.g. "iris" → classify → "Iri", camelize → "Iris")
- */
 function buildExtendedAliases(
   sf: ts.SourceFile,
   baseAliases: ReadonlyMap<string, string>,
@@ -181,17 +131,12 @@ function buildExtendedAliases(
         continue;
       const rawClassName = call.options["className"];
       if (rawClassName) {
-        // Gap A: resolve "Namespace::Class" to TS class name.
-        // If unresolvable, omit the alias so the synthesizer skips the declare
-        // (no entry → resolveAssociationTarget returns undefined → no emit).
-        // Rails raises on a bad class name; we should not bake Base as a fallback.
         const stripped = stripQuotes(rawClassName);
         if (stripped.includes("::") && !out.has(stripped)) {
           const tsName = resolveNamespacedClassName(stripped, namespacedRegistry);
           if (tsName) out.set(stripped, tsName);
         }
       } else {
-        // Gap B: fix mis-singularized classify results
         const classified = classify(call.name);
         if (!registry.has(classified) && !out.has(classified)) {
           const cam = camelize(call.name);
@@ -203,11 +148,6 @@ function buildExtendedAliases(
   return out;
 }
 
-/**
- * Extract the DB column names consumed by `composedOf(this, name, { mapping })` calls
- * in static blocks, keyed by class name. These columns should be excluded from
- * schema-reflected `declare` lines to avoid conflicting with the aggregation type.
- */
 function extractComposedOfColumns(sf: ts.SourceFile): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
   const visitClass = (cls: ts.ClassDeclaration): void => {
@@ -220,7 +160,6 @@ function extractComposedOfColumns(sf: ts.SourceFile): Map<string, Set<string>> {
         const call = stmt.expression;
         if (!ts.isCallExpression(call)) continue;
         if (!ts.isIdentifier(call.expression) || call.expression.text !== "composedOf") continue;
-        // composedOf(this, name, { ..., mapping: [[col, method], ...] })
         const [, , optsArg] = call.arguments;
         if (!optsArg || !ts.isObjectLiteralExpression(optsArg)) continue;
         for (const prop of optsArg.properties) {
@@ -254,7 +193,6 @@ function associationCalls(info: ClassInfo): AssociationCall[] {
   return info.calls.filter((c): c is AssociationCall => ASSOC_KINDS.has(c.kind));
 }
 
-/** The `extends X` superclass identifier of a class declaration, if any. */
 function superClassNameOf(cls: ts.ClassDeclaration): string | undefined {
   for (const hc of cls.heritageClauses ?? []) {
     if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
@@ -264,13 +202,6 @@ function superClassNameOf(cls: ts.ClassDeclaration): string | undefined {
   return undefined;
 }
 
-/**
- * Build a global class-name → direct-superclass-name map from all registered
- * model files, mirroring `buildInheritance` but across file boundaries. Used
- * to thread into the virtualizer so cross-file subtype relationships are
- * recognized during conflict suppression (prevents conservatively dropping a
- * correct narrowed declare when the target's superclass lives in another file).
- */
 function buildGlobalSuperNameOf(registry: ReadonlyMap<string, string>): Map<string, string> {
   const result = new Map<string, string>();
   const walkedFiles = new Set<string>();
@@ -292,21 +223,6 @@ function buildGlobalSuperNameOf(registry: ReadonlyMap<string, string>): Map<stri
   return result;
 }
 
-/**
- * Cross-file lookup of a model's association calls by class name (parse each
- * registered file on demand, cached) for `resolveThroughTarget`. Walks ALL
- * classes since a through target may be an STI subclass.
- *
- * The lookup is inheritance-aware: a class's calls include those of its
- * ancestor chain, because Rails source reflections resolve against the whole
- * class hierarchy. An STI subclass used as a `through` target — `SpecialPost`
- * / `StiPost` (source `comments` on `Post`), `SelectedMembership` (source
- * `club` on `Membership`), or `SpecialComment` (through `post` on `Comment`) —
- * carries no association calls of its own, so without merging the parent's the
- * source reflection is unresolvable and the declare degrades to `Base`.
- * Subclass calls come first so an override wins the `.find` in
- * `resolveThroughTarget`.
- */
 function buildModelAssociationLookup(
   registry: ReadonlyMap<string, string>,
 ): ModelAssociationLookup {
@@ -341,7 +257,7 @@ function buildModelAssociationLookup(
   const merged = (className: string, seen: Set<string>): AssociationCall[] | null => {
     const cached = mergedCache.get(className);
     if (cached !== undefined) return cached;
-    if (seen.has(className)) return null; // guard cyclic `extends` chains
+    if (seen.has(className)) return null;
     seen.add(className);
     ensureWalked(className);
     const own = ownByClassName.get(className);
@@ -359,19 +275,6 @@ function buildModelAssociationLookup(
   return (className) => merged(className, new Set()) ?? undefined;
 }
 
-/**
- * Resolve every `through:` association on the file's models to its source
- * class, keyed `"<ClassName>#<assocName>"`. Unresolvable chains fall back to
- * `Base` (always in scope) — keeps output green.
- *
- * Plain (non-`through`) `belongsTo`/`hasOne`/`hasMany` targets are also
- * pinned to `Base` when they classify to a name that is neither a registered
- * model nor lexically visible from the declaring class — otherwise the
- * synthesizer would emit a dangling class reference (TS2304), e.g.
- * `hasOne("otherThing")` with no `OtherThing` model → `declare otherThing:
- * OtherThing | null`. Resolvable targets are left untouched so their real
- * type (and auto-import) is preserved.
- */
 function buildAssociationTargets(
   sf: ts.SourceFile,
   modelClasses: readonly ClassInfo[],
@@ -383,15 +286,8 @@ function buildAssociationTargets(
   const moduleScope = collectNamesInScope(sf);
   for (const info of modelClasses) {
     const own = associationCalls(info);
-    // Names a bare target reference spliced into this class can resolve to:
-    // module-scope imports/decls plus lexically-visible in-file classes.
-    // Mirrors the visibility set `resolveAutoImports` uses.
     const visible = new Set(moduleScope);
     collectVisibleClassNames(info.classDecl, visible);
-    // Resolve `through:` against the class's inheritance-merged association
-    // set so a subclass whose `through` target is an INHERITED association
-    // (e.g. `SpecialComment.has_one :author, through: :post`, where `post` is
-    // `Comment`'s `belongs_to`) finds it instead of degrading to `Base`.
     const defining = lookup(info.name) ?? own;
     for (const call of own) {
       if (call.options["through"]) {
@@ -399,8 +295,6 @@ function buildAssociationTargets(
         targets.set(`${info.name}#${call.name}`, resolved);
         continue;
       }
-      // Polymorphic belongsTo is rendered as `Base` by the synthesizer
-      // directly (no single target class), so leave it out of the map.
       if (call.options["polymorphic"] === "true") continue;
       const resolved = resolveAssociationTarget(call);
       const mapped = aliases.get(resolved) ?? resolved;
@@ -418,20 +312,6 @@ function buildAssociationTargets(
   return targets;
 }
 
-/**
- * Compute the set of class-declaration NODES in a file that transitively
- * extend `Base`, resolving each `extends X` to the lexically-nearest
- * in-scope `class X` — the source-walker analogue of the CLI's
- * checker-backed `collectBaseDescendants`.
- *
- * Per-node (rather than per-name) is required because classes are visited
- * at every nesting depth: two `class Foo extends Bar` in sibling
- * `describe`/`it` scopes share the name `Foo` but may resolve `Bar` to
- * different declarations, so a flat name allow-list would let a
- * sibling-scope subclass contaminate another model's inheritance chain.
- * Lexical resolution mirrors how Ruby constant lookup would scope each
- * superclass reference.
- */
 function collectModelClassNodes(sf: ts.SourceFile): Set<ts.ClassDeclaration> {
   const rootNames = new Set(["Base"]);
   const memo = new Map<ts.ClassDeclaration, boolean>();
@@ -445,7 +325,7 @@ function collectModelClassNodes(sf: ts.SourceFile): Set<ts.ClassDeclaration> {
   const isBaseDescendant = (cls: ts.ClassDeclaration): boolean => {
     const cached = memo.get(cls);
     if (cached !== undefined) return cached;
-    memo.set(cls, false); // tentative, breaks cycles
+    memo.set(cls, false);
     for (const hc of cls.heritageClauses ?? []) {
       if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
       for (const t of hc.types) {
@@ -470,11 +350,6 @@ function collectModelClassNodes(sf: ts.SourceFile): Set<ts.ClassDeclaration> {
   return out;
 }
 
-/**
- * The class declaration named `name` that is lexically visible from `from`:
- * declared in the same block/source file or an enclosing block/function
- * body. Returns the nearest match, mirroring constant scoping.
- */
 function resolveLexicalClass(from: ts.Node, name: string): ts.ClassDeclaration | undefined {
   for (let n: ts.Node | undefined = from.parent; n; n = n.parent) {
     const statements = ts.isSourceFile(n)
@@ -490,12 +365,6 @@ function resolveLexicalClass(from: ts.Node, name: string): ts.ClassDeclaration |
   return undefined;
 }
 
-/**
- * `import type { Target }` lines for association targets referenced by a
- * synthesized declare that aren't already in scope. Mirrors the CLI's
- * `resolveAutoImports`, reimplemented here against the source walker so
- * the script needs no built `dist/`.
- */
 function resolveAutoImports(
   sf: ts.SourceFile,
   fileName: string,
@@ -511,14 +380,6 @@ function resolveAutoImports(
     const needed = new Set<string>();
     collectTargets(info, needed, aliases, associationTargets);
     if (needed.size === 0) continue;
-    // A declare spliced into THIS class can only reference a bare
-    // `Target` that is lexically visible from the class — module-scope
-    // imports/decls plus in-file classes declared in the same or an
-    // enclosing `describe`/`it`/function body. A same-named class in a
-    // sibling callback is NOT visible, so we must still emit the
-    // model-registry `import type` for it (and conversely, never emit a
-    // dead import for a target that IS visible). `collectNamesInScope`
-    // covers only module scope, so add the lexically-visible classes.
     const visible = new Set(moduleScope);
     collectVisibleClassNames(info.classDecl, visible);
     for (const name of needed) {
@@ -534,12 +395,6 @@ function resolveAutoImports(
   return [...imports.values()].sort((a, b) => a.localeCompare(b));
 }
 
-/**
- * Add the names of every class declaration lexically visible from `node`:
- * those declared in the same block/source file and in each enclosing
- * block/function body. This is the scope from which a `declare` spliced
- * into `node`'s class body can reference a bare class name.
- */
 function collectVisibleClassNames(node: ts.Node, out: Set<string>): void {
   for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
     const statements = ts.isSourceFile(n)
@@ -569,7 +424,6 @@ function collectTargets(
     )
       continue;
     if (call.kind === "belongsTo" && call.options["polymorphic"] === "true") continue;
-    // Import the pre-resolved `through:` source class, not classify-of-name.
     const override = associationTargets.get(`${info.name}#${call.name}`);
     if (override) {
       out.add(override);
@@ -580,13 +434,6 @@ function collectTargets(
   }
 }
 
-/**
- * Build the association-`className` → in-file class-name alias map from the
- * file's `registerModel("Alias", LocalClass)` calls (at any nesting depth).
- * Test models routinely register under an alias that differs from the class
- * identifier; without this map an association `className: "EsOctopus"` would
- * emit `declare octopus: EsOctopus | null`, a type that does not exist.
- */
 function buildClassNameAliases(sf: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>();
   const visit = (node: ts.Node): void => {
@@ -636,33 +483,7 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
   return names;
 }
 
-// The virtualizer qualifies its built-in generic types with inline
-// `import("…").X` expressions so it never has to touch a user file's
-// import list (that's correct for a compile-time transform). When we
-// MATERIALIZE the output into source we'd rather read normal top-level
-// imports, so this pass rewrites every `import("mod").Sym` to a bare
-// `Sym` and hoists one `import type { … } from "mod"` line per module.
-//
-// Symbols already in scope (e.g. a model that already imports `Relation`,
-// or `Temporal` imported as a value) are reused — no duplicate import.
-// AR built-ins are pointed at the same relative paths the hand-written
-// model declares use, to match convention; anything else keeps its
-// original module specifier.
-// The trailing `(?![\w$]|\s*\()` lookahead excludes runtime dynamic imports —
-// `import("mod").then((m) => m.Foo)` — where the member access is immediately
-// CALLED. The virtualizer only ever emits `import("mod").Sym` in TYPE position
-// (used as `Sym`, `Sym<…>`, `Sym | null`, …), which is never followed by `(`,
-// so rejecting a call site keeps a `.then(...)` Promise chain from being
-// misparsed as a named import of a symbol called `then`. The `[\w$]` half of
-// the lookahead pins the identifier to its full extent: without it the greedy
-// `[\w$]*` would backtrack and match the prefix `the` of `then(`, whose next
-// char is `n` (not `(`), re-introducing the bug.
 export const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?![\w$]|\s*\()/g;
-// AR built-ins, keyed by symbol → the source module relative to MODELS_DIR
-// (the same paths the hand-written model declares under that dir use). The
-// specifier is recomputed relative to each materialized file's directory in
-// `hoistInlineImports`, so files outside MODELS_DIR (e.g. test files) get a
-// correct relative path rather than the model-dir-relative one.
 const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
   AssociationProxy: "../../associations/collection-proxy.js",
   Relation: "../../relation.js",
@@ -670,7 +491,6 @@ const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
   PrimaryKeyValue: "../../base.js",
 };
 
-/** Builtin specifier recomputed relative to `fileDir`. */
 function builtinSpecifierFor(sym: string, fileDir: string): string | undefined {
   const fromModels = BUILTIN_IMPORT_FROM_MODELS_DIR[sym];
   if (!fromModels) return undefined;
@@ -703,12 +523,6 @@ export function hoistInlineImports(
   return { text: rewritten, importLines };
 }
 
-/**
- * Splice hoisted `import type` lines into `text` just before the first
- * existing top-level `import` statement, so they group with the file's
- * import block rather than landing above a leading header docstring. Files
- * with no import statement (rare for a model) get the lines prepended.
- */
 function insertHoistedImports(text: string, importLines: readonly string[]): string {
   const block = importLines.join("\n") + "\n";
   const match = /^import\s/m.exec(text);
@@ -718,11 +532,6 @@ function insertHoistedImports(text: string, importLines: readonly string[]): str
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  // With no args, process the canonical pilot set under MODELS_DIR. With args,
-  // accept either a bare model filename (resolved against MODELS_DIR, the
-  // historical behavior) or a path that resolves to an existing file relative
-  // to the cwd / absolute — so the generator can materialize declares into test
-  // files outside the canonical models dir.
   const targets =
     args.length > 0
       ? args.map((a) => {
@@ -734,13 +543,6 @@ async function main(): Promise<void> {
   const registry = buildModelRegistry();
 
   const modelsDirPrefix = MODELS_DIR + path.sep;
-  // The canonical schema map is only consumed when materializing files UNDER
-  // MODELS_DIR (test-local models elsewhere supply their own bespoke schema).
-  // Load it lazily via dynamic import so a test-file-only run never pays the
-  // import cost of `schema-types`'s adapter-runtime dependency graph. This is
-  // now purely an import-cost optimization: the static-import TDZ crash it
-  // originally worked around is fixed at the source (abstract-adapter defers its
-  // mixin wiring to first construction), so `isWrappedSchema` imports cleanly.
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
     const { TEST_SCHEMA, ARUNIT2_SCHEMA } = await import("../src/test-helpers/test-schema.js");
@@ -753,17 +555,11 @@ async function main(): Promise<void> {
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
-    // `virtualize` re-parses `source` into its own AST, so a predicate
-    // keyed on node identity would never match there. Key on the node's
-    // source span instead — identical text re-parses to identical
-    // `pos`/`end`, so the predicate is stable across both parses.
     const modelSpans = new Set<string>();
     for (const cls of collectModelClassNodes(sf)) modelSpans.add(`${cls.pos}:${cls.end}`);
     const isModelClass = (cls: ts.ClassDeclaration): boolean =>
       modelSpans.has(`${cls.pos}:${cls.end}`);
     const baseAliases = buildClassNameAliases(sf);
-    // Gap A + Gap B: extend aliases with namespaced class resolutions and
-    // registry-corrected classify results.
     const classNameAliases = buildExtendedAliases(
       sf,
       baseAliases,
@@ -771,10 +567,7 @@ async function main(): Promise<void> {
       registry,
       namespacedClassRegistry,
     );
-    // Gap D: collect composedOf mapping columns to exclude from schema declares.
     const composedOfColumns = extractComposedOfColumns(sf);
-    // Pre-resolve `through:` targets so declares + auto-imports name the real
-    // source class, not `classify`-of-the-association-name.
     const associationTargets = buildAssociationTargets(
       sf,
       walk(sf, { isModelClass }),
@@ -790,27 +583,7 @@ async function main(): Promise<void> {
       classNameAliases,
       associationTargets,
     );
-    // The schema-column merge maps each model to a table by `tableName` (or
-    // `pluralize(underscore(className))` when unset) and bakes that table's
-    // canonical columns into the declares. That is correct for the canonical
-    // models under MODELS_DIR, but test-local model classes elsewhere define
-    // their own bespoke schemas — a class named `Post` (or one assigning
-    // `this.tableName` in a static block, which the walker does not capture)
-    // would otherwise pull phantom columns off the canonical `posts` table
-    // that its runtime table lacks. For files outside MODELS_DIR we therefore
-    // omit the schema map: declares then reflect only the class's explicit
-    // `attribute()` / association / enum calls — exactly its real surface.
     const underModelsDir = file.startsWith(modelsDirPrefix);
-    // An association-target class name is "known" (resolves to a type in
-    // scope at the declare's splice site) when it is a registered model,
-    // `Base`, a module-scope import/declaration, or a class lexically visible
-    // from the host class (same or enclosing block). A `classify`-d target
-    // satisfying none of these — e.g. `hasOne("otherThing")` in a throwaway
-    // test class with no `OtherThing` model — must not be baked verbatim
-    // (dangling TS2304); the synthesizer degrades it to `Base`. Visibility is
-    // scoped to the host (not a flat whole-file scan) so a same-named class in
-    // a SIBLING `describe`/`it` closure does not count as visible — mirrors
-    // `resolveAutoImports`' `moduleScope + collectVisibleClassNames` logic.
     const moduleScope = collectNamesInScope(sf);
     const isKnownTarget = (name: string, host: ClassInfo): boolean => {
       if (name === "Base" || registry.has(name) || moduleScope.has(name)) return true;
@@ -826,8 +599,6 @@ async function main(): Promise<void> {
       associationTargets,
       composedOfColumns: composedOfColumns.size > 0 ? composedOfColumns : undefined,
       isKnownTarget,
-      // Baked attribute declares allow null assignment (Rails attributes
-      // carry no NOT NULL constraint); the live tsc-plugin keeps bare `T`.
       attributesNullable: true,
       globalSuperNameOf,
     });
@@ -835,8 +606,6 @@ async function main(): Promise<void> {
       process.stdout.write(`  unchanged ${path.basename(file)}\n`);
       continue;
     }
-    // Rewrite the virtualizer's inline `import("…").X` type expressions
-    // into bare references + hoisted top-level `import type` lines.
     const { text: hoisted, importLines } = hoistInlineImports(
       virtualized,
       collectNamesInScope(sf),
@@ -849,10 +618,6 @@ async function main(): Promise<void> {
   }
 }
 
-// Only run the generator when invoked as the CLI entry point — importing the
-// module (e.g. from a unit test) must not rewrite the pilot model files.
-// Compare module URL to argv[1] via `pathToFileURL` so Windows paths and
-// URL-encoded chars don't trip a naive `file://` string compare.
 const entry = process.argv[1];
 if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
   await main();

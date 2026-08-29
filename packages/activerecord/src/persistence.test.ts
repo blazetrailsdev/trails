@@ -1,7 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
-// All datetime columns now return Temporal.Instant across all adapters.
 function epochMs(v: unknown): number {
   if (v instanceof Temporal.Instant) return v.epochMilliseconds;
   throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
@@ -9,9 +8,6 @@ function epochMs(v: unknown): number {
 function isTemporalDatetime(v: unknown): boolean {
   return v instanceof Temporal.Instant;
 }
-/**
- * Mirrors: activerecord/test/cases/persistence_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -34,17 +30,10 @@ import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { queryConstraints, queryConstraintsList } from "./persistence.js";
-// Imported under an alias: a top-level `Topic`/`Item` binding would make
-// esbuild rename the bespoke in-function `class Topic`/`class Item`
-// declarations in the later (still-bespoke) describe blocks to `Topic2`/`Item2`,
-// so their name-derived tables would resolve to the non-existent
-// `topic2s`/`item2s`. Each converted block rebinds the alias to a local `const`.
 import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { PostWithPrefetchedPk } from "./test-helpers/models/post-with-prefetched-pk.js";
 import { Account } from "./test-helpers/models/account.js";
-// Registers the Reply STI subclasses so Topic#destroy can resolve its
-// `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
 import {
   Reply,
   SillyReply,
@@ -59,9 +48,6 @@ import {
   AuditLog,
 } from "./test-helpers/models/developer.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
-// `Post` is imported under an alias for the same esbuild-rename reason as
-// `Topic`/`Item`: a bespoke in-function `class Post` declaration still exists in
-// the not-yet-converted update-all block.
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { CpkBook, CpkOrder, CpkBestSeller } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
@@ -112,9 +98,6 @@ for (const klass of [
   registerModel(klass);
 }
 
-// ==========================================================================
-// PersistenceTest — targets persistence_test.rb
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const { topics, accounts, clothingItems } = fixtures([
@@ -124,12 +107,6 @@ describe("PersistenceTest", () => {
     "clothingItems",
   ]);
 
-  // The `auto_id_tests` table is prebuilt on the per-worker DB from the
-  // canonical schema (`template-global-setup.ts`); `loadSchema` warms the cache
-  // so the synchronous `columns()` reflection resolves (Rails loads columns
-  // lazily). `becomes default sti subclass` / `reset column information resets
-  // children` mutate the shared `topics` table's DDL but each reverts in its
-  // own `finally`, so no rebuild shield is needed here.
   beforeAll(async () => {
     await AutoId.loadSchema();
   });
@@ -139,8 +116,6 @@ describe("PersistenceTest", () => {
       .filter((c: { isAutoPopulated(): boolean }) => c.isAutoPopulated())
       .map((c: { name: string }) => c.name);
 
-    // It's important we test a scenario where tables has more than one auto populated column
-    // and the first column is not the primary key. Otherwise it will be a regular test not asserting this special case.
     expect(autoPopulatedColumnNames.length).toBeGreaterThan(1);
     expect(autoPopulatedColumnNames[0]).not.toBe(AutoId.primaryKey);
 
@@ -208,7 +183,6 @@ describe("PersistenceTest", () => {
     await Topic.create({ title: "b" });
     const before = (await Topic.count()) as number;
     expect(before).toBeGreaterThan(0);
-    // Rails test_delete_all asserts delete_all returns the deleted count.
     expect(await Topic.all().deleteAll()).toBe(before);
     expect(await Topic.count()).toBe(0);
   });
@@ -222,7 +196,6 @@ describe("PersistenceTest", () => {
 
   it("update does not run sql if record has not changed", async () => {
     const t = await Topic.create({ title: "a" });
-    // Saving without changes should still succeed
     const result = await t.save();
     expect(result).toBe(true);
   });
@@ -253,8 +226,6 @@ describe("PersistenceTest", () => {
     expect(a.credit_limit).toBe(59);
   });
 
-  // Rails: test_increment_aliased_attribute — `available_credit` is
-  // alias_attribute'd to `credit_limit` (account.rb:7).
   it("increment aliased attribute", async () => {
     const a = accounts("signals37") as any;
     expect(a.available_credit).toBe(50);
@@ -268,7 +239,6 @@ describe("PersistenceTest", () => {
     expect(a.available_credit).toBe(53);
   });
 
-  // Rails: test_increment_nil_attribute — `topics(:first).parent_id` starts nil.
   it("increment nil attribute", async () => {
     const topic = topics("first") as any;
     expect(topic.parent_id).toBeNull();
@@ -276,8 +246,6 @@ describe("PersistenceTest", () => {
     expect(topic.parent_id).toBe(1);
   });
 
-  // Rails: test_increment_updates_counter_in_db_using_offset — two in-memory
-  // copies each increment; the DB applies both offsets, so a1 reloads to +2.
   it("increment updates counter in db using offset", async () => {
     const a1 = accounts("signals37");
     const initialCredit = a1.credit_limit;
@@ -332,10 +300,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute for aborted callback!", async () => {
-    // Rails uses an anonymous `Class.new(Topic)` whose `self.name` is forced to
-    // "Topic" so the STI type column stays "Topic" and the reload resolves back
-    // to the base class. A `before_update { throw :abort }` halts the update, so
-    // `update_attribute!` must raise RecordNotSaved.
     class Klass extends Topic {
       static name = "Topic";
       static {
@@ -362,8 +326,6 @@ describe("PersistenceTest", () => {
       const reply = topics("second");
       expect(reply).toBeInstanceOf(Reply);
 
-      // Rails asserts `assert_instance_of Topic` (exact class): becomes must not
-      // be re-dispatched to the `Reply` default subclass.
       const topic = reply.becomes(Topic);
       expect((topic as any).constructor).toBe(Topic);
     } finally {
@@ -375,13 +337,12 @@ describe("PersistenceTest", () => {
   it("reset column information resets children", async () => {
     const adapter = (await Topic.leaseConnection()) as any;
     class Child extends Topic {}
-    new Child(); // force schema to load
+    new Child();
 
     try {
       await adapter.addColumn("topics", "foo", "string");
       await Topic.resetColumnInformation();
 
-      // this should redefine attribute methods
       const child = new Child();
       expect("foo" in child).toBe(true);
       expect(typeof (child as any).fooChanged).toBe("function");
@@ -410,9 +371,6 @@ describe("PersistenceTest", () => {
     expect(r2.title).toBe("y");
   });
 
-  // query_constraints route update/delete/destroy WHERE through
-  // _query_constraints_hash, keying each declared constraint column to its
-  // attribute_in_database value (not the single primary key).
   it("update uses query constraints config", async () => {
     const clothingItem = clothingItems("green_t_shirt");
     const sqls = await captureSql(async () => {
@@ -490,26 +448,17 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// More PersistenceTest
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
   const { topics } = fixtures(["topics", "developers", "parrots", "posts"]);
 
-  // Rails: `Developer.update!(salary: 1_000_000)` — the class-level bang
-  // update touches every Developer, and the salary inclusion validation
-  // (50_000..200_000) rejects 1_000_000.
   it("raises error when validations failed", async () => {
     await expect(CanonicalDeveloper.updateBang({ salary: 1_000_000 })).rejects.toThrow(
       RecordInvalid,
     );
   });
 
-  // Rails: `assert_equal Developer.all.to_a, Developer.update(salary: 1_000_000)`
-  // — the non-bang class-level update returns every record in scope even
-  // though the salary inclusion validation (50_000..200_000) rejects 1_000_000.
   it("returns object even if validations failed", async () => {
     const all = await CanonicalDeveloper.all();
     const result = await CanonicalDeveloper.update({ salary: 1_000_000 });
@@ -560,9 +509,6 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest (continued) — more persistence_test.rb coverage
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const { topics } = fixtures(["topics", "companies"]);
@@ -614,8 +560,6 @@ describe("PersistenceTest", () => {
       [{ content: "1 duplicated" }, { content: "1 updated" }, { content: "2 updated" }],
     );
     expect(updated.map((t) => Number(t.id))).toEqual([1, 1, 2]);
-    // Rails' `id.map { find }` returns a distinct instance per requested id, so
-    // the two occurrences of id=1 are separate objects (each updated once).
     expect(updated[0]).not.toBe(updated[1]);
     expect((await Topic.find(1)).content).toBe("1 updated");
     expect((await Topic.find(2)).content).toBe("2 updated");
@@ -757,8 +701,6 @@ describe("PersistenceTest", () => {
     expect(t.title).toBe("super_title");
   });
 
-  // Rails: test_increment_with_touch_updates_timestamps — bare `touch: true`
-  // bumps updated_at alongside the counter.
   it("increment with touch updates timestamps", async () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
@@ -787,21 +729,16 @@ describe("PersistenceTest", () => {
       title: "Another New Topic",
       does_not_exist: "test",
     });
-    const duped = topic.dup(); // reset @new_record
+    const duped = topic.dup();
     await duped.saveBang();
     expect(duped.isPersisted()).toBe(true);
     expect((await Topic.find(duped.id)).title).toBe("Another New Topic");
   });
 });
 
-// ==========================================================================
-// PersistenceTest — delete/destroy new and with-associations, converted from
-// bespoke Post to canonical Client + companies fixtures.
-// ==========================================================================
 describe("PersistenceTest", () => {
   fixtures(["companies"]);
 
-  // Rails: test_delete_new_record
   it("delete new record", async () => {
     const client = new Client({ name: "37signals" });
     await client.delete();
@@ -812,7 +749,6 @@ describe("PersistenceTest", () => {
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
-  // Rails: test_destroy_new_record
   it("destroy new record", async () => {
     const client = new Client({ name: "37signals" });
     await client.destroy();
@@ -823,7 +759,6 @@ describe("PersistenceTest", () => {
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
-  // Rails: test_destroy_record_with_associations
   it("destroy record with associations", async () => {
     const client = await Client.find(3);
     await client.destroy();
@@ -835,7 +770,6 @@ describe("PersistenceTest", () => {
     expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
-  // Rails: test_delete_record_with_associations
   it("delete record with associations", async () => {
     const client = await Client.find(3);
     await client.delete();
@@ -848,14 +782,9 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — instantiate creates a new instance, canonical Post +
-// SpecialPost STI (persistence_test.rb#test_instantiate_creates_a_new_instance)
-// ==========================================================================
 describe("PersistenceTest", () => {
   fixtures(["posts", "authors"]);
 
-  // Rails: test_instantiate_creates_a_new_instance
   it("instantiate creates a new instance", () => {
     const post = CanonicalPost.instantiate({
       title: "appropriate documentation",
@@ -867,13 +796,9 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — create with custom timestamps (canonical LiveParrot).
-// ==========================================================================
 describe("PersistenceTest", () => {
   fixtures(["parrots"]);
 
-  // Rails: test_create_with_custom_timestamps
   it("create with custom timestamps", async () => {
     const customDatetime = instant("2026-01-01T00:00:00Z");
     for (const attr of ["created_at", "created_on", "updated_at", "updated_on"]) {
@@ -885,13 +810,9 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — becomes errors base (canonical AdminUser subclass).
-// ==========================================================================
 describe("PersistenceTest", () => {
   fixtures(["admin/users"]);
 
-  // Rails: test_becomes_errors_base
   it("becomes errors base", () => {
     class ChildUser extends AdminUser {
       static {
@@ -912,18 +833,11 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — slice of the bespoke posts block converted to canonical
-// Topic / Minivan / Developer + fixtures.
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const Developer = CanonicalDeveloper;
   const { topics } = fixtures(["topics", "minivans", "developers"]);
 
-  // Rails: test_update_column_should_not_modify_updated_at
-  // Developer aliases updated_at → legacy_updated_at (developer.rb), so the
-  // alias-aware updateColumn path resolves the public name.
   it("update column should not modify updated at", async () => {
     const developer = await Developer.find(1);
     const prevMonth = instant("2026-05-25T12:00:00Z");
@@ -937,14 +851,12 @@ describe("PersistenceTest", () => {
     );
   });
 
-  // Rails: test_update_parameters
   it("update parameters", async () => {
     const topic = await Topic.find(1);
     await topic.update({});
     await expect(topic.update(null as any)).rejects.toBeInstanceOf(ArgumentError);
   });
 
-  // Rails: test_update_sti_type
   it("update sti type", async () => {
     expect(topics("second")).toBeInstanceOf(Reply);
     const topic = topics("second").becomesBang(Topic);
@@ -953,7 +865,6 @@ describe("PersistenceTest", () => {
     expect(await Topic.find(topic.id)).toBeInstanceOf(Topic);
   });
 
-  // Rails: test_delete_isnt_affected_by_scoping
   it("delete isnt affected by scoping", async () => {
     const topic = await Topic.find(1);
     const before = Number(await Topic.count());
@@ -961,7 +872,6 @@ describe("PersistenceTest", () => {
     expect(Number(await Topic.count())).toBe(before - 1);
   });
 
-  // Rails: test_update_column_with_model_having_primary_key_other_than_id
   it("update column with model having primary key other than id", async () => {
     const minivan = await Minivan.find("m1");
     const newName = "sebavan";
@@ -969,7 +879,6 @@ describe("PersistenceTest", () => {
     expect(minivan.readAttribute("name")).toBe(newName);
   });
 
-  // Rails: test_duped_becomes_persists_changes_from_the_original
   it("duped becomes persists changes from the original", async () => {
     const original = topics("first");
     const copy = original.dup().becomes(Reply);
@@ -978,15 +887,10 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — delete / destroy / update-all / increment-decrement
-// converted from the bespoke posts block to canonical Topic + fixtures.
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const { topics } = fixtures(["topics"]);
 
-  // Rails: test_delete
   it("delete", async () => {
     const topic = await Topic.find(1);
     expect(await topic.delete()).toBe(topic);
@@ -994,12 +898,10 @@ describe("PersistenceTest", () => {
     await expect(Topic.find((topic as any).id)).rejects.toThrow(RecordNotFound);
   });
 
-  // Rails: test_destroy_raises_record_not_found_exception
   it("destroy raises record not found exception", async () => {
     await expect(Topic.destroy(99999)).rejects.toThrow(RecordNotFound);
   });
 
-  // Rails: test_increment_with_touch_an_attribute_updates_timestamps
   it("increment with touch an attribute updates timestamps", async () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
@@ -1017,7 +919,6 @@ describe("PersistenceTest", () => {
     expect(epochMs(topic.written_on)).toBeGreaterThan(epochMs(previouslyWrittenOn));
   });
 
-  // Rails: test_decrement_with_touch_updates_timestamps
   it("decrement with touch updates timestamps", async () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
@@ -1033,7 +934,6 @@ describe("PersistenceTest", () => {
     expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
   });
 
-  // Rails: test_update_attribute_with_one_updated!
   it("update attribute with one updated!", async () => {
     const t = (await Topic.first())!;
     await t.updateAttributeBang("title", "super_title");
@@ -1045,7 +945,6 @@ describe("PersistenceTest", () => {
     expect(t.title).toBe("super_title");
   });
 
-  // Rails: test_build_through_factory_with_block
   it("build through factory with block", () => {
     const topic = Topic.build({ title: "New Topic" }, (t: any) => {
       t.author_name = "David";
@@ -1056,9 +955,6 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest3 — additional missing tests from persistence_test.rb
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const { topics, people } = fixtures(["topics", "people", "cars"]);
@@ -1121,25 +1017,14 @@ describe("PersistenceTest", () => {
 
   const Topic = CanonicalTopic;
 
-  // `topics` / `minimalistics` / `cpk_orders` are prebuilt on the per-worker DB
-  // from the canonical schema (`template-global-setup.ts`); transactional
-  // fixtures roll back row mutations per test, so no per-file schema setup is
-  // needed.
-
   it("update columns changing id", async () => {
     const t = await Topic.create({ title: "test" });
     const oldId = t.id;
-    // updateColumns can change the id column directly. The WHERE clause
-    // must target the *original* id — otherwise the UPDATE would bind
-    // the post-mutation id and affect zero rows.
     await t.updateColumns({ id: 999 });
     expect(Number(t.id)).toBe(999);
-    // The original row should have the new id now (proves the WHERE
-    // captured the pre-mutation id correctly).
     const refreshed = await Topic.find(999);
     expect(Number(refreshed.id)).toBe(999);
     expect(refreshed.title).toBe("test");
-    // The old id no longer exists.
     await expect(Topic.find(oldId)).rejects.toThrow();
   });
 
@@ -1215,8 +1100,6 @@ describe("PersistenceTest", () => {
     await expect(Minimalistic.createBang({ id: 2 })).resolves.not.toThrow();
   });
 
-  // Rails: test_update_columns_not_equal_attributes — saving a record that was
-  // instantiated with an unknown column must not raise; the extra key is dropped.
   it("update columns not equal attributes", async () => {
     const topic = Topic.new();
     (topic as any).title = "Still another topic";
@@ -1256,8 +1139,6 @@ describe("PersistenceTest", () => {
     await expect(Topic.update(99999, { title: "x" })).rejects.toThrow();
   });
 
-  // Rails: test_update_attribute_with_one_updated — update_attribute clears
-  // aggregate and per-attribute dirty state.
   it("update attribute with one updated", async () => {
     const t = await Topic.create({ title: "a" });
     await t.updateAttribute("title", "super_title");
@@ -1316,7 +1197,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level delete with invalid ids", async () => {
-    // Deleting a non-existent id should not throw, just return 0
     const affected = await Topic.delete(99999);
     expect(affected).toBe(0);
   });
@@ -1336,27 +1216,24 @@ describe("PersistenceTest", () => {
       await t.save();
       expect(t.id).toBe(id);
     });
-  }); // QueryConstraintsTest
+  });
 });
 describe("PersistenceTest", () => {
   fixtures(["topics", "posts", "authors"]);
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
 
-  // Rails: test_save_destroyed_object
   it("save destroyed object", async () => {
     const topic = await Topic.create({ title: "New Topic" });
     await topic.destroyBang();
     await expect(topic.saveBang()).rejects.toThrow("Failed to save the record");
   });
 
-  // Rails: test_delete_doesnt_run_callbacks
   it("delete doesnt run callbacks", async () => {
     await (await Topic.find(1)).delete();
     expect(await Topic.find(2)).not.toBeNull();
   });
 
-  // Rails: test_destroy
   it("destroy", async () => {
     const topic = await Topic.find(1);
     expect(await topic.destroy()).toBe(topic);
@@ -1364,7 +1241,6 @@ describe("PersistenceTest", () => {
     await expect(Topic.find((topic as any).id)).rejects.toThrow(RecordNotFound);
   });
 
-  // Rails: test_find_via_reload
   it("find via reload", async () => {
     const post = Post.new();
     expect(post.isNewRecord()).toBe(true);
@@ -1396,9 +1272,6 @@ describe("PersistenceTest", () => {
 
   it("update column should not use setter method", async () => {
     const dev = (await CanonicalDeveloper.find(1)) as any;
-    // Mirror Rails' `dev.instance_eval { def salary=(v); write_attribute(:salary, v * 2); end }`:
-    // a per-instance setter override that doubles the value. update_column must
-    // write the raw value straight to the column, never routing through it.
     let setterCalled = false;
     Object.defineProperty(dev, "salary", {
       configurable: true,
@@ -1456,9 +1329,6 @@ describe("PersistenceTest", () => {
     );
   });
 });
-// ==========================================================================
-// PersistenceTest — composite primary key destroy (persistence_test.rb)
-// ==========================================================================
 describe("PersistenceTest", () => {
   const { cpkBooks } = fixtures(["cpkAuthors", "cpkBooks"]);
 
@@ -1498,16 +1368,13 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — becomes / STI type variants (persistence_test.rb)
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const { topics } = fixtures(["topics", "companies"]);
 
   it("becomes after reload schema from cache", () => {
     (Reply as any).defineAttributeMethods();
-    Reply.serialize("content"); // invoke reload_schema_from_cache
+    Reply.serialize("content");
     const t = topics("first");
     expect(t.becomes(Reply)).toBeInstanceOf(Reply);
     expect(t.becomes(Reply).title).toBe("The First Topic");
@@ -1558,9 +1425,6 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — readonly attributes + non-id primary keys (persistence_test.rb)
-// ==========================================================================
 describe("PersistenceTest", () => {
   const { developers } = fixtures(["developers", "minivans", "speedometers"]);
 
@@ -1600,8 +1464,6 @@ describe("PersistenceTest", () => {
 
   it("update columns should not use setter method", async () => {
     const dev = (await CanonicalDeveloper.find(1)) as any;
-    // Mirror Rails' per-instance `salary=` override (doubles the value):
-    // update_columns must write the raw value straight to the column.
     let setterCalled = false;
     Object.defineProperty(dev, "salary", {
       configurable: true,
@@ -1680,15 +1542,6 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — PostgreSQL-only uuid primary-key create coverage.
-// Both Rails tests are guarded `if current_adapter?(:PostgreSQLAdapter)`; the
-// `chat_messages` / `chat_messages_custom_pk` tables live only in
-// postgresql_specific_schema.rb and use uuid PKs, so they are laid at boot by
-// loadSchema's adapter-specific arm on the postgres lane only, and both tests
-// are gated to that adapter (the tests stay in a `PersistenceTest` describe to
-// mirror Rails).
-// ==========================================================================
 describe("PersistenceTest", () => {
   registerModel(ChatMessage);
   registerModel(ChatMessageCustomPk);
@@ -1714,14 +1567,8 @@ describe("PersistenceTest", () => {
   );
 });
 
-// ==========================================================================
-// becomes + restricted-name dirty tracking (persistence_test.rb:473)
-// ==========================================================================
 describe("PersistenceTest", () => {
   fixtures(["companies"]);
-  // Warm the schema cache so Company's column accessors (incl. the restricted
-  // `name` reader) are generated before `new Company(...)`, matching Rails where
-  // the connection reflects columns lazily on first use.
   beforeAll(async () => {
     await (Company as unknown as { loadSchema(): Promise<void> }).loadSchema();
   });
@@ -1734,9 +1581,6 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — save / query-cache
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   fixtures(["topics", "developers", "parrots"]);
@@ -1758,7 +1602,6 @@ describe("PersistenceTest", () => {
     expect(connection.queryCacheEnabled).toBe(true);
     const parrot = await Parrot.create({ name: "Shane" });
 
-    // populate the cache with the SELECT result
     const foundParrot = await Parrot.find(parrot.id);
     expect(foundParrot.id).toBe(parrot.id);
 
@@ -1768,7 +1611,6 @@ describe("PersistenceTest", () => {
       await foundParrot.save();
     });
 
-    // reload should get the DB version, not the querycache version
     await foundParrot.reload();
     expect((foundParrot as any).name).toBe("Mary");
 
@@ -1779,15 +1621,10 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// QueryConstraintsTest — targets persistence_test.rb QueryConstraintsTest
-// ==========================================================================
 describe("QueryConstraintsTest", () => {
   const { clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"]);
 
   beforeAll(async () => {
-    // `developers_projects` is a join table with no single primary key; warm its
-    // schema so the anonymous class's `primaryKey` reflection resolves to null.
     await ClothingItem.loadSchema();
   });
 
@@ -1848,35 +1685,13 @@ describe("QueryConstraintsTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — adapter-specific auto-populated column coverage.
-// Rails defines `test_fills_auto_populated_columns_on_creation` three times —
-// once per adapter, guarded `if current_adapter?(:PostgreSQLAdapter)` /
-// `elsif :SQLite3Adapter` / `elsif :Mysql2Adapter` — each asserting the
-// DB-populated defaults on the `defaults` table. That table lives in the
-// per-adapter `*_specific_schema.rb` (NOT canonical schema.rb). We mirror the
-// three guarded defs as three adapter-gated tests (each builds its adapter's
-// `defaults` table faithfully).
-//
-// base.ts `_createRecord` reads back every auto-populated column via a
-// multi-column RETURNING on adapters that support it (PG, SQLite >= 3.35,
-// MariaDB), mirroring Rails `_create_record`'s `returning_columns.zip(
-// returning_values)`, so DB-computed defaults are visible on the record
-// returned by `create`.
-// ==========================================================================
 describe("PersistenceTest", () => {
   registerModel(Default);
-  // The adapter-specific `defaults` table is built and dropped with DDL inside
-  // each test; MySQL implicitly commits on DDL, which detonates a wrapping
-  // transactional-fixtures savepoint (ROLLBACK TO SAVEPOINT then fails). Run this
-  // suite non-transactionally — the `defaults` table is torn down in a `finally`
-  // regardless — matching the other DDL-driven suites.
   fixtures([], { useTransactionalTests: false });
 
   async function buildDefaultsTable() {
     const connection = Base.connection;
     if (adapterType === "postgres") {
-      // Mirror postgresql_specific_schema.rb `create_table :defaults`.
       const pg = connection as PostgreSQLAdapter;
       const supportsVirtualColumns = await pg.supportsVirtualColumns();
       await pg.createTable("defaults", { force: true }, (d) => {
@@ -1911,7 +1726,6 @@ describe("PersistenceTest", () => {
         d.binary("binary_default_function", { default: () => "convert_to('A', 'UTF8')" });
       });
     } else if (adapterType === "sqlite") {
-      // Mirror sqlite_specific_schema.rb `create_table :defaults`.
       await connection.createTable("defaults", { force: true }, (t) => {
         t.integer("random_number", { default: () => "ABS(RANDOM())" });
         t.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
@@ -1934,7 +1748,6 @@ describe("PersistenceTest", () => {
         t.text("char3", { default: "a text field" });
       });
     } else {
-      // Mirror mysql2_specific_schema.rb `create_table :defaults`.
       const supportsDefaultExpression =
         (
           connection as { supportsDefaultExpression?: () => boolean }
@@ -1964,7 +1777,6 @@ describe("PersistenceTest", () => {
     }
   }
 
-  // Rails: `if current_adapter?(:PostgreSQLAdapter)`.
   it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async () => {
     await withDefaultsTable(async (record) => {
       expect(record.ruby_on_rails).toBe("Ruby on Rails");
@@ -1977,8 +1789,6 @@ describe("PersistenceTest", () => {
       expect(record.modified_time).not.toBeNull();
       expect(record.modified_time_without_precision).not.toBeNull();
       expect(record.modified_time_function).not.toBeNull();
-      // Rails: `assert_equal "A", record.binary_default_function` — trails
-      // returns binary columns as raw bytes, so decode to compare.
       expect(Buffer.from(record.binary_default_function).toString()).toBe("A");
 
       if (await (Base.connection as PostgreSQLAdapter).supportsIdentityColumns()) {
@@ -1993,7 +1803,6 @@ describe("PersistenceTest", () => {
     });
   });
 
-  // Rails: `elsif current_adapter?(:SQLite3Adapter)`.
   it.skipIf(adapterType !== "sqlite")("fills auto populated columns on creation", async () => {
     await withDefaultsTable((record) => {
       expect(record.ruby_on_rails).toBe("Ruby on Rails");
@@ -2006,7 +1815,6 @@ describe("PersistenceTest", () => {
     });
   });
 
-  // Rails: `elsif current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`.
   it.skipIf(adapterType !== "mysql")("fills auto populated columns on creation", async () => {
     await withDefaultsTable(async (record) => {
       expect(record.char1).not.toBeNull();
@@ -2021,11 +1829,6 @@ describe("PersistenceTest", () => {
   });
 });
 
-// ==========================================================================
-// PersistenceTest — insert-returning PK populated by a DB trigger.
-// Rails gates `test_model_with_no_auto_populated_fields_still_returns_primary_key_after_insert`
-// on `supports_insert_returning? && !current_adapter?(:SQLite3Adapter)`.
-// ==========================================================================
 describe("PersistenceTest", () => {
   registerModel(PkAutopopulatedByATriggerRecord);
   fixtures([]);
@@ -2054,9 +1857,6 @@ describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   fixtures(["topics"]);
 
-  // `update_attribute` is a DB write, so the `before_validation` callback that
-  // calls it is async in trails; the RFC 0063 async validation chain awaits it
-  // (Rails' `set_author_name` is a plain sync method).
   it("update attribute in before validation respects callback chain", async () => {
     let counter = 0;
     const callOnce = (record: any) => {

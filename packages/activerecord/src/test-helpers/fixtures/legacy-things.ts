@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/legacy_things.yml
 export const legacyThingFixtureData = {
   obtuse: {
     id: 1,

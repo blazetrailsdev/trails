@@ -1,19 +1,9 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/secure_password_test.rb
- * Test names match the Rails counterpart.
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { SecurePassword } from "@blazetrails/activemodel";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Mirrors Rails' `retry_flaky_test` (secure_password_test.rb): retry the timing
-// assertion a few times before failing, so a single unlucky preemption spike
-// doesn't fail CI. Rails rescues only `Minitest::Assertion`; we likewise retry
-// only assertion failures (vitest throws `AssertionError`) so a genuine
-// exception surfaces immediately instead of being masked and delayed. Re-throws
-// the last assertion error once retries are spent.
 async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -35,7 +25,6 @@ describe("SecurePasswordTest", () => {
   let originalMinCost: boolean;
   let user: User;
   beforeEach(async () => {
-    // Speed up tests
     originalMinCost = SecurePassword.minCost;
     SecurePassword.minCost = true;
 
@@ -57,29 +46,9 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by takes the same amount of time regardless of whether record is found", async () => {
-    // Warm-up both the found (verify) and not-found (decoy hash) paths so the
-    // first timed sample doesn't eat crypto/JIT init cost and the DB connection
-    // is established.
     await (User as any).authenticateBy({ token: user.token, password: user.password });
     await (User as any).authenticateBy({ token: "wrong", password: user.password });
 
-    // Port of Rails' averaged + retried timing check
-    // (activerecord/test/cases/secure_password_test.rb): Rails sums 1000
-    // iterations to average out jitter and wraps the whole thing in
-    // retry_flaky_test. We can't afford 1000 DB round-trips per path, so we
-    // take the MINIMUM elapsed time over a handful of samples instead — the
-    // min reflects the true CPU cost of the hash and is immune to the
-    // GC/preemption spikes that make a single sample flaky (a preempted
-    // wrong-password run measuring ~30ms was the original flake).
-    //
-    // Every path must run one password hash so a timing attacker can't tell
-    // them apart: the found-and-correct path verifies the stored digest, the
-    // found-but-wrong-password path also verifies it, and the not-found path
-    // runs a decoy hash. We measure all three and assert the not-found run is
-    // not substantially shorter than either found run. Including the
-    // found-and-correct path matches the exact invariant Rails bounds (Rails
-    // compares found-correct vs not-found); the wrong-password comparison is an
-    // additional trails check that the two "auth fails" branches also match.
     await retryFlakyTest(async () => {
       const SAMPLES = 8;
       let foundCorrectMs = Infinity;

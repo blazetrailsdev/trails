@@ -4,29 +4,13 @@ import { parkNestedReaderLoad } from "./nested-attributes.js";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
-/**
- * Scoping module — manages current scope and scope registry.
- * Base delegates scoping operations to these classes.
- *
- * Mirrors: ActiveRecord::Scoping
- */
 export class Scoping {
   static scopeFor(modelClass: any): any | null {
     return ScopeRegistry.currentScope(modelClass);
   }
 }
 
-/**
- * Per-model registry tracking the current scope (set via scoping {}).
- * Uses a WeakMap so model classes can be garbage collected.
- *
- * Mirrors: ActiveRecord::Scoping::ScopeRegistry
- */
 export class ScopeRegistry {
-  // Rails: `@current_scope = {}` etc on the instance — per-fiber-isolated
-  // because `instance()` itself is per-fiber via IsolatedExecutionState.
-  // We use WeakMap (model class as key) instead of Rails' string-keyed Hash
-  // (model.name) so anonymous classes work and model classes can be GC'd.
   private readonly _currentScopes: WeakMap<object, any> = new WeakMap();
   private readonly _ignoreDefaultScope: WeakMap<object, any> = new WeakMap();
   private readonly _globalCurrentScope: WeakMap<object, any> = new WeakMap();
@@ -59,7 +43,6 @@ export class ScopeRegistry {
     setValueFor(this._globalCurrentScope, modelClass, scope);
   }
 
-  // Class-method delegators — Rails uses `delegate :current_scope, …, to: :instance`.
   static currentScope(modelClass: object, skipInheritedScope = false): any | null {
     return this.instance().currentScope(modelClass, skipInheritedScope);
   }
@@ -80,8 +63,6 @@ export class ScopeRegistry {
   }
 }
 
-// Rails: value_for(@registry, model, skip_inherited_scope).
-// Walks up the prototype chain unless skipInheritedScope is true.
 /** @internal */
 function valueFor(
   map: WeakMap<object, any>,
@@ -107,21 +88,11 @@ function setValueFor(map: WeakMap<object, any>, modelClass: object, value: any):
   }
 }
 
-// ---------------------------------------------------------------------------
-// Instance methods
-// ---------------------------------------------------------------------------
-
 interface ScopingHost {
   constructor: { isScopeAttributes(): boolean };
   assignAttributes?(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping#populate_with_current_scope_attributes
- * (scoping.rb:60-66). Runs from `initialize` (core.rb:474), which a JS
- * constructor cannot await, so the assignment is parked on the record for `save`
- * to drain — see `_applyScopeAttributes` (base.ts).
- */
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
   const klass = this.constructor as any;
   if (!klass.isScopeAttributes()) return;
@@ -135,10 +106,6 @@ export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
 export function initializeInternalsCallback(this: ScopingHost): void {
   populateWithCurrentScopeAttributes.call(this);
 }
-
-// ---------------------------------------------------------------------------
-// Class methods
-// ---------------------------------------------------------------------------
 
 interface ScopingClassHost {
   currentScope?(skipInheritedScope?: boolean): any;
@@ -154,28 +121,14 @@ export function isScopeAttributes(this: ScopingClassHost): boolean {
   return !!this.currentScope?.();
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping::ClassMethods#current_scope=
- * (scoping.rb:29-31). Ruby's `current_scope=` cannot be a TS `set` accessor
- * here (callers pass through delegation hosts), so it keeps the Rails name as
- * `setCurrentScope`.
- */
 export function setCurrentScope(this: ScopingClassHost, scope: any): void {
   ScopeRegistry.setCurrentScope(this as unknown as object, scope);
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope
- * (scoping.rb:34-36).
- */
 export function globalCurrentScope(this: ScopingClassHost, skipInheritedScope = false): any | null {
   return ScopeRegistry.globalCurrentScope(this as unknown as object, skipInheritedScope);
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope=
- * (scoping.rb:37-39).
- */
 export function setGlobalCurrentScope(this: ScopingClassHost, scope: any): void {
   ScopeRegistry.setGlobalCurrentScope(this as unknown as object, scope);
 }

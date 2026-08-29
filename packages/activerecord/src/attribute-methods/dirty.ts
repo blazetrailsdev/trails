@@ -1,12 +1,3 @@
-/**
- * Dirty tracking methods specific to ActiveRecord persistence.
- *
- * Extends ActiveModel::Dirty with persistence-aware methods like
- * saved_changes and will_save_change_to_attribute.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty
- */
-
 import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import type {
@@ -16,10 +7,6 @@ import type {
 } from "@blazetrails/activemodel";
 import * as Timestamp from "../timestamp.js";
 
-/**
- * Mirror of Ruby's `RuntimeError` — the class dirty.rb:45's bare
- * `raise "You cannot include Dirty after Timestamp"` builds.
- */
 class RuntimeError extends Error {
   constructor(message: string) {
     super(message);
@@ -32,13 +19,6 @@ interface DirtyRecord {
   mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker;
 }
 
-/**
- * Check if a specific attribute was changed in the last save.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
- * (dirty.rb:86-88) — `mutations_before_last_save.changed?(attr_name.to_s,
- * **options)`.
- */
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
   attr: string,
@@ -47,12 +27,6 @@ export function isSavedChangeToAttribute(
   return record.mutationsBeforeLastSave.isChanged(attr, options);
 }
 
-/**
- * Return the change for a specific attribute from the last save.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute
- * (dirty.rb:98-100)
- */
 export function savedChangeToAttribute(
   record: DirtyRecord,
   attr: string,
@@ -60,32 +34,14 @@ export function savedChangeToAttribute(
   return record.mutationsBeforeLastSave.changeToAttribute(attr);
 }
 
-/**
- * Return the value of an attribute before the last save.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
- * (dirty.rb:108-110)
- */
 export function attributeBeforeLastSave(record: DirtyRecord, attr: string): unknown {
   return record.mutationsBeforeLastSave.originalValue(attr);
 }
 
-/**
- * Check if there were any saved changes.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes?
- */
 export function isSavedChanges(record: DirtyRecord): boolean {
   return record.mutationsBeforeLastSave.anyChanges();
 }
 
-/**
- * Check if a specific attribute will change on the next save.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
- * (dirty.rb:138-140) — `mutations_from_database.changed?(attr_name.to_s,
- * **options)`.
- */
 export function isWillSaveChangeToAttribute(
   record: DirtyRecord,
   attr: string,
@@ -94,11 +50,6 @@ export function isWillSaveChangeToAttribute(
   return record.mutationsFromDatabase.isChanged(attr, options);
 }
 
-/**
- * Return the pending change for a specific attribute.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
- */
 export function attributeChangeToBeSaved(
   record: DirtyRecord,
   attr: string,
@@ -106,20 +57,10 @@ export function attributeChangeToBeSaved(
   return record.mutationsFromDatabase.changeToAttribute(attr);
 }
 
-/**
- * Return the database value of an attribute (before unsaved changes).
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
- * (dirty.rb:164-166)
- */
 export function attributeInDatabase(record: DirtyRecord, attr: string): unknown {
   return record.mutationsFromDatabase.originalValue(attr);
 }
 
-/**
- * The host `include ActiveRecord::AttributeMethods::Dirty` needs — a class that
- * already carries `ActiveModel::Dirty`, which dirty.rb:42 includes.
- */
 interface DirtyIncludeHost {
   prototype: object;
   attributeMethodPrefix(...prefixes: Array<string | { parameters?: string | null | false }>): void;
@@ -129,33 +70,7 @@ interface DirtyIncludeHost {
   ): void;
 }
 
-/**
- * The half of ActiveRecord::AttributeMethods::Dirty whose Ruby bodies are
- * zero-arg readers, so they port as accessor properties (CLAUDE.md,
- * "Generated attribute readers are properties"). A class module rather than a
- * plain-object one because only `include()`'s class branch copies accessor
- * descriptors; an object literal is read by value and would flatten each
- * getter into a data property.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty
- */
 export class Dirty {
-  /**
-   * Mirrors: dirty.rb:44-59 — the module's `included do` block.
-   *
-   * Ruby tells the predicate `saved_change_to_name?` (dirty.rb:53) from the
-   * array-returning `saved_change_to_name` (dirty.rb:54) by the trailing `?`,
-   * which the camel spelling drops; the `is*` prefix
-   * (docs/ruby-ts-conventions.md) is where TypeScript puts the same
-   * distinction, so it goes in the pattern's own prefix and the derived
-   * `${prefix}Attribute${suffix}` proxy target (attribute_methods.rb:481)
-   * lands on `isSavedChangeToAttribute` unchanged.
-   *
-   * The opening guard is dirty.rb:44-47's `if self < ::ActiveRecord::Timestamp`
-   * — Timestamp's `_create_record` / `_update_record` wrappers must sit above
-   * Dirty's `changes_applied` links, so including Dirty second silently breaks
-   * dirty tracking on save and the raise makes that loud.
-   */
   static [included](base: DirtyIncludeHost): void {
     if (isModuleIncluded(base, Timestamp.InstanceMethods)) {
       throw new RuntimeError("You cannot include Dirty after Timestamp");
@@ -172,42 +87,22 @@ export class Dirty {
     base.attributeMethodSuffix("ChangeToBeSaved", "InDatabase", { parameters: false });
   }
 
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes
-   * (dirty.rb:118-120) — `mutations_before_last_save.changes`.
-   */
   get savedChanges(): Record<string, [unknown, unknown]> {
     return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
   }
 
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save?
-   * (dirty.rb:169-171) — `mutations_from_database.any_changes?`.
-   */
   get hasChangesToSave(): boolean {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
   }
 
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changes_to_save
-   * (dirty.rb:175-177) — `mutations_from_database.changes`.
-   */
   get changesToSave(): Record<string, [unknown, unknown]> {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
   }
 
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changed_attribute_names_to_save
-   * (dirty.rb:181-183) — `mutations_from_database.changed_attribute_names`.
-   */
   get changedAttributeNamesToSave(): string[] {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
   }
 
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attributes_in_database
-   * (dirty.rb:191-193) — `mutations_from_database.changed_values`.
-   */
   get attributesInDatabase(): Record<string, unknown> {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
   }

@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/reserved_words/values.yml
 export const reservedWordsValuesFixtureData = {
   values1: {
     as: 1,

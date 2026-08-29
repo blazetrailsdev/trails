@@ -1,10 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "../base.js";
 
-// Rails seats `@primary_key` once, at `init_internals` (core.rb:846), and every
-// instance-side reader reads that ivar (primary_key.rb:18-56) — so the record
-// keeps the key its class answered at construction, whatever the class says
-// later.
 describe("per-instance @primary_key slot", () => {
   it("seats the record's primary key from the class at init_internals", () => {
     class SeatedToy extends Base {

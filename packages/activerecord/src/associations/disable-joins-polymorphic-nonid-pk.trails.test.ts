@@ -1,30 +1,3 @@
-/**
- * DJAS: polymorphic belongsTo-through with non-id target PK (task #20).
- *
- * The non-DJAS path has a regression test at
- * `association-scope.test.ts` ("findTarget through with sourceType +
- * non-id target PK uses correct join column"). The DJAS walk routes
- * through the same reflection infrastructure (`joinPrimaryKey`
- * resolves the source target's actual PK column for a polymorphic
- * belongsTo at runtime), but no direct DJAS coverage existed for
- * that intersection. This file pins the DJAS shape end-to-end.
- *
- * Key setup:
- *   Author  has_many :galleries (regular FK)
- *   Gallery belongs_to :imageable, polymorphic: true, foreign_key: :imageable_uuid
- *   Photo   primaryKey = "uuid"       # non-id PK
- *   Author  has_many :photos, through: :galleries, source: :imageable,
- *                    sourceType: "DpNonIdPhoto",
- *                    disable_joins: true
- *
- * The walk must read the *source-target's* `uuid` column on the
- * through step (not the default `"id"` that
- * `BelongsToReflection#joinPrimaryKey` hard-codes for polymorphic
- * sources). Rails resolves this via
- * `BelongsToReflection#join_primary_key_for(klass)`
- * (reflection.rb:968); our ReflectionProxy forwards it, and DJAS'
- * `_addConstraintsDj` threads it through the chain walk.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel, TableDefinition } from "../index.js";

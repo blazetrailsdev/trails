@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/movies.yml
 export const movieFixtureData = {
   first: {
     movieid: 1,

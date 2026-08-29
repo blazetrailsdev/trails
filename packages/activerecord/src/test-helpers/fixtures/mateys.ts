@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/mateys.yml
 export const mateyFixtureData = {
   blackbeard_to_redbeard: {
     pirate_id: ref("pirates", "blackbeard"),

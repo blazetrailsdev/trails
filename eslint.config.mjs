@@ -825,9 +825,9 @@ export default defineConfig(
   //    an excluded tree does not earn it a pass — write it without prose.
   //    Rows are trees rather than files because the backlog is 2421 files
   //    deep; a tree stops being excluded the moment its story lands. Nothing
-  //    that lints clean today rides on a row: the already-swept trees are
-  //    re-enrolled by the block below, and so is every individually-clean file
-  //    inside an excluded tree (`sweptFilesInsideUnsweptTrees`).
+  //    that lints clean today rides on a row: every individually-clean file
+  //    inside an excluded tree is re-enrolled by the block below
+  //    (`sweptFilesInsideUnsweptTrees`).
   {
     files: ["**/*.ts", "**/*.mts", "**/*.mjs", "**/*.js"],
     ignores: [
@@ -836,40 +836,6 @@ export default defineConfig(
       // rewritten by `scripts/test-compare/generate-stubs.ts` on every run.
       // This row never shrinks; there is nothing to sweep.
       "scripts/test-compare/output/**",
-
-      // story strip-freeform-comments-ar-root-b — activerecord/src root files
-      // past the swept `a*.ts` slice.
-      "packages/activerecord/src/*.ts",
-      // story strip-freeform-comments-ar-associations-tests
-      "packages/activerecord/src/associations/**/*.test.ts",
-      // story strip-freeform-comments-ar-connection-adapters-toplevel-tests
-      "packages/activerecord/src/connection-adapters/**/*.test.ts",
-      // story strip-freeform-comments-ar-remaining-dirs
-      "packages/activerecord/src/assertions/**/*.ts",
-      "packages/activerecord/src/attribute-methods/**/*.ts",
-      "packages/activerecord/src/cases/**/*.ts",
-      "packages/activerecord/src/coders/**/*.ts",
-      "packages/activerecord/src/database-configurations/**/*.ts",
-      "packages/activerecord/src/encryption/**/*.ts",
-      "packages/activerecord/src/locale/**/*.ts",
-      "packages/activerecord/src/locking/**/*.ts",
-      "packages/activerecord/src/middleware/**/*.ts",
-      "packages/activerecord/src/migration/**/*.ts",
-      "packages/activerecord/src/persistence/**/*.ts",
-      "packages/activerecord/src/scoping/**/*.ts",
-      "packages/activerecord/src/sqlite/**/*.ts",
-      "packages/activerecord/src/tasks/**/*.ts",
-      "packages/activerecord/src/test-fixtures/**/*.ts",
-      "packages/activerecord/src/test-helpers/**",
-      "packages/activerecord/src/testing/**/*.ts",
-      "packages/activerecord/src/trailties/**/*.ts",
-      "packages/activerecord/src/type/**/*.ts",
-      "packages/activerecord/src/type-caster/**/*.ts",
-      "packages/activerecord/src/type-virtualization/**/*.ts",
-      "packages/activerecord/src/validations/**/*.ts",
-      "packages/activerecord/dx-tests/**",
-      "packages/activerecord/virtualized-dx-tests/**",
-      "packages/activerecord/scripts/**",
 
       // story enroll-remaining-packages-in-no-freeform-comments — the packages
       // and tooling trees with no sweep of their own yet.
@@ -899,80 +865,6 @@ export default defineConfig(
       "blazetrails/no-freeform-comments": "error",
     },
   },
-  // ── no-freeform-comments, swept trees. These were the enrollment allowlist
-  //    before the rule went repo-wide above; they are kept because several of
-  //    them sit inside an exclusion row (activerecord/src root files, the
-  //    connection-adapters and associations trees) and this block, coming
-  //    after that one, carves the swept half back in. A tree here lints clean
-  //    today — do not move one back into the exclusion list to turn a run
-  //    green. ──
-  {
-    files: [
-      "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
-      "packages/activerecord/src/relation/**/*.ts",
-      "packages/activerecord/src/support/**/*.ts",
-      // activerecord/src root files, swept alphabetically one slice per PR
-      // (story strip-freeform-comments-ar-root-b onward for the rest).
-      "packages/activerecord/src/a*.ts",
-      "packages/activerecord/src/connection-adapters/abstract/**/*.ts",
-      "packages/activerecord/src/connection-adapters/mysql/**/*.ts",
-      "packages/activerecord/src/connection-adapters/mysql2/**/*.ts",
-      "packages/activerecord/src/connection-adapters/postgresql/**/*.ts",
-      "packages/activerecord/src/connection-adapters/sqlite3/**/*.ts",
-      "packages/activerecord/src/adapters/**/*.ts",
-    ],
-    rules: {
-      "blazetrails/no-freeform-comments": "error",
-    },
-  },
-
-  // ── no-freeform-comments, activerecord/connection-adapters top-level: the
-  //    implementation files and all but three of the test files at the root of
-  //    the tree are swept; the three heaviest test files did not fit the PR
-  //    ceiling and are still outstanding (story
-  //    strip-freeform-comments-ar-connection-adapters-toplevel-tests-rest), so
-  //    they are ignored here rather than holding the rule off the whole
-  //    slice. ──
-  {
-    files: ["packages/activerecord/src/connection-adapters/*.ts"],
-    ignores: [
-      "packages/activerecord/src/connection-adapters/schema-cache.test.ts",
-      "packages/activerecord/src/connection-adapters/postgresql-adapter.exec-query.trails.test.ts",
-      "packages/activerecord/src/connection-adapters/postgresql-adapter.get-client.trails.test.ts",
-    ],
-    rules: {
-      "blazetrails/no-freeform-comments": "error",
-    },
-  },
-
-  // ── no-freeform-comments, activerecord/associations: swept a slice at a
-  //    time. The implementation files are done; the test files under the same
-  //    tree are still outstanding (story
-  //    strip-freeform-comments-ar-associations-tests), so they are ignored here
-  //    rather than holding the rule off the whole tree until they land. The
-  //    block below re-enables the rule for the test files already swept; each
-  //    slice appends to that list until it covers the tree and both blocks
-  //    collapse back into one. ──
-  {
-    files: ["packages/activerecord/src/associations/**/*.ts"],
-    ignores: ["packages/activerecord/src/associations/**/*.test.ts"],
-    rules: {
-      "blazetrails/no-freeform-comments": "error",
-    },
-  },
-  {
-    files: [
-      "packages/activerecord/src/associations/eager.test.ts",
-      "packages/activerecord/src/associations/has-many-associations.test.ts",
-      "packages/activerecord/src/associations/has-one-associations.test.ts",
-      "packages/activerecord/src/associations/join-model.test.ts",
-    ],
-    rules: {
-      "blazetrails/no-freeform-comments": "error",
-    },
-  },
-
   // ── no-freeform-comments, individually-clean files inside an excluded tree.
   //    An exclusion row above is a tree, so it would otherwise hand a pass to
   //    the files under it that carry no comment today. These 476 do, measured

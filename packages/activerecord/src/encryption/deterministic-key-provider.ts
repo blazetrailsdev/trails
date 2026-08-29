@@ -1,9 +1,3 @@
-/**
- * Deterministic key provider — derives a single key from a password.
- *
- * Mirrors: ActiveRecord::Encryption::DeterministicKeyProvider
- */
-
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 

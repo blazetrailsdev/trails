@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/valid/2_we_need_reminders.rb
 import { Migration } from "../../../migration.js";
 
 export class WeNeedReminders extends Migration {

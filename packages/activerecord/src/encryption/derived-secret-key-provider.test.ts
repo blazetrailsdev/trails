@@ -20,8 +20,6 @@ describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
     Configurable.config.storeKeyReferences = false;
   });
 
-  // Rails' setup block (derived_secret_key_provider_test.rb:6-10) builds the
-  // shared provider from `build_keys(3)` (encryption/helper.rb:57-63).
   let keyProvider: KeyProvider;
   beforeEach(() => {
     const keys = Array.from(
@@ -37,9 +35,6 @@ describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
     const key = keyProvider.encryptionKey();
 
     expect([key]).toEqual(keyProvider.decryptionKeys(new Message({ payload: "some secret" })));
-    // Rails' `key.secret.bytesize` counts the raw derived bytes; trails'
-    // KeyGenerator#deriveKeyFrom hands the secret back base64-encoded
-    // (key-generator.ts:35-39), so decode before measuring.
     expect(Configurable.cipher.keyLength()).toEqual(Buffer.from(key.secret, "base64").byteLength);
   });
 

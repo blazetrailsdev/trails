@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/eye.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 

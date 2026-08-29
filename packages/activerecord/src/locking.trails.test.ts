@@ -36,8 +36,6 @@ describe("OptimisticLockingTrailsTest", () => {
     untyped.lockingColumn = 123;
     expect(LockCoerce.lockingColumn).toBe("123");
 
-    // Ruby's nil.to_s is "", so the reader yields "" rather than falling back
-    // to the "lock_version" default.
     untyped.lockingColumn = null;
     expect(LockCoerce.lockingColumn).toBe("");
   });

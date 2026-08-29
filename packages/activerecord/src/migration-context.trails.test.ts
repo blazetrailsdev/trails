@@ -1,8 +1,3 @@
-// trails-only: Rails' MigrationContext discovery reads `.rb` files off disk via
-// `Dir[]`, so there is no upstream test to mirror for the `.ts`/`.js` scan. These
-// pin that the discovery half (`migration_files` / `parse_migration_filename` /
-// the timestamp validation) lives on MigrationContext itself, reading *its own*
-// `migrationsPaths` rather than delegating to Migrator.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   MigrationContext,
@@ -87,11 +82,6 @@ describe("MigrationContext", () => {
       new NullInternalMetadata(),
     );
 
-    // The null objects Rails' `Migration.copy` seats (`migration.rb:1065-1066`)
-    // answer no `SchemaMigration` / `InternalMetadata` message, so `up` / `down`
-    // / `currentVersion` are typed off-limits for a discovery-only context. The
-    // `@ts-expect-error`s are the assertion: tsc fails the build if any of these
-    // becomes callable again.
     // @ts-expect-error discovery-only context has no SchemaMigration
     void (() => context.currentVersion());
     // @ts-expect-error discovery-only context has no SchemaMigration
@@ -99,10 +89,6 @@ describe("MigrationContext", () => {
     // @ts-expect-error discovery-only context has no InternalMetadata
     void (() => context.lastStoredEnvironment());
 
-    // …and a context typed for the null objects cannot skip seating them, so
-    // `initialize`'s `schema_migration || SchemaMigration.new(connection_pool)`
-    // fallback (`migration.rb:1215-1216`) can never hand back a real
-    // collaborator through a reader typed for a null one.
     // @ts-expect-error a narrowed context must seat both collaborators
     void (() => new MigrationContext<NullSchemaMigration, NullInternalMetadata>([""]));
 
@@ -128,10 +114,6 @@ describe("MigrationContext", () => {
 });
 
 describe("MigrationContext filename spellings", () => {
-  // Moved here from trailties' deleted `migration-loader`, whose second
-  // discovery path these pinned. `migrationFiles` is now the only one, and the
-  // spellings are committed fixture directories rather than files a test lays
-  // down, so nothing here touches the filesystem itself.
   const found = (dir: string): MigrationProxy[] =>
     new MigrationContext(
       [`${MIGRATIONS_ROOT}/${dir}`],
@@ -172,10 +154,6 @@ describe("MigrationContext connected surface", () => {
     );
   });
 
-  // The `valid` migrations do real DDL against the canonical schema, so undo it
-  // — this describe runs without the transactional wrap. Mirrors
-  // migration_test.rb's teardown, which drops the tables its migrations create
-  // and strips `last_name` back off `people`.
   afterEach(async () => {
     const adapter = Base.connection;
     for (const table of ["people_reminders", "reminders"]) {
@@ -230,9 +208,6 @@ describe("MigrationContext connected surface", () => {
     expect(await context.lastStoredEnvironment()).toBeNull();
   });
 
-  // `MigrationContext#migrate` has no Rails test of its own — upstream reaches
-  // it through `DatabaseTasks.migrate` — so pin its routing end-to-end here:
-  // no target runs `up`, and a target below the current version runs `down`.
   it("migrate with no target runs every migration, and a lower target runs down", async () => {
     const adapter = Base.connection;
 
@@ -267,10 +242,7 @@ describe("MigrationContext connected surface", () => {
   it("a context built without a schemaMigration defaults it from the connection pool", () => {
     const discoveryOnly = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
 
-    // Discovery never consults the collaborators, so it answers regardless.
     expect(discoveryOnly.migrations).toHaveLength(3);
-    // Rails: `schema_migration || SchemaMigration.new(connection_pool)`
-    // (migration.rb:1214-1218).
     expect(discoveryOnly.schemaMigration).toBeInstanceOf(SchemaMigration);
     expect(discoveryOnly.internalMetadata).toBeInstanceOf(InternalMetadata);
   });

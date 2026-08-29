@@ -6,7 +6,6 @@ import type { Department } from "./department.js";
 import type { DrinkDesigner } from "./drink-designer.js";
 import type { MocktailDesigner } from "./drink-designer.js";
 import type { Recipe } from "./recipe.js";
-// vendor/rails/activerecord/test/models/hotel.rb
 import { Base } from "../../base.js";
 
 export class Hotel extends Base {

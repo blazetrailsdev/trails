@@ -55,9 +55,6 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    // A reflected column lives in `columns_hash` and reaches the attribute set
-    // through `_default_attributes`' seed (attributes.rb:241-245) — never
-    // through a class-level registry, which holds user declarations only.
     expect(Model.typeForAttribute("guid").name).toBe("uuid");
     expect(Model.typeForAttribute("payload").name).toBe("jsonb");
   });
@@ -206,11 +203,6 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     expect(Object.keys(Post.columnsHash())).not.toContain("secret");
-    // The schema-sourced def is dropped, but an accessor that already exists
-    // survives: `load_schema!` defines and undefines no methods, and
-    // `ignored_columns=` (model_schema.rb:366-369) calls only
-    // `reload_schema_from_cache` — only `reset_column_information` (:523-530)
-    // undefines attribute methods.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "secret")).toBeDefined();
     expect(Object.keys(Post.columnsHash())).toContain("guid");
   });
@@ -228,9 +220,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     (Post as unknown as { adapter: unknown }).adapter = adapter;
     await Post.loadSchema();
 
-    // User-declared def survives ignoredColumns.
     expect(Post.typeForAttribute("age").name).toBe("integer");
-    // Accessor stripped.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
 
@@ -266,7 +256,6 @@ describe("loadSchemaFromAdapter integration details", () => {
   });
 
   it("discards the load if the adapter is swapped mid-flight (race guard)", async () => {
-    // Plain host object — avoids Base's adapter getter/setter side effects.
     let resolveColumns: (v: Record<string, unknown>) => void = () => {};
     const columnsPromise = new Promise<Record<string, unknown>>((r) => {
       resolveColumns = r;

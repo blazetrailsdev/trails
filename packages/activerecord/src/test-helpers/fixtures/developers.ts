@@ -1,12 +1,8 @@
-// activerecord/test/fixtures/developers.yml
 export const developerFixtureData = {
   david: {
     id: 1,
     name: "David",
     salary: 80000,
-    // Rails YAML's `shared_computers: laptop` — the `hasAndBelongsToMany`
-    // `sharedComputers` association label (class_name: "Computer"). The loader
-    // materializes it into a `computers_developers` join row, not a column.
     sharedComputers: ["laptop"],
   },
   jamis: {

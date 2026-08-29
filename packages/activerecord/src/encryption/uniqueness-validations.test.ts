@@ -28,8 +28,6 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     serialize?: (...args: any[]) => unknown;
   } = {};
 
-  // EncryptedBook rides the canonical `encrypted_books` table, laid at boot by
-  // loadCanonicalSchema — no per-suite schema setup is needed.
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
     savedExtendQueries = Configurable.config.extendQueries;

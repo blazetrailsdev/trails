@@ -1,19 +1,3 @@
-/**
- * Mirrors: vendor/rails/activerecord/test/cases/json_serialization_test.rb
- *
- * Faithful port of Rails' JsonSerializationTest and
- * DatabaseConnectedJsonEncodingTest. Rides the canonical models
- * (Contact / ContactSti / Author / Post / Comment / Tag / Tagging) — declares
- * NO bespoke `defineSchema`. The first suite exercises the in-memory `Contact`
- * (a fake-adapter model in Rails, never persisted); the second drives the real
- * `authors`/`posts`/`comments`/`tags`/`taggings` fixtures via the handler suite,
- * loading rows through `name(:label)` registry lookups exactly like Rails'
- * `authors(:david)`.
- *
- * Test names mirror the Ruby method names verbatim (`parity:test` matches on
- * them). The trailing trails-specific cases (sync fail-loud / awaitable
- * contract) have no Rails analog but ride the same canonical tables.
- */
 import { describe, it, expect } from "vitest";
 import { ActiveSupportJSON, assertNotRespondTo } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
@@ -29,9 +13,6 @@ import { fixtures } from "./test-fixtures.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
-// Establish the worker's canonical template DB for the whole file so the
-// in-memory `Contact` suite below doesn't lazily initialize a bare connection
-// that would shadow the handler clone for the fixture-backed suite.
 fixtures({}, { useTransactionalTests: false });
 
 registerModel(Author);
@@ -40,8 +21,6 @@ registerModel(Comment);
 registerModel(Tag);
 registerModel(Tagging);
 
-// Rails' `JsonSerializationHelpers#set_include_root_in_json` — toggle the
-// class-level flag for the duration of the block, then restore.
 function setIncludeRootInJson(value: boolean, fn: () => void): void {
   const original = Base.includeRootInJson;
   Base.includeRootInJson = value;
@@ -53,7 +32,6 @@ function setIncludeRootInJson(value: boolean, fn: () => void): void {
 }
 
 describe("JsonSerializationTest", () => {
-  // Rails: `class NamespacedContact < Contact; column :name, "string"; end`.
   class NamespacedContact extends Contact {}
 
   function newContact(): Contact {
@@ -124,11 +102,9 @@ describe("JsonSerializationTest", () => {
     (contact as unknown as { favoriteQuote: () => string }).favoriteQuote = () =>
       "Constraints are liberating";
 
-    // Single method.
     const single = contact.asJson({ only: ["name"], methods: ["label"] });
     expect(single.label).toBe("Has cheezburger");
 
-    // Both methods.
     const both = contact.asJson({ only: ["name"], methods: ["label", "favoriteQuote"] });
     expect(both.label).toBe("Has cheezburger");
     expect(both.favoriteQuote).toBe("Constraints are liberating");
@@ -232,8 +208,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
     const posts = json.posts as Array<Record<string, unknown>>;
     expect(Array.isArray(posts)).toBe(true);
-    // Postgres returns bigint ids as strings; compare numerically (Rails emits
-    // an integer either way).
     expect(Number(json.id)).toBe(1);
     expect(json.name).toBe("David");
 
@@ -273,7 +247,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     );
     expect(bodies).toContain("Thank you again for the welcome");
     expect(bodies).toContain("Don't think too hard");
-    // `only: :body` filters out post_id on the nested comments.
     for (const p of posts) {
       for (const c of p.comments as Array<Record<string, unknown>>) {
         expect(c.post_id).toBeUndefined();
@@ -338,9 +311,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
           "owned_essay_id",
         ],
       });
-      // Rails emits `[{"id":1},{"id":2}]`; Postgres serializes bigint ids as
-      // strings, so normalize the id values before comparing (the single-key
-      // `except` shape is still pinned).
       const decoded = (JSON.parse(encoded) as Array<{ id: unknown }>).map((o) => ({
         id: Number(o.id),
       }));
@@ -367,8 +337,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     const [david, mary] = [await getDavid(), await getMary()];
     setIncludeRootInJson(true, () => {
       const authorsHash: Record<number, Author> = { 1: david, 2: mary };
-      // Rails filters the hash by key (`only: [1, :name]` keeps key 1 only),
-      // then serializes each surviving author with the same options (`:name`).
       expect(ActiveSupportJSON.encode(authorsHash, { only: [1, "name"] })).toBe(
         '{"1":{"author":{"name":"David"}}}',
       );
@@ -384,33 +352,24 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     });
   });
 
-  // -- trails-specific: synchronous fail-loud / awaitable contract --
-
   it("raises when including an unloaded has_many (sync serialization cannot query)", async () => {
-    // Rails' `to_ary` would lazily load the rows; trails serialization is
-    // synchronous and must not query, so an unloaded collection fails loud
-    // rather than silently serializing as `[]`.
     const post = await Post.find(1);
     expect(() => post.asJson({ include: "comments" }).comments).toThrow(/not loaded/);
     expect(() => JSON.stringify(post.asJson({ include: "comments" }))).toThrow(/not loaded/);
-    // Fail-loud is all-or-nothing: reading any key (not just the include) throws.
     expect(() => post.asJson({ include: "comments" }).title).toThrow(/not loaded/);
   });
 
   it("without an include the hash is plain (no awaitable contract)", async () => {
     const post = await Post.find(1);
-    // No `:include` → Rails-plain Hash with no `then` for assimilation to catch.
     expect((post.asJson() as { then?: unknown }).then).toBeUndefined();
     expect((post.serializableHash() as { then?: unknown }).then).toBeUndefined();
   });
 
-  // Awaiting runs the async path: lazy-load unloaded includes (Rails' `to_ary`).
   it("awaiting loads an unloaded belongs_to and serializes the row", async () => {
     const comment = await Comment.find(1);
     const json = await comment.asJson({ only: ["body"], include: "post" });
     expect((json.post as Record<string, unknown>).title).toBe("Welcome to the weblog");
 
-    // root + include on the async path exercises the `element()` thunk.
     Comment.includeRootInJson = true;
     try {
       const rooted = await comment.asJson({ only: ["body"], include: "post" });
@@ -434,12 +393,10 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     expect(greetings.body).toBe("Thank you for the welcome");
     const children = greetings.children as Array<Record<string, unknown>>;
     expect(children[0].body).toBe("Thank you again for the welcome");
-    // The awaited value is a plain object — JSON.stringify works normally.
     expect(typeof JSON.stringify(json)).toBe("string");
   });
 });
 
-// Async sibling of `setIncludeRootInJson` for the relation-encoding case.
 async function setIncludeRootInJsonAsync(value: boolean, fn: () => Promise<void>): Promise<void> {
   const original = Base.includeRootInJson;
   Base.includeRootInJson = value;

@@ -1,20 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/readonly_test.rb
- *
- * Faithful port of Rails' ReadOnlyTest. Rides the canonical schema + models
- * (Developer / Person / Post / Project) via the handler suite + transactional
- * fixtures — declares NO bespoke `defineSchema` and uses NO `dropExisting`, so it
- * issues zero per-test DDL (every table it touches is already in the preloaded
- * canonical schema, a signature-cache hit). Removes the divergent
- * `posts`/`users`/`products`/`items`/`devs`/`ro_people` shapes the old version
- * wrote into the shared worker DB — the cross-file collisions that forced
- * `dropExisting` shields in sibling suites.
- *
- * Test names mirror the Ruby method names verbatim (`parity:test` matches on
- * them). Tests blocked by a genuine trails gap (association collection proxy,
- * has_many through) are `it.skip` with a precise reason rather than silently
- * stubbed or adapted.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 
 import { fixtures } from "./test-fixtures.js";
@@ -38,15 +21,12 @@ describe("ReadOnlyTest", () => {
     "developers",
     "people",
     "posts",
-    "projects", // loaded for cross-join tests; accessor not used directly
-    "developersProjects", // join rows for Developer#projects HABTM tests
-    "readers", // join rows for Post#people through-association tests
-    "comments", // needed for post.comments association tests
+    "projects",
+    "developersProjects",
+    "readers",
+    "comments",
   ]);
 
-  // Force schema reflection ONCE per worker: trails reflects columns lazily on
-  // first query, and methods like `isReadonly()` / `readonlyBang()` need the
-  // attribute accessors already present.
   beforeAll(async () => {
     await Promise.all([Developer, Person, Post].map((m) => m.first().catch(() => null)));
   });
@@ -58,12 +38,6 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBeTruthy();
 
-    // In-memory writes remain allowed; only persistence is blocked. The
-    // 25-char name violates Developer's `length: { in: [3, 20] }` validation,
-    // so `save` returns false from validations (which run before the readonly
-    // guard, per ActiveRecord::Validations#save → Persistence#create_or_update)
-    // rather than raising ReadOnlyRecord. Resetting to a valid name then
-    // surfaces the readonly guard.
     (dev as Record<string, unknown>).name = "Luscious forbidden fruit.";
     expect(await dev.save()).toBeFalsy();
     (dev as Record<string, unknown>).name = "Forbidden.";
@@ -154,14 +128,10 @@ describe("ReadOnlyTest", () => {
 
   it("has many find readonly", async () => {
     const post = await Post.find(posts("welcome").id);
-    // assert_not_empty post.comments
     expect(await (post as any).comments.isAny()).toBe(true);
-    // assert_not post.comments.any?(&:readonly?)
     expect(await (post as any).comments.isAny((c: any) => c.isReadonly())).toBe(false);
-    // assert_not post.comments.to_a.any?(&:readonly?)
     const arr = await (post as any).comments.toArray();
     expect(arr.some((c: any) => c.isReadonly())).toBe(false);
-    // assert post.comments.readonly(true).all?(&:readonly?)
     const readonlyComments = await (post as any).comments.readonly(true).toArray();
     expect(readonlyComments.every((c: any) => c.isReadonly())).toBe(true);
   });
@@ -191,28 +161,24 @@ describe("ReadOnlyTest", () => {
   });
 
   it("readonly scoping", async () => {
-    // Post.where("1=1").scoping do ...
     await Post.where("1=1").scoping(async () => {
       expect((await Post.find(posts("welcome").id)).isReadonly()).toBe(false);
       expect((await Post.readonly(true).find(posts("welcome").id)).isReadonly()).toBe(true);
       expect((await Post.readonly(false).find(posts("welcome").id)).isReadonly()).toBe(false);
     });
 
-    // Post.joins("   ").scoping do ...
     await Post.joins("   ").scoping(async () => {
       expect((await Post.find(posts("welcome").id)).isReadonly()).toBe(false);
       expect((await Post.readonly().find(posts("welcome").id)).isReadonly()).toBe(true);
       expect((await Post.readonly(false).find(posts("welcome").id)).isReadonly()).toBe(false);
     });
 
-    // Post.joins(", developers").scoping do ...
     await Post.joins(", developers").scoping(async () => {
       expect((await Post.find(posts("welcome").id)).isReadonly()).toBe(false);
       expect((await Post.readonly().find(posts("welcome").id)).isReadonly()).toBe(true);
       expect((await Post.readonly(false).find(posts("welcome").id)).isReadonly()).toBe(false);
     });
 
-    // Post.readonly(true).scoping do ...
     await Post.readonly(true).scoping(async () => {
       expect((await Post.find(posts("welcome").id)).isReadonly()).toBe(true);
       expect((await Post.readonly().find(posts("welcome").id)).isReadonly()).toBe(true);

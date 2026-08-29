@@ -1,7 +1,3 @@
-/**
- * Ported from vendor/rails/activerecord/test/cases/suppressor_test.rb.
- * Test names match the Ruby `test_*` methods.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -86,9 +82,6 @@ describe("SuppressorTest", () => {
   });
 });
 
-// TS-only coverage of the `Suppressor.registry` plumbing (no Rails counterpart).
-// These exercise async-scope isolation of `IsolatedExecutionState` and never
-// touch the database, so they need no fixtures or schema.
 describe("Suppressor.registry", () => {
   it("returns the suppression registry", () => {
     const registry = Base.registry;

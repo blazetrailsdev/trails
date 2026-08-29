@@ -1,6 +1,3 @@
-// trails-only Migrator cases with no counterpart in
-// vendor/rails/activerecord/test/cases/migrator_test.rb. See migrator.test.ts
-// for the faithful Rails mirror.
 import {
   describe,
   it,
@@ -32,25 +29,15 @@ import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
-// `Migrator#connection` is `DatabaseTasks.migration_connection`
-// (migration.rb:1488-1491), so a case that needs the Migrator to run against a
-// stand-in adapter swaps that reader rather than handing one to the
-// constructor.
 function withMigrationConnection(adapter: DatabaseAdapter): void {
   const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockReturnValue(adapter);
   onTestFinished(() => spy.mockRestore());
 }
 
-/** The env name `record_environment` stamps: `connection.pool.db_config.env_name`. */
 function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
 }
 
-/**
- * Rails' `migrator_class` (`migrator_test.rb:229-238`): a `MigrationContext`
- * subclass whose `#migrations` answers an in-memory list, so the path argument
- * is never read.
- */
 function migrationContextClass(migrations: MigrationProxy[]): MigrationContext {
   return new (class extends MigrationContext {
     override get migrations(): MigrationProxy[] {
@@ -72,17 +59,8 @@ function makeMigration(
   };
 }
 
-// Ride the primary schema-loaded pool (`Base.connection`) instead of the sidecar
-// test pool. Hoisted to file scope (not nested in the first describe) so every
-// describe in the file — including "Migrator advisory lock wrapping" below —
-// resolves `Base.connection` regardless of declaration/run order.
 fixtures({}, { useTransactionalTests: false });
 
-// Nothing drops the schema_migrations / ar_internal_metadata tables between
-// tests, so clear them before every test to keep each case's
-// version + environment state fresh (mirrors Rails' setup/teardown, which
-// deletes all versions around every test). File-scoped because the advisory-lock
-// describe runs `migrate()` too and needs the same fresh version table.
 let schemaMigration: SchemaMigration;
 let internalMetadata: InternalMetadata;
 
@@ -113,7 +91,6 @@ describe("Migrator trails extensions", () => {
   });
 
   it("stamps the environment once per run, not once per migration", async () => {
-    // migration.rb:1508-1512 stamps before the loop; :1528-1537 writes nothing.
     const migrator = new Migrator(
       "up",
       [makeMigration(1, "M1"), makeMigration(2, "M2"), makeMigration(3, "M3")],
@@ -141,8 +118,6 @@ describe("Migrator trails extensions", () => {
       async () => void calls.push(["down", 1]),
     );
 
-    // Called directly, so nothing has run `runnable()` / `_ensureSchemaTable()`
-    // for us — the guards read `migrated`, which needs the table present.
     await new SchemaMigration(adapter.pool).createTable();
     await new InternalMetadata(adapter.pool).createTable();
 
@@ -167,9 +142,6 @@ describe("Migrator trails extensions", () => {
   });
 
   it("up and down raise UnknownMigrationVersionError for an unknown target", async () => {
-    // Rails routes both through a per-run Migrator whose migrate_without_lock
-    // starts with `raise UnknownMigrationVersionError if invalid_target?`
-    // (migration.rb:1503-1505); target 0 stays valid.
     const list = (): MigrationProxy[] => [makeMigration(1, "M1"), makeMigration(2, "M2")];
     await expect(
       new Migrator("up", list(), schemaMigration, internalMetadata, 3).migrate(),
@@ -258,7 +230,6 @@ describe("Migrator trails extensions", () => {
   });
 
   it("down does not stamp the environment", async () => {
-    // Rails' record_environment returns early when down? (migration.rb:1511).
     const migrator = new Migrator(
       "down",
       [makeMigration(1, "M1")],
@@ -490,8 +461,6 @@ describe("Migrator advisory lock wrapping", () => {
     adapter.currentDatabase = async () => "myapp_test";
     const migrator = new Migrator("up", [], schemaMigration, internalMetadata);
     await migrator.migrate();
-    // Ruby: Zlib.crc32("myapp_test") == 601888509
-    // Rails: MIGRATOR_SALT (2053462845) * 601888509 == 1235955690063948105
     expect(lockIds[0]).toBe(1235955690063948105n);
   });
 
@@ -512,12 +481,8 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("isUseAdvisoryLock does not depend on currentDatabase", async () => {
-    // Regression: the gate must mirror Rails' advisory_locks_enabled? only, and
-    // NOT return false (silently skipping the lock) merely because the adapter
-    // lacks a currentDatabase() function.
     const adapter = {
       isAdvisoryLocksEnabled: () => true,
-      // currentDatabase intentionally absent
     } as unknown as DatabaseAdapter;
     const migrator = new Migrator(
       "up",
@@ -545,10 +510,6 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("reloads the migrated versions after acquiring the advisory lock", async () => {
-    // Regression: `migrated` is memoized (Rails' `@migrated_versions`), so a
-    // migrator that computed its applied set before blocking on the lock would
-    // proceed on a stale view of schema_migrations unless `with_advisory_lock`
-    // reloads it once the lock is held (migration.rb:1601).
     const adapter = Base.connection;
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
@@ -563,7 +524,6 @@ describe("Migrator advisory lock wrapping", () => {
     );
     expect(await migrator.migrated()).toEqual(new Set());
 
-    // Another process migrates version 1 while we wait for the lock.
     await schemaMigration.createVersion("1");
     expect(await migrator.migrated()).toEqual(new Set());
 
@@ -576,7 +536,6 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("record_version_state_after_migrating updates the migrated memo in place", async () => {
     const adapter = Base.connection;
-    // Rails reads `down?` off the Migrator, so up and down are two Migrators.
     const up = new Migrator("up", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
     const down = new Migrator("down", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
     await new SchemaMigration(adapter.pool).createTable();
@@ -631,8 +590,6 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("Migration#name defaults to the class and #version stays unset", () => {
-    // Rails: `initialize(name = self.class.name, version = nil)`
-    // (migration.rb:799) — only the name falls back to the class.
     class Chunky extends Migration {}
     const migration = new Chunky();
     expect(migration.name).toBe("Chunky");
@@ -640,9 +597,6 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("announces the identity the proxy constructed the migration with", async () => {
-    // Rails' load_migration builds `name.constantize.new(name, version)`
-    // (migration.rb:1195), so the banner carries the proxy's identity even
-    // though the class is named something else.
     class SomeOtherClassName extends Migration {
       override async change(): Promise<void> {}
     }
@@ -665,8 +619,6 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("honours a Migration subclass override of announce", async () => {
-    // Rails' MigrationProxy delegates announce to the real migration
-    // (migration.rb:1187), so an override wins over the base banner.
     class Shouty extends Migration {
       override announce(message: string): void {
         this.write(`!! ${message} !!`);
@@ -700,8 +652,6 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("honours the migration's verbose setting", async () => {
-    // Rails' verbose is a cattr_accessor (migration.rb:797) — one shared
-    // setting, not per-Migrator state.
     const was = Migration.verbose;
     Migration.verbose = false;
     try {
@@ -719,9 +669,6 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 });
 
-// Rails has no direct migrator_test.rb coverage for Migrator#runnable /
-// #migrations, so the direction-awareness ported from migration.rb:1466-1480
-// (and the start/finish/target helpers at 1538-1546) is exercised here.
 describe("Migrator runnable direction awareness", () => {
   let adapter: DatabaseAdapter;
 

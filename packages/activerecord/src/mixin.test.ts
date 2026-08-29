@@ -34,8 +34,6 @@ describe("TouchTest", () => {
 
     travel(Duration.minutes(5));
 
-    // Mirror lft_will_change! — force-marks lft dirty without changing its value,
-    // the way attributeWillChangeBang does.
     (stamped as any).attributeWillChangeBang("lft");
     await stamped.save();
 

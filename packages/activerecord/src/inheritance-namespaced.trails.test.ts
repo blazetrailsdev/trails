@@ -1,13 +1,3 @@
-/**
- * Module-namespaced model names in STI `type` / polymorphic `*_type` columns
- * and `model_name`. Rails stores the full `::`-qualified constant name
- * (`sti_name` / `polymorphic_name` default `store_full_*` to true), and
- * `model_name` derives `singular`/`element`/i18n from the namespace segments.
- *
- * Test names mirror the Rails sources:
- * - `inheritance_test.rb` `test_class_with_store_full_sti_class_returns_full_name`
- * - `naming_test.rb` namespaced `model_name` fields.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { stiName, polymorphicName, qualifiedName, namespaceSegments } from "./inheritance.js";
 import { fixtures } from "./test-fixtures.js";
@@ -55,7 +45,6 @@ describe("module-namespaced qualifiedName / polymorphic_name", () => {
   });
 
   it("polymorphic_name returns the full base_class name", () => {
-    // STI subclass folds to its base; the namespaced base name is qualified.
     expect(polymorphicName(ClothingItemUsed)).toBe("ClothingItem");
     expect(polymorphicName(AdminUser)).toBe("Admin::User");
   });
@@ -80,15 +69,10 @@ describe("NamingTest (Admin::User model_name)", () => {
   });
 
   it("param key keeps the namespace prefix (Admin is not an isolated engine namespace)", () => {
-    // naming.rb:180 — `@param_key = namespace ? _singularize(@unnamespaced) : @singular`.
     expect(AdminUser.modelName.paramKey).toBe("admin_user");
   });
 });
 
-// A name guard (`row[type] !== this.name`) mis-fires for every namespaced STI
-// row, because `sti_name` never equals the flattened JS class name. That was
-// latent while a second hydration path absorbed it; with one path the identity
-// guard is the only thing making re-entry terminate here.
 describe("namespaced STI hydration goes through the single instantiate path", () => {
   fixtures([]);
 

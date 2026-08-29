@@ -1,40 +1,12 @@
-// Pure text-transform that turns a user-authored model source into a
-// virtualized version with `declare` members spliced into each affected
-// class body. No on-disk output; no `ts.Program` or `TypeChecker`
-// dependency.
-//
-// Shells (the trails-tsc CLI and the tsserver plugin) call this and hand
-// the result back to the compiler / language service. Tests exercise it
-// directly against fixture pairs.
-
 import ts from "typescript";
 import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
 import { synthesizeDeclares } from "./synthesize.js";
 
-// Aliased name used in the auto-injected `import type` line and the
-// generated interface-merge heritage. Aliasing (rather than importing
-// `Included` bare) avoids `Cannot redeclare block-scoped variable`
-// when the user file already imports `Included` themselves.
 const INCLUDED_ALIAS = "__TrailsIncluded";
 const INCLUDED_IMPORT_LINE = `import type { Included as ${INCLUDED_ALIAS} } from "@blazetrails/activesupport";`;
 
 export interface LineDelta {
-  /**
-   * 0-indexed line in the VIRTUALIZED text where the injected block
-   * begins. The injected range spans
-   * `insertedAtLine + 1 .. insertedAtLine + lineCount`, and those
-   * virtual lines have no corresponding line in the original source.
-   *
-   * To map a later virtual line back to the original source,
-   * `remapLine` subtracts `lineCount` once the line is after the
-   * injected block; deltas are stacked in ascending virtual order so
-   * multi-class files and prepended imports compose correctly.
-   *
-   * The sentinel value `-1` means the block was prepended ABOVE
-   * virtual line 0 (used by `prependImports` for auto-imports).
-   */
   insertedAtLine: number;
-  /** Number of lines the injected block spans. */
   lineCount: number;
 }
 
@@ -45,78 +17,14 @@ export interface VirtualizeResult {
 
 export interface VirtualizeOptions extends WalkOptions {
   prependImports?: readonly string[];
-  /**
-   * Schema columns keyed by table name. When supplied, the virtualizer
-   * emits `declare <col>: <tsType>` for every column not already covered
-   * by a user-authored `declare` or `this.attribute(...)` call — giving
-   * IDE autocomplete to schema-only columns (Rails-default pattern:
-   * columns come from the migration, not from per-class declarations).
-   *
-   * Table resolution: `static tableName = "..."` on the class when
-   * present, otherwise `pluralize(underscore(className))`.
-   *
-   * Each column's value is a `SchemaColumnValue` — either:
-   *   - a Rails type string (legacy shape, e.g. `"string"`), or
-   *   - a rich object `{ type, null?, arrayElementType? }` as parsed
-   *     from `db/schema.ts`. `null: false` renders `Type`;
-   *     `null: true` OR `null` omitted renders `Type | null` (Rails'
-   *     conservative default — columns without a NOT NULL constraint
-   *     are nullable). `arrayElementType` on an `array` column renders
-   *     `ElementTsType[]` instead of the default `unknown[]`.
-   *
-   * Caveats:
-   * - `id` is skipped (Base's `PrimaryKeyValue` accessor handles it).
-   * - Non-identifier / reserved-word names are emitted as quoted class
-   *   fields (`declare "strange-col": string;`).
-   * - Columns are emitted in sorted order for stable output.
-   */
   schemaColumnsByTable?: Readonly<
     Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>
   >;
-  /**
-   * Maps an association `className` to the in-file class it was registered
-   * against (`registerModel("Alias", LocalClass)`). Forwarded to
-   * `synthesizeDeclares` so association declares resolve to the real
-   * in-file type rather than a non-existent alias type. See
-   * {@link import("./synthesize.js").SynthesizeOptions.classNameAliases}.
-   */
   classNameAliases?: ReadonlyMap<string, string>;
-  /**
-   * Render `attribute()` declares as `T | null`. Forwarded to
-   * `synthesizeDeclares` — set by the materializing generator so baked
-   * declares allow null assignment. See
-   * {@link import("./synthesize.js").SynthesizeOptions.attributesNullable}.
-   */
   attributesNullable?: boolean;
-  /**
-   * Pre-resolved `through:` association targets keyed `"<ClassName>#<assocName>"`.
-   * Forwarded to `synthesizeDeclares`. See
-   * {@link import("./synthesize.js").SynthesizeOptions.associationTargets}.
-   */
   associationTargets?: ReadonlyMap<string, string>;
-  /**
-   * Cross-file class-name → direct-superclass-name map built by the generator
-   * from the model registry (all model files). Merged with the in-file
-   * `superNameOf` produced by `buildInheritance` so that a subclass narrowing
-   * an association to a target whose `extends` chain lives in another model
-   * file is recognized as a valid subtype and the precise declare is kept
-   * rather than conservatively suppressed. In-file entries take precedence.
-   */
   globalSuperNameOf?: ReadonlyMap<string, string>;
-  /**
-   * DB column names consumed by `composedOf` aggregations, keyed by class name.
-   * Forwarded to `synthesizeDeclares` to prevent emitting a bare scalar declare
-   * for a column whose value is exposed as an aggregate object.
-   */
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
-  /**
-   * Predicate: does an association-target class name resolve to a type in
-   * scope where the declare is spliced? Forwarded to `synthesizeDeclares` so a
-   * plain association naming no in-scope model falls back to `Base` instead of
-   * emitting a dangling type reference. `host` is the class the declare is
-   * spliced into, so visibility is judged at the splice site. See
-   * {@link import("./synthesize.js").SynthesizeOptions.isKnownTarget}.
-   */
   isKnownTarget?: (name: string, host: import("./walker.js").ClassInfo) => boolean;
 }
 
@@ -127,11 +35,7 @@ export function virtualize(
 ): VirtualizeResult {
   const sf = ts.createSourceFile(fileName, originalText, ts.ScriptTarget.ES2022, true);
   const classes = walk(sf, options);
-  // In-file superclass graph + per-class ancestor chains (for inherited
-  // loader overloads and incompatible-override detection — see synthesize).
   const { superNameOf: inFileSuperNameOf, ancestorsOf } = buildInheritance(classes);
-  // Merge cross-file map first (lower precedence) then overwrite with in-file
-  // entries so local `extends` always wins over the registry-derived chain.
   const superNameOf: ReadonlyMap<string, string> = (() => {
     if (!options.globalSuperNameOf) return inFileSuperNameOf;
     const merged = new Map<string, string>(options.globalSuperNameOf);
@@ -166,7 +70,7 @@ export function virtualize(
       pos: info.openBracePos,
       text: block,
       originalLine: sf.getLineAndCharacterOfPosition(info.openBracePos).line,
-      lineCount: decls.length + 1, // leading newline + one per decl
+      lineCount: decls.length + 1,
     });
   }
 
@@ -177,14 +81,6 @@ export function virtualize(
     text = text.slice(0, e.pos) + e.text + text.slice(e.pos);
   }
 
-  // Convert each edit's originalLine into a VIRTUAL line by accumulating
-  // the lineCount of all earlier injections. `remapLine` expects
-  // `insertedAtLine` to be a virtual coordinate so multi-class files
-  // (two injected declare blocks) remap correctly for lines after the
-  // second block.
-  // Sort by (originalLine, pos) so multiple injections on the same
-  // line (e.g., two one-line class declarations) compose in stable,
-  // file-order delta-cumulation for remapLine.
   const sortedEdits = edits
     .slice()
     .sort((a, b) => a.originalLine - b.originalLine || a.pos - b.pos);
@@ -195,35 +91,12 @@ export function virtualize(
     return d;
   });
 
-  // Detect `include(...)` calls and fold both the aliased
-  // `import type` line AND the generated interface-merge declarations
-  // into the same prepend pass. Appending at end-of-file would leave
-  // diagnostics on those lines un-remappable (no delta entry), which
-  // causes `getPositionOfLineAndCharacter` to crash. Putting them in
-  // the prepend block reuses the existing delta math.
-  // Declaration merging is order-agnostic — TS resolves
-  // `interface Foo extends ...` before the class declaration just
-  // fine.
   const includes = findIncludeCalls(sf);
   const effectivePrepends: string[] = [];
   if (options.prependImports) effectivePrepends.push(...options.prependImports);
   if (includes.length > 0) {
-    // Three cases for the `__TrailsIncluded` binding:
-    //   - "absent": inject the import AND interfaces.
-    //   - "matches": existing binding is `Included as __TrailsIncluded`
-    //     from `@blazetrails/activesupport` (e.g. re-virtualizing prior
-    //     output, or a user-written equivalent). Skip the import line
-    //     but still emit interfaces, reusing the existing alias.
-    //   - "different": some other binding owns the name. Skip the
-    //     entire bridge — emitting interfaces would type them against
-    //     the wrong symbol.
     const aliasState = checkIncludedAliasBinding(sf, INCLUDED_ALIAS);
     if (aliasState !== "different") {
-      // Skip auto-bridging classes whose name already has a top-level
-      // `interface` declaration in the file — the user is hand-typing
-      // refined signatures (e.g. overloads narrower than the module's
-      // erased ones), and adding an `Included<typeof Mod>` heritage
-      // could widen those back to `(...args: unknown[]) => any`.
       const userInterfaces = collectInterfaceNames(sf);
       interface Group {
         mods: string[];
@@ -245,14 +118,9 @@ export function virtualize(
       const interfaceLines: string[] = [];
       for (const [className, { mods, exported, typeParams }] of grouped) {
         const heritage = mods.map((m) => `${INCLUDED_ALIAS}<typeof ${m}>`).join(", ");
-        // Match the class's export modifier and generic parameters —
-        // declaration merging requires both to line up.
         const prefix = exported ? "export " : "";
         interfaceLines.push(`${prefix}interface ${className}${typeParams} extends ${heritage} {}`);
       }
-      // Only inject the alias import when at least one interface line
-      // will actually use it — otherwise the import would dangle and
-      // trigger noUnusedLocals.
       if (interfaceLines.length > 0) {
         if (aliasState === "absent") effectivePrepends.push(INCLUDED_IMPORT_LINE);
         effectivePrepends.push(...interfaceLines);
@@ -260,36 +128,15 @@ export function virtualize(
     }
   }
 
-  // Insert the prepend block AFTER any leading directives (shebangs,
-  // triple-slash refs, @ts-nocheck) that must stay at the top of the
-  // file. The block is one line per entry — entries may be `import type`
-  // lines (auto-imports + the `Included` alias) AND/OR synthesized
-  // `interface X extends ...` declarations from include() bridging.
-  // All entries are erased at runtime (types only).
   const prependLines = effectivePrepends.length > 0 ? effectivePrepends : undefined;
   if (prependLines && prependLines.length > 0) {
     const importBlock = prependLines.join("\n") + "\n";
     const insertPos = findDirectiveEnd(text);
-    // Compute the virtual line BEFORE which the import block is
-    // inserted: `-1` if the block is truly at the start of the file,
-    // otherwise the line index of the last directive/blank line that
-    // precedes the insertion point. This preserves `remapLine` for
-    // any leading directives (shebang / @ts-nocheck / triple-slash)
-    // — including the edge case where the file ends at a directive
-    // with no trailing newline (in which case `split(/\r?\n/)`
-    // wouldn't produce a final empty element, so subtracting 2 would
-    // be off by one).
     const before = text.slice(0, insertPos);
     const newlineCount = (before.match(/\r?\n/g) ?? []).length;
     const insertedAtLine =
       insertPos === 0 ? -1 : before.endsWith("\n") ? newlineCount - 1 : newlineCount;
     text = text.slice(0, insertPos) + importBlock + text.slice(insertPos);
-    // Count physical newlines in the inserted block rather than
-    // trusting `prependLines.length`. Synthesized entries derived from
-    // `getText()` (module expressions, type parameter lists) may carry
-    // embedded newlines when the original source formats them across
-    // lines — undercounting here breaks delta remapping for every
-    // line below the prepend block.
     const prependedLines = (importBlock.match(/\r?\n/g) ?? []).length;
     for (const d of deltas) {
       d.insertedAtLine += prependedLines;
@@ -300,11 +147,6 @@ export function virtualize(
   return { text, deltas };
 }
 
-/**
- * From the walked classes, build a class-name → direct-superclass-name map and
- * each `ClassInfo`'s ancestor chain (nearest first), resolving `extends X` to
- * the in-file `ClassInfo` named `X`. Only in-file ancestors are tracked.
- */
 function buildInheritance(classes: readonly ClassInfo[]): {
   superNameOf: ReadonlyMap<string, string>;
   ancestorsOf: ReadonlyMap<ClassInfo, ClassInfo[]>;
@@ -343,15 +185,6 @@ function directSuperName(cls: ts.ClassDeclaration): string | undefined {
 
 type AliasBindingState = "absent" | "matches" | "different";
 
-/**
- * Classify any existing top-level binding for `alias` in `sf`:
- *   - "absent": no top-level statement binds the name.
- *   - "matches": a single `import` from `@blazetrails/activesupport`
- *     binds it as `Included as <alias>` — we can reuse the binding.
- *   - "different": something else owns the name (different module,
- *     namespace import, type alias, var, etc.). Reusing would type
- *     against the wrong symbol; the caller should bail entirely.
- */
 function checkIncludedAliasBinding(sf: ts.SourceFile, alias: string): AliasBindingState {
   let state: AliasBindingState = "absent";
   const escalate = (next: AliasBindingState): void => {
@@ -415,19 +248,7 @@ function collectInterfaceNames(sf: ts.SourceFile): Set<string> {
   return out;
 }
 
-/**
- * Find the character offset AFTER any leading directives that must
- * stay at the top of the file: shebangs (`#!`), triple-slash refs
- * (`/// <reference ...>`), and TS comment directives (`// @ts-nocheck`
- * etc.). Auto-imports are inserted at this offset so they don't break
- * file-leading semantics.
- */
 function findDirectiveEnd(text: string): number {
-  // Scan line-by-line preserving the actual line terminator width
-  // (`\n` or `\r\n`) so the returned offset is a valid index in
-  // `text`. Stops at the first non-directive, non-blank line; also
-  // stops if the file ends without a trailing newline so we never
-  // overshoot `text.length`.
   const lineRe = /([^\r\n]*)(\r?\n|$)/g;
   let pos = 0;
   let match: RegExpExecArray | null;
@@ -435,17 +256,6 @@ function findDirectiveEnd(text: string): number {
     const [full, line, terminator] = match;
     if (terminator === "" && line === "") break;
     const trimmed = line.trimStart();
-    // File-leading directives we preserve above the auto-import block:
-    //   - shebangs (`#!...`)
-    //   - triple-slash reference directives (`/// <reference ...>`)
-    //   - whole-file TS pragmas `// @ts-nocheck` / `// @ts-check`
-    //     (NOT `// @ts-ignore` / `// @ts-expect-error`, which apply to
-    //     the NEXT statement — injecting imports between the pragma
-    //     and the statement would change behavior)
-    //   - single-line block-comment form `/* @ts-nocheck */` /
-    //     `/* @ts-check */` (multi-line `/* ... */` would require
-    //     scanning to `*/` to avoid splicing into the comment body)
-    //   - blank lines in between
     const isSingleLineBlockPragma =
       (trimmed.startsWith("/* @ts-nocheck") || trimmed.startsWith("/* @ts-check")) &&
       trimmed.includes("*/");
@@ -466,11 +276,6 @@ function findDirectiveEnd(text: string): number {
   return pos;
 }
 
-/**
- * Given a line number in the virtualized text, returns the corresponding
- * line in the ORIGINAL source — or `null` if the position is inside an
- * injected block.
- */
 export function remapLine(virtualLine: number, deltas: readonly LineDelta[]): number | null {
   let line = virtualLine;
   for (let i = deltas.length - 1; i >= 0; i--) {

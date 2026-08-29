@@ -1,19 +1,7 @@
-// Array-likeness on CollectionProxy / AssociationProxy (Phase R.1/R.2) plus
-// the `CollectionProxy#delete` nullify-path transaction-rollback regression.
-//
-// Canonical schema + models: the owner is `Author` and the collection is its
-// default `has_many :posts` (posts.author_id is nullable, so `delete` takes the
-// non-through nullify path). No bespoke tables.
-
 import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Base, association, registerModel, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
-// Opt this file into the canonical-model autoload index (Zeitwerk analog):
-// `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
-// fixture set of their own — resolve by name on first reference instead of
-// needing a manual `registerModel`. Installed per-file rather than globally so
-// only converted (fully-canonical) files pick up the fallback.
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -26,24 +14,9 @@ import { Firm } from "../test-helpers/models/company.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { ShipPart } from "../test-helpers/models/ship-part.js";
 
-// `authors`, `posts`, `cpkAuthors`, `cpkBooks`, `pets`, and `toys` are declared
-// fixture sets below, so their models (`Author`, `Post`, `CpkAuthor`, `CpkBook`,
-// `Pet`, `Toy`) register automatically when the set resolves — no `registerModel`
-// needed, mirroring Rails' `fixtures :authors`. `Comment`, `Tagging`, `Tag`, and
-// `Owner` are association targets with no fixture set of their own; the canonical
-// autoload fallback resolves them by name on first association reference, the
-// trails equivalent of Rails autoloading the constant from `test/models/`.
-
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   fixtures(["authors", "posts"]);
 
-  // A fresh author owns only the posts we create here, so the loaded `posts`
-  // collection is the deterministic {"a", "b", "c"} *set*. `Author.posts`
-  // carries no `-> { order(...) }` scope (`test/models/author.rb`), so its
-  // SELECT has no ORDER BY and the row order is whatever the server returns —
-  // PostgreSQL has been observed returning `c, a, b`. Assertions here compare
-  // sets (sorted) or read positions back off the loaded target; none of them
-  // may pin the row order of the unordered SELECT.
   async function authorWithPosts(): Promise<Author> {
     const author = await Author.create({ name: "Dev" });
     for (const title of ["a", "b", "c"]) {
@@ -57,9 +30,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("exposes `length` against the loaded target", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    // With CP extending Relation, `proxy.length` is now the inherited
-    // async `Relation#length()`. For a sync count over the loaded target
-    // reach for `Array.from(proxy).length` or `proxy.target.length`.
     expect(Array.from(proxy).length).toBe(3);
     expect(proxy.target.length).toBe(3);
   });
@@ -69,7 +39,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const proxy = association<Post>(author, "posts") as any;
     expect(typeof proxy.length).toBe("function");
     expect(await proxy.length()).toBe(3);
-    // `proxy.count()` still works too (association-specific path).
     expect(await proxy.count()).toBe(3);
   });
 
@@ -84,9 +53,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("supports numeric indexing (proxy[0]) — typed via the index signature", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    // No `as any` needed — AssociationProxy declares
-    // `[index: number]: T | undefined` (the runtime support comes from
-    // `wrapCollectionProxy`'s `get` trap). Out-of-range returns undefined.
     expect(proxy[0]).toBe(proxy.target[0]);
     expect(proxy[2]).toBe(proxy.target[2]);
     expect(proxy[99]).toBeUndefined();
@@ -123,9 +89,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   });
 
   it("delegates arbitrary Array methods to the loaded target (method_missing)", async () => {
-    // Mirrors Rails' CollectionProxy/Relation `delegate ... to: :records`
-    // (delegation.rb): Array methods not on the curated proxy surface route
-    // through the loaded records — e.g. `sort`, `reverse`, `join`.
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
     const loaded = proxy.target.map((p: Post) => p.title);
@@ -136,8 +99,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     ).toEqual(["c", "b", "a"]);
     expect((proxy.reverse() as Post[]).map((p: Post) => p.title)).toEqual([...loaded].reverse());
     expect(proxy.join(",")).toBe(proxy.target.join(","));
-    // Non-mutating: Ruby's `sort`/`reverse`, not `sort!`/`reverse!` — the
-    // loaded target order is untouched.
     expect(proxy.target.map((p: Post) => p.title)).toEqual(loaded);
   });
 
@@ -145,12 +106,8 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
     const first = proxy.at(0)!;
-    // CollectionProxy intentionally does NOT define an Array-style
-    // includes — that would shadow Relation#includes(...associations).
-    // proxy.includes(...) falls through to Relation and builds an
-    // eager-loading Relation. Membership is via Array.from(proxy).
     const rel = proxy.includes(":comments");
-    expect(typeof rel?.where).toBe("function"); // it's a Relation, not a boolean
+    expect(typeof rel?.where).toBe("function");
     expect(Array.from(proxy as Iterable<Post>).includes(first)).toBe(true);
     expect(proxy.target.includes(first)).toBe(true);
   });
@@ -158,13 +115,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("preserves Relation#values (query state) — proxy.values routes to Relation", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
-    // CollectionProxy intentionally does NOT define an Array-style
-    // values() — that would shadow Relation#values which returns the
-    // query-state Record<string, unknown>. Iteration is via
-    // [Symbol.iterator] / spread / Array.from.
     const v = proxy.values();
     expect(typeof v).toBe("object");
-    expect(Array.isArray(v)).toBe(false); // confirms it's not the array iterator
+    expect(Array.isArray(v)).toBe(false);
     expect([...(proxy as Iterable<Post>)].map((p) => p.title).sort()).toEqual(["a", "b", "c"]);
   });
 
@@ -196,8 +149,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("array spread reads the loaded target", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    // proxy is a thenable Relation; spread it via its iterator contract so the
-    // lint sees an Iterable, not a Promise being spread.
     const titles = [...(proxy as Iterable<Post>)].map((p) => p.title);
     expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
@@ -216,9 +167,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   });
 
   it("await proxy hydrates `_target` so subsequent sync ops work", async () => {
-    // Build an author/post pair WITHOUT pre-loading via authorWithPosts (which
-    // calls .load()). `await proxy` alone should be enough to make
-    // `proxy.target`, `proxy[0]`, iteration all work afterwards.
     const author = await Author.create({ name: "Fresh" });
     for (const title of ["x", "y"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
@@ -243,7 +191,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("reduce supports the no-initial overload (Array.prototype parity)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    // Without an initial value, accumulator type is the element type (T).
     const concat = proxy.reduce((acc: Post, p: Post) => {
       return { ...acc, title: acc.title + p.title } as Post;
     });
@@ -253,9 +200,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("Array.isArray returns false on the proxy (known limitation)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    // `Array.isArray` checks an internal slot that proxies cannot fake.
-    // Consumers of the post-R.2 reader who branch on Array.isArray must
-    // reach for the loaded target via `await` or `Array.from(...)`.
     expect(Array.isArray(proxy)).toBe(false);
     expect(Array.isArray(Array.from(proxy))).toBe(true);
   });
@@ -263,22 +207,12 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("preserves PK-lookup `find(id)` — Array-style find(predicate) intentionally not added", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
-    // CollectionProxy already defines `async find(id): Promise<T | T[]>`
-    // (the Rails-style PK lookup form), and that's what `proxy.find(...)`
-    // resolves to. We intentionally do NOT add an Array-style
-    // `find(predicate)` overload — it would shadow the PK lookup.
-    // For Array semantics use `Array.from(proxy).find(p => ...)`.
     const first = (author as any).posts[0];
     const found = await proxy.find(first?.id);
     expect(found?.title).toBe(first?.title);
   });
 
   it("toArray hydrates and caches the target — a second call returns the cached set", async () => {
-    // Rails `to_a` → `records` → `load_target` caches `@target` and marks the
-    // association loaded, so a subsequent `to_a` returns the cached records
-    // without re-querying. Prove the cache by inserting a matching row directly
-    // into the DB after the first load: a re-query would pick it up; the cached
-    // read must not.
     const author = await Author.create({ name: "Cached" });
     for (const title of ["a", "b"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
@@ -287,20 +221,13 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const first = await proxy.toArray();
     expect(first.map((p: Post) => p.title).sort()).toEqual(["a", "b"]);
 
-    // Out-of-band insert that a fresh query would return but the cache must not.
     await Post.create({ title: "c", body: "c", author_id: author.id as number });
     const second = await proxy.toArray();
     expect(second.map((p: Post) => p.title).sort()).toEqual(["a", "b"]);
-    // Same cached instances, not re-materialized rows.
     expect(second[0]).toBe(first[0]);
   });
 
   it("bang builders delegate to scope, leaving load_target untouched", async () => {
-    // `collection_proxy.rb:1128-1137` delegates the bang half of
-    // `QueryMethods.public_instance_methods(false)` to `scope` just like the
-    // non-bang half, so `proxy.whereBang(...)` mutates the memoized association
-    // scope — never the proxy's own target — and `to_a` (load_target) still
-    // returns the full collection.
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
     const scope = proxy.scope();
@@ -320,13 +247,8 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect((await scope.toArray()).map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
   });
 
-  // ── Phase R.2 — collection reader returns the AssociationProxy ─────
-
   it("author.posts is the AssociationProxy itself (Phase R.2 reader swap)", async () => {
     const author = await authorWithPosts();
-    // After Phase R.2, the collection reader returns the AssociationProxy
-    // directly — no `association(author, "posts")` indirection needed.
-    // Same identity as what `association()` returns.
     const direct = (author as any).posts;
     const helper = association<Post>(author, "posts");
     expect(direct).toBe(helper);
@@ -335,7 +257,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("author.posts.where(...) chains through Relation delegation", async () => {
     const author = await authorWithPosts();
     const reader = (author as any).posts;
-    // Chainable through the JS Proxy `get` trap → Relation delegation.
     const filtered = await reader.where({ title: "b" });
     expect(filtered.length).toBe(1);
     expect(filtered[0].title).toBe("b");
@@ -353,11 +274,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   });
 
   it("writer `author.posts = [...]` still flows through Association#writer", async () => {
-    // R.2 only swapped the reader; the writer routes through
-    // `this.association(name).writer(value)` — awaitable since RFC 0068 (it
-    // persists the replacement inline for a persisted owner), so RFC 0087 §1
-    // deleted the `=` setter that could not await it. `author.posts` is a
-    // getter-only property now and the awaitable `replace` is the writer.
     const author = await authorWithPosts();
     const replacement = await Post.create({
       title: "z",
@@ -368,7 +284,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
       (author as any).posts = [replacement];
     }).toThrow(TypeError);
     await association<Post>(author, "posts").replace([replacement]);
-    // The proxy returned by the reader reflects the new target.
     const reader = (author as any).posts;
     expect(reader.target.length).toBe(1);
     expect(reader[0]?.title).toBe("z");
@@ -396,7 +311,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(instance._associationIds).toBeNull();
   });
 
-  // RFC 0006 S1 — proxy-backed read API + the `_associationCache` accessor.
   it("readTargets() returns the loaded target array (single source of truth)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
@@ -438,20 +352,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   });
 });
 
-// Regression: `CollectionProxy#delete` non-through nullify path wraps the Rails
-// remove_records sequence (before_remove → update_all nullify → in-memory target
-// removal → after_remove) in a transaction when persisted records exist, matching
-// CollectionAssociation#delete_or_destroy (collection_association.rb:385-397). A
-// raising after_remove must therefore roll back the DB nullify. New-record-only
-// deletes run outside any transaction. No Rails test covers this delete/nullify +
-// transaction case (test_transaction_when_deleting_persisted/_new_record cover
-// `destroy`), so these use descriptive trails-only names.
 describe("CollectionProxy#delete — nullify transaction rollback", () => {
   fixtures(["authors", "posts"]);
 
-  // Author subclass on the canonical `authors` table whose has_many :posts
-  // carries an after_remove that raises — the only deviation from the default
-  // Author#posts association under test.
   class AuthorWithRaisingAfterRemove extends Base {
     static {
       this.tableName = "authors";
@@ -474,8 +377,6 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
 
     await expect(proxy.delete(post)).rejects.toThrow("after_remove boom");
 
-    // The transaction wrapping remove_records rolled the nullify back, so the
-    // child FK is still set in the DB.
     const reloaded = await Post.find(post.id as number);
     expect((reloaded as any).author_id).toBe(Number(author.id));
   });
@@ -487,11 +388,6 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     expect(built.isNewRecord()).toBe(true);
 
     // Spy on the real DB boundary: `CollectionProxy#transaction` delegates to
-    // `reflection.klass.transaction` (collection_association.rb:395 wraps
-    // remove_records in `transaction { ... }` where `transaction` is the
-    // reflection class method), so `Post.transaction` is what `deleteOrDestroy`
-    // opens when persisted records exist. Restored in `finally` because it is
-    // shared static state on the canonical model.
     let opened = false;
     const realTransaction = (Post as any).transaction.bind(Post);
     (Post as any).transaction = (fn: any, options: any) => {
@@ -504,26 +400,14 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
       (Post as any).transaction = realTransaction;
     }
 
-    // Rails delete_or_destroy only wraps remove_records when persisted records
-    // exist; a new-record-only delete runs outside any transaction.
     expect(opened).toBe(false);
     expect(proxy.target.length).toBe(0);
   });
 });
 
-// CollectionAssociation#delete_or_destroy opens with `return if records.empty?`
-// (collection_association.rb:385) and remove_records aborts via
-// `catch(:abort) { ... } || return` (collection_association.rb:399-402), so both
-// `delete` and `destroy` return nil — not [] — on an empty batch or a halted
-// before_remove. `[]` vs nil is observable (a JS `[]` is truthy), so mirror the
-// nil return with `undefined`. No Rails test asserts the return value directly,
-// so these use descriptive trails-only names.
 describe("CollectionProxy#delete / #destroy — nil return on empty or abort", () => {
   fixtures(["authors", "posts"]);
 
-  // Author subclass on the canonical `authors` table whose has_many :posts
-  // carries a before_remove that throws :abort — the only deviation from the
-  // default Author#posts association.
   class AuthorWithAbortingBeforeRemove extends Base {
     static {
       this.tableName = "authors";
@@ -549,9 +433,6 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
   });
 
   it("returns [] (not nil) when delete is called with an explicit empty array", async () => {
-    // Rails checks `records.empty?` on the raw splat before flatten, so
-    // `delete([])` is `[[]]` (size 1) → flattens to [] → returns [], unlike the
-    // no-arg `delete()` which returns nil (collection_association.rb:385-388).
     const author = await Author.create({ name: "Owner" });
     const proxy = association<Post>(author, "posts");
     expect(await (proxy.delete as (...r: unknown[]) => Promise<Base[] | undefined>)([])).toEqual(
@@ -566,27 +447,14 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
     await proxy.load();
 
     expect(await proxy.delete(post)).toBeUndefined();
-    // The abort halted the operation: the child FK is untouched.
     const reloaded = await Post.find(post.id as number);
     expect((reloaded as any).author_id).toBe(Number(author.id));
   });
 });
 
-// The nil-on-empty contract holds through the association layer too, which is
-// what `CollectionProxy#delete/#destroy` delegate to for has_many :through
-// (collection_proxy.rb:620-693 → @association.delete/destroy): the shared
-// `delete_or_destroy` returns nil for empty args (collection_association.rb:385).
-// The ABORT case, however, diverges from the non-through path:
-// `HasManyThroughAssociation#remove_records` (has_many_through_association.rb:
-// 116-118) runs `super; delete_through_records(records)` and returns the latter's
-// records array, discarding super's abort-nil — so a through before_remove abort
-// still skips the DB delete but returns the records, NOT nil.
 describe("CollectionProxy#delete / #destroy through has_many :through — nil on empty, records on abort", () => {
   fixtures(["posts", "tags"]);
 
-  // Post subclass on the canonical `posts` table whose `has_many :tags,
-  // through: :taggings` carries a before_remove that throws :abort — the only
-  // deviation from the default Post#tags through association.
   class PostWithAbortingTagRemove extends Base {
     static {
       this.tableName = "posts";
@@ -603,8 +471,6 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
   });
 
   it("returns [] (not nil) when a through delete is called with an explicit empty array", async () => {
-    // The raw-splat empty check holds through the association layer too:
-    // `delete([])` flattens to [] and returns [], not nil.
     const post = await Post.create({ title: "p", body: "p" });
     const proxy = association<Tag>(post, "tags");
     expect(await (proxy.delete as (...r: unknown[]) => Promise<Base[] | undefined>)([])).toEqual(
@@ -623,27 +489,16 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     const proxy = association<Tag>(post, "tags");
     await proxy.load();
 
-    // Rails HMT#remove_records returns delete_through_records(records) → the
-    // records array, NOT the base method's abort-nil
-    // (has_many_through_association.rb:116-118). So the through delete returns
-    // the records even on abort — unlike the non-through path.
     const result = await proxy.delete(tag);
     expect(result).toHaveLength(1);
     expect((result as Tag[])[0]).toBe(tag);
-    // The abort still skips super's delete_records, so the DB join row survives.
     const count = await Tagging.where({ taggable_id: post.id as number }).count();
     expect(count).toBe(1);
-    // Rails leaves @target intact on abort (remove_records exits before
-    // `@target -= records`), so the proxy's loaded collection is NOT emptied.
     expect(proxy.target).toHaveLength(1);
     expect(proxy.target[0].id).toBe(tag.id);
   });
 
   it("coerces a bare id but raises on an id nested in an array for a through delete", async () => {
-    // Rails checks `records.any? { Integer/String }` on the raw splat before
-    // flatten (collection_association.rb:186-197): a bare `delete(id)` is coerced
-    // via `find`, but `delete([id])` is `[[id]]` (no top-level id) → flattens to
-    // `[id]` → `raise_on_type_mismatch!` on the raw id → AssociationTypeMismatch.
     const post = await Post.create({ title: "p", body: "p" });
     const tag = await Tag.create({ name: "t" });
     await Tagging.create({
@@ -654,27 +509,17 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     const proxy = association<Tag>(post, "tags");
     await proxy.load();
 
-    // An id nested in an array is not coerced — it hits the type check and raises.
     await expect((proxy.delete as (...r: unknown[]) => Promise<unknown>)([tag.id])).rejects.toThrow(
       /Tag.*expected/,
     );
-    // The join row is untouched by the failed call.
     expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(1);
 
-    // A bare top-level id IS coerced via find and removes the join row.
     const removed = await proxy.delete(tag.id as number);
     expect(removed).toBeDefined();
     expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(0);
   });
 });
 
-// RFC 0006 S1 — targetsByPrimaryKey() across non-default primary keys. The
-// token routes through `record.id` → `PrimaryKey#id` → `_readAttribute(primaryKey)`,
-// so a custom single-column PK and a composite PK must key correctly, and a
-// composite new record (an `id` array with null parts) must be skipped.
-// Canonical models: `CpkAuthor has_many :books` (CpkBook PK `[author_id, id]`)
-// for the composite case, and `Pet has_many :toys` (Toy PK `toy_id`) for the
-// custom single-column case. No bespoke tables.
 describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () => {
   fixtures(["cpkAuthors", "cpkBooks", "pets", "toys"]);
 
@@ -686,7 +531,6 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
     await proxy.load();
     const byKey = proxy.targetsByPrimaryKey() as Map<string, CpkBook>;
     expect(byKey.size).toBe(2);
-    // Distinct composite keys never collide, and every loaded book is a value.
     expect(new Set(byKey.values())).toEqual(new Set(proxy.target as CpkBook[]));
   });
 
@@ -707,25 +551,15 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
     await CpkBook.create({ id: [owner.id as number, 7], title: "a" });
     const proxy = association<CpkBook>(owner, "books") as any;
     await proxy.load();
-    // `id` unassigned → null part in the composite key array.
     (proxy.target as CpkBook[]).push(new CpkBook({ author_id: owner.id as number }));
     expect((proxy.targetsByPrimaryKey() as Map<string, CpkBook>).size).toBe(1);
   });
 });
 
-// Tracked in the activerecord-surfaced-deviations bucket: a CollectionProxy's
-// relation clauses are seeded ONCE at construction. When the owner is a NEW
-// record then, its FK is unresolvable and the seed collapses to the `1=0`
-// NullRelation. A relation spawned off that stale seed
-// (`owner.things.where(...)`) — or the proxy itself once a bang has diverged
-// it — must pick up the persisted FK once the owner is saved, mirroring Rails'
-// CollectionProxy delegating every query to the live `association.scope`.
 describe("CollectionProxy — mutated finder requery on stale new-owner seed", () => {
   fixtures(["authors", "posts"]);
 
   it("resolves the persisted FK on first/last/take/find_nth after save", async () => {
-    // Owner is a NEW record when the mutated relation is spawned, so its seed
-    // is the `1=0` NullRelation.
     const author = new Author({ name: "New Owner" });
     const rel = (association<Post>(author, "posts") as any)
       .where({ title: "match" })
@@ -735,8 +569,6 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     const authorId = author.id as number;
     const first = await Post.create({ title: "match", body: "1", author_id: authorId });
     const last = await Post.create({ title: "match", body: "2", author_id: authorId });
-    // A non-matching sibling proves the mutation (`where(title:)`) is still
-    // applied on top of the rebuilt scope, not dropped.
     await Post.create({ title: "other", body: "3", author_id: authorId });
 
     expect((await rel.first()).id).toBe(first.id);
@@ -748,8 +580,6 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
   it("resolves the persisted FK when the proxy itself is mutated while new", async () => {
     const author = new Author({ name: "New Owner Two" });
     const proxy = association<Post>(author, "posts") as any;
-    // Diverge the proxy in place (sets `_cpMutated`) while the owner is still a
-    // new record, so its base is the stale `1=0` seed.
     proxy.whereBang({ title: "keep" });
 
     await author.save();
@@ -761,17 +591,12 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
   });
 
   it("resolves the persisted FK on count/exists/pluck/pick/find after save", async () => {
-    // The bounded finders were rebased in PR #4465; the other query terminals
-    // (count/exists/pluck/pick/find) have their own `_isNone` short-circuits, so
-    // a relation spawned off the stale `1=0` seed must rebase there too.
     const author = new Author({ name: "New Owner Three" });
     const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
 
     await author.save();
     const authorId = author.id as number;
     const match = await Post.create({ title: "match", body: "1", author_id: authorId });
-    // A non-matching sibling proves the mutation (`where(title:)`) is still
-    // applied on top of the rebuilt scope, not dropped.
     await Post.create({ title: "other", body: "2", author_id: authorId });
 
     expect(await rel.count()).toBe(1);
@@ -782,16 +607,12 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
   });
 
   it("resolves the persisted FK on updateAll/updateCounters after save", async () => {
-    // The mutation terminals carry their own none short-circuits, so they must
-    // consult the same `isNullRelation()` chokepoint the read terminals do.
     const author = new Author({ name: "New Owner Four" });
     const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
 
     await author.save();
     const authorId = author.id as number;
     const match = await Post.create({ title: "match", body: "1", author_id: authorId });
-    // A non-matching sibling proves the mutation (`where(title:)`) is still
-    // applied on top of the rebuilt scope, not dropped.
     const other = await Post.create({ title: "other", body: "2", author_id: authorId });
 
     expect(await rel.updateCounters({ tags_count: 1 })).toBe(1);
@@ -816,9 +637,6 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([other.id]);
   });
 
-  // `posts` has no timestamps, so touchAll rides `ship.parts` (ship_parts has
-  // `updated_at`). touchAll routes through updateAll, but its OWN short-circuit
-  // runs first — so it needs the chokepoint independently.
   it("resolves the persisted FK on touchAll after save", async () => {
     const ship = new Ship({ name: "New Owner Six" });
     const rel = (association<ShipPart>(ship, "parts") as any).where({ name: "mast" });
@@ -830,21 +648,11 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     const sail = await ShipPart.create({ name: "sail", ship_id: shipId, updated_at: stale });
 
     expect(await rel.touchAll()).toBe(1);
-    // Assert each row absolutely, not just that the two differ: the matching
-    // part moved off the stale timestamp, and the non-matching sibling is
-    // untouched — proving the `where(...)` mutation still rides on top of the
-    // rebuilt scope, and that touchAll hit the RIGHT row.
     expect(String((await ShipPart.find(mast.id)).updated_at)).not.toBe(stale);
     expect(String((await ShipPart.find(sail.id)).updated_at)).toBe(stale);
   });
 });
 
-// The mutation terminals invoked on the PROXY itself (not a spawned relation)
-// route through `scope()`, which the association rebuilds against the resolved
-// FK — so the proxy's own stale new-owner `1=0` seed is never read. Rails gets
-// this from `delegate(*delegate_methods, to: :scope)`
-// (collection_proxy.rb:1128-1137) sending the QueryMethods value readers the
-// inherited `update_all` uses to `@association.scope`.
 describe("CollectionProxy — mutation terminals invoked on the proxy itself on stale new-owner seed", () => {
   fixtures(["authors", "posts"]);
 
@@ -855,8 +663,6 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     await author.save();
     const authorId = author.id as number;
     const mine = await Post.create({ title: "mine", body: "1", author_id: authorId });
-    // A post belonging to a DIFFERENT author proves the rebuilt scope still
-    // constrains to this owner's FK, not a bare `updateAll` over the table.
     const otherAuthor = await Author.create({ name: "Someone Else" });
     const theirs = await Post.create({ title: "theirs", body: "2", author_id: otherAuthor.id });
 
@@ -872,25 +678,15 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
   it("resolves the persisted FK on the diverged deleteAll branch invoked on the proxy after save", async () => {
     const author = new Author({ name: "Proxy Mutation Two" });
     const posts = association<Post>(author, "posts") as any;
-    // Diverge the proxy in place while the owner is new, so its own relation
-    // state sits on the stale `1=0` seed.
     posts.whereBang({ title: "drop" });
 
     await author.save();
     const authorId = author.id as number;
     const dropped = await Post.create({ title: "drop", body: "1", author_id: authorId });
     const kept = await Post.create({ title: "keep", body: "2", author_id: authorId });
-    // A post belonging to a DIFFERENT author proves the association scope still
-    // constrains to this owner's FK, not a bare `deleteAll` over the table.
     const otherAuthor = await Author.create({ name: "Someone Else Two" });
     const theirs = await Post.create({ title: "drop", body: "3", author_id: otherAuthor.id });
 
-    // Rails' `CollectionProxy#delete_all` is `@association.delete_all(dependent)`
-    // (collection_proxy.rb:474-476): it runs against the association scope, so
-    // the proxy's in-place `where!` does NOT narrow it — both of this author's
-    // posts leave the collection. `Author has_many :posts` declares no
-    // `:dependent`, so Rails' `delete_count(nil, scope)`
-    // (has_many_association.rb:112-118) nullifies the FK rather than deleting.
     expect(await posts.deleteAll()).toBe(2);
     expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([]);
     expect((await Post.find(dropped.id)).author_id).toBeNull();
@@ -898,16 +694,8 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     expect((await Post.find(theirs.id)).author_id).toBe(otherAuthor.id);
   });
 
-  // Rails' `reader` (collection_association.rb:34-43) ends in
-  // `@proxy.reset_scope`, so every collection read drops the memoized `@scope`
-  // (collection_proxy.rb:1112-1116) and rebuilds it from the association. A
-  // proxy whose scope was memoized while the owner was new therefore resolves
-  // the persisted FK on the next read — which is how #6612's delegated value
-  // readers reach a live scope rather than the stale `1=0` seed.
   it("resolves the persisted FK on updateAll read again after save", async () => {
     const author = new Author({ name: "Proxy Mutation Four" });
-    // `whereBang` is delegated to `scope()`, so this memoizes the `1=0` scope
-    // while the owner is still new.
     (association<Post>(author, "posts") as any).whereBang({ title: "mine" });
 
     await author.save();
@@ -916,15 +704,12 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     const otherAuthor = await Author.create({ name: "Someone Else Three" });
     const theirs = await Post.create({ title: "mine", body: "2", author_id: otherAuthor.id });
 
-    // Re-read through the reader, as Rails' `person.posts.update_all` does.
     const posts = association<Post>(author, "posts") as any;
     expect(await posts.updateAll({ body: "updated" })).toBe(1);
     expect((await Post.find(mine.id)).body).toBe("updated");
     expect((await Post.find(theirs.id)).body).toBe("2");
   });
 
-  // The same reader contract on a read terminal: a count taken while the owner
-  // was new must not pin the collection to the `1=0` seed for later reads.
   it("counts against the persisted FK when read again after save", async () => {
     const author = new Author({ name: "Proxy Mutation Five" });
     expect(await (association<Post>(author, "posts") as any).count()).toBe(0);
@@ -954,11 +739,6 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
   });
 });
 
-// The other side of `calculate`'s none branch: a proxy whose own state is a none
-// relation for a reason that has nothing to do with a new owner — here
-// `Tag has_many :null_taggings, -> { none }` on a PERSISTED tag. Deferring to
-// `scope()` must return the same answer the in-memory short-circuit did, since
-// the association scope carries the same `none`.
 describe("CollectionProxy — a none-scoped association on a persisted owner", () => {
   const { tags } = fixtures(["tags", "taggings"]);
 
@@ -971,13 +751,6 @@ describe("CollectionProxy — a none-scoped association on a persisted owner", (
   });
 });
 
-// The in-memory `CollectionProxy#find` path (loaded `inverse_of` collection,
-// scanned in memory) must emit the identical not-found message as the SQL
-// `performFind` path — Rails routes both through
-// `raise_record_not_found_exception!`, so a missing id in a multi-id lookup
-// pluralizes the model name and appends the found/expected suffix.
-// `Firm has_many :clients_of_firm, inverse_of: :firm` is the canonical loaded
-// inverse-of collection (same fixture setup as the BigInt-key-match test).
 describe("CollectionProxy#find — in-memory not-found message fidelity", () => {
   const { companies } = fixtures(["companies"]);
 
@@ -994,14 +767,6 @@ describe("CollectionProxy#find — in-memory not-found message fidelity", () => 
     } catch (e) {
       const err = e as RecordNotFound;
       expect(err).toBeInstanceOf(RecordNotFound);
-      // Pluralized model name + found/expected suffix + the association scope's
-      // `[WHERE …]` conditions clause. Rails' in-memory `find` routes through
-      // `scope.raise_record_not_found_exception!`, whose `arel.where_sql(model)`
-      // renders BindParams as placeholders, so the message carries the scope's
-      // STI type filter + owner FK with placeholder values. Placeholder style
-      // (`?` vs `$N`) and quote characters (double-quote vs backtick) differ by
-      // adapter, so the regex accepts both — assert structure, not exact
-      // rendering.
       const ph = `(\\?|\\$\\d+)`;
       expect(err.message).toMatch(
         new RegExp(

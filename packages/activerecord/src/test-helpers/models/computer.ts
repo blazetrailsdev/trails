@@ -1,7 +1,6 @@
 import type { Temporal } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
-// vendor/rails/activerecord/test/models/computer.rb
 import { Base } from "../../base.js";
 
 export class Computer extends Base {

@@ -54,12 +54,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
   });
 
   it("deterministic IV matches Rails HMAC-SHA256 derivation (fixed vector)", () => {
-    // Fixed key and plaintext — verify the IV equals HMAC-SHA256(key_bytes, plaintext)[0..12].
-    // To verify with Ruby:
-    //   key_bytes = Base64.strict_decode64(key)[0,32]
-    //   iv = OpenSSL::HMAC.digest("SHA256", key_bytes, "hello world")[0, 12]
-    //   puts Base64.strict_encode64(iv)
-    const key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; // 32 zero bytes base64
+    const key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     const keyBuf = Buffer.from(key, "base64").subarray(0, 32);
     const expectedIv = crypto
       .createHmac("sha256", keyBuf)
@@ -69,26 +64,11 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
 
     const cipher = new Cipher(key, { deterministic: true });
     const message = cipher.encrypt("hello world");
-    // Header values are now raw bytes (Buffers, the MRI representation), so
-    // compare against the raw digest rather than its base64 encoding.
     expect(message.headers.get("iv")).toEqual(expectedIv);
   });
 
   it("serialized envelope is byte-identical to MRI (single base64 hop)", () => {
-    // Pins the wire format against any regression back to the double-base64
-    // divergence. The expected envelope was produced by real Rails 8.0.2 (MRI):
-    //
-    //   require "active_record/encryption/cipher/aes256_gcm"
-    //   require "active_record/encryption/message_serializer"
-    //   raw_key = Base64.strict_decode64("dGVzdC1kZXRlcm1pbmlzdGljLWtleS0zMmJ5dGVzISE=")
-    //   cipher = ActiveRecord::Encryption::Cipher::Aes256Gcm.new(raw_key, deterministic: true)
-    //   serializer = ActiveRecord::Encryption::MessageSerializer.new
-    //   serializer.dump(cipher.encrypt("Hello from Rails 8.0.2"))
-    //   # => {"p":"aiDvn3GJU0oNJl8gVJvDI8B7acYIBA==","h":{"iv":"wePblsDr4KpYOpQK","at":"91La92jfskP8kAvEw77Q7Q=="}}
-    //
-    // Deterministic mode makes the IV (and thus the whole envelope) reproducible,
-    // so trails must emit exactly the same bytes for the same key + plaintext.
-    const key = "dGVzdC1kZXRlcm1pbmlzdGljLWtleS0zMmJ5dGVzISE="; // 32 bytes base64
+    const key = "dGVzdC1kZXRlcm1pbmlzdGljLWtleS0zMmJ5dGVzISE=";
     const message = new Cipher(key, { deterministic: true }).encrypt("Hello from Rails 8.0.2");
     expect(new MessageSerializer().dump(message)).toBe(
       '{"p":"aiDvn3GJU0oNJl8gVJvDI8B7acYIBA==","h":{"iv":"wePblsDr4KpYOpQK","at":"91La92jfskP8kAvEw77Q7Q=="}}',
@@ -104,8 +84,6 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
   });
 
   it("raises EncryptedContentIntegrity for a truncated auth tag", () => {
-    // Mirrors Rails: auth_tag.bytes.length != 16 always raises EncryptedContentIntegrity
-    // (truncated-tag forgery defence), propagating out of the per-key retry loop.
     const key = generateKey();
     const fresh = new Cipher(key).encrypt("hello world");
     const iv = fresh.headers.get("iv") as Buffer;
@@ -117,9 +95,6 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
   });
 
   it("raises a retryable Decryption error (not integrity) when a well-formed tag is decrypted with the wrong key", () => {
-    // Symmetric to the truncated-tag case: a 16-byte tag is well-formed, so failure
-    // here is a genuine decryption failure (wrong key), which Cipher#tryToDecryptWithEach
-    // retries against the next key — it must NOT surface as EncryptedContentIntegrity.
     const message = new Cipher(generateKey()).encrypt("hello world");
     expect(() => new Cipher(generateKey()).decrypt(message)).toThrow(Decryption);
   });

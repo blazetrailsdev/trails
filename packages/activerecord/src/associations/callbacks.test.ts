@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, registerSubclass } from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
@@ -16,22 +12,12 @@ import { Account } from "../test-helpers/models/account.js";
 
 registerModel(Project);
 registerModel(Developer);
-// Developer#before_create builds an `audit_logs` record, autosaved on create.
 registerModel(AuditLog);
-// Rails' `AssociationCallbacksTest` carries the has_many add/remove callbacks
-// on `Author#posts_with_callbacks` (owner = Author, child = Post). Register
-// both canonical models so the throwaway owner's has_many :posts resolves.
 registerModel(Author);
 registerModel(Post);
 
 let cbIdx = 0;
 
-// A throwaway Author subclass on the canonical `authors` table carrying the
-// has_many :posts add/remove callbacks under test — mirrors Rails'
-// `has_many :posts_with_callbacks, class_name: "Post"` on Author, inlined per
-// test (as Rails inlines `Class.new(Project)` for the HABTM callback below).
-// `posts.author_id` is nullable, so the default has_many delete (nullify)
-// works exactly as in Rails — no `dependent` override needed.
 function makeAuthorWithCallbacks(callbacks: any) {
   const idx = ++cbIdx;
   class CbAuthor extends Base {
@@ -49,21 +35,15 @@ function makeAuthorWithCallbacks(callbacks: any) {
   return { Author: CbAuthor, Post };
 }
 
-// The canonical `authors`/`posts` tables ride the boot-laid schema.
-// Used by the has_many callback describes below.
 function setupAuthorPostSuite(): void {
   fixtures({});
 }
 
-// ==========================================================================
-// AssociationCallbacksTest — targets associations/callbacks_test.rb
-// ==========================================================================
 describe("AssociationCallbacksTest", () => {
   setupAuthorPostSuite();
 
   it("adding macro callbacks", async () => {
     const log: string[] = [];
-    // "macro" style: callback defined as a named function (equivalent to Ruby's method name symbol)
     function onAdd(_owner: any, record: any) {
       log.push("macro:add:" + record.title);
     }
@@ -423,17 +403,12 @@ describe("AssociationCallbacksTest", () => {
     const p = await (Post as any).create({ title: "abc", body: "Body", author_id: author.id });
     const proxy = association(author, "posts");
     expect((await proxy).length).toBe(1);
-    // Rails passes the bare id to `destroy` (not `delete`): the abortable
-    // before_remove loop shares remove_records with delete, so an abort leaves
-    // the record (and its DB row) in place.
     await proxy.destroy(p.id);
     expect((await proxy).length).toBe(1);
     expect(await (Post as any).exists(p.id)).toBe(true);
   });
 
   it("before_remove abort halts the whole removal, not just the current record", async () => {
-    // Rails wraps the entire before_remove loop in one catch(:abort), so an
-    // abort on any record leaves ALL records (including earlier ones) in place.
     const { Author, Post } = makeAuthorWithCallbacks({
       beforeRemove: (_owner: any, record: any) => {
         if (record.title === "keep") throwAbort();
@@ -449,7 +424,6 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     expect((await proxy).length).toBe(2);
     await proxy.delete(p1, p2);
-    // p1 must NOT have been removed even though its own before_remove passed.
     expect((await proxy).length).toBe(2);
   });
 
@@ -484,8 +458,6 @@ describe("AssociationCallbacksTest", () => {
     proxy.build({ title: "Call me back!", body: "Body" });
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
     expect(await author.save()).toBe(true);
-    // Re-query the DB (not the in-memory proxy target) so this asserts the
-    // built post was actually persisted — mirrors Rails' `.count`.
     expect((await (Post as any).all().toArray()).length).toBe(1);
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
@@ -503,16 +475,11 @@ describe("AssociationCallbacksTest", () => {
     const p = new (Post as any)({ title: "blocked", body: "Body", author_id: author.id });
     try {
       await proxy.push(p);
-    } catch {
-      // swallowed, like Rails' `rescue Exception`
-    }
+    } catch {}
     expect((await proxy).length).toBe(0);
   });
 
   it("after_add callback throwing abort propagates (not swallowed)", async () => {
-    // Rails wraps only before_add/before_remove in catch(:abort); after_add
-    // runs outside it (collection_association.rb:485), so a thrown abort
-    // surfaces to the caller rather than being silently swallowed.
     const { Author, Post } = makeAuthorWithCallbacks({
       afterAdd: () => throwAbort(),
     });
@@ -523,12 +490,6 @@ describe("AssociationCallbacksTest", () => {
   });
 });
 
-// ==========================================================================
-// Destroy-on-parent uses the canonical Firm/Client (Company STI) models, whose
-// `clients` dependent:destroy has_many carries the before/after_remove logging
-// to `firm.log` — mirroring Rails' test_has_many_callbacks_for_destroy_on_parent
-// (associations/callbacks_test.rb:105-111).
-// ==========================================================================
 describe("AssociationCallbacksTest", () => {
   fixtures({});
   beforeAll(async () => {
@@ -550,14 +511,6 @@ describe("AssociationCallbacksTest", () => {
   });
 });
 
-// ==========================================================================
-// HABTM callback tests migrated to the canonical Project / Developer models
-// (whose `developersWithCallbacks` association carries the Rails before/after
-// add+remove callbacks logging to `developersLog`) + real projects/developers
-// fixture lookups, mirroring `AssociationCallbacksTest`'s
-// `developers(:david)` / `projects(:active_record)` rows joined via the
-// developers_projects fixtures.
-// ==========================================================================
 describe("AssociationCallbacksTest", () => {
   const { projects, developers } = fixtures(["projects", "developers", "developersProjects"]);
 
@@ -580,9 +533,6 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many before add called before save", async () => {
     let dev: any = null;
     let newDev: boolean | undefined;
-    // Rails uses a throwaway `Class.new(Project)` on the `projects` table with a
-    // closure-capturing before_add; the closure proves the added record is still
-    // new inside the callback but persisted afterwards.
     class ProjectWithCallback extends Base {
       static {
         this.tableName = "projects";
@@ -649,9 +599,6 @@ describe("AssociationCallbacksTest", () => {
     const activerecord = projects("active_record");
     expect(activerecord.developersLog).toEqual([]);
     const proxy = association(activerecord, "developersWithCallbacks");
-    // david + jamis (+ poor_jamis) are joined to active_record via the
-    // developers_projects fixtures, so clear() actually removes rows — and
-    // must do so without firing the before/after remove callbacks.
     expect((await proxy).length).toBeGreaterThan(0);
     await proxy.clear();
     expect(activerecord.developersLog).toEqual([]);

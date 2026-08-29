@@ -8,13 +8,6 @@ import { loadSchemaBang } from "./model-schema.js";
 import "./counter-cache.js";
 import "./encryption/encryptable-record.js";
 
-/**
- * TS-only: Rails gets the ordering from `include` (base.rb:309 CounterCache,
- * :313 Encryption::EncryptableRecord), so a Ruby test would have nothing to
- * assert. trails rebuilds the chain by hand, so the order and the `super`
- * wiring are worth pinning. The table-less host makes the anchor throw, which
- * is all the ordering assertion needs.
- */
 describe("load_schema! super chain", () => {
   it("registers CounterCache and EncryptableRecord at their include positions", () => {
     expect(loadSchemaOverrides.map((entry) => entry.includeOrder)).toEqual([309, 313]);

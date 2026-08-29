@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/admin/user_json.rb
 import { Base } from "../../../base.js";
 
 class Coder {

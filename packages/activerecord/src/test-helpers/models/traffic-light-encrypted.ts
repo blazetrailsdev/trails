@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/traffic_light_encrypted.rb
 import { Base } from "../../base.js";
 import { TrafficLight } from "./traffic-light.js";
 

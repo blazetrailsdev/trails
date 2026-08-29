@@ -1,12 +1,3 @@
-/**
- * Faithful port of activerecord/test/cases/associations/nested_error_test.rb.
- *
- * Rails' anonymous classes (`Class.new(ActiveRecord::Base) { def self.name;
- * "Guitar"; end }`) become named classes registered under distinct model names
- * — registering them as "Guitar"/"Pet" would shadow the canonical models
- * file-wide — with `foreignKey` passed explicitly where Rails infers it from
- * the faked `name`.
- */
 import { describe, it, expect } from "vitest";
 import { ActiveRecord, Base, registerModel } from "../index.js";
 import { NestedError } from "./nested-error.js";
@@ -41,10 +32,6 @@ describe("AssociationsNestedErrorInAssociationOrderTest", () => {
 describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
   fixtures({ guitars: [Guitar, {}], tuning_pegs: [TuningPeg, {}] });
 
-  // Rails' anonymous `@guitar_class` (nested_error_test.rb:35): `has_many
-  // :tuning_pegs, index_errors: :nested_attributes_order` keys nested errors
-  // by write order. Rides the canonical `guitars` table and the canonical
-  // `TuningPeg` (`validates_numericality_of :pitch`).
   class NestedOrderGuitar extends Base {
     static tableName = "guitars";
     declare tuningPegs: AssociationProxy<TuningPeg>;
@@ -54,7 +41,6 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         foreignKey: "guitar_id",
         indexErrors: "nestedAttributesOrder",
       });
-      // Rails: `reject_if: lambda { |attrs| attrs[:pitch]&.odd? }`
       this.acceptsNestedAttributesFor("tuningPegs", {
         rejectIf: (attrs: Record<string, unknown>) =>
           attrs["pitch"] != null && Number(attrs["pitch"]) % 2 === 1,
@@ -82,10 +68,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     const guitar = await NestedOrderGuitar.createBang({});
 
     await guitar.update({
-      tuningPegsAttributes: [
-        { pitch: 1 }, // rejected
-        { pitch: null },
-      ],
+      tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }],
     });
 
     const error = guitar.errors.objects[0] as NestedError;
@@ -100,8 +83,6 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
   describe("AssociationsNestedErrorWithSingularAssociationTest", () => {
     fixtures({ owners: [Owner, {}], pets: [Pet, {}] });
 
-    // Rails' anonymous `pet_class` / `@owner_class` (nested_error_test.rb:80-94)
-    // on the canonical `pets` / `owners` tables.
     class ValidatedPet extends Base {
       static tableName = "pets";
       declare name: string | null;
@@ -134,9 +115,6 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         const pet = (owner.association("pet") as unknown as { target?: ValidatedPet }).target!;
 
         expect(error).toBeInstanceOf(NestedError);
-        // Rails' `assert_equal` goes through ActiveModel::Error#== (semantic
-        // equality on base/attribute/type/options), not object identity —
-        // trails' associated-validation path wraps a duplicated inner error.
         expect(error.innerError).toStrictEqual(pet.errors.objects[0]);
         expect(error.attribute).toBe("pet.name");
         expect(error.type).toBe(":blank");

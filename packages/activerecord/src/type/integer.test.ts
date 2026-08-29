@@ -9,7 +9,6 @@ fixtures({});
 describe("IntegerTest", () => {
   it("casting ActiveRecord models", async () => {
     const type = new IntegerType();
-    // AR model stringifies to "[object Object]" → parseInt → NaN → null
     const firm = await Firm.create({ name: "Apple" });
     expect(type.cast(firm)).toBeNull();
   });

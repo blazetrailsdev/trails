@@ -8,7 +8,6 @@ import type { Person } from "./person.js";
 import type { PriceEstimate } from "./price-estimate.js";
 import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
-// vendor/rails/activerecord/test/models/car.rb
 import { Base } from "../../base.js";
 import { Temporal } from "@blazetrails/date";
 

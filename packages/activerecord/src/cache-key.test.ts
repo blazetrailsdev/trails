@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/cases/cache_key_test.rb
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
@@ -7,7 +6,6 @@ import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { ActiveRecord } from "./ar-config.js";
 
-// Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
 function usec(ts: unknown): string {
   if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
   const dt = ts.toZonedDateTimeISO("UTC");
@@ -22,16 +20,6 @@ function usec(ts: unknown): string {
 }
 
 describe("CacheKeyTest", () => {
-  // Rails: `cache_mes` / `cache_me_with_versions` are not schema.rb fixture
-  // tables — the test builds them with `create_table(..., force: true) { |t|
-  // t.timestamps }` in `setup` and drops them in `teardown`. Mirror that here
-  // rather than seeding placeholders into the canonical schema. Rails also sets
-  // `self.use_transactional_tests = false`, so each test recreates the tables.
-  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
-  // rows). Rails sets `use_transactional_tests = false` here and recreates the
-  // bespoke tables per-test, so opt out of transactional fixtures — the per-test
-  // DDL must commit, not roll back inside a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
@@ -101,9 +89,6 @@ describe("CacheKeyTest", () => {
     );
   });
 
-  // Rails skips these on Mysql2/Trilogy/PostgreSQL — those adapters don't return
-  // a raw string for updated_at_before_type_cast, so the fast path can't fire and
-  // the reader is always called.
   it.skipIf(adapterType !== "sqlite")(
     "cache_version is the same when it comes from the DB or from the user",
     async () => {
@@ -122,10 +107,6 @@ describe("CacheKeyTest", () => {
     async () => {
       const CacheMeWithVersion = cacheMeWithVersion();
       const record = await CacheMeWithVersion.create({});
-      // Rails uses `travel_to beginning_of_day` so the DB stores a zeros-ending
-      // timestamp. We persist one directly (skipping the touch callback) so the
-      // reloaded record's raw before-type-cast string ends in zeros and exercises
-      // the fast path's zero-padding.
       await record.updateColumns({
         updated_at: Temporal.Instant.from("2016-11-12T00:00:00.000000Z"),
       });
@@ -140,8 +121,6 @@ describe("CacheKeyTest", () => {
   it("cache_version calls updated_at when the value is generated at create time", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
-    // The create-time timestamp stays user-sourced (cameFromUser true, before-type-cast
-    // is the assigned Time), so the fast path is skipped and the reader is called.
     const spy = vi.spyOn(record, "readAttribute");
     const version = record.cacheVersion();
     expect(spy).toHaveBeenCalledWith("updated_at");
@@ -162,10 +141,6 @@ describe("CacheKeyTest", () => {
     },
   );
 
-  // No Rails counterpart (Rails inlines the `default_timezone == :utc` guard in
-  // can_use_fast_cache_version?). When the connection's default_timezone is not
-  // UTC, the raw DB string can't be reused verbatim, so the fast path must NOT
-  // fire and cache_version falls through to the type-casting reader.
   it.skipIf(adapterType !== "sqlite")(
     "cache_version does call updated_at when default_timezone is not utc",
     async () => {
@@ -205,8 +180,6 @@ describe("CacheKeyTest", () => {
     expect(version).toBe("20161112010203000000");
   });
 
-  // No Rails counterpart: pins the DB-format-string-from-user case that the
-  // `!cameFromUser` guard rejects (independent of the default_timezone guard).
   it("cache_version does call updated_at when a DB-format string is assigned by the user", async () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
@@ -222,8 +195,6 @@ describe("CacheKeyTest", () => {
     const CacheMeWithVersion = cacheMeWithVersion();
     const record = await CacheMeWithVersion.create({});
     const recordFromDb = await CacheMeWithVersion.find(record.id);
-    // Rails assigns a multiparameter hash ({1=>2016, 2=>11, ...}); the trails
-    // equivalent value object is a Date built from the same components.
     const spy = vi.spyOn(recordFromDb, "readAttribute");
     recordFromDb.updated_at = new Date(Date.UTC(2016, 10, 12, 1, 2, 3));
     const version = recordFromDb.cacheVersion();

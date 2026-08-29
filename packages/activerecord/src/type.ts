@@ -1,9 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Type
- *
- * Re-exports ActiveModel types under ActiveRecord::Type and adds
- * AR-specific types (Date, DateTime, Time with timezone, Text, Json, etc.).
- */
 import {
   Type,
   BigIntegerType,
@@ -62,10 +56,6 @@ let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
 
 export interface AdapterNameSource {
   connectionDbConfig: () => { adapter?: string } | undefined;
-  // trails-only: a model may carry a directly-assigned adapter instead of an
-  // established connection (`Base._adapter`). Rails has no analogue — every
-  // model resolves through a pool — so `adapter_name_from` has nothing to read
-  // it from.
   _adapter?: { typeRegistryKey?: AdapterName } | null;
 }
 
@@ -84,15 +74,6 @@ _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
 _registry.register("value", ValueType, { override: false });
 
-/**
- * Mirrors: ActiveRecord::Type.registry, registry= (type.rb:26)
- *
- * Not a `get`/`set` pair: Rails hangs `attr_accessor :registry` off the
- * `ActiveRecord::Type` module object, whose trails analogue is this ES module,
- * and a module namespace is read-only from the importer's side — there is no
- * object to define an accessor on. Same constraint, same shape as
- * `Core.configurations` and `PrimaryKey#primary_key`.
- */
 export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
   if (r !== undefined) {
     _registry = r;
@@ -102,15 +83,8 @@ export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
 }
 
 /**
- * Trails-only seam with no Rails counterpart. Rails' `Type.lookup` reads the
- * current adapter straight off `ActiveRecord::Base.connection_db_config.adapter`
- * (type.rb:41), but a static import of `base.ts` from here would close the cycle
- * `type.ts → base.ts → attributes → type.ts` and leave `Base` undefined at eval
- * time. `base.ts` injects the resolver at module end instead (base.ts:5244), and
- * `lookup` reads it lazily inside the call.
- *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby reads Base.connection_db_config.adapter at call time (active_record/type.rb:49); a TS import would close a module cycle.
+ * @noRailsEquivalent PERMANENT
  */
 export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
   _currentAdapterResolver = resolver;
@@ -125,7 +99,6 @@ export function register(
   registry().register(typeName, klass, options, block);
 }
 
-/** Mirrors: ActiveRecord::Type.add_modifier */
 export function addModifier(
   options: Record<string, unknown>,
   klass: new (subtype: Type) => Type,
@@ -146,16 +119,7 @@ export function defaultValue(): Type {
   return (_defaultValue ??= new ValueType());
 }
 
-/**
- * Return the normalized adapter name for a given model's connection,
- * matching the keys used for adapter-specific type registrations.
- *
- * Mirrors: ActiveRecord::Type.adapter_name_from
- */
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  // A directly-assigned adapter (see AdapterNameSource) IS the model's
-  // connection and has no pool, so it both outranks the pool the class would
-  // otherwise inherit from Base and is the only place its name can be read.
   const directTypeRegistryKey = model._adapter?.typeRegistryKey;
   if (directTypeRegistryKey) return directTypeRegistryKey;
 
@@ -163,27 +127,18 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
   try {
     configAdapter = model.connectionDbConfig()?.adapter;
   } catch (error) {
-    // Deviation: Rails lets `connection_db_config`'s ConnectionNotEstablished
-    // propagate. trails resolves adapter names during module load and during
-    // `attribute()` declarations that run before `establishConnection`, so an
-    // unconfigured model degrades to the default adapter instead of raising.
-    // Narrowed on purpose: any other error is a real bug and must not be masked.
     if (!(error instanceof ConnectionNotEstablished)) throw error;
     return "sqlite";
   }
   return adapterNameFromConfig(configAdapter);
 }
 
-// currentAdapterName is private in Rails — exposed here for parity:api parity only.
 /** @internal */
 export function currentAdapterName(): AdapterName {
   const base = _currentAdapterResolver?.();
   return base ? adapterNameFrom(base) : "sqlite";
 }
 
-// Override ActiveModel's type registry with AR-specific types so that
-// Model.attribute() calls resolve to timezone-aware Date/DateTime/Time,
-// AR's Text, Json, etc.
 typeRegistry.register("date", () => new Date()); // boundary: AR Type::Date class, not JS Date
 typeRegistry.register("datetime", () => new DateTime());
 typeRegistry.register("time", () => new Time());

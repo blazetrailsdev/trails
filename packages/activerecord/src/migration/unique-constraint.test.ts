@@ -1,9 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/migration/unique_constraint_test.rb
- * (PostgreSQL-only — `supports_unique_constraints?`).
- *
- * The model-backed and schema-scoped arms are not ported here.
- */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -15,9 +9,6 @@ describeIfSupports("unique_constraints", "Migration", () => {
   let scratch: ScratchDatabase;
   let connection: PostgreSQLAdapter;
 
-  // `sections` is a canonical table (`schema.rb:1090`) the session/seminar
-  // association suites read, and this suite clobbers and drops it as Rails
-  // does, so it runs against a database of its own (RFC 0079).
   beforeAll(async () => {
     scratch = await openScratchDatabase("unique_constraints");
     connection = scratch.connection;

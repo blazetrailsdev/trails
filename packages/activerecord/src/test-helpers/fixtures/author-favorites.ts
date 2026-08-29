@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/author_favorites.yml
 export const authorFavoriteFixtureData = {
   david_mary: {
     id: 1,

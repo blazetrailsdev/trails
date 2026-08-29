@@ -1,13 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/json_shared_test_cases.rb — the module
- * the sqlite3, PostgreSQL and MySQL JSON suites all `include`.
- *
- * Ruby `include JSONSharedTestCases` mixes the cases into the including
- * TestCase, which supplies `column_type` (and, in the PG/MySQL suites,
- * `insert_statement_per_database`). TypeScript has no such mixin for vitest
- * suites, so the module is a function called from inside the including
- * `describe`, taking the same overridable members as its host argument.
- */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
@@ -18,11 +8,8 @@ import { pp } from "../pretty-print.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
 
-/** The members an including suite supplies — Rails' overridable private methods. */
 export interface JSONSharedTestCasesHost {
-  /** Rails: `def column_type` — `:json` everywhere but PG's jsonb suite. */
   columnType: string;
-  /** Rails: `def insert_statement_per_database(values)`. */
   insertStatementPerDatabase?: (values: string) => string;
 }
 
@@ -33,11 +20,6 @@ export class JsonDataType extends Base {
   }
 }
 
-/**
- * A `JsonDataType` seen through its generated attribute readers (`payload`,
- * `resolution`), which are declared by the schema at runtime rather than by
- * the class body.
- */
 type JsonRecord = InstanceType<typeof JsonDataType> & Record<string, unknown>;
 
 export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
@@ -47,8 +29,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
 
   beforeEach(async () => {
     connection = await Base.leaseConnection();
-    // trails: Rails reflects the ad-hoc table's columns lazily on first
-    // attribute access; `loadSchema()` is async here, so it is awaited up front.
     await klass().loadSchema();
   });
 
@@ -83,11 +63,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_cast_value_on_write", async () => {
-    // Ruby's `{ "string" => "foo", :symbol => :bar }` keeps its Symbol key and
-    // value in `payload_before_type_cast` and is stringified only by the cast.
-    // JS has no Symbol-vs-String distinction to normalize, so the live half of
-    // the same assertion is identity: before-type-cast is the assigned object
-    // itself, while the reader returns the serialize/deserialize round trip.
     const payload = { string: "foo", symbol: "bar" };
     const x = klass().new({ payload }) as JsonRecord;
     expect((x.attributeBeforeTypeCast as (attrName: string) => unknown)("payload")).toBe(payload);
@@ -194,10 +169,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     const x = klass().new({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
-    // Rails: YAML.dump(x) / YAML.unsafe_load(payload) round-trips the record
-    // through AR's encode_with / init_with hooks. trails has no object-graph
-    // YAML for a record, so the round trip runs one level down, over the
-    // attribute hash the store accessor state lives in.
     const payload = yamlStringify(x.serializableHash());
     const y = klass().new(yamlParse(payload) as Record<string, unknown>) as JsonRecord;
     expect(y.resolution).toBe("320×480");
@@ -224,14 +195,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(json.isChanged).toBe(false);
   });
 
-  // SKIP: reassigning an equal-but-reordered hash reads as changed. Rails'
-  // `Type::Value#changed?` is `old_value != new_value` (activemodel/lib/
-  // active_model/type/value.rb:114-116), which for a Hash is Ruby's
-  // order-insensitive `Hash#==`; trails' port compares with `!==`
-  // (activemodel/src/type/value.ts:77), so two structurally equal hashes are
-  // "changed". Converging that base predicate is a change to every value type,
-  // tracked as converge-value-type-changed-to-ruby-equality — not something to
-  // paper over with a `Json`-only `changed?` override Rails does not have.
   it.skip("test_changes_in_place_ignores_key_order", async () => {
     const json = klass().new() as JsonRecord;
     expect(json.isChanged).toBe(false);
@@ -284,9 +247,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_not_compatible_with_serialize_json", async () => {
-    // Rails: Class.new(klass) { serialize :payload, coder: JSON }
     class NewKlass extends klass() {}
-    // Rails: `coder: JSON` — trails names the same built-in coder `"json"`.
     NewKlass.serialize("payload", { coder: JSON });
     expect(() => new NewKlass()).toThrow(ColumnNotSerializableError);
   });
@@ -305,7 +266,6 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   }
 
   it("test_json_with_serialized_attributes", async () => {
-    // Rails: Class.new(klass) { serialize :settings, coder: MySettings }
     class NewKlass extends klass() {}
     NewKlass.serialize("settings", { coder: MySettings });
     await NewKlass.loadSchema();

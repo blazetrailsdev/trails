@@ -1,30 +1,10 @@
-/**
- * StatementCache — cache a single statement to avoid rebuilding the AST.
- *
- * Mirrors: ActiveRecord::StatementCache
- *
- * Usage:
- *   const cache = StatementCache.create(connection, (params) => {
- *     return Model.where({ name: params.bind() });
- *   });
- *   const results = await cache.execute(["my book"], connection);
- */
-
 import { Attribute, RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";
 
-/**
- * Placeholder for bind values in cached statements.
- * Mirrors: ActiveRecord::StatementCache::Substitute
- */
 export class Substitute {}
 
-/**
- * Wraps a fixed SQL string for prepared statement execution.
- * Mirrors: ActiveRecord::StatementCache::Query
- */
 export class Query {
   private _sql: string;
 
@@ -37,10 +17,6 @@ export class Query {
   }
 }
 
-/**
- * SQL template with Substitute slots for value interpolation.
- * Mirrors: ActiveRecord::StatementCache::PartialQuery
- */
 export class PartialQuery extends Query {
   private _values: unknown[];
   private _indexes: number[];
@@ -71,14 +47,8 @@ export class PartialQuery extends Query {
   }
 }
 
-/**
- * Collects SQL parts and binds during AST compilation for PartialQuery.
- * Mirrors: ActiveRecord::StatementCache::PartialQueryCollector
- */
 export class PartialQueryCollector {
   preparable = false;
-  // Starts true and is flipped false when the visitor encounters a
-  // non-retryable node, matching Arel's SQLString/Composite collectors.
   retryable = true;
   private _parts: unknown[] = [];
   private _binds: unknown[] = [];
@@ -113,20 +83,12 @@ export class PartialQueryCollector {
   }
 }
 
-/**
- * Provides bind() for building relations with Substitute placeholders.
- * Mirrors: ActiveRecord::StatementCache::Params
- */
 export class Params {
   bind(): Substitute {
     return new Substitute();
   }
 }
 
-/**
- * Maps Substitute positions in bound attributes to execution-time values.
- * Mirrors: ActiveRecord::StatementCache::BindMap
- */
 export class BindMap {
   private _indexes: number[];
   private _boundAttributes: unknown[];
@@ -160,10 +122,6 @@ export class BindMap {
   }
 }
 
-/**
- * Caches a compiled statement for repeated execution with different values.
- * Mirrors: ActiveRecord::StatementCache
- */
 export class StatementCache {
   private _queryBuilder: Query | PartialQuery;
   private _bindMap: BindMap;
@@ -187,17 +145,7 @@ export class StatementCache {
     return new PartialQueryCollector();
   }
 
-  /**
-   * Create a cached statement from a relation-building block.
-   * Mirrors: ActiveRecord::StatementCache.create
-   *
-   * @missingRailsCall call — PERMANENT: Verified per-site (RFC 0106 wave 4g):
-   *   `(callable || block).call Params.new` (statement_cache.rb:133) is Ruby
-   *   `Proc#call`; a JS function is invoked directly as `callable(new Params())`
-   *   (statement-cache.ts:204). There is no `call` method to route through — JS
-   *   `Function.prototype.call` is the receiver-binding primitive, not Ruby's
-   *   Proc invocation.
-   */
+  /** @missingRailsCall call — PERMANENT */
   static create(
     connection: {
       cacheableQuery(klass: unknown, arel: unknown): [unknown, unknown[]];
@@ -218,21 +166,11 @@ export class StatementCache {
     const queryBuilder = cacheableQuery[0];
     let binds = cacheableQuery[1];
 
-    // The prepared path (the Composite collector) already unwraps each collected
-    // BindParam to its `.value`; the unprepared PartialQueryCollector path
-    // hands back the raw BindParam nodes. Normalize here so BindMap sees the
-    // bound attributes/Substitutes directly — otherwise a concrete bind (e.g.
-    // the LIMIT added by find/find_by) reaches the adapter's quote() as a raw
-    // BindParam ("can't quote BindParam").
     binds = binds.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
     const bindMap = new BindMap(binds);
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
 
-  /**
-   * Execute the cached statement with the given bind values.
-   * Mirrors: ActiveRecord::StatementCache#execute
-   */
   async execute(
     params: unknown[],
     connection: unknown,
@@ -242,32 +180,16 @@ export class StatementCache {
       const bindValues = this._bindMap.bind(params);
       const sql = this._queryBuilder.sqlFor(bindValues, connection);
       const allowRetry = opts.allowRetry ?? false;
-      // PartialQuery inlines values into the SQL string — pass empty binds
-      // to avoid findBySql trying to re-substitute them. This matches Rails:
-      // PartialQuery#sql_for drains the bind_values array in place via
-      // `binds.shift` (statement_cache.rb:51-61), so by the time it reaches
-      // find_by_sql the array is empty and the unprepared query log carries no
-      // bind payload. (Our sqlFor copies the array, so we drop it explicitly.)
       if (this._queryBuilder instanceof PartialQuery) {
         return await this._model.findBySql(sql, [], { allowRetry, preparable: true });
       }
       return await this._model.findBySql(sql, bindValues, { allowRetry, preparable: true });
     } catch (e) {
-      // Mirrors statement_cache.rb:154 — `rescue ::RangeError` → `[]`. An
-      // out-of-range bind (e.g. a belongs_to FK beyond the column's integer
-      // range) raises while serializing `valueForDatabase` *before* the query
-      // reaches `selectAll`'s own RangeError rescue, so it must be caught here
-      // too. Ruby's bare `::RangeError` covers both ActiveModel::RangeError
-      // (type-level) and ActiveRecord::RangeError (adapter-level wire rejection).
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return [];
       throw e;
     }
   }
 
-  /**
-   * Check if a value type is unsupported for statement caching.
-   * Mirrors: ActiveRecord::StatementCache.unsupported_value?
-   */
   static unsupportedValue(value: unknown): boolean {
     if (value === null || value === undefined) return true;
     if (Array.isArray(value)) return true;
@@ -275,9 +197,6 @@ export class StatementCache {
       const name = (value as any).constructor?.name;
       if (name === "Range" || name === "Relation") return true;
       if (value instanceof Map || value instanceof Set) return true;
-      // Plain Hash and ActiveRecord instances are unsupported in Rails; a
-      // nested-hash condition (find_by(author: {...})) must take the
-      // relation path, not the cached statement.
       if (Object.getPrototypeOf(value) === Object.prototype) return true;
       if ("_attributes" in value) return true;
     }

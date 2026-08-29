@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/cpk_authors.yml
 export const cpkAuthorFixtureData = {
   cpk_great_author: {
     name: "Alice",

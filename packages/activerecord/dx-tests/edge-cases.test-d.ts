@@ -2,9 +2,6 @@ import { describe, it, expectTypeOf, assertType } from "vitest";
 import { Base, type DatabaseAdapter } from "@blazetrails/activerecord";
 import type { Visitors } from "@blazetrails/arel";
 
-// Scenario: the rough edges a real app will hit — composite keys, enums,
-// scopes, transactions, and the permissive attributes bag.
-
 class Widget extends Base {
   declare name: string;
 
@@ -84,8 +81,6 @@ describe("edge cases — rough edges in current DX", () => {
     expectTypeOf<Widget["id"]>().toEqualTypeOf<
       import("@blazetrails/activerecord").PrimaryKeyValue
     >();
-    // PrimaryKeyValue includes scalar IDs and CPK tuples — narrow at the use
-    // site (e.g. `w.id as number`) when you know the PK type.
   });
 
   it("belongsTo / hasMany / hasOne are statically typed on typeof Base", () => {
@@ -96,8 +91,6 @@ describe("edge cases — rough edges in current DX", () => {
   });
 
   it("DatabaseAdapter is a structural superset of ArelQuoter", () => {
-    // The arel visitor accepts any ArelConnection; the connection adapter satisfies
-    // it structurally so passing `connection` to `new ToSql(connection)` type-checks.
     expectTypeOf<DatabaseAdapter>().toMatchTypeOf<Visitors.ArelConnection>();
   });
 });

@@ -1,9 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/explain_test.rb
- *
- * Rails guards the whole suite on `supports_explain?` and rides
- * `fixtures :cars` + the canonical `Car` model.
- */
 import { describe, it, expect } from "vitest";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
 import { buildExplainClause, renderBind } from "./explain.js";
@@ -35,10 +29,6 @@ describe("ExplainTest", () => {
 
     const [sql, binds] = queries[0];
     expect(sql).toContain("SELECT");
-    // Rails: `if binds.any?` — when the adapter parameterizes the predicate the
-    // value rides in `binds`; otherwise the literal is interpolated into the SQL.
-    // ExplainRegistry collects the `ActiveModel::Attribute` binds the adapter
-    // received, so the value is read off the attribute — Rails' `binds.last.value`.
     if (binds.length > 0) {
       expect(binds.length).toBe(1);
       expect((binds[binds.length - 1] as { value: unknown }).value).toBe("honda");
@@ -47,9 +37,6 @@ describe("ExplainTest", () => {
     }
   });
 
-  // Rails asserts the EXPLAIN header AND that the explained SQL is the query the
-  // matching operation actually runs (`capture_sql { Car.average(:id) }.first`),
-  // which is what makes the proxy members distinguishable from `inspect`.
   itIfSupports("explain", "relation explain with average", async () => {
     const expectedQuery = (
       await captureSql(async () => {
@@ -161,9 +148,6 @@ describe("ExplainTest", () => {
   });
 
   itIfSupports("explain", "exec explain with no binds", async () => {
-    // Mirrors Rails: stub the connection's `explain` to return canned plans, then
-    // assert `exec_explain` renders `<clause> <sql>\n<plan>` per query. Our impl
-    // separates blocks with a blank line (`\n\n`) rather than Rails' single `\n`.
     const sqls = ["foo", "bar"];
     const queries: [string, unknown[]][] = [
       [sqls[0], []],
@@ -185,10 +169,6 @@ describe("ExplainTest", () => {
   });
 
   itIfSupports("explain", "exec explain with binds", async () => {
-    // Mirrors Rails: `binds = [[bind_param("wadus", 1)], [bind_param("chaflan", 2)]]`
-    // (explain_test.rb:141), where `bind_param` is a QueryAttribute over
-    // `Type::Value` (explain_test.rb:176-178). `render_bind` renders each as a
-    // `[name, value]` tuple, and `exec_explain` inspects the resulting array.
     const sqls = ["foo", "bar"];
     const queries: [string, unknown[]][] = [
       [sqls[0], [bindParam("wadus", 1)]],
@@ -220,11 +200,6 @@ describe("ExplainTest", () => {
 
   it("prints one EXPLAIN block per collected query with the header prefix", async () => {
     const plan = await Car.where({ name: "honda" }).explain();
-    // The header is whatever the adapter's build_explain_clause returns, which
-    // is adapter-specific: PG returns a bare "EXPLAIN" / "EXPLAIN (...)"
-    // (postgresql/database_statements.rb:96-100), while an adapter that defines
-    // none falls back to "EXPLAIN for:" (explain.rb:56-61). Assert the part
-    // they share — every block is prefixed by the clause.
     expect(plan).toMatch(/^EXPLAIN\b/m);
     expect(plan.toLowerCase()).toContain("select");
   });
@@ -244,60 +219,32 @@ describe("ExplainTest", () => {
   });
 
   it("does not load the relation as a side effect", async () => {
-    // Rails' ExplainProxy calls `exec_queries` directly, bypassing the
-    // `@records ||= exec_queries` in `#records`, so `.explain` leaves the
-    // relation un-loaded (`loaded? == false`; next access re-queries). Mirror
-    // that: explain must not flip `isLoaded` or cache `_records`.
     const relation = Car.where({ name: "honda" });
     await relation.explain();
     expect(relation.isLoaded).toBe(false);
   });
 
   it("yields empty output for a query-less relation", async () => {
-    // Rails collects over the always-executing `exec_queries`; a `.none()`
-    // relation runs no SELECT, so `collecting_queries_for_explain` captures
-    // nothing and `exec_explain` yields empty output. We do NOT fall back to
-    // explaining `_toSql()`, which would emit Arel's double-quoted identifiers
-    // that diverge from the SQL the adapter actually executes.
     const plan = await Car.none().explain();
     expect(plan).toBe("");
   });
 
   it("yields empty output for a contradiction relation", async () => {
-    // A contradictory where-clause (empty `IN`) short-circuits in
-    // `exec_main_query` to `[]` without issuing a SELECT, so
-    // `collecting_queries_for_explain` captures nothing — same as `.none()`.
     const plan = await Car.where({ id: [] }).explain();
     expect(plan).toBe("");
   });
 
   it("renders binds via adapter.typeCast + Ruby-inspect form", async () => {
-    // Mirrors Rails' `exec_explain`:
-    //   binds.map { |attr| render_bind(c, attr) }.inspect
-    // where `render_bind` does
-    // `connection.type_cast(attr.value_for_database)`. That produces
-    // Ruby's `Array#inspect` output: strings double-quoted, numbers
-    // bare, nil as `nil`, booleans as `true/false`. The BigInt case
-    // is the one that used to crash raw `JSON.stringify`.
-    // Booleans go through the adapter's typeCast: SQLite collapses
-    // them to 1/0, PG/MySQL keep them as true/false. So the rendered
-    // form differs by backend; assert both halves independently.
     const rendered = rubyInspect(
       [BigInt(42), "str", 7, null, true, false].map((b) => renderBind(Base.connection, b)),
     );
     expect(rendered.startsWith('[[nil, 42], [nil, "str"], [nil, 7], [nil, nil], ')).toBe(true);
     expect(rendered).toMatch(/\[nil, (1\], \[nil, 0|true\], \[nil, false)\]\]$/);
-    // End-to-end on sqlite: where-literals are interpolated into the
-    // SQL (no binds reach the adapter), so the round-trip still
-    // returns non-empty output.
     const plan = await Car.all().explain();
     expect(plan.length).toBeGreaterThan(0);
   });
 
   it("normalizes Date binds — invalid Dates render as 'Invalid Date'", () => {
-    // A raw Date bind bypasses the adapter typeCast (which rejects it post-PR-6);
-    // the branch still exists as a defensive boundary handler for legacy / test
-    // code paths.
     const stub = { typeCast: (v: unknown) => v } as unknown as DatabaseAdapter;
     expect(renderBind(stub, new Date("2026-04-15T12:00:00.000Z"))[1]).toBe(
       "2026-04-15T12:00:00.000Z",
@@ -306,15 +253,9 @@ describe("ExplainTest", () => {
   });
 
   it("renders binary binds as '<N bytes of binary data>' (Rails parity)", async () => {
-    // Rails' `render_bind` special-cases binary-typed attrs:
-    //   "<#{attr.value_for_database.to_s.bytesize} bytes of binary data>"
-    // We reach the same result structurally — after typeCast, any
-    // Buffer / Uint8Array / ArrayBuffer bind gets normalized to the
-    // same byte-count string, so an EXPLAIN over a BYTEA/BLOB column
-    // doesn't dump the raw buffer.
     const stub = { typeCast: (v: unknown) => v } as unknown as DatabaseAdapter;
-    const buf = Buffer.from("hello world"); // 11 bytes
-    const u8 = new Uint8Array([1, 2, 3, 4, 5]); // 5 bytes
+    const buf = Buffer.from("hello world");
+    const u8 = new Uint8Array([1, 2, 3, 4, 5]);
     const rendered = rubyInspect([buf, u8].map((b) => renderBind(stub, b)));
     expect(rendered).toBe(
       '[[nil, "<11 bytes of binary data>"], [nil, "<5 bytes of binary data>"]]',
@@ -322,13 +263,6 @@ describe("ExplainTest", () => {
   });
 
   it("unwraps PG-style { value, format } bind shapes when rendering", async () => {
-    // PG's `typeCast(BinaryData)` returns `{ value, format }` — the
-    // raw wrapper would stringify to "[object Object]" via
-    // `rubyInspect`'s object fallback. Normalization recurses on
-    // `.value` so we show the actual payload instead of the envelope.
-    // Skip typeCast here — we're testing the normalization of a
-    // pre-cast bind-wrapper value. The inner adapter.typeCast call
-    // would pass these objects through unchanged on non-PG adapters.
     const stub = {
       typeCast: (v: unknown) => v,
     } as unknown as DatabaseAdapter;
@@ -342,23 +276,16 @@ describe("ExplainTest", () => {
   });
 
   it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {
-    // Two parallel explain() calls must not trample each other's
-    // collected queries. Without async-context isolation a global
-    // collect flag + shared queries array leaks across the await
-    // boundaries of concurrent tasks.
     const [plan1, plan2] = await Promise.all([
       Car.where({ name: "honda" }).explain(),
       Car.all().explain(),
     ]);
     expect(plan1.length).toBeGreaterThan(0);
     expect(plan2.length).toBeGreaterThan(0);
-    // plan1's SELECT had a WHERE clause; plan2's did not. Each plan's
-    // header block should reference only its own SQL.
     expect(plan1.toLowerCase()).toContain("where");
     expect(plan2.toLowerCase()).not.toContain("where");
   });
 
-  // Mirrors: explain_test.rb:176-178
   function bindParam(name: string, value: unknown): QueryAttribute {
     return new QueryAttribute(name, value, new ValueType());
   }

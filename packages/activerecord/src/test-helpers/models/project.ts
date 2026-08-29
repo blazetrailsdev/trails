@@ -3,7 +3,6 @@ import type { Relation } from "../../relation.js";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import type { Mentor } from "./mentor.js";
-// vendor/rails/activerecord/test/models/project.rb
 import { Base } from "../../base.js";
 
 export class Project extends Base {
@@ -68,9 +67,6 @@ export class Project extends Base {
       beforeRemove: (o: any, r: any) => o.developersLog.push(`before_removing${r.id}`),
       afterRemove: (o: any, r: any) => o.developersLog.push(`after_removing${r.id}`),
     });
-    // Mirrors Rails project.rb:21-26: declare this habtm while
-    // `belongs_to_required_by_default` is true so the join model's implicit
-    // belongs_to sides are required, then restore the previous value.
     {
       const prev = (Base as unknown as { belongsToRequiredByDefault?: boolean })
         .belongsToRequiredByDefault;

@@ -1,7 +1,3 @@
-/**
- * Multi-DB migrator tests: two separate database connections run migrations independently.
- * Mirrors: activerecord/test/cases/multi_db_migrator_test.rb
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migrator } from "./index.js";
 import { MigrationContext } from "./migration.js";
@@ -13,7 +9,6 @@ import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
-// Rails' `@path_a` / `@path_b` (multi_db_migrator_test.rb:33-34).
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 const PATH_A = [`${MIGRATIONS_ROOT}/valid`];
 const PATH_B = [`${MIGRATIONS_ROOT}/to_copy`];
@@ -42,9 +37,6 @@ function sensor(
   return proxy;
 }
 
-// Rails' `migrator_class(count)` subclasses MigrationContext and overrides
-// #migrations to return the sensor list, which is why its path argument is
-// never read (multi_db_migrator_test.rb:229-238).
 function migratorClass(
   migrations: MigrationProxy[],
   schemaMigration: SchemaMigration,

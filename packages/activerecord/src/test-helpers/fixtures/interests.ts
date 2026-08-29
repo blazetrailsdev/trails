@@ -1,11 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/interests.yml
-// Rails YAML uses association-name keys (`human:`, `zine:`,
-// `polymorphic_human: gordon (Human)`); translated to the FK columns
-// (`human_id`, `zine_id`, `polymorphic_human_id` + `_type`) for
-// loadability. The "gordon (Human)" polymorphic shorthand splits into
-// the id ref + the type string.
 export const interestFixtureData = {
   trainspotting: {
     topic: "Trainspotting",

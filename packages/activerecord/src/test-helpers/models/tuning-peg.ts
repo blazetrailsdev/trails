@@ -1,5 +1,4 @@
 import type { Guitar } from "./guitar.js";
-// vendor/rails/activerecord/test/models/tuning_peg.rb
 import { Base } from "../../base.js";
 
 export class TuningPeg extends Base {

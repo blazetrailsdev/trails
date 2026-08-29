@@ -1,16 +1,3 @@
-/**
- * Trails-only: Rails' `CollectionAssociation#concat` / `#delete` have finished
- * mutating the target by the time they return
- * (vendor/rails/activerecord/lib/active_record/associations/collection_association.rb:123-135,
- * :186-197), and for a NEW owner neither does any I/O — `concat_records` skips
- * `insert_record` under `unless owner.new_record?` (:434-448) and
- * `remove_records` skips `delete_records` when `existing_records` is empty
- * (:404-405). The chain is therefore restated as `Promise<T> | T` bodies: they
- * run inline and answer a promise only when a call actually owed I/O, so
- * `replace`'s new-owner arm — reached synchronously from the constructor's
- * mass-assignment dispatch — can drive it. There is no Rails
- * test for this deviation.
- */
 import { describe, it, expect } from "vitest";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -56,9 +43,6 @@ describe("CollectionSyncRemovalChain", () => {
     const first = Post.new({ title: "First", body: "hi" });
     const second = Post.new({ title: "Second", body: "hi" });
     const assoc = postsAssociation(author);
-    // Rails short-circuits only `insert_record` once `result` is false
-    // (collection_association.rb:441-449); `add_to_target` still runs for every
-    // remaining record, so both stay buffered.
     (assoc as unknown as { insertRecord(): Promise<boolean> }).insertRecord = () =>
       Promise.resolve(false);
 

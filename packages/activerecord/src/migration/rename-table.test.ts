@@ -1,13 +1,3 @@
-/**
- * Port of `ActiveRecord::Migration::RenameTableTest`
- * (vendor/rails/activerecord/test/cases/migration/rename_table_test.rb).
- *
- * Driven by the ambient connection, mirroring Rails'
- * `@connection = ActiveRecord::Base.lease_connection`. `test_models` is not a
- * canonical-schema table in Rails either — `Migration::TestHelper`'s setup
- * creates and drops it (migration/helper.rb:20-34) — so this mirrors that
- * rather than reaching for the canonical schema.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -51,7 +41,6 @@ describe("Migration", () => {
       renamed = true;
 
       try {
-        // Using explicit id in insert for compatibility across all databases
         const tableName = connection.quoteTableName("references");
         await connection.execute(
           `INSERT INTO ${tableName} (id, url) VALUES (123, 'http://rubyonrails.com')`,

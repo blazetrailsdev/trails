@@ -22,10 +22,6 @@ import {
   columnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
 
-// `quote` / `typeCast` / `quotedTime` / `quoteTableName` self-send onto their
-// receiver, so bind an override-free adapter host: date/time values route
-// through the abstract module helpers and table-name dispatch reaches the
-// abstract `quoteColumnName`, which raises, as Rails' abstract layer does.
 const HOST = quotingHost();
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, name);
@@ -120,37 +116,25 @@ describe("QuotingTest", () => {
   });
 
   it("quote column name", () => {
-    // Rails: the abstract Quoting module raises NotImplementedError — every
-    // adapter must define its own quote_column_name (quoting.rb L61).
     expect(() => quoteColumnName("foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name", () => {
-    // Rails: abstract quote_table_name delegates to quote_column_name, which
-    // raises NotImplementedError (quoting.rb L66).
     expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name for assignment", () => {
-    // Abstract quote_table_name_for_assignment delegates to quote_table_name,
-    // which raises at the abstract layer; adapters override with real behavior.
     expect(() => quoteTableNameForAssignment.call(HOST, "users", "name")).toThrow(
       NotImplementedError,
     );
   });
 
   it("quote duration", () => {
-    // Rails: quote(30.minutes) raises "can't quote ActiveSupport::Duration".
-    // A Duration is an object instance, so it falls through to the final throw.
     expect(() => quote(minutes(30))).toThrow(TypeError);
     expect(() => quote(minutes(30))).toThrow(/can't quote/);
     expect(() => quote(minutes(30))).toThrow(/Duration/);
   });
   it("quote table name calls quote column name", () => {
-    // Rails overrides quote_column_name and asserts quote_table_name routes
-    // through it. Now that a host receiver is required, that is directly
-    // expressible: bind a host whose quoteColumnName is a spy and assert the
-    // dispatch reaches it.
     const calls: string[] = [];
     const host = quotingHost({
       quoteColumnName(name: string): string {
@@ -160,7 +144,6 @@ describe("QuotingTest", () => {
     });
     expect(quoteTableNameFn.call(host, "foo")).toBe("[foo]");
     expect(calls).toEqual(["foo"]);
-    // Without an override the abstract quote_column_name still raises.
     expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
   it("quoted timestamp local", () => {
@@ -170,9 +153,6 @@ describe("QuotingTest", () => {
     expect(quotedDate(zdt.toInstant())).toBe("2026-04-07 15:30:00");
   });
   it("quoted time local", () => {
-    // Mirrors Rails' with_timezone_config(:local); quotedTime takes only naive
-    // types (PlainTime/PlainDateTime), so the local setting is intentionally a
-    // no-op here — kept to parallel the Rails test's structure.
     ActiveRecord.defaultTimezone = "local";
     const t = Temporal.PlainTime.from("15:30:45");
     expect(quotedTime(t)).toBe("15:30:45");
@@ -182,32 +162,21 @@ describe("QuotingTest", () => {
     expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
   it("quoted datetime local", () => {
-    // DateTime has no getlocal, so the local setting is a no-op for naive values.
     ActiveRecord.defaultTimezone = "local";
     const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
     expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
   });
   it("quote bigdecimal", () => {
-    // Rails: BigDecimal((1 << 100).to_s) quotes bare via to_s("F"). trails'
-    // BigDecimal preserves the arbitrary-precision integer and renders the
-    // fixed form with a trailing ".0", matching Rails exactly.
     const bigdec = new BigDecimal((1n << 100n).toString());
     expect(quote(bigdec)).toBe(bigdec.toString("F"));
     expect(quote(bigdec)).toBe("1267650600228229401496703205376.0");
   });
   it("dates and times", () => {
-    // Rails monkey-patches quoted_date to verify quote() dispatches through it.
-    // trails' quote() branches on instanceof and calls the formatters directly —
-    // there is no quoted_date method on a host to override — so the faithful port
-    // asserts the concrete serialized output, which also guards against formatting
-    // regressions the Rails dispatch-only test would miss. quote wraps in quotes.
     expect(quote(Temporal.PlainDate.from("2026-04-07"))).toBe("'2026-04-07'");
     expect(quote(Temporal.Instant.from("2026-04-07T15:30:00Z"))).toBe("'2026-04-07 15:30:00'");
     expect(quote(Temporal.PlainDateTime.from("2026-04-07T15:30:00"))).toBe("'2026-04-07 15:30:00'");
   });
   it("quote as mb chars no column", () => {
-    // JS strings are already the multibyte representation, so a "Chars" value is
-    // a plain string; backslash escaping matches quote_string_no_column.
     expect(quote("lo\\l")).toBe("'lo\\\\l'");
   });
 });
@@ -235,7 +204,6 @@ describe("TypeCastingTest", () => {
     expect(() => typeCast(new Date())).toThrow(/Temporal/);
   });
   it("type cast time", () => {
-    // Rails (non-mysql): type_cast(time) returns quoted_date(time).
     const t = Temporal.Instant.from("2026-04-07T15:30:00Z");
     expect(typeCast(t)).toBe("2026-04-07 15:30:00");
   });
@@ -263,10 +231,6 @@ describe("QuoteBooleanTest", () => {
   });
 
   it("quoted binary decodes bytes rather than String()-joining them", () => {
-    // Rails' quoted_binary is `'#{quote_string(value.to_s)}'` where value is a
-    // Type::Binary::Data whose to_s is the raw byte string. JS's
-    // String(Uint8Array) would emit the comma-joined decimals "31,139"; the
-    // byte string must round-trip instead.
     const quoted = quotedBinary(new Uint8Array([0x1f, 0x8b]));
     expect(quoted).not.toContain("31,139");
     expect([...Buffer.from(quoted.slice(1, -1), "latin1")]).toEqual([0x1f, 0x8b]);
@@ -307,7 +271,6 @@ describe("QuoteBooleanTest", () => {
   });
 
   it("quote returns frozen string", () => {
-    // JS string primitives are immutable; Object.isFrozen reports true for them.
     expect(Object.isFrozen(quote(true))).toBe(true);
     expect(Object.isFrozen(quote(false))).toBe(true);
   });

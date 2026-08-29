@@ -1,5 +1,4 @@
 import type { Person } from "./person.js";
-// vendor/rails/activerecord/test/models/personal_legacy_thing.rb
 import { Base } from "../../base.js";
 
 export class PersonalLegacyThing extends Base {

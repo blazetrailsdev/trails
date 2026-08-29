@@ -1,6 +1,5 @@
 import type { Book } from "./book.js";
 import type { Subscriber } from "./subscriber.js";
-// vendor/rails/activerecord/test/models/subscription.rb
 import { Base } from "../../base.js";
 
 export class Subscription extends Base {

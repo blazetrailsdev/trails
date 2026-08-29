@@ -1,11 +1,5 @@
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 
-/**
- * Coder that serializes/deserializes values using JSON.
- * Suitable for use with ActiveRecord::Base.serialize.
- *
- * Mirrors: ActiveRecord::Coders::JSON
- */
 export class JSON {
   static dump(obj: unknown): string {
     return ActiveSupportJSON.encode(obj);

@@ -1,9 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-// vendor/rails/activerecord/test/models/sharded/
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
 
-// sharded/blog.rb
 export class ShardedBlog extends Base {
   declare blogPosts: AssociationProxy<ShardedBlogPost>;
   declare commentsViaPosts: AssociationProxy<ShardedComment>;
@@ -21,7 +19,6 @@ export class ShardedBlog extends Base {
   }
 }
 
-// sharded/blog_post.rb
 export class ShardedBlogPost extends Base {
   declare parent: Base | null;
   declare blog: ShardedBlog | null;
@@ -51,7 +48,6 @@ export class ShardedBlogPost extends Base {
       className: "ShardedComment",
       foreignKey: ["blog_id", "blog_post_id"],
     });
-    // Rails: dependent: :delete_all — "deleteAll" not yet in AssociationOptions.dependent type
     this.hasMany("deleteComments", {
       className: "ShardedComment",
       foreignKey: ["blog_id", "blog_post_id"],
@@ -79,7 +75,6 @@ export class ShardedBlogPost extends Base {
   }
 }
 
-// sharded/blog_post_with_revision.rb
 export class ShardedBlogPostWithRevision extends Base {
   declare comments: AssociationProxy<ShardedComment>;
 
@@ -96,7 +91,6 @@ export class ShardedBlogPostWithRevision extends Base {
   }
 }
 
-// sharded/comment.rb
 export class ShardedComment extends Base {
   declare blogPost: ShardedBlogPost | null;
   declare blogPostById: ShardedBlogPost | null;
@@ -131,7 +125,6 @@ export class ShardedComment extends Base {
   }
 }
 
-// sharded/tag.rb
 export class ShardedTag extends Base {
   declare blogPostTags: AssociationProxy<ShardedBlogPostTag>;
   declare blogPosts: AssociationProxy<ShardedBlogPost>;
@@ -151,7 +144,6 @@ export class ShardedTag extends Base {
   }
 }
 
-// sharded/blog_post_tag.rb
 export class ShardedBlogPostTag extends Base {
   declare blogPost: ShardedBlogPost | null;
   declare tag: ShardedTag | null;

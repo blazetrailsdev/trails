@@ -50,7 +50,6 @@ describe("fixtureId", () => {
   });
 
   it("is deterministic and stable: same label always yields the same known value", () => {
-    // For ASCII labels this matches Ruby's Zlib.crc32(label) % (2**30 - 1) exactly.
     expect(fixtureId("david")).toBe(127326141);
     expect(fixtureId("david")).toBe(fixtureId("david"));
     expect(fixtureId("david")).not.toBe(fixtureId("mary"));
@@ -64,8 +63,6 @@ describe("effectiveFixtureKey", () => {
   });
 
   it("puts an explicit pin and a colliding derived id in the same keyspace", () => {
-    // A row pinning `id: fixtureId("grace")` must produce the same key as an
-    // unpinned `grace` row, so a cross-kind DB collision is caught.
     const model = makeModel("users", new Map());
     const pinned = effectiveFixtureKey(model, "other", { id: fixtureId("grace") });
     const derived = effectiveFixtureKey(model, "grace", {});
@@ -73,10 +70,8 @@ describe("effectiveFixtureKey", () => {
   });
 
   it("keys on the model's real primary-key column, not a hardcoded id", () => {
-    // Subscriber pins its PK under `nick`; an `id`-based guard would miss it.
     const model = makeModel("subscribers", new Map(), "nick");
     expect(effectiveFixtureKey(model, "first", { nick: "alex" })).toBe("s:alex");
-    // A stray `id` value on a nick-keyed model is irrelevant to the PK.
     expect(effectiveFixtureKey(model, "second", { nick: "bo", id: 1 })).toBe("s:bo");
   });
 });
@@ -111,7 +106,6 @@ describe("defineFixtures", () => {
 
     expect(users.david).toEqual({ id: fixtureId("david"), name: "David" });
     expect(users.mary).toEqual({ id: fixtureId("mary"), name: "Mary" });
-    // Mirrors Rails: table is cleared before insert so repeated calls replace rows
     const deleteSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .find((s) => s.includes("DELETE FROM"));
@@ -139,10 +133,6 @@ describe("defineFixtures", () => {
   });
 
   it("ref() resolves a declared string primary key from a previously loaded target", async () => {
-    // When the target set declares an explicit string PK (Subscriber's `nick`), a
-    // dependent's ref() to it must resolve to that string verbatim — not the CRC32
-    // fallback. Mirrors loading the target before its dependent so the declared-id
-    // registry is populated (resolveFixtureId returns the string, not fixtureId()).
     const adapter = makeAdapter();
 
     const subscriberRows = new Map([["webster132", { nick: "webster132", name: "DHH" }]]);
@@ -194,8 +184,6 @@ describe("defineFixtures", () => {
   });
 
   it("auto-generates absent composite primary-key columns from the label", async () => {
-    // Mirrors Rails' generate_composite_primary_key/composite_identify: a row that
-    // omits its key columns has each generated as identify(label) << index.
     const adapter = makeAdapter();
     const Model = {
       tableName: "orders",
@@ -224,19 +212,12 @@ describe("defineFixtures", () => {
     const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .find((s) => s.includes("INSERT INTO"));
-    // `posts.welcome` pins an explicit `id: 1` in the canonical fixtures, so the
-    // ref resolves to that pinned id (not the CRC32 fallback) even though the posts
-    // set isn't loaded here. `tags` has no `rails` label canonically, so that ref
-    // falls back to CRC32.
     expect(insertSql).toMatch(/, 1, /);
     expect(insertSql).not.toContain(String(fixtureId("welcome")));
     expect(insertSql).toContain(String(fixtureId("rails")));
   });
 
   it("ref() to an unloaded set resolves to the target's pinned explicit id", async () => {
-    // author_addresses.david_address_extra pins `id: 2` canonically. A ref to it must
-    // resolve to 2 even when the author_addresses set is never loaded — a cross-table
-    // FK coincidence the join-model custom-primary_key source test depends on.
     const adapter = makeAdapter();
     const rows = new Map([
       [fixtureId("david"), { id: fixtureId("david"), author_address_extra_id: 2 }],
@@ -257,7 +238,6 @@ describe("defineFixtures", () => {
   it("HABTM: string values for FK columns auto-resolve to fixtureId when table matches a_b pattern", async () => {
     const adapter = makeAdapter();
 
-    // Register developers and projects first
     const developerRows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
     const Developer = makeModel("developers", developerRows);
     const projectRows = new Map([[fixtureId("trails"), { id: fixtureId("trails") }]]);
@@ -265,7 +245,6 @@ describe("defineFixtures", () => {
     await defineFixtures(adapter, Developer, { david: {} });
     await defineFixtures(adapter, Project, { trails: {} });
 
-    // Join-table: developers_projects auto-detects "developers" and "projects" in registry
     const joinRow = {
       developer_id: fixtureId("david"),
       project_id: fixtureId("trails"),
@@ -285,11 +264,6 @@ describe("defineFixtures", () => {
     expect(insertCalls[0]).toContain(String(fixtureId("trails")));
   });
 
-  // A plain `has_many :through` reflection (macro !== "hasAndBelongsToMany"): the
-  // through model (`categorizations`) is a real model whose fixture set — unlike a
-  // HABTM join model's anonymous table — is requested by name, so `sliceSchema`
-  // does NOT pull its join table in implicitly. Its label still materializes join
-  // rows through the same HasManyThroughProxy arm as HABTM.
   function makePlainThroughAuthor() {
     const Categorization = makeModel("categorizations", new Map());
     const Author = makeModel(
@@ -325,12 +299,8 @@ describe("defineFixtures", () => {
       .map((c: unknown[]) => c[0] as string)
       .find((s) => s.includes("INSERT INTO") && s.includes("categorizations"));
     expect(joinInsert).toBeDefined();
-    // lhs = through_reflection.foreign_key (author_id) → owner id; rhs =
-    // association.foreign_key (post_id) → posts.welcome, which pins `id: 1`
-    // canonically (resolved through resolveFixtureId, like the HABTM path).
     expect(joinInsert).toContain(String(fixtureId("david")));
     expect(joinInsert).toMatch(/, 1\)/);
-    // The preflight consulted the through table by name before inserting.
     expect((adapter as any).tableExists).toHaveBeenCalledWith("categorizations");
   });
 
@@ -344,7 +314,6 @@ describe("defineFixtures", () => {
         david: { name: "David", categorizedPosts: ["welcome"] },
       }),
     ).rejects.toThrow(/join table "categorizations" is not loaded/);
-    // The join-table INSERT must never have been attempted.
     const joinInsert = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .find((s) => s.includes("INSERT INTO") && s.includes("categorizations"));
@@ -375,7 +344,6 @@ describe("defineFixtures", () => {
   it("polymorphic ref: { taggable: instance } expands to taggable_type + taggable_id", async () => {
     const adapter = makeAdapter();
 
-    // Post instance with a known ID
     const postId = fixtureId("welcome");
     class Post extends Base {
       static {
@@ -386,7 +354,6 @@ describe("defineFixtures", () => {
     const postInstance = new Post();
     (postInstance as any).id = postId;
 
-    // Tagging model with a polymorphic belongs_to :taggable reflection
     const taggingId = fixtureId("welcome_tag");
     const taggingRow = {
       id: taggingId,
@@ -415,8 +382,6 @@ describe("defineFixtures", () => {
   });
 
   it("polymorphic ref: explicit taggable_type/taggable_id pass through without expansion", async () => {
-    // When the caller already provides the concrete type/id columns directly (no association key),
-    // they should pass through unchanged — no expansion is triggered.
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("welcome_tag"), { id: fixtureId("welcome_tag") }]]);
     const Tagging = makeModel("taggings", rows);
@@ -452,7 +417,6 @@ describe("defineFixtures", () => {
       .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
     expect(insertSql).toContain("taggable_type");
     expect(insertSql).toContain("taggable_id");
-    // Both FK columns appear with null values (test adapter serialises null as "null")
     const nullCount = (insertSql!.match(/\bnull\b/g) ?? []).length;
     expect(nullCount).toBeGreaterThanOrEqual(2);
   });
@@ -471,8 +435,6 @@ describe("defineFixtures", () => {
   });
 
   it("polymorphic ref: non-Base class instance is rejected (no duck typing)", async () => {
-    // Guards the narrowing from regressing to the old constructor !== Object
-    // duck-typed check, which would have happily accepted any class instance.
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
     const Tagging = makeModel("taggings", rows);
@@ -501,10 +463,6 @@ describe("defineFixtures", () => {
   });
 
   it("uses a string declared primary key verbatim", async () => {
-    // Rails' FixtureSet::TableRow#generate_primary_key only auto-generates an id
-    // when the PK column is absent (column_defined? false); a declared value is
-    // used as-is regardless of type. A model with a string primary_key (Subscriber's
-    // `nick`, Dashboard's `dashboard_id`) therefore seeds the literal string.
     const adapter = makeAdapter();
     const rows = new Map([["abc", { id: "abc", name: "x" }]]);
     const Model = makeModel("widgets", rows);
@@ -519,9 +477,6 @@ describe("defineFixtures", () => {
   });
 
   it("rejects a fractional or boolean declared primary key with a clear error", async () => {
-    // Strings and integers are accepted verbatim; any other declared type (fractional
-    // number, boolean, object) is a fixture-author mistake — reject rather than mask it
-    // by silently falling back to the CRC32 id.
     const adapter = makeAdapter();
     const Model = makeModel("widgets", new Map());
 
@@ -570,8 +525,6 @@ describe("PrimaryKeyError", () => {
       quoteColumnName: (n: string) => `"${n}"`,
     } as unknown as DatabaseAdapter;
 
-    // Mirror the Author model's ownedEssay belongs_to: primaryKey: "name", class_name: "Essay".
-    // Essay.primaryKey defaults to "id", so joinPrimaryKey ("name") !== klass.primaryKey ("id").
     const AuthorModel = {
       tableName: "authors",
       primaryKey: "id",
@@ -601,11 +554,6 @@ describe("PrimaryKeyError", () => {
   });
 });
 
-// vendor/rails/activerecord/test/cases/fixtures_test.rb:887-952. Rails writes
-// fk_pointing_to_non_existent_object.yml at runtime and reads it back through create_fixtures;
-// the tableless loader takes the same rows directly, as naked-fixtures.trails.test.ts does. Rails'
-// `first: fk_object_to_point_to: one` names a label the tableless loader has no registry for,
-// so the dangling reference is spelled as the id itself.
 describe("FixturesWithForeignKeyViolationsTest", () => {
   async function withVerifyForeignKeysForFixtures(block: () => Promise<void>): Promise<void> {
     const settingWas = ActiveRecord.verifyForeignKeysForFixtures;
@@ -649,14 +597,6 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
   });
 });
 
-// Trails-only guard, no Rails counterpart. `has_and_belongs_to_many` registers
-// its public association by re-entering the `has_many` macro
-// (associations.rb:1904), so the raw `_reflections[name]` these two helpers walk
-// is the generated through-`has_many` and the HABTM identity lives on its
-// `parent_reflection` (associations.rb:1905) — the link `normalized_reflections`
-// substitutes by (reflection.rb:86-93). Reading `macro` off the raw reflection
-// instead silently marks every HABTM join as non-HABTM and drops its anonymous
-// join table out of fixture slices, which no other test in the suite catches.
 describe("HABTM fixture reflection walking (trails)", () => {
   it("throughJoinTableNames pulls in the anonymous HABTM join tables", async () => {
     const { throughJoinTableNames } = await import("./fixtures.js");
@@ -676,8 +616,6 @@ describe("HABTM fixture reflection walking (trails)", () => {
     const assocs = throughLabelAssociations(Developer as never);
     expect(assocs.get("projects")?.isHabtm).toBe(true);
     expect(assocs.get("projects")?.joinTable).toBe("developers_projects");
-    // `ratings` is a plain has_many :through on the same model — its join model
-    // is a real one with its own fixture set, so it must NOT be marked HABTM.
     expect(assocs.get("ratings")?.isHabtm).toBe(false);
   });
 });

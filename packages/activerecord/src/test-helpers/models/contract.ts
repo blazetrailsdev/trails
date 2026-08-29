@@ -2,7 +2,6 @@ import type { Company } from "./company.js";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import type { SpecialDeveloper } from "./developer.js";
-// vendor/rails/activerecord/test/models/contract.rb
 import { Base } from "../../base.js";
 
 export class Contract extends Base {

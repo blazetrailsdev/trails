@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/to_copy_with_timestamps/20090101010101_people_have_hobbies.rb
 import { Migration } from "../../../migration.js";
 
 export class PeopleHaveHobbies extends Migration {

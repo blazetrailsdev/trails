@@ -1,6 +1,5 @@
 import type { Editor } from "./editor.js";
 import type { Publication } from "./publication.js";
-// vendor/rails/activerecord/test/models/editorship.rb
 import { Base } from "../../base.js";
 
 export class Editorship extends Base {

@@ -1,11 +1,3 @@
-/**
- * Mirrors activerecord/test/cases/normalized_attribute_test.rb
- *
- * Rails drives the canonical `Aircraft` (`aircraft` table) plus a
- * `NormalizedAircraft < Aircraft` subclass carrying `normalizes` declarations.
- * Both shapes are canonical, so this file rides the worker-built `aircraft`
- * table via `fixtures([])` — no `defineSchema`, no bespoke adapter.
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { presence, titleize } from "@blazetrails/activesupport";
@@ -13,7 +5,6 @@ import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Rails `Time#noon` — the same instant moved to 12:00:00 (midday) UTC.
 function noon(time: Temporal.Instant): Temporal.Instant {
   return time
     .toZonedDateTimeISO("UTC")
@@ -21,9 +12,7 @@ function noon(time: Temporal.Instant): Temporal.Instant {
     .toInstant();
 }
 
-// Rails: class NormalizedAircraft < Aircraft (normalizes :name, :manufactured_at)
 class NormalizedAircraft extends Aircraft {
-  // Rails: attr_accessor :validated_name
   declare validated_name: string | undefined;
 
   static {
@@ -36,7 +25,6 @@ class NormalizedAircraft extends Aircraft {
     this.normalizes("manufactured_at", {
       with: (time: unknown) => noon(time as Temporal.Instant),
     });
-    // Rails: validate { self.validated_name = name.dup }
     this.validate(function (this: NormalizedAircraft) {
       this.validated_name = this.name as string;
     });
@@ -72,10 +60,6 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("normalizes changed-in-place value before validation", async () => {
-    // Ruby's `@aircraft.name.downcase!` (normalized_attribute_test.rb:36)
-    // mutates the cast value the `Attribute` holds. JS strings are immutable,
-    // and writing through the set yields a `WithCastValue`, whose
-    // `changed_in_place?` is false by definition (attribute.rb:243-245).
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
       _hasValue: boolean;
@@ -89,10 +73,6 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("normalizes value on demand", () => {
-    // Ruby's `@aircraft.name.downcase!` (normalized_attribute_test.rb:36)
-    // mutates the cast value the `Attribute` holds. JS strings are immutable,
-    // and writing through the set yields a `WithCastValue`, whose
-    // `changed_in_place?` is false by definition (attribute.rb:243-245).
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
       _hasValue: boolean;
@@ -141,8 +121,6 @@ describe("NormalizedAttributeTest", () => {
   it("finds record by normalized value", async () => {
     expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
     const found = await NormalizedAircraft.findBy({ manufactured_at: time.toString() });
-    // Rails' `assert_equal @aircraft, find_by(...)` leans on AR record equality
-    // (`Core#==`, class + id), not a structural compare.
     expect(found!.id).toBe(aircraft.id);
   });
 
@@ -176,9 +154,6 @@ describe("NormalizedAttributeTest", () => {
     await counted.save();
     expect(counted.name).toBe("1");
 
-    // Rails mutates the name in place (`name.replace("0")`); JS strings are
-    // immutable, so assign through the raw attribute to model the same
-    // changed-in-place value, then let save re-normalize it.
     counted._attributes.writeCastValue("name", "0");
     expect(counted.name).toBe("0");
     await counted.save();
@@ -186,7 +161,6 @@ describe("NormalizedAttributeTest", () => {
   });
 });
 
-// Rails `String#succ` for the numeric case the test exercises ("0" -> "1").
 function succ(value: string): string {
   return String(Number(value) + 1);
 }

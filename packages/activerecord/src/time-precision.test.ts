@@ -8,30 +8,19 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 
-/** Ruby `::Time#nsec` — the sub-second nanoseconds of the instant. */
 function nsecTime(v: Temporal.Instant): number {
   return Number(v.epochNanoseconds % 1_000_000_000n);
 }
 
-/** Ruby `::Time.now.change(nsec:)`. */
 function timeNowChangeNsec(nsec: number): Temporal.Instant {
   const now = Temporal.Now.instant().epochNanoseconds;
   return Temporal.Instant.fromEpochNanoseconds(now - (now % 1_000_000_000n) + BigInt(nsec));
 }
 
 describe("TimePrecisionTest", () => {
-  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
-  // rows). The bespoke `foos` table is recreated per-test, so opt out of
-  // transactional fixtures — the per-test DDL must commit, not roll back inside
-  // a wrapping (PG-poisoning) transaction.
   fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
 
-  // Rails: `foos` is not a schema.rb fixture table — each test builds it with
-  // `create_table(:foos, force: true)` for the precision under test and the
-  // `teardown` drops it (`drop_table :foos, if_exists: true`). Mirror that
-  // here rather than seeding a placeholder into the canonical schema.
   beforeEach(async () => {
     adapter = Base.connection;
   });
@@ -72,9 +61,6 @@ describe("TimePrecisionTest", () => {
     expect(nsecTime((foo as any).finish)).toBe(123456000);
   });
 
-  // Rails skips this on Mysql2Adapter: a `TIME` column without
-  // explicit precision is `TIME(0)` on MySQL/MariaDB, so the assignment does
-  // truncate. See vendor/rails/activerecord/test/cases/time_precision_test.rb.
   itIfSupports.skipIf(adapterType === "mysql")(
     "datetime_with_precision",
     "no time precision isnt truncated on assignment",
@@ -121,7 +107,6 @@ describe("TimePrecisionTest", () => {
 
   itIfSupports("datetime_with_precision", "formatting time according to precision", () => {
     // BLOCKED: type — PlainTime WHERE-clause quoting needed + time.to_s Rails-format comparison
-    // ROOT-CAUSE: ~20 LOC in connection-adapters/abstract/quoting.ts PlainTime quoting
   });
 
   itIfSupports("datetime_with_precision", "schema dump includes time precision", async () => {

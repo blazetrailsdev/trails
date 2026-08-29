@@ -1,10 +1,3 @@
-/**
- * Trails-specific invariants split out of base.test.ts (RFC 0043).
- *
- * These guard trails-internal behavior with no Rails counterpart in
- * base_test.rb: the _applyScopeAttributes
- * scoping mechanism and the UnknownPrimaryKey error message.
- */
 import { describe, it, expect } from "vitest";
 import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
 import { registerSubclass } from "./inheritance.js";
@@ -48,9 +41,9 @@ describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => 
     const User = makeModel();
     const rel = User.where({ role: "admin", status: "active" });
     await User.scoping(rel, async () => {
-      const u = new User({ role: "guest" }); // only role is explicit
-      expect(u.readAttribute("role")).toBe("guest"); // explicit wins
-      expect(u.readAttribute("status")).toBe("active"); // scope fills in
+      const u = new User({ role: "guest" });
+      expect(u.readAttribute("role")).toBe("guest");
+      expect(u.readAttribute("status")).toBe("active");
     });
   });
 
@@ -73,9 +66,7 @@ describe("_applyScopeAttributes — multiparameter path", () => {
     }
     const rel = Event.where({ role: "organizer" });
     await Event.scoping(rel, async () => {
-      // Use multiparameter date keys — triggers the multiparameter constructor path
       const e = new Event({ "starts_on(1i)": "2024", "starts_on(2i)": "6", "starts_on(3i)": "15" });
-      // Scope attr should be applied (role was not in the explicit multiparams)
       expect(e.readAttribute("role")).toBe("organizer");
     });
   });
@@ -91,14 +82,13 @@ describe("_applyScopeAttributes — multiparameter path", () => {
     }
     const rel = Event.where({ role: "organizer" });
     await Event.scoping(rel, async () => {
-      // role is provided explicitly (non-multiparameter key alongside multiparameter keys)
       const e = new Event({
         "starts_on(1i)": "2024",
         "starts_on(2i)": "6",
         "starts_on(3i)": "15",
         role: "guest",
       });
-      expect(e.readAttribute("role")).toBe("guest"); // explicit wins
+      expect(e.readAttribute("role")).toBe("guest");
     });
   });
 
@@ -113,8 +103,6 @@ describe("_applyScopeAttributes — multiparameter path", () => {
     }
     const rel = Event.where({ starts_on: "2020-01-01" });
     await Event.scoping(rel, async () => {
-      // The scope names the same column the multiparameter trio assigns, so the
-      // explicit-key set has to carry `starts_on`, not `starts_on(1i)`.
       const e = new Event({
         "starts_on(1i)": "2024",
         "starts_on(2i)": "6",
@@ -126,13 +114,6 @@ describe("_applyScopeAttributes — multiparameter path", () => {
 });
 
 describe("_applyScopeAttributes — a scope that sets type wins over the STI default", () => {
-  // The scope source is not special: ClassMethods#new feeds scope attributes to
-  // the same subclass_from_attributes as the explicit ones (inheritance.rb:56-78),
-  // and find_sti_class raises unless the resolved constant is self or in
-  // descendants (:242-265). An STI ancestor is neither, so the type never
-  // reaches the column — this test used to assert the port's build-as-is escape.
-  // The class names are unique to this file because the assertion turns on which
-  // class the global model registry resolves the stored type to.
   it("scope that sets type overwrites the STI type column", async () => {
     class ScopeStiVehicle extends Base {
       static {
@@ -218,12 +199,6 @@ describe("instantiate override types for absent keys (trails)", () => {
     return attrs;
   };
 
-  // builder.rb's `elsif types.key?(name)` / `else Attribute.uninitialized(name,
-  // type)` branch: a schema column absent from the values hash with no default
-  // (every non-PK column, since attributes_builder passes
-  // `_default_attributes.except(column_names - [primary_key])`) is materialized
-  // uninitialized, and `type = additional_types.fetch(name, types[name])`, so a
-  // per-query override wins over the declared schema type.
   it("materializes an override type for a schema column absent from the projected row", async () => {
     class Topic extends Base {}
     const attrs = await seedAttrs();
@@ -237,11 +212,6 @@ describe("instantiate override types for absent keys (trails)", () => {
     expect(attr.type).toBeInstanceOf(Typecast);
   });
 
-  // builder.rb only materializes `values.each_key` and `types.each_key`;
-  // `additional_types` is consulted only for names already sourced from values
-  // or schema `types`. An override-only key that is neither in the row nor a
-  // schema column is therefore never materialized (its `default_attribute`
-  // falls to the `else Attribute.null` branch) — it must not appear in the set.
   it("does not materialize an override-only key absent from the row and schema", async () => {
     class Topic extends Base {}
     const attrs = await seedAttrs();
@@ -258,8 +228,6 @@ describe("BasicsTest (trails)", () => {
   fixtures(["posts"]);
 
   it("columnNames raises TableNotSpecified on an abstract class", () => {
-    // Rails column_names has no abstract-class fallback — load_schema! raises
-    // TableNotSpecified. Guards against reintroducing the attribute-walk branch.
     class AbstractIntrospected extends Base {
       static {
         this.abstractClass = true;
@@ -272,10 +240,6 @@ describe("BasicsTest (trails)", () => {
   });
 
   it("an abstract subclass of a concrete model reflects the inherited table", async () => {
-    // `reset_table_name`'s `abstract_class?` arm is `superclass.table_name`
-    // (model_schema.rb:293-294), and `load_schema!` raises only `unless
-    // table_name` (model_schema.rb:587-590) — so `AbstractStiPost < Post`
-    // (test/models/post.rb:232-234) reflects `posts`, type column included.
     const { AbstractStiPost } = await import("./test-helpers/models/post.js");
     expect(AbstractStiPost.tableName).toBe("posts");
     await AbstractStiPost.loadSchema();
@@ -293,32 +257,14 @@ describe("attribute_names table_exists? guard (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    // Populate the schema cache's dataSourceExists=false entry — the sync
-    // stand-in for Rails' table_exists? DB hit (attribute_methods.rb:236-241).
     expect(await DeclaredNonExistent.tableExists()).toBe(false);
     expect(DeclaredNonExistent.attributeNames()).toEqual([]);
   });
 });
 
-// Rails removes ignored columns only from schema/default `attribute_types`
-// (`columns_hash.except(*ignored_columns)`), NOT from a raw result row: a
-// `SELECT *` that projects an ignored column still lands it in `@attributes`
-// (LazyAttributeSet keys off `values`), so `read_attribute` returns it and
-// `method_missing` responds to the accessor (`@attributes.key?` → true).
-// A load that does not project the column leaves its slot uninitialized, so
-// `key?` is false. These guard the trails analogs (dynamic reader install +
-// narrow-to-uninitialized) against regressing to a schema-membership gate.
 describe("ignored columns follow Rails' value-keyed attribute set (trails)", () => {
   fixtures([]);
 
-  // `ignored_columns=` (model_schema.rb:366-369) calls only
-  // `reload_schema_from_cache` (:553-571), which nils the memos and clears
-  // `@schema_loaded`. It never calls `undefine_attribute_methods` — only
-  // `reset_column_information` (:523-530) does — so an accessor generated
-  // BEFORE the ignore survives it in Ruby. Rails' own coverage matches: the
-  // methods assertions (base_test.rb:1796-1806) use models that ignore in the
-  // class body, and the post-generation assignment (base_test.rb:1844-1846)
-  // asserts `column_names` only.
   it("assigning ignoredColumns after generation leaves the generated accessor live", async () => {
     class Developer extends Base {
       static tableName = "developers";
@@ -340,8 +286,6 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     }
     await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
     const [topic] = await Topic.findBySql("SELECT * FROM topics");
-    // Rails: values-keyed @attributes ⇒ read_attribute returns it, and
-    // method_missing responds (the trails dynamic reader).
     expect(
       (topic as unknown as { readAttribute(n: string): unknown }).readAttribute("author_name"),
     ).toBe("bob");
@@ -357,8 +301,6 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
       }
     }
     await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
-    // The default select drops ignored columns, so the row never carries it —
-    // Rails' key? is false and no accessor responds.
     const topic = (await Topic.first())!;
     expect("author_name" in topic).toBe(false);
     expect([
@@ -463,8 +405,6 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const dev = await AttributedDeveloper.create();
     await dev.updateColumn("name", "name");
     const loaded = await AttributedDeveloper.where({ id: dev.id }).select("*").first();
-    // Rails asserts `loaded.name == "Developer: name"` (base_test.rb): the
-    // projected value casts through DeveloperName and the accessor responds.
     expect((loaded as unknown as Record<string, unknown>).name).toBe("Developer: name");
     expect((loaded as unknown as { readAttribute(n: string): unknown }).readAttribute("name")).toBe(
       "Developer: name",
@@ -476,11 +416,6 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const dev = await AttributedDeveloper.create();
     await dev.updateColumn("name", "name");
     await dev.reload();
-    // A declared attribute IS in `types`, so an unprojected slot takes
-    // `default_attribute`'s `types.key?` arm, which ASSIGNS `@attributes[name]`
-    // (attribute_set/builder.rb:82-87) — the `else` arm's `Attribute.null` is
-    // returned but never assigned, which is why only a plain ignored column
-    // (the case above) drops out of the set.
     expect("name" in dev).toBe(true);
   });
 });

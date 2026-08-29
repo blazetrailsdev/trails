@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
@@ -9,9 +5,6 @@ import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";
-// Canonical models — mirror Rails' `require "models/{account,entry,message,recipient,comment}"`.
-// Entry carries both the `entryable` delegated_type (Message/Comment) and the
-// `thing` delegated_type (Post) used by the custom-foreign_type cases.
 import { Entry } from "./test-helpers/models/entry.js";
 import { Message } from "./test-helpers/models/message.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -28,14 +21,8 @@ afterAll(() => {
 });
 
 describe("DelegatedTypeTest", () => {
-  // Rails: `fixtures :comments, :accounts, :posts`. The canonical tables come
-  // from the template clone; the beforeAll below force-recreates them so the
-  // suite survives sibling-file contamination.
   const { comments, accounts, posts } = fixtures(["comments", "accounts", "posts"]);
 
-  // Entry/Message/Recipient aren't fixture-loaded (Rails builds them in setup),
-  // so register them by name for polymorphic type resolution and create their
-  // canonical tables.
   registerModel("Entry", Entry);
   registerModel("Message", Message);
   registerModel("Comment", Comment);
@@ -47,7 +34,6 @@ describe("DelegatedTypeTest", () => {
   let entryWithComment: Base;
   let entryWithPost: Base;
 
-  // Rails `setup do`.
   beforeEach(async () => {
     entryWithMessage = await Entry.create({
       entryable: Message.build({ subject: "Hello world!" }),
@@ -79,8 +65,6 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("delegated type name", () => {
-    // Rails: entryable_name is an ActiveSupport::StringInquirer so
-    // `entryable_name.message?` works in addition to string equality.
     expect(String((entryWithMessage as any).entryableName)).toBe("message");
     expect((entryWithMessage as any).entryableName).toBeInstanceOf(StringInquirer);
     expect((entryWithMessage as any).entryableName["message?"]()).toBe(true);
@@ -133,12 +117,6 @@ describe("DelegatedTypeTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("association uuid", () => {
-    // Mirrors Rails PostgreSQLDelegatedTypeTest#test_association_uuid.
-    // UUID PK accessor naming: delegatedType with primaryKey: "uuid" and
-    // foreignKey: "entryable_uuid" generates `uuidMessageUuid` / `uuidCommentUuid`
-    // accessors (camelCase of ${singular}_${primaryKey}) instead of the default `Id` suffix.
-    // No canonical uuid_* tables exist (Rails declares them under PostgreSQL only),
-    // so this exercises accessor naming in-memory rather than the DB-backed setup.
     class UuidEntry extends Base {
       static {
         this.attribute("entryable_uuid", "string");
@@ -170,9 +148,6 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("touch account", async () => {
-    // Recipient → message (belongs_to touch) → entry (has_one entryable touch)
-    // → account (belongs_to touch): a create on the recipient must walk the
-    // whole chain up to the account.
     const message = await (entryWithMessage as any).loadBelongsTo("entryable");
     const account = await (entryWithMessage as any).loadBelongsTo("account");
     const previousAccountUpdatedAt = account.updated_at;
@@ -197,8 +172,6 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("builder method", () => {
-    // Rails: Entry.new responds to build_entryable; Entry.new(entryable_type:
-    // "Message").build_entryable returns a Message instance.
     expect(typeof (Entry.build({}) as any).buildEntryable).toBe("function");
     const built = (Entry.build({ entryable_type: "Message" }) as any).buildEntryable();
     expect(built).toBeInstanceOf(Message);
@@ -212,11 +185,7 @@ describe("DelegatedTypeTest", () => {
     expect((reflection as any).options?.foreignType).toBe("entryable_type");
   });
 
-  // ── TS-specific coverage (no Rails counterpart): namespaced delegated types ──
-
   it("namespaced types", () => {
-    // Rails: types: %w[Access::NoticeMessage] generates Entry.access_notice_messages
-    // scope and @entry.access_notice_message accessor via type.tableize.tr("/", "_").
     class Entry3 extends Base {
       static {
         this.attribute("entryable_id", "integer");
@@ -230,22 +199,13 @@ describe("DelegatedTypeTest", () => {
     const e = new Entry3({ entryable_type: "Access::NoticeMessage", entryable_id: 7 });
     expect((e as any).isAccessNoticeMessage()).toBe(true);
     expect((e as any).accessNoticeMessageId).toBe(7);
-    // The per-type singular accessor mirrors Rails: returns the role
-    // association reader when the foreign_type matches, otherwise null.
     const target = new NoticeMsg();
     (e as any).entryable = target;
     expect((e as any).accessNoticeMessage).toBe(target);
-    // entryableName also tracks the full namespaced form.
     expect(String((e as any).entryableName)).toBe("access_notice_message");
   });
 
   it("buildEntryable preserves namespaced foreign_type", () => {
-    // Rails BelongsToPolymorphicAssociation stores record.class.polymorphic_name
-    // (the Ruby class name, including "::"). JS class names can't carry "::",
-    // so the writer must prefer the registry key the class was registered
-    // under — otherwise buildEntryable on a namespaced type clobbers
-    // entryable_type from "Access::NoticeMessage" to "AccessNoticeMessage"
-    // and breaks the generated predicates/scope/accessor.
     class AccessNoticeMessage extends Base {
       static {
         this.attribute("body", "string");

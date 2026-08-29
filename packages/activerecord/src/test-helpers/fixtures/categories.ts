@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/categories.yml
 export const categoryFixtureData = {
   general: {
     id: 1,

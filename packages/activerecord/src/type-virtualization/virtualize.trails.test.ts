@@ -41,7 +41,7 @@ describe("virtualize — deltas", () => {
       "}\n";
     const { deltas } = virtualize(src, "post.ts");
     expect(deltas).toHaveLength(1);
-    expect(deltas[0].lineCount).toBe(3); // leading \n + 2 declare lines
+    expect(deltas[0].lineCount).toBe(3);
   });
 
   test("no deltas when no class matches Base", () => {
@@ -63,10 +63,8 @@ describe("virtualize — deltas", () => {
         posts: { title: "string", body: "text", published_at: "datetime", views: "integer" },
       },
     });
-    // User-declared `title` is NOT re-emitted.
     expect(text).toMatch(/declare title: string;/);
     expect(text.match(/declare title: string;/g)?.length).toBe(1);
-    // Schema-only columns ARE emitted.
     expect(text).toMatch(/declare body: string;/);
     expect(text).toMatch(/declare published_at:.*Temporal\.Instant.*Temporal\.PlainDateTime/);
     expect(text).toMatch(/declare views: number;/);
@@ -81,7 +79,6 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "post.ts", {
       schemaColumnsByTable: { posts: { body: "text" } },
     });
-    // User already declared `body` — the virtualizer must not duplicate.
     expect(text.match(/declare body:/g)?.length).toBe(1);
   });
 
@@ -101,10 +98,10 @@ describe("virtualize — deltas", () => {
         posts: {
           "strange-col": "string",
           "2bad": "string",
-          class: "string", // JS reserved — must be quoted
-          static: "string", // TS-class reserved — also must be quoted
-          interface: "string", // TS reserved — must be quoted
-          private: "string", // TS reserved — must be quoted
+          class: "string",
+          static: "string",
+          interface: "string",
+          private: "string",
           safe: "string",
         },
       },
@@ -116,7 +113,6 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare "static": string;/);
     expect(text).toMatch(/declare "interface": string;/);
     expect(text).toMatch(/declare "private": string;/);
-    // Bare (unquoted) reserved names would be parse errors.
     expect(text).not.toMatch(/declare class: string;/);
     expect(text).not.toMatch(/declare static: string;/);
   });
@@ -128,9 +124,7 @@ describe("virtualize — deltas", () => {
         posts: { "strange-col": "string", safe: "string" },
       },
     });
-    // User-authored quoted member is only written once.
     expect(text.match(/declare "strange-col":/g)?.length).toBe(1);
-    // Other schema column still emitted.
     expect(text).toMatch(/declare safe: string;/);
   });
 
@@ -143,25 +137,18 @@ describe("virtualize — deltas", () => {
       '    this.belongsTo("owner");\n' +
       "  }\n" +
       "}\n";
-    // Only `Owner` is a known target; `OtherThing` / `Gadget` name no model.
     const { text } = virtualize(src, "thing.ts", {
       isKnownTarget: (name) => name === "Base" || name === "Owner",
     });
-    // Dangling names degrade to Base (in scope); known target is kept.
     expect(text).toMatch(/declare otherThing: Base \| null;/);
     expect(text).toMatch(/declare gadgets: .*AssociationProxy<Base>;/);
     expect(text).toMatch(/declare owner: Owner \| null;/);
     expect(text).not.toMatch(/OtherThing/);
     expect(text).not.toMatch(/Gadget/);
-    // Loader overload for the unknown hasOne also degrades to Base.
     expect(text).toMatch(/declare loadHasOne:.*name: "otherThing".*Promise<Base \| null>/);
   });
 
   test("isKnownTarget is scoped to the splice-site host, not a flat file scan", () => {
-    // Two independent model classes each associate `widget`. The predicate
-    // only reports `Widget` known when the host is `A` — modeling `Widget`
-    // being visible in A's closure but NOT B's sibling closure. B's declare
-    // must degrade to Base even though the name is "known" for A.
     const src =
       "export class A extends Base {\n" +
       "  static {\n" +
@@ -176,7 +163,6 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "ab.ts", {
       isKnownTarget: (name, host) => name === "Base" || (name === "Widget" && host.name === "A"),
     });
-    // A sees Widget; B does not — B falls back to Base.
     expect(text).toMatch(/class A extends Base \{\s*declare widget: Widget \| null;/);
     expect(text).toMatch(/class B extends Base \{\s*declare widget: Base \| null;/);
   });
@@ -190,11 +176,9 @@ describe("virtualize — deltas", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "membership.ts", { attributesNullable: true });
-    // FK attribute accepts a model `.id` (PrimaryKeyValue) assignment.
     expect(text).toMatch(
       /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
-    // Non-FK integer attribute keeps its (nullable) narrow type.
     expect(text).toMatch(/declare rank: number \| null;/);
   });
 
@@ -206,7 +190,6 @@ describe("virtualize — deltas", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "thing.ts");
-    // No predicate → classify result emitted as-is (back-compat).
     expect(text).toMatch(/declare otherThing: OtherThing \| null;/);
   });
 
@@ -223,10 +206,8 @@ describe("virtualize — deltas", () => {
         posts: { comments: "string", author: "string", body: "string" },
       },
     });
-    // Only one declare per name — association wins over schema column.
     expect(text.match(/declare comments:/g)?.length).toBe(1);
     expect(text.match(/declare author:/g)?.length).toBe(1);
-    // Non-colliding schema column is still emitted.
     expect(text).toMatch(/declare body: string;/);
   });
 
@@ -238,7 +219,6 @@ describe("virtualize — deltas", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "post.ts");
-    // Bare `declare class: ...` would be a parse error.
     expect(text).toMatch(/declare "class": string;/);
     expect(text).not.toMatch(/declare class: string;/);
   });
@@ -255,13 +235,9 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    // null: false → no `| null`
     expect(text).toMatch(/declare title: string;/);
-    // null: true → `| null`
     expect(text).toMatch(/declare bio: string \| null;/);
-    // array with known element type → `number[] | null`
     expect(text).toMatch(/declare tags: number\[\] \| null;/);
-    // non-nullable array → `string[]`
     expect(text).toMatch(/declare strict_tags: string\[\];/);
   });
 
@@ -282,7 +258,6 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare updated_at:.*Temporal\.PlainDateTime;/);
     expect(text).toMatch(/declare starts_on:.*Temporal\.PlainDate.*\| null/);
     expect(text).toMatch(/declare duration:.*Temporal\.PlainTime;/);
-    // nullable datetime union must be parenthesised: (Instant | PlainDateTime) | null
     expect(text).toMatch(
       /declare scheduled_at: \(.*Temporal\.Instant.*Temporal\.PlainDateTime\) \| null/,
     );
@@ -309,12 +284,11 @@ describe("virtualize — deltas", () => {
         memberships: {
           club_id: { type: "integer", null: true },
           member_id: { type: "big_integer", null: false },
-          favorite_things_id: "integer", // legacy string shape is FK too
-          rank: { type: "integer", null: true }, // not an FK: name doesn't end in _id
+          favorite_things_id: "integer",
+          rank: { type: "integer", null: true },
         },
       },
     });
-    // FK columns accept a model `.id` (PrimaryKeyValue) assignment.
     expect(text).toMatch(
       /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
@@ -324,7 +298,6 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(
       /declare favorite_things_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
-    // Non-FK integer column keeps its narrow type.
     expect(text).toMatch(/declare rank: number \| null;/);
   });
 
@@ -333,7 +306,7 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "post.ts", {
       schemaColumnsByTable: {
         posts: {
-          legacy: "string", // legacy string — backwards-compat
+          legacy: "string",
           modern: { type: "integer", null: false },
         },
       },
@@ -360,7 +333,6 @@ describe("virtualize — deltas", () => {
   test("schemaColumnsByTable infers table name from class name when absent", () => {
     const src = "export class BlogPost extends Base {}\n";
     const { text } = virtualize(src, "blog-post.ts", {
-      // pluralize(underscore("BlogPost")) === "blog_posts"
       schemaColumnsByTable: { blog_posts: { slug: "string" } },
     });
     expect(text).toMatch(/declare slug: string;/);
@@ -386,7 +358,6 @@ describe("remapLine", () => {
 
   test("lines below injection subtract the inserted line count", () => {
     const deltas = [{ insertedAtLine: 5, lineCount: 3 }];
-    // A diagnostic at virtualized line 10 should map back to line 7.
     expect(remapLine(10, deltas)).toBe(7);
   });
 
@@ -402,11 +373,8 @@ describe("remapLine", () => {
       { insertedAtLine: 5, lineCount: 2 },
       { insertedAtLine: 15, lineCount: 3 },
     ];
-    // Below first injection only.
     expect(remapLine(10, deltas)).toBe(8);
-    // Below both injections.
     expect(remapLine(25, deltas)).toBe(20);
-    // Above everything.
     expect(remapLine(3, deltas)).toBe(3);
   });
 
@@ -440,7 +408,6 @@ describe("virtualize — prependImports", () => {
       prependImports: ['import type { Author } from "./author.js";'],
     });
     const lines = text.split("\n");
-    // Directives should come first, then import, then the class.
     expect(lines[0]).toBe("#!/usr/bin/env node");
     expect(lines[1]).toBe("// @ts-nocheck");
     expect(lines[2]).toBe("/// <reference types='node' />");
@@ -456,49 +423,40 @@ describe("virtualize — prependImports", () => {
     const { deltas } = virtualize(src, "post.ts", {
       prependImports: ['import type { A } from "./a.js";', 'import type { B } from "./b.js";'],
     });
-    // 2 prepended lines → virtual line 2 is original line 0
-    expect(remapLine(0, deltas)).toBeNull(); // inside prepended block
-    expect(remapLine(1, deltas)).toBeNull(); // inside prepended block
-    // The original file's first line (line 0) is now at virtual line 2.
+    expect(remapLine(0, deltas)).toBeNull();
+    expect(remapLine(1, deltas)).toBeNull();
     expect(remapLine(2, deltas)).toBe(0);
   });
 
   test("remapLine preserves leading-directive lines when imports are inserted after them", () => {
     const src =
-      "#!/usr/bin/env node\n" + //         L0 (original & virtual)
-      "// @ts-nocheck\n" + //              L1
-      "\n" + //                            L2
-      "export class Post extends Base {\n" + // L3
-      '  static { this.attribute("title", "string"); }\n' + // L4
-      "}\n"; //                            L5
+      "#!/usr/bin/env node\n" +
+      "// @ts-nocheck\n" +
+      "\n" +
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
     const { deltas } = virtualize(src, "post.ts", {
       prependImports: ['import type { Author } from "./author.js";'],
     });
-    // Directive lines remain at their original line indices.
     expect(remapLine(0, deltas)).toBe(0);
     expect(remapLine(1, deltas)).toBe(1);
     expect(remapLine(2, deltas)).toBe(2);
-    // The injected import sits at virtual line 3 — inside the block.
     expect(remapLine(3, deltas)).toBeNull();
-    // Virtual line 4 is now the `export class Post...` line.
     expect(remapLine(4, deltas)).toBe(3);
   });
 });
 
 describe("virtualize — multiple classes", () => {
   test("remapLine is correct for lines after the second injected block", () => {
-    // Two Base-descendant classes in one file. Each gets its own
-    // declare block injected after `{`. `remapLine` for user-written
-    // lines inside the SECOND class must account for BOTH blocks
-    // having shifted the file down.
     const src =
-      "export class Post extends Base {\n" + //           L0
-      '  static { this.attribute("title", "string"); }\n' + // L1
-      "}\n" + //                                           L2
-      "\n" + //                                            L3
-      "export class Comment extends Base {\n" + //         L4
-      '  static { this.attribute("body", "string"); }\n' + //  L5
-      "}\n"; //                                            L6
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n" +
+      "\n" +
+      "export class Comment extends Base {\n" +
+      '  static { this.attribute("body", "string"); }\n' +
+      "}\n";
     const { text, deltas } = virtualize(src, "file.ts");
     expect(deltas).toHaveLength(2);
 
@@ -507,21 +465,14 @@ describe("virtualize — multiple classes", () => {
     expect(commentBraceVLine).toBeGreaterThan(4);
     expect(remapLine(commentBraceVLine, deltas)).toBe(4);
 
-    // A line inside the Comment body (original line 5) should also
-    // remap correctly after both injections.
     const commentBodyVLine = vLines.findIndex((l) => l.includes('this.attribute("body"'));
     expect(remapLine(commentBodyVLine, deltas)).toBe(5);
 
-    // Injected lines (inside either block) return null.
     expect(remapLine(deltas[0].insertedAtLine + 1, deltas)).toBeNull();
     expect(remapLine(deltas[1].insertedAtLine + 1, deltas)).toBeNull();
   });
 
   test("injects declares into model classes nested inside function bodies", () => {
-    // AR test files declare their models inline inside `describe`/`it`
-    // callbacks. The walker must descend into those bodies — not just
-    // iterate top-level statements — so nested classes still get their
-    // association/attribute declares materialized.
     const src =
       'describe("nested", () => {\n' +
       "  function makeModels() {\n" +
@@ -540,10 +491,6 @@ describe("virtualize — multiple classes", () => {
   });
 
   test("materializes standalone defineEnum(Model, ...) nested in a function body", () => {
-    // Rails `enum` defines predicate/bang instance methods and scopes for
-    // every declaration; the walker must pick up the standalone
-    // `defineEnum(ClassName, ...)` form at nested depths, not just at the
-    // top level, so nested test models get those enum declares too.
     const src =
       'describe("nested enum", () => {\n' +
       '  it("works", () => {\n' +
@@ -559,9 +506,6 @@ describe("virtualize — multiple classes", () => {
   });
 
   test("nested defineEnum binds to the same-scope class, not a sibling-scope namesake", () => {
-    // Two `class Post` in sibling `it` callbacks; only the first carries a
-    // defineEnum. The enum declares must land on the first Post's body and
-    // not leak into the second.
     const src =
       'describe("d", () => {\n' +
       '  it("a", () => {\n' +
@@ -577,15 +521,10 @@ describe("virtualize — multiple classes", () => {
       "  });\n" +
       "});\n";
     const { text } = virtualize(src, "file.ts");
-    // Exactly one isDraft declare — bound to the first Post only.
     expect(text.match(/isDraft/g)?.length).toBe(1);
   });
 
   test("isModelClass predicate overrides name-based baseNames matching", () => {
-    // Two same-named `Client extends Company` in sibling scopes: only the
-    // first scope's Company roots at Base. A name-based allow-list cannot
-    // tell them apart; the per-node `isModelClass` predicate can, so only
-    // the first Client is virtualized.
     const src =
       'describe("d", () => {\n' +
       '  it("a", () => {\n' +
@@ -602,8 +541,6 @@ describe("virtualize — multiple classes", () => {
       "  });\n" +
       "});\n";
     const sf = ts.createSourceFile("file.ts", src, ts.ScriptTarget.ES2022, true);
-    // Mark only the FIRST `class Client` (the one whose Company roots at
-    // Base) as a model, by source span.
     const baseRooted = new Set<string>();
     const visit = (node: ts.Node): void => {
       if (ts.isClassDeclaration(node) && node.name?.text === "Client" && baseRooted.size === 0) {
@@ -615,16 +552,12 @@ describe("virtualize — multiple classes", () => {
     const { text } = virtualize(src, "file.ts", {
       isModelClass: (cls) => baseRooted.has(`${cls.pos}:${cls.end}`),
     });
-    // Exactly one `declare rating` — injected into the first Client only.
     expect(text.match(/declare rating: number;/g)?.length).toBe(1);
   });
 });
 
 describe("virtualize — materializing-generator gaps", () => {
   test('skips `declare id` for an explicit this.attribute("id", ...)', () => {
-    // Base owns the `id` accessor (composite-key aware); re-declaring it as
-    // an instance property is a TS2610 error. The schema-merge path already
-    // skips `id`; the attribute() path must too.
     const src =
       "class Reply extends Base {\n" +
       "  static {\n" +
@@ -649,9 +582,6 @@ describe("virtualize — materializing-generator gaps", () => {
   });
 
   test("classNameAliases resolves association targets registered under an alias", () => {
-    // `belongsTo("octopus", { className: "EsOctopus" })` where the in-file
-    // class is `Octopus` registered as `"EsOctopus"`. Without the alias the
-    // declare references a non-existent `EsOctopus` type (TS2304).
     const src =
       "class Virus extends Base {\n" +
       '  static { this.belongsTo("octopus", { className: "EsOctopus" }); }\n' +
@@ -660,12 +590,10 @@ describe("virtualize — materializing-generator gaps", () => {
     const { text } = virtualize(src, "file.ts", { classNameAliases: aliases });
     expect(text).toContain("declare octopus: Octopus | null;");
     expect(text).toContain('declare loadBelongsTo: (name: "octopus") => Promise<Octopus | null>;');
-    // The injected declares reference `Octopus`, not the non-existent alias.
     expect(text).not.toMatch(/declare octopus: EsOctopus/);
   });
 
   test("associationTargets overrides the through-association element type", () => {
-    // Otherwise `classify("commentsWithOrder")` → `CommentsWithOrder` (TS2304).
     const src =
       "class Author extends Base {\n" +
       '  static { this.hasMany("commentsWithOrder", { through: "posts", source: "comments" }); }\n' +
@@ -679,8 +607,6 @@ describe("virtualize — materializing-generator gaps", () => {
   });
 
   test("subclass loader overloads include inherited base overloads", () => {
-    // Subclass `loadBelongsTo` must keep the base overloads in its
-    // intersection or it isn't assignable to the base (TS2416).
     const src =
       "class Comment extends Base {\n" +
       '  static { this.belongsTo("post"); }\n' +
@@ -695,9 +621,6 @@ describe("virtualize — materializing-generator gaps", () => {
   });
 
   test("cross-file subtype: narrowed declare is kept when superclass chain lives in another file", () => {
-    // SpecialPost extends Post lives in a DIFFERENT file (not in src below).
-    // Without globalSuperNameOf the declare would be conservatively suppressed;
-    // with it, classExtends("SpecialPost","Post") returns true → kept.
     const src =
       "class Comment extends Base {\n" +
       '  static { this.belongsTo("post"); }\n' +
@@ -705,7 +628,6 @@ describe("virtualize — materializing-generator gaps", () => {
       "class SpecialComment extends Comment {\n" +
       '  static { this.belongsTo("post", { className: "SpecialPost" }); }\n' +
       "}\n";
-    // Simulate a cross-file registry entry: SpecialPost extends Post.
     const globalSuperNameOf = new Map([["SpecialPost", "Post"]]);
     const { text } = virtualize(src, "comment.ts", {
       isModelClass: () => true,
@@ -717,9 +639,6 @@ describe("virtualize — materializing-generator gaps", () => {
   });
 
   test("subclass association overrides across a 3-level chain (suppress, keep subtype, effective target)", () => {
-    // Mid.post → Sibling isn't assignable to Root's `post: Post` → suppressed
-    // (loader overload kept). Leaf.post → SpecialPost (extends Post): Mid was
-    // suppressed so Leaf's effective inherited target is still Post → kept.
     const src =
       "class Post extends Base {}\n" +
       "class SpecialPost extends Post {}\n" +
@@ -834,9 +753,6 @@ describe("virtualize — include() interface bridge", () => {
   });
 
   test("aliased include import (`include as inc`) is not picked up", () => {
-    // The aliased binding is `inc`, so a local user-defined `include(...)`
-    // helper in the same file must not be misclassified as the
-    // activesupport one.
     const src =
       'import { include as inc } from "@blazetrails/activesupport";\n' +
       "function include(c: any, m: any) {}\n" +
@@ -855,22 +771,15 @@ describe("virtualize — include() interface bridge", () => {
       "include(\n  Foo,\n  Persistence\n    .InstanceMethods,\n);\n" +
       "const target = 42;\n";
     const { text, deltas } = virtualize(src, "foo.ts");
-    // The synthesized declare must round-trip the multi-line text without losing newlines.
     expect(text).toMatch(/__TrailsIncluded<typeof Persistence[\s\S]*\.InstanceMethods>/);
-    // Delta line count must reflect ACTUAL physical lines in the
-    // prepended block, not the entry count.
     const headDelta = deltas[0];
     const headLines = text
       .slice(0, indexOfNthNewline(text, headDelta.insertedAtLine + headDelta.lineCount + 1))
       .split(/\r?\n/);
-    // The line at insertedAtLine+1 (start of injection) should be the first prepend line.
     expect(headLines[headDelta.insertedAtLine + 1]).toMatch(/import type \{ Included as/);
   });
 
   test("reuses existing `Included as __TrailsIncluded` import — emits interfaces but not a duplicate import", () => {
-    // Single-quoted, no semicolon: AST detection sees the import
-    // regardless of formatting. The bridge reuses the existing alias
-    // and still injects the interface declaration.
     const src =
       "import type { Included as __TrailsIncluded } from '@blazetrails/activesupport'\n" +
       'import { include } from "@blazetrails/activesupport";\n' +
@@ -889,9 +798,7 @@ describe("virtualize — include() interface bridge", () => {
       "export class Relation {}\n" +
       "include(Relation, QM);\n";
     const { text } = virtualize(src, "relation.ts");
-    // No injected import (existing one is from a different module).
     expect(text).not.toMatch(/import type \{ Included as __TrailsIncluded \}/);
-    // No interface either — would type against the wrong symbol.
     expect(text).not.toMatch(/interface Relation extends/);
   });
 
@@ -903,7 +810,6 @@ describe("virtualize — include() interface bridge", () => {
       "export interface Relation<T> { find(...args: unknown[]): Promise<T>; }\n" +
       "include(Relation, FinderMethods);\n";
     const { text } = virtualize(src, "relation.ts");
-    // No auto-bridge for Relation — user has refined typings.
     expect(text).not.toMatch(/interface Relation<T> extends __TrailsIncluded/);
   });
 
@@ -932,7 +838,6 @@ describe("virtualize — include() interface bridge", () => {
       "export interface Relation<T> { find(...args: unknown[]): Promise<T>; }\n" +
       "include(Relation, FinderMethods);\n";
     const { text } = virtualize(src, "relation.ts");
-    // No interface emitted (user has one), and no dangling alias import.
     expect(text).not.toMatch(/__TrailsIncluded/);
   });
 

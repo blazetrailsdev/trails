@@ -1,18 +1,3 @@
-// Syntactic walker for model source files.
-//
-// Finds class declarations that extend a name in the allow-list
-// (default: ["Base"]) — anywhere in the file, including classes nested in
-// `describe`/`it`/helper-function bodies — and collects the runtime calls
-// inside each class's
-// static blocks — `this.attribute(...)`, `this.hasMany(...)`,
-// `this.belongsTo(...)`, `this.hasOne(...)`, `this.hasAndBelongsToMany(...)`,
-// `this.scope(...)`, `this.enum(...)` — plus top-level `defineEnum(this, ...)`
-// statements whose first argument identifies the class.
-//
-// Intentionally does not resolve symbols or consult a `ts.Program`. Transitive
-// extends (e.g. `class Admin extends User`) are handled by a separate,
-// checker-backed pass that produces the allow-list.
-
 import ts from "typescript";
 
 export type AssociationKind = "hasMany" | "hasAndBelongsToMany" | "belongsTo" | "hasOne";
@@ -33,18 +18,13 @@ export interface AssociationCall {
 export interface ScopeCall {
   kind: "scope";
   name: string;
-  // Parameter list of the inline scope function, with the leading `this`
-  // parameter removed — a scope body receives the relation as its receiver
-  // (`_exec_scope`'s `instance_exec`), so only the positionals after it are
-  // callable arguments. Each element is the raw source text of a parameter
-  // (e.g. "limit: number", "name = \"draft\"").
   paramsAfterThis: string[];
 }
 
 export interface EnumCall {
   kind: "enum";
   attr: string;
-  values: string[]; // string keys of the mapping literal
+  values: string[];
   options: RecordLiteral;
 }
 
@@ -57,32 +37,11 @@ export interface DefineEnumCall {
 
 export type RuntimeCall = AttributeCall | AssociationCall | ScopeCall | EnumCall | DefineEnumCall;
 
-/**
- * A top-level `include(ClassName, ModuleExpr)` call from
- * `@blazetrails/activesupport`. The synthesizer turns each call into an
- * interface-merge declaration so the methods mixed in at runtime become
- * visible to the type checker without the user writing
- * `interface Foo extends Included<typeof Mod> {}` by hand.
- *
- * @internal
- */
+/** @internal */
 export interface IncludeCall {
   className: string;
-  /** Raw source text of the module expression — spliced verbatim into `typeof <expr>`. */
   moduleExpr: string;
-  /**
-   * Whether the target class declaration is `export`-ed in the file.
-   * The synthesized interface must carry the same modifier or
-   * TypeScript rejects the merge with "Individual declarations in
-   * merged declaration must be all exported or all local."
-   */
   classExported: boolean;
-  /**
-   * Raw text of the class's type parameter list (e.g. `<T extends Base>`)
-   * or the empty string when the class is non-generic. Declaration
-   * merging requires the merged interface to repeat the class's type
-   * parameters verbatim.
-   */
   classTypeParams: string;
 }
 
@@ -91,39 +50,17 @@ export type RecordLiteral = Record<string, string>;
 export interface ClassInfo {
   name: string;
   classDecl: ts.ClassDeclaration;
-  openBracePos: number; // char offset of the class body's `{` + 1
+  openBracePos: number;
   calls: RuntimeCall[];
-  // Member names the user has already declared by hand — the virtualizer
-  // must skip injection for any of these.
   existingMembers: Set<string>;
   existingStaticMembers: Set<string>;
-  skip: boolean; // `/** @trails-typegen skip */` JSDoc above the class
-  /** Column names listed in `@trails-typegen skip-columns: col1, col2` JSDoc — excluded from schema-reflected declares. */
+  skip: boolean;
   skipSchemaColumns: Set<string>;
-  /**
-   * The `static tableName = "..."` value when the user declared it
-   * explicitly. Used to look up schema columns in
-   * `VirtualizeOptions.schemaColumnsByTable`. When absent, callers
-   * should fall back to Rails' conventional inference
-   * (`pluralize(underscore(className))`).
-   */
   tableName?: string;
 }
 
 export interface WalkOptions {
-  /** Class names counted as roots. Defaults to `["Base"]`. */
   baseNames?: readonly string[];
-  /**
-   * When supplied, decides per class-declaration NODE whether it is a model
-   * to virtualize, REPLACING the name-based `baseNames` heritage match.
-   *
-   * The name-based match is ambiguous once classes are visited at any
-   * nesting depth: two `class Foo extends Bar` in sibling `describe`/`it`
-   * scopes share the name `Foo` but may have different `Bar`s, so a flat
-   * name allow-list can mis-classify a sibling-scope subclass. Callers that
-   * resolve inheritance lexically (or via a `ts.Program` checker) pass this
-   * predicate so the decision is made on the actual node, not its name.
-   */
   isModelClass?: (cls: ts.ClassDeclaration) => boolean;
 }
 
@@ -131,10 +68,6 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   const baseNames = new Set(opts.baseNames ?? ["Base"]);
   const out: ClassInfo[] = [];
 
-  // Visit class declarations anywhere in the tree — not just top-level
-  // statements. AR test files routinely declare their model classes inside
-  // `describe`/`it`/helper-function bodies, and those classes carry the
-  // same `static { this.hasMany(...) }` association calls we materialize.
   const isModel = opts.isModelClass ?? ((cls: ts.ClassDeclaration) => extendsOneOf(cls, baseNames));
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && node.name && isModel(node)) {
@@ -144,15 +77,6 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   };
   visit(sourceFile);
 
-  // Standalone `defineEnum(ClassName, ...)` calls — at any nesting depth,
-  // mirroring the class traversal above so nested test models authored as
-  // `defineEnum(Post, "status", ...)` inside an `it`/helper body get the
-  // same enum predicate/bang/scope declares as top-level ones. Supports
-  // both the array form (`["draft", "published"]`) and the object form
-  // (`{ draft: 0, published: 1 }`). The target is resolved lexically (the
-  // nearest in-scope `class ClassName`) so a `defineEnum(Post, ...)` in one
-  // callback attaches to that callback's `Post`, not a same-named class in
-  // a sibling scope.
   const visitDefineEnum = (node: ts.Node): void => {
     if (ts.isExpressionStatement(node)) {
       const call = node.expression;
@@ -184,14 +108,6 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   return out;
 }
 
-/**
- * Resolve `name` to the `ClassInfo` whose declaration is lexically visible
- * from `usage`, preferring the nearest enclosing scope — so a
- * `defineEnum(Post, ...)` binds to the `Post` declared in the same
- * `describe`/`it`/function body rather than a same-named class elsewhere in
- * the file. Falls back to the first `ClassInfo` with a matching name (the
- * historical top-level behavior) when no enclosing-scope class matches.
- */
 function resolveLexicalClassInfo(
   out: readonly ClassInfo[],
   usage: ts.Node,
@@ -237,11 +153,6 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
           info.calls.push(call);
           continue;
         }
-        // Static-block `defineEnum(this, "status", { ... })` —
-        // Rails-idiomatic authoring form (matches Ruby's
-        // `enum :status, ...` inside the class body). Walker also
-        // supports the top-level `defineEnum(ClassName, ...)` form
-        // below.
         const defineEnumCall = readDefineEnumThisCall(s);
         if (defineEnumCall) info.calls.push(defineEnumCall);
       }
@@ -277,11 +188,6 @@ function hasSkipMarker(cls: ts.ClassDeclaration, sf: ts.SourceFile): boolean {
   return false;
 }
 
-/**
- * Parse `@trails-typegen skip-columns: col1, col2` from leading JSDoc of a
- * class declaration. Returns the set of column names to exclude from
- * schema-reflected `declare` generation.
- */
 function parseSkipColumns(cls: ts.ClassDeclaration, sf: ts.SourceFile): Set<string> {
   const out = new Set<string>();
   const ranges = ts.getLeadingCommentRanges(sf.text, cls.pos) ?? [];
@@ -299,9 +205,6 @@ function parseSkipColumns(cls: ts.ClassDeclaration, sf: ts.SourceFile): Set<stri
 }
 
 function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
-  // Accept identifier AND string-literal member names so user-authored
-  // quoted members (e.g. `declare "strange-col": string;`) de-dupe
-  // against schema-emitted quoted declares.
   let name: string | undefined;
   if (m.name) {
     if (ts.isIdentifier(m.name)) name = m.name.text;
@@ -313,7 +216,6 @@ function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
   if (isStatic) info.existingStaticMembers.add(name);
   else info.existingMembers.add(name);
 
-  // Capture `static tableName = "..."` for schema-column lookup.
   if (
     isStatic &&
     name === "tableName" &&
@@ -402,7 +304,6 @@ function readScopeCall(call: ts.CallExpression): ScopeCall | null {
   if (!ts.isArrowFunction(fnArg) && !ts.isFunctionExpression(fnArg)) {
     return { kind: "scope", name: nameArg.text, paramsAfterThis: [] };
   }
-  // A leading `this` parameter is a type-position annotation, not an argument.
   const params = fnArg.parameters;
   const rest = params.length > 0 && params[0].name.getText() === "this" ? params.slice(1) : params;
   return {
@@ -412,24 +313,11 @@ function readScopeCall(call: ts.CallExpression): ScopeCall | null {
   };
 }
 
-/**
- * Render a scope parameter as text usable inside a FUNCTION TYPE
- * (`(<params>) => Relation<...>`). A default initializer (`approved =
- * false`) is illegal in a type position, so drop it and mark the
- * parameter optional, inferring a type from the default literal when the
- * source carries no explicit annotation. Parameters that already have a
- * type annotation keep it; their default (if any) just becomes `?`.
- */
 function renderScopeParam(p: ts.ParameterDeclaration): string {
   const name = p.name.getText();
-  // Rest params (`...args`) come first: they're never optional, can't
-  // carry a default, and must keep the spread even when annotated — a
-  // typed-annotation-first branch would silently drop the `...`.
   if (p.dotDotDotToken) return `...${name}: ${p.type ? p.type.getText() : "unknown[]"}`;
   const optional = p.questionToken != null || p.initializer != null ? "?" : "";
   if (p.type) return `${name}${optional}: ${p.type.getText()}`;
-  // No annotation and no default → an untyped positional param; emit
-  // `name: unknown` (no `?`, since it isn't optional).
   if (!p.initializer) return `${name}: unknown`;
   return `${name}${optional}: ${inferLiteralType(p.initializer)}`;
 }
@@ -492,29 +380,10 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
 }
 
 /**
- * Find every top-level `include(ClassName, ModuleExpr)` call where
- * `include` is imported from `@blazetrails/activesupport`. Returns a
- * flat list — `virtualize()` is responsible for grouping by class name
- * and emitting one interface-merge declaration per class that surfaces
- * the mixed-in instance methods to the type checker.
- *
- * Constraints:
- * - The first argument must be a bare identifier referencing a class
- *   declared in the same file (otherwise we'd be augmenting a foreign
- *   module without a `declare module "..."` boundary).
- * - The second argument is captured verbatim and must be usable inside
- *   a `typeof` type query — currently restricted to bare identifiers
- *   and property-access chains. Inline object literals, calls, and
- *   `as const` expressions are skipped (they'd produce parse errors
- *   in the synthesized `typeof <expr>`).
- *
  * @internal
- * @noRailsEquivalent PERMANENT scans TS source for include() calls so a Ruby `include` reaches the type checker (activesupport concern.rb:132); Ruby needs no such pass.
+ * @noRailsEquivalent PERMANENT
  */
 export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
-  // Only fire when `include` is imported from activesupport — the symbol
-  // is unqualified at the call site, so we need the import to disambiguate
-  // from any local helper named `include`.
   let includeImported = false;
   for (const stmt of sourceFile.statements) {
     if (!ts.isImportDeclaration(stmt)) continue;
@@ -523,12 +392,6 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
     const named = stmt.importClause?.namedBindings;
     if (named && ts.isNamedImports(named)) {
       for (const el of named.elements) {
-        // Local binding must be `include` AND the imported export must
-        // be `include`. Accepts both the bare form and the rare
-        // `include as include`; rejects `include as inc` (local is `inc`,
-        // any `include(...)` call is a separate helper) and
-        // `foo as include` (local is `include` but bound to a different
-        // export — calling it would invoke the wrong function).
         const importedName = el.propertyName?.text ?? el.name.text;
         if (importedName === "include" && el.name.text === "include") includeImported = true;
       }
@@ -566,11 +429,6 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
     if (!ts.isIdentifier(classArg)) continue;
     const meta = declaredClasses.get(classArg.text);
     if (!meta) continue;
-    // Only accept module expressions usable inside a `typeof` type
-    // query: bare identifiers and (chains of) property access. Inline
-    // object literals, calls, and other expressions can't be queried
-    // by `typeof`, so skip those calls — declaration merging there
-    // would just produce parse errors.
     if (!isTypeofQueryable(modArg)) continue;
     out.push({
       className: classArg.text,

@@ -1,11 +1,3 @@
-/**
- * HMT Slot E — Nested-through advanced. Closes the HMT cluster.
- * Regression contracts for
- * distinct, same-table-twice, polymorphic source + sourceType,
- * source-reflection reset between independent preloads, and the
- * autosave-skip guarantee. Mirrors selected scenarios from
- * vendor/rails/activerecord/test/cases/associations/nested_through_associations_test.rb.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -39,8 +31,6 @@ describe("HMT Slot E — nested-through advanced", () => {
   ]);
 
   it("distinct on the source-reflection scope returns one row when a tag is reachable via multiple posts", async () => {
-    // david has two posts (welcome + thinking) each tagged "general".
-    // distinctTags deduplicates by tag PK, so we get exactly one row.
     const david = authors("david");
     const general = tags("general");
     const result = await david.distinctTags;
@@ -51,33 +41,25 @@ describe("HMT Slot E — nested-through advanced", () => {
   it("preloading nested-through does not leak target rows between independent owner sets", async () => {
     const david = authors("david");
     const bob = authors("bob");
-    // Load each author's tags in separate preload queries.
     const [davidRow] = await Author.where({ id: david.id }).preload(":tags");
     const [bobRow] = await Author.where({ id: bob.id }).preload(":tags");
     const davidTags = (davidRow.association("tags").target ?? []) as any[];
     const bobTags = (bobRow.association("tags").target ?? []) as any[];
-    // david: welcome+thinking both tagged "general"
     expect(davidTags.every((t: any) => t.name === "General")).toBe(true);
-    // bob: misc_by_bob + other_by_bob tagged misc/blue — distinct from general
     expect(bobTags.every((t: any) => t.name !== "General")).toBe(true);
   });
 
   it("table referenced multiple times in the nested chain aliases consistently across loads", async () => {
-    // Author → posts → taggings: two separate preloads of the same chain
-    // must produce stable results (no alias collision between invocations).
     const david = authors("david");
     const [r1] = await Author.where({ id: david.id }).preload(":taggings");
     const [r2] = await Author.where({ id: david.id }).preload(":taggings");
     const t1 = ((r1.association("taggings").target ?? []) as any[]).map((r: any) => r.id).sort();
     const t2 = ((r2.association("taggings").target ?? []) as any[]).map((r: any) => r.id).sort();
     expect(t1).toEqual(t2);
-    // david has 2 post-taggings (welcome_general + thinking_general)
     expect(t1.length).toBe(2);
   });
 
   it("through with polymorphic source + sourceType filters cross-type targets out of the result", async () => {
-    // Hotel → chefs (polymorphic employable) → cakeDesigners (sourceType filter).
-    // A drink designer that shares the chefs table must not appear in cakeDesigners.
     const cake = await CakeDesigner.create({});
     const drink = await DrinkDesigner.create({});
     const dept = await Department.create({});
@@ -100,7 +82,6 @@ describe("HMT Slot E — nested-through advanced", () => {
   });
 
   it("preloading two independent author sets keeps each owner's nested-through targets isolated", async () => {
-    // Preload all authors' tags in one query — each owner must get only their own tags.
     const david = authors("david");
     const bob = authors("bob");
     const preloaded = await Author.where({ id: [david.id, bob.id] }).preload(":tags");
@@ -116,8 +97,6 @@ describe("HMT Slot E — nested-through advanced", () => {
   });
 
   it("nested-through must not autosave: reading the proxy after save inserts nothing", async () => {
-    // Re-saving an author must not insert duplicate taggings via the
-    // nested-through chain. Count before and after must match.
     const david = authors("david");
     const before = await Tagging.where({ taggable_type: "Post" }).count();
     await david.save();

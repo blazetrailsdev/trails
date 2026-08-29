@@ -1,33 +1,13 @@
-/**
- * Smoke test for useTransactionalTests (Phase 1 of the transactional-test-
- * isolation harness). Proves that per-test rollback isolation works on the
- * Base.connection path for both DML and (on PG / SQLite) DDL.
- *
- * Run this file only (not the whole suite):
- *   pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.trails.test.ts
- *
- * With PG:
- *   ARCONN=postgresql PGHOST=localhost PGPORT=5432 PGUSER=rails \
- *     pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.trails.test.ts
- */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../base.js";
 import { useTransactionalTests } from "./use-transactional-tests.js";
 import { adapterType } from "../test-adapter.js";
 
-// Shorthand for raw SQL operations on the shared Base.connection.
 const conn = () => Base.connection;
 
-// ---------------------------------------------------------------------------
-// DML isolation — works on all three adapters (SQLite, PG, MySQL).
-// Test A inserts a row; test B must see zero rows (A's insert rolled back).
-// ---------------------------------------------------------------------------
 describe("useTransactionalTests — DML isolation", () => {
   useTransactionalTests();
 
-  // txn_smoke_users is a bespoke smoke-test table (not in schema.rb): build it
-  // with create_table in beforeAll and drop it in afterAll, mirroring Rails'
-  // ad-hoc test tables.
   beforeAll(async () => {
     await conn().createTable("txn_smoke_users", { force: true }, (t) => {
       t.string("name");
@@ -50,14 +30,6 @@ describe("useTransactionalTests — DML isolation", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// DDL isolation — PostgreSQL and SQLite only.
-// Both support transactional DDL (CREATE TABLE rolls back). MySQL does not
-// (DDL auto-commits), so the suite is skipped on MySQL.
-//
-// Test C creates a temporary table inside a test transaction; test D must
-// confirm that table no longer exists (DDL was rolled back).
-// ---------------------------------------------------------------------------
 describe.skipIf(adapterType === "mysql")(
   "useTransactionalTests — DDL isolation (PG + SQLite)",
   () => {
@@ -68,13 +40,10 @@ describe.skipIf(adapterType === "mysql")(
         `CREATE TABLE txn_smoke_ddl (id INTEGER PRIMARY KEY, label TEXT)`,
       );
       const rows = await conn().execute(`SELECT 1 AS ok FROM txn_smoke_ddl`);
-      // Table exists and is empty — CREATE TABLE ran, no rows inserted yet.
       expect(rows).toHaveLength(0);
     });
 
     it("table does not exist because DDL was rolled back in afterEach", async () => {
-      // On PG the error is 'relation "txn_smoke_ddl" does not exist';
-      // on SQLite it is 'no such table: txn_smoke_ddl'. Both throw.
       await expect(conn().execute(`SELECT 1 AS ok FROM txn_smoke_ddl`)).rejects.toThrow();
     });
   },

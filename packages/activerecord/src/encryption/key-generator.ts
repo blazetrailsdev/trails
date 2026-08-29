@@ -1,9 +1,3 @@
-/**
- * Key generation — derives keys from passwords and generates random keys.
- *
- * Mirrors: ActiveRecord::Encryption::KeyGenerator
- */
-
 import { getCrypto } from "@blazetrails/activesupport";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 
@@ -27,9 +21,6 @@ export class KeyGenerator {
   }
 
   generateRandomHexKey({ length = this.keyLength() }: { length?: number } = {}): string {
-    // `generateRandomKey` hands the raw bytes back base64-encoded where Ruby
-    // returns a binary String, so Rails' `unpack("H*")[0]` re-encodes through
-    // that buffer (key_generator.rb:31).
     return Buffer.from(this.generateRandomKey({ length }), "base64").toString("hex");
   }
 
@@ -45,6 +36,6 @@ export class KeyGenerator {
 
   /** @internal */
   private keyLength(): number {
-    return 32; // AES-256 key length, mirrors Cipher.key_length
+    return 32;
   }
 }

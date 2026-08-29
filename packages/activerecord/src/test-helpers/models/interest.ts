@@ -1,6 +1,5 @@
 import type { Human } from "./human.js";
 import type { Zine } from "./zine.js";
-// vendor/rails/activerecord/test/models/interest.rb
 import { Base } from "../../base.js";
 
 export class Interest extends Base {

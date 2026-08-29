@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/reserved_words/group.yml
 export const reservedWordsGroupFixtureData = {
   group1: {
     id: 1,

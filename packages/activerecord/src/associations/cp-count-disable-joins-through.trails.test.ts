@@ -1,23 +1,3 @@
-/**
- * `CollectionProxy#count` on `disable_joins: true` through-
- * associations (task #22).
- *
- * Before this PR, CP#count fell back to `findTarget(...).length`
- * for every disable-joins through shape — the chain walk runs
- * intermediate pluck queries either way, but the final step
- * would SELECT every target row and `.length` the array. On
- * large collections the row-wise SELECT is the expensive part.
- *
- * Now CP#count routes through DJAR's deferred walker and emits a
- * single `SELECT COUNT(*)` on the final-step relation instead.
- * The intermediate plucks are unchanged.
- *
- * Rails' `CollectionAssociation#count` on a through uses
- * `scope.count`, and for disable_joins that resolves to the
- * DJAR's loaded `records.size` — perf-equivalent because Rails'
- * DJAR materializes records to enforce the in-memory reorder.
- * We don't need to materialize for the count, so we emit COUNT.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";

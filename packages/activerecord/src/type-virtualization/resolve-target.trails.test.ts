@@ -16,7 +16,6 @@ function lookupFrom(models: Record<string, AssociationCall[]>): ModelAssociation
 
 describe("resolveThroughTarget", () => {
   test("follows through→source into another model (explicit source)", () => {
-    // Author has_many :commentsWithOrder, through: :posts, source: :comments → Comment
     const author = [
       assoc("hasMany", "posts"),
       assoc("hasMany", "commentsWithOrder", { through: '"posts"', source: '"comments"' }),
@@ -26,7 +25,6 @@ describe("resolveThroughTarget", () => {
   });
 
   test("defaults the source to the singularized then plural association name", () => {
-    // Author has_many :comments, through: :posts  (source defaults to :comment / :comments)
     const author = [
       assoc("hasMany", "posts"),
       assoc("hasMany", "comments", { through: '"posts"' }),
@@ -36,7 +34,6 @@ describe("resolveThroughTarget", () => {
   });
 
   test("resolves a nested through (a through whose through is itself a through)", () => {
-    // Author has_many :members, through: :commentsWithOrder (itself through :posts → Comment)
     const author = [
       assoc("hasMany", "posts"),
       assoc("hasMany", "commentsWithOrder", { through: '"posts"', source: '"comments"' }),
@@ -97,7 +94,6 @@ describe("isEmittableTargetName", () => {
   });
 
   test("an unregistered, invisible name is NOT emittable — caller pins it to Base", () => {
-    // classify("otherThing") → "OtherThing" with no backing model: dangling.
     expect(isEmittableTargetName("OtherThing", none, none)).toBe(false);
   });
 });

@@ -1,17 +1,3 @@
-/**
- * trails-specific invariant with no verbatim Rails counterpart.
- *
- * Rails wires `dirties_query_cache` on the public `execute` (query_cache.rb:13),
- * and DDL runs through `execute`, so a schema change inside a `cache` block
- * clears the query cache. trails now routes DDL through that same wired
- * `execute` (schema-statements), while CRUD writes clear at the wired
- * `execInsert`/`execUpdate`/`execDelete` above the unwired `executeMutation`
- * primitive. This test pins the DDL half of that contract: a schema
- * change issued inside an enabled `cache` block clears the cache exactly once,
- * matching Rails' `execute`-based DDL. (Rails' closest test,
- * `test_cache_gets_cleared_after_migration`, warms the cache *outside* a `cache`
- * block and only asserts no stale-schema error — it never observes the clear.)
- */
 import { describe, it, expect, afterEach } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -21,10 +7,6 @@ import { isSqliteRun } from "./support/sqlite-template.js";
 registerModel(Post as never);
 
 describe("QueryCache DDL dirties (trails)", () => {
-  // `useTransactionalTests: false`: this test issues real DDL (`add_column` /
-  // `remove_column`). MySQL implicitly commits on DDL, which would commit the
-  // fixture transaction mid-test and leak `posts` rows into the shared worker
-  // DB; run non-transactionally so the fixtures are cleaned up by reload instead.
   fixtures(["posts"], { useTransactionalTests: false });
 
   afterEach(async () => {
@@ -39,11 +21,6 @@ describe("QueryCache DDL dirties (trails)", () => {
     };
 
     await Post.cache(async () => {
-      // Warm the cache so there is something for the DDL to clear. This also
-      // ensures the connection's `_queryCache` store is assigned (checkout) and
-      // enabled — that is the exact object the dirtying wrapper clears
-      // (`this._queryCache.clear()`), so spy on it rather than the
-      // execution-context-keyed pool store, which need not be the same object.
       await Post.find(1);
       const store = conn._queryCache;
       const real = store.clear.bind(store);
@@ -54,26 +31,15 @@ describe("QueryCache DDL dirties (trails)", () => {
         real();
       };
       try {
-        // `add_column` is a single `ALTER TABLE … ADD COLUMN` that funnels
-        // through the public `execute` on every adapter (unlike sqlite's
-        // `change_column`, which takes the table-rebuild path). It must dirty
-        // the cache exactly once — like Rails' `execute`-based DDL, where the
-        // pre-fix deviation left it untouched (zero clears).
         await conn.addColumn("posts", "queryCacheDdlProbe", "string");
         expect(clears).toBe(1);
       } finally {
         store.clear = real;
-        // Restore the canonical `posts` shape.
         await conn.removeColumn("posts", "queryCacheDdlProbe");
       }
     });
   });
 
-  // sqlite3's `removeIndex` and `createVirtualTable` are DDL that Rails issues
-  // via `exec_query` (sqlite3_adapter.rb:290, :314) — the wrapped path, so they
-  // dirty. They are one regex away from looking like the reflection reads
-  // around them (both were briefly mis-routed through the non-dirtying
-  // `internalExecQuery`), so pin that they still clear.
   it.skipIf(!isSqliteRun())(
     "sqlite removeIndex and createVirtualTable dirty the query cache",
     async () => {
@@ -85,8 +51,6 @@ describe("QueryCache DDL dirties (trails)", () => {
         dropVirtualTable(t: string, m?: string, v?: string[]): Promise<void>;
       };
 
-      // Each arm counts clears independently, so a regression in either one
-      // fails on its own rather than being masked by the other.
       const countClears = async (ddl: () => Promise<void>): Promise<number> => {
         const store = conn._queryCache;
         const real = store.clear.bind(store);
@@ -111,7 +75,6 @@ describe("QueryCache DDL dirties (trails)", () => {
         );
         expect(indexClears).toBeGreaterThan(0);
 
-        // Re-warm: the removeIndex clear emptied the store.
         await Post.find(1);
         const virtualClears = await countClears(() =>
           conn.createVirtualTable("ddl_probe_vtable", "fts5", ["title"]),
@@ -125,14 +88,6 @@ describe("QueryCache DDL dirties (trails)", () => {
     },
   );
 
-  // The table-rebuild path (`alter_table` → `copy_table`) is the one DDL route
-  // that does not emit a single ALTER: Rails runs its statements through
-  // `create_table`/`drop_table`/`add_index` (`execute`) and
-  // `copy_table_contents` (`internal_exec_query`), sqlite3_adapter.rb:593-648,
-  // so the clear is a side effect of those primitives. trails used to reach
-  // `driver.exec` and compensate with an explicit `clearQueryCache()` in
-  // `alterTable`; this pins that the primitives now do it, so no compensation
-  // is needed.
   it.skipIf(!isSqliteRun())(
     "sqlite change_column's table rebuild dirties the query cache",
     async () => {

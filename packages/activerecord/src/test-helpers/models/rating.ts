@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
-// vendor/rails/activerecord/test/models/rating.rb
 import { Base } from "../../base.js";
 
 export class Rating extends Base {

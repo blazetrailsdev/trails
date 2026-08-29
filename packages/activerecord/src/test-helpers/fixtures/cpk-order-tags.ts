@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/cpk_order_tags.yml
 export const cpkOrderTagFixtureData = {
   cpk_first_order_loyal_customer: {
     tag_id: ref("cpk_tags", "cpk_tag_loyal_customer"),

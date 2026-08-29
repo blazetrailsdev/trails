@@ -1,11 +1,3 @@
-/**
- * trails-only: `ambientPoolConfiguration()` claims to be Rails'
- * `ActiveRecord::Base.connection_pool.db_config.configuration_hash`. It used to
- * rebuild the sqlite entry by hand and disagreed with the pool on `database`,
- * `timeout` and `strict`; this pins the two to one source — the `connections:`
- * entry `ARCONN` selects.
- */
-
 import { describe, expect, test } from "vitest";
 import { Base } from "./base.js";
 import { ambientPoolConfiguration, checkoutRawTestAdapter } from "./test-adapter.js";
@@ -16,8 +8,6 @@ describe("ambientPoolConfiguration", () => {
     expect(ambientPoolConfiguration()).toEqual(Base.connectionPool().dbConfig.configurationHash);
   });
 
-  // A `:memory:` database belongs to its own connection: on the sqlite3_mem lane
-  // a second handle is a second, empty database by design.
   test.skipIf(inMemoryDb())("newRawTestAdapter opens the database Base rides", async () => {
     const { adapter, pool } = await checkoutRawTestAdapter();
     try {

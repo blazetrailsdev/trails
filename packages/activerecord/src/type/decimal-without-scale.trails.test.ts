@@ -35,17 +35,12 @@ describe("DecimalWithoutScale", () => {
 
   it("accepts large values beyond 32-bit range without truncation", () => {
     const type = new DecimalWithoutScale();
-    // Values above 2^31-1 would throw ActiveModelRangeError under 4-byte IntegerType.
-    // BigIntegerType's maxValue=Infinity bypasses that check. JS precision is exact up to 2^53.
     expect(type.cast("2147483648")).toBe(2147483648);
     expect(type.cast("9999999999")).toBe(9999999999);
   });
 
   it("carries genuine bignums as bigint without precision loss", () => {
     const type = new DecimalWithoutScale();
-    // Rails' DecimalWithoutScale < BigInteger reads back an unbounded Integer;
-    // 2**62 exceeds float64's exact-integer range, so it must stay a bigint
-    // (routing through a plain JS number would round to 4611686018427388000).
     expect(type.cast(2n ** 62n)).toBe(2n ** 62n);
     expect(type.cast("4611686018427387904")).toBe(2n ** 62n);
   });

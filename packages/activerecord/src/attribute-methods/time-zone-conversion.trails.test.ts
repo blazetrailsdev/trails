@@ -1,8 +1,3 @@
-/**
- * Tests for TimeZoneConversion wiring on Base.
- *
- * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversionTest
- */
 import { describe, it, expect } from "vitest";
 import { typeRegistry, Types } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
@@ -118,7 +113,7 @@ describe("TimeZoneConversionTest", () => {
 
 describe("TimeZoneConverter#isChanged", () => {
   const zone = new TimeZone("Europe/Paris");
-  const MS1 = 1_000_000n; // exactly 1ms from epoch — clean boundary for all precision tests
+  const MS1 = 1_000_000n;
 
   function converter(precision?: number) {
     return TimeZoneConverter.wrap(

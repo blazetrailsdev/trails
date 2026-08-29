@@ -1,21 +1,3 @@
-/**
- * Migration compatibility — versioned migration behavior.
- *
- * Mirrors: ActiveRecord::Migration::Compatibility
- *
- * Each version class preserves the migration behavior from that version.
- * Old migrations continue to work as originally written even as the
- * migration DSL evolves.
- *
- * Usage:
- *   class CreateUsers extends Migration.forVersion(1.0) {
- *     async change() { ... }
- *   }
- *
- * The current version can be obtained via currentVersion() / CURRENT_VERSION
- * and used with Migration.forVersion(currentVersion()).
- */
-
 import type { Migration } from "../migration.js";
 
 export type MigrationClass =
@@ -26,10 +8,6 @@ const CURRENT_VERSION = "1.0";
 
 const versionRegistry = new Map<string, MigrationClass>();
 
-/**
- * Normalize a version input to a canonical string key.
- * Ensures numeric 1.0 becomes "1.0" (not "1").
- */
 function normalizeVersion(version: string | number): string {
   if (typeof version === "number") {
     const str = String(version);
@@ -38,9 +16,6 @@ function normalizeVersion(version: string | number): string {
   return version;
 }
 
-/**
- * Parse a version string into [major, minor] for comparison.
- */
 function parseVersion(v: string): [number, number] {
   const parts = v.split(".");
   return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0];
@@ -53,32 +28,19 @@ function compareVersions(a: string, b: string): number {
   return aMin - bMin;
 }
 
-/**
- * Register a migration version class.
- */
 export function registerVersion(version: string, klass: MigrationClass): void {
   versionRegistry.set(normalizeVersion(version), klass);
 }
 
-/**
- * Reset the version registry (for testing only).
- */
 export function resetVersionRegistry(): void {
   versionRegistry.clear();
 }
 
-/**
- * Look up the migration base class for a given version.
- * Returns the exact version if registered, or the nearest lower version.
- *
- * Mirrors: ActiveRecord::Migration::Compatibility.find(version)
- */
 export function findVersion(version: string | number): MigrationClass {
   const key = normalizeVersion(version);
   const exact = versionRegistry.get(key);
   if (exact) return exact;
 
-  // Find nearest lower version using proper version comparison
   let best: MigrationClass | undefined;
   let bestKey = "";
 
@@ -99,16 +61,10 @@ export function findVersion(version: string | number): MigrationClass {
   throw err;
 }
 
-/**
- * Get the current (latest) migration version string.
- */
 export function currentVersion(): string {
   return CURRENT_VERSION;
 }
 
-/**
- * Mirrors: ActiveRecord::Migration::Compatibility
- */
 export interface Compatibility {
   version: string;
 }

@@ -1,6 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Dog } from "./dog.js";
-// vendor/rails/activerecord/test/models/dog_lover.rb
 import { Base } from "../../base.js";
 
 export class DogLover extends Base {

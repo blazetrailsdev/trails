@@ -8,10 +8,6 @@ import type {
   ColumnOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 
-// Mirrors Rails' ColumnDefinitionTest::DummyAdapter (column_definition_test.rb:8-18):
-// `native_database_types` maps `string` to "varchar", `quote_column_name` is the
-// identity on the singleton class, and everything else — including the
-// `quote_default_expression` → `quote` self-send — comes from AbstractAdapter.
 class DummyAdapter extends AbstractAdapter {
   static quoteColumnName(columnName: string): string {
     return String(columnName);

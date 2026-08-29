@@ -4,12 +4,6 @@ import { SerializationTypeMismatch } from "../errors.js";
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };
 type ClassLike = new (...args: unknown[]) => unknown;
 
-/**
- * Wraps a coder (e.g. YAML, JSON) with object-class validation so that
- * serialized columns only accept instances of the declared class.
- *
- * Mirrors: ActiveRecord::Coders::ColumnSerializer
- */
 export class ColumnSerializer {
   private _attrName: string;
   private _objectClass: ClassLike;
@@ -34,29 +28,18 @@ export class ColumnSerializer {
     this.checkArityOfConstructor();
   }
 
-  /**
-   * Restore from a serialized coder representation.
-   *
-   * Mirrors: ActiveRecord::Coders::ColumnSerializer#init_with
-   */
   initWith(coder: { attrName: string; objectClass: ClassLike; coder: CoderLike }): void {
     this._attrName = coder.attrName;
     this._objectClass = coder.objectClass;
     this._coder = coder.coder;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Coders::ColumnSerializer#dump
-   */
   dump(object: unknown): string | null {
     if (object == null) return null;
     this.assertValidValue(object, { action: "dump" });
     return this._coder.dump(object);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Coders::ColumnSerializer#load
-   */
   load(payload: unknown): unknown {
     if (payload == null) {
       if (this._objectClass !== (Object as unknown)) {
@@ -75,12 +58,8 @@ export class ColumnSerializer {
     return object;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Coders::ColumnSerializer#assert_valid_value
-   */
   assertValidValue(object: unknown, { action }: { action: string }): void {
     if (object == null) return;
-    // Object is the universal superclass — mirrors Ruby's `Object === anything`.
     if (this._objectClass === (Object as unknown)) return;
     if (!(object instanceof this._objectClass)) {
       throw new SerializationTypeMismatch(
@@ -95,11 +74,6 @@ export class ColumnSerializer {
     try {
       this.load(null);
     } catch (e: unknown) {
-      // Rails rescues ArgumentError alone (column_serializer.rb:56) — the error
-      // `Class.new` raises when the constructor demands arguments. Anything
-      // else the constructor raises propagates unchanged. A JS constructor
-      // never signals a missing argument (it receives `undefined`), so only a
-      // body that raises ArgumentError itself reaches the re-raise.
       if (!(e instanceof ArgumentError)) throw e;
       throw new ArgumentError(
         `Cannot serialize ${this._objectClass.name}. Classes passed to \`serialize\` must have a 0 argument constructor.`,

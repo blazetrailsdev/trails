@@ -15,11 +15,6 @@ function tmpDbPath(): string {
   return path.join(os.tmpdir(), `trails-sqlite-test-${process.pid}-${randomUUID()}.sqlite3`);
 }
 
-// `create` and `charset` reach `establish_connection`
-// (`sqlite_database_tasks.rb:15-20,39-41`) and leave a live pool behind, which
-// the suite guard in `cases/helper.ts:174-183` fails a file for. The beforeEach
-// round trip is how the file's config is captured — `removeConnection` is the
-// only reader that hands it back.
 function withRestoredConnection(): void {
   let previous: ReturnType<typeof Base.removeConnection>;
   beforeEach(async () => {
@@ -41,16 +36,12 @@ describe("SQLiteDatabaseTasks", () => {
     for (const file of created) {
       try {
         fs.unlinkSync(file);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     created.length = 0;
   });
 
   it("create guards and connects against the same relative database", async () => {
-    // `sqlite_database_tasks.rb:15-20` reads the raw `db_config.database` in both
-    // halves; only `drop` joins `root` (`:23-24`).
     const name = `trails-relative-${process.pid}-${randomUUID()}.sqlite3`;
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tasks-root-"));
     const cwdRelative = path.resolve(name);
@@ -105,11 +96,6 @@ describe("SQLiteDatabaseTasks", () => {
       );
       await (seedAdapter as unknown as { close(): Promise<void> }).close();
 
-      // Rails' structure_dump reaches its adapter with a bare
-      // `ActiveRecord::Base.lease_connection` (sqlite_database_tasks.rb:43,68-70),
-      // so the task's db_config has to be the established one before it runs —
-      // which is the caller's job, as it is for `db:schema:dump`
-      // (database_tasks.rb:523-530).
       await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
         await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
       });
@@ -146,8 +132,6 @@ describe("SQLiteDatabaseTasks", () => {
         await (loadedAdapter as unknown as { close(): Promise<void> }).close();
       }
     } finally {
-      // Explicit teardown for the raw-created `widgets` table (the dbPath file is
-      // also unlinked in afterEach) to balance require-table-teardown.
       const cleanupAdapter = new BetterSQLite3Adapter(dbPath);
       await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
       await (cleanupAdapter as unknown as { close(): Promise<void> }).close();
@@ -170,10 +154,6 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     return { mkdirSpy, writeSpy, unlinkSpy };
   };
 
-  // The two `file:` in-memory URI spellings this used to cover are not portable
-  // across the SQLite drivers trails binds: better-sqlite3's build does not set
-  // SQLITE_OPEN_URI, so it opens `file::memory:?cache=shared` as a literal
-  // on-disk file. `:memory:` is the one spelling every driver reads as memory.
   it("creates a canonical :memory: database by connecting, writing no file", async () => {
     const { mkdirSpy, writeSpy } = assertNoFsWrites();
     const config = new HashConfig("development", "primary", {
@@ -185,10 +165,6 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     expect(writeSpy).not.toHaveBeenCalled();
   });
 
-  // `sqlite_database_tasks.rb:22-28` has no in-memory arm: `FileUtils.rm` of a
-  // name with no file raises `Errno::ENOENT`, which the rescue turns into
-  // `NoDatabaseError`. So dropping an in-memory database raises rather than
-  // silently doing nothing.
   it("raises NoDatabaseError dropping an in-memory database, as FileUtils.rm does", async () => {
     for (const database of [
       ":memory:",
@@ -204,14 +180,6 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
   });
 });
 
-// trails-only: an in-memory database has no file for a child `sqlite3` to
-// attach, so structureDump materialises it with `VACUUM INTO` before shelling
-// out. Rails has no in-memory lane and so no counterpart test.
-//
-// The schema is laid through the live connection rather than through
-// `structureLoad`: since the RFC 0051 in-memory lane decision, `structureLoad`
-// is Rails' three-liner (`sqlite_database_tasks.rb:60-63`), whose child process
-// applies the script to its OWN throwaway in-memory database.
 describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   const created: string[] = [];
   const configuration = new HashConfig("development", "primary", {
@@ -219,10 +187,6 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     database: ":memory:",
   });
 
-  // `removeConnection` hands back the config it removed, which is how the
-  // file-scoped pool is put back afterwards — the suite guard in
-  // `cases/helper.ts:174-183` fails any file that leaves a writing pool behind.
-  // It drains the pool on the way out (`disconnectPoolFromPoolManager`).
   let previous: ReturnType<typeof Base.removeConnection>;
 
   async function lay(...statements: string[]): Promise<void> {
@@ -241,9 +205,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     for (const file of created) {
       try {
         fs.unlinkSync(file);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     created.length = 0;
   });
@@ -291,10 +253,6 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
     expect(contents).toMatch(/index_widgets_on_name/);
   });
 
-  // RFC 0051 `sqlite-structure-load-in-memory-lane-decision`: the `:memory:`
-  // lane gets Rails' behaviour rather than a trails-only adapter path. The
-  // child `sqlite3 :memory: < dump.sql` applies the script to a database of
-  // its own and exits, so the connection that owns this one never sees it.
   it("leaves the live in-memory connection untouched, as Rails' child process does", async () => {
     await new SQLiteDatabaseTasks(configuration).structureLoad(
       sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),

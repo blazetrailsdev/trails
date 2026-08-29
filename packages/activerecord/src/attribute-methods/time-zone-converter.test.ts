@@ -14,8 +14,6 @@ describe("TimeZoneConverterTest", () => {
   });
 
   it("comparison with date time type", () => {
-    // Two distinct DateTime instances (mirrors Rails' Marshal round-trip producing
-    // a new object) — verifies ValueType.equals compares by shape, not reference.
     const value = new TimeZoneConverter(new DateTime());
     const valueFromCache = new TimeZoneConverter(new DateTime());
 
@@ -36,7 +34,6 @@ describe("TimeZoneConverterTest", () => {
     const result = converter.cast(instant);
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
-    // 14:00 UTC = 10:00 EDT (UTC-4 in summer)
     expect(twz.hour).toBe(10);
     expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
   });
@@ -44,12 +41,10 @@ describe("TimeZoneConverterTest", () => {
   it("cast wraps Temporal.ZonedDateTime in current zone", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    // ZonedDateTime in UTC at 14:00
     const zdt = Temporal.Instant.from("2024-06-15T14:00:00Z").toZonedDateTimeISO("UTC");
     const result = converter.cast(zdt);
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
-    // 14:00 UTC = 10:00 EDT (UTC-4 in summer)
     expect(twz.hour).toBe(10);
     expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
     expect(twz.toI()).toBe(zdt.toInstant().epochMilliseconds / 1000);
@@ -67,21 +62,18 @@ describe("TimeZoneConverterTest", () => {
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
     expect(twz.timeZone.name).toBe(eastern.name);
-    expect(twz.toI()).toBe(pacificTime.toI()); // same instant
+    expect(twz.toI()).toBe(pacificTime.toI());
   });
 
   it("cast parses offset-less string as local to current zone (not default_timezone)", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    // "10:30:00" with no offset → should be 10:30 local Eastern, not 10:30 UTC
     const result = converter.cast("2024-06-15 10:30:00");
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
-    // Wall-clock in the zone must be 10:30 (not 06:30 as wrong UTC-then-display would give)
     expect(twz.hour).toBe(10);
     expect(twz.min).toBe(30);
     expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
-    // UTC instant should be 14:30 (10:30 EDT = UTC-4, so UTC = 10:30 + 4h)
     expect(twz.utc().toTime().epochMilliseconds).toBe(
       Temporal.Instant.from("2024-06-15T14:30:00Z").epochMilliseconds,
     );
@@ -93,7 +85,6 @@ describe("TimeZoneConverterTest", () => {
     const result = converter.cast("2024-06-15T10:30:00-04:00");
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
-    // 10:30 EDT = 14:30 UTC, displayed in UTC zone
     expect(twz.hour).toBe(14);
     expect(twz.min).toBe(30);
   });
@@ -103,26 +94,21 @@ describe("TimeZoneConverterTest", () => {
     const converter = new TimeZoneConverter(new DateTime());
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const result = converter.cast(instant);
-    // No zone set — value passes through unchanged
     expect(result).toBeInstanceOf(Temporal.Instant);
   });
 
   it("cast raises for plain object with non-multiparameter keys", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    // Rails: the Hash branch delegates to DateTime#value_from_multiparameter_assignment,
-    // which raises when keys 1/2/3 are missing.
     expect(() => converter.cast({ date: "2024-06-15" })).toThrow("doesn't contain necessary keys");
   });
 
   it("deserialize wraps Temporal.Instant from subtype in TimeWithZone", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    // DB value: "2024-06-15 14:00:00" (UTC stored value)
     const result = converter.deserialize("2024-06-15 14:00:00");
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
-    // 14:00 UTC = 10:00 EDT
     expect(twz.hour).toBe(10);
   });
 
@@ -132,9 +118,6 @@ describe("TimeZoneConverterTest", () => {
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = new TimeWithZone(instant, eastern);
-    // Rails' DelegateClass forwards `serialize` to the subtype, whose
-    // `ActiveModel::Type::Value#serialize` is the identity — value_for_database
-    // IS the TimeWithZone, and `quoted_date` getutc's it downstream.
     const result = converter.serialize(twz);
     expect(result).toBeInstanceOf(TimeWithZone);
     expect((result as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
@@ -148,7 +131,6 @@ describe("TimeZoneConverterTest", () => {
     const deserialized = converter.deserialize("2024-06-15 14:00:00");
     expect(deserialized).toBeInstanceOf(TimeWithZone);
     const serialized = converter.serialize(deserialized);
-    // value_for_database is the cast TimeWithZone, not a SQL string.
     expect(serialized).toBeInstanceOf(TimeWithZone);
     expect((serialized as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
       "2024-06-15T14:00:00Z",

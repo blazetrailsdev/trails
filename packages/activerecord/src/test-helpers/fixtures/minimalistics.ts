@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/minimalistics.yml
 export const minimalisticFixtureData = {
   zero: {
     id: 0,

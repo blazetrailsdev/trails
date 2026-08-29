@@ -1,15 +1,3 @@
-/**
- * Faithful port of activerecord/test/cases/nested_attributes_test.rb.
- *
- * Class names mirror the Rails test classes as `describe(...)` blocks and each
- * `it(...)` maps 1:1 to a Rails `def test_*` / `test "..."`. Trails-only cases
- * with no Rails counterpart live in `nested-attributes.trails.test.ts`.
- *
- * Where Rails reads an association synchronously after `reload`, trails returns
- * a promise, so reads go through `loadTarget()` / `loadHasOne` and in-memory
- * checks use `association(...).target`. These are the documented async-model
- * accommodations, not behavioral deviations.
- */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   Base,
@@ -39,12 +27,6 @@ import { Message } from "./test-helpers/models/message.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
-// The canonical models these tests exercise, declared as (data-less) fixture
-// sets. Their tables come from the template clone; declaring a set
-// auto-registers the model on resolution — replacing the manual
-// `defineSchema` + `registerModel` bootstrap. Empty data means no seeded rows;
-// each test builds the records it needs (matching Rails, which doesn't declare
-// fixtures for these classes).
 type ExtraFixtures = Record<string, readonly [typeof Base, Record<string, unknown>]>;
 function coreFixtures(extra: ExtraFixtures = {}) {
   return fixtures({
@@ -69,9 +51,6 @@ async function pirateOf(ship: Ship): Promise<Pirate | null> {
   return (await ship.association("pirate").loadTarget()) as Pirate | null;
 }
 
-// ==========================================================================
-// TestNestedAttributesInGeneral
-// ==========================================================================
 describe("TestNestedAttributesInGeneral", () => {
   coreFixtures({
     cpk_orders: [CpkOrder, {}],
@@ -79,7 +58,6 @@ describe("TestNestedAttributesInGeneral", () => {
     cpk_chapters: [CpkChapter, {}],
   });
 
-  // teardown { Pirate.accepts_nested_attributes_for :ship, allow_destroy: true, reject_if: proc(&:empty?) }
   function resetShipConfig(): void {
     Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
@@ -136,8 +114,6 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("should raise an UnknownAttributeError for non existing nested attributes", async () => {
-    // Rails' setup keeps `accepts_nested_attributes_for :ship` configured; the
-    // trails tests configure per-case and restore via resetShipConfig.
     resetShipConfig();
     await expect(
       (async () => {
@@ -168,8 +144,6 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method without arguments", async () => {
-    // Rails `reject_if: :new_record?` — the method runs on the owner; a new
-    // (unsaved) pirate rejects the nested ship.
     Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Black Pearl" });
@@ -180,13 +154,8 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method with arguments", async () => {
-    // Rails `reject_if: :reject_empty_ships_on_create` —
-    // `attributes.delete("_reject_me_if_new").present? && !persisted?`
     Pirate.acceptsNestedAttributesFor("ship", {
       rejectIf: (attrs, rec) => {
-        // Rails `attributes.delete("_reject_me_if_new")` removes the control key
-        // from the hash so the subsequent build never assigns it (which would
-        // now raise UnknownAttributeError).
         const v = attrs["_reject_me_if_new"];
         delete attrs["_reject_me_if_new"];
         return v != null && v !== "" && v !== false && !rec.isPersisted();
@@ -197,11 +166,8 @@ describe("TestNestedAttributesInGeneral", () => {
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     let before = Number(await Ship.count());
     await pirate.saveBang();
-    expect(Number(await Ship.count())).toBe(before); // not persisted → rejected
+    expect(Number(await Ship.count())).toBe(before);
 
-    // pirate is now persisted, so reject_empty_ships_on_create returns false.
-    // The awaitable writer, because a persisted owner's unloaded has_one still
-    // owes Rails' leading `load_target` (has_one_association.rb:59).
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     before = Number(await Ship.count());
     await pirate.saveBang();
@@ -273,8 +239,6 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await Pirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
-    // `build` on a persisted owner's unloaded has_one returns Rails' leading
-    // `load_target` for the caller to await.
     await (pirate.association("ship") as any).build();
     await (pirate as any).setShipAttributes({ name: "Ship 1", pirate_id: Number(pirate.id) + 1 });
     expect(Number((pirate.association("ship") as any).target.pirate_id)).toBe(Number(pirate.id));
@@ -371,12 +335,8 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 });
 
-// ==========================================================================
-// TestNestedAttributesOnAHasOneAssociation
-// ==========================================================================
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
   coreFixtures();
-  // Rails' treasure.rb declares `accepts_nested_attributes_for :looter`.
   beforeAll(() => Treasure.acceptsNestedAttributesFor("looter"));
 
   async function setup(): Promise<{ pirate: Pirate; ship: Ship }> {
@@ -402,9 +362,6 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const { pirate, ship } = await setup();
     await ship.destroy();
     const p = await Pirate.find(pirate.id);
-    // The awaitable writer: a persisted owner's unloaded has_one owes Rails'
-    // leading `load_target` (has_one_association.rb:59) even when it finds
-    // nothing, which the synchronous setter cannot await.
     await (p as any).setShipAttributes({ name: "Davy Jones Gold Dagger" });
     const target = (p.association("ship") as any).target as Ship;
     expect(target.isPersisted()).toBe(false);
@@ -431,8 +388,6 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const { pirate, ship } = await setup();
     const p = await Pirate.find(pirate.id);
     await shipOf(p);
-    // The awaitable writer: replacing a loaded record runs Rails'
-    // `remove_target!` (has_one_association.rb:69) inline at the assignment.
     await (p as any).setShipAttributes({ name: "Davy Jones Gold Dagger" });
     const target = (p.association("ship") as any).target as Ship;
     expect(target.isPersisted()).toBe(false);
@@ -503,7 +458,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const { pirate, ship } = await setup();
     for (const notTruth of [null, "0", 0, "false", false]) {
       const p = await Pirate.find(pirate.id);
-      await shipOf(p); // Rails reads `@pirate.ship`, loading it into memory
+      await shipOf(p);
       await p.update({ shipAttributes: { id: ship.id, _destroy: notTruth } });
       expect(String((await Ship.find(ship.id)).id)).toBe(String(ship.id));
     }
@@ -616,9 +571,6 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
   });
 });
 
-// ==========================================================================
-// TestNestedAttributesOnABelongsToAssociation
-// ==========================================================================
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
   coreFixtures();
 
@@ -792,10 +744,6 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const { ship, pirate } = await setup();
     await (pirate as any).delete();
     const s = await Ship.find(ship.id);
-    // trails defers the update_only build to the post-save flush (it cannot
-    // synchronously read "no existing record" without a DB load), so the
-    // observable outcome — a freshly created update_only pirate — is checked
-    // after save rather than the unsaved in-memory build Rails inspects.
     await s.update({ updateOnlyPirateAttributes: { catchphrase: "Arr" } });
     expect(
       await (await Ship.find(ship.id)).association("updateOnlyPirate").loadTarget(),
@@ -838,9 +786,6 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
   });
 });
 
-// ==========================================================================
-// NestedAttributesOnACollectionAssociationTests (mixed into has_many + HABTM)
-// ==========================================================================
 function collectionAssociationTests(
   associationName: "birds" | "parrots",
   childClass: typeof Bird | typeof Parrot,
@@ -986,9 +931,6 @@ function collectionAssociationTests(
 
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
     const { pirate } = await buildSetup();
-    // Rails queries `existing_records` here; trails can only consult the loaded
-    // target synchronously, so load it first and use the bare setter (which,
-    // unlike `attributes=`, surfaces the raw RecordNotFound).
     await proxy(pirate).load();
     expect(() => {
       write(pirate, [{ id: 1234567890 }]);
@@ -1099,10 +1041,6 @@ function collectionAssociationTests(
   it("should be possible to destroy a record", async () => {
     for (const trueVariable of ["1", 1, "true", true]) {
       const { pirate, child1, child2 } = await buildSetup();
-      // Rails: `record = @pirate.reload.public_send(@association_name).create!(...)`
-      // — reload resets the loaded association so the new record joins the same
-      // pirate's collection (rather than a separate `find`, which would leave
-      // this pirate's cached target stale and out of sync with the DB row).
       await pirate.reload();
       const record = await proxy(pirate).createBang({
         name: "Grace OMalley",
@@ -1239,9 +1177,6 @@ describe("TestNestedAttributesOnAHasAndBelongsToManyAssociation", () => {
   });
 });
 
-// ==========================================================================
-// NestedAttributesLimitTests (mixed into Numeric / Symbol / Proc)
-// ==========================================================================
 function limitTests(makePirate: () => Promise<Pirate>): void {
   it("limit with less records", async () => {
     const pirate = await makePirate();
@@ -1266,10 +1201,6 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
 
   it("limit with exceeding records", async () => {
     const pirate = await makePirate();
-    // `@pirate.attributes = { … }` (nested_attributes_test.rb:977-981) raises at
-    // the assignment expression: `check_record_limit!`
-    // (nested_attributes.rb:511) runs before any of the collection's writers, so
-    // the raise is synchronous here too.
     expect(() =>
       (pirate as any).setAttributes({
         parrotsAttributes: {
@@ -1316,9 +1247,6 @@ describe("TestNestedAttributesLimitProc", () => {
   );
 });
 
-// ==========================================================================
-// TestNestedAttributesWithNonStandardPrimaryKeys
-// ==========================================================================
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
   const { owners, pets } = fixtures(["owners", "pets"]);
 
@@ -1349,9 +1277,6 @@ describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
   });
 });
 
-// ==========================================================================
-// TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations
-// ==========================================================================
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   coreFixtures();
 
@@ -1423,9 +1348,6 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   });
 });
 
-// ==========================================================================
-// TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations
-// ==========================================================================
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   coreFixtures();
 
@@ -1520,18 +1442,9 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   });
 });
 
-// ==========================================================================
-// TestIndexErrorsWithNestedAttributesOnlyMode
-// ==========================================================================
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   fixtures({ guitars: [Guitar, {}], tuning_pegs: [TuningPeg, {}] });
 
-  // Mirrors Rails' anonymous `@guitar_class` (nested_attributes_test.rb:1171):
-  // `has_many :tuning_pegs, index_errors: :nested_attributes_order` keys nested
-  // errors by write order rather than the association/DB order used by the
-  // canonical `Guitar` model (`index_errors: true`). Rides the canonical
-  // `guitars`/`tuning_pegs` tables and the canonical `TuningPeg`
-  // (`validates_numericality_of :pitch`).
   class IndexedGuitar extends Base {
     static tableName = "guitars";
     declare tuningPegs: AssociationProxy<TuningPeg>;
@@ -1565,15 +1478,10 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   });
 });
 
-// ==========================================================================
-// TestNestedAttributesWithExtend
-// ==========================================================================
 describe("TestNestedAttributesWithExtend", () => {
   fixtures({ pirates: [Pirate, {}], treasures: [Treasure, {}] });
 
   it("extend affects nested attributes", async () => {
-    // Rails: `has_many :treasures, as: :looter, extend: Pirate::PostTreasuresExtension`
-    // with `PostTreasuresExtension#build` prepending `name: "from extension"`.
     class SuperPirate extends Base {
       static tableName = "pirates";
       declare treasures: AssociationProxy<Treasure>;
@@ -1597,9 +1505,6 @@ describe("TestNestedAttributesWithExtend", () => {
   });
 });
 
-// ==========================================================================
-// TestNestedAttributesForDelegatedType
-// ==========================================================================
 describe("TestNestedAttributesForDelegatedType", () => {
   fixtures({ entries: [Entry, {}], messages: [Message, {}] });
   beforeAll(() => {

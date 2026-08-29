@@ -20,12 +20,6 @@ import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
 
 describe("ConnectionHandlingTest", () => {
-  // The opted-out cases either assert the pool releases its connection, or
-  // establish one against a config that is never meant to be dialled
-  // (`db/foo.sqlite3`, an in-memory registry entry). Transactional fixtures
-  // defeat both: setup pins a connection for the wrapping transaction, and the
-  // `!connection.active_record` subscriber pins any pool established mid-test,
-  // whose `verifyBang` then really connects.
   fixtures(["posts"], {
     usesTransaction: [
       "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
@@ -47,8 +41,6 @@ describe("ConnectionHandlingTest", () => {
   afterEach(async () => {
     ActiveRecord.permanentConnectionCheckout = permanentConnectionCheckoutWas;
     connectedToStack().length = 0;
-    // `common APIs ...` opts out of transactional fixtures, so its insert is
-    // committed and would otherwise perturb the shared worker DB.
     await Post.where({ title: "foo" }).deleteAll();
   });
 
@@ -256,9 +248,6 @@ describe("ConnectionHandlingTest", () => {
     try {
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
-      // primaryClassQ() is true but _connectionSpecificationName has not been
-      // planted yet (connectsTo not called) — the reader's primary-class
-      // branch should still normalize to "Base".
       expect(Object.prototype.hasOwnProperty.call(AppRecord, "_connectionSpecificationName")).toBe(
         false,
       );
@@ -292,10 +281,6 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.connectionDbConfig().adapter).toBeTruthy();
   });
 
-  // Rails' build_db_config_from_hash deletes :url before constructing the
-  // UrlConfig, so configuration_hash carries the parsed discrete fields and
-  // never the verbatim URL string. establish_connection({ adapter, url })
-  // must mirror that shape, matching the resolver's "url removed from hash".
   it("establish_connection with a url stores a UrlConfig with discrete fields", async () => {
     await Base.establishConnection({ adapter: "sqlite3", url: "sqlite3:db/discrete.sqlite3" });
     const config = Base.connectionDbConfig();
@@ -359,7 +344,6 @@ describe("ConnectionHandlingTest", () => {
   it("remove_connection removes the pool", async () => {
     const ambientDbConfig = Base.connectionDbConfig();
     expect(Base.connectionPool()).toBeTruthy();
-    // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
     const removed = Base.removeConnection();
     expect(removed).toBe(ambientDbConfig);
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
@@ -494,12 +478,6 @@ describe("ConnectionHandlingTest", () => {
     },
   );
 
-  // Mirrors Rails: `ActiveRecord::Base.establish_connection` with no args
-  // reads from `Base.configurations` (the in-memory registry), not from
-  // disk. Required so callers that mutate `configurations` in place (e.g.
-  // `TestDatabases.create_and_load_schema`) actually reconnect to the
-  // mutated config rather than picking up the original from
-  // config/database.*.
   it("autoConnect honors an in-memory DatabaseConfigurations registry", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
@@ -515,29 +493,17 @@ describe("ConnectionHandlingTest", () => {
         }),
       ]);
 
-      // Rails' registry is one class variable, so the config goes on Base
-      // even though the connection is established on the subclass.
       Base.configurations(inMemory);
 
       await InMemoryModel.establishConnection();
       expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
       expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
     } finally {
-      // The pool is never connected here (only its dbConfig is read), but it
-      // stays in the handler's writing list, and `setup_transactional_fixtures`
-      // pins EVERY writing pool with an eager `verify!`
-      // (connection_pool.rb:335) — which would try to open `db/common.sqlite3`
-      // for real in a later test. Drop it, as the sibling establishConnection
-      // tests in this file do.
       InMemoryModel.removeConnection();
       Base.configurations(priorConfigs);
     }
   });
 
-  // Regression: a UrlConfig whose `_database` has been mutated in place
-  // (TestDatabases.create_and_load_schema's parallel-worker pattern)
-  // must reconnect to the mutated database, not the original URL. Rails
-  // resolves from configuration_hash, not the raw URL.
   it("autoConnect reconnects via mutated configuration.database for UrlConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { UrlConfig } = await import("./database-configurations/url-config.js");
@@ -547,17 +513,12 @@ describe("ConnectionHandlingTest", () => {
     class WorkerModel extends Base {}
     try {
       const url = new UrlConfig(env, "primary", "sqlite3:db/foo.sqlite3");
-      url._database = "db/foo-2.sqlite3"; // mimic worker-suffix mutation
+      url._database = "db/foo-2.sqlite3";
       const inMemory = new DatabaseConfigurations([url]);
 
       Base.configurations(inMemory);
 
       await WorkerModel.establishConnection();
-      // The connection pool's resolved dbConfig must point at the
-      // mutated database, not the original URL path. This is the
-      // actual reconnect-target observation Copilot review #3 asked
-      // for — without the URL-skip in autoConnect, this would surface
-      // the original "db/foo.sqlite3" instead.
       const pool = WorkerModel.connectionPool();
       expect(pool.dbConfig.database).toBe("db/foo-2.sqlite3");
       const Klass = await WorkerModel.adapterClass();
@@ -570,11 +531,6 @@ describe("ConnectionHandlingTest", () => {
     }
   });
 
-  // The adapter backfill in establishWithDbConfig is only reached by an
-  // adapter-less config carrying a derivable URL — a UrlConfig pre-infers the
-  // adapter in buildUrlHash, so only a HashConfig gets here. Configuration
-  // hashes are frozen, so the backfill has to replace the hash rather than
-  // write into it.
   it("establishConnection backfills the adapter on an adapter-less HashConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
@@ -591,7 +547,6 @@ describe("ConnectionHandlingTest", () => {
       expect(Object.isFrozen(dbConfig.configurationHash)).toBe(true);
       const pool = BackfillModel.connectionPool();
       expect(pool.dbConfig).toBe(dbConfig);
-      // Never checked out — db/foo.sqlite3 must not be created by this test.
       expect(pool.activeConnection).toBeNull();
     } finally {
       BackfillModel.removeConnection();
@@ -665,9 +620,6 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 });
 
 describe("AbstractAdapter#isPreventingWrites stack matching", () => {
-  // Each case establishes its own abstract-class pools; tear down exactly those
-  // rather than clearing every pool, which would take `Base`'s ambient worker
-  // connection with it.
   afterEach(async () => {
     connectedToStack().length = 0;
     for (const name of ["UnrelatedAbstract", "AnimalsRecord", "MealsRecord"]) {
@@ -726,11 +678,6 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
   });
 
   it("primary class connectedTo (after connectsTo) targets the Base-normalized pool", async () => {
-    // Realistic primary-class flow: primaryAbstractClass marks abstract, then
-    // connectsTo sets connectionClass=true so connectionClassForSelf walks no
-    // further than ApplicationRecord. PoolConfig normalizes the descriptor
-    // name to "Base"; the matcher must match the primary-class scope entry
-    // (klasses=[ApplicationRecord]) against that normalized "Base" pool name.
     class ApplicationRecord extends Base {
       static {
         this.abstractClass = true;
@@ -787,17 +734,12 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         this.abstractClass = true;
       }
     }
-    // No `Untouched.configurations` assigned — resolving an unknown env name
-    // against the empty default registry must surface AdapterNotSpecified
-    // rather than passing the string through.
     expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
       AdapterNotSpecified,
     );
     expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
       /`missing_env` database is not configured/,
     );
-    // Pin the available-configurations hint — regressions in the hint
-    // wording shouldn't slip through.
     expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
       /Available database configurations are:/,
     );
@@ -821,9 +763,6 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
       });
 
-      // Exercises the public connectsTo path so the
-      // resolveConfigForConnection side effect (planting
-      // _connectionSpecificationName) is covered end-to-end.
       AppRecord.connectsTo({ database: { writing: "primary" } });
       expect((AppRecord as any)._connectionSpecificationName).toBe("ActiveRecord::Base");
 
@@ -838,12 +777,6 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
   });
 });
 
-// trails-internal mechanism (no Rails counterpart): the connection threaded by
-// `withConnection` is only adopted by a model's internal reads when it
-// belongs to *that model's own pool*, so a statement for a different-pool model
-// running inside an outer wrap (cross-database eager-load, or `update_columns`
-// inside another model's `transaction` block) resolves against its own pool
-// rather than the foreign threaded connection.
 describe("threadedConnectionFor pool-identity guard", () => {
   class Secondary extends Base {}
 
@@ -860,8 +793,6 @@ describe("threadedConnectionFor pool-identity guard", () => {
     Secondary.connectionSpecificationName = "Secondary";
   });
 
-  // `Base` keeps riding the ambient worker pool, so only `Secondary`'s own
-  // pool is torn down and nothing here needs a re-establish.
   afterEach(async () => {
     Base.connectionHandler.removeConnectionPool("Secondary");
   });
@@ -870,10 +801,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
     await Base.withConnection(async () => {
       const threaded = Base.connectionPool().activeConnection;
       expect(threaded).toBeTruthy();
-      // Same pool: the threaded connection is adopted.
       expect(threadedConnectionFor(Base)).toBe(threaded);
-      // Foreign pool with no active connection of its own: not adopted, so the
-      // caller falls back to resolving against Secondary's own pool.
       expect(Secondary.connectionPool().activeConnection).toBeNull();
       expect(threadedConnectionFor(Secondary)).toBeNull();
     });
@@ -885,18 +813,12 @@ describe("threadedConnectionFor pool-identity guard", () => {
 });
 
 describe("establish_connection accepts a DatabaseConfig", () => {
-  // The round trip under test is observable on any class with a pool of its
-  // own, so this drives its own model rather than swapping `Base`'s pool.
   class CapturedConfigModel extends Base {}
 
   afterEach(async () => {
     CapturedConfigModel.removeConnection();
   });
 
-  // Mirrors Rails `establish_connection(db_config)` (the faithful
-  // `run_without_connection` restore): the object captured by
-  // `remove_connection` can be handed straight back to `establish_connection`,
-  // and the pool stores that same object as its db_config.
   it("re-establishes the connection from the captured DatabaseConfig object", async () => {
     const config = new HashConfig("test", "primary", {
       adapter: "sqlite3",

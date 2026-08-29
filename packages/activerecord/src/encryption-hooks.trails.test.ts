@@ -1,5 +1,4 @@
 import { describe, it, expect, afterEach } from "vitest";
-// Intentionally does NOT import encryption.js — tests the unregistered state.
 import { encryptionHooks, registerEncryptionHooks } from "./encryption-hooks.js";
 import { Base } from "./base.js";
 

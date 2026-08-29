@@ -4,7 +4,6 @@ import type { Family } from "./family.js";
 import type { FamilyTree } from "./family-tree.js";
 import type { Job } from "./job.js";
 import type { Room } from "./room.js";
-// vendor/rails/activerecord/test/models/user.rb
 import { Base } from "../../base.js";
 import { hasSecurePassword } from "../../secure-password.js";
 import { Notification } from "./notification.js";

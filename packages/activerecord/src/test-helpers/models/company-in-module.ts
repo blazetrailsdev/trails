@@ -3,35 +3,23 @@ import { Range } from "@blazetrails/activesupport";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import type { Project } from "./project.js";
-// vendor/rails/activerecord/test/models/company_in_module.rb
-// Ruby modules flattened to prefixed exports (TypeScript namespaces banned by lint rule).
-// Each class carries its Ruby module path via `static moduleName` (+ the bare
-// `_demodulizedName` when the flattened JS name differs), so `registerModel`
-// derives the `::`-qualified registry key — the one cross-namespace `className`
-// resolution looks up — instead of a hand-maintained `registerModel(name, …)` call.
 import { registerModel } from "../../associations.js";
 import { registerModuleTableNamePrefix, registerModuleTableNameSuffix } from "../../inheritance.js";
 import { Base } from "../../base.js";
 
-// module MyApplication::Business::Prefixed { def self.table_name_prefix; "prefixed_"; end }
 registerModuleTableNamePrefix("MyApplication::Business::Prefixed", "prefixed_");
-// module MyApplication::Business::Suffixed { def self.table_name_suffix; "_suffixed"; end }
 registerModuleTableNameSuffix("MyApplication::Business::Suffixed", "_suffixed");
 
-// MyApplication::Business::Company
 export class MyAppBusinessCompany extends Base {
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Company";
 }
 
-// MyApplication::Business::Firm
 export class MyAppBusinessFirm extends MyAppBusinessCompany {
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Firm";
 
   static {
-    // foreignKey explicit throughout: JS class name MyAppBusinessFirm would derive
-    // my_app_business_firm_id, but Rails demodulizes MyApplication::Business::Firm → firm_id.
     this.hasMany("clients", (q: any) => q.order("id"), {
       foreignKey: "firm_id",
       dependent: "destroy",
@@ -56,7 +44,6 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   }
 }
 
-// MyApplication::Business::Client
 export class MyAppBusinessClient extends MyAppBusinessCompany {
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Client";
@@ -67,15 +54,11 @@ export class MyAppBusinessClient extends MyAppBusinessCompany {
   }
 }
 
-// MyApplication::Business::Client::Contact
-// Nested under the AR model Client, so compute_table_name prepends the
-// singularized parent table → "company_contacts" (Client.table_name "companies").
 export class MyAppBusinessClientContact extends Base {
   static moduleName = "MyApplication::Business::Client";
   static _demodulizedName = "Contact";
 }
 
-// MyApplication::Business::Developer
 export class MyAppBusinessDeveloper extends Base {
   declare projects: AssociationProxy<Project>;
 
@@ -88,7 +71,6 @@ export class MyAppBusinessDeveloper extends Base {
   }
 }
 
-// MyApplication::Business::Project
 export class MyAppBusinessProject extends Base {
   declare developers: AssociationProxy<Developer>;
 
@@ -100,13 +82,11 @@ export class MyAppBusinessProject extends Base {
   }
 }
 
-// MyApplication::Business::Prefixed::Company
 export class MyAppBusinessPrefixedCompany extends Base {
   static moduleName = "MyApplication::Business::Prefixed";
   static _demodulizedName = "Company";
 }
 
-// MyApplication::Business::Prefixed::Firm
 export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
   static moduleName = "MyApplication::Business::Prefixed";
   static _demodulizedName = "Firm";
@@ -116,19 +96,16 @@ export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
   }
 }
 
-// MyApplication::Business::Prefixed::Nested::Company
 export class MyAppBusinessPrefixedNestedCompany extends Base {
   static moduleName = "MyApplication::Business::Prefixed::Nested";
   static _demodulizedName = "Company";
 }
 
-// MyApplication::Business::Suffixed::Company
 export class MyAppBusinessSuffixedCompany extends Base {
   static moduleName = "MyApplication::Business::Suffixed";
   static _demodulizedName = "Company";
 }
 
-// MyApplication::Business::Suffixed::Firm
 export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
   static moduleName = "MyApplication::Business::Suffixed";
   static _demodulizedName = "Firm";
@@ -138,13 +115,11 @@ export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
   }
 }
 
-// MyApplication::Business::Suffixed::Nested::Company
 export class MyAppBusinessSuffixedNestedCompany extends Base {
   static moduleName = "MyApplication::Business::Suffixed::Nested";
   static _demodulizedName = "Company";
 }
 
-// MyApplication::Billing::Firm
 export class MyAppBillingFirm extends Base {
   static moduleName = "MyApplication::Billing";
   static _demodulizedName = "Firm";
@@ -154,7 +129,6 @@ export class MyAppBillingFirm extends Base {
   }
 }
 
-// MyApplication::Billing::Nested::Firm
 export class MyAppBillingNestedFirm extends Base {
   static moduleName = "MyApplication::Billing::Nested";
   static _demodulizedName = "Firm";
@@ -164,9 +138,6 @@ export class MyAppBillingNestedFirm extends Base {
   }
 }
 
-// MyApplication::Billing::Account
-// Billing is a plain module (not an AR model), so the table is the inferred
-// "accounts" with no contained prefix.
 export class MyAppBillingAccount extends Base {
   declare firm: MyAppBusinessFirm | null;
   declare qualifiedBillingFirm: MyAppBillingFirm | null;
@@ -196,8 +167,6 @@ export class MyAppBillingAccount extends Base {
     });
     this.belongsTo("nestedUnqualifiedBillingFirm", { ...opts, className: "Nested::Firm" });
 
-    // Rails `validate :check_empty_credit_limit` (company_in_module.rb:91).
-    // Sync validation — the check only reads an attribute, no async work.
     this.validate(function (this: MyAppBillingAccount) {
       this.checkEmptyCreditLimit();
     });
@@ -211,9 +180,6 @@ export class MyAppBillingAccount extends Base {
   }
 }
 
-// Register each model: `registerModel` derives the `::`-qualified registry key
-// from the class's own `moduleName`, so cross-namespace className resolution
-// works without hand-written `registerModel("Ruby::Name", …)` strings.
 for (const klass of [
   MyAppBusinessCompany,
   MyAppBusinessFirm,

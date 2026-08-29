@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/user_with_invalid_relation.rb
 import { Base } from "../../base.js";
 
 export class UserWithInvalidRelation extends Base {

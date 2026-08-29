@@ -1,5 +1,4 @@
 import type { Relation } from "../../relation.js";
-// vendor/rails/activerecord/test/models/cat.rb
 import { Base } from "../../base.js";
 
 export class Cat extends Base {
@@ -19,9 +18,6 @@ export class Cat extends Base {
   }
 }
 
-// Rails' `Lion` is an empty subclass (test/models/cat.rb:11); the `declare`s are
-// trails-only typing for the reflected `lions` columns. `gender` reads back as
-// its enum label, not the stored integer, so it is typed as the label union.
 export class Lion extends Cat {
   declare gender: "female" | "male" | null;
   declare is_vegetarian: boolean | null;

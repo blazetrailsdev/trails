@@ -14,7 +14,6 @@ import type { Reader } from "./reader.js";
 import type { Reference } from "./reference.js";
 import type { SecureReader } from "./reader.js";
 import type { Treasure } from "./treasure.js";
-// vendor/rails/activerecord/test/models/person.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
@@ -275,9 +274,6 @@ export class NestedPerson extends Base {
     throw new Error("RuntimeError");
   }
 
-  // `best_friend_first_name=` (person.rb:126-128). `assign_attributes` is
-  // awaitable here, and a TS `set` accessor cannot be awaited, so the Rails name
-  // lands on a `setX()` method (CLAUDE.md § "Fidelity is the job").
   setBestFriendFirstName(newName: string): Promise<void> | void {
     return this.assignAttributes({ bestFriendAttributes: { first_name: newName } });
   }

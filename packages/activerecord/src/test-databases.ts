@@ -1,18 +1,7 @@
-/**
- * Test databases — utilities for managing test database lifecycle.
- *
- * Mirrors: ActiveRecord::TestDatabases
- */
-
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
-/**
- * Iterate over test database adapters, calling the callback for each.
- *
- * Mirrors: ActiveRecord::TestDatabases.each_database
- */
 export async function eachDatabase(
   adapters: DatabaseAdapter[],
   callback: (adapter: DatabaseAdapter, index: number) => void | Promise<void>,
@@ -22,26 +11,10 @@ export async function eachDatabase(
   }
 }
 
-// Only the canonical `:memory:` name is treated as in-memory by
-// the per-worker suffixing below. URI variants like
-// `file::memory:?cache=shared` are not currently special-cased there,
-// so we match only the one spelling every driver reads as in-memory.
 function isInMemorySqlite(name: string): boolean {
   return name === ":memory:";
 }
 
-/**
- * Create and load test schema(s) for parallelized test execution.
- *
- * For each configuration in the named environment, appends the index to
- * the database name, purges/creates the database, and loads the schema.
- * Finally re-establishes the connection so the worker uses the suffixed per-worker database.
- *
- * Called by ActiveSupport::Testing::Parallelization.after_fork_hook in
- * parallelized test workers (process i gets test databases with suffix `-i`).
- *
- * Mirrors: ActiveRecord::TestDatabases.create_and_load_schema
- */
 export async function createAndLoadSchema(
   index: number,
   { envName }: { envName: string } = { envName: "test" },
@@ -52,9 +25,6 @@ export async function createAndLoadSchema(
   try {
     const configs = Base.configurations().configsFor({ envName });
     for (const dbConfig of configs) {
-      // `dbConfig.database` falls back to URL parsing for URL-only configs
-      // (UrlConfig.database override landed in #957). Only fails for configs
-      // with neither an explicit `database` nor a parseable URL.
       const baseName = dbConfig.database;
       if (!baseName) {
         throw new Error(
@@ -62,18 +32,12 @@ export async function createAndLoadSchema(
             `neither database nor a parseable URL is available`,
         );
       }
-      // Skip suffixing for the canonical SQLite in-memory database — `:memory:`
-      // has no file to suffix, and suffixing would turn it into an on-disk
-      // path like `:memory:-2`.
       if (!isInMemorySqlite(baseName)) {
         dbConfig._database = `${baseName}-${index}`;
       }
       await DatabaseTasks.reconstructFromSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
     }
   } finally {
-    // Rails ensure order: establish_connection first, then restore VERBOSE
-    // (test_databases.rb:18-21). Nest VERBOSE restore in its own finally so
-    // it always runs even if establishConnection throws.
     try {
       await Base.establishConnection();
     } finally {

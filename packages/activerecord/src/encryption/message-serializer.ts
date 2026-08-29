@@ -1,9 +1,3 @@
-/**
- * JSON serialization of encrypted messages.
- *
- * Mirrors: ActiveRecord::Encryption::MessageSerializer
- */
-
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";
@@ -44,7 +38,6 @@ export class MessageSerializer implements MessageSerializerLike {
     this.validateMessageDataFormat(data, level);
     const d = data as Record<string, unknown>;
     const payload = this.decodeIfNeeded(d["p"]);
-    // A present payload decodes to a Buffer; anything else becomes a null payload.
     return new Message({
       payload: typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
       headers: this.parseProperties(d["h"] as Record<string, unknown> | null | undefined, level),
@@ -111,10 +104,6 @@ export class MessageSerializer implements MessageSerializerLike {
 
   /** @internal */
   private encodeIfNeeded(value: unknown): unknown {
-    // Mirrors Rails' Base64.strict_encode64 — one base64 hop over the value's
-    // bytes. Raw cipher bytes arrive as a Buffer and encode directly; text headers
-    // arrive as a string and encode as their UTF-8 bytes (booleans/numbers pass
-    // through), exactly like Rails encoding a String's bytes.
     if (Buffer.isBuffer(value)) {
       return value.toString("base64");
     }
@@ -134,10 +123,6 @@ export class MessageSerializer implements MessageSerializerLike {
         if (normalized !== reencoded) {
           throw new Decryption("Invalid base64 encoding");
         }
-        // Mirrors Rails' Base64.strict_decode64 (returns an ASCII-8BIT String):
-        // return the raw decoded bytes as a Buffer, so cipher payload/iv/at keep
-        // lossless bytes AND text headers (e.g. UTF-8 public tags) stay recoverable
-        // via `.toString("utf-8")`. latin1 here would mojibake non-ASCII text.
         return buf;
       } catch (e) {
         if (e instanceof Decryption) throw e;

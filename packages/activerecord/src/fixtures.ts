@@ -1,13 +1,3 @@
-/**
- * `ActiveRecord::FixtureSet` — fixture-row preparation and insertion.
- *
- * Rails home: `activerecord/lib/active_record/fixtures.rb:527` — `class
- * FixtureSet`, whose `create_fixtures` is `:595` (plus the row
- * helpers in `lib/active_record/fixture_set/table_row.rb`). **Library** code,
- * not test support, so it sits at the package root under the kebab rendering
- * of `fixtures.rb`; it was misfiled as `test-helpers/define-fixtures.ts`
- * (RFC 0064 bucket D).
- */
 import {
   insertFixturesSet,
   type DatabaseStatementsHost,
@@ -25,13 +15,7 @@ import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { defaultValue, type Type } from "@blazetrails/activemodel";
 
-/**
- * Mirrors Rails' `ActiveRecord::FixtureSet::TableRow::PrimaryKeyError`.
- * Raised when a fixture row uses an association name (e.g. `ownedEssay: "label"`)
- * for a belongs_to whose `joinPrimaryKey` differs from the associated model's
- * `primaryKey` — the loader cannot safely resolve the label to an FK value.
- * @internal
- */
+/** @internal */
 export class FixtureSetPrimaryKeyError extends Error {
   constructor(
     label: string,
@@ -59,13 +43,8 @@ export class FixtureSetPrimaryKeyError extends Error {
 
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
 
-// Standard Rails timestamp columns, auto-filled at fixture insert when present
-// (after alias resolution) and unset (see fill_timestamps below). Mirrors
-// ActiveRecord::Timestamp's create+update sets.
 const TIMESTAMP_COLUMN_NAMES = ["created_at", "created_on", "updated_at", "updated_on"];
 
-// CRC32 lookup table (polynomial 0xedb88320). For ASCII labels this produces values
-// identical to Ruby's Zlib.crc32(label) % MAX_ID, matching Rails' FixtureSet.identify.
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
@@ -84,18 +63,10 @@ function crc32(str: string): number {
   return ((crc ^ 0xffffffff) >>> 0) % FIXTURE_MAX_ID;
 }
 
-/** Returns the deterministic integer ID for a fixture label. Mirrors Rails' FixtureSet.identify. */
 export function fixtureId(label: string): number {
   return crc32(label);
 }
 
-/**
- * Per-column deterministic ids for a composite primary key. Mirrors Rails'
- * `ActiveRecord::FixtureSet.composite_identify`: each key column gets
- * `identify(label) << index` masked to MAX_ID, so a composite-PK fixture row may
- * omit key columns and have them generated — the composite analogue of a
- * single-PK row falling back to `fixtureId(label)`.
- */
 function compositeIdentify(label: string, keyCols: readonly string[]): Record<string, number> {
   const base = fixtureId(label);
   const out: Record<string, number> = {};
@@ -105,16 +76,6 @@ function compositeIdentify(label: string, keyCols: readonly string[]): Record<st
   return out;
 }
 
-/**
- * Resolves a row's primary key. The declared value is used verbatim when it is
- * an integer (Rails fixture parity — YAML `id: N` parses as a number) or a
- * string (models with a declared string/non-integer `primary_key`, e.g.
- * Subscriber's `nick` or Dashboard's `dashboard_id`). When the PK column is
- * absent, `fixtureId(label)` supplies the deterministic CRC32 id. A PK column
- * present with any other value (boolean, fractional number, object) is rejected:
- * it means the fixture author tried to declare an id but the type is wrong, and
- * silently falling back to CRC32 would mask the bug.
- */
 function resolveDeclaredPk(
   tableName: string,
   pkCol: string,
@@ -130,29 +91,15 @@ function resolveDeclaredPk(
 }
 
 /**
- * The primary-key value a fixture row will land on, as a stable string usable for
- * collision detection across sets that share a table — computed exactly the way
- * {@link prepareModelFixtures} derives it, so an explicit pin and a label-derived
- * CRC32 id share ONE keyspace (a row pinning `id: 42` collides with an unpinned
- * row whose label hashes to 42). Uses the model's declared `primaryKey`, so a
- * custom-PK model (e.g. Subscriber's `nick`, Dashboard's `dashboard_id`) is keyed
- * on its real column, not a hardcoded `id`. Composite-PK models fold their key
- * columns (present values, else `compositeIdentify`) into the string.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the primary-key derivation Ruby performs inline in FixtureSet#table_rows (fixtures.rb:742).
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
   const pk = model.primaryKey;
   if (Array.isArray(pk)) {
-    // No adapter here, so unlike prepareModelFixtures this can't drop composite key
-    // columns absent from the table schema (tableColumnNames gate). Harmless for the
-    // known composite fixtures (cpk_orders/cpk_order_tags key columns are all real);
-    // a phantom key column would only over-fold the guard key, never mask a real one.
     const generated = compositeIdentify(label, pk);
     return "c:" + JSON.stringify(pk.map((col) => row[col] ?? generated[col]));
   }
-  // Id-less tables (declared PK is null/undefined) have no PK to collide on; fall
-  // back to the label so two identically-labelled naked rows still flag.
   if (typeof pk !== "string") return "l:" + label;
   return "s:" + String(resolveDeclaredPk(model.tableName, pk, label, row[pk]));
 }
@@ -165,40 +112,20 @@ export interface FixtureRef {
   readonly fixtureName: string;
 }
 
-/**
- * Cross-batch cross-reference sentinel. Resolves to the target fixture's id at insert time:
- * `(tableName, fixtureName)` is looked up in the adapter-scoped declared-id registry first
- * (populated by `defineFixtures()` when a row carries an explicit primary key), falling back
- * to `fixtureId(fixtureName)` (CRC32) when the target fixture set hasn't been loaded yet
- * or the target row has no declared PK.
- *
- * Ordering requirement: if the target fixture set declares explicit ids, load it BEFORE
- * any set that references it. A `ref()` resolved before the target loads will return the
- * CRC32 fallback and persist that value as the FK — loading the target afterwards does
- * not retroactively update already-inserted rows. `useFixtures()` iterates its argument
- * in declaration order, so list dependents after dependencies.
- */
 export function ref(tableName: string, fixtureName: string): FixtureRef {
   return { [REF_TAG]: true, tableName, fixtureName };
 }
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT Ruby detects a label reference by String type at interpolation time (fixtures.rb:742); TS models it as a tagged value.
+ * @noRailsEquivalent PERMANENT
  */
 export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
 }
 
-// A row's resolved primary key: a scalar for single-PK tables, or a per-column
-// map for composite-PK tables (e.g. cpk_orders → { shop_id, id }). A composite
-// entry lets a belongs_to `ref()` resolve to a specific key column of the target.
 type DeclaredKey = number | string | Record<string, number | string>;
 
-// Adapter-scoped registry of declared fixture ids, nested by table so a subsequent
-// defineFixtures() call for the same table fully replaces the prior label set —
-// no leakage of stale labels when the caller reloads a subset. Values are the row's
-// primary-key value (declared PK when the row carries one, else fixtureId(label)).
 const declaredIds = new WeakMap<object, Map<string, Map<string, DeclaredKey>>>();
 
 function declaredIdsFor(adapter: object): Map<string, Map<string, DeclaredKey>> {
@@ -210,22 +137,6 @@ function declaredIdsFor(adapter: object): Map<string, Map<string, DeclaredKey>> 
   return m;
 }
 
-// Static fallback derived from the canonical fixture-data registry: table name →
-// (label → explicit `id:`). Lets a `ref()` resolve to a target row's pinned id even
-// when that fixture set has NOT been loaded into the adapter-scoped registry — a
-// cross-table reference (e.g. authors.author_address_extra_id ->
-// author_addresses.david_address_extra) needs the pinned id 2 regardless of whether
-// the author_addresses rows were inserted. The fixture-data modules import `ref`
-// from this file, so the registry is loaded via a deferred dynamic import (a static
-// import would form an initialization cycle) and primed before any row is resolved.
-//
-// The DB table name is derived by underscoring the registry key, which matches
-// `model.tableName` for ordinary sets but not for the few deliberately-misnamed
-// ones (e.g. `all/namespaced/accounts` -> AdminAccount#admin_accounts). Loading
-// every model to read `tableName` is unsafe (import-time `encrypts()` side effects
-// need add-ons), so when two keys collapse to the same derived table and disagree
-// on a label's id, that label is dropped — resolution falls back to CRC32 rather
-// than guess the wrong pinned id.
 let staticDeclaredIds: Map<string, Map<string, number | string>> | null = null;
 
 async function ensureStaticDeclaredIds(): Promise<void> {
@@ -258,7 +169,7 @@ async function ensureStaticDeclaredIds(): Promise<void> {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE FixtureSet.identify (fixtures.rb:619) applied to a resolved reference, extracted from the row-building loop.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function resolveFixtureId(
   adapter: DatabaseAdapter,
@@ -266,24 +177,14 @@ export function resolveFixtureId(
   fixtureName: string,
 ): number | string {
   const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
-  // A composite-PK target has no single scalar id; such a ref() must be resolved
-  // via resolveCompositeRefColumn (belongs_to path), so fall through to the CRC
-  // fallback here rather than return the key map.
   if (declared !== undefined && typeof declared !== "object") return declared;
   const pinned = staticDeclaredIds?.get(tableName)?.get(fixtureName);
   return pinned ?? fixtureId(fixtureName);
 }
 
 /**
- * Resolves a belongs_to `ref()` to a single key column of a composite-PK target,
- * honoring the association's `primaryKey` (e.g. `cpk_order_agreements.order_id`
- * → the referenced order's `id` column). Prefers the loaded target's registered
- * key map; when the target set hasn't been loaded yet, derives the same value the
- * target row would generate from its label via `compositeIdentify` — position of
- * `targetColumn` within `targetPkCols` matters, since `compositeIdentify` shifts
- * each successive key column (Rails' `composite_identify`).
  * @internal
- * @noRailsEquivalent CONVERGEABLE the composite arm of FixtureSet.composite_identify (fixtures.rb:633) for a belongs_to reference column.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function resolveCompositeRefColumn(
   adapter: DatabaseAdapter,
@@ -300,10 +201,6 @@ export function resolveCompositeRefColumn(
   return compositeIdentify(fixtureName, targetPkCols)[targetColumn] ?? fixtureId(fixtureName);
 }
 
-// --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---
-
-// WeakMap prevents cross-file leakage: each adapter object gets its own registry that
-// lives only as long as the adapter, so tests using distinct adapter instances are isolated.
 const tableRegistries = new WeakMap<object, Map<string, BaseClass>>();
 
 function getRegistry(adapter: object): Map<string, BaseClass> {
@@ -315,7 +212,6 @@ function getRegistry(adapter: object): Map<string, BaseClass> {
   return reg;
 }
 
-/** Clears the model registry for the given adapter. Useful in test suites that reuse one adapter across multiple files. */
 export function clearTableRegistry(adapter: DatabaseAdapter): void {
   tableRegistries.delete(adapter);
   declaredIds.delete(adapter);
@@ -323,7 +219,7 @@ export function clearTableRegistry(adapter: DatabaseAdapter): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE FixtureSet#model_class (fixtures.rb:754) reached by table name because our registry is keyed that way.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function resolveModelForTable(
   adapter: DatabaseAdapter,
@@ -332,13 +228,6 @@ export function resolveModelForTable(
   return getRegistry(adapter).get(tableName);
 }
 
-// --- Phase 1b: HABTM join-table detection ---
-
-/**
- * Given a join-table name like "developers_projects" and the adapter's registry, returns the
- * two *plural* table-name parts (e.g. `["developers", "projects"]`) if both are registered,
- * otherwise null. Singularization happens at call time when building the FK column names.
- */
 function detectHabtmParts(
   registry: Map<string, BaseClass>,
   tableName: string,
@@ -354,30 +243,6 @@ function detectHabtmParts(
   return null;
 }
 
-// --- has_many:through / HABTM association-label join-row materialization ---
-
-/**
- * A `has_many :through` (or HABTM, which trails models as a through association)
- * declared on the owner model, resolved into its join table's coordinates.
- * Mirrors Rails' `FixtureSet::TableRow::HasManyThroughProxy`, which materializes
- * join rows from an association label (`developers.yml`'s
- * `david: { shared_computers: laptop }`):
- *
- * - `joinTable` — the through model's table (`through_reflection.table_name`);
- * - `lhsKey` — the owner's FK in it (`through_reflection.foreign_key`);
- * - `rhsKey` — the target's FK (`association.foreign_key`);
- * - `targetTable` — the associated model's table, used to resolve a target label
- *   to its fixture id (CRC32 fallback);
- * - `throughModel` — the through model, consulted for timestamp filling.
- * - `isHabtm` — whether the reflection is a HABTM. `_reflections[name]` is the
- *   generated through-`has_many` (associations.rb:1904), so the HABTM identity
- *   lives on `parent_reflection` (associations.rb:1905) — the same link
- *   `normalized_reflections` substitutes by (reflection.rb:86-93). A HABTM join
- *   model is anonymous and owns its table
- *   (no fixture set of its own), whereas a plain `has_many :through` join table
- *   belongs to a real model whose fixture set is requested by name. This gates
- *   the precise "join table not loaded" guard in the join-row insertion loop.
- */
 interface ThroughLabelAssoc {
   joinTable: string;
   lhsKey: string;
@@ -387,17 +252,6 @@ interface ThroughLabelAssoc {
   isHabtm: boolean;
 }
 
-/**
- * Builds a map of association name → join-table coordinates for every
- * `has_many :through` reflection on the model (HABTM included — trails builds it
- * as a through association over an anonymous join model), so a fixture row that
- * names one (e.g. `sharedComputers: ["laptop"]`) can be expanded into join rows.
- * Mirrors the `:has_many` + `options[:through]` arm of Rails'
- * `TableRow#resolve_sti_reflections`. Reflection getters that resolve the target
- * class (`klass`, `throughReflection`) can throw when an associated model isn't
- * registered yet; such associations are skipped rather than failing the whole
- * fixture load — only the ones a row actually references matter.
- */
 export function throughLabelAssociations(ModelClass: BaseClass): Map<string, ThroughLabelAssoc> {
   const out = new Map<string, ThroughLabelAssoc>();
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -411,9 +265,6 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
     };
     if (!r.isThroughReflection?.()) continue;
     try {
-      // Rails' HasManyThroughProxy: rhs_key = association.foreign_key,
-      // lhs_key = through_reflection.foreign_key,
-      // join_table = through_reflection.table_name.
       const throughModel = r.throughReflection?.klass;
       const joinTable = r.throughReflection?.tableName;
       const lhsKey = r.throughReflection?.foreignKey;
@@ -440,40 +291,6 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
   return out;
 }
 
-/**
- * The join-table names {@link sliceSchema} must add so a model fixture can
- * materialize join rows from an owner association label.
- *
- * ONLY HABTM join tables qualify. `_reflections[name]` is the generated
- * through-`has_many` (associations.rb:1904) and the HABTM identity lives on its
- * `parent_reflection` (associations.rb:1905), which is the link
- * `normalized_reflections` substitutes by (reflection.rb:86-93). A HABTM
- * join model is an anonymous class the declaring model owns (its table, e.g.
- * `categories_posts`, has no fixture set of its own), so it must be pulled into
- * the slice implicitly. A plain `has_many :through` join table, by contrast,
- * belongs to a real model whose fixture set — if a test seeds it — is requested
- * by name and slices its own table in; we deliberately do NOT pull it in from the
- * owner's reflections.
- *
- * Restricting to HABTM is also what lets the canonical-model autoload
- * index install globally without ballooning the derived schema. The join table
- * is read off the HABTM through reflection (whose `.klass` is the owned join
- * model, resolving no further); the association's TARGET class is never touched,
- * so this walk triggers NO autoload. Consulting `.klass`/`modelRegistry` for a
- * plain `:through` reflection here would, with autoload active, resolve (and
- * register) every transitively reachable model instead of throwing, leaking the
- * slice far past the requested sets.
- *
- * NOTE on the wiring of {@link throughLabelAssociations} into actual fixture
- * loading (now live — `defineFixtures` materializes join rows from association
- * labels): that materializer expands plain `has_many :through` labels too, but
- * this slice does not create those join tables implicitly. A test whose fixture
- * row expands a plain-through label must therefore also load the through model's
- * fixture set by name (so its table exists) — otherwise `defineFixtures` throws a
- * precise "join table \"…\" is not loaded" error naming the missing set (rather
- * than an opaque "no such table"). HABTM labels are unaffected (their table is
- * pulled in here).
- */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
   const names: string[] = [];
@@ -484,10 +301,6 @@ export function throughJoinTableNames(ModelClass: BaseClass): string[] {
     };
     if (r.parentReflection?.macro !== "hasAndBelongsToMany") continue;
     try {
-      // `throughReflection.tableName` resolves the anonymous join model (owned by
-      // the declaring model, so no target resolution and no autoload). Guarded so
-      // an unresolvable HABTM skips rather than failing the whole slice, matching
-      // throughLabelAssociations.
       const joinTable = r.throughReflection?.tableName;
       if (typeof joinTable === "string") names.push(joinTable);
     } catch {
@@ -497,13 +310,6 @@ export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   return names;
 }
 
-/**
- * Normalizes a through/HABTM association-label fixture value into a list of target
- * labels. Mirrors Rails' `targets.is_a?(Array) ? targets : targets.split(...)`
- * (the Ruby split is on commas with surrounding whitespace): an array is taken
- * as-is; a string is split on commas. Each label resolves to a target fixture id
- * when the join rows are built.
- */
 function normalizeHabtmTargets(
   tableName: string,
   label: string,
@@ -516,8 +322,6 @@ function normalizeHabtmTargets(
     `defineFixtures: ${tableName}.${label} HABTM association "${col}" expects a label string or array of labels, got ${typeof val}`,
   );
 }
-
-// --- Phase 1b: polymorphic belongs_to detection ---
 
 interface PolymorphicBelongsTo {
   typeColumn: string;
@@ -535,7 +339,6 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
       }
     | undefined;
   if (!refl || refl.macro !== "belongsTo" || !refl.isPolymorphic?.()) return null;
-  // Prefer the reflection's own foreignType/foreignKey to honour custom column overrides.
   const typeColumn: string = refl.foreignType ?? `${colName}_type`;
   const rawFk: string | string[] = refl.foreignKey ?? `${colName}_id`;
   if (Array.isArray(rawFk)) {
@@ -546,18 +349,6 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
   return { typeColumn, idColumn: rawFk };
 }
 
-// --- STI reflection class + enum resolution (Phase: STI subclass standalone load) ---
-
-/**
- * Resolves the STI subclass a fixture row belongs to, mirroring Rails'
- * `FixtureSet::TableRow#reflection_class`: the inheritance-column value is
- * constantized (here looked up through `findStiClass`, the registry analog of
- * Ruby's `constantize`), falling back to the base model when the column is
- * absent/blank or names no registered subclass (Rails' `rescue model_class`).
- * Used so enum (and future reflection-traversing) resolution honours the row's
- * concrete subclass — e.g. a `parrots` row typed `LiveParrot` resolves the
- * `breed` enum that only `LiveParrot` declares, not the bare `Parrot` base.
- */
 function reflectionClassFor(
   ModelClass: BaseClass,
   inheritanceCol: string | null,
@@ -573,19 +364,7 @@ function reflectionClassFor(
   }
 }
 
-/**
- * Maps string enum keys in a row to their stored values, mirroring Rails'
- * `FixtureSet::TableRow#resolve_enums`: for each enum the reflection class
- * declares, a present column value that names an enum key is replaced with the
- * mapped value (`values.fetch(@row[name], @row[name])` — non-key values pass
- * through untouched). Without this a string enum key (e.g. `breed: "australian"`)
- * is quoted verbatim into an integer column, which SQLite's dynamic typing
- * tolerates but the strict PG/MariaDB engines reject.
- */
 function resolveEnums(reflectionClass: BaseClass, row: FixtureAttrs): void {
-  // `assertValidEnumDefinitionValues` permits string/number/boolean/null backing
-  // values (Rails supports e.g. `enum verified: { yes: true, no: false }`), so the
-  // stored value a key maps to may be any of those — all valid to write back.
   const enums = (
     reflectionClass as {
       _enums?: Map<string, Record<string, number | string | boolean | null>>;
@@ -606,44 +385,19 @@ type FixtureAttrs = Record<string, unknown>;
 type InsertHost = DatabaseStatementsHost &
   Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
 
-/**
- * A fixture set whose rows are fully built (ids/associations/timestamps/encryption
- * resolved) but not yet inserted. Mirrors Rails' `FixtureSet#table_rows` — the
- * pure row-building result, decoupled from the single `insert_fixtures_set` that
- * writes an entire load's worth of sets (`fixtures.rb` `insert`).
- * @internal
- */
+/** @internal */
 export interface PreparedFixtureSet {
-  /** Every table this set writes: the model's own table plus any through/HABTM join tables. */
   tables: Record<string, FixtureAttrs[]>;
-  /** Model table needing a Postgres serial-sequence resync after insert, or null. */
   serialReset: { table: string; column: string } | null;
-  /** Restores the declared-id registry when the shared insert fails (see `ref`). */
   rollback: () => void;
-  /** Reloads the persisted rows into the caller-facing result once the insert has run. */
   finalize: () => Promise<Record<string, unknown>>;
 }
 
-/**
- * Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
- * SQLite rowids and MySQL AUTO_INCREMENT, which self-adjust), so a record
- * created after fixtures load would draw a value the fixtures already used and
- * hit a duplicate-PK error. Mirror Rails' `reset_pk_sequence!`
- * (postgresql/schema_statements.rb) by syncing the serial sequence to MAX(col)
- * once the rows are in. Resolve the sequence first and only `setval` when it
- * exists — an `id` PK without a serial sequence (UUID / explicit PK) yields a
- * NULL sequence, and `setval(NULL, …)` would raise and poison the surrounding
- * per-test transaction (a swallowed JS catch can't un-abort it).
- */
 async function resetPkSequence(
   adapter: DatabaseAdapter,
   tableName: string,
   serialResetCol: string,
 ): Promise<void> {
-  // pg_get_serial_sequence takes the column as a bound text value and matches
-  // it verbatim (case-sensitive, no quote-stripping); defineSchema stores every
-  // identifier with its exact case, so passing the column as-is matches both
-  // lowercase (`id`, `pet_id`) and mixed-case (`monkeyID`) PKs.
   const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
     tableName,
     serialResetCol,
@@ -659,32 +413,15 @@ async function resetPkSequence(
 }
 
 /**
- * Inserts a whole load's worth of prepared fixture sets through a SINGLE
- * `insertFixturesSet` call, mirroring Rails' `fixtures.rb` `insert`: it merges
- * every set's `table_rows` into one `table_rows_for_connection` hash and calls
- * `conn.insert_fixtures_set(table_rows_for_connection, keys)` exactly once per
- * pool per load. That one call owns the sole `disable_referential_integrity`
- * block and the sole `transaction(requires_new: true)` — so referential
- * integrity is toggled once per load, not once per table (RFC 0060: the #4528
- * profile pinned 96% of PG DDL time on per-table RI toggling).
- *
- * Sets are prepared in declaration order (so a later set's `ref()` resolves ids
- * a prior set registered), then all rows land together with RI disabled, so
- * cross-table FK order among them does not matter. Returns each set's reloaded
- * result in the same order the sets were passed.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the single insert_fixtures_set call of FixtureSet.insert (fixtures.rb:665), extracted so the merge happens once per load.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export async function insertPreparedFixtureSets(
   adapter: DatabaseAdapter,
   prepared: PreparedFixtureSet[],
 ): Promise<Record<string, unknown>[]> {
-  // No sets → nothing to insert; skip the load's RI toggle entirely.
   if (prepared.length === 0) return [];
 
-  // Merge per-table rows across every set. Rails uses `unshift(*rows)` so a set
-  // prepared later prepends its rows; for the common case of one set per table
-  // order is irrelevant, and RI is disabled during the insert regardless.
   const merged: Record<string, FixtureAttrs[]> = {};
   for (const p of prepared) {
     for (const [table, rows] of Object.entries(p.tables)) {
@@ -692,13 +429,9 @@ export async function insertPreparedFixtureSets(
     }
   }
 
-  // One insert_fixtures_set for the whole load: deletes every table once, then
-  // inserts every row, all inside one RI-disabled transaction.
   try {
     await insertFixturesSet.call(adapter as unknown as InsertHost, merged, Object.keys(merged));
   } catch (err) {
-    // On failure, roll back every set's declared-id registry so a subsequent
-    // ref() doesn't resolve to ids for rows that never landed in the database.
     for (const p of prepared) p.rollback();
     throw err;
   }
@@ -716,11 +449,6 @@ export async function insertPreparedFixtureSets(
   return results;
 }
 
-/**
- * Mirrors: `ActiveRecord::FixtureSet.check_all_foreign_keys_valid!(conn)`
- * (fixtures.rb:696-704), which `insert` calls once per pool right after
- * `insert_fixtures_set` — once per load, not once per set.
- */
 async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
   if (!ActiveRecord.verifyForeignKeysForFixtures) return;
 
@@ -735,28 +463,8 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
   }
 }
 
-/**
- * Mirrors Rails' EncryptedFixtures#encrypt_fixture_data +
- * process_preserved_original_columns. For each encrypted attribute in each
- * row, serializes the cleartext value to ciphertext in-place so the DB stores
- * encrypted data. For original_* preserve-columns (added by ignoreCase),
- * encrypts the source attribute's clean value into the original_* column.
- *
- * Uses _pendingEncryptions to obtain the scheme directly — the schema may not
- * have been reflected yet at fixture-load time (loadSchemaFromAdapter is async),
- * so typeForAttribute returns a plain ValueType. The pending-encryption scheme
- * is the same one applyPendingEncryptions will use later, so the ciphertext
- * produced here is compatible with what the reloaded record will decrypt.
- */
 function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
   const encryptedAttrs = ModelClass.encryptedAttributes ?? new Set<string>();
-  // Build a name→EncryptedAttributeType map from _pendingEncryptions. This lets
-  // us serialize even before loadSchemaFromAdapter has run (the scheme is
-  // already recorded, while `type_for_attribute` still answers the fallback
-  // `Type.default_value` for an unreflected column). The resolved type is Rails'
-  // `model_class.type_for_attribute(attribute_name)` — the full decorated type —
-  // so a `attribute(:name, :date)` declared before `encrypts(:name)` keeps its
-  // cast type and the fixture value is serialized through it before encryption.
   const typeMap = new Map<string, EncryptedAttributeType>();
   const pending: Array<{ name: string; scheme: unknown }> =
     (ModelClass as any)._pendingEncryptions ?? [];
@@ -772,7 +480,6 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
   }
 
   for (const row of rows) {
-    // Phase 1: encrypt_fixture_data — encrypt each declared encrypted attribute.
     const cleanValues: Record<string, unknown> = {};
     for (const attrName of encryptedAttrs) {
       if (!(attrName in row)) continue;
@@ -782,8 +489,6 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
       if (!type) continue;
       row[attrName] = type.serialize(cleanValue);
     }
-    // Phase 2: process_preserved_original_columns — for original_* preserve-columns,
-    // encrypt the source attribute's clean value.
     for (const attrName of encryptedAttrs) {
       const sourceAttrName = EncryptableRecord.sourceAttributeFromPreservedAttribute(attrName);
       if (sourceAttrName === undefined) continue;
@@ -796,13 +501,6 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
   }
 }
 
-/**
- * Inserts fixture rows for a single model and returns persisted instances keyed
- * by label. Thin wrapper over {@link prepareModelFixtures} +
- * {@link insertPreparedFixtureSets} for callers loading one set on its own
- * (e.g. `FixtureSet.create`); multi-set loaders (`useFixtures`) prepare every
- * set first and insert them together through one `insertFixturesSet`.
- */
 export async function defineFixtures<T extends BaseClass, K extends string>(
   adapter: DatabaseAdapter,
   ModelClass: T,
@@ -813,38 +511,6 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   return result as { [P in K]: InstanceType<T> };
 }
 
-/**
- * Builds (but does not insert) the fixture rows for a model, returning a
- * {@link PreparedFixtureSet}. Mirrors Rails' `FixtureSet#table_rows`: id,
- * association, timestamp, and encryption resolution happen here; the actual
- * write is deferred to {@link insertPreparedFixtureSets} so a whole load's sets
- * insert together under one referential-integrity toggle.
- *
- * IDs are deterministic: same label → same ID across test runs, enabling cross-batch
- * FK references via `ref(tableName, label)` without insertion-order coupling.
- *
- * Phase 1b ergonomics (convention-over-config, additive):
- * - HABTM join tables: string values for `a_id`/`b_id` columns auto-resolve via fixtureId()
- *   when the table name matches the `a_b` pattern and both `a` and `b` are registered.
- * - Polymorphic refs: `{ taggable: postInstance }` expands to `taggable_type`/`taggable_id`
- *   when a polymorphic `belongsTo :taggable` reflection exists on the model.
- * - Each call registers `ModelClass` by `tableName` in an internal registry, available via
- *   `resolveModelForTable` for use by HABTM detection and future Phase 2 tooling.
- * - Composite primary keys: when the schema's PK is an array of columns
- *   (`cpk_order_tags` → `["order_id", "tag_id"]`), each key column is taken from
- *   the fixture row when present (typically via `ref()`) and otherwise generated
- *   from the label via `compositeIdentify`, mirroring Rails'
- *   `generate_composite_primary_key`/`composite_identify`. Reload matches on the
- *   full key tuple. A model that declares a composite `primaryKey` over a table
- *   whose schema PK is a plain serial `id` (e.g. `CpkOrder`: model `["shop_id",
- *   "id"]`, table `id`) is still seeded from its *model* composite PK — Rails'
- *   `composite_primary_key?` is model-level — so both key columns are generated
- *   from the label; the serial `id` sequence is then synced past the explicit ids.
- * - Timestamps: when the model records timestamps, any existing
- *   `created_at`/`created_on`/`updated_at`/`updated_on` column the row omits is filled with the
- *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
- *   timestamp tables seed without each fixture row spelling the columns out).
- */
 export async function prepareModelFixtures(
   adapter: DatabaseAdapter,
   ModelClass: BaseClass,
@@ -854,23 +520,6 @@ export async function prepareModelFixtures(
   const tableName = ModelClass.tableName;
   const declaredPk = ModelClass.primaryKey;
 
-  // Reconcile the model's PK against the table's ACTUAL schema PK column(s). Rails
-  // resolves `Base.primary_key` by introspecting the schema, so the schema is the
-  // source of truth. `pkCol` ends up as one of:
-  //   - `null`   → id-less table (`mateys`): no PK column seeded; reload matches the
-  //                full inserted row.
-  //   - string   → single-PK table. A PK column differing from the default `id`
-  //                (`bulbs` → "ID", `mixed_case_monkeys` → "monkeyID") is honoured.
-  //   - string[] → composite-PK table (`cpk_order_tags` → ["order_id", "tag_id"]):
-  //                key columns come from the fixture row when present (e.g. a
-  //                ref()) and are otherwise generated from the label, like single PKs.
-  // A model may declare a *composite* `primaryKey` while the test schema keeps a
-  // plain autoincrement `id` (e.g. CpkOrder: model `["shop_id", "id"]`, table `id`).
-  // Rails' `composite_primary_key?` is model-level, so the fixture loader honors the
-  // model's composite PK — generating every key column from the label via
-  // `compositeIdentify` — even though the DB table stays single-PK for `id`
-  // autoincrement. That serial `id`, not the model tuple, is what needs a sequence
-  // reset after the explicit-id inserts.
   let pkCol: string | string[] | null = declaredPk;
   let serialResetCol: string | null = null;
   if (typeof (adapter as any).primaryKey === "function") {
@@ -883,10 +532,6 @@ export async function prepareModelFixtures(
     } else if (Array.isArray(schemaPk)) {
       pkCol = schemaPk;
     } else if (declaredPk !== "id" && declaredPk !== schemaPk) {
-      // The model trusts a custom single PK that the schema contradicts — a real
-      // bug. (A plain `id` default just defers to the schema, exactly like Rails'
-      // introspected `Base.primary_key`.) Surface it rather than silently writing
-      // to a phantom column.
       throw new Error(
         `defineFixtures: ${ModelClass.name} declares primaryKey "${declaredPk}" but table "${tableName}" has primary key "${schemaPk}" — fix the model or the schema`,
       );
@@ -896,12 +541,10 @@ export async function prepareModelFixtures(
     }
   }
 
-  // Register this model in the adapter-scoped tableName registry (Phase 1b).
   const registry = getRegistry(adapter);
   registry.set(tableName, ModelClass);
 
   const habtmParts = detectHabtmParts(registry, tableName);
-  // Compute once per defineFixtures call; used for every row and column in the inner loop.
   const habtmFkColToTable: Map<string, string> | null = habtmParts
     ? new Map([
         [`${singularize(habtmParts[0])}_id`, habtmParts[0]],
@@ -909,11 +552,6 @@ export async function prepareModelFixtures(
       ])
     : null;
 
-  // Through/HABTM association labels declared on owner rows (e.g.
-  // `sharedComputers: ["laptop"]`) materialize into join-table rows, mirroring
-  // Rails' FixtureSet::TableRow HasManyThroughProxy arm. Accumulated across all
-  // rows and inserted after the model's own rows land. Keyed by join table so a
-  // model with several through associations sharing one table coalesces.
   const throughLabelAssocs = throughLabelAssociations(ModelClass);
   const joinTableRows = new Map<
     string,
@@ -922,20 +560,6 @@ export async function prepareModelFixtures(
 
   const labels = Object.keys(fixtures);
 
-  // Pre-pass: build this table's label→id map locally, then swap it in atomically
-  // so a mid-loop validation failure (e.g. non-integer declared PK) leaves the
-  // registry untouched. The swap also replaces any prior label set, evicting
-  // entries for labels omitted from a subset reload. The prior entry is captured
-  // so we can roll back if the INSERT itself fails — `ref()` resolution must not
-  // observe ids for rows that never landed in the database.
-  // Single-PK tables register a scalar id per label up front. Composite-PK tables
-  // register a per-column key map instead, but only AFTER each row is built in the
-  // loop below — a key column may be a `ref()` whose resolved value differs from
-  // `compositeIdentify(label)`, so the registry must reflect the actual row (Rails
-  // bases generation on the resolved row, table_row.rb:127-137). A belongs_to
-  // `ref()` into a composite target picks its primary-key column out of that map via
-  // resolveCompositeRefColumn; a forward-ref (target not yet registered) falls back
-  // to compositeIdentify there.
   const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {
     for (const label of labels) {
@@ -947,12 +571,6 @@ export async function prepareModelFixtures(
   const priorTableIds = adapterIds.get(tableName);
   adapterIds.set(tableName, tableIds);
 
-  // Map each belongs_to FK column to the composite-PK target column its ref()
-  // resolves to (the association's joinPrimaryKey), for targets whose model PK is
-  // composite. `cpk_order_agreements.order_id = ref("cpk_orders", ...)` must land on
-  // the order's `id` column, not a single-column identify(label). Only single-column
-  // FK/PK belongs_to associations to composite targets are recorded; everything else
-  // resolves through the scalar registry.
   const fkColToCompositeRef = new Map<string, { column: string; pkCols: string[] }>();
   {
     const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -964,9 +582,6 @@ export async function prepareModelFixtures(
       klass?: { primaryKey?: unknown };
     }[]) {
       if (refl.macro !== "belongsTo" || refl.isPolymorphic?.()) continue;
-      // `.klass` computes and validates the target class, throwing NameError when
-      // it isn't registered — a target that can't be resolved simply isn't a
-      // composite ref we can special-case, so fall back to scalar resolution.
       let targetPk: unknown;
       let jpk: string | string[] | undefined;
       try {
@@ -985,39 +600,25 @@ export async function prepareModelFixtures(
     }
   }
 
-  // Live table columns, inspected once and reused below for three purposes: the
-  // composite-PK generation guard (Rails' `has_column?`), virtual-column filtering,
-  // and timestamp auto-stamping. Avoid supportsVirtualColumns() — it requires
-  // databaseVersion to be pre-initialized; isVirtual() returns false for non-virtual
-  // adapters, so calling columns() is always safe.
   const tableColumns: { name: string; isVirtual(): boolean }[] | null =
     typeof (adapter as any).columns === "function"
       ? await (adapter as any).columns(tableName)
       : null;
   const tableColumnNames = tableColumns ? new Set(tableColumns.map((c) => c.name)) : null;
 
-  // Build rows with resolved IDs and references. Rows that declare `id: N` use it
-  // verbatim (Rails parity); rows without one fall back to fixtureId(label).
-  // Inheritance column (mirrors Rails' model_metadata.inheritance_column_name):
-  // null when the model isn't STI, so non-STI fixtures skip subclass resolution.
   const inheritanceCol = ModelClass.inheritanceColumn;
 
   const rows: FixtureAttrs[] = [];
   for (const label of labels) {
     const attrs = fixtures[label];
-    // Single-PK rows seed the PK up front (declared id or fixtureId fallback).
-    // Composite-PK rows seed every key column from `attrs` in the loop below
-    // (each is a real fixture-supplied value or a ref), so they start empty.
     const row: FixtureAttrs =
       typeof pkCol === "string"
         ? { [pkCol]: resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]) }
         : {};
 
     for (const [col, val] of Object.entries(attrs)) {
-      if (typeof pkCol === "string" && col === pkCol) continue; // PK already set above
+      if (typeof pkCol === "string" && col === pkCol) continue;
 
-      // Through/HABTM association label: not a real column. Expand into join-table
-      // rows (Rails' TableRow#add_join_records) and consume the key.
       const labelAssoc = throughLabelAssocs.get(col);
       if (labelAssoc) {
         if (typeof pkCol !== "string") {
@@ -1046,14 +647,8 @@ export async function prepareModelFixtures(
         continue;
       }
 
-      // Evaluate poly once so both the ref guard and the expansion below share the result.
       const poly = findPolymorphicRef(ModelClass, col);
 
-      // Rails' resolve_sti_reflections: when col matches a belongs_to association
-      // name (not the FK column) and the association has a custom joinPrimaryKey
-      // that differs from the target model's primaryKey, raise PrimaryKeyError.
-      // Guard: skip when association name equals the FK column name (Rails parity —
-      // `association.name.to_s != fk_name` prevents double-processing FK columns).
       if (!poly) {
         const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
         const refl = reflections[col] as
@@ -1106,15 +701,6 @@ export async function prepareModelFixtures(
         continue;
       }
 
-      // Polymorphic belongs_to expansion: { taggable: instance } → taggable_type + taggable_id.
-      // When the caller already provided explicit type/id columns, skip the association key
-      // entirely (don't write it as a spurious column) — explicit values win.
-      // When neither explicit column is present, expand only real Base instances.
-      // Plain objects, null-proto objects, and non-Base class instances throw —
-      // ambiguous duck-typing was rejected in favour of a real `instanceof Base` check.
-      // Polymorphic belongs_to: "col" is an association name, never a real column.
-      // It must always be consumed here — falling through to `row[col] = val` would
-      // attempt to INSERT a non-existent column and break fixture insertion.
       if (poly) {
         const hasType = poly.typeColumn in attrs;
         const hasId = poly.idColumn in attrs;
@@ -1123,10 +709,9 @@ export async function prepareModelFixtures(
             `defineFixtures: "${col}" — provide both ${poly.typeColumn} and ${poly.idColumn} explicitly, or neither (use the association key instead)`,
           );
         }
-        if (hasType) continue; // both explicit columns present; association key is not a column
+        if (hasType) continue;
 
         if (val === null) {
-          // null clears the association: mirrors Rails setting both FK columns to NULL.
           row[poly.idColumn] = null;
           row[poly.typeColumn] = null;
           continue;
@@ -1148,7 +733,6 @@ export async function prepareModelFixtures(
               `defineFixtures: polymorphic target "${col}" has no value for PK column "${instancePkCol}" — ensure the instance exposes its primary key`,
             );
           }
-          // Mirror Rails' polymorphicName: use static polymorphicName() if defined, else class name.
           const typeName: string =
             (instanceClass as any)?.polymorphicName?.() ?? instanceClass?.name ?? "Unknown";
           row[poly.idColumn] = pkValue;
@@ -1161,10 +745,6 @@ export async function prepareModelFixtures(
         );
       }
 
-      // HABTM auto-resolution: string label values for `a_id`/`b_id` columns
-      // resolve through the same declared-id registry as ref(), so explicit
-      // Rails ids on the target fixture (e.g. developers.david.id = 1) win
-      // over the CRC32 fallback.
       if (habtmFkColToTable && typeof val === "string") {
         const targetTable = habtmFkColToTable.get(col);
         if (targetTable !== undefined) {
@@ -1174,20 +754,12 @@ export async function prepareModelFixtures(
       }
 
       if (val !== null && typeof val === "object" && typeof pkCol === "string" && pkCol in val) {
-        // Model instance (or any object with the PK): extract the PK value.
         row[col] = (val as FixtureAttrs)[pkCol];
       } else {
         row[col] = val;
       }
     }
 
-    // Auto-generate any composite primary-key column the row doesn't already
-    // supply, mirroring Rails' FixtureSet::TableRow#generate_composite_primary_key:
-    // for each key column, `next if column_defined?(column)` where `column_defined?`
-    // is `!has_column?(col) || row.include?(col)`. So a component is generated only
-    // when it is an actual table column AND the row doesn't already carry it —
-    // columns already present (e.g. from a ref()) are kept, and a model-level PK
-    // component with no backing column is skipped rather than inserted.
     if (Array.isArray(pkCol)) {
       const generated = compositeIdentify(label, pkCol);
       for (const keyCol of pkCol) {
@@ -1195,11 +767,6 @@ export async function prepareModelFixtures(
         if (tableColumnNames !== null && !tableColumnNames.has(keyCol)) continue;
         row[keyCol] = generated[keyCol]!;
       }
-      // Register the resolved key map so a belongs_to `ref()` into this composite
-      // row reads the actual key components — including any `ref()`-valued column,
-      // whose resolved value differs from compositeIdentify(label). tableIds is the
-      // same Map already swapped into the adapter registry, so this is visible to
-      // later rows in this same set immediately.
       const keyMap: Record<string, number | string> = {};
       for (const keyCol of pkCol) {
         const v = row[keyCol];
@@ -1208,20 +775,14 @@ export async function prepareModelFixtures(
       tableIds.set(label, keyMap);
     }
 
-    // Resolve enums against the row's STI subclass (Rails' reflection_class):
-    // a `parrots` row typed LiveParrot maps `breed: "australian"` → 1 via the
-    // subclass enum the base Parrot doesn't declare.
     resolveEnums(reflectionClassFor(ModelClass, inheritanceCol, row), row);
 
     rows.push(row);
   }
 
-  // Two adjustments using the live table columns inspected above.
   if (tableColumns !== null) {
     const cols = tableColumns;
 
-    // Filter generated (virtual) columns — PG rejects INSERT on those columns.
-    // Mirrors Rails: build_fixture_sql rejects schema_cache.columns_hash entries where column.virtual?
     const virtualNames = new Set(cols.filter((c) => c.isVirtual()).map((c) => c.name));
     if (virtualNames.size > 0) {
       for (const row of rows) {
@@ -1229,20 +790,8 @@ export async function prepareModelFixtures(
       }
     }
 
-    // Auto-stamp timestamp columns the fixture didn't set. Mirrors Rails'
-    // FixtureSet::TableRow#fill_timestamps: when the model records timestamps,
-    // fill every existing created_at/created_on/updated_at/updated_on column that
-    // the row omits with the current time. NOT NULL timestamp tables (people, cars,
-    // toys, …) can't seed without this. A Temporal.Instant is used so the adapter's
-    // quoting renders an engine-safe datetime literal (no tz offset on MySQL).
     if ((ModelClass as { recordTimestamps?: boolean }).recordTimestamps !== false) {
       const colNames = tableColumnNames!;
-      // Mirrors Rails FixtureSet::TableRow#fill_timestamps → model_metadata
-      // #timestamp_column_names == all_timestamp_attributes_in_model: the model's
-      // *alias-resolved* timestamp columns (e.g. Developer → legacy_updated_at),
-      // not the literal created_at/updated_at names. Resolved against the actual
-      // insert columns (not the model's columnNames(), which can be stale before
-      // the schema cache is warmed — RFC 0030) so the fill is correct regardless.
       const aliases: Record<string, string> =
         (ModelClass as { attributeAliases?: Record<string, string> }).attributeAliases ?? {};
       const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
@@ -1257,32 +806,16 @@ export async function prepareModelFixtures(
     }
   }
 
-  // Mirrors Rails' EncryptedFixtures (gated on Encryption.config.encryptFixtures):
-  // serialize each encrypted column value to ciphertext before insert so the DB stores
-  // encrypted data (not cleartext), and populate original_* preserve-columns for ignoreCase.
-  // Mirrors: ActiveRecord::Railtie `Fixture.prepend EncryptedFixtures if config.encrypt_fixtures`
   if (Configurable.config.encryptFixtures && isPresent(ModelClass.encryptedAttributes)) {
     encryptFixtureRows(ModelClass, rows);
   }
 
-  // Assemble the tables this set writes: the model's own rows plus any join rows
-  // materialized from owner through/HABTM association labels. All are inserted
-  // together by insertPreparedFixtureSets under one referential-integrity toggle.
   const tables: Record<string, FixtureAttrs[]> = { [tableName]: rows };
 
-  // Join rows from through/HABTM association labels. Rails' `add_join_records`
-  // stamps every join row with the fixture set's single `now`, so compute it
-  // once here rather than per join table.
   if (joinTableRows.size > 0) {
     const now = currentTimeFromProperTimezone();
     for (const [joinTable, { rows: jrows, throughModel, isHabtm }] of joinTableRows) {
       if (jrows.length === 0) continue;
-      // A plain `has_many :through` join table belongs to a real through model
-      // whose fixture set — unlike a HABTM join model's anonymous table — is NOT
-      // pulled into the loaded schema implicitly (see throughJoinTableNames). If a
-      // row expands such a label but the requesting test never loaded that through
-      // set, the join table is absent; surface a precise error naming it rather
-      // than letting the INSERT fail with an opaque "no such table".
       if (!isHabtm && typeof (adapter as any).tableExists === "function") {
         const exists: boolean = await (adapter as any).tableExists(joinTable);
         if (!exists) {
@@ -1294,10 +827,6 @@ export async function prepareModelFixtures(
           );
         }
       }
-      // Mirror Rails' HasManyThroughProxy#timestamp_column_names —
-      // `through_reflection.klass.all_timestamp_attributes_in_model`: every
-      // timestamp column the through model *has* (alias-resolved), gated only by
-      // column existence, not by `record_timestamps`.
       if (throughModel && typeof (adapter as any).columns === "function") {
         const cols: { name: string }[] = await (adapter as any).columns(joinTable);
         const colNames = new Set(cols.map((c) => c.name));
@@ -1308,16 +837,10 @@ export async function prepareModelFixtures(
         );
         for (const jr of jrows) for (const c of stampCols) if (!(c in jr)) jr[c] = now;
       }
-      // Another set may contribute to the same join table (both declare the
-      // through association); concatenate rather than clobber, mirroring Rails'
-      // table_rows_for_connection merge. Within one set the Map already coalesces.
       (tables[joinTable] ??= []).push(...jrows);
     }
   }
 
-  // On insert failure, restore the declared-id registry to its pre-prepare state
-  // (the swap happened above) so a subsequent ref() doesn't resolve to ids for
-  // rows that never made it to the database.
   const rollback = () => {
     if (priorTableIds === undefined) {
       adapterIds.delete(tableName);
@@ -1326,18 +849,11 @@ export async function prepareModelFixtures(
     }
   };
 
-  // Reload persisted instances so AR attribute casting is applied. Reload runs
-  // `unscoped` so a model default_scope (e.g. Bulb's `where(name: "defaulty")`)
-  // can't hide a just-seeded row — fixtures bypass default scopes in Rails too.
-  // Id-less tables (pkCol === null) have no PK to look up by, so match the full
-  // inserted row instead.
   const finalize = async (): Promise<Record<string, unknown>> => {
     const result: Record<string, unknown> = {};
     for (let i = 0; i < labels.length; i++) {
       const label = labels[i];
       const row = rows[i];
-      // Single PK → match by the one column; composite PK → match by every key
-      // column; id-less (pkCol === null) → match the full inserted row.
       let criteria: FixtureAttrs;
       if (pkCol === null) {
         criteria = row;
@@ -1362,28 +878,11 @@ export async function prepareModelFixtures(
     return result;
   };
 
-  // Composite (`string[]`) and id-less (`null`) PKs are skipped; the sequence
-  // resync (Postgres only) applies to any single-column serial PK.
   const serialReset = serialResetCol !== null ? { table: tableName, column: serialResetCol } : null;
 
   return { tables, serialReset, rollback, finalize };
 }
 
-/**
- * Seeds a HABTM join table that has no model class. Rails handles these via
- * `FixtureSet::TableRow`'s tableless path (e.g. `categories_posts`,
- * `developers_projects`): the join table has rows of FK pairs (plus optional
- * scalar columns like `joined_on`) but no `ActiveRecord::Base` subclass to
- * register against. Option A from the followup spec — seed rows directly against
- * the schema's columns, skipping the Model requirement rather than synthesising a
- * fake `Base` subclass.
- *
- * `ref()` values resolve through the same adapter-scoped declared-id registry as
- * model fixtures, so explicit Rails ids on the target set win over the CRC32
- * fallback — load the referenced model sets BEFORE the join set (see {@link ref}).
- * Returns the resolved row attributes keyed by label (no reload: there is no model
- * to cast through, and a join table has no single PK to look rows up by).
- */
 export async function defineJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,
@@ -1394,20 +893,12 @@ export async function defineJoinTableFixtures(
   return result as Record<string, FixtureAttrs>;
 }
 
-/**
- * Builds (but does not insert) the rows for a tableless HABTM join fixture set,
- * returning a {@link PreparedFixtureSet}. The tableless analogue of
- * {@link prepareModelFixtures}: no declared-id registration or reload, since a
- * join table has no model to cast through or single PK to look rows up by.
- */
 export async function prepareJoinTableFixtures(
   adapter: DatabaseAdapter,
   tableName: string,
   fixtures: Record<string, FixtureAttrs>,
 ): Promise<PreparedFixtureSet> {
   await ensureStaticDeclaredIds();
-  // Read the live schema columns so a fixture row referencing a column the join
-  // table doesn't have fails loudly here, not as an opaque INSERT error.
   let columnNames: Set<string> | null = null;
   if (typeof (adapter as any).columns === "function") {
     const cols: { name: string }[] = await (adapter as any).columns(tableName);
@@ -1421,16 +912,12 @@ export async function prepareJoinTableFixtures(
     if (columnNames) {
       const unknown = Object.keys(attrs).filter((col) => !columnNames.has(col));
       if (unknown.length > 0) {
-        // Mirrors Rails' build_fixture_sql error format (database_statements.rb):
-        // table "X" has no columns named "a", "b".
         throw new Error(
           `table "${tableName}" has no columns named ${unknown.map((c) => `"${c}"`).join(", ")}.`,
         );
       }
     }
     for (const [col, val] of Object.entries(attrs)) {
-      // ref() resolves to the target row's PK (single-PK and composite-PK targets
-      // both surface a scalar id here); scalar columns pass through verbatim.
       row[col] = isFixtureRef(val)
         ? resolveFixtureId(adapter, val.tableName, val.fixtureName)
         : val;
@@ -1447,13 +934,6 @@ export async function prepareJoinTableFixtures(
   };
 }
 
-/**
- * Static wrapper around `defineFixtures` that mirrors the Rails
- * `ActiveRecord::FixtureSet` class surface (fixtures.rb `class FixtureSet`,
- * `.create_fixtures`). Lives in this file because Rails declares it here — it
- * was split out into an invented `test-helpers/fixture-set.ts` before the
- * fixture machinery was recognised as `lib/active_record/fixtures.rb` code.
- */
 export class FixtureSet {
   static async createFixtures<T extends BaseClass, K extends string>(
     adapter: DatabaseAdapter,

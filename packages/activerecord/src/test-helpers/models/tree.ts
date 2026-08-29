@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Node } from "./node.js";
-// vendor/rails/activerecord/test/models/tree.rb
 import { Base } from "../../base.js";
 
 export class Tree extends Base {

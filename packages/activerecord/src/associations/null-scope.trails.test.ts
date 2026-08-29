@@ -1,20 +1,3 @@
-/**
- * Trails-only: `null_scope?` has one body in Rails
- * (collection_association.rb:304-306, `owner.new_record? &&
- * !foreign_key_present?`); `CollectionProxy#null_scope?`
- * (collection_proxy.rb:1150-1152) is a one-line delegation to it, used to route
- * `calculate` and `pluck` through the `none!`d scope (collection_proxy.rb:
- * 724-730). Rails has no test naming the predicate.
- *
- * The first three tests pin the predicate itself from both hosts. The last two
- * pin the *observable* Rails behavior the routing exists to guarantee — a
- * keyless new owner's collection reports nothing, however many children have
- * been built on it. They are deliberately not framed as regression tests for
- * the routing: trails already produced these answers by other means (the
- * loaded-target arm filters new records; the requery arm sits on a `1=0` seed),
- * so they would pass without the `null_scope?` guards. What the guards buy is
- * that those incidental properties are no longer load-bearing.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";

@@ -1,6 +1,5 @@
 import type { Dashboard } from "./dashboard.js";
 import type { Speedometer } from "./speedometer.js";
-// vendor/rails/activerecord/test/models/minivan.rb
 import { Base } from "../../base.js";
 
 export class Minivan extends Base {

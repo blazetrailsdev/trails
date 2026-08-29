@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Electron } from "./electron.js";
 import type { Liquid } from "./liquid.js";
-// vendor/rails/activerecord/test/models/molecule.rb
 import { Base } from "../../base.js";
 
 export class Molecule extends Base {

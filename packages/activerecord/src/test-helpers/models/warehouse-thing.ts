@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/warehouse_thing.rb
 import { Base } from "../../base.js";
 
 export class WarehouseThing extends Base {

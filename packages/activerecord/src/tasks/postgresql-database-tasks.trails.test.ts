@@ -136,8 +136,6 @@ describe("PostgreSQLDatabaseTasks", () => {
 
   describe("structureDump schema filtering", () => {
     it("normalizes $user and quoted entries out of --schema= args", () => {
-      // Uses the exported normalizeSchemaSearchPath helper — same code
-      // path structureDump calls, so the test can't drift.
       expect(normalizeSchemaSearchPath("'$user', public, \"custom\"")).toEqual([
         "public",
         "custom",
@@ -150,8 +148,6 @@ describe("PostgreSQLDatabaseTasks", () => {
   });
 
   it("a global ignore_tables regexp excludes every matching data source", async () => {
-    // Ruby's `Regexp#===` (`postgresql_database_tasks.rb:68`) carries no state,
-    // so a `/g` pattern must not skip alternate tables here.
     const { SchemaDumper } = await import("../schema-dumper.js");
     const previous = SchemaDumper.ignoreTables;
     SchemaDumper.ignoreTables = [/^prefix_/g];

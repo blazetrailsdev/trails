@@ -1,6 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
-// vendor/rails/activerecord/test/models/citation.rb
 import { Base } from "../../base.js";
 
 export class Citation extends Base {

@@ -6,10 +6,6 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 
-/**
- * Compute byte length of a value, mirroring Rails' `to_s.bytesize`.
- * Handles strings, Buffers, TypedArrays, and falls back to string conversion.
- */
 function byteLength(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === "string") {
@@ -25,20 +21,6 @@ function byteLength(value: unknown): number {
   return byteLength(String(value));
 }
 
-/**
- * JSON.stringify that handles bigint values so logging never throws on valid
- * bind values. Integer binds now type-cast to BigInt (SQLite binds them as
- * SQLITE_INTEGER), and Rails renders a bound Integer bare — `[["id", 10]]` —
- * so we emit the exact decimal digits unquoted rather than JSON's quoted
- * `"10"` (Rails renders binds via `binds.inspect`, log_subscriber.rb:65-78).
- *
- * We wrap each bigint's digits in a marker, then strip the marker plus its
- * surrounding quotes. The marker is plain ASCII (JSON never escapes it, so it
- * appears identically in the output) and is extended until it is provably
- * absent from a probe serialization of the same data — so the unwrap only ever
- * matches our own sentinels and can never corrupt a string bind that resembles
- * the marker. (A fixed sentinel is reproducible by user data; this one is not.)
- */
 function safeJsonStringify(value: unknown): string {
   const probe = JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
   let marker = "@bigint@";
@@ -53,57 +35,37 @@ function safeJsonStringify(value: unknown): string {
 let _baseResolver: (() => any) | null = null;
 
 /**
- * Set the resolver for ActiveRecord::Base, avoiding circular imports.
- * Called from index.ts during module initialization.
- *
- * Trails-only seam with no Rails counterpart: Rails' LogSubscriber references
- * the `ActiveRecord::Base` constant directly (log_subscriber.rb), which Ruby
- * resolves at call time; a static TS import would close the cycle
- * `log-subscriber → base → index → log-subscriber`.
- *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby names the ActiveRecord::Base constant at call time (log_subscriber.rb:110); a TS import would close a module cycle.
+ * @noRailsEquivalent PERMANENT
  */
 export function setBaseResolver(resolver: () => any): void {
   _baseResolver = resolver;
 }
 
 /**
- * Read the `ActiveRecord::Base` constant at call time. Exported for the other
- * modules that name it inside a method body where Ruby's autoload resolves it
- * (`ActiveRecord.db_warnings_action=`'s `:log` arm, active_record.rb:245).
- *
  * @internal
- * @noRailsEquivalent PERMANENT — the read half of the `setBaseResolver` seam
- *   above; Ruby resolves `ActiveRecord::Base` by autoload at call time, which a
- *   static TS import cannot do without closing a cycle.
+ * @noRailsEquivalent PERMANENT
  */
 export function getBase(): any {
   return _baseResolver?.() ?? null;
 }
 
-// Backs Base.verboseQueryLogs; the flag lives here because log-subscriber.ts
-// cannot import base.ts (the cycle the _baseResolver seam above breaks).
 let _verboseQueryLogs = false;
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE reads ActiveRecord.verbose_query_logs (active_record.rb:329) through the lazily-wired resolver.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function getVerboseQueryLogs(): boolean {
   return _verboseQueryLogs;
 }
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE writes ActiveRecord.verbose_query_logs (active_record.rb:329) through the same resolver.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function setVerboseQueryLogs(value: boolean): void {
   _verboseQueryLogs = value;
 }
 
-/**
- * ActiveRecord::LogSubscriber — logs SQL queries with coloring, timing,
- * and bind parameter display. Mirrors Rails' ActiveRecord::LogSubscriber.
- */
 export class LogSubscriber extends BaseLogSubscriber {
   static readonly IGNORE_PAYLOAD_NAMES = ["SCHEMA", "EXPLAIN"];
 
@@ -115,13 +77,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     });
   }
 
-  /**
-   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106):
-   *   `payload[:binds]&.any?` (`log_subscriber.rb:120`) — a blockless
-   *   `Array#any?` is the emptiness test, whose faithful JS spelling is `length
-   *   > 0`. The gate flags it only because `any?` maps onto the unrelated
-   *   `Relation#any?`.
-   */
+  /** @missingRailsCall any? — PERMANENT */
   sql(event: Event): void {
     const payload = event.payload;
 
@@ -168,8 +124,6 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @internal */
   override get logger(): Logger | null {
-    // Rails: `def logger; ActiveRecord::Base.logger; end`
-    // Returns Base.logger directly — null means logging disabled.
     const B = getBase();
     if (B && "logger" in B) return B.logger as Logger | null;
     return (this.constructor as typeof LogSubscriber).logger;
@@ -207,10 +161,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     }
   }
 
-  // Rails: `class_attribute :backtrace_cleaner` on the LogSubscriber. Trails
-  // holds the equivalent instance in the private static `_backtraceCleaner`;
-  // expose the Rails-named reader (the `=`/`?` forms map to the same accessor).
-  // Mirrors: ActiveRecord::LogSubscriber#backtrace_cleaner
   static get backtraceCleaner(): BacktraceCleaner {
     return LogSubscriber._backtraceCleaner;
   }
@@ -253,9 +203,6 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   private renderBind(attr: unknown, value: unknown): [string | null, unknown] {
-    // Rails: render_bind takes an ActiveModel::Attribute. Resolve real
-    // Attribute instances via the activemodel API; also tolerate duck-typed
-    // shapes (legacy bind descriptors used elsewhere in the adapter layer).
     const resolved = this.resolveBindAttribute(attr);
     if (resolved) {
       const isBinary = resolved.type?.isBinary?.() ?? resolved.type?.binary?.() ?? false;
@@ -280,7 +227,6 @@ export class LogSubscriber extends BaseLogSubscriber {
       return [headName, value];
     }
 
-    // Simple object with .name (e.g. query attribute descriptor)
     if (attr && typeof attr === "object" && typeof (attr as { name?: unknown }).name === "string") {
       return [(attr as { name: string }).name, value];
     }
@@ -319,18 +265,10 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 }
 
-// Register log-level gates matching Rails' class-body `subscribe_log_level` calls.
 LogSubscriber.subscribeLogLevel("sql", "debug");
 LogSubscriber.subscribeLogLevel("strict_loading_violation", "debug");
 
-/**
- * Override of the parent logger's `debug` that also logs the query source
- * location when verbose_query_logs is enabled.
- *
- * Mirrors: ActiveRecord::LogSubscriber#debug (private)
- *
- * @internal
- */
+/** @internal */
 export function debug(subscriber: LogSubscriber, message: string): boolean {
   const logger = subscriber.logger;
   if (!logger) return false;

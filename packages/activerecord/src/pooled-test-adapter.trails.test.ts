@@ -1,11 +1,3 @@
-/**
- * Smoke test for {@link createPooledTestAdapter} (Phase B of the
- * connection-pool-epic). Verifies the pooled adapter wires through
- * `PoolConfig` + `ConnectionHandler` correctly and that
- * `pinConnectionBang` / `unpinConnectionBang` provide per-test isolation.
- *
- * Does NOT migrate any consumers — that's Phase C/D follow-up work.
- */
 import { describe, it, expect, afterAll } from "vitest";
 
 import { createPooledTestAdapter, _resetPooledTestAdapterForTests } from "./test-adapter.js";
@@ -23,9 +15,6 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
   it("returns an adapter with a non-null pool back-reference", async () => {
     const { adapter, pool } = await createPooledTestAdapter();
     expect(pool).toBeTruthy();
-    // Rails-shape invariant: every pooled connection has a `pool` back-ref
-    // set by `ConnectionPool#newConnection`. Bug 3 (schema-cache lazy-load)
-    // hinges on this not being null.
     expect((adapter as unknown as { pool: unknown }).pool).toBe(pool);
   });
 
@@ -46,13 +35,6 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     }
   });
 
-  // This test needs two connections: the setup lease above plus the pinned one.
-  // A SQLite `:memory:` database belongs to the connection that opened it, so
-  // on `sqlite3_mem` the second one is a second, EMPTY database and the pinned
-  // INSERT raises `no such table` — it never sees the setup CREATE TABLE.
-  // Rails guards its own pinned-connection case the same way —
-  // `skip("Can't test with in-memory dbs") if in_memory_db?`
-  // (`connection_pool_test.rb:891`).
   it.skipIf(inMemoryDb())(
     "pinConnectionBang + write + unpinConnectionBang rolls back",
     async () => {
@@ -62,9 +44,6 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
       await asExec(setupAdapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY)`);
       try {
         await withExecutionContext(async () => {
-          // Pin first, THEN check out so the pinned connection is the one we
-          // write through. Leases are keyed by executionContextId, so a lease
-          // taken outside this context would resolve to a different connection.
           await pool.pinConnectionBang(false);
           try {
             const pinned = await pool.checkout();

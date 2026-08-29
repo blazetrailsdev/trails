@@ -2,16 +2,6 @@ import type { Base } from "./base.js";
 import { upcaseFirst } from "@blazetrails/activesupport";
 import { association } from "./associations/instance-methods.js";
 
-/**
- * Delegate methods to an association.
- *
- * Mirrors: Module#delegate (used heavily in Rails models)
- *
- * Usage:
- *   delegate(Book, ['name', 'email'], { to: 'author' })
- *   delegate(Book, ['name'], { to: 'author', prefix: true })
- *     → book.authorName()
- */
 export function delegate(
   modelClass: typeof Base,
   methods: string[],
@@ -41,7 +31,6 @@ export function delegate(
 
         if (!target) return null;
 
-        // Try calling as a method first, then read as attribute
         if (typeof (target as any)[method] === "function") {
           return (target as any)[method]();
         }

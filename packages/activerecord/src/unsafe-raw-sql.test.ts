@@ -1,6 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -13,9 +10,6 @@ registerModel(Post);
 registerModel(Comment);
 
 describe("UnsafeRawSqlTest", () => {
-  // Rails `fixtures :posts, :comments` — seed the canonical rows so the
-  // ordering/pluck comparisons (Arel.sql vs string column name) read back the
-  // same set of records.
   fixtures(["posts", "comments"]);
 
   it("order: allows string column name", async () => {
@@ -252,8 +246,6 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: rejects comma-separated column list in a single argument", async () => {
-    // trails-specific guard: pluck("id, title") has ambiguous result mapping.
-    // Pass each column as a separate argument instead: pluck("id", "title").
     await expect(Post.pluck("id, title")).rejects.toMatchObject({
       name: "ArgumentError",
       message: /pluck does not allow comma-separated/,

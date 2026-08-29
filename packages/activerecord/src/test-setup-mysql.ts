@@ -1,8 +1,5 @@
 import { afterAll } from "vitest";
 
-// Suppress unhandled rejections from MariaDB/MySQL table-not-found errors
-// that occur when lazy relation queries fire during test teardown.
-
 type MysqlLikeError = Error & { code?: string; errno?: number };
 
 function isMysqlTableNotFoundError(reason: unknown): boolean {

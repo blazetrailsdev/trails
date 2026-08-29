@@ -1,11 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/view_test.rb
- *
- * Rails conditionally runs this entire file under `if supports_views?`.
- * SQLite, PostgreSQL, and MySQL all support views, so we run unconditionally.
- * The UpdateableViewTest block is guarded to non-SQLite adapters because
- * SQLite does not support DML (INSERT/UPDATE/DELETE) through views.
- */
 import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -14,17 +6,10 @@ import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
-// In Rails, AbstractAdapter includes SchemaStatements, so introspection
-// methods (views, viewExists, tableExists, dataSourceExists) live directly
-// on the connection object. Cast once here; all helpers pass through.
 function conn(): AbstractAdapter {
   return Base.connection as unknown as AbstractAdapter;
 }
 
-// Rails view tests create/drop views with raw execute, not schema statement
-// helpers (create_view / drop_view don't exist in the vendored Rails source).
-// Use conn().quoteTableName so the adapter's own quoting is used (backticks on
-// MySQL, double-quotes on PG/SQLite) — mirrors Rails' quote_table_name(name).
 async function createView(name: string, sql: string): Promise<void> {
   await conn().executeMutation(`CREATE VIEW ${conn().quoteTableName(name)} AS ${sql}`);
 }
@@ -34,14 +19,6 @@ async function dropView(name: string): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// ViewWithPrimaryKeyTest
-// ---------------------------------------------------------------------------
-// Rails defines these tests in the `ViewBehavior` concern, which is mixed into
-// `ViewWithPrimaryKeyTest` — a class that sits under `if …supports_views?`. The
-// gate extractor now propagates that `views` feature gate to the module's tests,
-// so gate this suite the same way (all adapters support views, so it gates
-// nothing at runtime — it keeps the gate-fidelity match with Rails).
 describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   const { books } = fixtures(["books", "authors"]);
 
@@ -106,25 +83,16 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
     class Model extends Base {
       static override _tableName = "ebooks'";
     }
-    // Rails resolves `primary_key` synchronously via the connection's schema
-    // cache; our sync resolver reads only what's already cached, so warm it
-    // first (the async analogue of Ruby's lazy schema_cache.primary_keys query).
     await Model.loadSchema();
     expect(Model.primaryKey).toBeNull();
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "ebooks'");
-    // TS schema DSL: ctx.createTable("ebooks'", ...) — not the Ruby create_table form
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
   });
 });
 
-// ---------------------------------------------------------------------------
-// ViewWithoutPrimaryKeyTest
-// ---------------------------------------------------------------------------
-// Rails sets `self.use_transactional_tests = false` on this class
-// (vendor/rails/activerecord/test/cases/view_test.rb:100).
 describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   const { books } = fixtures(["books", "authors"], {
     useTransactionalTests: false,
@@ -144,10 +112,6 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
     await dropView("paperbacks");
   });
 
-  // Rails defines these tests directly inside `ViewWithoutPrimaryKeyTest`, which
-  // sits textually under `if supports_views?` — so they carry a `views` feature
-  // gate. All adapters support views, so this gates nothing at runtime; it keeps
-  // the gate-fidelity match with Rails.
   itIfSupports("views", "reading", async () => {
     const records = await Paperback.all();
     expect(records.map((b: any) => b.name)).toEqual([books("awdr").name]);
@@ -186,20 +150,10 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
 
   itIfSupports("views", "does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "paperbacks");
-    // TS schema DSL: ctx.createTable("paperbacks", ...) — not the Ruby create_table form
     expect(schema).not.toMatch(/ctx\.createTable\("paperbacks"/);
   });
 });
 
-// ---------------------------------------------------------------------------
-// UpdateableViewTest — MySQL/PG only (SQLite views do not support DML)
-// ---------------------------------------------------------------------------
-// Rails sets `self.use_transactional_tests = false` here because DML through
-// views must commit to be visible across connections. The transactional
-// fixtures path wraps each test in a savepoint; on MySQL a different pool
-// connection for PrintedBook.last() cannot see the uncommitted row. Mirror
-// Rails by passing `useTransactionalTests: false` to fixtures() (per-test
-// delete/reseed via beforeEach/afterEach, committed DML, no savepoint).
 describe("UpdateableViewTest", () => {
   const { books } = fixtures(["books", "authors"], {
     useTransactionalTests: false,
@@ -233,18 +187,12 @@ describe("UpdateableViewTest", () => {
     expect((book as any).name).toBe("AWDwR");
   });
 
-  // Rails gates this `features=[views]` (runs on mysql + postgresql; SQLite views
-  // do not support DML).
   itIfSupports.skipIf(adapterType === "sqlite")("views", "insert record", async () => {
     await PrintedBook.createBang({ name: "Rails in Action", status: 0, format: "paperback" });
     const newBook = await PrintedBook.last();
     expect((newBook as any).name).toBe("Rails in Action");
   });
 
-  // view_test.rb:197 gates the method itself with
-  // `current_adapter?(:PostgreSQLAdapter, :SQLite3Adapter) && supports_insert_returning?`,
-  // which intersects with the class guard (mysql + postgresql) down to
-  // PostgreSQL alone.
   itIfSupports.skipIf(adapterType !== "postgres")(
     "insert_returning,views",
     "insert record populates primary key",

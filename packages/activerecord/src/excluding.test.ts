@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/excluding_test.rb
- */
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -15,10 +10,6 @@ registerModel(Post);
 registerModel(Comment);
 
 describe("ExcludingTest", () => {
-  // Rails: `fixtures :posts, :comments`. The canonical `posts`/`comments`
-  // tables are pre-built per worker; seed them so each `excluding` relation has
-  // rows to read back, and so the shared models resolve regardless of any
-  // bespoke table a sibling file left in the worker DB.
   const { posts, comments } = fixtures(["posts", "comments"]);
 
   const ids = (records: { id: unknown }[]) => records.map((r) => r.id);

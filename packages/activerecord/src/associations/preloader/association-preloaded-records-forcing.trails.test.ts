@@ -1,12 +1,3 @@
-/**
- * Preloader::Association#preloaded_records forces `load_records`.
- *
- * Rails' reader is `load_records unless defined?(@preloaded_records)`
- * (preloader/association.rb:153-157), so a preloader used outside the `Batch`
- * runner still answers the queried records rather than an empty array. The
- * guard is on the ivar being *assigned*, not on the value being present, so a
- * legitimately-empty preload does not re-run the query.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";

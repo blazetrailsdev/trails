@@ -1,22 +1,3 @@
-/**
- * Regression guard for RFC 0022 b1: seeding an inverse belongs_to target
- * through the holder (`record.association(name).setTarget(target)`) marks the
- * holder loaded, which captures `staleState()` → `foreignKeyNames()`. Before
- * the fix, the target class was resolved from the registry (throwing
- * `Model '...' not found`) instead of being read from the instance.
- *
- * Also covers scalar-FK + composite-PK-target assignment: when the target has
- * composite PK `[shop_id, id]` and no explicit `foreignKey`, the inferred
- * scalar FK (`composite_pk_parent_id`) must write the `"id"` component —
- * mirrors Rails `BelongsToReflection#association_primary_key` (reflection.rb:936-938).
- *
- * NOTE: Both models must now be registered because constructor-level
- * `check_validity!` (Rails' `Association#initialize`)
- * requires the target class in the registry before `association()` is called.
- * This weakens the original guard: a future regression where `staleState()`
- * falls back to a registry lookup instead of reading from the held instance
- * would go undetected. Catching that would require a spy on `autoloadModel`.
- */
 import { describe, it, expect, vi } from "vitest";
 
 import { Base } from "../base.js";
@@ -41,8 +22,6 @@ class CpkSeedChild extends Base {
   }
 }
 
-// Target whose composite PK has the shape `[tenant_key, tenant_id]` — no `"id"`
-// column — so Rails keeps the full composite array as the association PK.
 class TenantPkParent extends Base {
   static _tableName = "cpk_tenant_parents";
   static {
@@ -79,8 +58,6 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     const child = new CpkSeedChild();
     const parent = new CompositePkParent({ id: [1, 2] });
 
-    // Build the holder first (constructor-level check_validity! resolves the class);
-    // the spy only guards the setTarget → staleState → foreignKeyNames path.
     const holder = child.association("compositePkParent");
 
     const spy = vi.spyOn(associationsModule, "autoloadModel");
@@ -121,13 +98,6 @@ describe("belongs_to to a composite-PK target without an id column", () => {
   it("raises a composite-PK/FK length mismatch at first association access", () => {
     const child = new CpkTenantChild();
 
-    // The target's composite PK `[shop_id, tenant_id]` (no `id` column) keeps
-    // its full two-column array as the association primary key, but the
-    // belongs_to's default foreign key (`tenant_pk_parent_id`) is scalar — a
-    // 2-vs-1 length mismatch. Rails runs `reflection.check_validity!` in
-    // `Association#initialize` (now mirrored in the `Association` constructor),
-    // so this misconfiguration raises on first `association()` access rather
-    // than being silently inferred.
     expect(() => child.association("tenantPkParent")).toThrow(CompositePrimaryKeyMismatchError);
   });
 });

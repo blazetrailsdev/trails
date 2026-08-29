@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/author_encrypted.rb
 import { Base } from "../../base.js";
 import { Scheme } from "../../encryption/scheme.js";
 

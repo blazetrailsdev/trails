@@ -5,7 +5,6 @@ import type { Member } from "./member.js";
 import type { Membership } from "./membership.js";
 import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
-// vendor/rails/activerecord/test/models/club.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 

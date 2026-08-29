@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/locking_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
@@ -38,13 +33,6 @@ import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertio
 import { adapterType } from "./test-adapter.js";
 
 describe("OptimisticLockingTest", () => {
-  // Mirrors Rails `fixtures :people, :legacy_things, :references,
-  // :string_key_objects, :peoples_treasures`: seed the canonical rows and read
-  // them with the shared Person/LegacyThing/Reference/StringKeyObject models
-  // (Rails' `Person.find(1)` etc.) instead of constructing records inline. The
-  // bespoke `LockWithoutDefault*` (Rails declares these top-level, no fixtures)
-  // and `ReadonlyNameShip < Ship` tables are canonical too. Treasures are listed
-  // before peoples_treasures so their IDs are resolved first (ref ordering).
   const { people, stringKeyObjects, legacyThings, references } = fixtures([
     "people",
     "stringKeyObjects",
@@ -66,10 +54,6 @@ describe("OptimisticLockingTest", () => {
     await Car.loadSchema();
     await Wheel.loadSchema();
     registerModel(Treasure);
-    // Destroying a Person runs its `dependent:` association callbacks
-    // (`jobs_with_dependent_destroy` through `references`, `personal_legacy_things`,
-    // `comments`), so those models must be registered for the reflections to
-    // resolve during `destroy with dirty primary key`.
     registerModel(Reference);
     registerModel(Job);
     registerModel(Comment);
@@ -126,11 +110,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock destroy", async () => {
-    // Reads the `michael` fixture (Rails' `Person.find(1)`) but through an
-    // association-free model: the canonical Person's `dependent: :destroy` HMT
-    // graph (jobsWithDependentDestroy → references → job) isn't resolvable on
-    // the destroy path yet. Follow-up: use the shared Person once through-
-    // association dependent destroy resolves its source class.
     class LockPerson extends Base {
       static {
         this.attribute("id", "integer");
@@ -278,9 +257,6 @@ describe("OptimisticLockingTest", () => {
     person.id = 42;
     expect(await person.touch()).toBe(true);
 
-    // Touch routes through _query_constraints_hash → id_in_database, so the row
-    // last loaded from the DB (id 1) is the one updated; the in-memory PK 42
-    // never persists, mirroring the update/delete/destroy dirty-PK behavior.
     const persisted = await Person.find(1);
     expect(persisted.lock_version).toBe(beforeLockVersion + 1);
     await expect(Person.find(42)).rejects.toBeInstanceOf(RecordNotFound);
@@ -326,7 +302,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch existing lock without default should work with null in the database", async () => {
-    // Mirrors Rails: raw INSERT so lock_version and updated_at start as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
     );
@@ -350,7 +325,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default should work with null in the database", async () => {
-    // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
     );
@@ -371,7 +345,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update with lock version without default should work on dirty value before type cast", async () => {
-    // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
     );
@@ -388,7 +361,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("destroy with lock version without default should work on dirty value before type cast", async () => {
-    // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
     );
@@ -436,7 +408,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
-    // Mirrors Rails: raw INSERT so custom_lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults_cust(title) VALUES('title1')",
     );
@@ -581,8 +552,6 @@ describe("OptimisticLockingTest", () => {
     expect(await wheels.count()).toBe(beforeCreate + 1);
 
     const reloaded = await car.reload();
-    // Mirrors Rails `assert_difference "car.wheels.count", -1 { car.reload.destroy }`:
-    // the dependent: :destroy cascade must actually remove the wheel row.
     const beforeDestroy = Number(await Wheel.where({ wheelable_id: reloaded.id }).count());
     expect(beforeDestroy).toBe(1);
     await reloaded.destroy();
@@ -596,9 +565,6 @@ describe("OptimisticLockingTest", () => {
     await proxy.create({});
     expect(await proxy.isEmpty()).toBe(false);
     await p.destroy();
-    // Rails' destroy does NOT clear @association_cache (it only freezes the
-    // record), so the in-memory proxy still holds the pre-destroy records.
-    // Force a reload to re-query the join table and confirm the rows are gone.
     await proxy.reload();
     expect(await proxy.isEmpty()).toBe(true);
     const rows = await (Base.connection as any).selectRows(
@@ -616,18 +582,6 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
-  // Mirrors Rails `fixtures :people, :legacy_things, :references` plus
-  // `self.use_transactional_tests = false` (locking_test.rb:562-568): the whole
-  // class is non-transactional. The counter tests run DDL
-  // (`add_counter_column_to`), and on MySQL `ALTER TABLE` forces an implicit
-  // commit that would end the per-test SAVEPOINT. The DDL churn also leaves
-  // stale PostgreSQL prepared plans on the connection (the column is dropped in
-  // each test's `ensure`); a later test reusing that plan raises "cached plan
-  // must not change result type". Outside a transaction the PG adapter recovers
-  // by deallocating and retrying, but inside the per-test SAVEPOINT it raises
-  // PreparedStatementCacheExpired — so EVERY test here opts out of the wrapper,
-  // matching Rails' class-level setting. The fixture loader still delete+inserts
-  // each table per test, resetting `lock_version` to 0 between cases.
   const schemaChangeTests = [
     "increment counter updates lock version",
     "decrement counter updates lock version",
@@ -643,9 +597,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     usesTransaction: schemaChangeTests,
   });
 
-  // Mirrors Rails' private add_counter_column_to / remove_counter_column_from
-  // helpers: add a `test_count` integer column, run reset_column_information so
-  // the model picks it up, then strip it again in the ensure block.
   async function addCounterColumnTo(model: typeof Base): Promise<void> {
     await (Base.connection as any).addColumn(model.tableName, "test_count", "integer", {
       null: false,
@@ -658,7 +609,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     void model.resetColumnInformation();
   }
 
-  // Mirrors Rails' private counter_test(model, expected_count) { |id| ... }.
   async function counterTest(
     model: typeof Base,
     expectedCount: number,
@@ -678,13 +628,9 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     }
   }
 
-  // Touch the fixture accessors so the seeded sets are referenced (Rails
-  // declares `fixtures :people, :legacy_things` for these); `model.first()`
-  // inside counterTest reads the seeded row, mirroring Rails' `model.first`.
   void people;
   void legacyThings;
 
-  // Rails generates these with { lock_version: Person, custom_lock_version: LegacyThing }.
   it("increment counter updates lock version", async () => {
     await counterTest(Person, 1, (id) => Person.incrementCounter("test_count", id));
   });
@@ -705,8 +651,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy dependents", async () => {
-    // Mirrors Rails: Person with PersonalLegacyThing (dependent: :destroy).
-    // Uses inline classes to avoid counterCache on the canonical PersonalLegacyThing.
     class LockPerson extends Base {
       static {
         this.attribute("id", "integer");
@@ -723,9 +667,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
         this._tableName = "personal_legacy_things";
         this.lockingColumn = "version";
         this.attribute("person_id", "integer");
-        // Custom locking column written on insert; declare it for strict
-        // writeFromUser (the table's cache may be cold after a sibling
-        // schema-change test in this file).
         this.attribute("version", "integer", { default: 0 });
       }
     }
@@ -746,7 +687,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
-    // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
     );
@@ -767,20 +707,10 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 });
 
 describe("PessimisticLockingTest", () => {
-  // Mirrors Rails `fixtures :people` — seed the canonical people rows and read
-  // them with `Person.find(people("michael").id)` (Rails' `Person.find(1)`)
-  // instead of constructing records inline. The canonical `people` table —
-  // with its full fixture columns (gender, *_id, counts) — comes from the
-  // template clone.
-  // `with lock sets isolation` must run outside the transactional-fixtures
-  // wrapper — setting an isolation level inside a nested transaction raises
-  // (mirrors Rails, where isolation requires a top-level transaction).
   const { people } = fixtures(["people"], {
     usesTransaction: ["with lock sets isolation"],
   });
 
-  // `eager find with lock` traverses Person's `has_many :readers`, so the
-  // Reader model must be registered for the reflection to resolve.
   beforeAll(() => {
     registerModel("Reader", Reader);
   });
@@ -792,8 +722,6 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  // Rails guards this with `unless current_adapter?(:PostgreSQLAdapter)` —
-  // PostgreSQL protests SELECT ... FOR UPDATE on an outer join.
   it.skipIf(adapterType === "postgres")("eager find with lock", async () => {
     await Person.transaction(async () => {
       await Person.includes(":readers").lock().find(people("michael").id);
@@ -836,9 +764,7 @@ describe("PessimisticLockingTest", () => {
         await person.saveBang();
         throw new Error("oops");
       });
-    } catch {
-      // expected
-    }
+    } catch {}
     const reloaded = await Person.find(person.id);
     expect(reloaded.first_name).toBe(old);
   });
@@ -857,7 +783,6 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  // Rails guards this with `if current_adapter?(:PostgreSQLAdapter)`.
   it.skipIf(adapterType !== "postgres")("lock sending custom lock statement", async () => {
     await Person.transaction(async () => {
       const person = await Person.find(people("michael").id);
@@ -867,7 +792,6 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  // Rails guards this with `if current_adapter?(:PostgreSQLAdapter)`.
   it.skipIf(adapterType !== "postgres")("with lock sets isolation", async () => {
     const adapter = Base.connection as any;
     const person = await Person.find(people("michael").id);
@@ -885,9 +809,5 @@ describe("PessimisticLockingTest", () => {
   });
 
   // PERMANENT-SKIP: thread-based concurrency. Rails' `duel` spawns two
-  // `Thread.new` blocks that each open a `joinable: false` transaction and
-  // race on the same row, then asserts on wall-clock ordering. There is no
-  // single-threaded JS equivalent (same class as the excluded
-  // Marshal/YAML/thread/fork permanent-skips), so this stays skipped.
   it.skip("no locks no wait", () => {});
 });

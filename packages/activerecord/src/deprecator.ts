@@ -1,13 +1,3 @@
-/**
- * Deprecator — handles deprecation warnings for ActiveRecord.
- *
- * Mirrors: ActiveRecord.deprecator (deprecator.rb)
- * Also covers: gem_version.rb, version.rb, and MigrationProxy (migration.rb)
- *
- * Node-only: MigrationProxy uses node:module (createRequire) for synchronous
- * file loading, matching Rails' synchronous load_migration. Do not import
- * this file in browser bundles.
- */
 import { createRequire } from "node:module";
 import { Deprecation, getPath } from "@blazetrails/activesupport";
 import type { Migration } from "./migration.js";
@@ -28,28 +18,10 @@ export function version(): string {
   return gemVersion();
 }
 
-/**
- * Mirrors: ActiveRecord (the root module that exposes .deprecator)
- */
 export interface ActiveRecord {
   deprecator(): Deprecation;
 }
 
-/**
- * Defers loading of the actual migration class until it is needed.
- *
- * Mirrors: ActiveRecord::MigrationProxy (defined in migration.rb,
- * mapped to deprecator.rb by the parity:api extractor)
- *
- * This is the file-loading proxy: it resolves `name` out of `filename` and
- * constructs the migration, mirroring `load_migration`'s
- * `name.constantize.new(name, version)`. It stays separate from the
- * `MigrationProxy` interface in `migration.ts` — the already-resolved shape
- * `Migrator` consumes, whose `loadMigration` is async — because parity:api
- * buckets the `MigrationProxy` surface under `deprecator.rb` while `Migrator`
- * must keep its collaborator type in `migration.ts`. Both delegate to a real
- * `Migration`.
- */
 export class MigrationProxy {
   name: string;
   version: number;
@@ -90,7 +62,7 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE MigrationProxy#migration (migration.rb:1190) made async because the migration file loads through a dynamic import.
+   * @noRailsEquivalent CONVERGEABLE
    */
   migration(): Promise<Migration> {
     this._migrationPromise ??= this.loadMigrationAsync().then((m) => (this._migration = m));
@@ -99,7 +71,7 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE MigrationProxy#load_migration (migration.rb:1194); the sync arm kept for CJS migrations.
+   * @noRailsEquivalent CONVERGEABLE
    */
   loadMigration(): Migration {
     const req = createRequire(import.meta.url);
@@ -107,7 +79,6 @@ export class MigrationProxy {
     return this._instantiate(req(this.filename) as Record<string, unknown>);
   }
 
-  /** Mirrors: `name.constantize.new(name, version)` (`migration.rb:1195`). */
   private _instantiate(mod: Record<string, unknown>, cause?: unknown): Migration {
     const klass = mod[this.name] ?? mod.default;
     if (typeof klass !== "function") {
@@ -122,26 +93,15 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * ESM-capable loader. Falls through to `require()` for CJS migrations and
-   * uses `import(pathToFileURL(...))` for ESM files (ERR_REQUIRE_ESM).
-   * @noRailsEquivalent PERMANENT Ruby's `require` in load_migration is synchronous (migration.rb:1194); an ESM migration can only be loaded by await import().
+   * @noRailsEquivalent PERMANENT
    */
   async loadMigrationAsync(): Promise<Migration> {
     try {
-      // require() works for CJS migrations; falls through to import() for ESM.
       return this.loadMigration();
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ERR_REQUIRE_ESM") throw err;
-      // ESM migration file — use dynamic import() via file URL.
-      // Note: unlike the require() path above, import() is module-cached by the
-      // Node.js ESM loader and will not reload the file if it changes during the
-      // same process. Cache-busting (e.g. appending ?t=Date.now()) is unstable
-      // across runtimes; in practice, ESM migrations run once per process.
       const { pathToFileURL } = await import("node:url");
-      const mod = (await import(/* @vite-ignore */ pathToFileURL(this.filename).href)) as Record<
-        string,
-        unknown
-      >;
+      const mod = (await import(pathToFileURL(this.filename).href)) as Record<string, unknown>;
       return this._instantiate(mod, err);
     }
   }

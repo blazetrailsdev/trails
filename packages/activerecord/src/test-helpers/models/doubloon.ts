@@ -1,5 +1,4 @@
 import type { Pirate } from "./pirate.js";
-// vendor/rails/activerecord/test/models/doubloon.rb
 import { Base } from "../../base.js";
 
 export class AbstractDoubloon extends Base {

@@ -1,7 +1,3 @@
-/**
- * Port of vendor/rails/activerecord/test/cases/signed_id_test.rb
- * Test names match the Rails counterpart.
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -20,7 +16,6 @@ const SIGNED_ID_VERIFIER_TEST_SECRET = () =>
 const MINUTE = 60;
 
 describe("SignedIdTest", () => {
-  // Rails: class GetSignedIDInCallback < ActiveRecord::Base ... after_create :set_signed_id
   class GetSignedIDInCallback extends Base {
     static _tableName = "accounts";
     signedIdFromCallback: string | null = null;

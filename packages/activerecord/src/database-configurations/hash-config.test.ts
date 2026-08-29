@@ -3,8 +3,6 @@ import { HashConfig } from "./hash-config.js";
 import { AdapterNotFound } from "../errors.js";
 import * as connectionAdapters from "../connection-adapters.js";
 import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-// connection-handling registers the adapter class resolver that validateBang()
-// relies on; import it so this suite isn't order-dependent.
 import "../connection-handling.js";
 
 connectionAdapters.register("abstract", async () => AbstractAdapter as any);
@@ -145,7 +143,6 @@ describe("DatabaseConfigurations", () => {
 
     it("default schema dump value", () => {
       const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      // trails default schema format is "ts" (Rails: "ruby" → "schema.rb").
       expect(config.schemaDump()).toBe("schema.ts");
       expect(config.schemaDump("ruby")).toBe("schema.rb");
     });
@@ -195,7 +192,6 @@ describe("DatabaseConfigurations", () => {
 
     it("schema cache path default for primary", () => {
       const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      // trails writes JSON, not YAML (no Ruby Marshal/YAML in TS).
       expect(config.defaultSchemaCachePath()).toBe("db/schema_cache.json");
     });
 

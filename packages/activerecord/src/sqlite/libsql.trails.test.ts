@@ -91,7 +91,6 @@ describe("SqliteDriver — libsql round-trip", () => {
     expect(libsqlDriver.capabilities.inProcessSync).toBe(true);
     expect(libsqlDriver.capabilities.streaming).toBe(true);
     expect(libsqlDriver.capabilities.foreignKeysOnByDefault).toBe(false);
-    // libsql disables runtime extension loading, unlike better-sqlite3.
     expect(libsqlDriver.capabilities.loadExtension).toBe(false);
   });
 });
@@ -103,9 +102,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
     for (const p of sidecars) {
       try {
         getFs().unlinkSync(p);
-      } catch {
-        /* best effort */
-      }
+      } catch {}
     }
   };
 
@@ -122,7 +119,6 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
 
     expect(libsqlDriver.databaseExists?.({ database: dbPath })).toBe(true);
 
-    // A fresh connection sees the persisted rows.
     const probe = await libsqlDriver.open({ database: dbPath });
     const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
       c: number;
@@ -132,7 +128,6 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
       await probe.prepare("SELECT label FROM gadgets WHERE id = ?")
     ).get([1])) as { label: string };
     expect(row.label).toBe("alpha");
-    // dbPath is a per-test temporary file; a stranded table dies with it.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await probe.exec("DROP TABLE IF EXISTS gadgets");
     await probe.close();
@@ -143,13 +138,10 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
   });
 
   it("databaseExists() preserves a relative file: URI (cwd-relative, not /-anchored)", async () => {
-    // libsql opens `file:name.db` relative to cwd, so databaseExists() must
-    // check the same cwd-relative path rather than anchoring it at "/".
     const relName = `libsql-rel-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
     try {
       const conn = await libsqlDriver.open({ database: `file:${relName}` });
       await conn.exec("CREATE TABLE t (x INTEGER)");
-      // Same: a throwaway database the finally below unlinks.
       // eslint-disable-next-line blazetrails/require-table-teardown
       await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();
@@ -158,9 +150,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
       for (const p of [relName, `${relName}-wal`, `${relName}-shm`]) {
         try {
           getFs().unlinkSync(p);
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     }
   });
@@ -173,9 +163,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
     for (const p of sidecars) {
       try {
         getFs().unlinkSync(p);
-      } catch {
-        /* best effort */
-      }
+      } catch {}
     }
   };
 
@@ -227,9 +215,7 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     for (const p of tempFiles) {
       try {
         getFs().unlinkSync(p);
-      } catch {
-        /* best effort */
-      }
+      } catch {}
     }
   };
 
@@ -539,9 +525,7 @@ describe.skipIf(!hasCredentials)(
       for (const p of sidecars) {
         try {
           getFs().unlinkSync(p);
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     };
 
@@ -551,7 +535,6 @@ describe.skipIf(!hasCredentials)(
 
     beforeAll(async () => {
       removeFiles();
-      // Write to the primary directly so we have a known remote state to pull.
       primary = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
         driverOptions: { authToken: tursoToken },
       });
@@ -576,7 +559,6 @@ describe.skipIf(!hasCredentials)(
       const rows = await replica.execute(`SELECT label FROM ${table} WHERE id = 1`);
       expect((rows[0] as { label: string }).label).toBe("remote");
 
-      // A subsequent remote write is invisible until the next sync.
       await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (2, 'later')`);
       await replica.syncReplica();
       const after = await replica.execute(`SELECT count(*) AS c FROM ${table}`);
@@ -599,9 +581,7 @@ describe.skipIf(!hasCredentials)(
       for (const p of sidecars) {
         try {
           getFs().unlinkSync(p);
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     };
     const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -633,8 +613,6 @@ describe.skipIf(!hasCredentials)(
     it("reflects a remote write without an explicit syncReplica()", async () => {
       await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (1, 'auto')`);
 
-      // Poll the replica WITHOUT calling syncReplica(): the native background
-      // loop (syncPeriod: 1s) should pull the row on its own.
       let label: string | undefined;
       for (let attempt = 0; attempt < 15 && label === undefined; attempt++) {
         await delay(1000);

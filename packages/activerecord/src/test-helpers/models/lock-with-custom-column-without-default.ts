@@ -1,5 +1,4 @@
 import type { Temporal } from "@blazetrails/date";
-// vendor/rails/activerecord/test/cases/locking_test.rb
 import { Base } from "../../base.js";
 
 export class LockWithCustomColumnWithoutDefault extends Base {

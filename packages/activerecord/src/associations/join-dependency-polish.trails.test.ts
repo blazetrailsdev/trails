@@ -1,7 +1,3 @@
-/**
- * Tests for JoinBase.table (Arel Table node) and joinType propagation
- * in makeConstraints.
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
@@ -10,9 +6,6 @@ import { JoinDependency } from "./join-dependency.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { Nodes, Table } from "@blazetrails/arel";
 
-// Ride the boot-laid canonical `Base.connection` (single-pool test model)
-// rather than a sidecar `_pool` lease; these wiring tests only need an
-// adapter for JoinDependency's quoting, not a bespoke schema.
 fixtures({});
 
 describe("JoinBase.table", () => {

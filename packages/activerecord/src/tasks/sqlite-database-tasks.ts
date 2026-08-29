@@ -1,16 +1,3 @@
-/**
- * SQLiteDatabaseTasks — SQLite-specific database lifecycle operations.
- *
- * Mirrors: ActiveRecord::Tasks::SQLiteDatabaseTasks.
- *
- * `structureDump` shells out to the `sqlite3` CLI as Rails does
- * (`sqlite_database_tasks.rb:44-58`), materialising an in-memory database with
- * `VACUUM INTO` first so there is one dump path. `structureLoad` still routes
- * an in-memory database through the SQLite3Adapter: SQLite has no inverse of
- * `VACUUM INTO`, so nothing can pull a file's schema back into the live
- * connection that owns the database.
- */
-
 import {
   getFs,
   getFsAsync,
@@ -39,20 +26,6 @@ export class SQLiteDatabaseTasks {
     this.root = root;
   }
 
-  /**
-   * `sqlite_database_tasks.rb:15-20`. The database file is created by SQLite on
-   * connect, not by this method: Rails' trailing bare `connection` is what forces
-   * the checkout that opens it. `File.exist?` reads the *raw* configured
-   * database — only `drop` joins `root` (`:23-24`) — and the message the caller
-   * prints comes from `DatabaseTasks.create`'s rescue
-   * (`database_tasks.rb:119-120`), so the exception carries none of its own.
-   *
-   * `File.exist?(":memory:")` is false, so an in-memory database simply
-   * connects; Rails has no in-memory lane and so no guard here. Both halves
-   * read the same raw `db_config.database`: the guard and the connect have to
-   * mean the same file, which is why the `root` join lives inline in `drop`
-   * (`:23-24`) and nowhere else.
-   */
   async create(): Promise<void> {
     const fs = getFs();
     if (fs.existsSync(this.dbConfig.database as string)) throw new DatabaseAlreadyExists();
@@ -61,17 +34,6 @@ export class SQLiteDatabaseTasks {
     await this.connection();
   }
 
-  /**
-   * `sqlite_database_tasks.rb:22-29`. This is the one place Rails joins
-   * `root`, and it writes the join inline — `File.absolute_path?(db_path)`
-   * short-circuits it for an already-absolute name.
-   *
-   * There is no in-memory arm: `FileUtils.rm(":memory:")` raises `Errno::ENOENT`,
-   * which the rescue turns into `NoDatabaseError`, so that is what an in-memory
-   * database answers here too. Per the PathAdapter contract a missing
-   * `isAbsolute` means the adapter does not model the relative/absolute
-   * distinction (e.g. a VFS), which takes the `File.absolute_path?` arm.
-   */
   async drop(): Promise<void> {
     const fs = getFs();
     const path = getPath();
@@ -89,25 +51,10 @@ export class SQLiteDatabaseTasks {
     for (const suffix of ["-shm", "-wal"]) {
       try {
         fs.unlinkSync(file + suffix);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
   }
 
-  /**
-   * `sqlite_database_tasks.rb:31-38`. The `rescue` names `NoDatabaseError`
-   * alone — every other failure propagates — and the `ensure` runs `create`
-   * and `connection.reconnect!` whether or not it did.
-   *
-   * The `whenClosed()` drain is a TypeScript-async necessity, not an extra
-   * step: MRI's sqlite3 gem closes the handle synchronously inside
-   * `disconnect!` (`sqlite3_adapter.rb:221`), so `drop`'s `FileUtils.rm` always
-   * runs against a closed file. An async-only JS driver instead leaves
-   * `driver.close()` in flight and records it for a later drain
-   * (`sqlite3-adapter.ts` `whenClosed`), so without this the unlink — and the
-   * `create` that reopens the same path — can race the previous handle (#1269).
-   */
   async purge(): Promise<void> {
     try {
       const connection = (await this.connection()) as SQLite3Adapter;
@@ -122,15 +69,6 @@ export class SQLiteDatabaseTasks {
     }
   }
 
-  /**
-   * `sqlite_database_tasks.rb:39-41`. `SQLite3Adapter#encoding` is
-   * `any_raw_connection.encoding.to_s` (`sqlite3_adapter.rb:236-239`), i.e.
-   * `PRAGMA encoding`; the literal this used to return could never satisfy
-   * `SqliteDBCharsetTest#test_db_retrieves_charset`, which asserts `encoding`
-   * is called on the connection. Ruby's send is duck-typed; `encoding` is
-   * declared on `SQLite3Adapter`, not on `AbstractAdapter` (Rails puts it there
-   * too), so TS needs the cast to reach it.
-   */
   async charset(): Promise<string> {
     return ((await this.connection()) as SQLite3Adapter).encoding;
   }
@@ -147,9 +85,6 @@ export class SQLiteDatabaseTasks {
       ignoreTables = (await connection.dataSources()).filter((table) =>
         ignoreTables.some((pattern) => {
           if (!(pattern instanceof RegExp)) return pattern === table;
-          // Ruby's Regexp#=== carries no state; a JS `g`/`y` regex advances
-          // `lastIndex` on every `.test()`, so without this reset the second
-          // table tested against the same pattern can silently miss.
           pattern.lastIndex = 0;
           return pattern.test(table);
         }),
@@ -160,9 +95,6 @@ export class SQLiteDatabaseTasks {
       dumpSpec = ".schema --nosys";
     }
 
-    // An in-memory database belongs to the connection that opened it, so the
-    // child `sqlite3` Rails shells out to (sqlite_database_tasks.rb:44-58) has
-    // no file to attach; it is copied out with `VACUUM INTO` (SQLite 3.27+).
     let database = this.dbConfig.database as string;
     let materialized: string | undefined;
     if (isInMemoryDatabase(database)) {
@@ -185,47 +117,13 @@ export class SQLiteDatabaseTasks {
     }
   }
 
-  /**
-   * RFC 0051 decision (`sqlite-structure-load-in-memory-lane-decision`): the
-   * `:memory:` lane gets Rails' behaviour, not an adapter path of its own.
-   *
-   * `structureDump` can materialise an in-memory database with `VACUUM INTO`,
-   * but SQLite has no inverse — nothing pulls a file's schema back into a live
-   * in-memory connection — so the only mechanism that could load a script into
-   * the connection that owns the database is an adapter `exec`, which Rails has
-   * no counterpart for. Rather than keep a trails-only adapter path here, the
-   * child process runs exactly as it does in Rails: it opens its own throwaway
-   * in-memory database, applies the script to that, and exits. `db schema:load
-   * --format=sql` is therefore not a meaningful operation against a `:memory:`
-   * config, in trails as in Rails.
-   */
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const flags = extraFlags != null ? (Array.isArray(extraFlags) ? extraFlags : [extraFlags]) : [];
-    // Rails' backtick form redirects the dump file into sqlite3's stdin
-    // (`sqlite3 #{flags} #{database} < "#{filename}"`) and does NOT check the
-    // child's exit status. The child-process adapter has no shell, so the
-    // redirect is expressed as the `in` option — the child reads the file
-    // descriptor, so the dump's bytes reach it verbatim.
     const childProcess = await getChildProcessAsync();
     const args = [...flags, this.dbConfig.database as string];
     childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
   }
 
-  /**
-   * Truncate every user table in the database — used by
-   * `DatabaseTasks.truncate_all` / `trails db seed:replant`. SQLite
-   * doesn't support TRUNCATE TABLE, so we DELETE FROM each user table
-   * instead (the Rails parallel is Arel::Truncate which falls back to
-   * DELETE for sqlite adapters).
-   *
-   * Skips schema_migrations and ar_internal_metadata so migration
-   * state and environment stamping survive.
-   *
-   * Wraps the per-table deletes in disableReferentialIntegrity so
-   * foreign-key constraints don't block deletion of a parent table
-   * while its children are still populated — matches the FK-safety
-   * the PG/MySQL truncateAll implementations provide.
-   */
   async truncateAll(): Promise<void> {
     const adapter = await this.connection();
     const bookkeeping = metadataTableNames();
@@ -241,11 +139,6 @@ export class SQLiteDatabaseTasks {
       for (const row of rows) {
         await adapter.execute(`DELETE FROM "${row.name.replace(/"/g, '""')}"`);
       }
-      // Match TRUNCATE/RESTART IDENTITY semantics by clearing the
-      // AUTOINCREMENT counters for the truncated tables. Rails'
-      // SQLite3Adapter#truncate_tables does the same thing.
-      // sqlite_sequence only exists once any AUTOINCREMENT column has
-      // been created — silently skip when it's absent.
       const hasSequence = (await adapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'",
       )) as Array<{ name: string }>;
@@ -265,16 +158,6 @@ export class SQLiteDatabaseTasks {
     return Base.connectionPool().leaseConnection();
   }
 
-  /**
-   * `sqlite_database_tasks.rb:72-75`. Rails connects to `db_config` unchanged;
-   * the `root` join belongs to `drop` alone, so nothing rewrites `database`
-   * on the way through here.
-   *
-   * `establish_connection` alone opens nothing — it installs a pool lazily — so
-   * the trailing `connection.connect!` is what forces the database file open.
-   * `create` (`:15-20`) masks a missing one with its own bare `connection`, but
-   * `reconnect`/`purge` (`:31-37`) does not.
-   */
   private async establishConnection(config: DatabaseConfig = this.dbConfig): Promise<void> {
     await Base.establishConnection(config);
     await (await this.connection()).connectBang();

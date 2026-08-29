@@ -1,5 +1,4 @@
 import type { Book } from "./book.js";
-// vendor/rails/activerecord/test/models/paragraph.rb
 import { Base } from "../../base.js";
 
 export class Paragraph extends Base {

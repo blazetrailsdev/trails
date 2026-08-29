@@ -1,5 +1,3 @@
-// No Rails counterpart; exercises the sync singular-association strict-loading reader (Phase R.3).
-
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, StrictLoadingViolationError } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -35,18 +33,12 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     expect(dev.id).toBe(developers("david").id);
   });
 
-  // `Association#violates_strict_loading?` (association.rb:284-292) ends at
-  // `owner.strict_loading? && !owner.strict_loading_n_plus_one_only?`, so the
-  // first level loads lazily under `:n_plus_one_only` — the sync reader has to
-  // consult the same predicate rather than the bare owner flag.
   it("sync belongsTo access does not throw under n_plus_one_only mode", async () => {
     const ship = await Ship.create({ name: "N+1 Ship", developer_id: developers("david").id });
     ship.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(() => (ship as any).developer).not.toThrow();
   });
 
-  // `return reflection.strict_loading? if reflection.options.key?(:strict_loading)`
-  // — the reflection-level option wins over the owner's flag, in both directions.
   it("sync hasOne access does not throw when the reflection opts out of strict loading", async () => {
     const developer = await Developer.find(developers("jamis").id);
     developer.strictLoadingBang();
@@ -94,7 +86,6 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   });
 
   it("belongsTo with null FK returns null without throwing under strict loading", async () => {
-    // No FK set → findTargetNeeded() is false → sync access returns null, no raise.
     const ship = await Ship.create({ name: "Orphan Ship" });
     ship.strictLoadingBang();
     expect(() => (ship as any).developer).not.toThrow();
@@ -114,15 +105,12 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     const ship = await Ship.create({ name: "Cached Ship", developer_id: developers("david").id });
     ship.strictLoadingBang();
     const developer = new Developer({ id: developers("david").id });
-    // The belongs_to writer caches the target (belongs_to_association.rb:95).
     (ship as any).association("developer").writer(developer);
     expect(() => (ship as any).developer).not.toThrow();
     expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
   });
 
   it("hasOne on a new (unsaved) owner returns null without throwing", async () => {
-    // New records with no primary key → findTargetNeeded() is false
-    // (no ID to query by), so strict loading does not fire.
     const developer = new Developer({ name: "new" });
     developer.strictLoadingBang();
     expect(() => (developer as any).ship).not.toThrow();
@@ -137,10 +125,7 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     ship.strictLoadingBang();
     const developer = new Developer({ id: developers("david").id });
     const assoc = ship.association("developer") as any;
-    // The Preloader path's bare `@target = …` (association.rb:189); `target=`
-    // would mark it loaded (:100-103) and skip the reader path under test.
     assoc._writeTargetStore(developer);
-    // loaded is still false; reader short-circuits on the non-null target.
     expect(assoc.loaded).toBe(false);
     expect(() => (ship as any).developer).not.toThrow();
     expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
@@ -148,9 +133,6 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   });
 
   it("ships fixture is linked to developer in the ships fixture", () => {
-    // Sanity check: the ships fixture (black_pearl) has a pirate_id, not developer_id.
-    // The interceptor has no developer_id. This confirms sync-reader tests
-    // that use developer_id must create their own ships.
     expect(ships("interceptor").developer_id).toBeFalsy();
   });
 });

@@ -13,7 +13,6 @@ import {
 import { UniquenessValidator } from "../validations.js";
 import { YAMLColumn } from "../coders/yaml-column.js";
 import { encryptedTypeOf } from "./encryptable-record.js";
-// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -21,32 +20,15 @@ import { DisallowedClass } from "../coders/yaml-column.js";
 
 fixtures([], { useTransactionalTests: false });
 
-// 32 bytes (base64-encoded) for AES-256-GCM, matching the port suite's key.
 const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
 const PREVIOUS_KEY = Buffer.alloc(32, "y").toString("base64");
 
-/**
- * TS-only guard (Rails has no direct test): a deterministic
- * Serialized(Encrypted(...)) attribute — `encrypts` then `serialize`, so the
- * coder dumps BEFORE encryption — must be queryable by plaintext value.
- * Query expansion has to serialize candidates through the FULL resolved type
- * (Rails' `owner.type_for_attribute(name)` delegation,
- * extended_deterministic_queries.rb:58-62), not the bare inner
- * EncryptedAttributeType, or the expansion ciphertext diverges from the
- * write path and the lookup silently misses.
- */
 function buildSerializedBook({ previousSchemes = false, coder = JSON as unknown } = {}) {
   class EncryptedSerializedBook extends Base {
     static {
       this._tableName = "books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      // supportUnencryptedData: false removes the raw-plaintext candidate
-      // from the expansion, so the lookup can only succeed through a
-      // correctly-serialized ciphertext candidate. A previous scheme makes
-      // `previousTypes` non-empty so query expansion actually runs — but in
-      // Rails that combination RAISES (see the raise test below), so the
-      // lookup tests use the no-previous-schemes variant.
       this.encrypts("name", {
         deterministic: true,
         key: TEST_KEY,
@@ -95,8 +77,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     EncryptedSerializedBook = buildSerializedBook();
     PreviousSchemeSerializedBook = buildSerializedBook({ previousSchemes: true });
     PreviousSchemeYamlBook = buildSerializedBook({ previousSchemes: true, coder: YAMLColumn });
-    // Warm the books table once so the first create doesn't race the
-    // test-adapter's schema-recovery path (see the port suite's note).
     await EncryptedSerializedBook.where("1=1");
   });
 
@@ -126,12 +106,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     expect(await EncryptedSerializedBook.exists({ name: "Dune" })).toBe(true);
   });
 
-  // Rails-verified (vendored Rails, sqlite3, extend_queries installed): with
-  // previous schemes, plaintext lookups raise NoMethodError — the expansion's
-  // AdditionalValue reaches Type::Serialized#serialize and the JSON coder's
-  // as_json traversal hits ActiveModel::Type::Value#as_json (value.rb:145)
-  // via the AV's @type. No SQL is generated, so no scheme/key material can
-  // land in a bind.
   it("raises NoMethodError when a previous-scheme candidate reaches the serialized coder", async () => {
     await expect(PreviousSchemeSerializedBook.findBy({ name: "Dune" })).rejects.toThrow(
       NoMethodError,
@@ -140,9 +114,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
       NoMethodError,
     );
 
-    // The mechanism, pinned directly: Serialized#serialize(AV) raises inside
-    // coder.dump before any payload exists — the dumped-AV JSON (which would
-    // embed previous-scheme internals) is never produced.
     const fullType = PreviousSchemeSerializedBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
@@ -152,13 +123,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     expect(() => fullType.serialize(av)).toThrow(NoMethodError);
   });
 
-  // Rails-verified (vendored Rails, sqlite3, extend_queries installed): with
-  // the YAML coder, the previous-scheme AdditionalValue reaches
-  // Coders::YAMLColumn#dump and Psych's safe_dump raises
-  // `Psych::DisallowedClass: Tried to dump unspecified class:
-  // ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue`.
-  // Like the JSON path, the raise fires before any payload or SQL exists, so
-  // no scheme/key material can land in a bind.
   it("raises Psych::DisallowedClass when a previous-scheme candidate reaches the YAML coder", async () => {
     await expect(PreviousSchemeYamlBook.findBy({ name: "Dune" })).rejects.toThrow(DisallowedClass);
     await expect(PreviousSchemeYamlBook.where({ name: "Dune" }).first()).rejects.toThrow(
@@ -179,8 +143,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     const fullType = PreviousSchemeSerializedBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
-    // The resolved type is the outer Serialized wrapper, not the bare
-    // EncryptedAttributeType — the delegation the expansion must honor.
     expect(fullType).not.toBeInstanceOf(EncryptedAttributeType);
 
     const candidates = EncryptedUniquenessValidator.allCiphertextsFor(
@@ -188,14 +150,8 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
       "name",
       "Dune",
     );
-    // Rails shape: raw plaintext first, AdditionalValues only for previous
-    // schemes.
     expect(candidates[0]).toBe("Dune");
     expect(candidates.length).toBeGreaterThan(1);
-    // The type the PredicateBuilder serializes IN-list scalars through
-    // (HomogeneousIn#castedValues → attribute typeCaster) must be the full
-    // resolved type, so the raw candidate encrypts to the write-path
-    // ciphertext (coder dump applied before encryption).
     const arelAttr = (
       PreviousSchemeSerializedBook as unknown as {
         arelTable: { get(name: string): { typeCaster: unknown } };

@@ -9,9 +9,6 @@ import { _associationNotFound } from "../associations.js";
 
 describe("AssociationErrors", () => {
   it("AssociationNotFoundError keeps the suggestion out of message but in detailedMessage", () => {
-    // Rails parity: errors.rb AssociationNotFoundError includes
-    // DidYouMean::Correctable, so corrections surface only via
-    // `detailed_message`, not the bare `message`.
     const err = new AssociationNotFoundError({ constructor: { name: "Post" } }, "taggingz", [
       "tagging",
     ]);
@@ -30,8 +27,6 @@ describe("AssociationErrors", () => {
   });
 
   it("_associationNotFound spell-checks the name against declared association names", () => {
-    // Mirrors Rails AssociationNotFoundError#corrections, which feeds
-    // `record.class.reflections.keys` into DidYouMean::SpellChecker.
     const record = {
       constructor: {
         _reflections: { tagging: { name: "tagging" }, comments: { name: "comments" } },
@@ -44,10 +39,6 @@ describe("AssociationErrors", () => {
   });
 
   it("HasManyThroughAssociationNotFoundError exposes ownerClass and reflection", () => {
-    // Rails parity: activerecord/lib/active_record/associations/errors.rb
-    // HasManyThroughAssociationNotFoundError has `attr_reader :owner_class,
-    // :reflection`. The reflection attr identifies the failing has_many
-    // :through association itself (not its :through target).
     const err = new HasManyThroughAssociationNotFoundError("Author", "memberships", "posts");
     expect(err).toBeInstanceOf(Error);
     expect(err.ownerClass).toBe("Author");
@@ -57,15 +48,11 @@ describe("AssociationErrors", () => {
   });
 
   it("HasManyThroughAssociationNotFoundError reflection defaults to through when unspecified", () => {
-    // Back-compat: callers that don't pass a reflection get the through
-    // name (matches the pre-reader behavior of the error).
     const err = new HasManyThroughAssociationNotFoundError("Author", "memberships");
     expect(err.reflection).toBe("memberships");
   });
 
   it("InverseOfAssociationNotFoundError exposes associatedClass when provided", () => {
-    // Rails parity: errors.rb InverseOfAssociationNotFoundError has
-    // `attr_reader :reflection, :associated_class`.
     const user = { name: "User", reflections: () => ({}) };
     const err = new InverseOfAssociationNotFoundError(
       { name: "posts", options: { inverseOf: "author" }, className: "Post", klass: user },
@@ -80,12 +67,6 @@ describe("AssociationErrors", () => {
   });
 
   it("CompositePrimaryKeyMismatchError derives its message from the reflection but leaves reflection nil", () => {
-    // Rails parity: activerecord/lib/active_record/associations/errors.rb:187.
-    // CompositePrimaryKeyMismatchError builds its message from the reflection
-    // inside the constructor, branching on the macro: belongs_to uses
-    // `association_primary_key` (errors.rb:195). Rails declares
-    // `attr_reader :reflection` but `initialize` never assigns @reflection
-    // (errors.rb:190-200), so `error.reflection` is always nil — we mirror that.
     const reflection = {
       activeRecord: { name: "CpkBrokenBook" },
       name: "order",
@@ -102,8 +83,6 @@ describe("AssociationErrors", () => {
   });
 
   it("CompositePrimaryKeyMismatchError uses active_record_primary_key for collection/has_one reflections", () => {
-    // Rails parity (errors.rb:192-193): has_one? || collection? reflections
-    // report `active_record_primary_key` instead of association_primary_key.
     const reflection = {
       activeRecord: { name: "CpkBrokenOrder" },
       name: "books",
@@ -119,8 +98,6 @@ describe("AssociationErrors", () => {
   });
 
   it("CompositePrimaryKeyMismatchError accepts a pre-resolved primaryKey for reflection-less guards", () => {
-    // Trails-only defensive guards (association-scope, collection-proxy,
-    // autosave) hold no reflection; they pass the key pair they resolved.
     const reflection = {
       activeRecord: "CpkBrokenBook",
       name: "order",

@@ -1,23 +1,3 @@
-/**
- * DJAS routing gate widening (task #12).
- *
- * `Association#scope`'s `disable_joins` branch (association.rb:300-306)
- * used to bail out on `options.sourceType` and on
- * `sourceReflection.isPolymorphic()` — those shapes fell back to the
- * JOIN-based AssociationScope path, defeating `disable_joins: true`.
- *
- * Rails has no such restriction: `DisableJoinsAssociationScope` walks
- * the reverseChain and evaluates `reflection.constraints()` at each
- * step. When the source is polymorphic, the through chain wraps the
- * relevant step in a `PolymorphicReflection` whose `constraints()`
- * contributes `_sourceTypeScope()` (reflection.ts#_sourceTypeScope),
- * so the walk naturally applies `WHERE source_type = 'Target'` on
- * the through step once the gate is lifted.
- *
- * These tests pin the resulting SQL shape (no JOIN) so a regression
- * that re-introduces the gate — or any future change that silently
- * falls back to AssociationScope — is caught.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";

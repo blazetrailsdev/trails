@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/sharded_blog_posts.yml
 export const shardedBlogPostFixtureData = {
   great_post_blog_one: {
     title: "My first post in my Blog1!",

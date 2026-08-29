@@ -2,7 +2,6 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Section } from "./section.js";
 import type { Seminar } from "./seminar.js";
-// vendor/rails/activerecord/test/models/session.rb
 import { Base } from "../../base.js";
 
 export class Session extends Base {

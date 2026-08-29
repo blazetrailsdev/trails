@@ -1,11 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/sponsors.yml
-// Rails YAML uses the association name `sponsor_club:` (belongs_to
-// :sponsor_club, class_name: "Club", foreign_key: "club_id"); translated
-// to the underlying FK column for loadability. `sponsorable` is
-// polymorphic — `sponsorable_id` resolves via ref to the row in the
-// table implied by `sponsorable_type`.
 export const sponsorFixtureData = {
   moustache_club_sponsor_for_groucho: {
     club_id: ref("clubs", "moustache_club"),

@@ -3,9 +3,6 @@ import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
 import { ActiveRecord } from "../ar-config.js";
 import { Temporal } from "@blazetrails/date";
 
-// Trails-only round-trip coverage plus the ported safe-dump restriction. The
-// remaining YAMLColumnTest / YAMLColumnTestWithSafeLoad skips stay Ruby-only
-// (Psych safe-LOAD / permitted-classes-on-load have no JS analog).
 describe("YAMLColumn round-trip", () => {
   it("dumps and loads a plain hash", () => {
     const coder = new YAMLColumn("params");
@@ -27,10 +24,6 @@ describe("YAMLColumn round-trip", () => {
     expect(coder.load(coder.dump(value))).toEqual(value);
   });
 
-  // Rails-verified (vendored Rails, Psych >= 5.1): safe_dump raises
-  // Psych::DisallowedClass on any class instance outside the permitted set —
-  // top-level or nested — while `ActiveRecord.use_yaml_unsafe_load = true`
-  // switches to the unrestricted `::YAML.dump` branch (yaml_column.rb:15-24).
   describe("safe dump", () => {
     afterEach(() => (ActiveRecord.useYamlUnsafeLoad = false));
 
@@ -90,8 +83,6 @@ describe("YAMLColumnTestWithSafeLoad", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
   });
   it("yaml column permitted classes are consumed by safe dump", () => {
-    // Rails: `assert_raises(Psych::DisallowedClass) { coder.dump([Time.new]) }`.
-    // Temporal is the trails Time analog; it's outside the permitted set.
     const coder = new YAMLColumn("attr_name");
     expect(() => coder.dump([Temporal.Now.instant()])).toThrow(DisallowedClass);
   });

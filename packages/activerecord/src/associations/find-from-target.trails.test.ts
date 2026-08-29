@@ -1,12 +1,3 @@
-/**
- * Trails-only: `find_from_target?` has one body in Rails
- * (collection_association.rb:308); `CollectionProxy#find_from_target?`
- * (collection_proxy.rb:1154) is a one-line delegation to it. Trails carried two
- * hand-maintained copies — one on `CollectionAssociation`, one on
- * `CollectionProxy` — which drifted once (the association copy gated on
- * `hasChangesToSave` where Rails uses `changed?`). These tests pin the
- * now-shared body from both hosts. Rails has no test for the predicate itself.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";

@@ -1,5 +1,4 @@
 import type { Human } from "./human.js";
-// vendor/rails/activerecord/test/models/face.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 

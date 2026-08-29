@@ -5,7 +5,6 @@ import type { Category } from "./category.js";
 import type { Member } from "./member.js";
 import type { MemberDetail } from "./member-detail.js";
 import type { Post } from "./post.js";
-// vendor/rails/activerecord/test/models/organization.rb
 import { Base } from "../../base.js";
 
 export class Organization extends Base {

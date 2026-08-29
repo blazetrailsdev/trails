@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/customer.rb
 import { composedOf } from "../../aggregations.js";
 import { Base } from "../../base.js";
 
@@ -140,7 +139,6 @@ export class Customer extends Base {
       constructorFn: (name: unknown) => Fullname.parse(name),
       converter: (v: unknown) => Fullname.parse(v),
     });
-    // mapping uses "toString" so plain-object assignment falls back to Object.prototype.toString
     composedOf(this, "fullnameNoConverter", {
       className: Fullname,
       mapping: [["name", "toString"]],

@@ -1,5 +1,4 @@
 import type { Vertex } from "./vertex.js";
-// vendor/rails/activerecord/test/models/edge.rb
 import { Base } from "../../base.js";
 
 export class Edge extends Base {

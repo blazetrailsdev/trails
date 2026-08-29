@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/member_types.yml
 export const memberTypeFixtureData = {
   founding: {
     id: 1,

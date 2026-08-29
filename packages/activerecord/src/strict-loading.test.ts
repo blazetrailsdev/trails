@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Targets: vendor/rails/activerecord/test/cases/strict_loading_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -23,10 +18,6 @@ import { StrictZine } from "./test-helpers/models/strict-zine.js";
 import { Zine } from "./test-helpers/models/zine.js";
 import { Interest } from "./test-helpers/models/interest.js";
 
-// Simulate an eager-preload by seeding the real association holder (RFC 0022:
-// `record.association(name).target` is the source of truth) the same way the
-// `Preloader` does — `setTarget(...)` + the preload provenance flag — so the
-// reader short-circuits without a lazy load (and thus no strict-loading raise).
 function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
   const holder = (record as any).association(name);
   holder.setTarget(value);
@@ -42,9 +33,6 @@ async function withStrictLoadingByDefault<T>(model: typeof Base, fn: () => Promi
   }
 }
 
-// ==========================================================================
-// StrictLoadingTest — targets strict_loading_test.rb
-// ==========================================================================
 describe("StrictLoadingTest", () => {
   const { developers, ships } = fixtures(["developers", "developersProjects", "projects", "ships"]);
 
@@ -63,7 +51,6 @@ describe("StrictLoadingTest", () => {
     registerModel(Treasure);
   });
 
-  // Rails: test_strict_loading!
   it("strict loading!", async () => {
     const developer = await Developer.first();
     expect(developer!.isStrictLoading()).toBe(false);
@@ -84,7 +71,6 @@ describe("StrictLoadingTest", () => {
     expect(developer!.isStrictLoadingNPlusOneOnly()).toBe(true);
   });
 
-  // Rails: test_strict_loading_n_plus_one_only_mode_with_has_many
   it("strict loading n plus one only mode with has many", async () => {
     const developer = await Developer.first();
     const firm = await Firm.create({ name: "NASA" });
@@ -110,7 +96,6 @@ describe("StrictLoadingTest", () => {
     ).rejects.toThrow(StrictLoadingViolationError);
   });
 
-  // Rails: test_strict_loading_n_plus_one_only_mode_with_belongs_to
   it("strict loading n plus one only mode with belongs to", async () => {
     const developer = await Developer.first();
     const ship = await Ship.first();
@@ -122,43 +107,32 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(developer!.isStrictLoading()).toBe(true);
 
-    // Does not raise when a belongs_to association (:ship) loads its has_many (:parts)
     const loadedShip = (await (developer as any).association("ship").loadTarget()) as Ship;
     const parts = await association(loadedShip, "parts");
 
-    // strict_loading is not enabled on the belongs_to target
     expect(loadedShip.isStrictLoading()).toBe(false);
-    // strict_loading is enabled for has_many through a belongs_to
     expect(parts.every((p) => p.isStrictLoading())).toBe(true);
     await expect((parts[0] as any).association("trinkets").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });
 
-  // Rails: test_strict_loading_n_plus_one_only_mode_does_not_eager_load_child_associations
   it("strict loading n plus one only mode does not eager load child associations", async () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     await developer!.projects.first();
 
-    // Rails checks `developer.projects.loaded?` via the OO association proxy.
-    // We check the CollectionProxy's `loaded` flag — same semantics in our stack.
     expect(developer!.projects.loaded).toBe(false);
 
-    // Rails asserts `developer.projects.first.firm` does not raise: `first` runs a
-    // bounded LIMIT query and does NOT cascade strict loading onto the returned
-    // record, so `project.firm` (a child association) loads freely.
     const project = await developer!.projects.first();
     await project!.firm;
   });
 
-  // Rails: test_default_mode_is_all
   it("default mode is all", async () => {
     const developer = await Developer.first();
     expect(developer!.isStrictLoadingAll()).toBe(true);
   });
 
-  // Rails: test_default_mode_can_be_changed_globally
   it("default mode can be changed globally", async () => {
     class NplDeveloper extends Base {
       static {
@@ -170,7 +144,6 @@ describe("StrictLoadingTest", () => {
     expect(developer.isStrictLoadingNPlusOneOnly()).toBe(true);
   });
 
-  // Rails: test_strict_loading
   it("strict loading", async () => {
     const allDevs = await Developer.all();
     expect(allDevs.every((d) => !d.isStrictLoading())).toBe(true);
@@ -178,7 +151,6 @@ describe("StrictLoadingTest", () => {
     expect(strictDevs.every((d) => d.isStrictLoading())).toBe(true);
   });
 
-  // Rails: test_strict_loading_by_default
   it("strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const allDevs = await Developer.all();
@@ -188,7 +160,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_by_default_can_be_set_per_model
   it("strict loading by default can be set per model", () => {
     class Model1 extends Base {
       static {
@@ -206,7 +177,6 @@ describe("StrictLoadingTest", () => {
     expect(new Model2().isStrictLoading()).toBe(false);
   });
 
-  // Rails: test_strict_loading_by_default_is_inheritable
   it("strict loading by default is inheritable", async () => {
     await withStrictLoadingByDefault(Base, async () => {
       class Model1 extends Base {
@@ -225,7 +195,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_raises_if_strict_loading_and_lazy_loading
   it("raises if strict loading and lazy loading", async () => {
     const dev = await Developer.all().strictLoading().first();
     expect(dev!.isStrictLoading()).toBe(true);
@@ -235,7 +204,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_raises_if_strict_loading_by_default_and_lazy_loading
   it("raises if strict loading by default and lazy loading", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const dev = await Developer.first();
@@ -247,7 +215,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_is_ignored_in_validation_context
   it("strict loading is ignored in validation context", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -260,7 +227,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_with_reflection_is_ignored_in_validation_context
   it("strict loading with reflection is ignored in validation context", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -271,7 +237,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_on_concat_is_ignored
   it("strict loading on concat is ignored", async () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang();
@@ -280,7 +245,6 @@ describe("StrictLoadingTest", () => {
     expect(developer!.isStrictLoading()).toBe(true);
   });
 
-  // Rails: test_strict_loading_on_build_is_ignored
   it("strict loading on build is ignored", async () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang();
@@ -291,7 +255,6 @@ describe("StrictLoadingTest", () => {
     expect(developer!.isStrictLoading()).toBe(true);
   });
 
-  // Rails: test_strict_loading_on_writer_is_ignored
   it("strict loading on writer is ignored", async () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang();
@@ -300,7 +263,6 @@ describe("StrictLoadingTest", () => {
     expect(developer!.isStrictLoading()).toBe(true);
   });
 
-  // Rails: test_strict_loading_with_new_record_on_concat_is_ignored
   it("strict loading with new record on concat is ignored", async () => {
     const developer = new Developer({ id: developers("david").id, name: "Test" });
     developer.strictLoadingBang();
@@ -309,7 +271,6 @@ describe("StrictLoadingTest", () => {
     expect(developer.isStrictLoading()).toBe(true);
   });
 
-  // Rails: test_strict_loading_with_new_record_on_build_is_ignored
   it("strict loading with new record on build is ignored", async () => {
     const developer = new Developer({ id: developers("david").id, name: "Test" });
     developer.strictLoadingBang();
@@ -320,7 +281,6 @@ describe("StrictLoadingTest", () => {
     expect(developer.isStrictLoading()).toBe(true);
   });
 
-  // Rails: test_strict_loading_with_new_record_on_writer_is_ignored
   it("strict loading with new record on writer is ignored", async () => {
     const developer = new Developer({ id: developers("david").id, name: "Test" });
     developer.strictLoadingBang();
@@ -329,7 +289,6 @@ describe("StrictLoadingTest", () => {
     expect(developer.isStrictLoading()).toBe(true);
   });
 
-  // Rails: test_strict_loading_has_one_reload
   it("strict loading has one reload", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -350,7 +309,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_with_has_many
   it("strict loading with has many", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const dev = await Developer.first();
@@ -362,7 +320,6 @@ describe("StrictLoadingTest", () => {
         await association(d, "auditLogs");
       }
 
-      // Reload and re-access
       for (const d of devs) {
         await d.reload();
       }
@@ -373,7 +330,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_with_has_many_singular_association_and_reload
   it("strict loading with has many singular association and reload", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const dev0 = await Developer.first();
@@ -388,7 +344,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_with_has_many_through_cascade_down_to_middle_records
   it("strict loading with has many through cascade down to middle records", async () => {
     const dev = await Developer.first();
     const firm = await Firm.create({ name: "NASA" });
@@ -401,7 +356,6 @@ describe("StrictLoadingTest", () => {
     const firms = (loaded as any).association("firms").target ?? [];
     expect(firms.length).toBeGreaterThan(0);
 
-    // Middle records (firms) cascade strict loading
     await expect(association(firms[0], "contracts").toArray()).rejects.toThrow(
       StrictLoadingViolationError,
     );
@@ -411,7 +365,6 @@ describe("StrictLoadingTest", () => {
     await expect(loadSingularTarget(loaded!, "ship")).rejects.toThrow(StrictLoadingViolationError);
   });
 
-  // Rails: test_strict_loading_with_has_one_through_does_not_prevent_creation_of_association
   it("strict loading with has one through does not prevent creation of association", async () => {
     const firm = new Firm({ name: "SuperFirm" });
     firm.strictLoadingBang();
@@ -426,7 +379,6 @@ describe("StrictLoadingTest", () => {
     expect(computer.isNewRecord()).toBe(false);
   });
 
-  // Rails: test_preload_audit_logs_are_strict_loading_because_parent_is_strict_loading
   it("preload audit logs are strict loading because parent is strict loading", async () => {
     const developer = await Developer.first();
     for (let i = 0; i < 3; i++) {
@@ -441,7 +393,6 @@ describe("StrictLoadingTest", () => {
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
 
-  // Rails: test_preload_audit_logs_are_strict_loading_because_it_is_strict_loading_by_default
   it("preload audit logs are strict loading because it is strict loading by default", async () => {
     await withStrictLoadingByDefault(AuditLog, async () => {
       const developer = await Developer.first();
@@ -458,7 +409,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_eager_load_audit_logs_are_strict_loading_because_parent_is_strict_loading_in_hm_relation
   it("eager load audit logs are strict loading because parent is strict loading in hm relation", async () => {
     const developer = await Developer.first();
     for (let i = 0; i < 3; i++) {
@@ -475,7 +425,6 @@ describe("StrictLoadingTest", () => {
     expect(logs2.every((l: any) => !l._strictLoading)).toBe(true);
   });
 
-  // Rails: test_eager_load_audit_logs_are_strict_loading_because_parent_is_strict_loading
   it("eager load audit logs are strict loading because parent is strict loading", async () => {
     const developer = await Developer.first();
     for (let i = 0; i < 3; i++) {
@@ -494,7 +443,6 @@ describe("StrictLoadingTest", () => {
     expect(logs2.every((l: any) => !l._strictLoading)).toBe(true);
   });
 
-  // Rails: test_eager_load_audit_logs_are_strict_loading_because_it_is_strict_loading_by_default
   it("eager load audit logs are strict loading because it is strict loading by default", async () => {
     await withStrictLoadingByDefault(AuditLog, async () => {
       const developer = await Developer.first();
@@ -512,7 +460,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_raises_on_unloaded_relation_methods_if_strict_loading
   it("raises on unloaded relation methods if strict loading", async () => {
     const dev = await Developer.all().strictLoading().first();
     expect(dev!.isStrictLoading()).toBe(true);
@@ -522,7 +469,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_raises_on_unloaded_relation_methods_if_strict_loading_by_default
   it("raises on unloaded relation methods if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const dev = await Developer.first();
@@ -534,7 +480,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_raises_on_lazy_loading_a_strict_loading_belongs_to_relation
   it("raises on lazy loading a strict loading belongs to relation", async () => {
     const mentor = await Mentor.create({ name: "Mentor" });
     const developer = await Developer.first();
@@ -545,7 +490,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_raises_on_lazy_loading_a_belongs_to_relation_if_strict_loading_by_default
   it("raises on lazy loading a belongs to relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const mentor = await Mentor.create({ name: "Mentor" });
@@ -558,7 +502,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_can_be_turned_off_on_an_association_in_a_model_with_strict_loading_on
   it("strict loading can be turned off on an association in a model with strict loading on", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const mentor = await Mentor.create({ name: "Mentor" });
@@ -570,7 +513,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_strict_loading_belongs_to_relation
   it("does not raise on eager loading a strict loading belongs to relation", async () => {
     const mentor = await Mentor.create({ name: "Mentor" });
     const first = await Developer.first();
@@ -582,7 +524,6 @@ describe("StrictLoadingTest", () => {
     expect(loaded?.id).toBe(mentor.id);
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_belongs_to_relation_if_strict_loading_by_default
   it("does not raise on eager loading a belongs to relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const mentor = await Mentor.create({ name: "Mentor" });
@@ -595,7 +536,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_raises_on_lazy_loading_a_strict_loading_has_one_relation
   it("raises on lazy loading a strict loading has one relation", async () => {
     const developer = await Developer.first();
     const ship = await Ship.first();
@@ -606,7 +546,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_raises_on_lazy_loading_a_has_one_relation_if_strict_loading_by_default
   it("raises on lazy loading a has one relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -619,7 +558,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_strict_loading_has_one_relation
   it("does not raise on eager loading a strict loading has one relation", async () => {
     const ship = await Ship.first();
     await ship!.updateColumn("developer_id", developers("david").id);
@@ -629,7 +567,6 @@ describe("StrictLoadingTest", () => {
     expect(loaded).not.toBeNull();
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_has_one_relation_if_strict_loading_by_default
   it("does not raise on eager loading a has one relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const ship = await Ship.first();
@@ -641,7 +578,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
   it("raises on lazy loading a strict loading has many relation", async () => {
     const developer = await Developer.first();
     for (let i = 0; i < 3; i++) {
@@ -653,7 +589,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_raises_on_lazy_loading_a_has_many_relation_if_strict_loading_by_default
   it("raises on lazy loading a has many relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -667,7 +602,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_strict_loading_has_many_relation
   it("does not raise on eager loading a strict loading has many relation", async () => {
     const developer = await Developer.first();
     for (let i = 0; i < 3; i++) {
@@ -679,7 +613,6 @@ describe("StrictLoadingTest", () => {
     expect(first).not.toBeNull();
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_has_many_relation_if_strict_loading_by_default
   it("does not raise on eager loading a has many relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -693,7 +626,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_raises_on_lazy_loading_a_strict_loading_habtm_relation
   it("raises on lazy loading a strict loading habtm relation", async () => {
     const developer = await Developer.first();
     const project = await Project.first();
@@ -706,7 +638,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_raises_on_lazy_loading_a_habtm_relation_if_strict_loading_by_default
   it("raises on lazy loading a habtm relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -721,7 +652,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_strict_loading_habtm_relation
   it("does not raise on eager loading a strict loading habtm relation", async () => {
     const developer = await Developer.first();
     await association(developer!, "projects").concat((await Project.first())!);
@@ -731,7 +661,6 @@ describe("StrictLoadingTest", () => {
     expect(first).not.toBeNull();
   });
 
-  // Rails: test_does_not_raise_on_eager_loading_a_habtm_relation_if_strict_loading_by_default
   it("does not raise on eager loading a habtm relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
@@ -743,7 +672,6 @@ describe("StrictLoadingTest", () => {
     });
   });
 
-  // Rails: test_strict_loading_violation_raises_by_default
   it("strict loading violation raises by default", async () => {
     expect(ActiveRecord.actionOnStrictLoadingViolation).toBe("raise");
 
@@ -758,7 +686,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_strict_loading_violation_can_log_instead_of_raise
   it("strict loading violation can log instead of raise", async () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang();
@@ -778,7 +705,6 @@ describe("StrictLoadingTest", () => {
     }
   });
 
-  // Rails: test_strict_loading_violation_on_polymorphic_relation
   it("strict loading violation on polymorphic relation", async () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr!" });
     await Treasure.create({ name: "Ruby", looter_id: pirate.id, looter_type: "Pirate" });
@@ -793,7 +719,6 @@ describe("StrictLoadingTest", () => {
     );
   });
 
-  // Rails: test_strict_loading_violation_logs_on_polymorphic_relation
   it("strict loading violation logs on polymorphic relation", async () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr!" });
     await Treasure.create({ name: "Ruby", looter_id: pirate.id, looter_type: "Pirate" });
@@ -820,9 +745,6 @@ describe("StrictLoadingTest", () => {
   });
 });
 
-// ==========================================================================
-// StrictLoadingFixturesTest — targets strict_loading_test.rb (bottom class)
-// ==========================================================================
 describe("StrictLoadingFixturesTest", () => {
   const { strictZines } = fixtures(["strictZines"]);
 
@@ -832,10 +754,7 @@ describe("StrictLoadingFixturesTest", () => {
     registerModel(Interest);
   });
 
-  // Rails: test_strict_loading_violations_are_ignored_on_fixtures
   it("strict loading violations are ignored on fixtures", async () => {
-    // Load the record while strict loading is disabled, simulating a
-    // fixture-loaded instance captured before the class default was set.
     const prevDefault = StrictZine.strictLoadingByDefault;
     StrictZine.strictLoadingByDefault = false;
     const fixtureZine = await StrictZine.find(strictZines("going_out").id);
@@ -844,10 +763,8 @@ describe("StrictLoadingFixturesTest", () => {
     try {
       expect(fixtureZine.isStrictLoading()).toBe(false);
 
-      // The fixture-loaded record does NOT raise when accessing the association.
       await association(fixtureZine, "interests");
 
-      // A freshly-queried record IS strict and DOES raise.
       const fresh = await StrictZine.find(strictZines("going_out").id);
       expect(fresh.isStrictLoading()).toBe(true);
       await expect(association(fresh, "interests").toArray()).rejects.toThrow(

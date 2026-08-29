@@ -1,9 +1,3 @@
-/**
- * PostgreSQLDatabaseTasks — PostgreSQL-specific database lifecycle operations.
- *
- * Mirrors: ActiveRecord::Tasks::PostgreSQLDatabaseTasks
- */
-
 import {
   getFs,
   getOsAsync,
@@ -41,13 +35,7 @@ export class PostgreSQLDatabaseTasks {
     this.configurationHash = { ...dbConfig.configuration };
   }
 
-  /**
-   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
-   *   `configuration_hash.merge(encoding: encoding)`
-   *   (`postgresql_database_tasks.rb:23`) — a non-mutating Hash merge is an
-   *   object spread in TS, which is not a `merge` call the comparator can
-   *   credit.
-   */
+  /** @missingRailsCall merge — PERMANENT */
   async create(connectionAlreadyEstablished = false): Promise<void> {
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
@@ -75,18 +63,12 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async purge(): Promise<void> {
-    // `postgresql_database_tasks.rb:41` — the leased connection must go before
-    // the DROP/CREATE pair, or it survives pointing at a database that no
-    // longer exists. The handler spells Rails' `:all` role as "all"
-    // (`connection-handler.ts:113`).
     Base.connectionHandler.clearActiveConnectionsBang("all");
     await this.drop();
     await this.create(true);
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    // `ActiveRecord.dump_schemas` is `DatabaseTasks.dumpSchemas` here; Ruby's
-    // `:schema_search_path` / `:all` Symbols are the same strings.
     const dumpSchemas = DatabaseTasks.dumpSchemas;
     let searchPath: string | undefined;
     if (dumpSchemas === "schema_search_path") {
@@ -118,9 +100,6 @@ export class PostgreSQLDatabaseTasks {
       ignoreTables = dataSources.filter((table) =>
         ignoreTables.some((pattern) => {
           if (!(pattern instanceof RegExp)) return pattern === table;
-          // Ruby's Regexp#=== carries no state; a JS `g`/`y` regex advances
-          // `lastIndex` on every `.test()`, so without this reset the second
-          // table tested against the same pattern can silently miss.
           pattern.lastIndex = 0;
           return pattern.test(table);
         }),
@@ -139,7 +118,6 @@ export class PostgreSQLDatabaseTasks {
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const os = await getOsAsync();
-    // Ruby's `File::NULL`.
     const nullDevice = os.platform() === "win32" ? "NUL" : "/dev/null";
     const args = [
       "--set",
@@ -201,22 +179,12 @@ export class PostgreSQLDatabaseTasks {
       if (result.signal) details.push(`Signal: ${result.signal}`);
       if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
       if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-      // Rails leaves the child's own output on the terminal because
-      // `Kernel.system` does; `spawnSync` captures it, so the captured streams
-      // follow the ported message rather than replacing it.
       throw new Error(
         runCmdError(cmd, args, action) + (details.length ? `${details.join("\n\n")}\n` : ""),
       );
     }
   }
 
-  /**
-   * `File.foreach` streams the file line by line, newline included; the fs
-   * adapter is read-whole-file, so the same lines come from a lookbehind split
-   * that keeps each terminator where `foreach` leaves it. And Ruby leaves the
-   * tempfile's removal to its finalizer, which JS has no equivalent of, so the
-   * non-block form is unlinked explicitly once the copy has been made.
-   */
   private removeSqlHeaderComments(filename: string): void {
     const fs = getFs();
     let removingComments = true;
@@ -237,32 +205,18 @@ export class PostgreSQLDatabaseTasks {
 
   /** @internal */
   private async establishConnection(config?: Record<string, unknown>): Promise<void> {
-    // `establish_connection(config = db_config)`
-    // (`postgresql_database_tasks.rb:85-87`) — the default is the db_config
-    // object itself, which `Base.establish_connection` accepts.
     await Base.establishConnection(config ?? this.dbConfig);
   }
 
   /**
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
-   *   `configuration_hash.merge(database: "postgres", schema_search_path:
-   *   "public")` (`postgresql_database_tasks.rb:103`) — a non-mutating Hash
-   *   merge is an object spread in TS.
+   * @missingRailsCall merge — PERMANENT
    */
   private publicSchemaConfig(): ConfigHash {
     return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
   }
 }
 
-/**
- * Normalize a PG schema_search_path string into an array of schema
- * names suitable for pg_dump `--schema=` args. Strips surrounding
- * quotes, drops `$user` (PG runtime variable, not a real schema),
- * and filters empties. Exported so the test can exercise the same
- * code path instead of reimplementing the logic.
- */
 export function normalizeSchemaSearchPath(raw: string): string[] {
   return raw
     .split(",")
@@ -274,8 +228,6 @@ export function normalizeSchemaSearchPath(raw: string): string[] {
       ) {
         const quote = s[0];
         const inner = s.slice(1, -1).trim();
-        // Unescape doubled quotes inside quoted identifiers:
-        // "we""ird" → we"ird, 'it''s' → it's
         return quote === '"' ? inner.replace(/""/g, '"') : inner.replace(/''/g, "'");
       }
       return s;

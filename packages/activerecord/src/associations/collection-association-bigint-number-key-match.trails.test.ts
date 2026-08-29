@@ -1,18 +1,3 @@
-/**
- * Collection-association in-memory `find` key-type normalization. When a loaded
- * `inverse_of` collection is scanned by `find(id)`, the target PKs are matched
- * against the `find` argument in memory. On the PG bigserial-PK lane
- * node-postgres parses an int8 PK to a JS `BigInt` while the `find(id)` argument
- * is a `number`; `1n` and `1` are distinct JS values even though Ruby's
- * width-agnostic `Integer ==` matches them.
- *
- * Two scan implementations exist: `CollectionProxy#find` (the public path) keys
- * both sides through `String(...)`, so it was already width-agnostic — the
- * second test pins that. The association-level `CollectionAssociation#findByScan`
- * keyed target PKs through a raw `JSON.stringify`, which *throws* on a BigInt
- * (`Do not know how to serialize a BigInt`) and mismatches a BigInt PK against a
- * number id — the first test guards that fix.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -36,16 +21,12 @@ const internals = (record: Base): RecordInternals => record as unknown as Record
 describe("CollectionAssociation BigInt PK / number find(id) key match", () => {
   const { companies } = fixtures(["companies"]);
 
-  // Force the first loaded `clientsOfFirm` target PK to BigInt (as if int8
-  // bigserial via node-postgres) and return its equal-valued number id.
   async function loadFirmWithBigIntTargetPk(): Promise<{
     firm: Base;
     target: Base;
     numberId: number;
   }> {
     const firm = (await Firm.find(companies("first_firm").id)) as Base;
-    // `clientsOfFirm` declares `inverse_of`, so a loaded collection is scanned
-    // in memory (never re-queried) by `find(id)`.
     const clients = await internals(firm).clientsOfFirm.load();
     expect(clients.length).toBeGreaterThan(0);
 

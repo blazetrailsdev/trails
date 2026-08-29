@@ -26,7 +26,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
   beforeEach(() => {
     savedConfig = snapshotConfig();
-    // EncryptionTestCase#setup — helper.rb:141.
     Configurable.config.previousSchemes.length = 0;
   });
 
@@ -46,7 +45,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it(".configure configures initial config properties", () => {
-    // Set salt first so DerivedSecretKeyProvider can run PBKDF2 in its constructor.
     Configurable.config.keyDerivationSalt = "the salt";
     const previousKeyProvider = new DerivedSecretKeyProvider("some secret");
 
@@ -75,9 +73,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
     try {
       const modelClass = class extends Model {};
-      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
-      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
-      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
       include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "isbn");
 
@@ -98,12 +93,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      // Named class: filter key is "underscore(ClassName).attribute"
       class NamedPirate extends Model {}
       const modelClass = NamedPirate;
-      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
-      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
-      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
       include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "catchphrase");
 
@@ -123,12 +114,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      // Truly anonymous class (empty .name): filter key is just the attribute
-      // name. Returned from a function so JS name inference doesn't kick in.
       const modelClass = (() => class extends Model {})();
-      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
-      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
-      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
       include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "catchphrase");
 
@@ -152,9 +138,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
     try {
       const modelClass = class extends Model {};
-      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
-      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
-      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
       include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "catchphrase");
 
@@ -172,9 +155,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("configure applies Context-only properties to the reset default context", () => {
-    // configurable.rb:35-37 — the second `properties.each`, over `context`
-    // rather than `config`. `encryptor` is a Context::PROPERTIES member
-    // (context.rb:13) with no Config counterpart, so only that loop can set it.
     const encryptor = new NullEncryptor();
     Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt", encryptor });
     expect(Contexts.context.encryptor).toBe(encryptor);
@@ -194,14 +174,10 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     try {
       class PaymentModel extends Model {}
       const modelClass = PaymentModel;
-      // `ActiveRecord::Attributes` is `include ActiveModel::AttributeRegistration`
-      // (activerecord/attributes.rb:8), the half `encrypts` reaches through
-      // `decorate_attributes`; `ActiveModel::Model` does not carry it (model.rb:42-45).
       include(modelClass, AttributeRegistration);
       encrypts.call(modelClass, "card_number");
       encrypts.call(modelClass, "secret_token");
 
-      // "card_number" is added; "secret_token" is excluded
       expect(filterParameters).toContain("payment_model.card_number");
       expect(filterParameters).not.toContain("payment_model.secret_token");
     } finally {

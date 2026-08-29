@@ -93,24 +93,16 @@ describe("DatabaseConfigurations", () => {
     });
 
     it("treats a bare filesystem path as the database name", () => {
-      // No URL scheme → buildUrlHash passes through; the override falls
-      // back to the URL string itself (matches Rails' raw-path handling).
       const cfg = new UrlConfig("test", "primary", "test/db/primary.sqlite3");
       expect(cfg.database).toBe("test/db/primary.sqlite3");
     });
 
     it("overrides config database with a scheme-less bare name", () => {
-      // Rails' URI parser turns a bare word (incl. hyphens, e.g. "foo-bar")
-      // into { database: "foo-bar" }, overriding the config's database.
       const cfg = new UrlConfig("test", "primary", "foo-bar", { database: "not_foo" });
       expect(cfg.database).toBe("foo-bar");
     });
 
     it("infers the adapter for a scheme-less sqlite shorthand at build time", () => {
-      // Trails-specific: a bare `:memory:` from DATABASE_URL has no scheme, so
-      // Rails' always-present adapter invariant doesn't hold. Inferring the
-      // adapter at build time keeps the resolved config self-describing so the
-      // handler never has to backfill it at connect time.
       expect(new UrlConfig("test", "primary", ":memory:").adapter).toBe("sqlite");
       expect(new UrlConfig("test", "primary", "test/db/primary.sqlite3").adapter).toBe("sqlite");
     });

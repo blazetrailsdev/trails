@@ -3,8 +3,6 @@ import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-g
 import { KeyGenerator } from "./key-generator.js";
 import { Configurable } from "./configurable.js";
 
-// Mirrors the `assert_derive_key` helper in
-// vendor/rails/activerecord/test/cases/encryption/key_generator_test.rb:47-53.
 function assertDeriveKey(
   secret: string,
   { digestClass = "SHA256", length = 20 }: { digestClass?: string; length?: number } = {},
@@ -20,8 +18,6 @@ function assertDeriveKey(
 }
 
 describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
-  // Rails' EncryptionTestCase restores the encryption config between tests;
-  // assertDeriveKey writes hash_digest_class the way its Rails counterpart does.
   let originalHashDigestClass: string;
   beforeEach(() => {
     originalHashDigestClass = Configurable.config.hashDigestClass;

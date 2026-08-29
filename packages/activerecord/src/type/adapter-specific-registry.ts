@@ -1,8 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Type::AdapterSpecificRegistry
- *
- * Also defines Registration, DecorationRegistration, and TypeConflictError.
- */
 import { Type } from "@blazetrails/activemodel";
 
 export class TypeConflictError extends Error {

@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/tags.yml
 export const tagFixtureData = {
   general: {
     id: 1,

@@ -5,9 +5,6 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
-// supplied stubbed configs. They also go through the array constructor arm so
-// the registry reports itself non-empty.
 const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
   const dc = new DatabaseConfigurations(configs as never);
   vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);
@@ -27,8 +24,6 @@ describe("TestDatabasesTest", () => {
   beforeEach(() => {
     priorConfigs = Base.configurations();
   });
-  // Mirrors the Rails case's `ensure ActiveRecord::Base.configurations =
-  // prev_configs` (test_databases_test.rb:51).
   afterEach(() => {
     Base.configurations(priorConfigs);
     vi.restoreAllMocks();
@@ -84,9 +79,6 @@ describe("TestDatabasesTest", () => {
     await createAndLoadSchema(42, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-42");
-    // "Updates the database configuration" — Rails re-reads the registry
-    // (test_databases_test.rb:49); `configsFor` is stubbed to hand back the same
-    // config object, which is the one create_and_load_schema suffixed.
     expect(mockConfigurations.configsFor({ envName: "arunit" })[0].database).toBe(
       "test/db/primary.sqlite3-42",
     );
@@ -117,9 +109,6 @@ describe("TestDatabasesTest", () => {
     expect(reconstructedNames).toEqual(["primary", "replica"]);
   });
 
-  // URL-only configs (no explicit `database`) — e.g. sqlite paths
-  // embedded in the URL. UrlConfig.database (#957) parses the URL,
-  // so the suffix lands on the parsed path rather than `undefined`.
   it("suffixes a URL-based config by deriving the database from configuration.url", async () => {
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
@@ -157,16 +146,10 @@ describe("TestDatabasesTest", () => {
     Base.configurations(stubConfigurations([mockConfig]));
 
     await createAndLoadSchema(7, { envName: "arunit" });
-    // _database setter must NOT have been called for an in-memory DB —
-    // suffixing `:memory:` would turn it into an on-disk path.
     expect(suffixed).toBeUndefined();
     expect(mockReconstructFromSchema).toHaveBeenCalled();
   });
 
-  // Rails has no empty-registry guard: `create_and_load_schema` iterates
-  // whatever `configs_for` yields (possibly nothing) and still runs the
-  // `ensure ActiveRecord::Base.establish_connection`
-  // (test_databases.rb:11-21).
   it("reconnects through the ensure even when the registry is empty", async () => {
     const mockReconstructFromSchema = vi
       .spyOn(DatabaseTasks, "reconstructFromSchema")
@@ -200,8 +183,6 @@ describe("TestDatabasesTest", () => {
     );
   });
 
-  // Mirrors Rails' `ensure` semantics in test_databases.rb:18-21 — the env
-  // restore and reconnect must still happen if reconstruct_from_schema raises.
   it("restores VERBOSE and re-establishes connection after schema load failure", async () => {
     const error = new Error("schema load failed");
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockRejectedValue(error);

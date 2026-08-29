@@ -1,8 +1,6 @@
 import { describe, it, expectTypeOf, assertType } from "vitest";
 import { Base, Relation } from "@blazetrails/activerecord";
 
-// Scenario: an app that models users — the ActiveRecord onboarding path.
-// Someone reading the Rails guide should be able to write this verbatim.
 class User extends Base {
   declare name: string;
   declare email: string;
@@ -38,12 +36,10 @@ describe("basic CRUD DX — defining and using a model", () => {
 
   it("Relation build / create / createBang array overloads return T[]", async () => {
     const rel = User.where({ admin: false });
-    // single-attrs form
     expectTypeOf(rel.build()).toEqualTypeOf<User>();
     expectTypeOf(rel.build({})).toEqualTypeOf<User>();
     expectTypeOf(await rel.create({})).toEqualTypeOf<User>();
     expectTypeOf(await rel.createBang({})).toEqualTypeOf<User>();
-    // array form
     expectTypeOf(rel.build([{}, {}])).toEqualTypeOf<User[]>();
     expectTypeOf(await rel.create([{}, {}])).toEqualTypeOf<User[]>();
     expectTypeOf(await rel.createBang([{}, {}])).toEqualTypeOf<User[]>();
@@ -56,9 +52,6 @@ describe("basic CRUD DX — defining and using a model", () => {
   });
 
   it("User.find([ids]) returns User | User[] — caller narrows (CPK ambiguity)", async () => {
-    // For simple primary keys `find([1,2,3])` returns User[] at runtime.
-    // For composite keys `find([shop_id, id])` returns a single User.
-    // TS can't statically inspect `primaryKey`, so the return is a union.
     const users = await User.find([1, 2, 3]);
     expectTypeOf(users).toEqualTypeOf<User | User[]>();
   });
@@ -107,10 +100,6 @@ describe("basic CRUD DX — defining and using a model", () => {
   });
 
   it("User.count / exists / pluck have concrete return types", () => {
-    // Rails' count returns either a scalar or a grouped hash, depending on
-    // whether the active scope has a GROUP BY — signature widened to match
-    // Relation#count. Grouped results are a Map keyed by the deserialized
-    // group value (a loaded record for a belongs_to group).
     expectTypeOf(User.count).returns.resolves.toEqualTypeOf<number | Map<unknown, number>>();
     expectTypeOf(User.exists).returns.resolves.toBeBoolean();
     expectTypeOf(User.pluck).returns.resolves.toEqualTypeOf<unknown[]>();
@@ -143,7 +132,6 @@ describe("basic CRUD DX — defining and using a model", () => {
     const u = new User({ name: "dean" });
     expectTypeOf(u.dup()).toEqualTypeOf<User>();
     expectTypeOf(u.clone()).toEqualTypeOf<User>();
-    // becomes / becomesBang let you switch model classes (e.g., STI).
     class Admin extends User {}
     expectTypeOf(u.becomes(Admin)).toEqualTypeOf<Admin>();
     expectTypeOf(u.becomesBang(Admin)).toEqualTypeOf<Admin>();
@@ -182,7 +170,6 @@ describe("basic CRUD DX — defining and using a model", () => {
         this.afterCommit((record) => {
           expectTypeOf(record).toEqualTypeOf<WithHooks>();
         });
-        // Conditions' `if` / `unless` predicates are typed too.
         this.beforeSave(
           (record) => {
             expectTypeOf(record).toEqualTypeOf<WithHooks>();

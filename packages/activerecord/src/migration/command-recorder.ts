@@ -1,9 +1,3 @@
-/**
- * Command recorder — records migration commands for reversal.
- *
- * Mirrors: ActiveRecord::Migration::CommandRecorder
- */
-
 import { extractOptionsBang, isPlainObject, methodMissingProxy } from "@blazetrails/activesupport";
 
 import { IrreversibleMigration } from "../migration.js";
@@ -13,13 +7,8 @@ import {
   joinTableName as _joinTableName,
 } from "./join-table.js";
 
-/**
- * A recorded migration block — the third element of a command tuple, Rails'
- * `&block` (migration/command_recorder.rb:109).
- */
 export type MigrationBlock = (...args: any[]) => unknown;
 
-/** A recorded command: `[cmd, args, block]` (migration/command_recorder.rb:109). */
 export type MigrationCommand = [string, unknown[], MigrationBlock?];
 
 export class CommandRecorder {
@@ -29,10 +18,6 @@ export class CommandRecorder {
 
   constructor(delegate?: unknown) {
     this._delegate = delegate ?? null;
-    // Stands in for Rails' `method_missing` / `respond_to_missing?`
-    // (command_recorder.rb:395-406), which forward any method the recorder does
-    // not define to the delegate. JS has no method_missing, so the forwarding
-    // lives in a Proxy returned from the constructor — class-wide, as in Rails.
     return methodMissingProxy(this, { delegate: (target) => target._delegate });
   }
 
@@ -48,8 +33,6 @@ export class CommandRecorder {
     this._reverting = value;
   }
 
-  /** Mirrors `attr_accessor :commands` (command_recorder.rb:65) — the live
-   *  array, which `change_table`'s bulk path and `revert` mutate in place. */
   get commands(): MigrationCommand[] {
     return this._commands;
   }
@@ -58,12 +41,6 @@ export class CommandRecorder {
     this._commands = value;
   }
 
-  /**
-   * Record a command. When the recorder is in reverting mode the command is
-   * inverted at record time (mirrors Rails' `record`, which stores
-   * `inverse_of(...)` when `@reverting`), so nested `revert` blocks cancel out
-   * by double-negation.
-   */
   async record(cmd: string, args: unknown[], block?: MigrationBlock): Promise<void> {
     if (this._reverting) {
       this._commands.push(await this.inverseOf(cmd, args, block));
@@ -72,30 +49,15 @@ export class CommandRecorder {
     }
   }
 
-  /**
-   * Alias of addReference (Rails: `alias :add_belongs_to :add_reference`).
-   * Records the `addReference` command — the alias shares the underlying
-   * generated recordable method, so it records `:add_reference` verbatim.
-   */
   async addBelongsTo(...args: unknown[]): Promise<void> {
     await this.record("addReference", args);
   }
 
-  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
   async removeBelongsTo(...args: unknown[]): Promise<void> {
     await this.record("removeReference", args);
   }
 
-  /**
-   * Execute a block in reverting mode. Commands recorded inside the block
-   * are collected, reversed, and their inverses are appended to the
-   * command list.
-   *
-   * Mirrors: ActiveRecord::Migration::CommandRecorder#revert
-   */
   async revert(fn: () => Promise<void>): Promise<void> {
-    // Mirrors Rails: toggle reverting, capture the block's commands (already
-    // inverted at record time), then splice them back in reverse order.
     this._reverting = !this._reverting;
     const previous = this._commands;
     this._commands = [];
@@ -108,16 +70,6 @@ export class CommandRecorder {
     }
   }
 
-  /**
-   * Returns the inverse command and args for the given command.
-   *
-   * Mirrors: ActiveRecord::Migration::CommandRecorder#inverse_of
-   * (command_recorder.rb:114-123). The `method in this` test is Ruby's
-   * `respond_to?(method, true)` (command_recorder.rb:116), routed through the
-   * `methodMissingProxy` `has` trap; membership is tested before the read,
-   * because a name the recorder does not answer reads back as the proxy's
-   * `NoMethodError`-raising function rather than `undefined`.
-   */
   async inverseOf(cmd: string, args: unknown[], block?: MigrationBlock): Promise<MigrationCommand> {
     const method = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
     if (!(method in this)) {
@@ -136,17 +88,6 @@ export class CommandRecorder {
     ).call(this, args, block);
   }
 
-  /**
-   * Record a change_table block. When a callback is given, operations inside
-   * the block are individually recorded so they can be inverted.  With
-   * `bulk: true` the operations are captured into a sub-recorder and stored as
-   * a single batched command (mirrors the Rails bulk alter path).
-   *
-   * Mirrors: ActiveRecord::Migration::CommandRecorder#change_table
-   * (command_recorder.rb:141-152). The bulk path's recorded lambda reaches
-   * `bulkChangeTable` through the `methodMissingProxy`, as the Ruby lambda's
-   * `self` reaches it through `method_missing` (command_recorder.rb:142).
-   */
   async changeTable(
     tableName: string,
     fnOrOptions: ((t: Table) => Promise<void> | void) | Record<string, unknown>,
@@ -186,22 +127,9 @@ export class CommandRecorder {
     }
   }
 
-  /**
-   * Replay all recorded commands against the given migration.
-   *
-   * Mirrors: ActiveRecord::Migration::CommandRecorder#replay
-   * (command_recorder.rb:148-152). TS has no block syntax: Ruby's `&block`
-   * passes nothing when the block is nil, so an absent block must not become a
-   * trailing `undefined` argument to a splat-taking method like
-   * `drop_table(*table_names)`.
-   */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
     for (const [cmd, args, block] of this.commands) {
       const rest = [...args, ...(block === undefined ? [] : [block])];
-      // `migration.send(cmd, ...)` (command_recorder.rb:150) lands in
-      // `Migration#method_missing` (migration.rb:1045) for a command the
-      // migration does not define itself — `transaction`, say. TS has no
-      // implicit dispatch, so the fallback is spelled out.
       if (typeof migration[cmd] === "function") {
         await migration[cmd](...rest);
       } else {
@@ -212,16 +140,9 @@ export class CommandRecorder {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // invert* methods — mirrors Rails private StraightReversions + overrides
-  // ---------------------------------------------------------------------------
-
   /**
    * @internal
-   *
-   * @missingRailsCall delete — PERMANENT: Ruby `Hash#delete(:if_not_exists)`
-   *   (migration/command_recorder.rb:199); JS spells the same operation as the
-   *   `delete` OPERATOR (command-recorder.ts:192), which records no callee.
+   * @missingRailsCall delete — PERMANENT
    */
   invertCreateTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const last = args[args.length - 1];
@@ -255,8 +176,8 @@ export class CommandRecorder {
   }
 
   /**
-   * @internal Straight reversion — `execute_block: :execute_block` (command_recorder.rb:158).
-   * @noRailsEquivalent CONVERGEABLE the `execute_block: :execute_block` entry of CommandRecorder's inverse table (command_recorder.rb:158) as a method.
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertExecuteBlock(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["executeBlock", args, block];
@@ -264,7 +185,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_create_join_table (command_recorder.rb:176).
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertCreateJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropJoinTable", args, block];
@@ -272,7 +193,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `drop_join_table: :create_join_table` inverse entry (command_recorder.rb:160) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertDropJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["createJoinTable", args, block];
@@ -280,7 +201,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_column: :remove_column` inverse entry (command_recorder.rb:161) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertAddColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeColumn", args, block];
@@ -296,7 +217,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_index: :remove_index` inverse entry (command_recorder.rb:162) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertAddIndex(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeIndex", args, block];
@@ -306,7 +227,6 @@ export class CommandRecorder {
   invertRemoveIndex(args: unknown[]): [string, unknown[]] {
     const a = args.slice();
     let options: Record<string, unknown> = {};
-    // extract_options! only strips a trailing Hash, never an Array (which is a column list)
     if (
       a.length > 0 &&
       typeof a[a.length - 1] === "object" &&
@@ -332,7 +252,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_timestamps: :remove_timestamps` inverse entry (command_recorder.rb:163) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertAddTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeTimestamps", args, block];
@@ -340,7 +260,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `remove_timestamps: :add_timestamps` inverse entry (command_recorder.rb:163) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertRemoveTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["addTimestamps", args, block];
@@ -348,36 +268,33 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_reference: :remove_reference` inverse entry (command_recorder.rb:164) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertAddReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeReference", args, block];
   }
 
-  /** Alias of invertAddReference (Rails: `alias :invert_add_belongs_to :invert_add_reference`). @internal */
+  /** @internal */
   invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return this.invertAddReference(args, block);
   }
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_remove_reference (command_recorder.rb:176).
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertRemoveReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["addReference", args, block];
   }
 
-  /** Alias of invertRemoveReference (Rails: `alias :invert_remove_belongs_to :invert_remove_reference`). @internal */
+  /** @internal */
   invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return this.invertRemoveReference(args, block);
   }
 
   /**
    * @internal
-   *
-   * @missingRailsCall delete — PERMANENT: Ruby `Hash#delete(:validate)`
-   *   (migration/command_recorder.rb:288); JS spells the same operation as the
-   *   `delete` OPERATOR (command-recorder.ts:326), which records no callee.
+   * @missingRailsCall delete — PERMANENT
    */
   invertAddForeignKey(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
@@ -448,7 +365,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_exclusion_constraint: :remove_exclusion_constraint` inverse entry (command_recorder.rb:167) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertAddExclusionConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["removeExclusionConstraint", args, block];
@@ -481,7 +398,6 @@ export class CommandRecorder {
   /** @internal */
   invertRemoveUniqueConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
-    // extract_options! only strips a trailing Hash, never an Array
     if (
       a.length > 0 &&
       typeof a[a.length - 1] === "object" &&
@@ -515,7 +431,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_change_column, which Ruby defines only to raise IrreversibleMigration (command_recorder.rb:53).
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertChangeColumn(_args: unknown[]): [string, unknown[]] {
     throw new IrreversibleMigration(
@@ -550,7 +466,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `[:add_columns, args]` return of CommandRecorder#invert_remove_columns (command_recorder.rb:233), which Ruby reaches by inversion rather than a named method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertAddColumns(args: unknown[]): [string, unknown[]] {
     return ["removeColumns", args];
@@ -628,7 +544,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `create_enum: :drop_enum` inverse entry (command_recorder.rb:170) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertCreateEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropEnum", args, block];
@@ -636,7 +552,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `enable_extension: :disable_extension` inverse entry (command_recorder.rb:169) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertEnableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["disableExtension", args, block];
@@ -644,7 +560,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `disable_extension: :enable_extension` inverse entry (command_recorder.rb:169) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertDisableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["enableExtension", args, block];
@@ -652,7 +568,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `create_schema: :drop_schema` inverse entry (command_recorder.rb:171) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertCreateSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropSchema", args, block];
@@ -660,7 +576,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `drop_schema: :create_schema` inverse entry (command_recorder.rb:171) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertDropSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["createSchema", args, block];
@@ -668,7 +584,7 @@ export class CommandRecorder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the `create_virtual_table: :drop_virtual_table` inverse entry (command_recorder.rb:172) as a method.
+   * @noRailsEquivalent CONVERGEABLE
    */
   invertCreateVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     return ["dropVirtualTable", args, block];
@@ -676,7 +592,6 @@ export class CommandRecorder {
 
   /** @internal */
   invertDropEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    // Mirror Rails: extract_options! strips trailing hash, then check second positional arg
     const a = args.slice();
     if (
       a.length > 0 &&
@@ -727,7 +642,6 @@ export class CommandRecorder {
 
   /** @internal */
   invertDropVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    // Mirror Rails: extract_options! strips trailing hash, then check second positional arg
     const a = args.slice();
     if (
       a.length > 0 &&
@@ -754,7 +668,6 @@ export class CommandRecorder {
   }
 }
 
-/** Mirrors: ActiveRecord::Migration::CommandRecorder::ReversibleAndIrreversibleMethods */
 const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "createTable",
   "createJoinTable",
@@ -807,8 +720,6 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
     this: CommandRecorder,
     ...args: unknown[]
   ): Promise<void> {
-    // Ruby's `&block` takes the trailing block out of `*args`; TS has no block
-    // syntax, so the trailing function argument is moved into the block seat.
     const block =
       typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
     return this.record(method, args, block);

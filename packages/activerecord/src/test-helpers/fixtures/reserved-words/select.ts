@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/reserved_words/select.yml
 export const reservedWordsSelectFixtureData = {
   select1: {
     id: 1,

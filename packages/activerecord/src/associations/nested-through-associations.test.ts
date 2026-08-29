@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/nested_through_associations_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -114,9 +111,6 @@ describe("NestedThroughAssociationsTest", () => {
     "essays",
   ]);
 
-  // has_many through
-  // Source: has_many through
-  // Through: has_many
   it("has many through has many with has many through source reflection", async () => {
     const general = tags("general");
     const david = authors("david");
@@ -141,9 +135,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(empty).toHaveLength(0);
   });
 
-  // has_many through
-  // Source: has_many
-  // Through: has_many through
   it("has many through has many through with has many source reflection", async () => {
     const luke = subscribers("first");
     const davidSub = subscribers("second");
@@ -173,9 +164,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((a) => a.id)).toContain(david.id);
   });
 
-  // has_many through
-  // Source: has_one through
-  // Through: has_one
   it("has many through has one with has one through source reflection", async () => {
     const founding = memberTypes("founding");
     const groucho = members("groucho");
@@ -199,9 +187,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((m) => m.id)).toContain(groucho.id);
   });
 
-  // has_many through
-  // Source: has_one (polymorphic, Club.sponsors `as: :sponsorable`)
-  // Through: has_one through
   it("has many through has one through with has one source reflection", async () => {
     const mustache = sponsors("moustache_club_sponsor_for_groucho");
     const groucho = members("groucho");
@@ -223,9 +208,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((m) => m.id)).toContain(groucho.id);
   });
 
-  // has_many through
-  // Source: has_many through
-  // Through: has_one
   it("has many through has one with has many through source reflection", async () => {
     const grouchoDetails = memberDetails("groucho");
     const otherDetails = memberDetails("some_other_guy");
@@ -267,9 +249,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(empty).toHaveLength(0);
   });
 
-  // has_many through
-  // Source: has_many
-  // Through: has_one through
   it("has many through has one through with has many source reflection", async () => {
     const grouchoDetails = memberDetails("groucho");
     const otherDetails = memberDetails("some_other_guy");
@@ -311,9 +290,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(empty).toHaveLength(0);
   });
 
-  // has_many through
-  // Source: has_and_belongs_to_many
-  // Through: has_many
   it("has many through has many with has and belongs to many source reflection", async () => {
     const general = categories("general");
     const cooking = categories("cooking");
@@ -344,9 +320,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((a) => a.id)).toContain(bob.id);
   });
 
-  // has_many through
-  // Source: has_many
-  // Through: has_and_belongs_to_many
   it("has many through has and belongs to many with has many source reflection", async () => {
     const greetings = comments("greetings");
     const moreGreetings = comments("more_greetings");
@@ -378,9 +351,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(ids).toContain(technology.id);
   });
 
-  // has_many through
-  // Source: has_many through a habtm
-  // Through: has_many through
   it("has many through has many with has many through habtm source reflection", async () => {
     const greetings = comments("greetings");
     const moreGreetings = comments("more_greetings");
@@ -411,9 +381,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(ids).toContain(mary.id);
   });
 
-  // has_many through
-  // Source: belongs_to
-  // Through: has_many through
   it("has many through has many through with belongs to source reflection", async () => {
     const general = tags("general");
     const david = authors("david");
@@ -435,9 +402,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((a) => a.id)).toContain(david.id);
   });
 
-  // has_many through
-  // Source: has_many through
-  // Through: belongs_to
   it("has many through belongs to with has many through source reflection", async () => {
     const welcomeGeneral = taggings("welcome_general");
     const thinkingGeneral = taggings("thinking_general");
@@ -472,9 +436,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((c) => c.id)).toContain(davidWelcomeGeneral.id);
   });
 
-  // has_one through
-  // Source: has_one through
-  // Through: has_one
   it("has one through has one with has one through source reflection", async () => {
     const founding = memberTypes("founding");
     const groucho = members("groucho");
@@ -498,9 +459,6 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((m) => m.id)).toContain(groucho.id);
   });
 
-  // has_one through
-  // Source: belongs_to
-  // Through: has_one through
   it("has one through has one through with belongs to source reflection", async () => {
     const general = categories("general");
     const groucho = members("groucho");
@@ -729,11 +687,6 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("nested has many through with conditions on source associations preload", async () => {
     const blue = tags("blue");
-    // Matches Rails' `assert_queries_count(2)`: one author query plus one
-    // through query whose eager-load (`includes!(source)` + `references!`) JOINs
-    // the source sub-chain, so the middle records carry the source association
-    // already loaded and the recursive source-preloader stage issues no further
-    // query — authors + posts(⋈ taggings ⋈ tags) = 2.
     let author!: Author;
     await assertQueriesCount(2, false, async () => {
       [, , author] = await Author.includes(":miscPostFirstBlueTags_2").order("authors.id");
@@ -841,7 +794,6 @@ describe("NestedThroughAssociationsTest", () => {
 
     const post = await Post.create({ title: "Catchy Title", body: "Interesting body." });
     const category = await Category.create({ name: "Anything" });
-    // Rails: Post::CategoryPost.create!(post:, category:). No canonical join model in trails.
     await (
       await (Post as any).leaseConnection()
     ).executeMutation(

@@ -1,13 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/validations/uniqueness_validation_test.rb
- *
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Since RFC 0063 made the validation chain async, uniqueness runs inline in
- * `valid?`/`isValid()` like any other validator — `await record.isValid()`
- * issues the existence check and returns `false` on a collision, matching
- * Rails' `valid?` before any save.
- */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Range } from "@blazetrails/activesupport";
@@ -28,13 +18,10 @@ import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
-// Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
-// are resolved by name, as Rails resolves them from the autoloaded models tree.
 import "../support/canonical-model-index.js";
 
 const INT_MAX_VALUE = 2147483647;
 
-// Rails `class Wizard < ActiveRecord::Base; self.abstract_class = true; ...`.
 class Wizard extends Base {
   static {
     this.abstractClass = true;
@@ -42,7 +29,6 @@ class Wizard extends Base {
   }
 }
 
-// Rails `class IneptWizard < Wizard; validates_uniqueness_of :city; end`.
 class IneptWizard extends Wizard {
   static _tableName = "inept_wizards";
   static {
@@ -53,22 +39,18 @@ class IneptWizard extends Wizard {
 class Conjurer extends IneptWizard {}
 class Thaumaturgist extends IneptWizard {}
 
-// Rails `class ReplyWithTitleObject < Reply;
-//        validates_uniqueness_of :content, scope: :title; ...`.
 class ReplyWithTitleObject extends Reply {
   static {
     this.validatesUniquenessOf("content", { scope: "title" });
   }
 }
 
-// Rails `class CoolTopic < Topic; validates_uniqueness_of :id; end`.
 class CoolTopic extends Topic {
   static {
     this.validatesUniquenessOf("id");
   }
 }
 
-// Rails `class TopicWithAfterCreate < Topic; after_create :set_author; ...`.
 class TopicWithAfterCreate extends Topic {
   static {
     this.afterCreate(async (record: TopicWithAfterCreate) => {
@@ -79,9 +61,6 @@ class TopicWithAfterCreate extends Topic {
   }
 }
 
-// Rails `class LessonWithUniqKeyboard < ActiveRecord::Base;
-//        self.table_name = "lessons"; belongs_to :keyboard, ...;
-//        validates_uniqueness_of :keyboard; end`.
 class LessonWithUniqKeyboard extends Base {
   static _tableName = "lessons";
   static {
@@ -90,23 +69,14 @@ class LessonWithUniqKeyboard extends Base {
   }
 }
 
-// Rails `Class.new(ActiveRecord::Base) { self.table_name = "dashboards";
-//        validates_uniqueness_of :dashboard_id; def self.name; "Dashboard" end }`
-// — an anonymous model on the primary-key-less `dashboards` table (distinct
-// from the canonical `Dashboard`, which declares `dashboard_id` as its PK).
 class DashboardWithoutPrimaryKey extends Base {
   static _tableName = "dashboards";
-  // No `_primaryKey`: the `dashboards` table is declared `primaryKey: false`, so
-  // schema reflection leaves `primaryKey` null — matching Rails' anonymous class
-  // (which never sets `self.primary_key`).
   static name = "Dashboard";
   static {
     this.validatesUniquenessOf("dashboard_id");
   }
 }
 
-// Rails `class BookWithUniqueRevision < Cpk::Book;
-//        validates :revision, uniqueness: true; end`.
 class BookWithUniqueRevision extends CpkBook {
   static {
     this.validates("revision", { uniqueness: true });
@@ -121,7 +91,6 @@ for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
 }
 
 describe("UniquenessValidationTest", () => {
-  // Rails `fixtures :topics, "warehouse-things"`.
   fixtures(["topics", "warehouseThings"]);
 
   beforeAll(() => {
@@ -144,8 +113,6 @@ describe("UniquenessValidationTest", () => {
     registerModel("Thaumaturgist", Thaumaturgist);
   });
 
-  // Rails `repair_validations(Topic, Reply)` — clear validators (including the
-  // uniqueness ones) added to Topic/Reply per test so they don't leak.
   afterEach(() => {
     Topic.clearValidatorsBang();
     Reply.clearValidatorsBang();
@@ -172,17 +139,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with singleton class", async () => {
     await Topic.createBang({ title: "abc" });
 
-    // Rails declares the validation on `t2.singleton_class`; trails has no
-    // per-instance validator, so the class-level declaration plus a save-time
-    // check expresses the same "duplicate is rejected, fresh row is accepted".
     Topic.validatesUniquenessOf("title");
     const t2 = new Topic({ title: "abc" });
     expect(await t2.save()).toBe(false);
   });
 
   it("validate uniqueness with alias attribute", async () => {
-    // Rails aliases :new_title → :title and validates :new_title; `heading` is
-    // the canonical Topic alias for :title, so it exercises the same path.
     Topic.validatesUniquenessOf("heading");
 
     const topic = new Topic({ title: "abc" });
@@ -195,8 +157,6 @@ describe("UniquenessValidationTest", () => {
     const t = new Topic({ title: null });
     expect(await t.save()).toBe(true);
 
-    // Rails does not skip nil unless allow_nil is set: the second nil title
-    // collides with the first via `title IS NULL`.
     const t2 = new Topic({ title: null });
     expect(await t2.save()).toBe(false);
     expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
@@ -228,14 +188,6 @@ describe("UniquenessValidationTest", () => {
     expect(await t.save()).toBe(true);
   });
 
-  // These 5 content-uniqueness tests validate `Reply.content` (a serialize-
-  // wrapped column). They were skipped by #4738 as a suspected shared-DB flake,
-  // but the true cause was a deterministic double-serialize in build_relation
-  // (uniqueness.ts): it dumped the value through the coder AND the bind path
-  // re-dumped it via the arel table's decorated type, so r2's query looked for
-  // `"hello world\n\n"` and never matched r1's stored `"hello world\n"` — the
-  // collision was missed and `save()` wrongly returned true. Fixed by dropping
-  // the manual serialize (Rails lets `bind_attribute`/the type serialize once).
   it("validate uniqueness with scope", async () => {
     Reply.validatesUniquenessOf("content", { scope: "parent_id" });
 
@@ -255,10 +207,7 @@ describe("UniquenessValidationTest", () => {
     expect(r3.isPersisted()).toBe(true);
   });
 
-  // Un-skipped: see the double-serialize note on "validate uniqueness with scope".
   it("validate uniqueness with aliases", async () => {
-    // Rails validates :new_content scope :new_parent_id (aliases of content /
-    // parent_id, already declared on Reply).
     Reply.validatesUniquenessOf("new_content", { scope: "new_parent_id" });
 
     const t = await Topic.create({ title: "I'm unique!" });
@@ -279,10 +228,7 @@ describe("UniquenessValidationTest", () => {
     }).toThrow(ArgumentError);
   });
 
-  // Un-skipped: see the double-serialize note on "validate uniqueness with scope".
   it("validate uniqueness with object scope", async () => {
-    // Rails `scope: :topic` — scope by the belongs_to association name, which
-    // resolve_attributes/scope_relation expand to the parent_id foreign key.
     Reply.validatesUniquenessOf("content", { scope: "topic" });
 
     const t = await Topic.create({ title: "I'm unique!" });
@@ -310,11 +256,7 @@ describe("UniquenessValidationTest", () => {
     }
   });
 
-  // Un-skipped: see the double-serialize note on "validate uniqueness with scope".
   it("validate uniqueness with composed attribute scope", async () => {
-    // Rails `ReplyWithTitleObject` validates content scoped to :title; the
-    // dedicated subclass carries the validation so it does not perturb the
-    // shared Reply/UniqueReply models.
     const r1 = await ReplyWithTitleObject.create({ title: "r1", content: "hello world" });
     expect(r1.isPersisted()).toBe(true);
 
@@ -323,8 +265,6 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with object arg", async () => {
-    // Rails `validates_uniqueness_of(:topic)` — uniqueness on the association
-    // itself; the validator reads/compares the underlying parent_id FK.
     Reply.validatesUniquenessOf("topic");
 
     const t = await Topic.create({ title: "I'm unique!" });
@@ -336,12 +276,9 @@ describe("UniquenessValidationTest", () => {
     expect(await r2.save()).toBe(false);
   });
 
-  // Un-skipped: see the double-serialize note on "validate uniqueness with scope".
   it("validate uniqueness scoped to defining class", async () => {
     const t = await Topic.create({ title: "What, me worry?" });
 
-    // UniqueReply / SillyUniqueReply carry the uniqueness validation (defined on
-    // the canonical models); plain Reply does not.
     const r1 = await (t as any).uniqueReplies.create({
       title: "r1",
       content: "a barrel of fun",
@@ -355,7 +292,6 @@ describe("UniquenessValidationTest", () => {
     });
     expect(await r2.save()).toBe(false);
 
-    // Plain Reply has no uniqueness validation, so this saves.
     const r3 = await (t as any).replies.create({
       title: "r2",
       content: "a barrel of fun",
@@ -409,7 +345,6 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness", async () => {
-    // Rails: `validates_uniqueness_of(:title, :parent_id, case_sensitive: false, allow_nil: true)`.
     Topic.validatesUniquenessOf("title", "parent_id", { caseSensitive: false, allowNil: true });
 
     const t = new Topic({ title: "I'm unique!", parent_id: 2 });
@@ -418,7 +353,6 @@ describe("UniquenessValidationTest", () => {
     t.writeAttribute("content", "Remaining unique");
     expect(await t.save()).toBe(true);
 
-    // fixture topics(:second) has parent_id 1, so parent_id collides too.
     const t2 = new Topic({ title: "I'm UNIQUE!", parent_id: 1 });
     expect(await t2.save()).toBe(false);
     expect(t2.errors.messagesFor("title").length).toBeGreaterThan(0);
@@ -439,18 +373,8 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness of with multiple attributes and array forms", async () => {
-    // Rails' `validates_uniqueness_of(*attr_names)` arity: `_merge_attributes`
-    // flattens nested arrays into one validator whose EachValidator loop guards
-    // each column, so a single call can guard several columns. (A string-column
-    // variant of the multi-attr form used by Rails'
-    // test_validate_case_insensitive_uniqueness; the integer `:parent_id`
-    // case-insensitive column that test also covers is asserted directly in
-    // "validate case insensitive uniqueness".)
     Topic.validatesUniquenessOf(["title"], "author_name");
 
-    // Rails registers ONE UniquenessValidator owning both attributes
-    // (validates_with UniquenessValidator, _merge_attributes(...)), so it
-    // de-dups to a single instance rather than one per attribute.
     const uniqValidators = Topic.validators().filter(
       (v) => (v as { kind?: string }).kind === "uniqueness",
     );
@@ -460,7 +384,6 @@ describe("UniquenessValidationTest", () => {
       "author_name",
     ]);
 
-    // Fixture topics(:first): title "The First Topic", author_name "David".
     const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });
     expect(await collideTitle.save()).toBe(false);
     expect(collideTitle.errors.messagesFor("title")).toEqual(["has already been taken"]);
@@ -506,7 +429,6 @@ describe("UniquenessValidationTest", () => {
 
     const topic1 = new Topic({ author_email_address: "david@loudthinking.com" });
 
-    // Fixture `topics(:first)` already holds david@loudthinking.com.
     expect(await Topic.where({ author_email_address: "david@loudthinking.com" }).count()).toBe(1);
 
     expect(await topic1.save()).toBe(false);
@@ -572,11 +494,6 @@ describe("UniquenessValidationTest", () => {
     }
   });
 
-  // Event.title has limit 5. SQLite doesn't truncate, so two 8-char titles
-  // collide on the uniqueness check; MySQL/Postgres raise on the over-length
-  // insert. The branch picks the test callback at registration time (outside
-  // the test body) so the per-adapter behavior stays faithful to Rails'
-  // `current_adapter?` split without a conditional inside the test.
   const limitTest = (longTitle: string) =>
     adapterType === "sqlite"
       ? async () => {
@@ -598,7 +515,6 @@ describe("UniquenessValidationTest", () => {
     const w1 = await IneptWizard.create({ name: "Rincewind", city: "Ankh-Morpork" });
     expect(w1.isPersisted()).toBe(true);
 
-    // Uses validation from the (abstract) base class.
     const w2 = new IneptWizard({ name: "Rincewind", city: "Quirm" });
     expect(await w2.save()).toBe(false);
     expect(w2.errors.messagesFor("name")).toEqual(["has already been taken"]);
@@ -636,8 +552,6 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with non callable conditions is not supported", () => {
-    // Rails instantiates the validator at declaration time (validates_with),
-    // so a non-callable :conditions raises immediately, not at save.
     expect(() =>
       Topic.validatesUniquenessOf("title", {
         conditions: Topic.where({ approved: true }) as any,
@@ -695,8 +609,6 @@ describe("UniquenessValidationTest", () => {
     expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "xyz" }).save()).toBe(true);
     expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "abc" }).save()).toBe(false);
 
-    // Rails raises UnknownPrimaryKey when validating uniqueness on a persisted
-    // record whose table has no primary key (it cannot exclude the row itself).
     abc.writeAttribute("dashboard_id", "def");
     await expect(abc.saveBang()).rejects.toThrow(
       /Unknown primary key for table dashboards in model[\s\S]*Cannot validate uniqueness for persisted record without primary key\.$/,
@@ -709,8 +621,6 @@ describe("UniquenessValidationTest", () => {
     const t = new Topic({ title: "This is a unique title" });
     expect(await t.save()).toBe(true);
 
-    // Rails `t.id += 1`. Postgres returns the id as a BigInt while SQLite/MySQL
-    // return a number, so increment in the value's own numeric domain.
     const id = t.readAttribute("id");
     t.writeAttribute("id", typeof id === "bigint" ? id + 1n : (id as number) + 1);
     expect(await t.save()).toBe(true);
@@ -730,9 +640,7 @@ describe("UniquenessValidationTest", () => {
     }
   });
 
-  it.skipIf(adapterType !== "postgres")("validate uniqueness uuid", async () => {
-    // Postgres-only in Rails (UuidItem). Skipped on other adapters.
-  });
+  it.skipIf(adapterType !== "postgres")("validate uniqueness uuid", async () => {});
 
   it("validate uniqueness regular id", async () => {
     const item = await CoolTopic.createBang({ title: "MyItem" });
@@ -754,8 +662,6 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   beforeEach(async () => {
-    // Rails' `@connection.schema_cache.clear!` — the index list for `topics` must
-    // go cold between tests so each test's freshly added index is reflected.
     const connection = Base.connection;
     connection.internalSchemaCache.clearDataSourceCacheBang(
       connection.pool ?? connection,
@@ -886,10 +792,6 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("uniqueness on relation", async () => {
-    // Rails declares `validates_uniqueness_of :event` here and clears it in the
-    // ensure block; trails' TopicWithEvent carries the declaration on the class,
-    // so redeclaring would run the validator twice (and clearing it would strip
-    // it for the rest of the file).
     await Base.connection.addIndex("topics", "parent_id", {
       unique: true,
       name: "topics_index",
@@ -998,9 +900,6 @@ describe("UniquenessWithCompositeKey", () => {
   });
 });
 
-// Rails `class BigIntTest < ActiveRecord::Base; self.table_name = "cars";
-//        validates :engines_count, uniqueness: true,
-//          inclusion: { in: 0..INT_MAX_VALUE }; end`.
 class BigIntTest extends Base {
   static _tableName = "cars";
   static {
@@ -1011,7 +910,6 @@ class BigIntTest extends Base {
   }
 }
 
-// Rails `class BigIntReverseTest` — same validations, declared in reverse order.
 class BigIntReverseTest extends Base {
   static _tableName = "cars";
   static {
@@ -1020,7 +918,6 @@ class BigIntReverseTest extends Base {
   }
 }
 
-// Rails `class TopicWithEvent < Topic; belongs_to :event, foreign_key: :parent_id; end`.
 class TopicWithEvent extends Topic {
   static {
     this.belongsTo("event", { foreignKey: "parent_id" });
@@ -1028,8 +925,6 @@ class TopicWithEvent extends Topic {
   }
 }
 
-// Rails `class TopicWithUniqEvent < Topic; belongs_to :event, foreign_key: :parent_id;
-//        validates :event, uniqueness: true; end`.
 class TopicWithUniqEvent extends Topic {
   static {
     this.belongsTo("event", { foreignKey: "parent_id" });

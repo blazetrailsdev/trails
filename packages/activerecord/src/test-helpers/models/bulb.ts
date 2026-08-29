@@ -1,7 +1,6 @@
 import { throwAbort } from "@blazetrails/activesupport";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
-// vendor/rails/activerecord/test/models/bulb.rb
 import { Base } from "../../base.js";
 import { association } from "../../associations.js";
 import { association as associationInstance } from "../../associations/instance-methods.js";
@@ -15,16 +14,12 @@ export class Bulb extends Base {
   declare ID: number;
   declare name: string;
 
-  // `declare` (not a plain field) so no constructor initializer runs after
-  // super() — a value emitter would reset these to `undefined` right after the
-  // after_initialize callbacks in Base's constructor populate them.
   declare scopeAfterInitialize: any;
   declare attributesAfterInitialize: any;
   declare countAfterCreate: number | undefined;
 
   static {
     this.defaultScope((q: any) => q.where({ name: "defaulty" }));
-    // Rails: counter_cache: { active: false } — object form not yet typed; cast as any
     this.belongsTo("car", { touch: true, counterCache: { active: false } as any });
     this.scope("awesome", function (this: any) {
       return this.where({ frickinawesome: true });

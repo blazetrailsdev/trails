@@ -5,16 +5,12 @@ import { Base, ConfigurationError } from "./index.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Rails: fixtures :'admin/users'
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("StoreTest", () => {
   let john: InstanceType<typeof AdminUser>;
 
   beforeEach(async () => {
-    // Base constructor dispatches store accessor keys by BASE name (before prefix/suffix),
-    // so prefixed/suffixed accessors (parent_name, partner_name, partner_birthday) can't
-    // be set by name in create(). Pass the underlying store column values directly instead.
     john = await AdminUser.create({
       name: "John Doe",
       color: "black",
@@ -234,10 +230,6 @@ describe("StoreTest", () => {
 
   it("store takes precedence when updating store and accessor", async () => {
     const user = adminUsers("jamis");
-    // Rails: update(settings: {homepage:"rails"}, homepage:"not rails") — the Hash
-    // value (settings) is processed after the string (homepage) so the store wins.
-    // trails' assign_attributes routes string values via writeAttribute (not public_send),
-    // so we reproduce the same ordering explicitly.
     (user as any).homepage = "not rails";
     await user.update({ settings: new HashWithIndifferentAccess({ homepage: "rails" }) });
 
@@ -247,9 +239,6 @@ describe("StoreTest", () => {
 
   it("convert store attributes from Hash to HashWithIndifferentAccess saving the data and access attributes indifferently", async () => {
     const user = adminUsers("jamis");
-    // Rails YAML loads :symbol as a Ruby Symbol → HWIA normalizes it to "symbol"
-    // via Symbol#to_s. Our fixture stores the already-normalized "symbol" key, so
-    // the HWIA key matches Rails' runtime key.
     expect((user.settings as HashWithIndifferentAccess).get("symbol")).toBe("symbol");
     expect((user.settings as HashWithIndifferentAccess).get("string")).toBe("string");
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);

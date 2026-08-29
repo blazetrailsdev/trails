@@ -6,7 +6,6 @@ import type { FamousPirate } from "./pirate.js";
 import type { Pirate } from "./pirate.js";
 import type { ShipPart } from "./ship-part.js";
 import type { Treasure } from "./treasure.js";
-// vendor/rails/activerecord/test/models/ship.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
@@ -53,12 +52,6 @@ export class Ship extends Base {
   }
 }
 
-// vendor/rails/activerecord/test/models/ship.rb:12-14 —
-//   accepts_nested_attributes_for :parts, allow_destroy: true
-//   accepts_nested_attributes_for :pirate, allow_destroy: true, reject_if: proc(&:empty?)
-//   accepts_nested_attributes_for :update_only_pirate, update_only: true
-// Flips `autosave: true` on these reflections so records marked for destruction
-// are destroyed as part of the ship's save transaction.
 acceptsNestedAttributesFor(Ship, "parts", { allowDestroy: true });
 acceptsNestedAttributesFor(Ship, "pirate", {
   allowDestroy: true,

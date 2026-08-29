@@ -7,7 +7,6 @@ import { Contexts } from "./contexts.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import type { EncryptorLike } from "./encryptor.js";
 
-// Encryptors that produce distinguishable ciphertexts so assertions are meaningful.
 const encryptorA: EncryptorLike = {
   encrypt: (v) => `A:${v}`,
   decrypt: (v) => v.replace(/^A:/, ""),
@@ -38,9 +37,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     };
     const record = { constructor: klass };
 
-    // The suite boots with ExtendedDeterministicQueries installed (helper.rb:104-107),
-    // which suppresses the extra previous-scheme query. Pin it off so this test
-    // exercises the un-extended branch it is about.
     const installedSpy = vi
       .spyOn(ExtendedDeterministicQueries, "installed", "get")
       .mockReturnValue(false);
@@ -61,11 +57,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       "user@example.com",
     );
 
-    // First call: current value (encryption enabled)
     expect(calls[0].value).toBe("user@example.com");
     expect(calls[0].encryptionDisabled).toBe(false);
 
-    // Second call: all previous-scheme ciphertexts as an array (single IN query, encryption disabled)
     expect(calls[1]).toBeDefined();
     expect(calls[1].value).toEqual([type.previousTypes[0].serialize("user@example.com")]);
     expect(calls[1].encryptionDisabled).toBe(true);

@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/toys.yml
 export const toyFixtureData = {
   bone: {
     toy_id: 1,

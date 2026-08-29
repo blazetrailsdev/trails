@@ -1,9 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/subscriptions.yml
-// subscriber_id holds the Subscriber#nick string PK directly (not a fixture
-// row-name ref); book_id is numeric in Rails YAML and resolves to the
-// book row carrying that id.
 export const subscriptionFixtureData = {
   webster_awdr: {
     id: 1,

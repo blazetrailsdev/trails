@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/ships.yml
 export const shipFixtureData = {
   black_pearl: {
     name: "Black Pearl",

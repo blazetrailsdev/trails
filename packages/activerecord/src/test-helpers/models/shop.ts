@@ -1,5 +1,4 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-// vendor/rails/activerecord/test/models/shop.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 

@@ -1,12 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Mirrors associations/cascaded_eager_loading_test.rb — the cascaded
- * Author/Post/Comment/Categorization/Category/Topic/Vertex eager-loading suite.
- * Rails declares a single fixtures set for the whole class; we mirror that with
- * one `fixtures` call seeding the canonical association tables.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel, registerSubclass, resetCallbacks } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -115,10 +106,6 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading dedups a manual join coinciding with an eager root", async () => {
-    // Author.joins(:posts).eager_load(posts: :comments): the manual INNER JOIN
-    // posts and the eager root posts are the SAME association — Rails' `walk`
-    // dedups them to ONE un-aliased `posts` (manual INNER), with `comments`
-    // joined onto it. No second `posts`/`posts_authors` join, no ambiguous column.
     const loaded = await Author.all()
       .joins(":posts")
       .eagerLoad({ ":posts": ":comments" })
@@ -130,8 +117,6 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading dedups a single-step manual join and eager root", async () => {
-    // Author.joins(:posts).eager_load(:posts): single-step root coincides with
-    // the manual join — one un-aliased INNER `posts`, no duplicate.
     const loaded = await Author.all().joins(":posts").eagerLoad(":posts").order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
@@ -139,8 +124,6 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading dedups a manual join coinciding with a dotted eager root", async () => {
-    // A dotted-path eager spec roots at its first segment (`posts.comments` →
-    // `posts`), so it too dedups against the coinciding manual `joins(:posts)`.
     const loaded = await Author.all()
       .joins(":posts")
       .eagerLoad("posts.comments")
@@ -151,18 +134,10 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading dedups a nested hash-form manual join and eager spec", async () => {
-    // Author.joins(posts: :comments).eager_load(posts: :comments): a HASH-form
-    // manual join coincides with the eager spec at EVERY level. Rails' `walk`
-    // recurses (join_dependency.rb:219), so both `posts` AND `comments` dedup to
-    // their manual INNER JOINs — no duplicate `posts`/`comments`, no ambiguous
-    // column. Mirrors the root-only string dedup but down the whole nested path.
     const loaded = await Author.all()
       .joins({ ":posts": ":comments" })
       .eagerLoad({ ":posts": ":comments" })
       .order("authors.id");
-    // INNER JOIN semantics (manual join wins): only authors with a post that has
-    // a comment, only posts that have comments. The eager hydration reads the
-    // single deduped `posts`/`comments` joins with no fan-out duplication.
     expect(loaded).toHaveLength(2);
     expect(targetArr(loaded[0], "posts")).toHaveLength(4);
     expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
@@ -171,21 +146,10 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading dedups a through-association intermediate join and eager spec", async () => {
-    // Author.joins(:comments).eager_load(:comments) where `comments` is a
-    // has_many :through :posts. The through reflection materializes BOTH the
-    // intermediate `posts` join AND the target `comments` join. Rails' `walk`
-    // dedups the FULL reflection chain (join_dependency.rb:214-219), so the
-    // intermediate `posts` collapses against the manual join too — not just the
-    // `comments` target. No extra aliased `posts` (e.g. `posts_authors`).
     const rel = Author.all().joins(":comments").eagerLoad(":comments").order("authors.id");
-    // The intermediate `posts` join is deduped: no aliased duplicate such as
-    // `posts_authors`/`posts_authors_join` re-emitted for the eager spec.
     const sql = rel.toSql();
     expect(sql).not.toMatch(/posts_authors/);
     const loaded = await rel;
-    // INNER JOIN semantics (manual join wins): only authors reachable through a
-    // post that has a comment. The single deduped `posts`/`comments` joins drive
-    // the eager hydration with no fan-out duplication from an extra alias.
     expect(loaded).toHaveLength(2);
     expect(targetArr(loaded[0], "comments")).toHaveLength(11);
     expect(targetArr(loaded[1], "comments")).toHaveLength(1);
@@ -197,7 +161,6 @@ describe("CascadedEagerLoadingTest", () => {
       .where("primary_contacts_people_2.first_name = ?", "Susan")
       .order("people.id")
       .first();
-    // Rails: assert_equal people(:michael), ...first — AR#== is same class + same id.
     expect(person).toBeInstanceOf(Person);
     expect(person!.id).toBe((people("michael") as any).id);
   });
@@ -292,14 +255,12 @@ describe("CascadedEagerLoadingTest", () => {
     const firstAccount = target(firms[0], "account") as Base;
     const firmAccount = target(target(firstAccount, "firm") as Base, "account") as Base;
     expect(firmAccount.id).toBe(firstAccount.id);
-    // companies(:first_firm).account — fixture record's has_one, loaded directly.
     const expected = (await (companies("first_firm") as Firm).loadHasOne("account")) as Base;
     await assertQueriesCount(0, false, () => {
       expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
         expected.id,
       );
     });
-    // companies(:first_firm).account.firm.account — same value via a deeper walk.
     const ffAccount = (await (companies("first_firm") as Firm).loadHasOne("account")) as Account;
     const ffFirm = (await ffAccount.loadBelongsTo("firm")) as Firm;
     const expectedDeep = (await ffFirm.loadHasOne("account")) as Base;
@@ -312,9 +273,6 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with has many sti", async () => {
     const loaded = await Topic.all().includes(":replies").order("topics.id");
-    // topics(:first).replies.size / topics(:second).replies.size — Topic#replies
-    // is has_many Reply by parent_id, so query it directly to avoid loading the
-    // fixture record's proxy (whose STI subtree drags in an unrelated inverse_of).
     const firstSize = (await Reply.where({ parent_id: (topics("first") as any).id })).length;
     const secondSize = (await Reply.where({ parent_id: (topics("second") as any).id })).length;
     await assertQueriesCount(0, false, () => {
@@ -385,9 +343,6 @@ describe("CascadedEagerLoadingTest", () => {
       (authors("david") as any).id,
     ]);
     await assertQueriesCount(0, false, () => {
-      // Rails (rb:171) only evaluates post_about_thinking.comments.first inside
-      // the 0-query guard and never asserts the value (.first may be nil), so we
-      // exercise the preloaded access without strengthening: a Comment or null.
       const post = target(loaded[2], "postAboutThinking") as Base;
       const firstComment = targetArr(post, "comments")[0] ?? null;
       expect(firstComment === null || firstComment instanceof Comment).toBe(true);
@@ -500,8 +455,6 @@ describe("CascadedEagerLoadingTest", () => {
       await authorsRel.preload({ ":recentPost": ":comments" }).load();
     });
 
-    // Rails: assert_equal [last_comment], retrieved_comments — AR#== is same
-    // class + same id, so match the recorded record's class and id.
     expect(retrievedComments).toHaveLength(1);
     expect(retrievedComments[0]).toBeInstanceOf(Comment);
     expect(retrievedComments[0].id).toBe(lastComment.id);
@@ -535,8 +488,6 @@ describe("CascadedEagerLoadingTest", () => {
       await authorsRel.preload({ ":recentResponse": ":author" }).load();
     });
 
-    // Rails: assert_equal [author, authors(:bob)], retrieved_authors — AR#== is
-    // same class + same id, so match the recorded records' class and ids.
     expect(retrievedAuthors).toHaveLength(2);
     expect(retrievedAuthors.map((r) => (r as any).id)).toEqual([
       author.id,

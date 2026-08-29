@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
- */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
@@ -39,8 +36,6 @@ import { Professor } from "../test-helpers/models/professor.js";
 import { Course } from "../test-helpers/models/course.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
 
-// Test-file-local models mirroring the Rails fixture file's inline class
-// definitions (has_and_belongs_to_many_associations_test.rb:63-90).
 class ProjectWithSymbolsForKeys extends Base {
   static {
     this.tableName = "projects";
@@ -67,9 +62,6 @@ class DeveloperWithSymbolsForKeys extends Base {
 
 class DeveloperWithSymbolClassName extends Developer {
   static {
-    // Rails: `class_name: :ProjectWithSymbolsForKeys` (a Symbol). The faithful
-    // JS analogue of a Ruby symbol is `Symbol("…")`; the HABTM builder coerces
-    // it to its description, mirroring Rails' `class_name.to_s`.
     this.hasAndBelongsToMany("projects", {
       className: Symbol("ProjectWithSymbolsForKeys") as unknown as string,
     });
@@ -98,7 +90,6 @@ class ProjectWithAfterCreateHook extends Base {
       associationForeignKey: "developer_id",
     });
 
-    // Rails: `after_create :add_david` → `david.projects << self`.
     this.afterCreate(async function (record: any) {
       const david = await DeveloperForProjectWithAfterCreateHook.findBy({ name: "David" });
       await (david as any).projects.push(record);
@@ -107,7 +98,6 @@ class ProjectWithAfterCreateHook extends Base {
 }
 
 class DeveloperWithExtendOption extends Developer {
-  // Rails: `module NamedExtension; def category; "sns"; end; end`.
   static namedExtension = {
     category(): string {
       return "sns";
@@ -162,11 +152,6 @@ class Source extends Base {
   }
 }
 
-// ==========================================================================
-// HasAndBelongsToManyAssociationsTest — mirrors
-// has_and_belongs_to_many_associations_test.rb, ported onto the canonical
-// Developer/Project models + developers_projects fixtures.
-// ==========================================================================
 describe("HasAndBelongsToManyAssociationsTest", () => {
   const { developers, projects, computers } = fixtures([
     "developers",
@@ -1000,16 +985,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await (developer as any).projects.first()).id).toBe(project.id);
   });
 
-  // Tracked in the activerecord-surfaced-deviations bucket: a HABTM proxy whose
-  // owner was NEW when a finder relation was spawned off it
-  // (`project.developers.where(...)`) seeds the `1=0` NullRelation. After
-  // `save`, the mutated finder must rebase onto the resolved join scope so it
-  // picks up the persisted FK rather than the stale seed — mirroring Rails'
-  // CollectionProxy delegating to `association.scope`.
   it("mutated finder on new-owner seed resolves the join after save", async () => {
     const developer = await Developer.create({ name: "Zed" });
     const project = new Project({ name: "Rails Testing" });
-    // `where(...)` spawns off the still-new owner's `1=0` seed.
     const scoped = (project as any).developers.where({ name: "Zed" });
     await (project as any).developers.push(developer);
     await (project as any).saveBang();
@@ -1017,32 +995,21 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await scoped.first()).id).toBe(developer.id);
   });
 
-  // The non-finder terminals (count/exists/pluck) have their own `_isNone`
-  // short-circuits, so a HABTM relation spawned off the stale new-owner seed
-  // must rebase onto the resolved join scope for those too — not just the
-  // bounded finders covered above.
   it("mutated count/exists/pluck on new-owner seed resolves the join after save", async () => {
     const developer = await Developer.create({ name: "Yara" });
     const project = new Project({ name: "Rails Counting" });
-    // `where(...)` spawns off the still-new owner's `1=0` seed.
     const scoped = (project as any).developers.where({ name: "Yara" });
     await (project as any).developers.push(developer);
     await (project as any).saveBang();
 
     expect(await scoped.count()).toBe(1);
     expect(await scoped.exists()).toBe(true);
-    // The `developers` scope is `distinct().order("developers.name desc,
-    // developers.id desc")`, so pluck must select both ordered columns —
-    // PostgreSQL requires every SELECT DISTINCT ORDER BY expression to appear in
-    // the select list (42P10).
     expect(await scoped.pluck("developers.name", "developers.id")).toEqual([
       ["Yara", developer.id],
     ]);
   });
 
   it("dynamic find should respect association include", async () => {
-    // SQL error in sort clause if :include is not included
-    // due to Unknown column 'authors.id'
     const category = await Category.find(1);
     const post = await (category.postsWithAuthorsSortedByAuthorId as any).findBy({
       title: "Welcome to the weblog",
@@ -1060,9 +1027,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proxy = category!.posts as any;
     const spy = vi.spyOn(Post as any, "transaction");
     try {
-      await proxy.transaction(async () => {
-        // nothing
-      });
+      await proxy.transaction(async () => {});
       expect(spy).toHaveBeenCalled();
     } finally {
       vi.restoreAllMocks();
@@ -1119,9 +1084,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await treasure.isValid();
 
     expect(await treasure.richPeople.size()).toBe(1);
-    // Rails asserts `assert_nil rich_person.first_name`; an unset attribute
-    // reads as undefined here — the point is the before_validation callback
-    // (which would set it) never ran.
     expect((richPerson as any).first_name ?? null).toBeNull();
   });
 
@@ -1169,12 +1131,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("habtm with reflection using class name and fixtures", async () => {
-    // `shared_computers` → camelCase `sharedComputers` reflection (class_name: "Computer").
     expect((Developer as any)._reflectOnAssociation("sharedComputers")).not.toBeNull();
-    // Rails additionally asserts developers.yml literally contains "shared_computers"
-    // (the only way the bug reproduced). trails' fixture loader materializes the
-    // `sharedComputers: ["laptop"]` association label on `david` into a
-    // computers_developers join row — exercised by the data assertion below.
     const david = developers("david");
     const sharedComputers = await david.sharedComputers;
     expect((sharedComputers[0] as any).id).toBe((computers("laptop") as any).id);
@@ -1183,9 +1140,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("with symbol class name", () => {
     expect(() => {
       const developer = new DeveloperWithSymbolClassName({});
-      // Mirrors Rails' `developer.projects`; also force klass resolution so the
-      // Symbol class_name (`:ProjectWithSymbolsForKeys`) is actually resolved,
-      // not merely declared.
       void (developer as any).projects;
       void (DeveloperWithSymbolClassName as any)._reflectOnAssociation("projects").klass;
     }).not.toThrow();
@@ -1227,7 +1181,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       await preloadedProject!.salariedDevelopers.size(),
     );
 
-    // Nested HATBM
     const developer = await Developer.first();
     const firstProject = await developer!.projects.first();
     const preloadedDeveloper = await Developer.preload({

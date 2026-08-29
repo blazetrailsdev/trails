@@ -1,16 +1,3 @@
-/**
- * Trails-only coverage for the `dependent: :destroy_async` arm on the three
- * association bodies — `BelongsToAssociation#handle_dependency`
- * (belongs_to_association.rb:14-35), `HasManyAssociation#handle_dependency`
- * (has_many_association.rb:30-55) and `HasOneAssociation#delete`
- * (has_one_association.rb:34-51).
- *
- * Rails asserts the arm end-to-end through ActiveJob
- * (activejob/destroy_association_async_test.rb), which needs the ActiveJob test
- * helpers trails has not ported; these cases assert the same thing one layer
- * down — the payload `enqueue_destroy_association` parks on the owner's
- * `_after_commit_jobs` (association.rb:398-404).
- */
 import { describe, it, expect } from "vitest";
 import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { Base } from "../base.js";

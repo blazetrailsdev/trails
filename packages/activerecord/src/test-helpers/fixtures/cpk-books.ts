@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/cpk_books.yml
 export const cpkBookFixtureData = {
   cpk_great_author_first_book: {
     author_id: ref("cpk_authors", "cpk_great_author"),

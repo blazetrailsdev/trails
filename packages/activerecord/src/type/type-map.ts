@@ -1,6 +1,3 @@
-/**
- * Mirrors: ActiveRecord::Type::TypeMap
- */
 import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
 
 export class TypeMap {
@@ -12,9 +9,6 @@ export class TypeMap {
     this._parent = parent;
   }
 
-  // `lookupKey` is nullable because Rails reaches here with a nil `sql_type`
-  // (`lookup_cast_type(column.sql_type)`, abstract/quoting.rb:125-127); as with
-  // `Regexp#===(nil)`, a nil key matches nothing and falls to the default type.
   lookup(lookupKey: string | null): Type {
     return this.fetch(lookupKey, () => new ValueType());
   }
@@ -44,11 +38,7 @@ export class TypeMap {
     });
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT: type_map.rb:49 invokes the matched Proc with
-   * `matching_pair.last.call(lookup_key)`. A Proc is a plain function in JS and
-   * a plain function invocation has no `.call`-named form.
-   */
+  /** @missingRailsCall call — PERMANENT */
   protected performFetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
     const matchingPair = [...this._mapping.entries()]
       .reverse()

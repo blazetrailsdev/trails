@@ -1,8 +1,3 @@
-/**
- * Connection adapters — top-level module for database adapter infrastructure.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters
- */
 import { AdapterNotFound } from "./errors.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
@@ -10,59 +5,29 @@ export interface ConnectionAdapters {
   readonly AbstractAdapter: unknown;
 }
 
-// Registered adapters: name → async loader producing the adapter class.
-// Mirrors Rails ConnectionAdapters @adapters Hash storing [class_name, path].
-// In TS we can't use String constantize, so we store loader functions instead.
 type AdapterLoader = () => Promise<new (...args: any[]) => DatabaseAdapter>;
 type AdapterClass = new (...args: any[]) => DatabaseAdapter;
 const adapters = new Map<string, AdapterLoader>();
-// Memoize the loader's result so resolve() is effectively a cached lookup
-// (like Rails' adapter registry). Cleared when a name is re-registered.
 const resolved = new Map<string, Promise<AdapterClass>>();
-// Sync mirror of `resolved`, populated when each promise settles. Lets
-// `db_config.new_connection` name the adapter class synchronously, as Ruby's
-// `require` lets it, once async adapter loading has completed at least once.
 const resolvedSyncCache = new Map<string, AdapterClass>();
-// Mirror of resolution rejections. Surfaces from `resolveSyncError` so the
-// sync auto-resolve path can re-throw the original loader error (unknown
-// adapter, failed dynamic import, etc.) instead of a generic "not pre-resolved".
 const resolveErrors = new Map<string, unknown>();
 
 /**
- * Synchronous companion to `resolve(name)`. Returns the adapter class if it
- * has been resolved at least once (via `resolve()`), or null. Used by
- * `db_config.new_connection`, which is synchronous as Rails' is.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE Ruby's ConnectionAdapters.resolve (connection_adapters.rb:34-39) is synchronous because `require` is; retires with the pool async convergence.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function resolveSync(adapterName: string): AdapterClass | null {
   return resolvedSyncCache.get(adapterName) ?? null;
 }
 
 /**
- * Returns the rejection from a prior `resolve()` call for this adapter
- * name, or null if no failure was recorded. Lets sync entry points
- * (`ConnectionPool.newConnection` → `dbConfig.newConnection`) surface the
- * original failure cause (AdapterNotFound, import error, etc.) instead of
- * a generic "not pre-resolved" message.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE surfaces the failure Ruby's synchronous resolve raises in place (connection_adapters.rb:34-39); retires with the same convergence.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function resolveSyncError(adapterName: string): unknown | null {
   return resolveErrors.get(adapterName) ?? null;
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters.register
- *
- * Registers a custom database adapter. Can also be used to define aliases.
- *
- *   ConnectionAdapters.register("megadb", () => import("megadb").then(m => m.MegaDBAdapter))
- *
- * Pre-registered: sqlite3, mysql2, postgresql
- */
 export function register(name: string, loader: AdapterLoader): void {
   adapters.set(name, loader);
   resolved.delete(name);
@@ -71,12 +36,8 @@ export function register(name: string, loader: AdapterLoader): void {
 }
 
 /**
- * Synchronous half of `resolve(name)` — Rails does this check inline, but
- * trails' sync callers can't await the dynamic import. Raises the same
- * AdapterNotFound `resolve` raises (connection_adapters.rb:34-39).
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the AdapterNotFound check Ruby writes inline in resolve (connection_adapters.rb:34-39), split out for the sync callers.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function validateAdapterName(adapterName: string): void {
   if (adapters.has(adapterName)) return;
@@ -88,13 +49,6 @@ export function validateAdapterName(adapterName: string): void {
   );
 }
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters.resolve
- *
- * Resolves an adapter name to its class. The AdapterNotFound message is built
- * inline as Rails builds it (connection_adapters.rb:34-39), with its
- * gem/Gemfile pair rendered as the JS package/package.json one.
- */
 export async function resolve(adapterName: string): Promise<AdapterClass> {
   const cached = resolved.get(adapterName);
   if (cached) return cached;
@@ -125,10 +79,7 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
   return promise;
 }
 
-// Pre-registered adapters matching Rails' canonical names.
 const sqlite3Loader: AdapterLoader = async () =>
-  // The `sqlite3` adapter name defaults to the better-sqlite3-backed subclass.
-  // BetterSQLite3Adapter bundles its own driver via defaultSqliteDriver().
   (await import("./connection-adapters/better-sqlite3-adapter.js")).BetterSQLite3Adapter as any;
 const nodeSqliteLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/node-sqlite-adapter.js")).NodeSQLiteAdapter as any;
@@ -146,23 +97,13 @@ const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
 register("sqlite3", sqlite3Loader);
 register("node-sqlite", nodeSqliteLoader);
-// `expo-sqlite`'s driver only implements async `open()`. It's now openable via
-// the async construction path (`SQLite3Adapter.openAsync()` / the pool's
-// async checkout, which awaits `completeAsyncConnect()` in `verifyBang`).
 register("expo-sqlite", expoSqliteLoader);
 register("libsql", libsqlLoader);
-// `libsql-remote` uses the async-open path (no openSync); the driver opens
-// network-backed Turso databases via `new Database(url, { authToken })`.
 register("libsql-remote", libsqlRemoteLoader);
-// `libsql-replica` is an embedded replica: a local file kept in sync with a
-// remote primary via `new Database(localPath, { syncUrl, authToken })`. Like
-// the remote driver it uses the async-open path (initial sync runs on connect).
 register("libsql-replica", libsqlReplicaLoader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 
-// Backward-compat aliases — canonical names come from Rails (sqlite3, mysql2,
-// postgresql) but our codebase historically also accepts these short forms.
 register("sqlite", sqlite3Loader);
 register("mysql", mysql2Loader);
 register("postgres", postgresqlLoader);
@@ -191,12 +132,8 @@ export {
 } from "./connection-adapters/abstract/schema-definitions.js";
 
 /**
- * Returns the default primary key name used when creating tables.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#default_primary_key (private)
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE TableDefinition#default_primary_key (abstract/schema_definitions.rb:170) hoisted to a free function; the port splits that file.
+ * @noRailsEquivalent CONVERGEABLE
  */
 export function defaultPrimaryKey(): string {
   return "id";

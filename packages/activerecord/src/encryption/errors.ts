@@ -1,9 +1,3 @@
-/**
- * Encryption-specific error classes.
- *
- * Mirrors: ActiveRecord::Encryption::Errors
- */
-
 export class Base extends Error {
   constructor(message?: string) {
     super(message);

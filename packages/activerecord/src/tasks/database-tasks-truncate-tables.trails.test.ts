@@ -8,11 +8,6 @@ import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 
-// Rails' `truncate_tables` leases the pool connection and calls
-// `conn.truncate_tables(*conn.tables)` (`tasks/database_tasks.rb:230-234`),
-// letting the adapter build its own statements
-// (`abstract/database_statements.rb:222-231`). This covers that path, which the
-// adapter-specific handler hook shadows wherever one is still registered.
 describe("DatabaseTasksTruncateTablesTest", () => {
   const created: string[] = [];
 
@@ -45,7 +40,6 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     await seed.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
     await seed.close();
 
-    // No handler `truncateAll` registered, so truncation takes the Rails path.
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
     await DatabaseTasks.truncateTables(config);

@@ -1,13 +1,3 @@
-/**
- * Trails-only surface: `Preloader::Association#associate_records_to_owner`
- * partitions the existing target with `reject(&:persisted?)`
- * (`preloader/association.rb:251`), so a DESTROYED record — neither new nor
- * persisted — survives the preload writeback. trails used to spell that
- * partition `isNewRecord()` on a proxy-side `_hydrateFromPreload` hook, which
- * dropped the destroyed record; Ruby cannot drift this way (there is one
- * writeback, through `Association#target=`, `association.rb:100-103`), so there
- * is no Rails test to mirror and the coverage lives here.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";

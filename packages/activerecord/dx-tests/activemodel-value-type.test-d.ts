@@ -11,12 +11,6 @@ import {
   BinaryType,
 } from "@blazetrails/activemodel";
 
-// Regression guard for the ValueType<T> refactor — inherited methods on
-// concrete subclasses must return the concrete narrowed type, not
-// `unknown`. Before `ValueType<T = unknown>` was introduced, extending
-// `ValueType` without a type parameter silently leaked `unknown` back
-// into every subclass's cast / deserialize / serialize surface.
-
 describe("ValueType<T> type parameter flows into concrete subclasses", () => {
   it("IntegerType#cast narrows to number | null", () => {
     const t = new IntegerType();
@@ -38,9 +32,6 @@ describe("ValueType<T> type parameter flows into concrete subclasses", () => {
     expectTypeOf(t.cast(0)).toEqualTypeOf<number | null>();
   });
 
-  // BinaryType is the one deliberate `unknown`: `Binary#cast` (binary.rb:18-26)
-  // coerces only a ::String, so a non-string value comes back out unchanged and
-  // there is no narrower type to promise. `serialize` still narrows to `Data`.
   it("BinaryType#cast stays unknown because Binary#cast passes non-strings through", () => {
     const t = new BinaryType();
     expectTypeOf(t.cast(0)).toEqualTypeOf<unknown>();

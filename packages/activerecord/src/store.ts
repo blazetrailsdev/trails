@@ -10,12 +10,6 @@ interface CoderLike {
   load(v: unknown): unknown;
 }
 
-/**
- * Wraps a column coder to ensure the deserialized value is a
- * HashWithIndifferentAccess and the serialized form is a plain hash.
- *
- * Mirrors: ActiveRecord::Store::IndifferentCoder
- */
 export class IndifferentCoder {
   readonly storeAttribute: string;
   readonly coder: CoderLike | null;
@@ -31,10 +25,6 @@ export class IndifferentCoder {
   }
 
   load(value: unknown): HashWithIndifferentAccess<unknown> {
-    // Mirror Rails: @coder.load(yaml || "") — Ruby || coerces nil and false to "".
-    // JS ?? only coerces null/undefined, so match Ruby truthiness explicitly.
-    // For the default JSON path, blank/null → empty HWIA; invalid JSON → empty HWIA
-    // (mirrors Rails YAMLColumn treating blank input as {}).
     if (this.coder) {
       const coerced = value === null || value === undefined || value === false ? "" : value;
       return asIndifferentHash(this.coder.load(coerced));
@@ -52,50 +42,24 @@ export class IndifferentCoder {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Store::ClassMethods#store_accessor's accessor lookup (store.rb:112); Ruby reads the constant inline.
+   * @noRailsEquivalent CONVERGEABLE
    */
   accessor(): typeof IndifferentHashAccessor {
     return IndifferentHashAccessor;
   }
 }
 
-/**
- * Tracks stored attributes per model class.
- * Maps model class -> { storeName -> accessor keys[] }
- */
 const _storedAttributes = new WeakMap<typeof Base, Record<string, string[]>>();
 
-/**
- * Tracks the set of accessor method names defined via store() on each class.
- * Mirrors Rails' @_store_accessors_module which is a Module where store
- * accessor methods live. In TS we track the accessor names instead of a
- * real module (JS has no include mechanism).
- */
 const _storeAccessorsModules = new WeakMap<typeof Base, Set<string>>();
 
-/**
- * Intermediate prototype objects inserted into the prototype chain so that
- * store accessors can be overridden on modelClass.prototype with `super`.
- * Mirrors Rails: Module.new { include … } inserted via _store_accessors_module.
- */
 const _storeModuleProtos = new WeakMap<typeof Base, object>();
 
-/**
- * Returns (creating if needed) the intermediate prototype that holds store
- * accessor descriptors for a model class. On first call the intermediate
- * object is spliced into the chain between modelClass.prototype and its
- * current parent so that user overrides on modelClass.prototype can call super.
- *
- * @internal
- */
+/** @internal */
 function getOrCreateStoreModuleProto(modelClass: typeof Base): object {
   return getOrCreateModuleCarrier(modelClass, _storeModuleProtos);
 }
 
-/**
- * Returns (creating if needed) the store-accessor module for a model class.
- * Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module
- */
 function _storeAccessorsModule(this: typeof Base): Set<string> {
   if (!_storeAccessorsModules.has(this)) {
     _storeAccessorsModules.set(this, new Set());
@@ -103,22 +67,10 @@ function _storeAccessorsModule(this: typeof Base): Set<string> {
   return _storeAccessorsModules.get(this)!;
 }
 
-/**
- * Returns the stored attributes registered directly on this class (not inherited).
- *
- * Mirrors: ActiveRecord::Store#local_stored_attributes
- */
 export function localStoredAttributes(this: typeof Base): Record<string, string[]> | undefined {
   return _storedAttributes.get(this);
 }
 
-/**
- * Returns stored attributes for this class merged with all ancestors'.
- * Each store column's key list is the union of parent and local keys (deduped,
- * order: parent keys first). Mirrors Rails' merge block: `{ |k, a, b| a | b }`.
- *
- * Mirrors: ActiveRecord::Store::ClassMethods#stored_attributes
- */
 export function storedAttributes(this: typeof Base): Record<string, string[]> {
   const modelClass = this;
   const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
@@ -133,11 +85,6 @@ export function storedAttributes(this: typeof Base): Record<string, string[]> {
   return merged;
 }
 
-/**
- * Reads/writes hash keys on a store attribute.
- *
- * Mirrors: ActiveRecord::Store::HashAccessor
- */
 export class HashAccessor {
   static read(object: Base, attribute: string, key: string): unknown {
     this.prepare(object, attribute);
@@ -153,12 +100,6 @@ export class HashAccessor {
       const raw = object.readAttribute(attribute);
       const obj = this._writeHash(raw);
       obj[key] = value;
-      // Mirror Rails: write the plain hash back and let the column's type encode
-      // it. Serialized columns (text-backed store) run Serialized#cast, which is
-      // `deserialize(serialize(hash))` — the coder JSON-encodes the hash — while
-      // structured types (json/jsonb/hstore) store the object directly. Writing a
-      // hash (not a pre-encoded JSON string) is required for the serialize-first
-      // cast to round-trip; a raw string would be flattened to {} by the coder.
       object.writeAttribute(attribute, obj);
     }
   }
@@ -203,17 +144,6 @@ export class HashAccessor {
   }
 }
 
-/**
- * Ensures the store attribute value is a HashWithIndifferentAccess before
- * reading or writing a key. The `prepare` override coerces non-HWIA values
- * via `asIndifferentHash`: hash-like objects (plain `{}`) are promoted to
- * HWIA preserving their keys; non-object values (strings, numbers, null)
- * become an empty HWIA. Matches Rails' behavior for structured column types
- * (json/jsonb/hstore) where the type deserializer may return a plain hash
- * or nil rather than a HWIA.
- *
- * Mirrors: ActiveRecord::Store::IndifferentHashAccessor
- */
 export class IndifferentHashAccessor extends HashAccessor {
   static override prepare(object: Base, attribute: string): void {
     const val = object.readAttribute(attribute);
@@ -223,13 +153,6 @@ export class IndifferentHashAccessor extends HashAccessor {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Store::StringKeyedHashAccessor.
- * Rails uses this for Hstore columns — keys are coerced to strings on
- * both read and write, matching PG's text-only hstore key model. JS
- * object keys are already strings natively, so this ends up being a
- * thin wrapper; kept distinct for Rails API parity.
- */
 export class StringKeyedHashAccessor extends HashAccessor {
   static override read(object: Base, attribute: string, key: unknown): unknown {
     return super.read(object, attribute, String(key));
@@ -245,10 +168,6 @@ interface StoreAccessorOptions {
   suffix?: boolean | string;
 }
 
-/**
- * `store_accessor(store_attribute, *keys, prefix: nil, suffix: nil)`
- * (store.rb:117) — the keys are positional and the kwargs trail them.
- */
 type StoreAccessorArgs =
   | Array<string | string[]>
   | [...keys: Array<string | string[]>, options: StoreAccessorOptions];
@@ -261,18 +180,6 @@ export interface StoreOptions {
   yaml?: YamlColumnOptions;
 }
 
-/**
- * Defines property accessors for the listed keys on a store column.
- * Does not wire IndifferentCoder — used internally by store() and
- * as the standalone store_accessor() implementation.
- *
- * Rails defines `#{accessor_key}=` (store.rb:137) before the reader
- * (store.rb:141); a JS property carries both halves in one descriptor, so the
- * writer is the first entry inside it (see CLAUDE.md, "Generated attribute
- * readers are properties").
- *
- * Mirrors: ActiveRecord::Store::ClassMethods#store_accessor
- */
 function storeAccessor(
   this: typeof Base,
   storeAttribute: string,
@@ -293,9 +200,6 @@ function storeAccessor(
   const accessorSuffix =
     typeof suffix === "string" ? `_${suffix}` : suffix === true ? `_${storeAttribute}` : "";
 
-  // Install on the intermediate storeModule prototype so that user overrides
-  // on this.prototype can reach the store accessor via `super`.
-  // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
   const storeModuleProto = getOrCreateStoreModuleProto(this);
   for (const key of keys) {
     const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
@@ -336,9 +240,6 @@ function storeAccessor(
       const [prevStore] = this.changes[storeAttribute] ?? [undefined];
       return dig(prevStore, key) ?? null;
     });
-    // store.rb:164-175 — `saved_change_to_#{accessor_key}?` and
-    // `saved_change_to_#{accessor_key}`, the predicate/array pair the `?`
-    // separates in Ruby and the `is*` prefix separates here.
     define(`isSavedChangeTo${cap}`, function (this) {
       if (!this.isSavedChangeToAttribute?.(storeAttribute)) return false;
       const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
@@ -356,8 +257,6 @@ function storeAccessor(
     });
   }
 
-  // assign new store attribute and create new hash to ensure that each class in the hierarchy
-  // has its own hash of stored attributes.
   let localStored = this.localStoredAttributes();
   if (!localStored) {
     localStored = {};
@@ -383,24 +282,8 @@ function dig(obj: unknown, key: string): unknown {
   return undefined;
 }
 
-/**
- * Store — JSON-backed attribute accessors.
- *
- * Mirrors: ActiveRecord::Store::ClassMethods#store
- *
- * Wires IndifferentCoder so the column deserializes to HashWithIndifferentAccess,
- * then delegates accessor definition to storeAccessor().
- *
- * Usage:
- *   User.store('settings', { accessors: ['theme', 'language'] })
- *   User.store('settings', { accessors: ['theme'], prefix: true })
- *   User.store('settings', { accessors: ['theme'], coder: JSON })
- */
 function store(this: typeof Base, storeAttribute: string, options: StoreOptions = {}): void {
-  // Mirror Rails three-step: build_column_serializer → IndifferentCoder → serialize
   const coder = buildColumnSerializer(storeAttribute, options.coder, Object, options.yaml);
-  // Validate: if a coder was resolved, it must implement dump/load. Strings, numbers,
-  // and arbitrary objects without these methods would crash silently later.
   if (
     coder != null &&
     (typeof (coder as any).dump !== "function" || typeof (coder as any).load !== "function")
@@ -410,7 +293,6 @@ function store(this: typeof Base, storeAttribute: string, options: StoreOptions 
         `but got ${typeof coder}.`,
     );
   }
-  // store.rb:108 — `serialize store_attribute, coder: IndifferentCoder.new(store_attribute, coder)`.
   this.serialize(storeAttribute, {
     coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
   });
@@ -423,23 +305,13 @@ function store(this: typeof Base, storeAttribute: string, options: StoreOptions 
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Store::ClassMethods
- */
 export const ClassMethods = {
   store,
   storeAccessor,
   _storeAccessorsModule,
 };
 
-/**
- * Returns the HashAccessor class for a given store attribute column.
- * Raises ConfigurationError unless the attribute's type responds to `accessor`.
- *
- * Mirrors: ActiveRecord::Store#store_accessor_for (private)
- *
- * @internal
- */
+/** @internal */
 export function storeAccessorFor(this: Base, storeAttribute: string): typeof HashAccessor {
   const type = this.typeForAttribute(storeAttribute) as { accessor?: () => unknown };
   if (typeof type?.accessor !== "function") {
@@ -452,21 +324,11 @@ export function storeAccessorFor(this: Base, storeAttribute: string): typeof Has
   return type.accessor() as typeof HashAccessor;
 }
 
-/**
- * Reads a single key from a store attribute.
- *
- * Mirrors: ActiveRecord::Store#read_store_attribute (private)
- */
 export function readStoreAttribute(this: Base, storeAttribute: string, key: string): unknown {
   const accessor = this.storeAccessorFor(storeAttribute);
   return accessor.read(this, storeAttribute, key);
 }
 
-/**
- * Writes a single key to a store attribute.
- *
- * Mirrors: ActiveRecord::Store#write_store_attribute (private)
- */
 export function writeStoreAttribute(
   this: Base,
   storeAttribute: string,
@@ -477,17 +339,8 @@ export function writeStoreAttribute(
   accessor.write(this, storeAttribute, key, value);
 }
 
-/**
- * Converts a HashWithIndifferentAccess to a plain object.
- *
- * Mirrors: ActiveRecord::Store::IndifferentCoder#as_regular_hash (private)
- *
- * @internal
- */
+/** @internal */
 function asRegularHash(obj: unknown): Record<string, unknown> {
-  // Mirror Rails as_regular_hash: obj.to_hash if it responds, else {}.
-  // null/undefined → {}; HWIA → toHash(); plain objects (Object/null proto) → spread;
-  // class instances, Arrays, primitives → {} (respond_to?(:to_hash) is false for those).
   if (obj == null) return {};
   if (obj instanceof HashWithIndifferentAccess) return obj.toHash();
   if (typeof obj !== "object" || Array.isArray(obj)) return {};
@@ -497,12 +350,6 @@ function asRegularHash(obj: unknown): Record<string, unknown> {
     : {};
 }
 
-/**
- * Converts any value to a HashWithIndifferentAccess. Returns an empty HWIA
- * for nil/non-hash values, mirroring Rails' IndifferentCoder.as_indifferent_hash.
- *
- * Mirrors: ActiveRecord::Store::IndifferentCoder.as_indifferent_hash
- */
 export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unknown> {
   if (obj instanceof HashWithIndifferentAccess) return obj;
   if (obj !== null && obj !== undefined && typeof obj === "object" && !Array.isArray(obj)) {

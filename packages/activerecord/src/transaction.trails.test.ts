@@ -1,10 +1,3 @@
-/**
- * Unit tests for the public ActiveRecord::Transaction wrapper.
- * The behavior-in-transaction test suites (transaction-callbacks,
- * transaction-instrumentation, transaction-isolation, transactions)
- * exercise the wrapper indirectly; these pin the direct API shape.
- */
-
 import { describe, it, expect } from "vitest";
 import { Transaction } from "./transaction.js";
 

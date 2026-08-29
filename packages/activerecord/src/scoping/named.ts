@@ -4,13 +4,7 @@ import type { Base } from "../base.js";
 
 let _base: typeof Base | undefined;
 
-/**
- * @internal Receives `ActiveRecord::Base` from base.ts at module init. Rails
- * resolves the constant at call time via autoload (attribute_methods.rb:88), so base.rb
- * is not required here; in ESM a value import of `base.js` would instead be a
- * load-time edge putting base.ts in an import cycle, leaving its own
- * module-evaluation-time mixin wiring dependent on the graph's entry order.
- */
+/** @internal */
 export function _registerBase(base: typeof Base): void {
   _base = base;
 }
@@ -23,12 +17,6 @@ function baseClass(): typeof Base {
 import { Relation } from "../relation.js";
 import { Default } from "./default.js";
 
-/**
- * Mirrors `ActiveRecord::AttributeMethods::ClassMethods::RESTRICTED_CLASS_METHODS`
- * (`%w(private public protected allocate new name superclass)`), plus `relation`:
- * Rails reserves the private `AR::Base#relation` (core.rb:431), so a scope may
- * not shadow it.
- */
 const RESTRICTED_CLASS_METHODS = new Set([
   "private",
   "public",
@@ -40,19 +28,8 @@ const RESTRICTED_CLASS_METHODS = new Set([
   "relation",
 ]);
 
-// Own properties every class function carries (`Base.length`/`Base.prototype`);
-// they are not AR-defined methods, so — unlike Rails' `name` — they must not
-// count as dangerous. `name` stays dangerous via RESTRICTED_CLASS_METHODS.
 const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
 
-/**
- * Mirrors `ActiveRecord::AttributeMethods::ClassMethods#dangerous_class_method?`:
- * a name is dangerous if it is in `RESTRICTED_CLASS_METHODS` or if AR::Base (or
- * one of its ancestor classes) defines a class method with that name that is not
- * inherited from `Object`/`Function`. Class methods defined on subclasses
- * (existing scopes, user class methods) and Kernel methods are not dangerous —
- * the walk starts at `Base`, never the model subclass.
- */
 export function isDangerousClassMethod(name: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(name)) return true;
   if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;
@@ -64,10 +41,6 @@ export function isDangerousClassMethod(name: string): boolean {
   return false;
 }
 
-/**
- * Mirrors `method_defined_within?(name, Relation)`: true when `Relation`
- * defines an instance method with this name that is not inherited from `Object`.
- */
 export function isRelationInstanceMethod(name: string): boolean {
   let proto: any = Relation.prototype;
   while (proto && proto !== Object.prototype) {
@@ -77,18 +50,6 @@ export function isRelationInstanceMethod(name: string): boolean {
   return false;
 }
 
-/**
- * Named scope handling — defines named scopes on model classes
- * and registers them as static methods.
- *
- * Mirrors: ActiveRecord::Scoping::Named
- */
-
-/**
- * Define a named scope on a model class. Called via `Base.scope(name, body)`.
- *
- * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#scope
- */
 export function scope<T extends typeof Base>(
   this: T,
   name: string,
@@ -141,18 +102,9 @@ export function scope<T extends typeof Base>(
 interface NamedHost {
   currentScope?(skipInheritedScope?: boolean): any;
   defaultScopes?: import("./default.js").DefaultScope[];
-  // Rails' `relation` (core.rb) — a pristine Relation with the STI type
-  // condition but neither current_scope nor default_scope applied. It is the
-  // default `scope` argument for both methods below.
   relation?(): any;
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#scope_for_association —
- * `current_scope&.empty_scope? ? scope : default_scoped(scope)`. The base
- * `scope` ignores current_scope; default_scope is applied unless an enclosing
- * current_scope is itself an empty scope.
- */
 export function scopeForAssociation(this: NamedHost, scope?: any): any {
   const rel = scope ?? this.relation?.();
   if (this.currentScope?.()?.isEmptyScope) {
@@ -161,10 +113,6 @@ export function scopeForAssociation(this: NamedHost, scope?: any): any {
   return defaultScoped.call(this, rel);
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_scoped —
- * `build_default_scope(scope, all_queries: all_queries) || scope`
- */
 export function defaultScoped(this: NamedHost, options: { allQueries?: boolean | null }): any;
 export function defaultScoped(
   this: NamedHost,
@@ -176,11 +124,6 @@ export function defaultScoped(
   scopeOrOptions?: any,
   options?: { allQueries?: boolean | null },
 ): any {
-  // Ruby `default_scoped(scope = relation, all_queries: nil)` is callable with
-  // the kwargs alone (`default_scoped(all_queries: true)`, persistence.rb:330),
-  // and TypeScript cannot skip a leading optional positional — so the kwargs
-  // object may arrive in its place. It is a plain object; a `scope` is always a
-  // Relation instance.
   const kwargsOnly =
     scopeOrOptions != null && Object.getPrototypeOf(scopeOrOptions) === Object.prototype;
   const scope = (kwargsOnly ? undefined : scopeOrOptions) ?? this.relation?.();
@@ -188,18 +131,11 @@ export function defaultScoped(
   return Default.buildDefaultScope.call(this, scope, { allQueries: opts?.allQueries }) ?? scope;
 }
 
-/**
- * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_extensions
- */
 export function defaultExtensions(this: NamedHost): any[] {
   const scope = scopeForAssociation.call(this) ?? defaultScoped.call(this);
   return scope?.extensions ?? [];
 }
 
-/**
- * Module methods wired onto Base as static methods via `extend()` in base.ts.
- * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
- */
 export const ClassMethods = {
   scope,
   scopeForAssociation,

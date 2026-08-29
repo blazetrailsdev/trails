@@ -1,30 +1,9 @@
-/**
- * Access attribute values before type casting.
- *
- * `read_attribute_before_type_cast` / `read_attribute_for_database` resolve the
- * alias and hand off to the private `attribute_before_type_cast` /
- * `attribute_for_database` readers at the bottom of this file, exactly as
- * before_type_cast.rb:48-69 does.
- *
- * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
- */
-
 import { included } from "@blazetrails/activesupport";
 
-/** The host `include ActiveRecord::AttributeMethods::BeforeTypeCast` needs. */
 interface BeforeTypeCastIncludeHost {
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
 }
 
-/**
- * `ActiveRecord::AttributeMethods::BeforeTypeCast` — the module whose
- * `included do` block (before_type_cast.rb:31-34) declares the
- * `*_before_type_cast` / `*_for_database` / `*_came_from_user?` patterns. Its
- * instance methods are the `this`-typed functions below (CLAUDE.md, "Module
- * mixins"), so the module object itself carries only the hook.
- *
- * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
- */
 export const BeforeTypeCast = {
   [included](base: BeforeTypeCastIncludeHost): void {
     base.attributeMethodSuffix("BeforeTypeCast", "ForDatabase", { parameters: false });
@@ -38,11 +17,6 @@ interface BeforeTypeCastRecord extends AttributeOwner {
   };
 }
 
-/**
- * Read the attribute value before type casting.
- *
- * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#read_attribute_before_type_cast
- */
 export function readAttributeBeforeTypeCast(
   record: BeforeTypeCastRecord,
   attrName: string,
@@ -54,12 +28,6 @@ export function readAttributeBeforeTypeCast(
   return attributeBeforeTypeCast.call(record, name) ?? null;
 }
 
-/**
- * Return all attribute values before type casting.
- *
- * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#attributes_before_type_cast
- * (before_type_cast.rb:82-84).
- */
 export function attributesBeforeTypeCast(this: BeforeTypeCastRecord): Record<string, unknown> {
   return this._attributes.valuesBeforeTypeCast();
 }
@@ -70,22 +38,12 @@ interface DatabaseRecord extends AttributeOwner {
   };
 }
 
-/**
- * Read the attribute value after serialization.
- *
- * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#read_attribute_for_database
- */
 export function readAttributeForDatabase(record: DatabaseRecord, attrName: string): unknown {
   const name = record.constructor.attributeAliases?.[attrName] ?? attrName;
 
   return attributeForDatabase.call(record, name);
 }
 
-/**
- * Return all attribute values for assignment to the database.
- *
- * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#attributes_for_database
- */
 export function attributesForDatabase(record: DatabaseRecord): Record<string, unknown> {
   return record._attributes.valuesForDatabase();
 }
@@ -111,13 +69,7 @@ export function attributeForDatabase(this: AttributeOwner, attrName: string): un
   return this._attributes.getAttribute(attrName).valueForDatabase;
 }
 
-/**
- * Dispatch target for the `*CameFromUser` attribute methods
- * (before_type_cast.rb:33).
- *
- * @internal Rails-private helper. Mirrors:
- * ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_came_from_user?
- */
+/** @internal */
 export function attributeCameFromUser(this: AttributeOwner, attrName: string): boolean {
   const name = this.constructor.attributeAliases?.[attrName] ?? attrName;
   return this._attributes.getAttribute(name).cameFromUser();

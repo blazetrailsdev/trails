@@ -4,10 +4,6 @@ import type { QueryTransformer } from "./query-transformers.js";
 import { QueryLogs } from "./query-logs.js";
 
 describe("queryTransformers", () => {
-  // Process-global, like ActiveRecord.query_transformers. Snapshot the live
-  // contents and restore them (rather than `length = 0`) so that once a later
-  // PR registers a default transformer at import time, these tests neither wipe
-  // it nor leak an emptied registry into sibling suites.
   let saved: QueryTransformer[];
   beforeEach(() => {
     saved = [...ActiveRecord.queryTransformers];

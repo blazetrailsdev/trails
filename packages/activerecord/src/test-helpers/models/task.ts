@@ -1,5 +1,4 @@
 import type { Temporal } from "@blazetrails/date";
-// vendor/rails/activerecord/test/models/task.rb
 import { Base } from "../../base.js";
 
 export class Task extends Base {

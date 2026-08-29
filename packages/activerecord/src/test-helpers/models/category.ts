@@ -7,7 +7,6 @@ import type { Essay } from "./essay.js";
 import type { Human } from "./human.js";
 import type { Post } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
-// vendor/rails/activerecord/test/models/category.rb
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
@@ -84,5 +83,4 @@ export class Category extends Base {
 
 export class SpecialCategory extends Category {}
 
-// Track the STI subtree on the `categories` table.
 registerSubclass(SpecialCategory);

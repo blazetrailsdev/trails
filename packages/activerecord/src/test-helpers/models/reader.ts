@@ -2,7 +2,6 @@ import type { Relation } from "../../relation.js";
 import type { FirstPost } from "./post.js";
 import type { Person } from "./person.js";
 import type { Post } from "./post.js";
-// vendor/rails/activerecord/test/models/reader.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 

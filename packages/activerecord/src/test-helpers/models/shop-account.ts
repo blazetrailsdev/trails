@@ -1,7 +1,6 @@
 import type { Carrier } from "./carrier.js";
 import type { Customer } from "./customer.js";
 import type { CustomerCarrier } from "./customer-carrier.js";
-// vendor/rails/activerecord/test/models/shop_account.rb
 import { Base } from "../../base.js";
 
 export class ShopAccount extends Base {

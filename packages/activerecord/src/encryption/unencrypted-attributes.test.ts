@@ -12,9 +12,6 @@ import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/
 import { Configurable } from "./configurable.js";
 import { Decryption } from "./errors.js";
 
-// EncryptedPost's `body` key provider (MutableDerivedSecretKeyProvider) derives
-// its key eagerly at class-initialization, so encryption config must be set
-// before the model is imported — load it lazily after configureEncryption().
 let EncryptedPost: typeof EncryptedPostType;
 
 fixtures([]);
@@ -45,7 +42,6 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
     );
     assertNotEncryptedAttribute(post, "title", "The Starfleet is here!");
 
-    // It will encrypt on saving
     await post.update({ title: "Other title" });
     await post.reload();
     await assertEncryptedAttribute(post, "title", "Other title");

@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 
-// Custom type proves the adapter-resolved cast reaches the record —
-// its deserialize doubles a string so we can assert it ran.
 class DoublingType extends ValueType {
   override readonly name = "doubling" as unknown as "value";
   override deserialize(value: unknown): unknown {
@@ -35,7 +33,6 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
 
     const rec = Widget._instantiate({ payload: "ab" });
 
-    // DoublingType.deserialize doubled the raw DB value.
     expect((rec as unknown as { payload: string }).payload).toBe("abab");
   });
 
@@ -59,10 +56,8 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsA);
     await Widget.loadSchema();
 
-    // Adapter A has no cast for "unknown" → ValueType fallback.
     expect(Widget.typeForAttribute("payload").name).toBe("value");
 
-    // Swap to adapter B that provides the DoublingType.
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
     await Widget.loadSchema();
@@ -82,7 +77,6 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     await Widget.loadSchema();
     expect(Object.keys(Widget.columnsHash())).toContain("removed");
 
-    // Adapter B doesn't have the `removed` column.
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
     await Widget.loadSchema();

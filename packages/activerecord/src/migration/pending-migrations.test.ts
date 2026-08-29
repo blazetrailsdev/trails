@@ -1,13 +1,3 @@
-/**
- * Port of `ActiveRecord::Migration::PendingMigrationsTest`
- * (vendor/rails/activerecord/test/cases/migration/pending_migrations_test.rb).
- *
- * Rails gates the whole class on
- * `current_adapter?(:SQLite3Adapter) && !in_memory_db?` — it rewrites
- * `ActiveRecord::Base.configurations` to a pair of on-disk sqlite databases in
- * a tmpdir — and this mirrors that gate.
- *
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -20,8 +10,6 @@ import { DatabaseConfigurations, type RawConfigurations } from "../database-conf
 import { camelize, Logger } from "@blazetrails/activesupport";
 import { currentAdapter, inMemoryDb } from "../support/adapter-helper.js";
 
-// Rails writes `class #{name.classify} < ActiveRecord::Migration::Current`; a
-// generated TS migration has to name the module it inherits from.
 const MIGRATION_MODULE = new URL("../migration.js", import.meta.url).pathname;
 
 const skip = !currentAdapter("SQLite3Adapter") || inMemoryDb();
@@ -62,12 +50,6 @@ describe.skipIf(skip)("Migration", () => {
       );
     };
 
-    // Rails is `Base.connection_pool.migration_context`. `pool.migrationContext`
-    // builds its collaborators from the pool's adapter *proxy*, whose every
-    // member answers a Promise — so `Migrator#with_advisory_lock`'s synchronous
-    // `supports_advisory_locks?` / `current_database` probes (migration.rb:1595)
-    // both misread. Threading a leased connection is what
-    // `migration-context-collaborators-need-a-pool` converges.
     const runMigrations = async (): Promise<void> => {
       const wasVerbose = Migration.verbose;
       Migration.verbose = false;
@@ -149,14 +131,11 @@ describe.skipIf(skip)("Migration", () => {
       await assertNoPendingMigrations();
     });
 
-    // Regression test for https://github.com/rails/rails/pull/29759
     it("understands migrations created out of order", async () => {
-      // With a prior file before even initialization
       createMigration("05", "create_bar");
       await runMigrations();
       await assertNoPendingMigrations();
 
-      // It understands the new migration created at 01
       createMigration("01", "create_foo");
       await assertPendingMigrations("01_create_foo.ts");
     });

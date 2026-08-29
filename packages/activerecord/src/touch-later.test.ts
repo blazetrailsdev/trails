@@ -1,16 +1,8 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Ported from vendor/rails/activerecord/test/cases/touch_later_test.rb.
- */
 import { describe, it, expect } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so association targets resolve by
-// name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 import { ActiveRecord } from "./ar-config.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
@@ -19,19 +11,12 @@ import { LineItem } from "./test-helpers/models/line-item.js";
 import { Node } from "./test-helpers/models/node.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
-// Mirrors Rails `fixtures :nodes, :trees, :owners, :pets`. The fixture loader
-// seeds explicit PKs and resets serial sequences, which a plain `create` does
-// not do for the custom-named `owner_id`/`pet_id` PKs on Postgres.
 const { nodes, trees, owners, pets } = fixtures(["nodes", "trees", "owners", "pets"]);
 
-// Mirrors Ruby's `time.to_i` — whole epoch seconds, the granularity Rails'
-// touch_later assertions compare at (DB datetime columns drop sub-second
-// precision on round-trip).
 function toI(value: unknown): number {
   return Math.floor((value as Temporal.Instant).epochMilliseconds / 1000);
 }
 
-// `Time.now.utc - 25.days`.
 function twentyFiveDaysAgo(): Temporal.Instant {
   return Temporal.Now.instant().subtract({ hours: 24 * 25 });
 }
@@ -104,18 +89,13 @@ describe("TouchLaterTest", () => {
     await Invoice.transaction(async () => {
       await lineItem.update({ amount: 2 });
       const reloaded = await Invoice.find(invoice.id!);
-      // The touch is deferred to before_committed!, so the DB copy still
-      // carries the original time inside the transaction.
       expect(toI(reloaded.updated_at)).toBe(toI(time));
     });
 
-    // After commit the deferred touch flushed onto the in-memory parent.
     expect(toI(invoice.updated_at)).not.toBe(toI(time));
   });
 
   it("touch touches immediately with a custom time", async () => {
-    // Rails: `(Time.now.utc - 25.days).change(nsec: 0)` — whole seconds so the
-    // exact-equality assertions survive the DB datetime round-trip.
     const time = Temporal.Instant.fromEpochMilliseconds(
       Math.floor(twentyFiveDaysAgo().epochMilliseconds / 1000) * 1000,
     );
@@ -177,7 +157,6 @@ describe("TouchLaterTest", () => {
 
       await owner.update({ petsAttributes: { "0": { id: String(petId), name: "Alfred" } } });
 
-      // The second copy of the parent is not touched, so updated_at is unchanged.
       expect(toI((await owner.reload()).updated_at)).toBe(toI(time));
     } finally {
       ActiveRecord.beforeCommittedOnAllRecords = false;
@@ -219,9 +198,7 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
 
     surreptitiouslyTouch.call(inv as any, ["updated_at"]);
 
-    // writeAttribute was called with _touchTime (not an explicit param)
     expect(written).toEqual([["updated_at", touchTime]]);
-    // No dirty tracking — surreptitiouslyTouch clears the change
     expect((inv as any).attributeChanged("updated_at")).toBe(false);
   });
 });

@@ -1,11 +1,3 @@
-/**
- * Public-facing cipher API that wraps Aes256Gcm with multi-key rotation
- * and deterministic-mode support.
- *
- * Mirrors: ActiveRecord::Encryption::Cipher (encryption/cipher.rb)
- */
-
-// Ruby's `Kernel#Array` is a global method, so cipher.rb:26 spells it `Array(key)`.
 import { kernelArray as Array } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
@@ -40,7 +32,7 @@ export class Cipher {
       try {
         return this.cipherFor(keys[i]).decrypt(encryptedText);
       } catch (e) {
-        if (!(e instanceof Decryption)) throw e; // integrity/config errors propagate immediately
+        if (!(e instanceof Decryption)) throw e;
         lastError = e;
       }
     }

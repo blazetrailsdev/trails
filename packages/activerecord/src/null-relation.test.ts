@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/null_relation_test.rb
- */
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -18,12 +13,7 @@ registerModel(Comment);
 registerModel(Post);
 registerModel(Topic);
 
-// ==========================================================================
-// NullRelationTest — targets null_relation_test.rb
-// ==========================================================================
 describe("NullRelationTest", () => {
-  // Mirrors Rails `fixtures :posts, :comments`; the canonical tables come from
-  // the template clone.
   fixtures(["posts", "comments"]);
 
   it("none", async () => {
@@ -166,7 +156,7 @@ describe("NullRelationTest", () => {
   });
 
   it("null relation in where condition", async () => {
-    expect(await Comment.count()).toBeGreaterThan(0); // precondition, make sure there are comments.
+    expect(await Comment.count()).toBeGreaterThan(0);
     expect(await Comment.where({ post_id: Post.none() }).count()).toBe(0);
   });
 });

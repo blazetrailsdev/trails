@@ -9,17 +9,8 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures({});
 
 describe("I18nGenerateMessageValidationTest", () => {
-  /**
-   * Mirrors: activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:7-9
-   * — `class Backend < I18n::Backend::Simple; include I18n::Backend::Fallbacks; end`.
-   */
   class Backend extends I18n.Fallbacks(I18n.Simple) {}
 
-  /**
-   * Mirrors: activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:17-25
-   * — snapshots the load path and backend, clears/replaces both, yields, and
-   * restores both in `ensure`.
-   */
   function resetI18nLoadPath(fn: () => void): void {
     const oldLoadPath = [...I18n.loadPath()];
     const oldBackend = I18n.backend();

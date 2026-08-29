@@ -6,11 +6,6 @@ import { fixtures } from "./test-fixtures.js";
 describe("Delegate (Rails-guided)", () => {
   fixtures([]);
 
-  // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; tests create Post
-  // without body. defineSchema fast-path reuses the canonical table (title+author_id
-  // are a subset), so the NOT NULL constraint fires. Phase G: supply body in creates
-  // or migrate to fixtures().
-  // Rails: test "delegate to association"
   it.skip("delegates attribute reads to a belongs_to association", async () => {
     class Author extends Base {
       static {
@@ -40,8 +35,6 @@ describe("Delegate (Rails-guided)", () => {
     expect(await (post as any).city()).toBe("Chicago");
   });
 
-  // D-Y-INCOMPATIBLE: same body NOT NULL constraint as above.
-  // Rails: test "delegate with prefix"
   it.skip("delegate with prefix: true prefixes method names", async () => {
     class Author extends Base {
       static {
@@ -68,8 +61,6 @@ describe("Delegate (Rails-guided)", () => {
     expect(await (post as any).authorName()).toBe("DHH");
   });
 
-  // D-Y-INCOMPATIBLE: same body NOT NULL constraint as above.
-  // Rails: test "delegate returns null when association is nil"
   it.skip("returns null when the association target is nil", async () => {
     class Author extends Base {
       static {

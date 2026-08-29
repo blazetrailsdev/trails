@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/clubs.yml
 export const clubFixtureData = {
   boring_club: {
     name: "Banana appreciation society",

@@ -1,9 +1,3 @@
-/**
- * Trails-only: an `id` / `update_only` one-to-one nested-attributes update whose
- * target is not in memory. Rails has no separate test because it has no separate
- * case — `existing_record = send(association_name)` (nested_attributes.rb:436)
- * loads the association, so the update lands in place at the assignment.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, StrictLoadingViolationError, type Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -108,10 +102,6 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
     const [pirate, ship] = await pirateWithUnloadedShip();
     pirate.strictLoadingBang();
 
-    // `strict_loading!` makes the `send(association_name)` reader
-    // (nested_attributes.rb:436) raise before any I/O, and Ruby raises that at
-    // the assignment expression — so the writer does too, rather than handing
-    // back a rejected promise.
     expect(() =>
       (
         pirate as unknown as { setShipAttributes(attributes: unknown): Promise<void> | void }

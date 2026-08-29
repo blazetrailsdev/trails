@@ -1,21 +1,8 @@
-/**
- * Mirrors: activerecord/test/cases/validations_test.rb
- *
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Rails declares `repair_validations(Topic)` so any validators a test adds to
- * Topic are cleared afterward; the ported tests only add validators to
- * anonymous subclasses of Topic (`Class.new(Topic)`), so Topic itself is never
- * mutated. We still clear Topic's validators in `afterEach` to mirror the
- * repair behavior exactly.
- */
 import { afterEach, describe, expect, it } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-// Opt into the canonical-model autoload index so association targets resolve by
-// name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -26,12 +13,8 @@ import { Company } from "./test-helpers/models/company.js";
 import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 
 describe("ValidationsTest", () => {
-  // Rails `fixtures :topics, :developers`. Loading the topics set registers the
-  // Topic/Reply STI subtree; loading developers builds the developers table.
   fixtures(["topics", "developers"]);
 
-  // Rails: `repair_validations(Topic)` — Topic is never mutated by these tests,
-  // but mirror the cleanup anyway.
   afterEach(() => {
     Topic.clearValidatorsBang();
   });
@@ -193,9 +176,6 @@ describe("ValidationsTest", () => {
     Klass.validatesNumericalityOf("wibble", { onlyInteger: true });
 
     const topic = Klass.new({ wibble: "123-4567" });
-    // Ruby mutates the string in place with `gsub!`; JS strings are immutable,
-    // so reassign the cleaned value — the behavior under test is that the
-    // current attribute value (now all digits) validates.
     topic.writeAttribute("wibble", String(topic.readAttribute("wibble")).replaceAll("-", ""));
 
     expect(await topic.isValid()).toBe(true);

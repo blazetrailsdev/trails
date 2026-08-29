@@ -1,8 +1,3 @@
-/**
- * Tests for AliasTracker wiring in JoinDependency.
- *
- * Mirrors: ActiveRecord::Associations::AliasTracker + JoinDependency#join_constraints
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
@@ -12,9 +7,6 @@ import { Nodes } from "@blazetrails/arel";
 import { AliasTracker } from "./alias-tracker.js";
 
 describe("JoinDependency AliasTracker wiring", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
   fixtures({});
 
   class Post extends Base {
@@ -44,12 +36,9 @@ describe("JoinDependency AliasTracker wiring", () => {
 
   it("uses an AliasTracker instance for collision tracking", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
-    // Tables are claimed when the joins are built (`aliased_table_for`), not at
-    // construction — Rails' `make_constraints` (join_dependency.rb:189-211).
     jd.joinConstraints([]);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker).toBeInstanceOf(AliasTracker);
-    // base table + joined table registered
     expect(tracker.aliases.get("posts") ?? 0).toBeGreaterThan(0);
     expect(tracker.aliases.get("comments") ?? 0).toBeGreaterThan(0);
   });

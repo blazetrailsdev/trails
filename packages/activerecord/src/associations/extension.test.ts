@@ -1,7 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
@@ -17,10 +13,6 @@ registerModel(Comment);
 registerModel(Developer);
 registerModel(Project);
 
-// has_many :comments extension tests — migrated to the canonical Post model
-// (whose `comments` association carries the Rails `find_most_recent` /
-// `with_content` extension block) + real posts/comments fixture lookups,
-// mirroring `AssociationsExtensionsTest` against `posts(:welcome).comments`.
 describe("AssociationsExtensionsTest", () => {
   const { posts, comments, developers, projects } = fixtures([
     "posts",
@@ -37,10 +29,6 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it("proxy association after scoped", async () => {
-    // Rails: `post.comments.the_association == post.association(:comments)`.
-    // `the_association` returns `proxy_association`; assert it exposes the
-    // owning record + reflection, and that a relation spawned off the proxy
-    // via `where("1=1")` still surfaces the extension method.
     const post = posts("welcome");
     const proxy = association(post, "comments") as unknown as CollectionProxy & {
       theAssociation: () => { owner: Base; reflection: { name: string } };
@@ -57,8 +45,6 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it("extension with dirty target", async () => {
-    // `with_content` scans the loaded target — including the dirty (built but
-    // unsaved) record — so it returns the just-built comment by identity.
     const proxy = association(posts("welcome"), "comments") as unknown as CollectionProxy & {
       withContent: (content: string) => Promise<Base | null>;
     };
@@ -67,14 +53,6 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it("extension with scopes", async () => {
-    // Mirrors `posts(:welcome).comments.offset(1).find_most_recent` and
-    // `posts(:welcome).comments.not_again.find_most_recent`: the extension
-    // method survives both a query-method spawn (`offset`) and a *named-scope*
-    // spawn (`not_again`, a Comment scope dispatched through the proxy's
-    // `scope()`). posts(:welcome).comments = [greetings(1), more_greetings(2)];
-    // find_most_recent orders id DESC, so offset(1) lands on greetings, and
-    // not_again — filtering out the "again"-bodied more_greetings — leaves only
-    // greetings.
     const post = posts("welcome");
     const offsetScoped = (association(post, "comments") as any).offset(1) as {
       findMostRecent: () => Promise<Base | null>;
@@ -86,13 +64,6 @@ describe("AssociationsExtensionsTest", () => {
     expect((await namedScoped.findMostRecent())!.id).toBe(comments("greetings").id);
   });
 
-  // HABTM extension tests — migrated to the canonical Developer model (whose
-  // `projects*` associations carry the Rails `find_most_recent` /
-  // `find_least_recent` extensions) + real developers/projects/developers_projects
-  // fixtures. `developers(:david).projects` resolves through the join table to
-  // projects(:active_record) (id 1) and projects(:action_controller) (id 2);
-  // `find_most_recent` (order id DESC) → action_controller, `find_least_recent`
-  // (order id ASC) → active_record.
   it("extension on habtm", async () => {
     const proxy = association(developers("david"), "projects") as unknown as {
       findMostRecent: () => Promise<Base | null>;
@@ -125,10 +96,6 @@ describe("AssociationsExtensionsTest", () => {
     expect((await proxy.findLeastRecent())!.id).toBe(projects("active_record").id);
   });
 
-  // Rails: `posts(:welcome).comments.destroy_all` raises `OopsError` — the
-  // canonical Comment `default_scope { extending OopsExtension }` overrides
-  // `destroy_all` on every Comment relation, including the one spawned by the
-  // `posts(:welcome).comments` association proxy.
   it("association with default scope", async () => {
     const proxy = association(posts("welcome"), "comments") as unknown as {
       destroyAll: () => never;
@@ -143,12 +110,6 @@ describe("AssociationsExtensionsTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it("extension name", () => {
-    // Mirrors Rails `extend!(model)` helper, which calls
-    // `Builder::HasMany.define_extensions(model, :association_name) { }`.
-    // The block triggers a generated extension module named off the
-    // camelized association name, stored as a constant on the model.
-    // The two-model assertion mirrors Rails checking both `Developer`
-    // and the namespaced `MyApplication::Business::Developer`.
     class Developer extends Base {}
     class BusinessDeveloper extends Base {}
     HasMany.defineExtensions(Developer, "associationName", () => {});

@@ -1,21 +1,3 @@
-/**
- * ActiveRecord::ExplainRegistry — per-execution-context registry for
- * EXPLAIN query collection.
- *
- * Rails uses thread-local storage (`ActiveSupport::PerThreadRegistry`)
- * so concurrent `Relation#explain` calls across requests don't leak
- * into each other's collection buffers. The Node equivalent is
- * AsyncLocalStorage, which carries state through the `await` chain of
- * a single logical task without bleeding into concurrent tasks.
- *
- * `collectingQueries(fn)` is the canonical entry point — matches Rails'
- * `ExplainRegistry.collect = true; yield; queries; ensure reset`
- * pattern with async-safe scoping. The static `collect` / `queries` /
- * `reset` accessors still exist for direct use (e.g. by
- * ExplainSubscriber), and fall back to a process-global slot when no
- * scope has been opened so existing unit-level tests keep working.
- */
-
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 const REGISTRY_KEY = "active_record_explain_registry";
@@ -31,12 +13,7 @@ function currentSlot(): Slot {
 }
 
 export class ExplainRegistry {
-  constructor() {
-    // Rails' initialize calls reset() on per-instance state (@collect, @queries).
-    // Our implementation stores state in an async-local slot rather than per-instance
-    // fields, so the constructor is a no-op — the slot is initialized lazily on first
-    // access via currentSlot().
-  }
+  constructor() {}
 
   static get collect(): boolean {
     return currentSlot().collect;
@@ -60,15 +37,6 @@ export class ExplainRegistry {
     slot.queries = [];
   }
 
-  /**
-   * Run `fn` inside a fresh, isolated collection scope. The scope's
-   * `collect` flag and queries array are invisible to any other async
-   * task, so two parallel `Relation#explain` calls never trample each
-   * other's buffers. On exit, the scope is torn down automatically.
-   *
-   * Mirrors: ActiveRecord::Relation#collecting_queries_for_explain,
-   * scoped via IsolatedExecutionState per-fiber in Rails.
-   */
   static async collectingQueries<T>(
     fn: () => Promise<T>,
   ): Promise<{ value: T; queries: [string, unknown[]][] }> {
@@ -77,25 +45,13 @@ export class ExplainRegistry {
       const value = await IsolatedExecutionState.scope(SLOT_KEY, slot, fn);
       return { value, queries: [...slot.queries] };
     } finally {
-      // Clear the slot so late subscriber notifications holding a reference
-      // to it don't keep accumulating into an abandoned explain block.
       slot.collect = false;
       slot.queries = [];
     }
   }
 }
 
-/**
- * Returns an ExplainRegistry instance. Rails stores one per thread in
- * IsolatedExecutionState; trails stores async-local state in a Slot bag
- * and the ExplainRegistry class delegates all static methods to it.
- * Because the constructor is a no-op, a new instance is functionally
- * equivalent to the "cached" thread-local one.
- *
- * Mirrors: ActiveRecord::ExplainRegistry.instance (private class method)
- *
- * @internal
- */
+/** @internal */
 export function instance(): ExplainRegistry {
   return IsolatedExecutionState.fetch(REGISTRY_KEY, () => new ExplainRegistry());
 }

@@ -16,12 +16,6 @@ import {
 } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "./future-result.js";
 
-// Rails' own load_async_test.rb / asynchronous_queries_test.rb stay excluded
-// (scripts/parity/unported-files/unscoped.ts): every live test class there
-// asserts thread-pool sizing, `scheduled?` interleaving or mutex lock_wait,
-// none of which is observable on a single-threaded event loop. These cover the
-// arms that ARE observable.
-
 describe("Result.empty", () => {
   it("returns EMPTY for the sync arm", () => {
     expect(Result.empty()).toBe(Result.empty());
@@ -32,7 +26,6 @@ describe("Result.empty", () => {
     const empty = Result.empty({ async: true }) as unknown as Complete;
     expect(empty).toBeInstanceOf(Complete);
     expect(empty.result).toBe(Result.empty());
-    // Rails holds it as one frozen constant (result.rb:247).
     expect(Result.empty({ async: true })).toBe(Result.empty({ async: true }));
   });
 });
@@ -53,9 +46,6 @@ describe("FutureResult.wrap", () => {
 });
 
 describe("FutureResult#then", () => {
-  // Ruby returns an ActiveRecord::Promise here and reads it with `#value`.
-  // `then` is the JS thenable protocol, so the port implements that instead —
-  // see the FutureResult class comment and promise.rb's unported-files entry.
   it("applies the block when the value is read", async () => {
     expect(await new Complete(new Result([], [])).then((r) => r.rows.length)).toBe(0);
   });
@@ -176,9 +166,6 @@ describe("DatabaseStatements#select", () => {
       currentTransaction: () => ({ open: true, joinable: true }),
     };
 
-    // Ruby raises here, synchronously, before any query is issued
-    // (database_statements.rb:672-674) — `select` is not an async function, so
-    // the raise reaches the caller as a throw rather than a rejected promise.
     expect(() =>
       select.call(host as never, "SELECT 1", null, [], { async: FutureResult.SelectAll }),
     ).toThrow(AsynchronousQueryInsideTransactionError);
@@ -191,8 +178,6 @@ describe("DatabaseStatements#select", () => {
       internalExecQuery: async () => result,
     };
 
-    // Rails' non-enabled arm is `FutureResult.wrap(result)` — already complete,
-    // so awaiting it yields the Result, which is what select_one/select_rows read.
     expect(
       await select.call(host as never, "SELECT 1", null, [], { async: FutureResult.SelectAll }),
     ).toBe(result);
@@ -214,9 +199,6 @@ describe("DatabaseStatements#select", () => {
       async: FutureResult.SelectAll,
     });
 
-    // Ruby's `raw_exec_query(...)` forwards the whole argument list, so the
-    // `prepare:` select() chose and the `async: true` execute_or_skip passes both
-    // reach `raw_execute` (future_result.rb:159, database_statements.rb:541-552).
     expect(pool.lastArgs).toEqual({
       sql: "SELECT 1",
       name: "SQL",
@@ -246,12 +228,6 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("hands back a pending FutureResult without waiting for the query", async () => {
-    // Ruby's `select` is an ordinary method: the async arm schedules the query
-    // and returns the still-pending FutureResult, so the caller holds a handle
-    // and reads `.value` later (database_statements.rb:671-694). `select` is
-    // therefore NOT an async function here — an async function's promise would
-    // adopt the returned FutureResult (a thenable) and resolve it away, so no
-    // caller could ever observe one pending.
     ActiveRecord.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
     const pool = deferredPool(result);
@@ -274,15 +250,10 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("runs the query to completion before returning when connections are not concurrent", async () => {
-    // Ruby's `execute!` branch blocks (database_statements.rb:685-689): it is
-    // taken when the connection cannot be used concurrently, so the query must
-    // finish before anything else touches it.
     ActiveRecord.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
-    // `execute!` is handed the adapter itself as the connection, not a pooled
-    // one (database_statements.rb:688), so the host is what answers the query.
     const host = {
       pool: {},
       asyncEnabled: () => true,
@@ -320,9 +291,6 @@ describe("DatabaseStatements#select", () => {
 });
 
 describe("DatabaseStatements#select_all", () => {
-  // database_statements.rb:77-79 — `rescue ::RangeError` →
-  // `ActiveRecord::Result.empty(async: async)`. Ruby has one rescue clause; the
-  // port spells it at two points, so both need covering.
   it("rescues a ::RangeError the query rejects with into an empty Result", async () => {
     const host = {
       internalExecQuery: async () => {
@@ -359,11 +327,6 @@ describe("DatabaseStatements#select_all", () => {
 });
 
 describe("QueryCache#select_all", () => {
-  // query_cache.rb:243-250 splits on `async`: the async arm is
-  // `FutureResult.wrap(lookup_sql_cache(...) || super)`, so the pending handle
-  // has to survive the cache wrapper. It only does because `cachedSelectAll`
-  // is not an `async function` — one would adopt the thenable FutureResult and
-  // settle with its Result, which is exactly the collapse this covers.
   function cacheHost(store: Store) {
     return {
       _queryCache: store,
@@ -473,13 +436,6 @@ describe("FutureResult::EventBuffer", () => {
   });
 });
 
-/**
- * A deferred pool whose connection instruments its query the way
- * `AbstractAdapter#log` does — through
- * `IsolatedExecutionState[:active_record_instrumenter]`
- * (abstract_adapter.rb:1151-1153), which is the slot a scheduled
- * FutureResult swaps its EventBuffer into.
- */
 function instrumentedDeferredPool(outcome: Result) {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
@@ -511,7 +467,6 @@ function instrumentedDeferredPool(outcome: Result) {
   };
 }
 
-/** A pool whose query stays in flight until `finish()` is called. */
 function deferredPool(outcome: Result) {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
@@ -533,10 +488,6 @@ function deferredPool(outcome: Result) {
   };
 }
 
-/**
- * A pool whose `withConnection` yields a connection returning (or raising)
- * `outcome`, recording the arguments each `rawExecQuery` was issued with.
- */
 function fakePool(outcome: Result | Error) {
   const pool = {
     calls: 0,

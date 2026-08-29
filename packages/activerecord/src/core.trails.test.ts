@@ -1,8 +1,3 @@
-/**
- * trails-specific invariants relocated from core.test.ts (RFC 0043).
- * These guard documented trails implementation behavior that has no
- * Rails counterpart test, so they live in a `.trails.test.ts` sibling.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { fixtures } from "./test-fixtures.js";
@@ -16,18 +11,12 @@ describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
 
   it("deleting an unpersisted record still marks it destroyed and frozen", async () => {
-    // Matches Rails' `delete` which only issues the DELETE when persisted?
-    // is true, but always ends with `@destroyed = true; freeze`.
     const topic = new Topic({ title: "Alice" });
     await topic.delete();
     expect(topic.isDestroyed()).toBe(true);
     expect(topic.isFrozen()).toBe(true);
   });
 
-  // Rails: ActiveRecord::Core#freeze aliases @attributes = @attributes.clone.freeze.
-  // Verifies our implementation backs isFrozen() by freezing the AttributeSet,
-  // and that the pre-freeze reference is left untouched so records sharing
-  // an attribute map (e.g. via clone/becomes) aren't frozen together.
   it("freeze clones the attribute set so prior references stay mutable", async () => {
     const topic = await Topic.create({ title: "Alice" });
     const attrsOf = (record: Topic) => (record as unknown as { _attributes: object })._attributes;
@@ -36,7 +25,6 @@ describe("frozen / isFrozen", () => {
     expect(topic.isFrozen()).toBe(true);
     expect(attrsOf(topic)).not.toBe(preFreezeAttrs);
     expect(Object.isFrozen(preFreezeAttrs)).toBe(false);
-    // The frozen clone is what the record now exposes.
     expect(Object.isFrozen(attrsOf(topic))).toBe(true);
   });
 });
@@ -90,9 +78,6 @@ describe("connection checkout for directly-assigned adapters", () => {
     class TopicWithDirectAdapter extends Base {
       static tableName = "topics";
       static {
-        // No handler-registered pool for this name, so `connectionPool()`
-        // throws — the shape `adapters/postgresql/datatype.test.ts` hits under
-        // AR_NO_AUTO_SCHEMA, where only the assigned adapter can serve queries.
         this.connectionSpecificationName = "TopicWithDirectAdapter";
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -109,9 +94,6 @@ describe("connection checkout for directly-assigned adapters", () => {
   });
 
   it("find resolves through the assigned adapter without a pool", async () => {
-    // Seeded through the assigned adapter only, so a lookup that leased from
-    // the ambient Base pool (whose canonical `topics` table lacks this row)
-    // would come back empty instead of quietly reading the wrong database.
     await adapter.exec("INSERT INTO topics (id, title) VALUES (42, 'Alice')");
     expect((await DirectTopic.find(42)).readAttribute("title")).toBe("Alice");
     expect((await DirectTopic.findBy({ title: "Alice" }))!.id).toBe(42);
@@ -123,10 +105,6 @@ describe("connection checkout for directly-assigned adapters", () => {
   });
 });
 
-// Rails stores the registry in the class variable `@@configurations`
-// (core.rb:71-79), so there is one registry per process. JS statics would
-// instead shadow per class, which has no Rails counterpart test — hence
-// this trails-side guard.
 describe("configurations is a single process-global registry", () => {
   let priorConfigs: DatabaseConfigurations;
 
@@ -152,10 +130,6 @@ describe("configurations is a single process-global registry", () => {
     }
   });
 
-  // Rails names the `Base` constant literally in
-  // `resolve_config_for_connection` (connection_handling.rb:385-391), so a
-  // model-local `configurations` is never consulted. JS would otherwise
-  // dispatch the read through the receiver.
   it("resolveConfigForConnection ignores a model-local configurations override", async () => {
     const { resolveConfigForConnection } = await import("./connection-handling.js");
 
@@ -182,8 +156,6 @@ describe("configurations is a single process-global registry", () => {
 describe("compare", () => {
   fixtures(["topics"]);
 
-  // Rails' `Core#<=>` is `to_key <=> other_object.to_key`; Ruby's nil result
-  // (incomparable) has no TS equivalent, so trails returns `undefined`.
   it("orders same-class records by primary key and reports nil as undefined", async () => {
     const first = await Topic.find(1);
     const second = await Topic.find(3);
@@ -192,14 +164,10 @@ describe("compare", () => {
     expect(second.compare(first)).toBe(1);
     expect(first.compare(first)).toBe(0);
 
-    // Two new records both have a nil to_key, which Ruby compares as 0.
     expect(new Topic({ title: "a" }).compare(new Topic({ title: "b" }))).toBe(0);
-    // A persisted record against a new one is `nil <=> [1]` — incomparable.
     expect(first.compare(new Topic({ title: "a" }))).toBeUndefined();
     expect(first.compare("not a topic")).toBeUndefined();
 
-    // `is_a?(self.class)` is subclass-permissive in one direction only: a Reply
-    // is_a? Topic, but a Topic is not is_a? Reply.
     const reply = await Reply.find(2);
     expect(first.compare(reply)).toBe(-1);
     expect(reply.compare(first)).toBeUndefined();
@@ -209,49 +177,25 @@ describe("compare", () => {
 describe("init_internals / initialize_dup super chain", () => {
   fixtures(["topics"]);
 
-  // core.rb:834 is the chain root and every other concern's `init_internals`
-  // opens with `super` (persistence.rb:814, attribute_methods/dirty.rb:196,
-  // timestamp.rb:102, associations.rb:75, autosave_association.rb:290,
-  // transactions.rb:432, touch_later.rb:49). Each hook's fields are only ever
-  // assigned by the chain, so an unwired link leaves its fields `undefined`.
   it("every concern's init_internals link runs on construction", () => {
     const topic = new Topic({ title: "Alice" }) as unknown as Record<string, unknown>;
-    // Core (core.rb:834-849)
     expect(topic._readonly).toBe(false);
     expect(topic._destroyedByAssociation).toBe(null);
-    // Persistence (persistence.rb:814-818)
     expect(topic._triggerUpdateCallback).toBe(null);
     expect(topic._triggerDestroyCallback).toBe(null);
-    // AttributeMethods::Dirty (attribute_methods/dirty.rb:196-201)
     expect(topic._mutationsBeforeLastSave).toBe(null);
-    // `_mutationsFromDatabase` is nil'd by the same link, but Topic's own
-    // after_initialize asks `will_save_change_to_title?`, so the lazy tracker
-    // (dirty.rb:382-388) is already rebuilt when the constructor returns.
     expect(topic._touchAttrNames).toBe(null);
     expect(topic._skipDirtyTracking).toBe(null);
-    // Timestamp (timestamp.rb:102-105)
     expect(topic._touchRecord).toBe(null);
-    // Associations (associations.rb:75-77)
     expect((topic._associationInstances as Map<string, unknown>).size).toBe(0);
-    // AutosaveAssociation (autosave_association.rb:290-293)
     expect(topic._alreadyCalled).toBe(null);
-    // Transactions (transactions.rb:432-437)
     expect(topic._startTransactionState).toBe(null);
     expect(topic._committedAlreadyCalled).toBe(null);
     expect(topic._newRecordBeforeLastCommit).toBe(null);
-    // TouchLater (touch_later.rb:49-52)
     expect(topic._deferTouchAttrs).toBe(null);
     expect(topic._touchTime).toBe(null);
   });
 
-  // Core#initialize_dup (core.rb:550-562) runs the initialize callbacks and only
-  // then unwinds through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
-  // (timestamp.rb:50-53), so the hook still observes the source's lock_version
-  // and timestamps. Below Core sit ActiveModel's links, which `Model.prototype`
-  // carries and an own `Base.prototype` body used to shadow:
-  // Validations#initialize_dup replaces `@errors` (validations.rb:310-313) and
-  // Dirty#initialize_dup gives the copy its own mutation tracker
-  // (dirty.rb:248-251).
   it("dup runs the whole chain, including the ActiveModel links", async () => {
     const topic = await Topic.create({ title: "Alice", content: "Hello" });
     topic.title = "Bob";
@@ -260,14 +204,10 @@ describe("init_internals / initialize_dup super chain", () => {
 
     const duped = topic.dup();
 
-    // Validations#initialize_dup: the copy gets a fresh error set rather than
-    // the source's, so the source's errors do not travel with it.
     expect(duped.errors).not.toBe(topic.errors);
     expect(duped.errors.empty).toBe(true);
     expect(topic.errors.size).toBe(1);
 
-    // Dirty#initialize_dup: the copy carries the source's pending changes but on
-    // its own tracker, so writing to one no longer marks the other.
     expect(duped.title).toBe("Bob");
     expect(duped.isWillSaveChangeToAttribute("title")).toBe(true);
     duped.content = "Changed";

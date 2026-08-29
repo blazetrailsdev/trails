@@ -1,5 +1,4 @@
 import type { DogLover } from "./dog-lover.js";
-// vendor/rails/activerecord/test/models/dog.rb
 import { Base } from "../../base.js";
 
 export class Dog extends Base {

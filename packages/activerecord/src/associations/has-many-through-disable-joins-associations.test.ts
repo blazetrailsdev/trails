@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/has_many_through_disable_joins_associations_test.rb
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -14,13 +11,6 @@ import { Rating } from "../test-helpers/models/rating.js";
 import { Member } from "../test-helpers/models/member.js";
 import { MemberType } from "../test-helpers/models/member-type.js";
 
-/**
- * Build a DJAS scope for `assocName` on `owner`. Returns the deferred
- * DisableJoinsAssociationRelation that supports chaining (.where / .reorder /
- * .limit / .first). Used by tests that chain conditions (Rails' `.unnamed`,
- * `.reorder`, `.limit`) onto the disable-joins result without going through
- * the CollectionProxy seed state.
- */
 function djasScope(owner: Base, assocName: string): any {
   const ctor = owner.constructor as typeof Base;
   const reflection = (ctor as any)._reflectOnAssociation?.(assocName);
@@ -275,8 +265,6 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("first and scope in double join applies order in memory", async () => {
-    // Rails verifies no ORDER BY in the final SQL (order is applied in memory via DJAR).
-    // TS: the DJAR loaded-chain mode sorts in memory; verify correct record returned.
     const noJoinsFirst = await djasScope(author, "noJoinsMembers").where({ name: null }).first();
     expect(noJoinsFirst?.id).toBe(member2.id);
   });
@@ -290,8 +278,6 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("limit and scope in double join applies limit in memory", async () => {
-    // Rails verifies no LIMIT 1 in the final SQL (limit is applied in memory via DJAR).
-    // TS: DJAR loaded-chain mode applies limit in memory; verify correct record returned.
     const noJoinsMembers = await djasScope(author, "noJoinsMembers")
       .where({ name: null })
       .limit(1)

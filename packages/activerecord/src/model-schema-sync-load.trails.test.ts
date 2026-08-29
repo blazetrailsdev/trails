@@ -59,8 +59,6 @@ describe("sync loadSchema / columnsHash", () => {
         this.attribute("name", "string");
       }
     }
-    // No adapter, so nothing reflected. `columns_hash` is a pure DB read
-    // (model_schema.rb:592-594): a declared attribute is not a column.
     expect(Widget.columnsHash()).toEqual({});
   });
 
@@ -82,18 +80,9 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
     expect(Object.keys(Circle.columnsHash())).toContain("guid");
-    // The subclass's own map is its own — but the base reflects too: generating
-    // Circle's attribute methods runs `superclass.define_attribute_methods
-    // unless base_class?` (attribute_methods.rb:111), whose body loads Shape's
-    // schema (:114). Shape and Circle share the `shapes` table, so `guid` is
-    // Shape's column as much as Circle's.
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
 
-  // D-Y-INCOMPATIBLE: D-Y installs Base.connectionHandler globally so Shape (which
-  // extends Base) inherits a handler-backed adapter. The "base has none" precondition
-  // no longer holds; the subclass-adapter fallback path is not taken. Phase G: isolate
-  // these models from Base.connectionHandler or test via a dedicated handler-less base.
   it.skip("STI reflection falls back to subclass adapter when base has none", () => {
     class Shape extends Base {
       static override tableName = "shapes";
@@ -105,13 +94,10 @@ describe("sync loadSchema / columnsHash", () => {
     class Circle extends Shape {}
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    // Adapter ONLY on the subclass (Shape has none).
     (Circle as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
 
     Circle.columnsHash();
 
-    // Reflection should have landed on the STI base via subclass adapter;
-    // subclass shares the base's map reference.
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
 
@@ -158,7 +144,6 @@ describe("sync loadSchema / columnsHash", () => {
     }
     class Circle extends Shape {
       static {
-        // User attribute declared on subclass — forks Circle's map.
         this.attribute("radius", "integer");
       }
     }
@@ -316,7 +301,7 @@ describe("sync loadSchema / columnsHash", () => {
     }
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
-    Post.columnsHash(); // triggers reflection
+    Post.columnsHash();
 
     expect(Object.keys(Post.columnsHash())).toContain("guid");
     expect(Post.typeForAttribute("title").name).toBe("string");
@@ -327,8 +312,6 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Post.typeForAttribute("title").name).toBe("string");
   });
 
-  // An internalSchemaCache that starts warm and tracks whether resetColumnInformation
-  // cleared it.
   function makeResettableAdapter(cols: Record<string, unknown>) {
     let warm = true;
     const calls = { clear: 0 };

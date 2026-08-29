@@ -1,18 +1,7 @@
-/**
- * Preloader key-type normalization: an int8 PK deserializes to a JS `BigInt`
- * while an int4 `references`/`integer` FK deserializes to a `number`
- * (node-postgres parses int8→BigInt, int4→number). The preloader matches owners
- * to children by building a Map keyed on the owner PK and looking up by the
- * child FK; `1n` and `1` are distinct JS Map keys, so without normalization the
- * association comes back empty even though Ruby's width-agnostic `Integer ==`
- * would match. Guards against that regression on the PG bigserial-PK lane.
- */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { Preloader } from "./preloader.js";
 import { fixtures } from "../test-fixtures.js";
-// Opt into the canonical-model autoload index so the `posts` association target
-// (`Post`) resolves by name during preload — no manual `registerModel`.
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 
@@ -29,8 +18,6 @@ describe("Preloader BigInt PK / number FK key match", () => {
 
   it("matches children when the owner PK is a BigInt and the child FK is a number", async () => {
     const david = await Author.find(authors("david").id);
-    // Simulate node-postgres parsing an int8 (bigserial) PK to BigInt; the int4
-    // FK on Post stays a number.
     internals(david)._attributes.writeCastValue(
       "id",
       BigInt(Number(internals(david)._readAttribute("id"))),
@@ -48,8 +35,6 @@ describe("Preloader BigInt PK / number FK key match", () => {
   it("normalizes a mix of BigInt and number owner PKs against number FKs", async () => {
     const david = await Author.find(authors("david").id);
     const mary = await Author.find(authors("mary").id);
-    // Only David's PK arrives as a BigInt (as if int8); Mary's stays a number.
-    // Both must still match their own number-typed child FKs.
     internals(david)._attributes.writeCastValue(
       "id",
       BigInt(Number(internals(david)._readAttribute("id"))),
@@ -63,7 +48,6 @@ describe("Preloader BigInt PK / number FK key match", () => {
       expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("david").id));
     }
 
-    // The still-number owner PK must also match its number FKs in the same call.
     const maryPosts = internals(mary).association("posts").target ?? [];
     expect(maryPosts.length).toBeGreaterThan(0);
     for (const post of maryPosts) {

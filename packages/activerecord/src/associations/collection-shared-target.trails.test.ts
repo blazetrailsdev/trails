@@ -1,13 +1,3 @@
-/**
- * Trails-only: Rails keeps ONE `@target` per collection association and
- * `CollectionProxy` forwards to it. Trails split the store in two — the
- * user-facing `CollectionProxy` (`record._collectionProxies`, RFC 0022's
- * canonical has_many store) and the OO `CollectionAssociation`
- * (`record._associationInstances`), each with its own array and loaded flag —
- * so `add_to_target` / `replace_on_target` landed in a mirror no reader
- * consulted. These tests pin the unified store from both surfaces. Rails has no
- * equivalent test: it has nothing to unify.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -16,7 +6,6 @@ import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { fixtures } from "../test-fixtures.js";
 
-/** `author.posts` / `author.association("posts")`, typed for these tests. */
 interface AuthorWithCollections {
   id: unknown;
   posts: ProxyLike;
@@ -74,8 +63,6 @@ describe("collection association and CollectionProxy share one target", () => {
     assoc.addToTarget(built);
 
     expect(proxy.target).toContain(built);
-    // `size` on an unloaded collection is the DB count plus the buffered new
-    // records — so the OO-side add has to show up in that count too.
     const persisted = (await Post.where({ author_id: author.id }).count()) as number;
     expect(await proxy.size()).toBe(persisted + 1);
   });

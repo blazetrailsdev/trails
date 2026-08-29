@@ -1,9 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Ported from vendor/rails/activerecord/test/cases/timestamp_test.rb.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
@@ -129,7 +123,7 @@ describe("TimestampTest", () => {
 
   it("touching updates timestamp with given time", async () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
-    const newTime = new Date(Date.UTC(2015, 1, 16, 0, 0, 0)); // Time.utc(2015, 2, 16, 0, 0, 0)
+    const newTime = new Date(Date.UTC(2015, 1, 16, 0, 0, 0));
     await developer.touch({ time: newTime });
 
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
@@ -177,7 +171,7 @@ describe("TimestampTest", () => {
   it("touching an attribute updates timestamp with given time", async () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
     const previousCreatedAt = developer.legacy_created_at as Temporal.Instant;
-    const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0)); // Time.utc(2015, 2, 16, 4, 54, 0)
+    const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0));
     await developer.touch("legacy_created_at", { time: newTime });
 
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
@@ -253,9 +247,6 @@ describe("TimestampTest", () => {
   });
 
   it("no touching threadsafe", async () => {
-    // JS is single-threaded; verify noTouching state is isolated to its block
-    // (Rails verifies Thread-local isolation; JS has no threads but the same
-    // temporal isolation applies to the async block).
     expect(developer.isNoTouching()).toBe(false);
     await Developer.noTouching(async () => {
       expect(developer.isNoTouching()).toBe(true);
@@ -531,23 +522,17 @@ describe("TimestampsWithoutTransactionTest", () => {
   });
 
   it("do not write timestamps on save if they are not attributes", async () => {
-    await Base.connection.createTable("timestamp_attribute_posts", { force: true }, (t) => {
-      // Only id column — no created_at / updated_at
-    });
+    await Base.connection.createTable("timestamp_attribute_posts", { force: true }, (t) => {});
 
     class TimestampAttributePost extends Base {
       static {
         this.tableName = "timestamp_attribute_posts";
-        // created_at and updated_at are virtual (mirrors Ruby attr_accessor)
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
       }
       created_at: unknown = null;
       updated_at: unknown = null;
     }
-    // Reflect the raw-created table's `id` column: the virtual attribute
-    // declarations suppress lazy DB reflection, and strict _writeAttribute
-    // (write.rb:42) raises when `id=` misses the attribute set.
     await TimestampAttributePost.loadSchema();
 
     const post = new TimestampAttributePost({ id: 1 });

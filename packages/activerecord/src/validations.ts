@@ -1,19 +1,7 @@
-/**
- * Mirrors: ActiveRecord::Validations
- *
- * AR-specific validation module. Extends ActiveModel validations with
- * database-aware validators (uniqueness, association validity, etc.)
- * and overrides save/valid? to run validations with context awareness.
- */
 import type { AttrNameArg, ValidationContext } from "@blazetrails/activemodel";
 import { I18n } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
-/**
- * Anything Rails' `valid?(context = nil)` accepts — shared between
- * AM's `Model.isValid` and AR's `valid?` override so the signatures
- * stay substitutable.
- */
 export type ValidationContextArg = string | string[] | ValidationContext | null;
 import { AbsenceValidator } from "./validations/absence.js";
 import { AssociatedValidator, validatesAssociated } from "./validations/associated.js";
@@ -24,9 +12,6 @@ import { UniquenessValidator, validatesUniquenessOf } from "./validations/unique
 import { _preloadedHolderTarget } from "./associations.js";
 import type { Base } from "./base.js";
 
-// Re-export validators (matching Rails' requires at the bottom of validations.rb)
-// plus the validator-adjacent ClassMethods registrars that Rails colocates
-// with each validator (validates_associated / validates_uniqueness_of).
 export {
   AbsenceValidator,
   AssociatedValidator,
@@ -38,12 +23,6 @@ export {
   validatesUniquenessOf,
 };
 
-/**
- * Mirrors: ActiveRecord::RecordInvalid
- *
- * Raised by save! and create! when the record is invalid.
- * Defined here matching Rails where it lives in validations.rb.
- */
 export class RecordInvalid extends ActiveRecordError {
   readonly record: any;
 
@@ -64,22 +43,11 @@ export class RecordInvalid extends ActiveRecordError {
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Validations (module instance methods)
- */
 export interface Validations {
-  /**
-   * Run validations and return whether the record is valid. AR inherits
-   * AM's alias `validate → valid?`
-   * (activemodel/lib/active_model/validations.rb:370).
-   */
   validate(context?: ValidationContextArg): Promise<boolean>;
   isValid(context?: ValidationContextArg): Promise<boolean>;
 }
 
-/**
- * Mirrors: ActiveRecord::Validations::ClassMethods
- */
 export interface ValidationsClassMethods {
   validatesAbsenceOf(...attrNames: AttrNameArg[]): void;
   validatesLengthOf(...attrNames: AttrNameArg[]): void;
@@ -90,7 +58,6 @@ export interface ValidationsClassMethods {
   validatesUniquenessOf(...attrNames: AttrNameArg[]): void;
 }
 
-/** Minimal instance-side surface used by Validations instance helpers. */
 interface ValidationsHost {
   _validationContext?: ValidationContextArg;
   isNewRecord?(): boolean;
@@ -103,30 +70,13 @@ interface ValidationsHost {
   readAttribute(name: string): unknown;
 }
 
-// Reference to the parent class's isValid (Model.prototype.isValid).
-// Set by Base at module load via _setSuperIsValid to avoid circular imports.
 let _superIsValid: ((context?: ValidationContextArg) => Promise<boolean>) | null = null;
 
-/** @internal Called by Base to register the super isValid for delegation. */
+/** @internal */
 export function _setSuperIsValid(fn: (context?: ValidationContextArg) => Promise<boolean>): void {
   _superIsValid = fn;
 }
 
-/**
- * Mirrors: ActiveRecord::Validations#valid?
- *
- * Runs validations with automatic context (:create for new records,
- * :update for persisted). Sets _validationContext for the duration
- * matching Rails' with_validation_context.
- *
- * Since the validation chain is async (RFC 0063), the DB-backed
- * `UniquenessValidator` runs inline here like any other validator: `isValid`
- * awaits the validate callback chain, which issues the
- * `SELECT 1 ... WHERE attr = ?` existence check and populates `errors` on a
- * collision — matching Rails' `valid?` (before any save). Uniqueness also
- * honors the active validation context (`on: :create` etc.) because it now
- * flows through the context-threaded callback chain.
- */
 export async function isValid(
   this: ValidationsHost,
   context?: ValidationContextArg,
@@ -148,36 +98,21 @@ export async function isValid(
   }
 }
 
-/**
- * Mirrors: ActiveRecord::Validations#validate — inherited alias of `valid?`
- * (activemodel/lib/active_model/validations.rb:370).
- */
 export function validate(this: ValidationsHost, context?: ValidationContextArg): Promise<boolean> {
   return isValid.call(this, context);
 }
 
-/**
- * Mirrors: ActiveRecord::Validations#custom_validation_context?
- */
 export function customValidationContext(this: ValidationsHost): boolean {
   const ctx = this._validationContext;
   return ctx != null && ctx !== "create" && ctx !== "update";
 }
 
-/**
- * Mirrors: ActiveRecord::Validations (private) #default_validation_context
- *
- * @internal
- */
+/** @internal */
 export function defaultValidationContext(this: ValidationsHost): string {
   return this.isNewRecord?.() || this._newRecord ? "create" : "update";
 }
 
-/**
- * Mirrors: ActiveRecord::Validations (private) #perform_validations
- *
- * @internal
- */
+/** @internal */
 export function performValidations(
   this: ValidationsHost,
   options?: { validate?: boolean; context?: string },
@@ -186,18 +121,7 @@ export function performValidations(
   return this.isValid(options?.context);
 }
 
-/**
- * Mirrors: ActiveModel::Validations#read_attribute_for_validation
- *
- * Rails aliases this to `send`, so calling it with an association name
- * returns the association target (loaded records). We resolve from
- * association caches first, falling back to readAttribute for regular
- * columns.
- */
 export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
-  // A loaded collection proxy (incl. in-memory built records on an unloaded
-  // proxy) is the canonical has_many target; check it before the holder so an
-  // unsaved `record.collection << x` is seen.
   const proxy = this._collectionProxies?.get?.(attribute) as
     | { loaded?: boolean; target?: unknown[] }
     | undefined;
@@ -207,20 +131,12 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   ) {
     return proxy.target;
   }
-  // RFC 0022: a loaded singular target lives on the SingularAssociation
-  // holder; `association(name)` hydrates it from any loaded proxy / preload,
-  // so the loaded target is read through the holder.
   if (typeof this.association === "function") {
     try {
       const assoc = this.association(attribute);
       if (assoc && (assoc.loaded === true || assoc.target != null)) return assoc.target;
-    } catch {
-      // Not a declared association — fall through.
-    }
+    } catch {}
   }
-  // Undeclared in-memory seeds (FakeTopic/FakeReply test fixtures) live on the
-  // association cache (`_associationCache`, Rails' `@association_cache`), keyed
-  // by the undeclared name and surfaced through `.target`.
   const cached = this._associationCache?.(attribute)?.target;
   if (cached !== undefined) return cached;
   const preloaded = _preloadedHolderTarget(this as unknown as Base, attribute);
@@ -228,63 +144,31 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   return this.readAttribute(attribute);
 }
 
-// ---------------------------------------------------------------------------
-// Class methods — Mirrors ActiveRecord::Validations::ClassMethods.
-// Wired onto Base via extend(Base, Validations.ClassMethods) in base.ts.
-// ---------------------------------------------------------------------------
-
-/**
- * Host shape for the `validates_*_of` helper overrides: the AR-specific
- * `validatesWith` plus `_mergeAttributes` (inherited from Model).
- */
 interface HelperMethodHost {
   validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
 }
 
-// Each `validates_*_of` helper in AR re-opens
-// `ActiveRecord::Validations::ClassMethods` to delegate to `validates_with`
-// with the AR-specific validator constant (association/column-aware), shadowing
-// the ActiveModel helper that would otherwise wire the base validator. Mirrors
-// activerecord/lib/active_record/validations/{presence,absence,length,
-// numericality}.rb.
-
-/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_presence_of */
 export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
   this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
 }
 
-/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_absence_of */
 export function validatesAbsenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
   this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
 }
 
-/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_length_of */
 export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
   this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
 }
 
-/**
- * Mirrors: ActiveRecord re-aliasing `validates_size_of` onto its own
- * `validates_length_of` so the AR LengthValidator (marked-for-destruction
- * aware) backs both spellings.
- */
 export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
   this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
 }
 
-/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_numericality_of */
 export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
   this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
 }
 
-/**
- * Module methods wired onto Base as static methods via `extend()` in base.ts.
- * Mirrors Rails' `ActiveRecord::Validations::ClassMethods` / `ActiveSupport::Concern#ClassMethods`.
- * `validatesAssociated` and `validatesUniquenessOf` live next to their
- * validator classes in validations/associated.ts and validations/uniqueness.ts
- * matching Rails' file layout.
- */
 export const ClassMethods = {
   validatesAssociated,
   validatesUniquenessOf,
@@ -295,14 +179,7 @@ export const ClassMethods = {
   validatesNumericalityOf,
 };
 
-/**
- * Throws `RecordInvalid` for the given record. Used by `save!` / `create!`
- * to convert a failed validation into an exception.
- *
- * Mirrors: ActiveRecord::Validations#raise_validation_error
- *
- * @internal
- */
+/** @internal */
 export function raiseValidationError(record: unknown): never {
   throw new RecordInvalid(record);
 }

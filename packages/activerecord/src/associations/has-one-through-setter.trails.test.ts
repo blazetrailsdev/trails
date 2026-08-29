@@ -1,24 +1,3 @@
-/**
- * Trails-only assertions pinning WHEN a has_one_through assignment hits the DB.
- *
- * Rails' `HasOneThroughAssociation#replace`
- * (has_one_through_association.rb:9-13) calls `create_through_record`
- * synchronously, so for a *persisted* owner the join row is created / updated /
- * destroyed AT ASSIGNMENT (`through_proxy.create` / `through_record.update` /
- * `through_record.destroy`, :21-40) — never deferred to the owner's next save.
- * Only the `owner.new_record? || !save` arm (:36-37) defers, by *building* the
- * join record for the owner's first save to persist.
- *
- * In trails the assignment-time write needs `await`, so it lives on the
- * awaitable `set#{Name}` setter (RFC 0068). No Rails test pins the *timing*
- * distinction — Ruby's setter is synchronous, so there is nothing to defer and
- * nothing to assert. These tests exist so the immediate arms can't silently
- * regress into save-time deferral (the two-row race RFC 0068 exists to kill),
- * and so `_pendingReplace` can't quietly reacquire a persisted-owner role.
- *
- * Each persisted-owner case asserts against a freshly-`find`ed join row and
- * never calls `member.save()`, so a deferred implementation fails outright.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -45,8 +24,6 @@ describe("HasOneThroughSetterTrails", () => {
     const newClub = clubs("moustache_club");
     await (member as unknown as AwaitableClubSetter).setClub(newClub);
 
-    // Rails' `through_record.update(attributes)` arm (:34) — already visible in
-    // the DB, with no `member.save()` anywhere.
     const reloaded = await CurrentMembership.find(membership!.id);
     expect(Number(reloaded.readAttribute("club_id"))).toBe(Number(newClub.id));
   });
@@ -58,7 +35,6 @@ describe("HasOneThroughSetterTrails", () => {
     const club = clubs("boring_club");
     await (member as unknown as AwaitableClubSetter).setClub(club);
 
-    // Rails' `through_proxy.create(attributes)` arm (:39).
     const created = await CurrentMembership.findBy({ member_id: member.id });
     expect(created).not.toBeNull();
     expect(Number(created!.readAttribute("club_id"))).toBe(Number(club.id));
@@ -71,7 +47,6 @@ describe("HasOneThroughSetterTrails", () => {
 
     await (member as unknown as AwaitableClubSetter).setClub(null);
 
-    // Rails' `through_record.destroy` arm (:21-22).
     expect(await CurrentMembership.findBy({ id: membership!.id })).toBeNull();
     expect(member.club).toBeNull();
   });
@@ -79,16 +54,11 @@ describe("HasOneThroughSetterTrails", () => {
   it("assigning to a new owner defers the join row to the owner's first save", async () => {
     const member = Member.new({ name: "Unsaved" });
     const club = clubs("boring_club");
-    // Row count, not a `findBy` on `club_id`: four fixture memberships already
-    // point at `boring_club`, so any club-scoped lookup is non-null before we
-    // start. A count delta is what actually pins "the build arm wrote nothing".
     const rowCount = async () => Number(await CurrentMembership.count());
     const before = await rowCount();
 
-    // A new owner takes Rails' `through_proxy.build` arm (:36-37).
     await (member as unknown as AwaitableClubSetter).setClub(club);
 
-    // Built in memory and readable immediately, but NOT yet in the DB.
     expect(member.club).toBe(club);
     const built = member.currentMembership;
     expect(built).not.toBeNull();
@@ -97,7 +67,6 @@ describe("HasOneThroughSetterTrails", () => {
 
     await member.save();
 
-    // The deferred build lands exactly one row, at the owner's first save.
     expect(await rowCount()).toBe(before + 1);
 
     const persisted = await CurrentMembership.findBy({ member_id: member.id });

@@ -12,7 +12,6 @@ import type { Rating } from "./rating.js";
 import type { Ship } from "./ship.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialProject } from "./project.js";
-// vendor/rails/activerecord/test/models/developer.rb
 import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
@@ -64,9 +63,6 @@ export class Developer extends Base {
 
   static instanceCount: number | undefined;
 
-  // Rails `module ProjectsAssociationExtension { def find_most_recent ... }`
-  // and `ProjectsAssociationExtension2 { def find_least_recent ... }`, mixed
-  // onto the HABTM `projects*` proxies per AssociationsExtensionsTest.
   static projectsAssociationExtension = {
     async findMostRecent(this: Relation<Base>) {
       return this.order("id DESC").first();
@@ -90,7 +86,6 @@ export class Developer extends Base {
     this.hasAndBelongsToMany("projects", {
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
-      // Rails: `has_and_belongs_to_many :projects do def find_most_recent ... end`
       extend: {
         async findMostRecent(this: Relation<Base>) {
           return this.order("id DESC").first();
@@ -117,7 +112,6 @@ export class Developer extends Base {
       className: "Project",
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
-      // Rails: `-> { extending(ProjectsAssociationExtension) }`
       extend: Developer.projectsAssociationExtension,
     });
 
@@ -125,7 +119,6 @@ export class Developer extends Base {
       className: "Project",
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
-      // Rails: `-> { extending(ProjectsAssociationExtension, ProjectsAssociationExtension2) }`
       extend: [Developer.projectsAssociationExtension, Developer.projectsAssociationExtension2],
     });
 
@@ -133,7 +126,6 @@ export class Developer extends Base {
       className: "Project",
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
-      // Rails: `-> { extending(ProjectsAssociationExtension) } do def find_least_recent ... end`
       extend: [
         Developer.projectsAssociationExtension,
         {
@@ -167,7 +159,6 @@ export class Developer extends Base {
     this.hasMany("strictLoadingOptAuditLogs", { strictLoading: true, className: "AuditLog" });
     this.hasMany("contracts");
     this.hasMany("firms", { through: "contracts", source: "firm" });
-    // Rails: `has_many :comments, ->(developer) { where(body: "I'm #{developer.name}") }`
     this.hasMany("comments", (q: any, developer: any) =>
       q.where({ body: `I'm ${developer.name}` }),
     );
@@ -188,15 +179,10 @@ export class Developer extends Base {
     } as any);
     this.validates("name", { length: { in: new Range(3, 20) } });
 
-    // Rails: `before_create do |developer| developer.audit_logs.build ... end`
-    // — the record arrives as the callback argument, not `this`.
     this.beforeCreate(async function (developer: Developer) {
       (developer as any).auditLogs.build({ message: "Computer created" });
     });
 
-    // Rails `attribute :last_name, :string` — there is no `last_name` column
-    // (the developers table has only `first_name`), so it's a virtual attribute
-    // and must be excluded from `SELECT developers.*`.
     this.attribute("lastName", "string");
 
     this.afterFind(function (this: Developer) {
@@ -393,8 +379,6 @@ export class ClassMethodDeveloperCalledDavid extends Base {
     this.tableName = "developers";
   }
 
-  // Method-form `default_scope` override (Rails: `def self.default_scope`),
-  // not the `default_scope { }` macro registry.
   static defaultScope(this: any): any {
     return this.where({ name: "David" });
   }
@@ -410,7 +394,6 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
     });
   }
 
-  // Method-form override referencing a named scope (Rails: `def self.default_scope; david; end`).
   static defaultScope(this: any): any {
     return this.david();
   }
@@ -506,8 +489,6 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
     });
   }
 
-  // Method-form `default_scope` override (Rails: `def self.default_scope`),
-  // not the `default_scope { }` macro registry.
   static defaultScope(this: any): any {
     return this.includes(":projects");
   }
@@ -562,7 +543,6 @@ export class ThreadsafeDeveloper extends Base {
 export class CachedDeveloper extends Base {
   static {
     this.tableName = "developers";
-    // Rails developer.rb:351 — `self.cache_timestamp_format = :number`.
     this.cacheTimestampFormat = "number";
     this.aliasAttribute("created_at", "legacy_created_at");
     this.aliasAttribute("updated_at", "legacy_updated_at");
@@ -671,8 +651,6 @@ export class NonMutatingUpdateKlass extends Base {
     this.aliasAttribute("updated_at", "legacy_updated_at");
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
-    this.beforeUpdate(function () {
-      // no-op
-    });
+    this.beforeUpdate(function () {});
   }
 }

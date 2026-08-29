@@ -1,4 +1,3 @@
-// Faithful port of vendor/rails/activerecord/test/cases/migrator_test.rb
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { stdout } from "@blazetrails/activesupport";
 import {
@@ -16,17 +15,8 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
-// MIGRATIONS_ROOT — Rails reads fixture migration directories from disk; the
-// trails equivalents live under test-helpers/migrations.
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
-// Rails: ActiveRecord::Migration.new(name, version) — a bare migration with
-// no-op up/down. Rails tolerates a nil version (e.g. `Migration.new("Chunky")`);
-// `Migrator#validate` checks duplicate names before ever reading versions, so a
-// version-less input is valid. Omit `version` to reproduce that nil case. In
-// Rails the nil-version inputs are `Migration` instances (a disk-loaded
-// `MigrationProxy` always has a version), so the null cast faithfully models
-// passing a bare Migration where the proxy type is annotated.
 function migration(name: string, version?: number): MigrationProxy {
   return {
     version: version === undefined ? (null as unknown as number) : version,
@@ -35,8 +25,6 @@ function migration(name: string, version?: number): MigrationProxy {
   };
 }
 
-// Rails: the Sensor migration class records whether it went up/down. Each call
-// pushes [direction, version] onto a shared `calls` array.
 function sensors(count: number): { calls: Array<[string, number]>; migrations: MigrationProxy[] } {
   const calls: Array<[string, number]> = [];
   const migrations: MigrationProxy[] = [];
@@ -62,20 +50,12 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
 }
 
 describe("MigratorTest", () => {
-  // Rails' setup rides `ActiveRecord::Base.connection_pool`; `fixtures({})`
-  // establishes the primary schema-loaded pool so `Base.connection` resolves.
   fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
   let schemaMigration: SchemaMigration;
   let internalMetadata: InternalMetadata;
 
-  // Rails' migrator_class(count) builds a MigrationContext subclass whose
-  // #migrations returns the sensor list; in trails a Migrator carries its own
-  // migrations, so this just wraps `sensors`.
-  // Rails' migrator_class(count) subclasses MigrationContext and overrides
-  // #migrations to return the sensor list, which is why its `.new("valid", ...)`
-  // path argument is never read. Same shape here.
   function migrationContextClass(count: number): {
     calls: Array<[string, number]>;
     context: MigrationContext;
@@ -96,11 +76,6 @@ describe("MigratorTest", () => {
 
   let verboseWas: boolean;
 
-  // Rails' setup/teardown do `@schema_migration.create_table` +
-  // `delete_all_versions rescue nil` around each test; on the shared
-  // `Base.connection` pool the schema_migrations rows persist between tests, so
-  // clear them here to match Rails' fresh-per-test version state. Rails' setup
-  // also stashes `@verbose_was` and its teardown restores it.
   beforeEach(async () => {
     adapter = Base.connection;
     schemaMigration = new SchemaMigration(adapter.pool);
@@ -279,8 +254,6 @@ describe("MigratorTest", () => {
 
   it("migrations status order new and old version applied out of order", async () => {
     const path = `${MIGRATIONS_ROOT}/old_and_new_versions`;
-    // "Apply" a newer migration and not an older to simulate out-of-order
-    // migration application which should not affect ordering in status.
     await seedVersions(230, 231, 20210716123013);
 
     const status = await new MigrationContext(
@@ -315,8 +288,6 @@ describe("MigratorTest", () => {
 
   it("migrations status with schema define in subdirectories", async () => {
     const path = `${MIGRATIONS_ROOT}/valid_with_subdirectories`;
-    // Rails runs Schema.define(version: 3), which marks every migration up to 3
-    // as applied.
     await seedVersions(1, 2, 3);
 
     const status = await new MigrationContext(
@@ -414,7 +385,6 @@ describe("MigratorTest", () => {
   });
 
   it("down calls down", async () => {
-    // Rails calls test_up_calls_up first; replicate the up pass here.
     const up0 = trackedSensor(null, 0);
     const up1 = trackedSensor(null, 1);
     const up2 = trackedSensor(null, 2);
@@ -522,9 +492,6 @@ describe("MigratorTest", () => {
 
   it("migrator verbosity", async () => {
     const lines: string[] = [];
-    // Rails counts messages via `Migration.message_count`, which its test
-    // helper increments from an overridden `write`. Here the equivalent seam
-    // is the stdout shim `write` puts to.
     const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
       lines.push(chunk);
       return true;
@@ -572,17 +539,14 @@ describe("MigratorTest", () => {
   it("target version zero should run only once", async () => {
     const { calls, migrations } = sensors(3);
 
-    // migrate up to 1
     await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
-    // migrate down to 0
     await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
     expect(calls).toEqual([["down", 1]]);
     calls.length = 0;
 
-    // migrate down to 0 again
     await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
     expect(calls).toEqual([]);
   });
@@ -612,7 +576,6 @@ describe("MigratorTest", () => {
     let result = await migrator.migrate();
     expect(result.length).toBe(3);
 
-    // Nothing migrated from duplicate run
     result = await migrator.migrate();
     expect(result.length).toBe(0);
 
@@ -669,7 +632,6 @@ describe("MigratorTest", () => {
   });
 
   it("only loads pending migrations", async () => {
-    // migrate up to 1
     await seedVersions("1");
 
     const { calls, context: migrator } = migrationContextClass(3);
@@ -698,8 +660,6 @@ describe("MigratorTest", () => {
   });
 });
 
-// Rails' Sensor instances expose went_up/went_down; trails records the same via
-// a small state object captured by the migration's up/down closures.
 function trackedSensor(
   name: string | null,
   version: number,

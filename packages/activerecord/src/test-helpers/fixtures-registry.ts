@@ -1,11 +1,3 @@
-/**
- * No Rails counterpart file. Rails discovers fixture sets by scanning
- * `fixture_paths` for `test/fixtures/*.yml` (`FixtureSet.create_fixtures`,
- * `lib/active_record/fixtures.rb`); trails has no YAML loader, so this module
- * is the hand-written index of `test-helpers/fixtures/` that stands in for that
- * scan. It stays beside the data it indexes — bucket A, which does not move —
- * rather than following the fixture *machinery* to the package root.
- */
 import type { Base } from "../base.js";
 
 import * as FixtureData from "./fixtures/index.js";
@@ -13,59 +5,15 @@ import * as FixtureData from "./fixtures/index.js";
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
 
-/**
- * A model-backed fixture-set entry. The model is resolved lazily through a dynamic
- * import so the registry can enumerate every fixture set without eagerly
- * importing every model module — several canonical models run import-time side
- * effects (`encrypts()`) that throw unless their add-on/handler is already
- * bootstrapped. Deferring the import
- * to seed time means a test only loads the models for the fixtures it requests.
- */
 export interface FixtureModelEntry {
-  /**
-   * Resolves the set's model class. May return an array whose FIRST element is
-   * the table-bearing model and whose remaining elements are extra classes to
-   * register alongside it — STI subclasses (so `findStiClass` resolves each
-   * row's inheritance-column value) or HABTM targets whose join table the loader
-   * writes. `resolveFixtureNames` passes the whole list to `registerModel`'s
-   * array form, which also routes any STI subclass through `registerSubclass`.
-   */
   readonly model: () => Promise<BaseClass | readonly BaseClass[]>;
   readonly data: Record<string, FixtureAttrs>;
-  /**
-   * Optional add-on bootstrap awaited BEFORE the {@link FixtureModelEntry.model}
-   * thunk fires. Some canonical models run import-time side effects that require
-   * an opt-in add-on already loaded into the runtime — e.g. `book-encrypted.ts`
-   * calls `encrypts()` in a `static {}` block, which throws unless the encryption
-   * add-on (`@blazetrails/activerecord/encryption`) has registered its hooks. The
-   * hook keeps the add-on opt-in: only entries that declare it pay the cost, and
-   * a fixture set without one (e.g. `authors`) never loads encryption.
-   */
   readonly addOn?: () => Promise<void>;
 }
 
-/**
- * Bootstraps the encryption add-on so the `EncryptedBook*` models import cleanly.
- * Importing the `../encryption.js` wiring registers `Base.encrypts`' hooks via its
- * module-load side effect — all the `static { encrypts(...) }` blocks in
- * `book-encrypted.ts` need to evaluate without throwing.
- *
- * Deliberately does NOT touch the process-global encryption config (keys):
- * that is per-suite state a fixture loader must not leak into unrelated tests.
- * The suites that load encrypted fixtures configure keys themselves with
- * snapshot/restore (mirroring how Rails' encryption test cases set up keys via
- * `ActiveRecord::EncryptionTestCase`).
- *
- * @internal
- */
+/** @internal */
 const bootstrapEncryptionAddOn = (): Promise<void> => import("../encryption.js").then(() => {});
 
-/**
- * A HABTM join-table fixture-set entry. These tables (e.g. `categories_posts`)
- * have no `ActiveRecord::Base` model in Rails — they're plain join tables of FK
- * pairs. `joinTable` is the literal DB table name; seeding goes through
- * {@link defineJoinTableFixtures} rather than {@link defineFixtures}.
- */
 export interface FixtureJoinTableEntry {
   readonly joinTable: string;
   readonly data: Record<string, FixtureAttrs>;
@@ -73,58 +21,13 @@ export interface FixtureJoinTableEntry {
 
 export type FixtureRegistryEntry = FixtureModelEntry | FixtureJoinTableEntry;
 
-/** @internal Narrows a registry entry to the join-table variant. */
+/** @internal */
 export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTableEntry {
   return "joinTable" in e;
 }
 
-/**
- * Maps a Rails-style fixture-set name to its canonical model class and the matching
- * `<name>FixtureData` export. Lets tests load fixtures by name —
- * `useFixtures(["authors", "posts"])` — mirroring Rails' `fixtures :authors`.
- *
- * **Key convention:** top-level fixture files use camelCase (e.g. `"authorAddresses"`
- * for `author_addresses.yml`). Subdirectory fixture files use a slash-separated path
- * whose segments are camelCased where the original YAML basename is snake_case
- * (e.g. `"admin/accounts"` for `admin/accounts.yml`,
- * `"reservedWords/distinct"` for `reserved_words/distinct.yml`).
- * Accessing a slash-keyed result requires bracket notation: `result["admin/accounts"]("david")`.
- *
- * Hand-maintained: add an entry when a fixture file gains a canonical model. The
- * underlying DB table name comes from `model.tableName`, independent of the key here.
- * The `model` thunk dynamic-imports the class so import-time side effects stay lazy.
- *
- * Unregistered fixture sets, grouped by blocker. Add an entry here when a gap closes.
- *
- * **Category A — missing canonical model (model-port work required):**
- * - `categories-ordered` — no dedicated model (alternate ordering fixture for categories)
- * - `fk-object-to-point-to`, `fk-test-has-fk`, `fk-test-has-pk` — no canonical model
- * - `mixins` — no canonical Mixin model
- * - `randomly-named-a9` — ambiguous: model uses table randomly_named_table1, not this set
- * - `virtual-columns` — no canonical VirtualColumn model
- *
- * **Category B — arunit2 alt-connection (needs alt-connection test infra):**
- * - `bad-posts`, `other-books`, `other-comments`, `other-posts`, `other-topics`
- *
- * **Category C — other blockers:**
- * - `cpk-reviews` — rows `ref("cpk_books", …)`, but `ref()` resolves to a single scalar
- *   (the CRC32 label id), not the book's generated composite `id` key component —
- *   composite-target ref resolution is a follow-up.
- * - `uuid-children`, `uuid-parents` — tables absent from the canonical SQLite TEST_SCHEMA.
- * - `naked/yml/{accounts,companies,courses,parrots,trees,…}` — model-less fixture sets
- *   (no `ActiveRecord::Base` subclass in Rails); need a model-less loader extension
- *   before they can be registered.
- *
- * Note on composite-PK seeding: `compositeIdentify` generates absent key columns, so
- * `cpk-books` seeds even when a row omits its key components. No composite-PK seeding gaps
- * remain. STI bases (`parrots`, `vegetables`) register their subclasses via `registerModel`
- * so `findStiClass` resolves each row's inheritance-column value correctly.
- */
 export const fixtureRegistry = {
   "all/namespaced/accounts": {
-    // Rails looks up Namespaced::Account which doesn't exist; the fixture data
-    // carries only `name` — matching admin_accounts, not accounts. AdminAccount
-    // is the model whose table schema fits this fixture.
     model: () => import("./models/admin/account.js").then((m) => m.AdminAccount),
     data: FixtureData.allNamespacedAccountsFixtureData,
   },
@@ -295,11 +198,6 @@ export const fixtureRegistry = {
     data: FixtureData.deadParrotFixtureData,
   },
   developers: {
-    // Register Computer (the `sharedComputers` HABTM target) so its join-table
-    // reflection resolves when the loader materializes `computers_developers`
-    // rows from the owner's `sharedComputers` association label — the join
-    // target must be registered even when the join set isn't requested by name.
-    // The `computers_developers` table itself comes from the template clone.
     model: (): Promise<
       [
         typeof import("./models/developer.js").Developer,
@@ -455,10 +353,6 @@ export const fixtureRegistry = {
     data: FixtureData.paragraphFixtureData,
   },
   parrots: {
-    // STI base. LiveParrot/DeadParrot live in the same module; registering them
-    // in `modelRegistry` (Rails' autoloader analog — `findStiClass` resolves the
-    // inheritance-column value through it) lets the base reload hydrate each row
-    // as its declared `parrot_sti_class` subclass.
     model: (): Promise<
       [
         typeof import("./models/parrot.js").Parrot,
@@ -581,9 +475,6 @@ export const fixtureRegistry = {
     data: FixtureData.taskFixtureData,
   },
   topics: {
-    // Reply (and its descendants) share Topic's `topics` table via STI; their
-    // module must load so they register into Topic's tracked subtree before the
-    // base reload dispatches `type: "Reply"` rows to the concrete subclass.
     model: () =>
       Promise.all([import("./models/topic.js"), import("./models/reply.js")]).then(
         ([m]) => m.Topic,
@@ -615,9 +506,6 @@ export const fixtureRegistry = {
     data: FixtureData.vertexFixtureData,
   },
   vegetables: {
-    // STI base with custom inheritance column `custom_type`. Register the
-    // subclasses the fixture rows reference so the base reload resolves each
-    // `custom_type` value to its concrete class.
     model: (): Promise<
       [
         typeof import("./models/vegetables.js").Vegetable,
@@ -644,25 +532,13 @@ export const fixtureRegistry = {
   },
 } as const;
 
-// Conformance check without `satisfies` on the literal: a contextual
-// `satisfies Record<string, FixtureRegistryEntry>` would widen each `model`
-// thunk's return into a `typeof Base | <Model>` union (the declared BaseClass
-// unified with the concrete class), collapsing `RegistryModel<N>` to that union.
-// This standalone assertion validates the shape while preserving the narrow
-// per-entry types from `as const`.
 type _AssertRegistryShape =
   typeof fixtureRegistry extends Record<string, FixtureRegistryEntry> ? true : never;
 const _registryConforms: _AssertRegistryShape = true;
 void _registryConforms;
 
-/** Union of all registered fixture-set names. */
 export type FixtureName = keyof typeof fixtureRegistry;
 
-/**
- * The canonical model class registered for fixture-set `N` (never for join-table sets).
- * For an entry whose `model` thunk returns a tuple (the table-bearing model plus extra
- * classes to register), this is the FIRST element — the table-bearing model.
- */
 export type RegistryModel<N extends FixtureName> = (typeof fixtureRegistry)[N] extends {
   model: () => Promise<infer R>;
 }
@@ -675,12 +551,10 @@ export type RegistryModel<N extends FixtureName> = (typeof fixtureRegistry)[N] e
       : never
   : never;
 
-/** True for join-table fixture-set names (no model class). */
 export type IsJoinTableName<N extends FixtureName> = (typeof fixtureRegistry)[N] extends {
   joinTable: string;
 }
   ? true
   : false;
 
-/** The fixture-data object registered for fixture-set `N`. */
 export type RegistryData<N extends FixtureName> = (typeof fixtureRegistry)[N]["data"];

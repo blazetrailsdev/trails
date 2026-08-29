@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/sharded/blog.rb
 import { Base } from "../../../base.js";
 
 export class ShardedBlog extends Base {

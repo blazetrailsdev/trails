@@ -1,33 +1,11 @@
 import { rubyInspect } from "./relation/ruby-inspect.js";
 
-/**
- * Minimal subset of Ruby's `PP` / `PrettyPrint`, enough to drive the
- * `obj.prettyPrint(pp)` protocol the way `PP.pp(obj, io)` does in Rails.
- *
- * JS has no `pp` library, so rather than leave `Relation` / `CollectionProxy`
- * with no pretty-printer protocol at all (the deviation surfaced by
- * `AssociationProxyTest#test_pretty_print`), we provide just the protocol
- * surface that those `prettyPrint` methods call: `pp(obj)`, `text`,
- * `breakable`, `group`, `seplist`, and `objectAddressGroup`. The driver is
- * async because loading an unloaded relation/proxy target is async in trails
- * (Rails performs blocking DB I/O inside `pretty_print`).
- *
- * Mirrors: Ruby's `PP` (stdlib `pp`) — the narrow slice exercised by
- * ActiveRecord's `Core#pretty_print`, `Relation#pretty_print`, and
- * `CollectionProxy#pretty_print`.
- */
 export interface PrettyPrinter {
-  /** Append literal text. Mirrors `PP#text`. */
   text(str: string): void;
-  /** Append a separator (a soft line break renders as a space here). Mirrors `PP#breakable`. */
   breakable(sep?: string): void;
-  /** Wrap `fn`'s output in `open`/`close`. Mirrors `PP#group`. */
   group(indent: number, open: string, close: string, fn: () => void | Promise<void>): Promise<void>;
-  /** Render `list`, calling `sep` between items. Mirrors `PP#seplist`. */
   seplist<I>(list: I[], sep: () => void, fn: (item: I) => void | Promise<void>): Promise<void>;
-  /** Wrap `fn` in `#<ClassName ...>`. Mirrors `PP#object_address_group`. */
   objectAddressGroup(obj: object, fn: () => void | Promise<void>): Promise<void>;
-  /** Pretty-print `obj`, dispatching to `obj.prettyPrint(this)` when defined. Mirrors `PP#pp`. */
   pp(obj: unknown): Promise<void>;
 }
 
@@ -108,16 +86,10 @@ class PrettyPrint implements PrettyPrinter {
   }
 }
 
-/** Minimal IO sink, mirroring the `out` argument of Ruby's `PP.pp(obj, out)`. */
 export interface PPSink {
   write(str: string): void;
 }
 
-/**
- * Pretty-print `obj` to `io` (defaulting to a throwaway sink), returning the
- * rendered string. Mirrors Ruby's `PP.pp(obj, out = $>)`, which writes
- * `"#{output}\n"` to `out` and returns the output.
- */
 export async function pp(obj: unknown, io?: PPSink): Promise<string> {
   const printer = new PrettyPrint();
   await printer.pp(obj);

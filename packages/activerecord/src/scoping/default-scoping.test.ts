@@ -1,15 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/scoping/default_scoping_test.rb
- *
- * Every Rails test is ported with a faithful body. Cases that exercise behavior
- * the engine does not yet implement are kept as `it.skip` (the migration
- * backlog) rather than fabricated passing stubs, so their names stay tracked by
- * parity:test; each skip carries a one-line note on the missing capability.
- * The `DefaultScopingWithThreadTest` cases are `unless in_memory_db?` in Rails
- * and so do not apply on the in-memory sqlite suite.
- */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Temporal } from "@blazetrails/date";
@@ -60,8 +48,6 @@ import { Project } from "../test-helpers/models/project.js";
 import { Lion } from "../test-helpers/models/cat.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 
-// Register the models whose associations are resolved by active tests
-// (Developer's `projects` HABTM is dereferenced in the eager_load/preload ports).
 registerModel(Developer);
 registerModel(Project);
 registerModel(AuditLog);
@@ -81,16 +67,10 @@ registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);
 const namesAndIds = (rows: any[]) => rows.map((r) => [r.name, r.id]);
-// Rails capture_sql(include_schema: false): drop introspection queries so the
-// SAVEPOINT/INSERT/UPDATE ordering matches Rails' .first/.second indexing.
 const capSql = (fn: () => unknown) =>
   captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("DefaultScopingTest", () => {
-  // `developers` backs the default-scope/unscope cases; `posts`/`comments` back
-  // the join + STI-association ports (default scope through joins, `unscoped`
-  // joins, STI association with `unscoped`), which read the canonical posts and
-  // comments fixtures exactly as Rails does.
   const { developers, posts, comments } = fixtures(["developers", "posts", "comments"]);
 
   it("default scope", async () => {
@@ -109,10 +89,6 @@ describe("DefaultScopingTest", () => {
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
-  // Regression: a method-form `default_scope` override (not the macro registry)
-  // must make `scope_attributes?` true so `new`/`create` seed its where
-  // equalities, matching `Scoping::Default::ClassMethods#scope_attributes?`'s
-  // `respond_to?(:default_scope)` clause.
   it("default scope as class method runs on create", async () => {
     expect((ClassMethodDeveloperCalledDavid.new() as any).name).toBe("David");
     const dev = (await ClassMethodDeveloperCalledDavid.create()) as any;
@@ -357,7 +333,6 @@ describe("DefaultScopingTest", () => {
     );
     expect(received.sort()).toEqual(expected.sort());
 
-    // Mixed args: selectively unscope only `name` from where, plus fully unscope select.
     const expected2 = names(await Developer.order("salary DESC"));
     const received2 = names(
       await DeveloperOrderedBySalary.select("id")
@@ -626,7 +601,6 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope comparison where clauses", async () => {
-    // unscoped for WHERE (`developers`.`id` <= 2) — Rails uses -Float::INFINITY..2
     const expected = names(await Developer.order("salary DESC"));
     const received = names(
       await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lteq(2) as any).unscope({
@@ -635,7 +609,6 @@ describe("DefaultScopingTest", () => {
     );
     expect(received.sort()).toEqual(expected.sort());
 
-    // unscoped for WHERE (`developers`.`id` < 2) — Rails uses -Float::INFINITY...2
     const expected2 = names(await Developer.order("salary DESC"));
     const received2 = names(
       await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lt(2) as any).unscope({
@@ -674,11 +647,6 @@ describe("DefaultScopingTest", () => {
     );
     expect(received).toEqual(expected);
   });
-
-  // ── Migration backlog: faithful Rails ports awaiting engine support. Kept as
-  //    `it.skip` (not fabricated passing stubs) so the Rails test names remain
-  //    tracked by parity:test while the behavior is unimplemented. Each notes
-  //    the missing capability.
 
   it("default scope with conditions hash", async () => {
     const expected = (await Developer.where({ name: "Jamis" })).map((d: any) => d.id).sort();
@@ -761,14 +729,8 @@ describe("DefaultScopingTest", () => {
         .reverseOrder()
         .unscope("reverse_order" as any),
     ).toThrow();
-    // Rails' 4th assertion, empty `unscope()` (no args), is omitted: it is the
-    // one form the engine does not yet reject (treated as a no-op rather than
-    // raising ArgumentError). Tracked here so it is restored when supported.
   });
 
-  // A hash argument to unscope must use `where` as its key; any other key raises.
-  // Rails' string-hash-key case (`unscope("where" => :name)`) has no TS analogue
-  // because `{ where: "name" }` is already the valid TS form, so it is omitted.
   it("unscope errors with non where hash keys", () => {
     expect(() =>
       Developer.where({ name: "Jamis" })
@@ -777,10 +739,6 @@ describe("DefaultScopingTest", () => {
     ).toThrow();
   });
 
-  // In TS, string clause names ARE the Ruby-symbol equivalent and are valid
-  // inputs — `unscope("limit")` / `unscope("select")` work and must not raise,
-  // so Rails' string-vs-symbol ArgumentError cases have no TS analogue. Only a
-  // non-clause value (a number) is invalid in both languages.
   it("unscope errors with non symbol or hash arguments", () => {
     expect(() => Developer.select("id").unscope(5 as any)).toThrow();
   });
@@ -839,9 +797,6 @@ describe("DefaultScopingTest", () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
-    // Rails: `post.special_comments.update_all(deleted_at: Time.now)`. A JS Date
-    // is not a quotable value in trails (abstract/quoting.ts rejects it in favor
-    // of Temporal); Temporal.Now.instant() is the Time.now analogue.
     await post.specialComments.updateAll({ deleted_at: Temporal.Now.instant() });
 
     await expect(Post.joins(":specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
@@ -859,33 +814,21 @@ describe("DefaultScopingTest", () => {
     });
   });
 
-  // Write-path sibling of the read/scope STI fix above: build / push /
-  // nullify on an STI subclass owner must derive the foreign key from the
-  // class that *declared* the association (`Post` → `post_id`), not the
-  // owner instance's class (`SpecialPost` → `special_post_id`). Mirrors
-  // Rails using `reflection.foreign_key` on every write path.
   it("sti association write paths use the declaring-class foreign key", async () => {
     const post = posts("thinking") as any;
     expect(post.constructor.name).toBe("SpecialPost");
 
     await (SpecialComment as any).unscoped(async () => {
-      // CollectionProxy#build (_buildRaw)
       const built = post.specialComments.build({ body: "built sti comment" });
       expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
 
-      // CollectionAssociation#setOwnerAttributes → foreignKeyColumns. Exercise
-      // it on a record built outside the association so no scope_for_create FK
-      // masks the column actually written by setOwnerAttributes.
       const assoc = post.association("specialComments");
       const fresh = new SpecialComment({ body: "fresh sti comment" });
       assoc.setOwnerAttributes(fresh);
       expect(Number(fresh._readAttribute("post_id"))).toBe(Number(post.id));
 
-      // The nullify update (computeNullifiedOwnerAttributes) keys the
-      // declaring-class FK, not `special_post_id`.
       expect(Object.keys(assoc.computeNullifiedOwnerAttributes())).toEqual(["post_id"]);
 
-      // CollectionProxy#push (insert_record)
       const pushed = new SpecialComment({ body: "pushed sti comment" });
       await post.specialComments.push(pushed);
       expect(Number(pushed._readAttribute("post_id"))).toBe(Number(post.id));
@@ -893,19 +836,11 @@ describe("DefaultScopingTest", () => {
     });
   });
 
-  // Singular sibling of the STI write-path fix: the has_one read (loadHasOne),
-  // build (Association#build), and assign (set#{Name}) paths on an STI subclass owner
-  // must derive the foreign key from the class that *declared* the association
-  // (`Post` → `post_id`), not the owner instance's class (`SpecialPost` →
-  // `special_post_id`). Mirrors Rails using `reflection.foreign_key`.
   it("sti has_one read build and assign paths use the declaring-class foreign key", async () => {
     const post = posts("thinking") as any;
     expect(post.constructor.name).toBe("SpecialPost");
 
     await (Comment as any).unscoped(async () => {
-      // loadHasOne reads via comments.post_id, not the nonexistent
-      // special_post_id. Use a fresh STI owner so no cached/assigned target
-      // masks the DB read.
       const reader = (await SpecialPost.create({ title: "sti reader", body: "x" })) as any;
       const comment = await Comment.create({
         type: "VerySpecialComment",
@@ -915,16 +850,10 @@ describe("DefaultScopingTest", () => {
       const loaded = await reader.loadHasOne("verySpecialComment");
       expect(loaded.id).toBe(comment.id);
 
-      // The has_one writer writes the declaring-class FK onto a freshly assigned target.
       const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
       await post.setVerySpecialComment(assigned);
       expect(Number(assigned._readAttribute("post_id"))).toBe(Number(post.id));
 
-      // Association#buildRecord sets the declaring-class FK on the built target.
-      // Build on an owner with no comment: Rails' `build` runs `load_target` +
-      // `remove_target!`, and nullifying a displaced comment's `post_id` would
-      // hit the column's NOT NULL constraint rather than exercise the FK
-      // derivation this asserts.
       const builder = (await SpecialPost.create({ title: "sti builder", body: "x" })) as any;
       const built = await builder
         .association("verySpecialComment")
@@ -933,8 +862,6 @@ describe("DefaultScopingTest", () => {
     });
   });
 
-  // `unscope({ where: "title" })` strips only the default-scope `title`
-  // predicate; the implicit STI `type IN (...)` condition survives.
   it("sti conditions are not carried in default scope", async () => {
     await ConditionalStiPost.create({ body: "" });
     await SubConditionalStiPost.create({ body: "" });
@@ -967,8 +894,6 @@ describe("DefaultScopingTest", () => {
     expect(first.id).toBe(comment.id);
   });
 
-  // `post.first_comment` lazy-loads the singular association; the trails idiom
-  // for a lazy has_one load is the async `loadHasOne` accessor.
   it("default scope with references works through association", async () => {
     const post = (await PostWithCommentWithDefaultScopeReferencesAssociation.create({
       title: "Hello World",
@@ -997,12 +922,6 @@ describe("DefaultScopingTest", () => {
   });
 });
 
-// Rails defines `DefaultScopingWithThreadTest` `unless in_memory_db?`. Mirror
-// that gate with `describe.skipIf(inMemoryDb())` so the class is omitted on the
-// anonymous-`:memory:` sqlite lane exactly as upstream. On the file-backed
-// sqlite / pg / mysql lanes the gate is open, but the bodies still cannot run:
-// they require real OS threads (Thread.new / Concurrent::CyclicBarrier), which
-// JS lacks, so each case stays `it.skip` with that as the recorded reason.
 describe.skipIf(inMemoryDb())("DefaultScopingWithThreadTest", () => {
   // PERMANENT-SKIP: needs real OS threads (Thread.new); not portable to JS.
   it.skip("default scoping with threads", () => {
@@ -1010,7 +929,6 @@ describe.skipIf(inMemoryDb())("DefaultScopingWithThreadTest", () => {
   });
 
   // PERMANENT-SKIP: needs real OS threads + Concurrent::CyclicBarrier; not
-  // portable to JS.
   it.skip("default scope is threadsafe", async () => {
     await ThreadsafeDeveloper.unscoped().create();
     await ThreadsafeDeveloper.unscoped().create();

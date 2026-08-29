@@ -1,13 +1,9 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/mixins.yml
-
-// Nested set mixins: set_1..set_10 with ids 3001..3010.
 const sets = Object.fromEntries(
   Array.from({ length: 10 }, (_, i) => [`set_${i + 1}`, { id: i + 3001 }]),
 );
 
-// Big old set: [id, parent_id, lft, rgt].
 const treeRows: ReadonlyArray<readonly [number, number, number, number]> = [
   [4001, 0, 1, 20],
   [4002, 4001, 2, 7],

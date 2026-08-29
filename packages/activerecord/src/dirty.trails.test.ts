@@ -1,11 +1,3 @@
-/**
- * `dirty_test.rb` covers `restore_attribute!` only for an assigned attribute
- * (`:153-161`), so this pins the in-place arm, which has no Rails test to
- * mirror. Rails' `restore_attribute!` (activemodel/lib/active_model/dirty.rb:
- * 414-420) guards on `attribute_changed?` — true for an attribute mutated in
- * place as well as one assigned — and writes back `attribute_was`, so a mutated
- * serialized Hash IS restored.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";

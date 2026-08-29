@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/zines.yml
 export const zineFixtureData = {
   staying_in: {
     title: "Staying in '08",

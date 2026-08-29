@@ -43,11 +43,6 @@ function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
 }
 
 describe("CollectionCacheKeyTest", () => {
-  // One test deliberately runs `cache_key(:published_at)` against a column that
-  // doesn't exist; on Postgres the resulting StatementInvalid aborts the
-  // transaction. It still runs transactionally because the fixture teardown
-  // skips its redundant DELETEs while the pinned transaction is open, so the
-  // abort no longer poisons the rollback.
   const { topics, projects } = fixtures([
     "developers",
     "developersProjects",

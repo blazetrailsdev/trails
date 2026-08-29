@@ -2,7 +2,6 @@ import type { Relation } from "../../relation.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
-// vendor/rails/activerecord/test/models/account.rb
 import { Base } from "../../base.js";
 
 export class Account extends Base {
@@ -42,13 +41,7 @@ export class Account extends Base {
     });
 
     this.beforeDestroy(function (this: Account, record?: Account) {
-      // The framework passes the record as the first argument; `this` may be
-      // unbound depending on the callback dispatch path. Prefer the argument.
       const self = (record ?? this) as any;
-      // Mirrors Rails `before_destroy { |account| ... if account.firm }`. Both
-      // the dependent-destroy cascade and the direct destroy now materialize
-      // `account.firm` before this sync reader runs, so it sees the record (or
-      // null) rather than the async reader's Promise.
       const firm = self?.firm;
       if (firm) {
         const ids = Account.destroyedAccountIds();

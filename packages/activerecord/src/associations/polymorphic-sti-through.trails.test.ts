@@ -1,32 +1,3 @@
-/**
- * HABTM Slot E — Polymorphic + STI through.
- *
- * Pins the contract for two intersecting through-association shapes
- * that Rails exercises but our previous regression coverage skipped:
- *
- *   - `has_many :through` whose source reflection is a polymorphic
- *     belongs_to, disambiguated by `source_type:` ("polymorphic
- *     has_many through"). The fixture layers this on top of a
- *     nested through (Hotel → Departments → Chefs), so `HasManyAssociation#findTarget`
- *     routes through `HasManyThroughAssociation#findTarget`'s walker rather than the
- *     final-step JOIN/AssociationScope path. Both that walker and
- *     the `includes()` preloader must filter through-records by the
- *     polymorphic discriminator (`*_type`) and only materialize the
- *     matching target class.
- *   - Two source-typed associations layered on the same intermediate
- *     (`joined_different_table_twice` in Rails) load disjoint sets.
- *
- * Also pins HMT Slot D's punted intermediate-table `where(...)`
- * contract: filtering the outer relation while preloading a
- * polymorphic-through must preserve every preloaded target (no
- * silent drops via JOIN-collapsed cardinality).
- *
- * Mirrors selected scenarios from
- * vendor/rails/activerecord/test/cases/associations/nested_through_associations_test.rb
- *   - test_polymorphic_has_many_through_when_through_association_has_not_loaded
- *   - test_polymorphic_has_many_through_joined_different_table_twice
- *   - test_has_many_through_reset_source_reflection_after_loading_is_complete
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -75,8 +46,6 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
       [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
-    // source_type filter must exclude DrinkDesigner rows even when their id
-    // collides with a CakeDesigner id (different tables share auto-increment sequences).
     expect(cakes.every((d: any) => d instanceof CakeDesigner)).toBe(true);
     expect(cakes.some((d: any) => d instanceof DrinkDesigner)).toBe(false);
   });
@@ -118,9 +87,6 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     expect(drinks.every((d: any) => d instanceof DrinkDesigner)).toBe(true);
   });
 
-  // STI subclass at the polymorphic leaf requires a `type` column on cake_designers.
-  // The canonical cake_designers table has no columns at all (test schema mirrors Rails).
-  // Port pending schema addition of type column to cake_designers.
   it.todo(
     "STI subclass at the polymorphic leaf materializes with the correct constructor under both load paths",
   );
@@ -129,7 +95,6 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const { hotel, cake1, cake2 } = await seed();
     const [h] = await Hotel.where({ id: (hotel as any).id }).includes(":cakeDesigners");
     const preloaded = (h.association("cakeDesigners").target ?? []) as any[];
-    // Filtering the outer relation must not silently drop preloaded targets.
     expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
       [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
@@ -154,7 +119,6 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     expect(secondIds).toEqual(
       [(h2cake1 as any).id, (h2cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
-    // No leakage between preloads.
     expect(secondIds.every((id) => !firstIds.includes(id))).toBe(true);
   });
 });

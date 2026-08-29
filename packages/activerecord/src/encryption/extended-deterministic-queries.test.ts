@@ -14,27 +14,14 @@ import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
 import { UniquenessValidator } from "../validations.js";
-// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 
 fixtures([], { useTransactionalTests: false });
 
-// 32 bytes (base64-encoded) for AES-256-GCM. Cipher decodes the key from
-// base64, so we pad a known repeating byte to 32 bytes and encode. Shared
-// across the five Book model classes so they round-trip the same rows.
 const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
 
-/**
- * Shared fixture for the Rails port of ExtendedDeterministicQueriesTest.
- * Mirrors Rails' `models/book_encrypted.rb`: one `books` table, five model
- * classes pointing at it with different encryption configurations.
- *
- * Schema and classes are built once in beforeAll so transactional fixtures
- * can wrap each test in BEGIN/ROLLBACK — DDL inside beforeEach would
- * auto-commit on MariaDB and break the outer wrap.
- */
 function buildBooks() {
   class UnencryptedBook extends Base {
     static {
@@ -88,10 +75,6 @@ function buildBooks() {
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
   let books: ReturnType<typeof buildBooks>;
 
-  // Snapshot global state up front and restore it after the whole
-  // block. Configurable.config and Relation/Base/EncryptedAttributeType
-  // prototypes are shared across the Vitest worker; leaving them
-  // mutated would make sibling test files order-dependent.
   const savedConfig = {
     extendQueries: Configurable.config.extendQueries,
     supportUnencryptedData: Configurable.config.supportUnencryptedData,
@@ -123,9 +106,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     installExtendedQueriesIfConfigured();
 
     books = buildBooks();
-    // Warm the books table once before any test runs so the first create
-    // doesn't race with the test-adapter's regex-recovery schema path on
-    // MariaDB. Subsequent tests reuse the warmed schema cache.
     await books.EncryptedBook.where("1=1");
   });
 
@@ -241,11 +221,8 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
   });
 
   it("AdditionalValue in where clause survives toSql without throwing", () => {
-    // Regression: visitArelNodesCasted must resolve valueForDatabase() on
-    // AdditionalValue so strict adapter quoters don't receive a raw object.
     const { EncryptedBook } = books;
     const relation = EncryptedBook.where({ name: "Agile Web Development" });
-    // toSql() must not throw and must produce a WHERE fragment with a string value.
     const sql = relation.toSql();
     expect(typeof sql).toBe("string");
     expect(sql).toMatch(/WHERE/i);
@@ -280,8 +257,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValu
 });
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery#processArguments", () => {
-  // Use a deterministic scheme with a previous scheme so expansion
-  // actually produces AdditionalValue wrappers we can assert on.
   function modelWithDeterministicEmail() {
     const prev = new Scheme({ deterministic: true, encryptor: new NullEncryptor() });
     const type = new EncryptedAttributeType({
@@ -298,9 +273,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
   }
 
   it("short-circuits when checkForAdditionalValues=true and the last array element is an AdditionalValue", () => {
-    // Rails: `return value if check_for_additional_values && value.last.is_a?(AdditionalValue)`.
-    // Prevents a chained `.where()` on the same relation from re-expanding
-    // an already-expanded condition into AV-of-AV.
     const model = modelWithDeterministicEmail();
     const type = model.typeForAttribute();
     const already = [new AdditionalValue("x", type)];
@@ -317,18 +289,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
     const [out] = EncryptedQuery.processArguments(model, [{ email: already }], false) as [
       Record<string, unknown[]>,
     ];
-    // Without short-circuit, the AV is re-expanded (wrapped in a fresh AV).
     expect(out.email.length).toBeGreaterThan(already.length);
   });
 
   it("preserves in-place AdditionalValue elements when checkForAdditionalValues=true", () => {
-    // Rails: within flat_map, `each_value` that is already an AV passes
-    // through untouched instead of running through additional_values_for.
     const model = modelWithDeterministicEmail();
     const type = model.typeForAttribute();
     const av = new AdditionalValue("x", type);
-    // Mix: a plaintext AND an AV that isn't last — so the whole-array
-    // short-circuit doesn't apply, but the per-element check should.
     const [out] = EncryptedQuery.processArguments(model, [{ email: [av, "y"] }], true) as [
       Record<string, unknown[]>,
     ];
@@ -367,9 +334,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     };
 
     const result = RelationQueries.scopeForCreate.call(relation, () => ({}));
-    // scope_for_create keeps the AV reference so serialize unwraps to
-    // ciphertext on save without re-encrypting (our cast->toString
-    // path would otherwise double-encrypt a plaintext-unwrapped value).
     expect(result.email).toBe(avCurrent);
   });
 
@@ -424,7 +388,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     }
     const rel = Contact.all().where({ email: ["a@x", "b@x"] });
     expect(rel.whereValuesHash()).toEqual({ email: ["a@x", "b@x"] });
-    // scope_for_create filters the IN array out (Rails: equality_only=true).
     expect(rel.scopeForCreate()).toEqual({});
   });
 
@@ -458,8 +421,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
 });
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport", () => {
-  // Use isolated classes / prototype clones so patches don't bleed into
-  // the other test files running in the same process.
   function isolatedTargets() {
     class FakeRelation {
       _model: any;
@@ -524,8 +485,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       rel.where({ email: "a@x" });
       const captured = rel._lastWhere.email as unknown[];
       expect(Array.isArray(captured)).toBe(true);
-      // Rails shape: raw plaintext at [0] (the PredicateBuilder serializes it
-      // through the resolved type), previous-scheme AVs after it.
       expect(captured[0]).toBe("a@x");
       expect(captured[1]).toBeInstanceOf(AdditionalValue);
     });
@@ -585,7 +544,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       });
       const av = new AdditionalValue("plain", type);
       expect(type.serialize(av)).toBe(av.value);
-      // Non-AdditionalValue still flows through the original serialize path.
       expect(typeof type.serialize("raw")).toBe("string");
     });
   });
@@ -612,7 +570,6 @@ describe("installExtendedQueriesIfConfigured", () => {
     const prev = Configurable.config.extendQueries;
     Configurable.config.extendQueries = false;
     try {
-      // Simulate a fresh process.
       (ExtendedDeterministicQueries as any)._installed = false;
       const installed = installExtendedQueriesIfConfigured();
       expect(installed).toBe(false);
@@ -643,9 +600,6 @@ describe("installExtendedQueriesIfConfigured", () => {
       expect((Base as any).findBy).not.toBe(origFindBy);
       expect(EncryptedAttributeType.prototype.serialize).not.toBe(origSerialize);
     } finally {
-      // Restore every patched entrypoint — leaving exists/scopeForCreate
-      // patched would make sibling tests in the same Vitest process
-      // order-dependent.
       Relation.prototype.where = origWhere;
       (Relation.prototype as any).exists = origExists;
       (Relation.prototype as any).scopeForCreate = origScopeForCreate;

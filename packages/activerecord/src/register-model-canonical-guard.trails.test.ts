@@ -1,14 +1,3 @@
-/**
- * Trails-only: guards `registerModel` against a bespoke inline model silently
- * shadowing a canonical one in the global registry. The registry is never torn
- * down between tests, so an early `registerModel("Author", BespokeAuthor)`
- * poisons every later test that resolves "Author" as an association target — a
- * wrong-value failure that never announces itself. There is no Rails analogue
- * (Ruby autoloading owns the constant), so this lives in a `.trails.test.ts`.
- *
- * The guard is only armed once the canonical autoload index is installed, so
- * this file imports it for its side effect.
- */
 import "./support/canonical-model-index.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "./index.js";
@@ -104,15 +93,8 @@ describe("registerModel canonical-name shadow guard", () => {
     const saved = [...modelRegistry.entries()];
     try {
       modelRegistry.clear();
-      // The invariant is that clear() drops every constant the registry owns,
-      // not that the name becomes unresolvable: a name rebound elsewhere (see
-      // the rebind case above) keeps the other writer's binding, since
-      // unregisterConstant only removes a constant that is still the registry's.
       for (const [name, model] of saved) expect(safeConstantize(name)).not.toBe(model);
     } finally {
-      // Replay each key the way it was installed: a bare `set` key (e.g. the
-      // habtm join key) must not come back with the `_registryKeys` entry and
-      // counter-cache flush that only `registerModel` performs.
       for (const [name, model] of saved) {
         if (model._registryKeys?.includes(name)) registerModel(name, model);
         else modelRegistry.set(name, model);

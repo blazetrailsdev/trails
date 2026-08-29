@@ -6,9 +6,6 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
 
-// Rails `fixtures :topics`. Recreate the canonical topics table empty so the
-// forwarder/aggregate assertions run against a clean shape on the shared worker
-// DB; the static forwarders only assert relation/promise types, not row data.
 fixtures({ topics: [Topic, {}] });
 
 describe("QueryingTest — static forwarders on Base", () => {
@@ -147,8 +144,6 @@ describe("QueryingTest — static forwarders on Base", () => {
   });
 
   it("except() does not re-erase the part when later merged (unlike unscope)", () => {
-    // Rails `except(:order)` deletes values one-shot; it must not record
-    // unscope_values, so merging the result preserves the other side's order.
     const merged = Topic.except("order").merge(Topic.order("id"));
     expect(merged.toSql()).toContain("ORDER BY");
   });
@@ -212,10 +207,7 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("accepts preparable/async/allowRetry opts without error", async () => {
-    // `find_by_sql` → `select_all` → `internal_exec_query` (Rails); trails'
-    // `selectAll` routes through `internalExecQuery`, so that is the seam.
     vi.spyOn(Topic.connection, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
-    // _queryBySql returns the full Result so _loadFromSql can read column_types.
     const result = await _queryBySql.call(Topic, "SELECT 1", [], {
       preparable: true,
       async: false,

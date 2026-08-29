@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/associations/eager_load_nested_include_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -11,11 +8,6 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 
-// Inline models mirroring the polymorphic graph defined in the Rails test
-// (eager_load_nested_include_test.rb). The Rails test declares these classes in
-// the test file itself; the tables (circles, squares, triangles, paint_colors,
-// paint_textures, non_poly_ones, non_poly_twos, shape_expressions) are canonical
-// TEST_SCHEMA tables.
 class ShapeExpression extends Base {
   declare shape_type: string;
   declare shape_id: number;
@@ -181,8 +173,6 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
       post_id: firstPost.id,
     });
 
-    // @daveyMcdave has no author_favorites; the nested include must not raise
-    // when constructing objects across the missing branch.
     await Author.all()
       .includes(
         { ":posts": ":comments" },

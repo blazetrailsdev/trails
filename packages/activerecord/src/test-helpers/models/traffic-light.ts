@@ -1,5 +1,4 @@
 import type { Temporal } from "@blazetrails/date";
-// vendor/rails/activerecord/test/models/traffic_light.rb
 import { Base } from "../../base.js";
 
 export class TrafficLight extends Base {

@@ -1,8 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- * Mirrors: activerecord/test/cases/batches_test.rb
- */
 import { describe, it, expect, vi } from "vitest";
 import { Relation, Base } from "./index.js";
 import { Batches } from "./relation/batches.js";
@@ -23,11 +18,6 @@ import { Tagging } from "./test-helpers/models/tagging.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { registerModel } from "./associations.js";
 
-// ==========================================================================
-// EachTest — targets batches_test.rb
-// ==========================================================================
-// Tagging and Tag must be in the model registry so Post's hasManyTaggings
-// dependent:destroy cascade can resolve them.
 registerModel([Tagging, Tag]);
 
 describe("EachTest", () => {
@@ -248,7 +238,7 @@ describe("EachTest", () => {
     for await (const batch of Post.findInBatches({ batchSize: 1 })) {
       expect(Array.isArray(batch)).toBe(true);
       expect(batch[0]).toBeInstanceOf(Post);
-      batch.splice(0, batch.length); // mutate batch; next iteration should not be affected
+      batch.splice(0, batch.length);
     }
   });
 
@@ -501,7 +491,6 @@ describe("EachTest", () => {
   });
 
   it("in batches destroy all returns rows affected", async () => {
-    // 1 record is not destroyed because of the callback (id === 1 throws abort)
     const count = await PostWithDestroyCallback.inBatches({ of: 2 }).destroyAll();
     expect(count).toBe(10);
   });
@@ -538,7 +527,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries", async () => {
     const posts = Post.all();
-    await posts; // load
+    await posts;
     const total = Number(await Post.count());
     let batchCount = 0;
     await assertQueriesCount(0, false, async () => {
@@ -552,7 +541,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries with order argument", async () => {
     const allPosts = Post.all().order("id asc");
-    await allPosts; // load
+    await allPosts;
     const total = Number(await Post.count());
     let batchCount = 0;
     await assertQueriesCount(0, false, async () => {
@@ -605,7 +594,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded can return an enum", async () => {
     const allPosts = Post.all();
-    await allPosts; // load
+    await allPosts;
     const total = Number(await Post.count());
     let batchCount = 0;
     await assertQueriesCount(0, false, async () => {
@@ -619,7 +608,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries when batching over cpk model", async () => {
     const incorrectlySorted = CpkOrder.order({ shop_id: "asc", id: "desc" });
-    await incorrectlySorted; // load
+    await incorrectlySorted;
     const correctlySorted = await CpkOrder.order({ shop_id: "desc", id: "asc" });
     const expected = correctlySorted.slice(1, correctlySorted.length - 1);
     const startId = (expected[0] as any).id;
@@ -647,7 +636,7 @@ describe("EachTest", () => {
     });
     try {
       const orderedPosts = Post.order("id desc");
-      await orderedPosts; // load
+      await orderedPosts;
       const expected = await Post.order("id desc");
       const collected: any[] = [];
       for await (const post of orderedPosts
@@ -934,7 +923,7 @@ describe("EachTest", () => {
       await batch.where({ author_id: 1 }).updateAll({ author_id: 2 });
     }
     await person!.reload();
-    expect(person!.readAttribute("author_id")).toBe(2); // updated only once
+    expect(person!.readAttribute("author_id")).toBe(2);
   });
 
   it("in batches with custom columns raises when start missing items", async () => {
@@ -952,14 +941,12 @@ describe("EachTest", () => {
   });
 
   it("in batches with custom columns raises when non unique columns", async () => {
-    // non-unique column: must raise
     await expect(async () => {
       for await (const _rel of Post.inBatches({ cursor: "title" })) {
         break;
       }
     }).rejects.toThrow();
 
-    // primary key column: must not raise
     let threw = false;
     try {
       for await (const _rel of Post.inBatches({ cursor: "id" })) {
@@ -1143,14 +1130,12 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should start from the start option when using composite primary key", async () => {
-    // Fixture cpk_orders have null shop_ids (schema uses single-pk id); create
-    // explicit records with non-null composite keys so start: works correctly.
     await CpkOrder.deleteAll();
     await CpkOrder.create({ id: [1, 1], status: "paid" });
     await CpkOrder.create({ id: [1, 2], status: "paid" });
     await CpkOrder.create({ id: [2, 3], status: "cancelled" });
     const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[1]; // second
+    const order = allOrders[1];
     let firstRelation: any = null;
     for await (const rel of CpkOrder.inBatches({ of: 1, start: (order as any).id })) {
       firstRelation = rel;
@@ -1166,7 +1151,7 @@ describe("EachTest", () => {
     await CpkOrder.create({ id: [1, 2], status: "paid" });
     await CpkOrder.create({ id: [2, 3], status: "cancelled" });
     const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
-    const order = allOrders[allOrders.length - 2]; // second_to_last
+    const order = allOrders[allOrders.length - 2];
     const batches: any[] = [];
     for await (const rel of CpkOrder.inBatches({ of: 1, finish: (order as any).id })) {
       batches.push(rel);

@@ -2,7 +2,6 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
-// vendor/rails/activerecord/test/models/ship_part.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 

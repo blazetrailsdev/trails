@@ -1,10 +1,3 @@
-/**
- * Covers walk() deduplication in JoinDependency — when two JoinDependency
- * instances share a subtree, merging via joinConstraints() should emit
- * exactly one join per unique (parent, association) pair.
- *
- * Mirrors: Rails JoinDependency walk() / make_constraints behavior.
- */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
@@ -13,9 +6,6 @@ import { JoinDependency } from "./join-dependency.js";
 import { Nodes, Table } from "@blazetrails/arel";
 
 describe("JoinDependency walk() deduplication", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
   fixtures({});
 
   class Post extends Base {
@@ -58,7 +48,6 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("deduplicates a matched has_many :through subtree across joinsToAdd", () => {
-    // Matched `walk` branch: oj's provisional through-group dedups to the left's resolved chain.
     const jd1 = new JoinDependency(Post, null, "commentLikes", Nodes.OuterJoin);
     const jd2 = new JoinDependency(Post, null, "commentLikes", Nodes.OuterJoin);
 
@@ -67,7 +56,6 @@ describe("JoinDependency walk() deduplication", () => {
       const t = (j as Nodes.OuterJoin).left;
       return (t as any).tableAlias ?? (t as any).name;
     });
-    // through (comments) + target (likes), deduped to a single chain.
     expect(joins).toHaveLength(2);
     expect(tables.filter((t) => t === "comments")).toHaveLength(1);
     expect(tables.filter((t) => t === "likes")).toHaveLength(1);
@@ -132,13 +120,6 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("rebinds ON predicates to merged parent alias when table names collide", () => {
-    // Mirrors Rails: cascaded eager loading with self-table reference.
-    // Post has both "comments" and "reviews" targeting the Comment model/table.
-    // jd1 joins comments (gets "comments") then reviews (collision → aliased).
-    // jd2 joins reviews (gets "comments" — no collision in its own namespace)
-    //      then reviews.likes.
-    // After walk merges jd2's "reviews" into jd1's aliased "reviews",
-    // the likes ON predicate must reference jd1's alias, not jd2's "comments".
     clearReflectionsCache(Post);
     Post.hasMany("reviews", { className: "Comment" });
 
@@ -148,15 +129,12 @@ describe("JoinDependency walk() deduplication", () => {
 
     const joins = jd1.joinConstraints([jd2]);
 
-    // jd1 emits: comments (table "comments"), reviews (table aliased e.g. "t2")
-    // jd2's "likes" should reference jd1's reviews alias in its ON predicate.
     const likesJoin = joins.find((j) => {
       const table = (j as Nodes.OuterJoin).left;
       return (table as any).name === "likes" || (table as any).tableAlias === "likes";
     }) as Nodes.OuterJoin | undefined;
     expect(likesJoin).toBeDefined();
 
-    // Extract all table references from the ON predicate
     const onNode = likesJoin!.right as Nodes.On;
     const referencedTables = new Set<string>();
     function collectTableRefs(node: unknown): void {
@@ -175,8 +153,6 @@ describe("JoinDependency walk() deduplication", () => {
     }
     collectTableRefs(onNode.expr);
 
-    // The ON predicate must NOT reference "comments" for the parent side —
-    // that's jd2's un-aliased name. It should reference jd1's alias (e.g. "t2").
     const jd1ReviewsJoin = joins.find((j) => {
       const table = (j as Nodes.OuterJoin).left as Table | Nodes.TableAlias;
       const realName = table instanceof Nodes.TableAlias ? table.tableName : table.name;

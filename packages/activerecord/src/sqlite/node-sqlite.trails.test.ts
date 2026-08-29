@@ -107,10 +107,6 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
   });
 
   it("databaseExists() preserves a relative file: URI (cwd-relative, not /-anchored)", async () => {
-    // node:sqlite enables SQLITE_OPEN_URI, so open() opens `file:name.db`
-    // relative to cwd (as `./name.db`), not as a literal file named
-    // "file:name.db" nor "/name.db". databaseExists() must check that same
-    // cwd-relative path rather than anchoring the URI body at "/".
     const relName = `node-rel-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
     try {
       const conn = await nodeSqliteDriver.open({ database: `file:${relName}` });
@@ -124,9 +120,7 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
       for (const p of [relName, `${relName}-wal`, `${relName}-shm`]) {
         try {
           getFs().unlinkSync(p);
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     }
   });
@@ -139,17 +133,9 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
 });
 
 describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite strict", () => {
-  // node:sqlite exposes SQLITE_DBCONFIG_DQS_* via the
-  // `enableDoubleQuotedStringLiterals` open option. With strict: true DQS is
-  // disabled, so `SELECT "missing_col"` raises "no such column". With
-  // strict: false (the default) the unknown double-quoted token is parsed
-  // as a string literal and SELECT returns its text verbatim.
   it("rejects unknown double-quoted identifiers under strict: true", async () => {
     const conn = await nodeSqliteDriver.open({ database: ":memory:", strict: true });
     try {
-      // node:sqlite raises at prepare() time (not get()) when DQS is off and
-      // the identifier is unknown — wrap the call so expect() catches the
-      // synchronous throw rather than evaluating it as an argument.
       expect(() => conn.prepare(`SELECT "missing_col" AS v`)).toThrow(/no such column/i);
     } finally {
       await conn.close();
@@ -172,8 +158,6 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite restoreFro
   const templatePath = `${getOs().tmpdir()}/nodesqlite-restore-template-${process.pid}.sqlite`;
   const destPath = `${getOs().tmpdir()}/nodesqlite-restore-dest-${process.pid}.sqlite`;
 
-  // All temp DB files this suite touches (main + WAL sidecars), so setup can
-  // pre-clean and teardown can remove every artifact.
   const tempFiles = [
     templatePath,
     `${templatePath}-wal`,
@@ -186,20 +170,14 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite restoreFro
     for (const p of tempFiles) {
       try {
         getFs().unlinkSync(p);
-      } catch {
-        /* best effort */
-      }
+      } catch {}
     }
   };
 
   beforeAll(async () => {
-    // Pre-clean so a prior interrupted run's leftover template (same pid path)
-    // can't make CREATE TABLE throw "table gadgets already exists".
     removeTempFiles();
     const tpl = await nodeSqliteDriver.open({ database: templatePath });
     await tpl.exec(
-      // The table lives in this suite's own temp template file, which
-      // afterAll deletes wholesale — there is no shared database to leak into.
       // eslint-disable-next-line blazetrails/require-table-teardown
       "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
         "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",

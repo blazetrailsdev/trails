@@ -1,9 +1,3 @@
-/**
- * Cache key and URL param generation for ActiveRecord models.
- *
- * Mirrors: ActiveRecord::Integration
- */
-
 import { Temporal } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, toFs, truncate } from "@blazetrails/activesupport";
@@ -19,20 +13,6 @@ interface Identifiable {
 
 type TemporalTimestamp = Temporal.Instant;
 
-// ──────────────────────────────────────────────
-// to_param helpers
-// ──────────────────────────────────────────────
-
-// ──────────────────────────────────────────────
-// Instance methods
-// ──────────────────────────────────────────────
-
-/**
- * Returns a string suitable for use in URLs.
- * For composite primary keys, joins with param_delimiter (default "_").
- *
- * Mirrors: ActiveRecord::Integration#to_param
- */
 export function toParam(this: Identifiable): string | null {
   const pk = this.id;
   if (pk == null) return null;
@@ -40,15 +20,7 @@ export function toParam(this: Identifiable): string | null {
   return Array.isArray(pk) ? pk.join(paramDelimiter) : String(pk);
 }
 
-/**
- * Returns the max of updated_at / updated_on as a Date, or null.
- *
- * Mirrors: ActiveRecord::Integration#max_updated_column_timestamp
- */
 function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
-  // Mirrors Rails timestamp.rb:163-167 — reads `timestamp_attributes_for_update_in_model`,
-  // which maps updated_at/updated_on through `attribute_aliases` to the real
-  // column (e.g. Developer's updated_at → legacy_updated_at) before reading.
   const aliases: Record<string, string> = record.constructor?.attributeAliases ?? {};
   const candidates: TemporalTimestamp[] = [];
   for (const name of ["updated_at", "updated_on"] as const) {
@@ -64,18 +36,8 @@ function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
   return candidates.reduce((a, b) => (Temporal.Instant.compare(a, b) >= 0 ? a : b));
 }
 
-/**
- * Returns a stable cache key. When cache_versioning is on, excludes the
- * timestamp (use cache_version for that). When off, embeds the timestamp.
- *
- * Mirrors: ActiveRecord::Integration#cache_key
- */
 export function cacheKey(this: Identifiable): string {
   const klass = this.constructor as any;
-  // Rails keys on `model_name.cache_key` (ActiveModel::Name#cache_key, the
-  // underscored/pluralized/namespace-preserving collection key), not the table
-  // name — so a model whose table is overridden (e.g. CachedDeveloper,
-  // `self.table_name = "developers"`) still keys on `cached_developers`.
   const modelKey: string = klass.name ? klass.modelName.cacheKey : klass.tableName;
   const pk = this.id;
 
@@ -99,22 +61,11 @@ export function cacheKey(this: Identifiable): string {
   return `${modelKey}/${idStr}`;
 }
 
-/**
- * Returns the cache version (timestamp string) when cache_versioning is on.
- *
- * Mirrors: ActiveRecord::Integration#cache_version
- */
 export function cacheVersion(this: Identifiable): string | null {
   const klass = this.constructor as any;
   if (!klass.cacheVersioning) return null;
 
   if ((this as any).hasAttribute?.("updated_at")) {
-    // Mirrors Rails integration.rb:100-107. Fast path: when `updated_at` is
-    // still the raw DB string (not type-cast, not user-assigned),
-    // canUseFastCacheVersion reformats it WITHOUT invoking the `updated_at`
-    // type-casting reader. Only user-assigned values fall through to the
-    // alias-aware reader (so models aliasing updated_at to a real column
-    // still resolve their cache version).
     let timestamp = this.readAttributeBeforeTypeCast("updated_at");
     if (canUseFastCacheVersion(this, timestamp)) {
       return rawTimestampToCacheVersion(timestamp as string);
@@ -134,28 +85,12 @@ export function cacheVersion(this: Identifiable): string | null {
   return null;
 }
 
-/**
- * Returns a cache key along with the version.
- *
- * Mirrors: ActiveRecord::Integration#cache_key_with_version
- */
 export function cacheKeyWithVersion(this: Identifiable): string {
   const base = cacheKey.call(this);
   const version = cacheVersion.call(this);
   return version ? `${base}-${version}` : base;
 }
 
-// ──────────────────────────────────────────────
-// Class methods
-// ──────────────────────────────────────────────
-
-/**
- * Called with no argument: returns the class name (Module#to_param in Ruby).
- * Called with a method name: defines an instance #to_param that returns
- * "id-parameterized-value" (truncated to 20 chars at a word boundary).
- *
- * Mirrors: ActiveRecord::Integration::ClassMethods#to_param
- */
 export function toParamClass(
   this: { name: string; prototype: any },
   methodName?: string,
@@ -167,8 +102,6 @@ export function toParamClass(
   klass.prototype.toParam = function (this: any): string | null {
     const base: string | null = Object.getPrototypeOf(klass.prototype).toParam?.call(this) ?? null;
     if (!base) return base;
-    // Rails `send(method_name)` resolves to the attribute reader for column
-    // names; fall back to readAttribute when no generated accessor is present.
     let member = this[methodName];
     if (member === undefined && typeof this.readAttribute === "function") {
       member = this.readAttribute(methodName);
@@ -180,9 +113,6 @@ export function toParamClass(
   return undefined;
 }
 
-/**
- * Mirrors: ActiveRecord::Integration::ClassMethods#collection_cache_key
- */
 export function collectionCacheKey(
   this: { all(): any },
   collection?: any,
@@ -192,45 +122,11 @@ export function collectionCacheKey(
   return Promise.resolve(rel.computeCacheKey(timestampColumn));
 }
 
-// Matches DB timestamp strings in the form "YYYY-MM-DD HH:MM:SS" or
-// "YYYY-MM-DD HH:MM:SS.ffffff" — the only shapes rawTimestampToCacheVersion
-// can reliably strip-and-pad to a 20-char usec key. Rails relies on the
-// connection returning microsecond (≤6 fractional digit) strings; some trails
-// adapters serialize timestamps with sub-microsecond precision (e.g. SQLite
-// stores nanoseconds), which rawTimestampToCacheVersion would NOT truncate
-// (Rails' helper only pads, never trims), yielding a >20-char key. Capping the
-// fractional part at 6 digits keeps the fast path only when it produces the
-// same value the type-casting reader would; longer strings fall through to it.
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
 
 /**
- * Returns true when the raw DB timestamp string can be converted directly
- * to a cache version without re-parsing (fast path). Checks: string type,
- * usec format, default_timezone == utc, not user-assigned, and expected DB
- * timestamp shape. Rails reads the timezone via
- * `with_connection(&:default_timezone) == :utc`; trails reads it synchronously
- * from the process-wide `defaultTimezone` (kept in lockstep with the
- * connection's configured `default_timezone` by `establishConnection`), which
- * realizes Rails' own FIXME to cache this rather than checking out a connection.
- * When default_timezone is not UTC, the raw DB string can't be reused verbatim,
- * so we fall through to the type-casting reader. The `!updated_at_came_from_user?`
- * guard IS implemented — it reads the generated `updated_atCameFromUser`
- * (before_type_cast.rb:33; the attribute keeps its column name, so the
- * generated reader does too), which is sync — so a user-assigned DB-format
- * string (e.g. `record.updated_at = "2020-01-01 00:00:00"`) also correctly
- * falls through to the type-casting reader. The shape check (TIMESTAMP_RE) is an
- * additional trails-only safeguard against sub-microsecond raw strings.
- *
- * Mirrors: ActiveRecord::Integration#can_use_fast_cache_version? (private)
- *
  * @internal
- *
- * @missingRailsCall with_connection — PERMANENT: integration.rb:181-184 reads
- *   `self.class.with_connection(&:default_timezone)`. `withConnection` returns a
- *   Promise in trails and `canUseFastCacheVersion` is a synchronous predicate on
- *   the `cacheKey` / `cacheVersion` path, so it cannot await one; the port reads
- *   the global `ActiveRecord.defaultTimezone` instead — which is what Rails' own
- *   FIXME on that line asks for (do not check out a connection here).
+ * @missingRailsCall with_connection — PERMANENT
  */
 export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown): boolean {
   if (typeof timestamp !== "string") return false;
@@ -241,15 +137,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   return TIMESTAMP_RE.test(timestamp);
 }
 
-/**
- * Convert a raw DB timestamp string (e.g. "2018-10-15 20:02:15.266505") to a
- * compact 20-character cache version string, padding with trailing zeros if
- * Postgres truncated them.
- *
- * Mirrors: ActiveRecord::Integration#raw_timestamp_to_cache_version (private)
- *
- * @internal
- */
+/** @internal */
 export function rawTimestampToCacheVersion(timestamp: string): string {
   const key = timestamp.replace(/[-: .]/g, "");
   return key.length < 20 ? key.padEnd(20, "0") : key;

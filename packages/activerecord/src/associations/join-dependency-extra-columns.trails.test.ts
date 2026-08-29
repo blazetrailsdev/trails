@@ -7,9 +7,6 @@ import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency extra columns in instantiate", () => {
-  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `aliasedRow`, so no bespoke schema is declared
-  // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
   class Post extends Base {
@@ -84,9 +81,6 @@ describe("JoinDependency extra columns in instantiate", () => {
     ];
 
     const { parents, associations } = jd.instantiateFromRows(rows);
-    // The associations map is keyed by the RAW aliased PK value (the same key the
-    // parents dedup map uses), not the model-cast `_readAttribute` value — look it
-    // up by the raw row value (`t0_r0`) accordingly.
     const children = associations.get(1)?.get("comments") ?? [];
 
     expect(children).toHaveLength(1);

@@ -1,8 +1,3 @@
-/**
- * TS-only cases with no counterpart in
- * `activerecord/test/cases/migration/command_recorder_test.rb`.
- */
-
 import { describe, expect, it } from "vitest";
 import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
@@ -36,11 +31,6 @@ describe("CommandRecorder", () => {
   });
 
   it("runs a reverted transaction's block to completion before recording the command", async () => {
-    // `invert_transaction` runs the block through `sub_recorder.revert(&block)`
-    // and only then returns its tuple (command_recorder.rb:186-190), so the
-    // block's inverses land on this recorder BEFORE the `transaction` command
-    // that wraps them. The block awaits here: a fire-and-forget run would push
-    // the command first and append the inverses after it.
     const recorder = new CommandRecorder(abstractDelegate);
     const recordable = recorder as unknown as {
       transaction(fn: () => Promise<void>): Promise<void>;
@@ -55,14 +45,10 @@ describe("CommandRecorder", () => {
       });
     });
     expect(ran).toBe(1);
-    // The enclosing `revert` reverses the pair, so the command recorded last
-    // reads first.
     expect(recorder.commands.map((c) => c[0])).toEqual(["transaction", "removeColumn"]);
   });
 
   it("propagates a throw from a reverted transaction's block", async () => {
-    // Ruby's exception propagates synchronously out of `invert_transaction`
-    // (command_recorder.rb:187); the awaited block rejects the same call.
     const recorder = new CommandRecorder(abstractDelegate);
     const recordable = recorder as unknown as {
       transaction(fn: () => Promise<void>): Promise<void>;
@@ -161,7 +147,6 @@ describe("CommandRecorder", () => {
   describe("invert change table (non-bulk)", () => {
     it("accepts (tableName, fn) without explicit options", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      // short form: no options argument
       await recorder.changeTable("fruits", async (t) => {
         await t.string("name");
       });
@@ -268,7 +253,7 @@ describe("CommandRecorder", () => {
       await expect(
         recorder.revert(async () => {
           await recorder.changeTable("fruits", async (t) => {
-            await t.remove("kind"); // no type → not reversible
+            await t.remove("kind");
           });
         }),
       ).rejects.toThrow(IrreversibleMigration);
@@ -276,9 +261,6 @@ describe("CommandRecorder", () => {
   });
 
   describe("change_table surfaces adapter ColumnMethods shorthands (serial/bigserial)", () => {
-    // Mirrors Rails: the PG `ColumnMethods` mixin exposes `t.serial` /
-    // `t.bigserial` (SERIAL/BIGSERIAL) inside change_table — shorthands the
-    // adapter advertises via _columnMethodNames() beyond NATIVE_DATABASE_TYPES.
     const pgLike = pgDelegate;
 
     it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
@@ -330,14 +312,6 @@ describe("CommandRecorder", () => {
   });
 
   describe("change_table surfaces adapter ColumnMethods shorthands (MySQL unsigned/blob)", () => {
-    // Mirrors Rails: the MySQL `ColumnMethods` mixin exposes `t.unsignedInteger`,
-    // `t.mediumtext`, `t.longblob`, ... inside change_table — shorthands the
-    // adapter advertises via _columnMethodNames() beyond NATIVE_DATABASE_TYPES.
-    //
-    // The proxy normalizes the camelCase method name back to the snake symbol
-    // Rails' `define_column_methods` records (`unsignedInteger` ->
-    // `unsigned_integer`); single-token shorthands (mediumtext, longblob) are
-    // unchanged.
     const mysqlLike = mysqlDelegate;
 
     it("records addColumn for MySQL shorthands (up adds)", async () => {

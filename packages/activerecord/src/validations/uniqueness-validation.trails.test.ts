@@ -1,10 +1,3 @@
-/**
- * TS-only coverage for uniqueness validation that has no direct Rails test
- * counterpart: since RFC 0063 made the validation chain async, uniqueness runs
- * inside the context-threaded validate callback chain, so `on:` context options
- * gate it exactly like any other validator (the sibling deviation
- * `async-validations-honor-validation-context`).
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StrictValidationFailed } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
@@ -32,14 +25,10 @@ describe("UniquenessValidationContextTest", () => {
 
     await Topic.createBang({ title: "ctx-unique" });
 
-    // A brand-new record validates in the :create context, so the collision
-    // is caught.
     const dup = new Topic({ title: "ctx-unique" });
     expect(await dup.isValid()).toBe(false);
     expect(dup.errors.messagesFor("title")).toEqual(["has already been taken"]);
 
-    // A persisted record validates in the :update context, where an `on: :create`
-    // validator does not fire — even though its changed title now collides.
     const other = await Topic.createBang({ title: "ctx-other" });
     other.writeAttribute("title", "ctx-unique");
     expect(await other.isValid("update")).toBe(true);
@@ -50,12 +39,9 @@ describe("UniquenessValidationContextTest", () => {
 
     await Topic.createBang({ title: "upd-unique" });
 
-    // New record in :create context — the `on: :update` validator is skipped.
     const created = new Topic({ title: "upd-unique" });
     expect(await created.isValid("create")).toBe(true);
 
-    // Persisted record in :update context — the validator fires and catches the
-    // collision.
     const persisted = await Topic.createBang({ title: "upd-other" });
     persisted.writeAttribute("title", "upd-unique");
     expect(await persisted.isValid("update")).toBe(false);
@@ -63,10 +49,6 @@ describe("UniquenessValidationContextTest", () => {
   });
 
   it("strict: true raises StrictValidationFailed on a uniqueness collision", async () => {
-    // Rails leaves :strict in the validator options and forwards it to
-    // errors.add, which raises. In trails, validatesWith's (async-aware) strict
-    // wrapper awaits this DB-backed validator and raises StrictValidationFailed
-    // when it flags a collision.
     Topic.validatesUniquenessOf("title", { strict: true });
 
     await Topic.createBang({ title: "strict-dup" });
@@ -80,22 +62,9 @@ describe("UniquenessValidationContextTest", () => {
 });
 
 describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
-  // A model whose adapter is assigned directly (rather than leased from a pool)
-  // carries a NullPool. `covered_by_unique_index?` must still see the table's
-  // indexes: resolving the schema-cache target as `pool ?? adapter` hands the
-  // raw cache the NullPool, which exposes neither `withConnection` nor
-  // `indexes`, so the lookup quietly yields `[]` and the optimization silently
-  // stays off for every directly-assigned model. Rails has no counterpart —
-  // its `klass.schema_cache` is always pool-resolved.
   let adapter: TestDatabaseAdapter;
   let pool: ConnectionPool;
 
-  // A table of this suite's own rather than canonical `subscribers`: the raw
-  // pool reaches a private, empty `:memory:` database on the `sqlite3_mem`
-  // lane and the shared per-worker one everywhere else, so a canonical name
-  // could neither be created on one lane nor torn down on the other. Same
-  // shape as schema.rb:1169-1176 — the unique index on `nick` is what
-  // `covered_by_unique_index?` reads.
   class DirectSubscriber extends Subscriber {
     static _tableName = "direct_subscribers";
   }
@@ -115,8 +84,6 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   });
 
   afterAll(async () => {
-    // Written through the raw pool, outside any fixtures transaction, so the
-    // table outlives the file on the shared per-worker lanes unless dropped.
     await adapter.dropTable("direct_subscribers", { ifExists: true });
     pool.releaseConnection();
     await pool.disconnectBang();
@@ -129,12 +96,10 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
     const s = await DirectSubscriber.createBang({ nick: "direct-abc" });
     s.writeAttribute("name", "John");
 
-    // nick is unchanged and covered by a unique index, so no SELECT is issued.
     await assertNoQueries(false, async () => {
       await s.isValid();
     });
 
-    // A changed nick still consults the database.
     s.writeAttribute("nick", "direct-abc v2");
     await assertQueriesCount(1, false, async () => {
       await s.isValid();

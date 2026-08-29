@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/minivans.yml
 export const minivanFixtureData = {
   cool_first: {
     minivan_id: "m1",

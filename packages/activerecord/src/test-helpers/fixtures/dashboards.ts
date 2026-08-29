@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/dashboards.yml
 export const dashboardFixtureData = {
   cool_first: {
     dashboard_id: "d1",

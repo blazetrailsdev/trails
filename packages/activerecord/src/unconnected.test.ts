@@ -7,9 +7,6 @@ class TestRecord extends Base {}
 
 describe("TestUnconnectedAdapter", () => {
   let underlying: { active(): Promise<boolean> };
-  // Rails' `remove_connection` hands back the db_config the pool was opened
-  // from, and teardown re-establishes it — the ambient `arunit` connection is
-  // never named or rebuilt by hand here.
   let connectionName: DatabaseConfig | undefined;
 
   beforeEach(async () => {
@@ -17,9 +14,6 @@ describe("TestUnconnectedAdapter", () => {
     connectionName = Base.removeConnection();
   });
 
-  // Rails pairs the re-establish with `load_schema if in_memory_db?` — removing
-  // the connection destroys an in-memory database along with it. The ambient
-  // connection is a file, so the schema survives and there is nothing to reload.
   afterEach(async () => {
     await Base.establishConnection(connectionName);
   });
@@ -30,9 +24,6 @@ describe("TestUnconnectedAdapter", () => {
   });
 
   it("error message when connection not established", async () => {
-    // Rails' `error = assert_raise(...) { ... }` both asserts the raise and hands
-    // back the exception; vitest's `rejects.toThrow` returns nothing, so the
-    // rejection is captured first and re-thrown into the raise assertion.
     const error = await TestRecord.find(1).catch((e: unknown) => e);
     expect(() => {
       throw error;

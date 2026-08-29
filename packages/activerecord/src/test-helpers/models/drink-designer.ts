@@ -1,5 +1,4 @@
 import type { Chef } from "./chef.js";
-// vendor/rails/activerecord/test/models/drink_designer.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 

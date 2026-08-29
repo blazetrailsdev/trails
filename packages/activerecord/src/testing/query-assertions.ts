@@ -1,9 +1,3 @@
-/**
- * Query assertions — test helpers for asserting SQL query behavior.
- *
- * Mirrors: ActiveRecord::Assertions::QueryAssertions
- */
-
 import { Notifications } from "@blazetrails/activesupport";
 
 /** @internal */
@@ -15,12 +9,6 @@ export interface SqlPayload {
   [key: string]: unknown;
 }
 
-/**
- * Mirrors: ActiveRecord::Assertions::QueryAssertions::SQLCounter
- *
- * Collects SQL queries by subscribing to `sql.active_record` notifications.
- * `logFull` contains non-schema [sql, binds] pairs; `logAll` contains all sql strings.
- */
 export class SQLCounter {
   readonly logFull: [string, unknown[]][];
 
@@ -35,10 +23,6 @@ export class SQLCounter {
     return this.logFull.map(([sql]) => sql);
   }
 
-  /**
-   * Mirrors Ruby's `def call(*, payload)` — the payload is the last positional,
-   * whatever arity the notifier's subscriber hands it.
-   */
   call(...args: unknown[]): void {
     const payload = args[args.length - 1] as SqlPayload;
     if (payload.cached) return;
@@ -47,9 +31,6 @@ export class SQLCounter {
     this.logAll.push(sql);
 
     if (payload.name !== "SCHEMA") {
-      // `value.value_for_database if value.respond_to?(:value_for_database)`
-      // (query_assertions.rb:111). trails' QueryAttribute spells it as a
-      // getter, so the respond_to? test is a property check.
       const boundValues = (payload.binds ?? []).map((value: unknown) =>
         value != null && "valueForDatabase" in Object(value)
           ? (value as { valueForDatabase: unknown }).valueForDatabase
@@ -61,12 +42,6 @@ export class SQLCounter {
   }
 }
 
-/**
- * Asserts that the number of SQL queries executed in the given block matches
- * the expected count. If `count` is omitted, asserts at least one query ran.
- *
- * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_queries_count
- */
 export async function assertQueriesCount(
   count: number | undefined,
   includeSchema = false,
@@ -90,11 +65,6 @@ export async function assertQueriesCount(
   });
 }
 
-/**
- * Asserts that no SQL queries are executed in the given block.
- *
- * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_no_queries
- */
 export async function assertNoQueries(
   includeSchema = false,
   fn: () => void | Promise<void>,
@@ -102,12 +72,6 @@ export async function assertNoQueries(
   await assertQueriesCount(0, includeSchema, fn);
 }
 
-/**
- * Asserts that SQL queries matching `match` executed in the given block meet
- * the expected count. If `count` is omitted, asserts at least one match.
- *
- * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_queries_match
- */
 export async function assertQueriesMatch(
   match: RegExp,
   count: number | undefined,
@@ -118,7 +82,6 @@ export async function assertQueriesMatch(
   await Notifications.subscribed(counter, "sql.active_record", async () => {
     await fn();
     const queries = includeSchema ? counter.logAll : counter.log;
-    // Reset lastIndex before each test (and after) to mirror Ruby Regexp#=== (always stateless).
     const matchedQueries = queries.filter((query) => {
       match.lastIndex = 0;
       return match.test(query);
@@ -141,11 +104,6 @@ export async function assertQueriesMatch(
   });
 }
 
-/**
- * Asserts that no SQL queries matching `match` are executed in the given block.
- *
- * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_no_queries_match
- */
 export async function assertNoQueriesMatch(
   match: RegExp,
   includeSchema = false,

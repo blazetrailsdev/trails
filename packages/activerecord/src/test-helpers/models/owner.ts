@@ -4,7 +4,6 @@ import type { Temporal } from "@blazetrails/date";
 import type { Person } from "./person.js";
 import type { Pet } from "./pet.js";
 import type { Toy } from "./toy.js";
-// vendor/rails/activerecord/test/models/owner.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 

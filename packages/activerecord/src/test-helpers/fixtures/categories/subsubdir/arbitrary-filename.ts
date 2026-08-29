@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/categories/subsubdir/arbitrary_filename.yml
 export const categoriesSubsubdirArbitraryFilenameFixtureData = {
   sub_special_3: {
     id: 102,

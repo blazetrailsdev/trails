@@ -1,5 +1,4 @@
 import type { Club } from "./club.js";
-// vendor/rails/activerecord/test/models/sponsor.rb
 import { Base } from "../../base.js";
 
 export class Sponsor extends Base {

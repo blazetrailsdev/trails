@@ -1,43 +1,5 @@
-/**
- * Vitest setupFile for the activerecord project: claims this worker's database
- * isolation slot before any test code or import runs.
- *
- * Opens a bootstrap connection to a maintenance DB (never a slot DB, which the
- * worker may later drop and recreate) and tries an advisory lock for
- * slot N=1..slotPoolSize(). The pool is sized with headroom over the worker
- * count (see support/ar-db-slots.ts), so a worker recycling in between
- * files always finds a free slot. Claims the first free slot, publishes it as
- * `AR_DB_SLOT`, and holds the bootstrap connection for the life of the process
- * (lock released automatically on disconnect).
- *
- * The slot is published as a *number*, not as a rewritten connection URL:
- * `support/config.ts` applies the `_N` database suffix, so
- * every consumer derives the same worker database from one signal instead of
- * reading a mutated string.
- *
- *   PG:      pg_try_advisory_lock(hash(runToken), N)
- *   MariaDB: GET_LOCK('ar_test_slot_<runToken>_N', 0) — 0s timeout = non-blocking
- *
- * Both keys carry the run token because advisory locks are server-wide, not
- * database-scoped: without it, a second concurrent run against the same server
- * competes for — and exhausts — this run's pool of `workers + headroom` locks.
- *
- * Idempotent: the claimed slot is cached on globalThis so re-evaluation
- * (e.g. hot-module reloading in vitest watch mode) returns the same slot
- * without opening a second connection or consuming an additional lock.
- *
- * TRAILS_TEST_FORKS / AR_DB_FORKS: the requested vitest worker count, clamped
- * to the host's numCpus - 1 by workerForkCount() itself (via the OS adapter).
- * The advisory-slot pool is sized separately, with headroom over that count —
- * see support/ar-db-slots.ts (override with AR_DB_SLOTS).
- */
-
 import pg from "pg";
 import mysql from "mysql2/promise";
-// Eagerly load better-sqlite3 here (not just in cases/helper.ts): this
-// setupFile runs first, and ensureWorkerClone() needs the driver's
-// restoreFromPath backup primitive to clone the template into the per-worker
-// file.
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
@@ -45,35 +7,22 @@ import { SLOT_ENV, mysqlSettings, ownsSlotDatabase, postgresSettings } from "./s
 import { RUN_TOKEN_ENV, mysqlAdvisoryLockName, pgAdvisoryLockKey } from "./support/run-token.js";
 import { activeLane } from "./support/connection.js";
 
-// The run token globalSetup stamped before this worker forked. Advisory locks
-// are server-wide, not database-scoped, so keying them on the bare slot number
-// let a second concurrent run exhaust this run's slot pool. Deriving the key
-// from the token gives each run a disjoint key space. Empty when globalSetup
-// did not run, which is still a single consistent key space for that run.
 function runToken(): string {
   return process.env[RUN_TOKEN_ENV] ?? "";
 }
 
-// Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {
   __arAdvisorySlotPg?: number;
   __arAdvisorySlotMysql?: number;
 };
 
-// Bounded retry policy: when all slots are held, retry with linear backoff.
-// Workers that can't acquire within the window fail loudly rather than
-// silently sharing a DB.
 const SLOT_RETRY_ATTEMPTS = 20;
-const SLOT_RETRY_DELAY_MS = 250; // 20 × 250ms = 5s max wait
+const SLOT_RETRY_DELAY_MS = 250;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// The pool is sized at the effective fork count + headroom (ar-db-slots.ts), so
-// exhaustion means more workers ran concurrently than that count promises —
-// name both numbers so that reads as a worker-cap bug, not a schema-setup
-// regression.
 function slotExhaustionMessage(fn: string, lockKind: string, slots: number): string {
   return (
     `${fn}: all ${slots} ${lockKind} slots are held after ` +
@@ -87,16 +36,12 @@ function slotExhaustionMessage(fn: string, lockKind: string, slots: number): str
 
 async function acquireAdvisorySlotPg(): Promise<number> {
   if (workerForkCount() <= 1) return 1;
-  // Slot pool is sized with headroom over the worker count (see ar-db-slots.ts).
   const slots = slotPoolSize();
 
-  // Idempotent: re-evaluation returns the already-claimed slot.
   if (g.__arAdvisorySlotPg !== undefined) {
     return g.__arAdvisorySlotPg;
   }
 
-  // A session inside the slot database would block that database's purge with
-  // PG error 55006, so hold the lock from the maintenance database instead.
   const { host, port, user, password } = postgresSettings();
   const client = new pg.Client({ host, port, user, password, database: "postgres" });
   await client.connect();
@@ -109,8 +54,6 @@ async function acquireAdvisorySlotPg(): Promise<number> {
       );
       if (res.rows[0]?.locked) {
         g.__arAdvisorySlotPg = slot;
-        // Keep client open for the process lifetime; PG drops session locks on
-        // disconnect, so no explicit release is needed on clean exit.
         process.on("exit", () => void client.end());
         return slot;
       }
@@ -124,15 +67,12 @@ async function acquireAdvisorySlotPg(): Promise<number> {
 
 async function acquireAdvisorySlotMysql(): Promise<number> {
   if (workerForkCount() <= 1) return 1;
-  // Slot pool is sized with headroom over the worker count (see ar-db-slots.ts).
   const slots = slotPoolSize();
 
-  // Idempotent: re-evaluation returns the already-claimed slot.
   if (g.__arAdvisorySlotMysql !== undefined) {
     return g.__arAdvisorySlotMysql;
   }
 
-  // No database selected, for the same reason as the PG path above.
   const { host, port, user, password, socket } = mysqlSettings();
   const conn = await mysql.createConnection({
     host,
@@ -145,13 +85,11 @@ async function acquireAdvisorySlotMysql(): Promise<number> {
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
     for (let slot = 1; slot <= slots; slot++) {
       const lockName = mysqlAdvisoryLockName(runToken(), slot);
-      // GET_LOCK returns 1 when acquired, 0 when timeout (0 s = non-blocking).
       const [rows] = await conn.query<mysql.RowDataPacket[]>("SELECT GET_LOCK(?, 0) AS acquired", [
         lockName,
       ]);
       if ((rows[0] as { acquired: number }).acquired === 1) {
         g.__arAdvisorySlotMysql = slot;
-        // Hold the connection open; MariaDB releases GET_LOCK on disconnect.
         process.on("exit", () => void conn.end());
         return slot;
       }
@@ -167,8 +105,6 @@ const lane = activeLane();
 if (lane === "postgres") {
   const slot = await acquireAdvisorySlotPg();
   process.env[SLOT_ENV] = String(slot);
-  // Owning the database lets test-setup-dy.ts purge it before the schema load
-  // instead of dropping the tables in place.
   if (ownsSlotDatabase()) process.env.AR_PG_EXCLUSIVE_DB = "1";
 }
 if (lane === "mysql") {
@@ -177,20 +113,11 @@ if (lane === "mysql") {
   if (ownsSlotDatabase()) process.env.AR_MYSQL_EXCLUSIVE_DB = "1";
 }
 
-// Phase 0 sqlite template-clone: when globalSetup built a canonical template,
-// copy it to a private per-worker file and point the worker DB at it. The
-// canonical schema arrives pre-built, so per-file defineSchema(TEST_SCHEMA)
-// short-circuits to a cache-hit instead of re-issuing the DDL. No-op when no
-// template was built (PG/MySQL runs, or globalSetup disabled).
 {
   const workerDb = await ensureWorkerClone();
   if (workerDb) process.env[WORKER_DB_ENV] = workerDb;
 }
 
-// Pre-warm the sync adapter-class cache for the active test environment so
-// ConnectionPool.newConnection() can resolve from `dbConfig.adapter`.
-// Mirrors how Rails' autoload makes
-// adapter classes synchronously available to ConnectionPool#new_connection.
 {
   const { resolve: resolveAdapter } = await import("./connection-adapters.js");
   const adapters: string[] = ["sqlite3"];

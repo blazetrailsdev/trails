@@ -1,9 +1,3 @@
-/**
- * TS-only coverage for `scope_attributes?`. Rails has no direct test for the
- * predicate — it is exercised indirectly through new-record seeding and the
- * `find`/`find_by` StatementCache guards — so these cases live here rather than
- * in the ported default_scoping_test.rb file.
- */
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import {

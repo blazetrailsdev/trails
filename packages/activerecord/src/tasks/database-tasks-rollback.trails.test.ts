@@ -8,12 +8,6 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
 
-// Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) reading
-// the pool's own `db_config.migrations_paths` (`connection_pool.rb:294-299`),
-// so a migration these tests can watch has to be a file under such a path — the
-// shape Rails' `DatabaseTasksMigrationTestCase` uses
-// (`test/cases/tasks/database_tasks_test.rb:1036-1039`). A generated `down`
-// appends its name to the revert log the test then reads.
 const REVERT_LOG = "__trailsRollbackReverted";
 
 const reverted = (): string[] =>

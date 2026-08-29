@@ -20,11 +20,6 @@ import { withTransactionalFixtures } from "../test-fixtures/with-transactional-f
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
 
-  // Rails' `EncryptionTestCase < ActiveRecord::TestCase` runs with
-  // `use_transactional_tests` on (test_fixtures.rb:113, :146), so every record
-  // these cases create is rolled back before the next one. Without it the posts
-  // and books written here survive into sibling cases on the shared canonical
-  // connection — the leak class #5719 hit in `encryptable-record.test.ts`.
   let txnAdapter: Awaited<ReturnType<typeof freshAdapter>>;
   beforeAll(async () => {
     txnAdapter = await freshAdapter();
@@ -53,7 +48,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await assertEncryptedAttribute(post, "title", title);
     await assertEncryptedAttribute(post, "body", body);
 
-    // Verify the DB was actually updated with ciphertext.
     const reloaded = await Post.find(post.id);
     expect(reloaded.readAttributeBeforeTypeCast("title")).not.toBe(title);
     expect(reloaded.readAttributeBeforeTypeCast("body")).not.toBe(body);
@@ -63,8 +57,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("encrypt won't fail for classes without attributes to encrypt", async () => {
     const PlainPost = makePlainPost(await freshAdapter());
-    // Canonical `posts.body` is NOT NULL, so supply it — this class simply has
-    // no *encrypted* attributes, which is what the test exercises.
     const post = await PlainPost.create({ title: "hello", body: "world" });
     await expect(post.encrypt()).resolves.toBeUndefined();
   });
@@ -119,7 +111,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   it("encrypted_attribute? returns true for encrypted attributes which content is encrypted", async () => {
     const Book = makeEncryptedBook(await freshAdapter());
     const book = await Book.create({ name: "Dune" });
-    // Reload so readAttributeBeforeTypeCast returns the DB ciphertext, not the in-memory plaintext.
     const reloaded = await Book.find(book.id);
     expect(reloaded.encryptedAttribute("name")).toBe(true);
   });
@@ -136,7 +127,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const ciphertext = book.ciphertextFor("name");
     expect(typeof ciphertext).toBe("string");
     expect(ciphertext).not.toBe("Dune");
-    // Verify the ciphertext decrypts to the correct value.
     const type = Book.typeForAttribute("name");
     expect(type.deserialize(ciphertext)).toBe("Dune");
   });
@@ -147,7 +137,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
       title: "Fear is the mind-killer",
       body: "Fear is the little-death...",
     });
-    // Reload so readAttributeBeforeTypeCast returns the persisted DB ciphertext.
     const reloaded = await Post.find(post.id);
     const ciphertext = reloaded.ciphertextFor("title");
     expect(ciphertext).toBe(reloaded.readAttributeBeforeTypeCast("title"));
@@ -183,9 +172,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt attributes encrypted with a previous encryption scheme", async () => {
-    // Build a previous scheme with a different key provider so oldCiphertext
-    // is real ciphertext produced by a different key — mirrors the Rails test
-    // which uses EncryptedAuthor with a previous scheme configured.
     const prevKeyProvider = makeKeyProvider("prev-key-for-encryption-test-32b!!");
     const prevScheme = new Scheme({ keyProvider: prevKeyProvider });
 
@@ -193,7 +179,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     const author = await Author.create({ name: "david" });
 
-    // Encrypt "dhh" using the previous scheme to simulate an old row.
     const type = Author.typeForAttribute("name");
     expect(type.previousTypes.length).toBeGreaterThan(0);
     const prevType = type.previousTypes[0];
@@ -201,22 +186,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     expect(typeof oldCiphertext).toBe("string");
 
     await withoutEncryption(() => author.updateColumns({ name: oldCiphertext }));
-    // Reload so the in-memory attribute reflects the DB state (old ciphertext)
-    // rather than the raw ciphertext string set by updateColumns.
     const authorWithOldCiphertext = await Author.find(author.id);
     await authorWithOldCiphertext.encrypt();
 
     const reloaded = await Author.find(authorWithOldCiphertext.id);
     expect(reloaded.name).toBe("dhh");
-    // Verify the DB row was re-encrypted with the current scheme (different ciphertext).
     expect(reloaded.readAttributeBeforeTypeCast("name")).not.toBe(oldCiphertext);
   });
 
   it("encrypt won't change the encoding of strings even when compression is used", async () => {
-    // JS strings have no explicit encoding — verify value round-trips unchanged.
     const Post = makeEncryptedPost(await freshAdapter());
-    // String must exceed THRESHOLD_TO_JUSTIFY_COMPRESSION (140 bytes) to exercise
-    // the compressed payload path in Encryptor.
     const title = `The Starfleet is here! ${"OMG👌".repeat(30)}`;
     const post = await withoutEncryption(() => Post.create({ title, body: "some body" }));
     await post.encrypt();
@@ -249,7 +228,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
-    // Before encryption, reads back the plaintext original case.
     expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
     expect(book.name).toBe("Dune");
     await book.encrypt();

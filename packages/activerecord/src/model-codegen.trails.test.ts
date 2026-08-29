@@ -5,7 +5,6 @@ import type { IntrospectedTable } from "./model-codegen.js";
 import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { Base } from "./base.js";
 
-// Deterministic timestamp so header-line comparisons stay stable.
 const NOW = Temporal.Instant.from("2026-04-24T14:23:05.000Z");
 
 function table(
@@ -16,10 +15,6 @@ function table(
     columns?: { name: string; type: string }[];
   } = {},
 ): IntrospectedTable {
-  // Preserve explicit null and [] (no-PK views) but treat `undefined`
-  // the same as an omitted option — tests shouldn't construct an
-  // impossible `primaryKey: undefined` shape just because the key
-  // was present.
   const primaryKey: string | string[] | null =
     "primaryKey" in opts && opts.primaryKey !== undefined ? opts.primaryKey : "id";
   return {
@@ -88,9 +83,6 @@ describe("generateModels", () => {
   });
 
   it("emits foreignKey option when FK column doesn't match <assoc>_id convention", () => {
-    // FK column "written_by" doesn't strip to a clean association name.
-    // Generator falls back to the target table's singularized classname
-    // ("author") and attaches the non-conventional column as foreignKey.
     const tables = [
       table("authors"),
       table("books", { foreignKeys: [fk("books", "authors", "written_by")] }),
@@ -101,12 +93,6 @@ describe("generateModels", () => {
   });
 
   it("handles self-referential FK without crashing", () => {
-    // parent_id → users.id. belongsTo("parent") would by convention look
-    // for class Parent; the real class is User, so className is emitted.
-    // Similarly hasMany("users") would conventionally point at class User
-    // (which matches), so no className there — but the foreign key from
-    // the user's POV is "parent_id", not "user_id", so foreignKey is
-    // emitted on the hasMany side.
     const tables = [table("users", { foreignKeys: [fk("users", "users", "parent_id")] })];
     const out = generateModels(tables, { noHeader: true, now: NOW });
     expect(out).toContain('this.belongsTo("parent", { className: "User" });');
@@ -137,9 +123,6 @@ describe("generateModels", () => {
   });
 
   it("skips tables with an empty-array primary key (introspection's no-PK shape)", () => {
-    // Callers that normalise the adapter's `primaryKey()` null to [] should
-    // still
-    // get view-filtering.
     const out = generateModels(
       [table("real_table"), table("v_users_summary", { primaryKey: [] })],
       { sourceHint: "sqlite:app.db", now: NOW },
@@ -182,20 +165,17 @@ describe("generateModels", () => {
     expect(out).toContain("export class Book extends Base {");
     expect(out).not.toMatch(/export class AppMyMigrations/);
     expect(out).not.toMatch(/export class AppMyMetadata/);
-    // The un-prefixed/un-suffixed literals are no longer what codegen ignores.
     const bare = generateModels([table("schema_migrations")], { noHeader: true, now: NOW });
     expect(bare).toContain("export class SchemaMigration extends Base {");
   });
 
   it("skips _tableName for irregular plural where round-trip works", () => {
-    // classify("people") === "Person"; tableize("Person") === "people" — no override needed.
     const out = generateModels([table("people")], { noHeader: true, now: NOW });
     expect(out).toContain("export class Person extends Base {");
     expect(out).not.toMatch(/_tableName/);
   });
 
   it("emits _tableName when round-trip would mis-pluralize (quirky plural)", () => {
-    // classify("status") === "Status"; tableize("Status") === "statuses" ≠ "status".
     const out = generateModels([table("status")], { noHeader: true, now: NOW });
     expect(out).toContain('this._tableName = "status";');
   });
@@ -211,12 +191,6 @@ describe("generateModels", () => {
   });
 
   it("strip-prefix does not change belongsTo association names (only class names)", () => {
-    // FK column `written_by` doesn't end in _id so belongsTo name falls
-    // back to the target table's singular. `blog_posts` with stripPrefix
-    // "blog_" yields `class Post`, but the *association* name should stay
-    // conventionally derived from the full table: "blog_post". Class and
-    // association names serve different purposes — strip only reshapes
-    // the class identifier.
     const tables = [
       table("blog_posts"),
       table("comments", {
@@ -229,9 +203,6 @@ describe("generateModels", () => {
       now: NOW,
     });
     expect(out).toContain("export class Post extends Base {");
-    // Association name stays "blog_post" (from the real table), with
-    // className: "Post" since the default classify("blog_post") = "BlogPost"
-    // doesn't match the stripped class.
     expect(out).toContain(
       'this.belongsTo("blog_post", { className: "Post", foreignKey: "written_by" });',
     );
@@ -248,21 +219,18 @@ describe("generateModels", () => {
   });
 
   it("sorts classes alphabetically and hasMany names alphabetically within a class", () => {
-    // accounts has two inbound FKs — hasMany should list them alphabetized.
     const tables = [
       table("accounts"),
       table("posts", { foreignKeys: [fk("posts", "accounts", "account_id")] }),
       table("comments", { foreignKeys: [fk("comments", "accounts", "account_id")] }),
     ];
     const out = generateModels(tables, { noHeader: true, now: NOW });
-    // Alphabetical class order: Account, Comment, Post.
     const accountIdx = out.indexOf("class Account ");
     const commentIdx = out.indexOf("class Comment ");
     const postIdx = out.indexOf("class Post ");
     expect(accountIdx).toBeGreaterThanOrEqual(0);
     expect(commentIdx).toBeGreaterThan(accountIdx);
     expect(postIdx).toBeGreaterThan(commentIdx);
-    // Inside Account: hasMany("comments") before hasMany("posts").
     const commentsHm = out.indexOf('this.hasMany("comments")');
     const postsHm = out.indexOf('this.hasMany("posts")');
     expect(commentsHm).toBeGreaterThan(0);
@@ -280,12 +248,6 @@ describe("generateModels", () => {
   });
 
   it("emits className option when --strip-prefix makes association name mismatch class name", () => {
-    // Without stripPrefix, `blog_post_id → blog_posts` infers belongsTo("blog_post")
-    // and className "BlogPost" — matches. With stripPrefix "blog_", the class
-    // becomes `Post`, so belongsTo("blog_post") no longer auto-resolves to
-    // the target class: we emit `className: "Post"`. On the hasMany side,
-    // the target class is `Post` but the FK column still has the blog_ prefix,
-    // so foreignKey is emitted.
     const tables = [
       table("blog_posts"),
       table("comments", {
@@ -302,8 +264,6 @@ describe("generateModels", () => {
   });
 
   it("throws on class-name collision from strip-prefix", () => {
-    // `posts` → class Post. `blog_posts` with stripPrefix "blog_" → class Post.
-    // Both would emit `export class Post`, producing invalid TS.
     expect(() =>
       generateModels([table("posts"), table("blog_posts")], {
         stripPrefix: "blog_",
@@ -314,12 +274,6 @@ describe("generateModels", () => {
   });
 
   it("disambiguates belongsTo when multiple non-_id FKs derive the same name", () => {
-    // books.written_by + books.edited_by both → authors.id. Neither
-    // column ends with _id, so both fall back to belongsTo("author")
-    // (singularized target table). Without disambiguation, two identical
-    // belongsTo declarations would be emitted on Book. Generator keeps
-    // the first with the convention name and switches later ones to the
-    // FK column itself, which is always unique within a class.
     const tables = [
       table("authors"),
       table("books", {
@@ -327,8 +281,6 @@ describe("generateModels", () => {
       }),
     ];
     const out = generateModels(tables, { noHeader: true, now: NOW });
-    // FK sort is alphabetical by column: edited_by first, written_by second.
-    // First one gets the conventional name; second is disambiguated.
     expect(out).toContain('this.belongsTo("author", { foreignKey: "edited_by" });');
     expect(out).toContain(
       'this.belongsTo("written_by", { className: "Author", foreignKey: "written_by" });',
@@ -336,10 +288,6 @@ describe("generateModels", () => {
   });
 
   it("disambiguates inverse hasMany when multiple FKs point at the same target", () => {
-    // posts.author_id and posts.editor_id both → users.id. Both inverses
-    // on User would be hasMany("posts") without disambiguation. Generator
-    // keeps the first as "posts" (convention) and names later ones with a
-    // role prefix derived from the belongsTo name.
     const tables = [
       table("users"),
       table("posts", {
@@ -347,16 +295,8 @@ describe("generateModels", () => {
       }),
     ];
     const out = generateModels(tables, { noHeader: true, now: NOW });
-    // Post gets two distinct belongsTo (author / editor), each with a
-    // className option since neither matches classify(name) === User.
     expect(out).toContain('this.belongsTo("author", { className: "User" });');
     expect(out).toContain('this.belongsTo("editor", { className: "User" });');
-    // On User: the disambiguation rule picks the conventional "posts"
-    // name for whichever FK is encountered first (FKs iterate column-
-    // alphabetical: author_id first, so that side gets "posts"); the
-    // second gets "editor_posts" with className + foreignKey options.
-    // hasMany lines are then sorted alphabetically by association name
-    // at emit time, so "editor_posts" lands before "posts".
     expect(out).toContain('this.hasMany("posts", { foreignKey: "author_id" });');
     expect(out).toContain(
       'this.hasMany("editor_posts", { className: "Post", foreignKey: "editor_id" });',
@@ -364,12 +304,6 @@ describe("generateModels", () => {
   });
 
   it("resolves quoted schema-qualified FK targets from the PG adapter", () => {
-    // PG quotes identifiers that need it (mixed case, reserved words,
-    // spaces). regclass::text may return any of:
-    //   other_schema."Authors"      (quoted target)
-    //   "other schema"."authors"    (quoted schema)
-    //   "a""b"."c"                  (embedded double-quote)
-    // All must unqualify to the bare name so classes.get() hits.
     const tables = [
       table("authors"),
       table("a"),
@@ -383,7 +317,6 @@ describe("generateModels", () => {
     const out = generateModels(tables, { noHeader: true, now: NOW });
     expect(out).toContain('this.belongsTo("author");');
     expect(out).toContain('this.belongsTo("a");');
-    // No stray quotes, schema prefixes, or unmatched dots anywhere.
     expect(out).not.toMatch(/["']\./);
   });
 
@@ -392,19 +325,11 @@ describe("generateModels", () => {
     expect(unqualify("schema.authors")).toBe("authors");
     expect(unqualify('schema."Authors"')).toBe("Authors");
     expect(unqualify('"other schema"."authors"')).toBe("authors");
-    // Embedded escaped double quote inside a quoted identifier: "" → ".
     expect(unqualify('"a""b"."c"')).toBe("c");
-    // A quoted identifier that itself contains a dot must not be split.
     expect(unqualify('schema."tab.le"')).toBe("tab.le");
   });
 
   it("resolves schema-qualified FK targets from the PG adapter", () => {
-    // PostgreSQL's FK introspection renders the target via `regclass::text`,
-    // which returns "schema.table" for tables in a non-default schema.
-    // `tables()` returns unqualified names, so the class map is
-    // keyed by "authors" (not "other_schema.authors"). The codegen layer
-    // must strip the schema prefix on lookup or the association and its
-    // inverse has_many both silently drop.
     const tables = [
       table("authors"),
       table("books", {
@@ -414,39 +339,20 @@ describe("generateModels", () => {
     const out = generateModels(tables, { noHeader: true, now: NOW });
     expect(out).toContain('this.belongsTo("author");');
     expect(out).toContain('this.hasMany("books");');
-    // The dotted form should not leak into generated names anywhere.
     expect(out).not.toMatch(/other_schema\./);
   });
 
   it("doesn't mangle hasMany name for irregular-plural source tables", () => {
-    // people → Person → pluralize("person") → "people". If we pluralized
-    // the table name directly, "people" (already plural) would become
-    // "peoples". Covers the same hazard for "children", "men", etc.
     const tables = [
       table("companies"),
       table("people", { foreignKeys: [fk("people", "companies", "company_id")] }),
     ];
     const out = generateModels(tables, { noHeader: true, now: NOW });
-    // The inverse hasMany on Company should be "people", not "peoples".
     expect(out).toContain('this.hasMany("people");');
     expect(out).not.toMatch(/this\.hasMany\("peoples"\)/);
   });
 
   it("sorts belongsTo by association name, not FK column", () => {
-    // Two FKs on books: `author_id` → authors (belongsTo "author") and
-    // `written_for_id` → publishers (belongsTo "written_for"). Sorted by
-    // association name, "author" comes before "written_for"; sorted by
-    // column, "author_id" < "written_for_id" — same order in this case.
-    // But if we had "z_author_id" (belongsTo "z_author") and "a_foo_id"
-    // (belongsTo "a_foo"), column-sort would put "a_foo" first, and
-    // name-sort should still put "a_foo" first. Harder: pick cases that
-    // differ between the two sorts.
-    //
-    // Non-convention column `zzz_ref` → authors (belongsTo "author"
-    // because column doesn't end with _id) plus convention column
-    // `publisher_id` → publishers (belongsTo "publisher"). Column sort:
-    // publisher_id < zzz_ref → publisher, author. Name sort: author,
-    // publisher. Verify name-sort.
     const tables = [
       table("authors"),
       table("publishers"),

@@ -43,7 +43,6 @@ describe("MigrationProxy", () => {
     vi.spyOn(proxy, "loadMigration").mockImplementation(() => {
       throw esmError;
     });
-    // loadMigrationAsync should re-throw since no ESM module can be loaded from a fake path
     await expect(proxy.loadMigrationAsync()).rejects.toThrow();
   });
 

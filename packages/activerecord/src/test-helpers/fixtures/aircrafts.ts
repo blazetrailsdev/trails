@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/aircrafts.yml
 export const aircraftFixtureData = {
   no_wheels: {
     name: "boeing-with-no-wheels",

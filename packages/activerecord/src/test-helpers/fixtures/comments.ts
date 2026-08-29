@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/comments.yml
 export const commentFixtureData = {
   greetings: {
     id: 1,

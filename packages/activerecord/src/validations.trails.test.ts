@@ -1,13 +1,3 @@
-/**
- * trails-only coverage for the constant lookup `validates` performs.
- *
- * Rails has no `ActiveRecord::Validations::ClassMethods#validates` override:
- * `validates :x, presence: true` on an AR model reaches ActiveModel's generic
- * macro, whose `const_get("#{key.to_s.camelize}Validator")`
- * (activemodel/lib/active_model/validations/validates.rb:121) resolves against
- * the model's ancestry — which includes `ActiveRecord::Validations` and so its
- * column/association-aware validators. These assert that the AR constants win.
- */
 import { describe, expect, it } from "vitest";
 import { Base } from "./index.js";
 import {

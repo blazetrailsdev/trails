@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/projects.yml
 export const projectFixtureData = {
   active_record: {
     id: 1,

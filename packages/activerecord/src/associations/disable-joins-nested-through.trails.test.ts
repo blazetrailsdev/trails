@@ -1,24 +1,3 @@
-/**
- * DJAS routing widening — nested-through (task #12, PR-B).
- *
- * A "nested through" is a `has_many :through` whose `through:`
- * association is itself a `has_many :through` (i.e.
- * `reflection.isNested()` is true). Rails handles these via the
- * generic chain walk — `reflection.chain` flattens the nested
- * structure into a straight sequence of reflection steps — and
- * `DisableJoinsAssociationScope` iterates that list in its
- * reverseChain walk with no special case.
- *
- * Our routing gate used to bail out on `reflection.isNested()`,
- * forcing nested-through + `disable_joins: true` onto the
- * JOIN-based AssociationScope path. This PR drops the gate; the
- * existing chain walk + constraints machinery already covers it.
- *
- * These tests pin the resulting SQL shape (no JOIN) and the
- * record set via Notifications so a regression that re-introduces
- * the gate, or a change to `getChain` that silently falls back,
- * gets caught.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";

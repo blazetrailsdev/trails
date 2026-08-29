@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/auto_id.rb
 import { Base } from "../../base.js";
 
 export class AutoId extends Base {

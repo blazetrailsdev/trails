@@ -1,12 +1,7 @@
-/**
- * Mirrors Rails activerecord/test/cases/type/adapter_specific_registry_test.rb
- */
 import { describe, it, expect } from "vitest";
 import { AdapterSpecificRegistry, TypeConflictError } from "./adapter-specific-registry.js";
 import { Type } from "@blazetrails/activemodel";
 
-// Mirrors the TYPE constant in Rails' test — a simple type class whose
-// equality is based on constructor args.
 class TestType extends Type<unknown> {
   readonly name = "test";
   readonly args: unknown;
@@ -22,7 +17,6 @@ class TestType extends Type<unknown> {
   }
 }
 
-// Two distinct type classes used to distinguish registrations (mirrors ::String / ::Array).
 class FooType extends Type<unknown> {
   readonly name = "foo";
   cast(value: unknown) {
@@ -42,7 +36,6 @@ class BarType extends Type<unknown> {
   }
 }
 
-// Decoration wrapper — mirrors Ruby's `Struct.new(:value)`.
 class Decoration extends Type<unknown> {
   readonly name = "decoration";
   readonly value: Type;
@@ -139,7 +132,6 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.register("foo", TestType);
 
     expect(registry.lookup("foo")).toEqual(new TestType());
-    // keyword args are passed (adapter is stripped)
     expect(registry.lookup("foo", { keyword: "arg" })).toEqual(new TestType({ keyword: "arg" }));
     expect(registry.lookup("foo", { keyword: "arg", adapter: "postgresql" })).toEqual(
       new TestType({ keyword: "arg" }),

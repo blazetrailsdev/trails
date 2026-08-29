@@ -1,13 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Mirrors associations/left_outer_join_association_test.rb — the canonical
- * Author/Post/Comment/Rating/Essay/Categorization/Person/Friendship
- * left_outer_joins suite. Rails declares one fixtures set for the whole class;
- * we mirror that with a single `fixtures` call seeding the canonical
- * association tables.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -141,8 +131,6 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("left outer joins forbids to use string as argument", async () => {
-    // Rails stores the arg verbatim and only raises lazily at build time (on
-    // `.to_a`), from build_join_buckets — not eagerly at leftOuterJoins(...).
     await expect(
       Author.leftOuterJoins(
         'LEFT OUTER JOIN "posts" ON "posts"."user_id" = "users"."id"',
@@ -211,9 +199,6 @@ describe("LeftOuterJoinAssociationTest", () => {
       ]);
     });
     const sql = queries.join("\n");
-    // Mirrors Rails' quote_table_name("friendships.friend_id"): identifier
-    // quoting is adapter-specific — double-quotes on SQLite/PG, backticks on
-    // MySQL/MariaDB — so match either quote char.
     expect(/["`]friendships["`]\.["`]friend_id["`]/i.test(sql)).toBe(true);
     expect(/["`]friendships["`]\.["`]follower_id["`]/i.test(sql)).toBe(true);
   });

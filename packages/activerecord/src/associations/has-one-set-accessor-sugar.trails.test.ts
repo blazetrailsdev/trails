@@ -1,15 +1,3 @@
-/**
- * Trails-only surface: the generated `set#{Name}` awaitable accessor
- * (`await firm.setAccount(x)` / `await member.setClub(x)`), the RFC 0068
- * ergonomic alternative to the racy native `firm.account = x` property setter.
- *
- * It is a thin delegation to `association(name).writer(value)`, so it inherits
- * the Rails-faithful immediate-persist replace path
- * (`HasOneAssociation#replace`'s persisting arm, and the
- * `HasOneThroughAssociation#writer` → `persistReplace` override for through).
- * Rails reaches that path through the synchronous `=` setter, which in JS
- * cannot await, so these assertions have no verbatim Rails test to mirror.
- */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   registerModel,
@@ -76,7 +64,6 @@ describe("has_one set#{Name} awaitable accessor", () => {
 
     await set(firm).setAccount(account);
 
-    // Immediate persist, not deferred to `firm.save()`.
     expect(account.isPersisted()).toBe(true);
     expect((await readHasOne(firm, "account"))?.id).toBe(account.id);
   });
@@ -87,7 +74,6 @@ describe("has_one set#{Name} awaitable accessor", () => {
 
     await set(firm).setAccount(new Account({ credit_limit: 5 }));
 
-    // No `firm.save()`: the dependent: :destroy removal already ran.
     await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
   });
 
@@ -149,9 +135,6 @@ describe("has_one :through set#{Name} awaitable accessor", () => {
 });
 
 describe("polymorphic has_one set#{Name} awaitable accessor", () => {
-  // The `=` setter is defined unconditionally for polymorphic has_one, so the
-  // sugar must exist there too — even though `build#{Name}` / `create#{Name}`
-  // are skipped for polymorphic. Member#sponsor is a `has_one as: sponsorable`.
   const { members } = fixtures(["members", "sponsors"]);
 
   beforeAll(() => {
@@ -172,17 +155,6 @@ describe("polymorphic has_one set#{Name} awaitable accessor", () => {
 });
 
 describe("has_one replace with no loaded target and no record", () => {
-  // Rails' `return target unless load_target || record`
-  // (has_one_association.rb:61): assigning nil to a has_one with nothing
-  // associated returns early, before the `assigning_another_record ||
-  // has_changes_to_save?` gate and before `self.target = record`.
-  //
-  // The association still ends up LOADED either way — `load_target` calls
-  // `loaded!` unconditionally (association.rb:192) — and the trailing
-  // `self.target = record` over a null target is itself a no-op, so the end
-  // state is identical with or without the early return. What the early return
-  // does guarantee is that nothing past it runs: no `remove_target!` and no
-  // transaction, which is what this pins.
   fixtures(["companies", "accounts"]);
 
   beforeAll(() => {

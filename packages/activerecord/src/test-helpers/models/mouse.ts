@@ -1,6 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Squeak } from "./squeak.js";
-// vendor/rails/activerecord/test/models/mouse.rb
 import { Base } from "../../base.js";
 
 export class Mouse extends Base {

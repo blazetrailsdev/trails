@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Engine } from "./engine.js";
 import type { Wheel } from "./wheel.js";
-// vendor/rails/activerecord/test/models/aircraft.rb
 import { Base } from "../../base.js";
 
 export class Aircraft extends Base {

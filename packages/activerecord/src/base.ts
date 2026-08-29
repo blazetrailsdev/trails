@@ -1,25 +1,13 @@
 import { Temporal } from "@blazetrails/date";
-// Registers Active Record's `en` locale (active_record.rb's on_load(:i18n) hook).
 import "./i18n.js";
 import {
   Locator as _Locator,
   GlobalID as _GlobalIDCtor,
   SignedGlobalID as _SignedGlobalIDType,
 } from "@blazetrails/globalid";
-// _SignedGlobalIDType is imported from the barrel so Locator.locateSigned's
-// parameter type stays nominally identical. Going through the
-// `/signed-global-id` subpath produces a distinct SignedGlobalID class under
-// src/ vs dist/ resolution (private fields are nominal in TS).
 
-/**
- * Options accepted by {@link Base.toSgid} / {@link Base.toSignedGlobalId} /
- * {@link Base.toSgidParam}. Mirrors SignedGlobalIDOptions minus `verifier`
- * (AR supplies the verifier via signedIdVerifier(this)). The index signature
- * carries arbitrary keys through as GID URI params, matching Rails.
- */
 interface ToSgidOptions {
   app?: string;
-  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string;
   expiresIn?: number;
   expiresAt?: Temporal.Instant;
@@ -49,9 +37,6 @@ import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Relation } from "./relation.js";
-// Side-effect import: relation.ts registers the `Relation` family slot that
-// `relationClassFor` builds every per-model relation subclass from. relation.ts
-// no longer imports base.js for its value, so this edge is one-way.
 import "./relation.js";
 import { generatedRelationMethods as _generatedRelationMethods } from "./relation/delegation.js";
 import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
@@ -376,43 +361,10 @@ import { respondToMissing } from "./dynamic-matchers.js";
 
 import { extractMultiparameterCallstack } from "./multiparameter-attribute-assignment.js";
 
-/**
- * A single column of a primary key.
- *
- * - `string` / `number` — the common scalar PK types (auto-increment ids, UUIDs).
- * - `bigint` — large integer PKs (big_integer columns, e.g. PG int8 / MySQL BIGINT).
- * - `null` / `undefined` — column unset (e.g. a new record, or an unassigned
- *   CPK column).
- */
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
-/**
- * Value of a primary key on a persisted (or to-be-persisted) record.
- *
- * - `PrimaryKeyScalar` — single-column primary key.
- * - `PrimaryKeyScalar[]` — composite primary key tuple. Individual columns
- *   may be null/undefined when the record isn't fully persisted
- *   (e.g. `readAttribute` returned `null` for an unset CPK column).
- *
- * When the concrete PK type is known, narrow at the use site (e.g.
- * `record.id as number`) rather than redeclaring `id` on a subclass —
- * `Base#id` is an accessor, and TS forbids overriding it with a
- * differently-typed instance property.
- *
- * Mirrors: the value returned by `ActiveRecord::Base#id`.
- */
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
-/**
- * Rails' `persistence.rb#update` / `#update!` dispatch on the first arg:
- *   ":all" | nil | bare hash    → iterate `all()` and update each
- *   Array (of ids)              → parallel with `attributes` array
- *   ActiveRecord::Base instance → ArgumentError
- *   anything else               → primary-key lookup, single update
- *
- * The string sentinel is `":all"` (with leading colon) — a bare `"all"`
- * would collide with a legitimate string/slug primary-key value.
- */
 async function performClassUpdate(
   this: typeof Base,
   idOrAttrs: unknown,
@@ -424,14 +376,6 @@ async function performClassUpdate(
     else await record.update(a);
   };
 
-  // Rails accepts `nil`/`:all` default. TS callers write update(attrs) with
-  // a single hash, or pass the sentinel ":all" explicitly.
-  //
-  // A non-array object argument is only treated as "attrs" when `attrs` is
-  // omitted (one-arg form) AND the value is a plain object. Otherwise a
-  // call like `update(dateId, attrs)` or `update(customIdObj, attrs)`
-  // would silently mass-update the scope; fall through to `find(id)`
-  // instead, matching Rails' `update(id, attributes)` path.
   const isPlainObject = (v: unknown): v is Record<string, unknown> => {
     if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
     if (v instanceof Base) return false;
@@ -445,7 +389,6 @@ async function performClassUpdate(
     (attrs === undefined && isPlainObject(idOrAttrs));
 
   if (isAllSentinel) {
-    // update(attrs) — apply to every record in the current scope.
     const candidate = attrs ?? idOrAttrs;
     if (!isPlainObject(candidate)) {
       throw new ArgumentError(
@@ -459,23 +402,14 @@ async function performClassUpdate(
 
   if (Array.isArray(idOrAttrs)) {
     if (idOrAttrs.some((i) => i instanceof Base)) {
-      // Rails raises the *array*-specific message here (distinct from the
-      // single-instance message below), pointing at `pluck(:id)`/`map(&:id)`.
       throw new ArgumentError(
         `You are passing an array of ActiveRecord::Base instances to \`${
           bang ? "update!" : "update"
         }\`. Please pass the ids of the objects by calling \`pluck(:id)\` or \`map(&:id)\`.`,
       );
     }
-    // Mirror destroy's CPK detection: on a composite-PK model, a flat
-    // array `[shop_id, id]` is ONE tuple, not parallel ids. Only an
-    // array-of-arrays triggers the parallel-update path.
     const isParallel = this.compositePrimaryKey ? Array.isArray(idOrAttrs[0]) : true;
     if (!isParallel) {
-      // Single CPK tuple — fall through to the single-id branch. Reject
-      // the parallel-update shape (an attrs array) up front so the
-      // user gets a readable error instead of UnknownAttributeError on
-      // numeric-keyed forwarding.
       if (Array.isArray(attrs)) {
         throw new ArgumentError(
           `${this.name}.update: parallel updates for composite PKs require an array-of-tuples first arg, e.g. update([[k1a,k2a],[k1b,k2b]], [attrsA, attrsB])`,
@@ -488,8 +422,6 @@ async function performClassUpdate(
       await run(record, attrs);
       return record;
     }
-    // Empty ids list is a no-op (Rails behaves this way; Base.find([]) would
-    // otherwise raise RecordNotFound "without an ID").
     if (idOrAttrs.length === 0) return [];
     const attrsArr = attrs as Record<string, unknown>[];
     if (!Array.isArray(attrsArr) || attrsArr.length !== idOrAttrs.length) {
@@ -502,11 +434,6 @@ async function performClassUpdate(
         throw new ArgumentError(`${this.name}.update: every attrs entry must be a plain object`);
       }
     }
-    // Mirror Rails' `id.map { |one_id| find(one_id) }.each_with_index { … }`:
-    // find each id individually (so a duplicated id like update([1, 1, 2], …)
-    // yields two DISTINCT in-memory instances of the same row), collecting all
-    // records BEFORE running any update so a missing id raises RecordNotFound
-    // up front without partially applying changes.
     const records: InstanceType<typeof Base>[] = [];
     for (const id of idOrAttrs) {
       records.push(await this.find(id));
@@ -533,35 +460,12 @@ async function performClassUpdate(
   return record;
 }
 
-/**
- * Base — the core ActiveRecord class with persistence and finders.
- *
- * Mirrors: ActiveRecord::Base
- */
 
-/**
- * Apply current-scope attributes to a new record instance, skipping any key
- * that was already explicitly provided in `explicitAttrs`.
- *
- * Rails calls populate_with_current_scope_attributes BEFORE super (so explicit
- * attrs overwrite scope attrs). In TS we call it after super, so we invert:
- * only write scope attrs for keys NOT in the explicit set.
- */
 function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   return ctor.isScopeAttributes();
 }
 
-/**
- * Source-text of every `before`/`around` callback registered for `event` whose
- * filter is a plain function (so it can be introspected via
- * `Function.prototype.toString`). `opaque` is true when any before/around entry
- * is an object/method-name filter whose body cannot be read from here.
- *
- * @noRailsEquivalent CONVERGEABLE: Rails loads a `belongs_to` target lazily, at
- *   the moment a callback body dereferences it; trails has to decide up front
- *   which targets to await, and reads the registered filter bodies to narrow
- *   that set. See `_preloadBelongsToForDestroyCallbacks`. Not exported.
- */
+/** @noRailsEquivalent CONVERGEABLE */
 function beforeOrAroundCallbackSources(
   proto: object,
   event: string,
@@ -583,40 +487,17 @@ function beforeOrAroundCallbackSources(
   return { sources, opaque };
 }
 
-/**
- * True when any before/around destroy callback source dereferences the
- * `belongs_to` reflection named `name` — matched as a whole identifier so
- * `firm` doesn't match `firmId` and `tag` doesn't match `tagWithPrimaryKey`.
- * Covers both dotted reads (`record.firm`) and the string form
- * (`this.association("firm")`).
- */
 function referencesAssociationName(sources: string[], name: string): boolean {
   const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
   return sources.some((src) => pattern.test(src));
 }
 
-/**
- * Expand callback filter sources with the source of any model-defined instance
- * method they (transitively) reference, so an association read reached through a
- * helper — e.g. `before_destroy { this.makeComments() }` where `makeComments`
- * reads `this.person` — is still detected. Methods declared on the model's own
- * prototype chain (below `Base`) are followed, as are instance-own
- * function-valued properties — arrow-function class fields
- * (`makeComments = async () => { ... this.person }`) live on the instance, not
- * the prototype, so the prototype walk alone would miss them. Framework methods
- * and the association readers themselves are ignored. Bounded by the model's
- * method count via the `seen` set, so mutually-recursive helpers can't loop.
- */
 function expandCallbackSourcesWithHelpers(
   sources: string[],
   ctor: typeof Base,
   record?: InstanceType<typeof Base>,
 ): string[] {
   const methods = new Map<string, string>();
-  // Instance-own function properties (arrow-field methods) first: they win
-  // method dispatch over a same-named prototype method, so their source is the
-  // one actually run — record them before the prototype walk, whose
-  // `methods.has(key)` guard then leaves them in place.
   if (record) {
     for (const key of Object.getOwnPropertyNames(record)) {
       if (key === "constructor" || methods.has(key)) continue;
@@ -667,44 +548,26 @@ function _applyScopeAttributes(
     }
   }
   if (Object.keys(toApply).length > 0) {
-    // assignAttributes is always mixed into Base instances; call directly.
-    // `populate_with_current_scope_attributes` runs from `initialize`
-    // (scoping.rb:60-66, core.rb:474), which a JS constructor cannot await, so
-    // the assignment is parked on the record for `save` to drain — the same
-    // deferral the nested-attribute writers use. A scope value naming an
-    // association (`Firm.where(firm: f).new`) is the only one that can still be
-    // in flight.
     const pending = (record as any).assignAttributes(toApply) as Promise<void> | void;
     if (pending) _NestedAttributes.parkNestedReaderLoad(record as any, pending);
   }
 }
 
-/** @internal An association definition as `_extractAssociationAttrs` reads it. */
+/** @internal */
 interface _AssociationDefLike {
   name: string;
   macro: string;
 }
 
-/**
- * A constructor-form assignment held back until after `super()` —
- * `_dispatchAssociationAttrs` reaches `this.association(...)`, whose cache
- * field is not initialized until `super()` returns.
- * @internal
- */
+/** @internal */
 interface _PendingAssociationAttr {
   name: string;
   value: unknown;
-  /** The association `name` resolved to, and whether `name` was its `#{singular}Ids` key. */
   assoc: _AssociationDefLike;
   idsKey: boolean;
 }
 
-/**
- * @internal
- * The collection association whose `#{singular}Ids` mass-assignment key is
- * `key`, if any. A `*Ids` key naming no collection association (a genuine
- * column, say) is left on the attribute path.
- */
+/** @internal */
 function _collectionIdsKeyOwner(
   defs: _AssociationDefLike[],
   key: string,
@@ -717,17 +580,7 @@ function _collectionIdsKeyOwner(
   );
 }
 
-/**
- * @internal
- * Pull constructor-form association assignments (e.g. `new Owner({items:
- * [...], profile: p})`) out of the regular attribute bag. Returns null
- * when no key matches a declared association so the hot path allocates
- * nothing.
- *
- * A `#{singular}Ids` key (`new Author({postIds: [...]})`) is deferred too:
- * `_dispatchAssociationAttrs` reaches `this.association(name)`, whose cache
- * field is not initialized until after `super()` returns.
- */
+/** @internal */
 function _extractAssociationAttrs(
   ctor: typeof Base | undefined,
   attrs: Record<string, unknown>,
@@ -740,10 +593,6 @@ function _extractAssociationAttrs(
   if (!reflections) return null;
   const defs = Object.values(reflections);
   if (defs.length === 0) return null;
-  // Common case: models that declare associations but receive only regular
-  // attrs at construction (`new Post({title})`). First pass detects whether
-  // any key matches an association; only then do we allocate `rest` and
-  // copy entries. Avoids per-construction overhead for the hot path.
   let assocs: _PendingAssociationAttr[] | null = null;
   for (const k of Object.keys(attrs)) {
     const named = defs.find((a) => a.name === k);
@@ -757,8 +606,6 @@ function _extractAssociationAttrs(
     }
   }
   if (!assocs) return null;
-  // Null-prototype to avoid `__proto__`/`constructor` keys mutating
-  // Object.prototype before `rest` is handed to super().
   const rest = Object.create(null) as Record<string, unknown>;
   const assocNames = new Set(assocs.map((a) => a.name));
   for (const [k, v] of Object.entries(attrs)) {
@@ -767,22 +614,7 @@ function _extractAssociationAttrs(
   return { rest, assocs };
 }
 
-/**
- * The constructor's association arm. Rails reaches these writers through
- * `assign_attributes` → `public_send("#{k}=", v)`
- * (activemodel/lib/active_model/attribute_assignment.rb:67-75); trails cannot,
- * because a has_one / collection writer is awaitable (RFC 0087) and `new` is
- * not. It stays synchronous here and only here, because a constructor's owner
- * is unpersisted by definition and Rails does no I/O for one either:
- * `save &&= owner.persisted?` (has_one_association.rb:66), `remove_target!`'s
- * `owner.persisted?` gate (:108) and `find_target?` (association.rb:320-322)
- * are all false, so the write is in-memory in Rails too and autosave persists
- * it at the owner's first `save`. Mass assignment onto an *existing* record has
- * no such guarantee and no longer routes here — it goes through `#update`,
- * which awaits the real writer.
- *
- * @internal
- */
+/** @internal */
 function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
   for (const { value, assoc, idsKey } of assocs) {
     const proxy = (
@@ -792,9 +624,6 @@ function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr
     if (idsKey) {
       proxy.syncIdsWrite?.(value as unknown[]);
     } else if (assoc.macro === "hasMany" || assoc.macro === "hasAndBelongsToMany") {
-      // Rails fidelity: pass the value through unchanged. `replace` calls
-      // `.each` on the argument and raises on nil / scalars, so an `Array.wrap`
-      // here would silently accept inputs the writer rejects.
       proxy.syncWrite?.(value as unknown[]);
     } else if (assoc.macro === "hasOne") {
       proxy.syncWrite?.(value);
@@ -804,7 +633,7 @@ function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr
   }
 }
 
-/** @internal The writers {@link _dispatchAssociationAttrs} reaches on an association. */
+/** @internal */
 interface _ConstructorAssociationWriter {
   writer?: (v: unknown) => void;
   syncWrite?: (v: unknown) => void;
@@ -813,33 +642,17 @@ interface _ConstructorAssociationWriter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
-  /**
-   * `class_attribute :include_root_in_json, instance_writer: false,
-   * default: false` (json.rb:15), installed by `JSON.[included]` from
-   * `include ActiveModel::Serializers::JSON` (serialization.rb:6). TS
-   * static-side inheritance flows only through `extends`, so the slot the
-   * mixin installs is declared here.
-   */
   declare static includeRootInJson: boolean | string;
 
-  /** `include ActiveModel::Validations::Callbacks` (callbacks.rb:413). */
   declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
   declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 
-  // --- Translation mixin (wired via extend() after class) ---
-  // Normalization
   declare static normalizes: (...args: NormalizesArgs) => void;
   declare static normalizeValueFor: (name: string, value: unknown) => unknown;
-  /**
-   * Mirrors: ActiveRecord::Normalization's `class_attribute
-   * :normalized_attributes, default: Set.new` (normalization.rb:8), installed
-   * by the module's `included` hook.
-   */
   declare static normalizedAttributes: Set<string>;
 
   declare static lookupAncestors: typeof Translation.lookupAncestors;
 
-  // --- Sanitization mixin (wired via extend() after class) ---
   declare static sanitizeSql: typeof Sanitization.ClassMethods.sanitizeSql;
   declare static sanitizeSqlArray: typeof Sanitization.ClassMethods.sanitizeSqlArray;
   declare static sanitizeSqlLike: typeof Sanitization.sanitizeSqlLike;
@@ -849,7 +662,6 @@ export class Base extends Model {
   declare static sanitizeSqlHashForAssignment: typeof Sanitization.ClassMethods.sanitizeSqlHashForAssignment;
   declare static disallowRawSqlBang: typeof Sanitization.disallowRawSqlBang;
 
-  // --- Associations (wired below after class body) ---
   declare static belongsTo: typeof _Associations.belongsTo;
   declare static hasOne: typeof _Associations.hasOne;
   declare static hasMany: typeof _Associations.hasMany;
@@ -858,24 +670,15 @@ export class Base extends Model {
     return Translation.i18nScope.call(this);
   }
 
-  // -- Class-level configuration --
   static _tableName: string | null = null;
-  // No default value: an *absent* _primaryKey (anywhere up the prototype chain)
-  // means "not configured", so primary_key resolution can consult the schema
-  // cache (Rails get_primary_key) before falling back to the "id" convention.
-  // An explicit `primary_key=` — including on a parent an STI subclass inherits
-  // from — sets an own value that the chain walk in getPrimaryKeyAttr honors.
   declare static _primaryKey?: string | string[];
   static readonly _isActiveRecordBase = true;
 
   /** @internal */
   declare static _registryKeys: string[];
-  /** Mirrors: ActiveRecord.writing_role */
   static writingRole = WRITING_ROLE;
-  /** Mirrors: ActiveRecord.reading_role */
   static readingRole = READING_ROLE;
 
-  // Mirrors: ActiveRecord::Base.filter_attributes = [] at class definition time.
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
 
   static get filterAttributes(): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
@@ -893,12 +696,7 @@ export class Base extends Model {
   }
 
   static _adapter: DatabaseAdapter | null = null;
-  /**
-   * Class name → class, populated whenever a subclass receives an adapter.
-   * Used by globalid's model finder so Base.findGlobalId can resolve any
-   * AR model without requiring explicit registerModel() calls.
-   * @internal
-   */
+  /** @internal */
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _abstractClass = false;
   static _connectionClass = false;
@@ -914,25 +712,10 @@ export class Base extends Model {
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
 
-  /**
-   * When true, datetime/time attributes are wrapped in a TimeZoneConverter.
-   *
-   * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_attributes
-   */
   declare static timeZoneAwareAttributes: boolean;
 
-  /**
-   * Attribute names exempt from time-zone conversion.
-   *
-   * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.skip_time_zone_conversion_for_attributes
-   */
   declare static skipTimeZoneConversionForAttributes: string[];
 
-  /**
-   * Column types eligible for time-zone conversion.
-   *
-   * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_types
-   */
   declare static timeZoneAwareTypes: string[];
 
   static get protectedEnvironments(): string[] {
@@ -943,18 +726,13 @@ export class Base extends Model {
     ModelSchema.protectedEnvironments.call(this, envs);
   }
 
-  /** Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class */
   declare static abstractClass: boolean;
 
-  /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
   declare static signedIdVerifier: _MessageVerifier;
 
-  /** Mirrors: ActiveRecord::SignedId#signed_id_verifier_secret */
   declare static signedIdVerifierSecret: string | (() => string | null | undefined) | null;
 
   static _requireConcreteClass(): void {
-    // Rails: `abstract_class? || self == Base` (inheritance.rb:57) — Base
-    // itself is not abstract_class? but still cannot be instantiated.
     if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
       // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
       throw new NotImplementedError(
@@ -963,14 +741,6 @@ export class Base extends Model {
     }
   }
 
-  /**
-   * Whether this class is a connection class (owns its own connection pool).
-   * Not a `class_attribute`: Rails stores it in a plain `@connection_class`
-   * ivar on the class singleton (core.rb:226-231), which is per-class and does
-   * NOT inherit — hence the hasOwnProperty read here.
-   *
-   * Mirrors: ActiveRecord::Base.connection_class
-   */
   static get connectionClass(): boolean {
     return Object.prototype.hasOwnProperty.call(this, "_connectionClass")
       ? this._connectionClass
@@ -981,32 +751,18 @@ export class Base extends Model {
     this._connectionClass = value;
   }
 
-  /**
-   * Returns true if this class has `connectionClass` set.
-   *
-   * Mirrors: ActiveRecord::Base.connection_class?
-   */
   static connectionClassQ(): boolean {
     return !!this.connectionClass;
   }
 
-  /**
-   * Returns true if this class is `Base` itself or the designated
-   * application-record class (set via `primaryAbstractClass()` or implicitly
-   * via a `globalThis.ApplicationRecord` constant).
-   *
-   * Mirrors: ActiveRecord::Base.primary_class?
-   */
   static primaryClassQ(): boolean {
     return this === Base || this.applicationRecordClassQ();
   }
 
-  // Mirrors: ActiveRecord::Core.asynchronous_queries_session (core.rb:141-143).
   static asynchronousQueriesSession(): Session {
     return _Core.asynchronousQueriesSession();
   }
 
-  // Mirrors: ActiveRecord::Core.asynchronous_queries_tracker (core.rb:145-148).
   static asynchronousQueriesTracker(): AsynchronousQueriesTracker {
     return _Core.asynchronousQueriesTracker();
   }
@@ -1015,22 +771,14 @@ export class Base extends Model {
     return _Core.currentPreventingWrites.call(this);
   }
 
-  // Mirrors: ActiveRecord::Core.current_role (core.rb:160-171).
   static currentRole(): string {
     return _Core.currentRole.call(this);
   }
 
-  // Mirrors: ActiveRecord::Core.current_shard (core.rb:173-184).
   static currentShard(): string {
     return _Core.currentShard.call(this);
   }
 
-  /**
-   * Walks up the superclass chain until it finds a class where
-   * connectionClassQ() is true, or reaches Base.
-   *
-   * Mirrors: ActiveRecord::Base.connection_class_for_self
-   */
   static connectionClassForSelf(): typeof Base {
     let klass: typeof Base = this;
     while (klass !== Base) {
@@ -1042,11 +790,6 @@ export class Base extends Model {
     return Base;
   }
 
-  /**
-   * Prefix applied to the inferred table name.
-   *
-   * Mirrors: ActiveRecord::Base.table_name_prefix
-   */
   static get tableNamePrefix(): string {
     return this._tableNamePrefix;
   }
@@ -1055,11 +798,6 @@ export class Base extends Model {
     this._tableNamePrefix = prefix;
   }
 
-  /**
-   * Suffix applied to the inferred table name.
-   *
-   * Mirrors: ActiveRecord::Base.table_name_suffix
-   */
   static get tableNameSuffix(): string {
     return this._tableNameSuffix;
   }
@@ -1077,10 +815,6 @@ export class Base extends Model {
   }
 
   static get primaryKey(): string | string[] {
-    // Type-level assertion (not a runtime guarantee) of the non-null contract
-    // every persistable model satisfies — see getPrimaryKeyAttr for why. A view
-    // still returns null at runtime; the assertion just keeps callers off the
-    // null-guard treadmill.
     return _getPrimaryKeyAttr.call(this) as string | string[];
   }
 
@@ -1088,31 +822,16 @@ export class Base extends Model {
     _setPrimaryKeyAttr.call(this, key);
   }
 
-  /**
-   * The column used for optimistic locking. Defaults to "lock_version".
-   *
-   * Mirrors: ActiveRecord::Locking::Optimistic.locking_column
-   */
   declare static lockingColumn: string;
 
-  /**
-   * Whether optimistic locking is enabled for this model (default true). Set to
-   * false to disable it even when a lock_version column exists.
-   *
-   * Mirrors: ActiveRecord::Base.lock_optimistically
-   */
   declare static lockOptimistically: boolean;
 
-  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? */
   declare static lockingEnabled: boolean;
 
   static get compositePrimaryKey(): boolean {
     return _isCompositePrimaryKey.call(this);
   }
 
-  /**
-   * Quote a single value for use in SQL.
-   */
   static _buildPkWhere(idValue: unknown): string {
     return ModelSchema.buildPkWhere.call(this, idValue);
   }
@@ -1127,106 +846,36 @@ export class Base extends Model {
     return ModelSchema.buildWhereNodeFromConstraints.call(this, constraints);
   }
 
-  /**
-   * Override attribute() to prevent generating an accessor for "id"
-   * (Base defines id getter/setter with CPK support) and to apply
-   * any pending encryption decorations (matching Rails' deferred
-   * PendingDecorator pattern).
-   *
-   * Rails seeds `@generated_attribute_methods` from `inherited`
-   * (attribute_methods.rb:265-272), so a class body never reaches ActiveModel's
-   * lazy `generated_attribute_methods` (:400-402). trails has no `inherited`
-   * hook, so this — the AR-owned entry every declaring class body passes
-   * through — seeds it, before `super` generates the first accessor.
-   */
   static attribute(
     name: string,
-    // Type is optional, mirroring Rails' `attribute(name, type = nil, **options)`.
-    // When omitted (`attribute("col", { default: "x" })`) the attribute keeps its
-    // existing schema-reflected / declared type and only the default is applied.
     typeName?: string | Type | AttributeOptions,
     options?: AttributeOptions,
   ): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
       _initializeGeneratedModules.call(this as never);
     }
-    // Ruby reads `attribute(name, type = nil, **options)` off the call itself, so
-    // AR's override never has to work out which argument is the options bag.
-    // Collapse the two-arity call to the three-arity one once, with
-    // AttributeRegistration#attribute's own test, so `super` re-runs it as a
-    // no-op and the two spellings cannot drift.
     if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
       options = typeName;
       typeName = undefined;
     }
-    // `ActiveRecord::Attributes::ClassMethods#attribute` IS
-    // `ActiveModel::AttributeRegistration::ClassMethods#attribute`
-    // (activerecord/attributes.rb:213 → attribute_registration.rb:12-20). TS has no
-    // `super` for a module outside the prototype chain, so the registration half is
-    // called through its import alias.
     AttributeRegistration.ClassMethods.attribute.call(this as never, name, typeName, options);
-    // CLAUDE.md § "Generated attribute readers are properties" — Rails' AR
-    // `attribute` stops at the registration and lets `method_missing` generate the
-    // reader on first send, after `reload_schema_from_cache` (attributes.rb:267-271)
-    // has dropped the stale set. A generated reader here is an accessor PROPERTY,
-    // which no `method_missing` can create, so the declaration generates it eagerly
-    // — the same statement `ActiveModel::Attributes::ClassMethods#attribute` makes
-    // (attributes.rb:61) on a host that includes that module.
     this.defineAttributeMethod(name);
-    // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
-    // `@attribute_names` recursively.
     ModelSchema.clearAttributeNamesMemo(this as never);
-    // If we just defined an "id" accessor on a subclass prototype, remove it
-    // so Base.prototype.id (which handles CPK) is used instead.
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
     }
-    // Encryption still needs a post-declaration pass — not for type wrapping
-    // (the durable decorator is pushed once at declaration and resolved via
-    // `typeForAttribute`) but for bookkeeping: column-size validation re-runs
-    // and the frozen-encryption validator install. `normalizes` / `serialize`
-    // push their durable decorator eagerly at declaration, so — now that
-    // `type_for_attribute` / `TypeCaster::Map` resolve through
-    // `attribute_types` (the decorated default attribute set) — they need
-    // no per-feature declaration-registry replay here.
     encryptionHooks.applyPendingEncryptions(this);
   }
 
-  /**
-   * Chains time-zone-conversion and optimistic-locking type decoration.
-   *
-   * @internal Rails-private helper.
-   * Mirrors: ActiveRecord::Base#hook_attribute_type (composed via module includes)
-   */
+  /** @internal */
   static hookAttributeType(name: string, type: Type): Type {
     const tzType = tzHookAttributeType.call(this as any, name, type);
     return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
   }
 
-  /**
-   * Returns the type object for a named attribute.
-   *
-   * Mirrors: ActiveRecord::ModelSchema::ClassMethods#type_for_attribute
-   */
   static typeForAttribute(name: string, block?: () => Type): Type {
     (ModelSchema.loadSchema as any).call(this);
-    // Rails resolves attribute aliases first
-    // (`attr_name = attribute_aliases[attr_name] || attr_name`).
     const resolved = (this as any).attributeAliases?.[name] ?? name;
-    // Resolve through the decorated default attribute set — Rails'
-    // `attribute_types[name]` is `_default_attributes.cast_types[name]` with a
-    // `Type.default_value` hash default (attribute_registration.rb:43-50). The set
-    // replays every pending decorator (serialize/normalizes/encrypts) onto the
-    // reflected column type, so query-side decorations are honored without a
-    // per-feature post-reflection replay onto a declaration registry. Read the
-    // single attribute (O(1), and `getAttribute` returns a `value`-typed Null for
-    // an unknown name) rather than `attributeTypes()[name]` — even though the
-    // cast-types record + Proxy are now memoized, this avoids the record's
-    // full-set iteration on the cold call in a hot per-bind path.
-    // Ruby `attribute_types.fetch(name, &block)` (attribute_registration.rb:47).
-    // `attribute_types` is `_default_attributes.cast_types` (:36-40), so the
-    // block answers on a plain hash-KEY miss — not on `AttributeSet#key?`,
-    // which additionally requires the attribute to be initialized.
     if (block) {
       const attributeTypes = this.attributeTypes();
       return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
@@ -1234,92 +883,37 @@ export class Base extends Model {
     return this._defaultAttributes().getAttribute(resolved).type;
   }
 
-  /**
-   * Get the Arel table for this model.
-   *
-   * Wires a TypeCasterMap so `arelTable.typeForAttribute(col)` resolves
-   * through the model's `attributeTypes`. Predicate-builder bind
-   * values rely on this to serialize through the right Type (e.g.
-   * EncryptedAttributeType for deterministic encryption) — without a
-   * typeCaster, `.where({col: "x"})` would emit the raw `"x"` in SQL
-   * instead of the encrypted ciphertext.
-   *
-   * Mirrors: ActiveRecord::Base.arel_table (memoized; ours builds each
-   * call since Table is cheap).
-   */
   static get arelTable(): Table {
     return _Core.arelTable.call(this);
   }
 
-  /** Mirrors: ActiveRecord::Base.type_caster (core.rb:399-401). */
   static typeCaster = _Core.typeCaster;
 
-  /**
-   * Returns the model's predicate builder, creating it if necessary.
-   * Use this to register custom value handlers:
-   *
-   *   MyModel.predicateBuilder.registerHandler(MyRange, handler)
-   *
-   * Mirrors: ActiveRecord::Base.predicate_builder
-   */
   static get predicateBuilder(): import("./relation/predicate-builder.js").PredicateBuilder {
     return _Core.predicateBuilder.call(this);
   }
 
-  /**
-   * Set the database adapter for this model class.
-   *
-   * This is a convenience setter that bypasses the ConnectionHandler/ConnectionPool
-   * infrastructure. Prefer `establishConnection` for production use.
-   */
   static set adapter(adapter: DatabaseAdapter) {
-    // Reassigning the same adapter is a no-op — avoid dropping reflected
-    // columns/types unnecessarily when user code re-sets the same ref.
     if (this._adapter === adapter) {
       return;
     }
-    // Registers (and shadow-guards) the name before any mutation: the guard
-    // throws, and a half-applied swap would leave `_adapter` pointing at the new
-    // adapter with the schema reset below never run.
     if (this !== Base && this.name) {
       registerModelConstant(this.name, this);
     }
     this._adapter = adapter;
 
-    // Full schema reset on adapter swap: drops schema-sourced defs and
-    // their prototype accessors (preserves user-declared defs), and
-    // clears every derived cache. Without this, a swap A → B could
-    // leave stale columns reachable (e.g. columns that only existed in
-    // A's schema) and `await Model.loadSchema()` would reuse the
-    // resolved promise from adapter A and never pick up B's types.
     const invalidate = (klass: typeof Base) => {
       (ModelSchema.resetColumnInformation as any).call(klass);
       (klass as unknown as { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
     };
     invalidate(this);
-    // Also invalidate descendants that inherit this adapter — otherwise
-    // a subclass that already called Subclass.loadSchema() keeps its
-    // own cached promise / columns from the old adapter.
     for (const descendant of this.descendants) {
       if (!Object.prototype.hasOwnProperty.call(descendant, "_adapter")) {
         invalidate(descendant);
       }
     }
-    // No longer kicks off a fire-and-forget schema reflection — the
-    // async query path races with explicit pool client usage. Schema
-    // reflection still runs via:
-    //   1. The sync loadSchema call in _instantiate (after the adapter
-    //      has naturally populated the schema cache via its first query).
-    //   2. An explicit `await Model.loadSchema()` when ordering matters.
   }
 
-  /**
-   * Await schema reflection — ensures `columnsHash` is populated from the
-   * adapter's schema cache before proceeding. Idempotent; cheap to call
-   * repeatedly.
-   *
-   * Mirrors: ActiveRecord::ModelSchema#load_schema (explicit variant).
-   */
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
     if (
@@ -1337,25 +931,14 @@ export class Base extends Model {
   }
 
   /**
-   * Reflect the schema from the configured adapter the first time the
-   * query/persistence path needs it — the async analogue of Rails' synchronous
-   * `method_missing` schema load (activemodel/attribute_methods.rb:474-486).
-   * Every declaration reaching here is a user `attribute()`; whether it also
-   * names a real column is decided by `columns_hash`, which is DB-sourced
-   * (model_schema.rb:437-441), so nothing has to be classified first.
-   *
-   * The residual gap is attribute access on a record that was never queried and
-   * never loaded (e.g. `new User().handle` before any DB hit), which a getter
-   * can't await without wrapping instances in a `Proxy`.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the schema load Ruby performs synchronously from method_missing (active_model/attribute_methods.rb:507-486); async here, so callers must await it.
+   * @noRailsEquivalent CONVERGEABLE
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
     return this.loadSchema();
   }
 
-  /** @deprecated Use {@link connection} instead. Compatibility alias. */
+  /** @deprecated */
   static get adapter(): DatabaseAdapter {
     return this.connection;
   }
@@ -1364,22 +947,6 @@ export class Base extends Model {
     return _Core.connectionHandler.call(this);
   }
 
-  /**
-   * Establish a database connection from a URL, config object, or config file.
-   *
-   * Accepts:
-   * - A URL string: `Base.establishConnection("postgres://localhost/mydb")`
-   * - A config object: `Base.establishConnection({ adapter: "postgresql", url: "..." })`
-   * - A `DatabaseConfig` instance: `Base.establishConnection(db_config)` (e.g.
-   *   the object captured by `removeConnection`), mirroring Rails'
-   *   `establish_connection(db_config)`.
-   * - No arguments: loads from `config/database.json` for NODE_ENV, or DATABASE_URL
-   *
-   * Creates a ConnectionPool managed by the ConnectionHandler, mirroring how
-   * Rails wires establish_connection → ConnectionHandler → ConnectionPool.
-   *
-   * Mirrors: ActiveRecord::Base.establish_connection
-   */
   static async establishConnection(
     config?:
       | string
@@ -1398,7 +965,6 @@ export class Base extends Model {
     return ConnectionHandling.establishConnection(this, config);
   }
 
-  // --- ConnectionHandling mixin (static methods, wired via extend() after class) ---
   declare static connectsTo: typeof ConnectionHandling.connectsTo;
   declare static connectedTo: typeof ConnectionHandling.connectedTo;
   declare static connectedToMany: typeof ConnectionHandling.connectedToMany;
@@ -1409,7 +975,6 @@ export class Base extends Model {
   declare static prohibitShardSwapping: typeof ConnectionHandling.prohibitShardSwapping;
   declare static isShardSwappingProhibited: typeof ConnectionHandling.isShardSwappingProhibited;
   declare static clearQueryCachesForCurrentThread: typeof ConnectionHandling.clearQueryCachesForCurrentThread;
-  // --- QueryCache::ClassMethods mixin (wired via extend() after class) ---
   declare static cache: typeof QueryCacheClassMethods.ClassMethods.cache;
   declare static uncached: typeof QueryCacheClassMethods.ClassMethods.uncached;
   declare static leaseConnection: typeof ConnectionHandling.leaseConnection;
@@ -1442,26 +1007,15 @@ export class Base extends Model {
   /** @internal */
   declare static resolveConfigForConnection: typeof ConnectionHandling.resolveConfigForConnection;
 
-  // `include Attributes` (base.rb:311) → `include ActiveModel::AttributeRegistration`
-  // (activerecord/attributes.rb:8), and `include AttributeMethods` (base.rb:316)
-  // → `include ActiveModel::AttributeMethods` (activerecord/attribute_methods.rb:9).
-  // These declarations are the type side of the two `include()`/`extend()` calls
-  // at the bottom of this file, read off the module halves rather than restated
-  // here; the members `Base` overrides itself are class-body statics above.
   declare static decorateAttributes: AttributeRegistrationClassHalf["decorateAttributes"];
   declare static attributeTypes: AttributeRegistrationClassHalf["attributeTypes"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static pendingAttributeModifications: AttributeRegistrationClassHalf["pendingAttributeModifications"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static resetDefaultAttributesBang: AttributeRegistrationClassHalf["resetDefaultAttributesBang"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static resolveAttributeName: AttributeRegistrationClassHalf["resolveAttributeName"];
 
-  /**
-   * `class_attribute :attribute_aliases` / `:attribute_method_patterns`
-   * (activemodel/attribute_methods.rb:70-73), installed by the module's
-   * `included` hook.
-   */
   declare static attributeAliases: Record<string, string>;
   declare static isAttributeAliases: boolean;
   declare static attributeMethodPatterns: AttributeMethodPattern[];
@@ -1475,30 +1029,25 @@ export class Base extends Model {
   declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
   declare static defineAttributeMethodPattern: AttributeMethodsClassHalf["defineAttributeMethodPattern"];
   declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static _aliasesByAttributeName: Map<string, string[]>;
-  /** @internal Rails-private helper (attribute_methods.rb:400-402). */
+  /** @internal */
   declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static attributeMethodPatternsCache: AttributeMethodsClassHalf["attributeMethodPatternsCache"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static attributeMethodPatternsMatching: AttributeMethodsClassHalf["attributeMethodPatternsMatching"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static defineProxyCall: AttributeMethodsClassHalf["defineProxyCall"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static buildMangledName: AttributeMethodsClassHalf["buildMangledName"];
-  /** @internal Rails-private helper. */
+  /** @internal */
   declare static defineCall: AttributeMethodsClassHalf["defineCall"];
 
-  // --- ModelSchema mixin (wired via extend() after class) ---
-  // Mirrors: ActiveRecord::Attributes
   declare static defineAttribute: typeof _defineAttribute;
   declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
   /** @internal */
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
-  // ActiveRecord's override of ActiveModel's `define_attribute_methods`
-  // (attribute_methods.rb:139-159): no attr-name splat, and it answers whether
-  // the class's methods were generated.
   declare static defineAttributeMethods: typeof _defineAttributeMethods;
   declare static undefineAttributeMethods: typeof _undefineAttributeMethods;
   declare static aliasAttribute: typeof _aliasAttribute;
@@ -1508,15 +1057,9 @@ export class Base extends Model {
   declare static resolveTypeName: typeof _resolveTypeName;
   /** @internal */
   declare static resetDefaultAttributes: typeof _resetDefaultAttributes;
-  /**
-   * Mirrors: ActiveRecord::Attributes::ClassMethods#reload_schema_from_cache
-   * (attributes.rb:268-271).
-   *
-   * @internal Rails-protected.
-   */
+  /** @internal */
   declare static reloadSchemaFromCache: () => void;
 
-  // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   declare static columnNames: typeof ModelSchema.columnNames;
   declare static columnsHash: typeof ModelSchema.columnsHash;
   declare static contentColumns: typeof ModelSchema.contentColumns;
@@ -1535,12 +1078,6 @@ export class Base extends Model {
   declare static resetColumnInformation: typeof ModelSchema.resetColumnInformation;
   declare static _returningColumnsForInsert: typeof ModelSchema._returningColumnsForInsert;
 
-  /**
-   * Return the STI inheritance column name. Defaults to "type" (Rails default
-   * for every model), regardless of whether the model participates in STI.
-   *
-   * Mirrors: ActiveRecord::Base.inheritance_column
-   */
   static get inheritanceColumn(): string | null {
     return ModelSchema.inheritanceColumn.call(this);
   }
@@ -1562,11 +1099,6 @@ export class Base extends Model {
     return isFinderNeedsTypeCondition(this);
   }
 
-  /**
-   * Returns true if this class is its own STI base class.
-   *
-   * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class?
-   */
   static isBaseClass(): boolean {
     return _isBaseClass(this);
   }
@@ -1577,8 +1109,7 @@ export class Base extends Model {
 
   /**
    * @internal
-   * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
-   * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) surfaced on Base as well as in inheritance.ts; one of the two should go.
+   * @noRailsEquivalent CONVERGEABLE
    */
   static applicationRecordClassQ(): boolean {
     return _applicationRecordClassQ(this);
@@ -1600,14 +1131,8 @@ export class Base extends Model {
     return inheritanceDescendants(this);
   }
 
-  // -- Logger --
   static _logger: BenchmarkLogger | null = null;
 
-  /**
-   * Set or get the logger for SQL and lifecycle events.
-   *
-   * Mirrors: ActiveRecord::Base.logger
-   */
   static get logger(): BenchmarkLogger | null {
     return this._logger;
   }
@@ -1616,14 +1141,8 @@ export class Base extends Model {
     this._logger = log;
   }
 
-  /**
-   * Times the given block and logs the result.
-   * Mirrors: `extend ActiveSupport::Benchmarkable` (base.rb:285) — the mixin
-   * reads this class's own `logger` reader (benchmarkable.rb:38).
-   */
   static benchmark = benchmarkable;
 
-  // -- Timestamp control --
   static _recordTimestamps = true;
 
   static get recordTimestamps(): boolean {
@@ -1634,10 +1153,6 @@ export class Base extends Model {
     this._recordTimestamps = value;
   }
 
-  // `class_attribute :partial_updates, :partial_inserts` (dirty.rb:50-51),
-  // installed by AttributeMethods::Dirty's `[included]` hook. Apps flip
-  // partial_inserts to false via `config.load_defaults 7.0`; that belongs in a
-  // config layer, not this framework default.
   declare static partialUpdates: boolean;
   declare static partialInserts: boolean;
 
@@ -1645,14 +1160,8 @@ export class Base extends Model {
     return _noTouchingBlock(this, fn);
   }
 
-  /**
-   * Returns true if the record's class has noTouching set.
-   *
-   * Mirrors: ActiveRecord::NoTouching#no_touching?. Wired via include() below.
-   */
   declare isNoTouching: () => boolean;
 
-  // -- Sequence name --
   static _sequenceName: string | null = null;
 
   static get sequenceName(): string | null {
@@ -1663,7 +1172,6 @@ export class Base extends Model {
     ModelSchema.sequenceName.call(this, name);
   }
 
-  // -- Ignored columns --
   static _ignoredColumns: string[] = [];
 
   static get ignoredColumns(): string[] {
@@ -1674,43 +1182,22 @@ export class Base extends Model {
     ModelSchema.ignoredColumns.call(this, columns);
   }
 
-  // Suppresses after_initialize in the constructor when set by _instantiate /
-  // directInstantiate (inheritance.ts) so we can fire after_find first, then
-  // after_initialize — matching Rails' init_with_attributes call order.
   static _suppressInitializeCallback = false;
 
-  // Suppresses the abstract-class guard during _instantiate, mirroring Rails'
-  // use of allocate (which bypasses initialize) for DB-loaded records.
   static _suppressAbstractCheck = false;
 
-  // --- ReadonlyAttributes mixin (wired via extend() after class) ---
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static readonlyAttributeQ: typeof ReadonlyAttributes.readonlyAttributeQ;
 
-  /**
-   * Return the list of readonly attribute names.
-   *
-   * Mirrors: ActiveRecord::Base.readonly_attributes
-   */
   static get readonlyAttributes(): string[] {
     return ReadonlyAttributes.readonlyAttributes.call(this);
   }
 
-  /**
-   * Per-model `associationName => options` map from accepts_nested_attributes_for.
-   *
-   * Mirrors: ActiveRecord::Base.nested_attributes_options
-   */
   declare static nestedAttributesOptions: Record<
     string,
     import("./nested-attributes.js").NestedAttributeOptions
   >;
 
-  /**
-   * Declare that this model accepts nested attributes for an association.
-   *
-   * Mirrors: ActiveRecord::NestedAttributes::ClassMethods#accepts_nested_attributes_for
-   */
   static acceptsNestedAttributesFor(
     associationName: string,
     options?: Parameters<typeof _NestedAttributes.acceptsNestedAttributesFor>[2],
@@ -1718,7 +1205,6 @@ export class Base extends Model {
     _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
   }
 
-  /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */
   static get verboseQueryLogs(): boolean {
     return _getVerboseQueryLogs();
   }
@@ -1727,68 +1213,31 @@ export class Base extends Model {
     _setVerboseQueryLogs(value);
   }
 
-  /**
-   * Per-model `purpose => TokenDefinition` map (inherited purposes included).
-   *
-   * Mirrors: ActiveRecord::Base.token_definitions
-   */
   declare static tokenDefinitions: _TokenDefinitionsHash;
 
-  /**
-   * MessageVerifier backing token-for (null until a verifier is configured).
-   *
-   * Mirrors: ActiveRecord::Base.generated_token_verifier
-   */
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
-  // -- Encrypted attributes --
 
-  /**
-   * Declare attributes as encrypted.
-   * Reads decrypt, writes encrypt transparently.
-   *
-   * Mirrors: ActiveRecord::Encryption.encrypts
-   */
   static encrypts(...args: Array<string | EncryptsOptions>): void {
     encryptionHooks.encrypts(this, ...args);
   }
 
-  /**
-   * Returns true if the attribute is currently stored as encrypted ciphertext.
-   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
-   *
-   * @internal
-   */
+  /** @internal */
   encryptedAttribute(attributeName: string): boolean {
     return encryptionHooks.encryptedAttribute(this, attributeName);
   }
 
-  /**
-   * Returns the raw ciphertext stored for the attribute.
-   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#ciphertext_for
-   *
-   * @internal
-   */
+  /** @internal */
   ciphertextFor(attributeName: string): unknown {
     return encryptionHooks.ciphertextFor(this, attributeName);
   }
 
-  /**
-   * Encrypts all encryptable attributes and persists via update_columns.
-   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypt
-   *
-   * @internal
-   */
+  /** @internal */
   async encrypt(): Promise<void> {
     return encryptionHooks.encrypt(this);
   }
 
-  /**
-   * Decrypts all encryptable attributes and persists via update_columns.
-   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#decrypt
-   *
-   * @internal
-   */
+  /** @internal */
   async decrypt(): Promise<void> {
     return encryptionHooks.decrypt(this);
   }
@@ -1801,20 +1250,12 @@ export class Base extends Model {
     return _suppressorRegistry();
   }
 
-  // --- Reflection::ClassMethods (wired via extend() after class body) ---
-  /** encryptable_record.rb:11 — `class_attribute :encrypted_attributes` (no default). */
   declare static encryptedAttributes: Set<string> | undefined;
-  /** The `class_attribute` predicate `encrypted_attributes?`. */
   declare static readonly isEncryptedAttributes: boolean;
-  /** readonly_attributes.rb:11 — `class_attribute :_attr_readonly, instance_accessor: false, default: []`. */
   declare static _attrReadonly: string[];
-  /** default.rb:19 — `class_attribute :default_scopes, instance_writer: false, instance_predicate: false, default: []`. */
   declare static defaultScopes: import("./scoping/default.js").DefaultScope[];
-  /** default.rb:20 — `class_attribute :default_scope_override, ... default: nil`. */
   declare static defaultScopeOverride: boolean | null;
-  /** reflection.rb:11 — `class_attribute :_reflections, instance_writer: false, default: {}`. */
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
-  /** reflection.rb:12 — `class_attribute :aggregate_reflections, instance_writer: false, default: {}`. */
   declare static aggregateReflections: Record<string, _Reflection.AggregateReflection>;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
   declare static reflections: typeof _Reflection.ClassMethods.reflections;
@@ -1825,18 +1266,11 @@ export class Base extends Model {
   declare static reflectOnAggregation: typeof _Reflection.ClassMethods.reflectOnAggregation;
   declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
 
-  // --- Validations::ClassMethods (wired via extend() after class body) ---
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  // -- Enums (wired via extend() after class body) --
   static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
 
-  /**
-   * Declare an enum attribute. Maps symbolic names to integer values.
-   *
-   * Mirrors: ActiveRecord::Enum.enum
-   */
   declare static enum: typeof _EnumModule.enumMethod;
 
   /** @internal */
@@ -1854,7 +1288,6 @@ export class Base extends Model {
   /** @internal */
   declare static detectNegativeEnumConditionsBang: typeof _EnumModule.detectNegativeEnumConditionsBang;
 
-  // -- Explain --
 
   declare static collectingQueriesForExplain: typeof _collectingQueriesForExplain;
 
@@ -1866,13 +1299,7 @@ export class Base extends Model {
   /** @internal */
   declare static buildExplainClause: typeof _buildExplainClause;
 
-  // -- DelegatedType --
 
-  /**
-   * Declare a delegated type on this model.
-   *
-   * Mirrors: ActiveRecord::DelegatedType.delegated_type
-   */
   static delegatedType(
     role: string,
     options: import("./delegated-type.js").DelegatedTypeOptions,
@@ -1897,52 +1324,27 @@ export class Base extends Model {
     });
   }
 
-  // -- Store --
 
-  /** Mirrors: ActiveRecord::Store::ClassMethods#store */
   declare static store: typeof _StoreClassMethods.store;
 
-  /** Mirrors: ActiveRecord::Store::ClassMethods#store_accessor */
   declare static storeAccessor: typeof _StoreClassMethods.storeAccessor;
 
-  /** Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module */
   declare static _storeAccessorsModule: typeof _StoreClassMethods._storeAccessorsModule;
 
-  /** Mirrors: ActiveRecord::SecurePassword::ClassMethods#authenticate_by (secure_password.rb:40). */
   static authenticateBy = _authenticateBy;
 
-  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#has_secure_token (secure_token.rb:38). */
   static hasSecureToken = _hasSecureToken;
 
-  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token (secure_token.rb:57). */
   static generateUniqueSecureToken = _generateUniqueSecureToken;
 
-  /** Mirrors: ActiveRecord::TokenFor::ClassMethods#generates_token_for (token_for.rb:100). */
   static generatesTokenFor = _generatesTokenFor;
 
-  /** Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for (token_for.rb:104). */
   static findByTokenFor = _findByTokenFor;
 
-  /** Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for! (token_for.rb:108). */
   static findByTokenForBang = _findByTokenForBang;
 
-  /**
-   * The fallback coder `serialize` uses when no explicit coder is given
-   * (`coder ||= default_column_serializer`, serialization.rb:184). Declared by
-   * `AttributeMethods::Serialization`'s `included do` block at its
-   * attribute_methods.rb:20 seat below.
-   *
-   * Mirrors: ActiveRecord::AttributeMethods::Serialization.default_column_serializer
-   */
   declare static defaultColumnSerializer: unknown;
 
-  /**
-   * Declare that an attribute should be serialized using the given coder.
-   * Arrives from `AttributeMethods::Serialization::ClassMethods` at the
-   * attribute_methods.rb:20 seat below.
-   *
-   * Mirrors: ActiveRecord::AttributeMethods::Serialization::ClassMethods#serialize
-   */
   declare static serialize: (
     attribute: string,
     options?: AttributeOptions & {
@@ -1951,38 +1353,25 @@ export class Base extends Model {
     },
   ) => void;
 
-  /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
   declare static localStoredAttributes: typeof _localStoredAttributes;
 
-  /** Mirrors: ActiveRecord::Store::ClassMethods#stored_attributes */
   static storedAttributes = _storedAttributes;
 
-  // -- Scopes registry (used by Relation) --
   static _scopes: Map<string, (this: any, ...args: any[]) => any> = new Map();
 
-  // --- Default scope (wired via extend() after class body) ---
   declare static defaultScope: typeof _defaultScope;
   declare static unscoped: typeof _unscoped;
 
-  /** @internal Like all() but skips currentScope — used by the preloader. */
+  /** @internal */
   static _allForPreload(): any {
     return this.defaultScoped();
   }
 
-  /**
-   * Mirrors: ActiveRecord::Core::ClassMethods#relation (core.rb:431-435).
-   *
-   * @internal Rails-private (core.rb:408 `private`).
-   */
+  /** @internal */
   static relation(): any {
     const relation = Relation.create(this);
 
     if (isFinderNeedsTypeCondition(this) && !isIgnoreDefaultScope.call(this)) {
-      // `finder_needs_type_condition?` memoizes on first call (inheritance.rb:92),
-      // so clearing `inheritance_column` afterwards leaves it answering true.
-      // Rails' `type_condition` then builds `table[nil]` (inheritance.rb:322);
-      // trails' `typeCondition` raises instead, so skip the arm rather than
-      // turning a Rails no-op into an error.
       if (this.inheritanceColumn === null) return relation;
       return relation.whereBang(typeCondition(this));
     } else {
@@ -1990,30 +1379,14 @@ export class Base extends Model {
     }
   }
 
-  // Scope extension methods: scope name -> Record of extra methods
   static _scopeExtensions: Map<string, Record<string, (...args: any[]) => any>> = new Map();
 
-  /**
-   * Define a named scope with an optional extension block.
-   *
-   * The extension object adds extra methods to the returned relation
-   * when the scope is invoked.
-   *
-   * Mirrors: ActiveRecord::Scoping::Named::ClassMethods. Wired via extend()
-   * after class.
-   */
   declare static scope: typeof NamedScoping.scope;
   declare static scopeForAssociation: typeof NamedScoping.scopeForAssociation;
   declare static defaultScoped: typeof NamedScoping.defaultScoped;
   declare static defaultExtensions: typeof NamedScoping.defaultExtensions;
 
-  // -- Scoping --
 
-  /**
-   * Execute a block with the given relation as the current scope.
-   *
-   * Mirrors: ActiveRecord::Relation#scoping
-   */
   static async scoping<R>(rel: any, fn: () => R | Promise<R>): Promise<R>;
   static async scoping<R>(
     rel: any,
@@ -2025,58 +1398,26 @@ export class Base extends Model {
     optionsOrFn: { allQueries?: boolean | null } | (() => R | Promise<R>),
     maybeFn?: () => R | Promise<R>,
   ): Promise<R> {
-    // Delegate to Relation#scoping so the all_queries threading (global current
-    // scope + nested-unset guard) lives in one place.
     return typeof optionsOrFn === "function"
       ? rel.scoping(optionsOrFn)
       : rel.scoping(optionsOrFn, maybeFn);
   }
 
-  /**
-   * Return the current scope if set, or null.
-   *
-   * Mirrors: ActiveRecord::Base.current_scope
-   */
   static currentScope(skipInheritedScope = false): any | null {
     return ScopeRegistry.currentScope(this, skipInheritedScope);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Scoping::ClassMethods#current_scope=
-   */
   static setCurrentScope = _setCurrentScope;
 
-  /**
-   * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope
-   */
   static globalCurrentScope = _globalCurrentScope;
 
-  /**
-   * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope=
-   */
   static setGlobalCurrentScope = _setGlobalCurrentScope;
 
-  /**
-   * Mirrors: ActiveRecord::Scoping::ClassMethods#scope_registry
-   */
   static scopeRegistry = _scopeRegistry;
 
-  /**
-   * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
-   */
   static isScopeAttributes = _isScopeAttributes;
 
-  // -- Finders (class methods) --
 
-  // Overloads match Rails' behavior:
-  //   find(id)          → single record
-  //   find([id, ...])   → array of records (plural PK)
-  //                       OR a single record when the model has a composite
-  //                       primary key and the array is the tuple form
-  //                       (`find([shop_id, id])`). Because TS can't inspect
-  //                       `primaryKey` at the type level, the return is a
-  //                       union: callers narrow with `Array.isArray` or cast.
-  //   find(id, id, ...) → variadic → array of records
   declare static find: {
     <T extends typeof Base>(
       this: T,
@@ -2095,33 +1436,20 @@ export class Base extends Model {
     conditions: Record<string, unknown>,
   ) => Promise<InstanceType<T> | null>;
 
-  // Mirrors Rails `Core::ClassMethods#initialize_find_by_cache` — resets the
-  // per-class `@find_by_statement_cache` (bucketed by prepared_statements).
   declare static initializeFindByCache: typeof _Core.initializeFindByCache;
   declare static cachedFindByStatement: typeof _Core.cachedFindByStatement;
   declare static _findByStatementCache?: Map<boolean, Map<string, unknown>>;
 
-  // Mirrors Rails' `Base.configurations` / `.configurations=` pair, collapsed
-  // into one optional-argument accessor.
   declare static configurations: typeof _Core.configurations;
 
-  // Mirrors Rails `find_by!(arg, *args)`: a Hash of conditions or a raw SQL
-  // fragment (`Post.find_by!("1 = 0")`) plus optional bind args.
   declare static findByBang: <T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown> | string,
     ...rest: unknown[]
   ) => Promise<InstanceType<T>>;
 
-  /** Mirrors `include DynamicMatchers` (base.rb) — see dynamic-matchers.ts. */
   static respondToMissing = respondToMissing;
 
-  /**
-   * Find the sole record matching conditions.
-   * Raises RecordNotFound if none, SoleRecordExceeded if more than one.
-   *
-   * Mirrors: ActiveRecord::Base.find_sole_by
-   */
   static async findSoleBy<T extends typeof Base>(
     this: T,
     ...conditions: unknown[]
@@ -2129,24 +1457,12 @@ export class Base extends Model {
     return (this.all().where as any)(...conditions).sole();
   }
 
-  /**
-   * Return all records as a Relation.
-   *
-   * Mirrors: ActiveRecord::Base.all
-   */
   static all<T extends typeof Base>(
     this: T,
     options?: { allQueries?: boolean | null },
   ): Relation<InstanceType<T>> {
     const scope = this.currentScope();
     if (scope) {
-      // Rails' `all`: `self == scope.model ? scope.clone :
-      // relation.merge!(scope)`. When the current scope was set on a
-      // superclass (an STI subclass reading a scope installed on its base, e.g.
-      // inside `Comment.unscoped { SpecialComment.find(1) }`), build this
-      // class's own relation — which carries the STI `type_condition` — and
-      // merge the inherited scope into it, rather than cloning the parent's
-      // type-unconstrained relation.
       if (scope._model === this) {
         return scope.clone();
       }
@@ -2155,11 +1471,6 @@ export class Base extends Model {
     return this.defaultScoped({ allQueries: options?.allQueries });
   }
 
-  /**
-   * Shorthand for all().where(conditions).
-   *
-   * Mirrors: ActiveRecord::Base.where
-   */
   static where<T extends typeof Base>(this: T): WhereChain<Relation<InstanceType<T>>>;
   static where<T extends typeof Base>(
     this: T,
@@ -2191,11 +1502,6 @@ export class Base extends Model {
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...rest);
     }
-    // Composite-key form (`where(cols, tuples)`) is a two-argument call, so it
-    // is disambiguated from Rails' sanitized-array conditions form
-    // (`where(["name = ?", x])`, a single array argument) by argument count. A
-    // single all-strings array falls through to `Relation#where`, which routes
-    // it to `buildWhereClause` for sanitization / BoundSqlLiteral handling.
     if (
       Array.isArray(conditionsOrSql) &&
       rest.length > 0 &&
@@ -2209,30 +1515,12 @@ export class Base extends Model {
       return this.all().where(conditionsOrSql as string[], rest[0] as unknown[][]);
     }
     if (Array.isArray(conditionsOrSql)) {
-      // A single array argument is the sanitized-conditions form. Any extra
-      // positional `rest` is intentionally dropped, mirroring Rails'
-      // `build_where_clause`, whose `opts, *rest = opts` overwrites `rest` with
-      // the array tail and discards the originally-passed args
-      // (query_methods.rb:1616-1618).
       return this.all().where(conditionsOrSql as unknown[]);
     }
     return this.all().where(conditionsOrSql);
   }
 
-  // insertAll / upsertAll / updateAll / deleteAll / destroyBy / deleteBy
-  // extracted to querying.ts; declared in the Querying mixin section below.
 
-  /**
-   * Update record(s). Mirrors Rails' `persistence.rb#update` — the id
-   * argument shape drives behavior:
-   *
-   *   update(attrs)                 → update every record in `all()` (Rails' `:all` default)
-   *   update(":all", attrs)         → same, explicit sentinel (mirrors Rails' :all symbol)
-   *   update(id, attrs)             → find(id) + update(attrs), returns the record
-   *   update([ids], [attrs])        → parallel arrays, index-aligned
-   *
-   * Passing a `Base` instance (or array containing one) raises.
-   */
   static update<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>,
@@ -2257,27 +1545,12 @@ export class Base extends Model {
     idOrAttrs: unknown,
     attrs?: Record<string, unknown> | Record<string, unknown>[],
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    return performClassUpdate.call(this, idOrAttrs, attrs, /*bang*/ false) as Promise<
+    return performClassUpdate.call(this, idOrAttrs, attrs, false) as Promise<
       InstanceType<T> | InstanceType<T>[]
     >;
   }
 
-  /**
-   * Destroy a record by primary key (with callbacks). Accepts a single id,
-   * an array of ids, a composite-PK tuple, or an array of tuples.
-   *
-   * Mirrors: ActiveRecord::Base.destroy — Rails detects multiple ids via
-   *   `composite_primary_key? ? id.first.is_a?(Array) : id.is_a?(Array)`
-   * so a plain tuple on a composite-PK model is treated as ONE record,
-   * not N.
-   *
-   * @missingRailsCall with_transaction_returning_status — PERMANENT: File-mapping artifact:
-   *   `base.ts`'s `destroy` is the instance-method table entry `destroy:
-   *   _Persistence.destroy` (base.ts:4609), not a body. Rails'
-   *   `Transactions#destroy` (transactions.rb:356-358) maps to persistence.ts
-   *   `destroy`, which does call `withTransactionReturningStatus`
-   *   (persistence.ts:855).
-   */
+  /** @missingRailsCall with_transaction_returning_status — PERMANENT */
   static async destroy<T extends typeof Base>(
     this: T,
     id: unknown | unknown[],
@@ -2297,14 +1570,7 @@ export class Base extends Model {
     return record;
   }
 
-  // destroyAll extracted to querying.ts; declared in the Querying mixin section.
 
-  /**
-   * Update record(s) and raise on validation failure. Same arg shapes as
-   * `update`.
-   *
-   * Mirrors: ActiveRecord::Base.update!
-   */
   static updateBang<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>,
@@ -2329,50 +1595,22 @@ export class Base extends Model {
     idOrAttrs: unknown,
     attrs?: Record<string, unknown> | Record<string, unknown>[],
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    return performClassUpdate.call(this, idOrAttrs, attrs, /*bang*/ true) as Promise<
+    return performClassUpdate.call(this, idOrAttrs, attrs, true) as Promise<
       InstanceType<T> | InstanceType<T>[]
     >;
   }
 
-  /**
-   * Touch all records matching conditions (update timestamps).
-   *
-   * Mirrors: ActiveRecord::Base.touch_all — a class-level entry point that
-   * delegates to `all().touchAll(...)` (Rails wires it up through
-   * `Querying::QUERYING_METHODS`, whose implementation lives on Relation).
-   * Wired via extend() after class.
-   */
   declare static touchAll: typeof Timestamp.touchAll;
 
-  // Positional / calculation / predicate delegators (second..thirdToLast,
-  // exists, count/minimum/maximum/average/sum/pluck/ids/pick,
-  // first[!] / last[!] / take / sole, findOrCreateBy, findOrInitializeBy)
-  // extracted to querying.ts; declared in the Querying mixin section below.
 
-  /**
-   * Try to create a record first; if it already exists (uniqueness violation),
-   * find and return the existing one.
-   *
-   * Mirrors: ActiveRecord::Base.create_or_find_by
-   */
   static createOrFindBy<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<InstanceType<T>> {
-    // Rails: `delegate :create_or_find_by, to: :all`. Routing through all()
-    // picks up the current scope + uses the narrow RecordNotUnique retry
-    // Relation#createOrFindBy implements, so validation failures and
-    // other adapter errors propagate unchanged.
     return this.all().createOrFindBy(conditions, extra);
   }
 
-  /**
-   * Try to create a record first (raising on validation failure);
-   * if it already exists, find and return the existing one.
-   *
-   * Mirrors: ActiveRecord::Base.create_or_find_by!
-   */
   static createOrFindByBang<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
@@ -2381,20 +1619,7 @@ export class Base extends Model {
     return this.all().createOrFindByBang(conditions, extra);
   }
 
-  /**
-   * Instantiate a new record (not yet saved).
-   *
-   * Rails: `Base.new(attributes = nil, &block)` — recurses on arrays and
-   * yields each record to the block before returning.
-   *
-   * @noRailsEquivalent PERMANENT Ruby never writes `def new` for this — the
-   * allocator is `Class#new` and the model side is
-   * `vendor/rails/activerecord/lib/active_record/core.rb:471` (`def
-   * initialize`), so no `.rb` can ever declare a matching name. TS reserves
-   * `new` for the constructor, which cannot recurse over an array of attribute
-   * hashes nor yield each record to a block, so the `Model.new(attrs, &block)`
-   * semantics have to live on a static factory of the same name.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static new<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>[],
@@ -2418,12 +1643,6 @@ export class Base extends Model {
     return record;
   }
 
-  /**
-   * Alias for `new` (Rails 7.2+). Handy when `new` reads awkwardly in
-   * fluent chains or template literals.
-   *
-   * Mirrors: ActiveRecord::Persistence::ClassMethods#build
-   */
   static build<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>[],
@@ -2442,12 +1661,6 @@ export class Base extends Model {
     return Array.isArray(attrs) ? this.new(attrs, block) : this.new(attrs, block);
   }
 
-  /**
-   * Create a record and save it to the database.
-   *
-   * Rails: `Base.create(attributes = nil, &block)` — recurses on arrays
-   * and yields each record to the block before save.
-   */
   private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
     const scope = this.currentScope();
     if (scope) {
@@ -2493,12 +1706,6 @@ export class Base extends Model {
     return _Persistence.createBang.call(this, attrs, block);
   }
 
-  /**
-   * Instantiate a record from a hash of database attributes, dispatching
-   * through STI if applicable.
-   *
-   * Mirrors: ActiveRecord::Persistence::ClassMethods#instantiate
-   */
   static instantiate<T extends typeof Base>(
     this: T,
     attributes: Record<string, unknown>,
@@ -2508,7 +1715,6 @@ export class Base extends Model {
     return _Persistence.instantiate.call(this, attributes, columnTypes, block);
   }
 
-  // --- Querying mixin (static methods, wired via extend() after class) ---
   declare static findBySql: typeof Querying.findBySql;
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
   declare static countBySql: typeof Querying.countBySql;
@@ -2624,36 +1830,14 @@ export class Base extends Model {
   /** @internal */
   declare static _loadFromSql: typeof Querying._loadFromSql;
 
-  /**
-   * Increment counter columns for a record by primary key.
-   *
-   * Mirrors: ActiveRecord::CounterCache::ClassMethods. Wired via extend()
-   * after class.
-   */
   declare static incrementCounter: typeof CounterCache.incrementCounter;
   declare static decrementCounter: typeof CounterCache.decrementCounter;
   declare static updateCounters: typeof CounterCache.updateCounters;
   declare static resetCounters: typeof CounterCache.resetCounters;
   declare static isCounterCacheColumn: typeof CounterCache.isCounterCacheColumn;
-  /** counter_cache.rb:9 — `class_attribute :_counter_cache_columns`. */
   declare static _counterCacheColumns: string[];
-  /** counter_cache.rb:10 — `class_attribute :counter_cached_association_names`. */
   declare static counterCachedAssociationNames: string[];
 
-  /**
-   * Instantiate a model from a database row (marks it as persisted).
-   *
-   * Mirrors `instantiate_instance_of` (persistence.rb:82-87):
-   * `klass.attributes_builder.build_from_database(attributes, column_types)`,
-   * installed by `init_with_attributes`. The resulting LazyAttributeSet reports
-   * only the projected columns from `keys`/`key?`, because the unprojected ones
-   * were never in `values` (attribute_set/builder.rb:32-39).
-   *
-   * trails carries a per-query `overrideTypes` map Rails has no counterpart
-   * for; it is merged into Rails' single `additional_types` argument, an
-   * override winning over the result set's reported column type for the same
-   * name.
-   */
   static _instantiate<T extends typeof Base>(
     this: T,
     row: Record<string, unknown>,
@@ -2661,12 +1845,6 @@ export class Base extends Model {
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
     overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
-    // Guard on class identity, not on `row[type] !== this.name`: the stored value
-    // is `sti_name`, which for a `store_full_sti_class` namespaced model
-    // ("ClothingItem::Used") never equals the flattened JS class name
-    // (`ClothingItemUsed`). Re-entry terminates because the resolution is
-    // idempotent. Receiver is `this`, as in Rails, not `base_class` — a projected
-    // row that omits the inheritance column must stay on the receiver.
     const klass = discriminateClassForRecord(this, row);
     if (klass !== this) {
       return klass._instantiate(
@@ -2677,12 +1855,6 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-    // Ensure schema reflection has populated `columns_hash` with
-    // adapter-resolved cast types before hydrating from the row — otherwise
-    // `attributes_builder`'s `attribute_types` falls back to ValueType and PG
-    // OID casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
-    // reads an already-populated schema cache; the preceding query
-    // would have populated it.
 
     (ModelSchema.loadSchema as any).call(this);
 
@@ -2722,66 +1894,27 @@ export class Base extends Model {
     defineDynamicSelectReaders(record as unknown as Base);
     record._newRecord = false;
     record.changesApplied();
-    // Apply strict_loading_by_default
     if (this._strictLoadingByDefault) {
       record._strictLoading = true;
     }
-    // Rails' `init_with_attributes` yields the record to the loader block
-    // (e.g. association inverse wiring) BEFORE running the find/initialize
-    // callbacks, so an `after_find` hook already sees the inverse set.
     block?.(record);
-    // strict:"sync" guarantees synchronous completion — void the settled result.
     void runCallbacks(record, "find", undefined, { strict: "sync" });
     void runCallbacks(record, "initialize", undefined, { strict: "sync" });
     return record;
   }
 
-  // -- Instance state --
 
   _newRecord = true;
   _destroyed = false;
-  // Mirrors ActiveRecord::Callbacks#destroy's `@_destroy_callback_already_called`
-  // reentrancy guard: two records that `dependent: :destroy` each other would
-  // otherwise recurse forever. Set while this record's destroy callback chain is
-  // running so a cascade back into the same record short-circuits.
   _destroyCallbackAlreadyCalled = false;
   _readonly = false;
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
-  // No Rails counterpart: Rails' strict_loading is tripped by `load_target`
-  // alone. Trails keeps the counter only for `loadBelongsTo` / `loadHasOne`
-  // (associations/instance-methods.ts) — explicit lazy loads the caller asked
-  // for by name, which Rails has no method to express an exemption for.
   _strictLoadingBypassCount = 0;
 
-  /**
-   * Return the *loaded* cached association object for `name` — callers read
-   * `.target` off it. This reads across the association-cache facets
-   * (`_collectionProxies`, `_associationInstances`), which since RFC-0022's fold
-   * are views onto one backing slot (`_associationCacheStore`) rather than
-   * separate maps. The literal
-   * `association_instance_get` analog (the built wrapper regardless of loaded
-   * state) is `_associationInstances.get(name)`.
-   *
-   * The gate still matters: a has_many's canonical target lives on its
-   * `CollectionProxy` (incl. in-memory inverse-seeded records on a
-   * not-yet-loaded proxy) while the `HasManyAssociation` mirror in
-   * `_associationInstances` is a stale secondary copy, so returning an
-   * unloaded/empty wrapper here would surface the wrong store's `.target`.
-   * Hence: a loaded-or-seeded proxy for collections; a loaded singular holder
-   * (or ad-hoc seed, which exposes no `isCollection`) otherwise; `undefined`
-   * for a miss or an unknown name.
-   *
-   * @internal
-   */
+  /** @internal */
   _associationCache(name: string): { target?: Base | Base[] | null } | undefined {
-    // A loaded *singular* holder (has_one/belongs_to, incl. has_one :through) is
-    // canonical and must win over any CollectionProxy that happens to share the
-    // name — a singular reader stores the unwrapped single record in
-    // `@association_cache`, whereas a proxy hydrated from that same holder boxes
-    // it into a 1-element array. Checking the holder first keeps the singular
-    // reader's target a single record on every preload path (RFC 0022).
     const instance = this._associationInstances.get(name) as
       | (AssociationInstance & {
           target?: Base | Base[] | null;
@@ -2797,11 +1930,6 @@ export class Base extends Model {
     ) {
       return proxy;
     }
-    // No proxy: the collection's canonical `@target` is the association object
-    // itself (`CollectionAssociation#@target`,
-    // collection_association.rb:284-296) — a proxy only reads through to that
-    // same store — so an inverse-seeded target is visible here without anyone
-    // having materialized the proxy first.
     if (
       instance?.isCollection() === true &&
       (instance.isLoaded() === true ||
@@ -2812,33 +1940,9 @@ export class Base extends Model {
     return undefined;
   }
 
-  /**
-   * Reset every per-record association cache in one place — the single
-   * lifecycle seam mirroring Rails resetting `@association_cache = {}` (in
-   * `init_internals`, and effectively on `reload`/`destroy`).
-   *
-   * RFC-0022 fold: the former maps are now `Map`-compatible facet views onto
-   * one backing slot (`_associationCacheStore`), so a single `clear()` resets
-   * all of them. Each facet still carries a genuinely distinct semantic that
-   * Ruby's single Association object folds together internally:
-   *   - `_associationInstances` is the canonical `@association_cache` analog
-   *     (name → built `Association` wrapper; what `association_instance_get/set`
-   *     and `association()` read/write). The holder also carries any
-   *     preloaded/eager-loaded target (`isLoaded()`),
-   *     including an eagerly-preloaded *nil* association.
-   *   - `_collectionProxies` is the Trails-specific user-facing `CollectionProxy`
-   *     layer (incl. in-memory inverse-seeded records on a not-yet-loaded proxy),
-   *     which has no standalone Ruby analog — Rails' proxy lives *inside* the
-   *     Association object.
-   * See `association-cache.ts` and associations.ts `initInternals`.
-   *
-   * @internal
-   */
+  /** @internal */
   _resetAssociationCaches(): void {
     if (this._associationCacheStore === undefined) {
-      // First call is `init_internals`' `@association_cache = {}`; later calls
-      // (reload/destroy) clear in place so callers holding a facet view keep
-      // seeing the record's cache.
       this._associationCacheStore = createAssociationCache();
       this._collectionProxies = this._associationCacheStore.proxies;
       this._associationInstances = this._associationCacheStore.instances as Map<
@@ -2852,29 +1956,10 @@ export class Base extends Model {
 
   constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
-    // Forbid/unwrap strong-params before anything inspects the attribute bag.
-    // Mirrors the Rails construction path: ActiveModel::API#initialize skips
-    // assignment for a nil bag (`assign_attributes(attributes) if attributes`
-    // → blank record), and #assign_attributes returns before sanitizing an
-    // empty one (`return if new_attributes.empty?`) — so a nil or empty (even
-    // un-permitted) params object neither raises nor sanitizes. Only a
-    // non-empty bag is checked.
     attrs ??= {};
     if (!isMassAssignmentEmpty(attrs)) {
       attrs = sanitizeForMassAssignment(attrs);
     }
-    // STI dispatch at `new`: when the inheritance column names a subclass in
-    // this class's own subtree, construct that subclass instead (Rails'
-    // Inheritance::ClassMethods#new). Resolution is registry-safe — scoped to
-    // this class's descendants, never the ambiguous global name map — so it
-    // runs after sanitize (the un-permitted params case raises above first).
-    // `_suppressStiNewDispatch` lets `becomes` build the exact target class
-    // (Rails uses `klass.allocate`, which bypasses `new`'s STI dispatch) so a
-    // record becomes(Topic) yields a Topic even when `topics.type` defaults to
-    // a subclass (persistence_test.rb#test_becomes_default_sti_subclass). It
-    // holds the suppressed class itself, not a boolean: statics inherit down the
-    // hierarchy, so the identity check confines suppression to that exact class
-    // and never leaks into a nested `new <subclass>()` during the window.
     if (
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target
@@ -2884,19 +1969,8 @@ export class Base extends Model {
         return new stiTarget(attrs, initBlock);
       }
     }
-    // Split out constructor-form association values (e.g. `new Owner({items:
-    // [...]})`) so super() never sees them as plain attributes. Dispatched
-    // after super() so the association proxy exists on `this`.
     let assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
-    // Suppress after_initialize during super() so we can call
-    // initialize_internals_callback first, then fire after_initialize.
-    // This matches Rails' Core#initialize order:
-    //   init_internals → initialize_internals_callback → super → after_initialize
-    // Multiparameter keys need no split here: super() reaches
-    // `assign_attributes` → `_assign_attributes`, which buckets `key(1i)` out
-    // of the scalar pass and calls `assign_multiparameter_attributes` itself
-    // (attribute_assignment.rb:11-22).
     const ctor = new.target;
     const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
@@ -2914,12 +1988,7 @@ export class Base extends Model {
     }
     if (!wasSuppressed) {
       inheritanceInitializeInternalsCallback.call(this as any);
-      // Guard before allocating the Set — the no-scope case is the hot path.
       if (_shouldApplyScopeAttributes(ctor)) {
-        // The explicit keys are the ATTRIBUTE names, so a `starts_on(1i)` trio
-        // has to collapse to `starts_on` before the scope default for that same
-        // attribute is tested against it — otherwise the scope wins over an
-        // explicit assignment, which Rails never lets it do.
         const { multiparams, regular } = extractMultiparameterCallstack(attrs);
         _applyScopeAttributes(
           ctor,
@@ -2931,28 +2000,20 @@ export class Base extends Model {
         _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
         assocPending = null;
       }
-      // Rails yields the constructor block (Core#initialize, core.rb:479)
-      // before after_initialize — used by association `build_record` to run
-      // `initialize_attributes` (scope FK + set_inverse_instance) first.
       initBlock?.(this as unknown as Base);
-      // strict:"sync" guarantees synchronous completion -- void the settled result.
       void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
-    // Suppressed-callback fallback: parent caller fires after_initialize, so
-    // we still dispatch first to keep Rails' "assign → after_initialize" order.
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
     }
   }
 
-  // --- Persistence instance predicates (wired via include() after class body) ---
   declare isNewRecord: typeof _Persistence.isNewRecord;
   declare isPersisted: typeof _Persistence.isPersisted;
   declare isDestroyed: typeof _Persistence.isDestroyed;
   declare isPreviouslyNewRecord: typeof _Persistence.isPreviouslyNewRecord;
   declare isPreviouslyPersisted: typeof _Persistence.isPreviouslyPersisted;
 
-  // --- Core instance methods (wired via include() after class body) ---
   declare isReadonly: typeof _Core.isReadonly;
   declare readonlyBang: typeof _Core.readonlyBang;
   declare isStrictLoading: typeof _Core.isStrictLoading;
@@ -2961,28 +2022,12 @@ export class Base extends Model {
   declare isStrictLoadingAll: typeof _Core.isStrictLoadingAll;
   declare isStrictLoadingNPlusOneOnly: typeof _Core.isStrictLoadingNPlusOneOnly;
   declare isFrozen: typeof _Core.isFrozen;
-  /**
-   * `ActiveRecord::Core#freeze` (core.rb:596-599) — `@attributes =
-   * @attributes.clone.freeze; self`. Spelled `() => this` rather than
-   * `typeof _Core.freeze` so it stays assignable to the `this`-returning link
-   * `ActiveModel::Validations#freeze` puts on `Model` (validations.rb:372-377).
-   */
   declare freeze: () => this;
 
-  /**
-   * Get the association that triggered the destruction of this record (if any).
-   *
-   * Mirrors: ActiveRecord::Base#destroyed_by_association
-   */
   get destroyedByAssociation(): unknown {
     return this._destroyedByAssociation;
   }
 
-  /**
-   * Set the association that triggered the destruction of this record.
-   *
-   * Mirrors: ActiveRecord::Base#destroyed_by_association=
-   */
   set destroyedByAssociation(assoc: unknown) {
     this._destroyedByAssociation = assoc;
   }
@@ -3003,33 +2048,15 @@ export class Base extends Model {
 
   declare id: PrimaryKeyValue;
 
-  // increment/decrement/toggle + bang variants wired via include() below;
-  // signatures live on the merged `interface Base` at the bottom of this file.
 
-  /**
-   * Register uniqueness validations for one or more attributes.
-   *
-   * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
-   */
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
 
-  // save / saveBang extracted to persistence.ts; wired via include() below.
 
-  /**
-   * The persistence half of save — runs callbacks, performs INSERT or UPDATE,
-   * autosaves children, and touches parents. Called by save() inside a
-   * transaction wrapper.
-   *
-   * Mirrors: ActiveRecord::Persistence#save (the super that Transactions#save calls)
-   */
   private async _createOrUpdate(block?: (record: this) => void): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
     let saved = false;
     let wasNewRecord = false;
 
-    // Rails: Callbacks#create_or_update wraps super in run_callbacks(:save) { ... }.
-    // Around_save callbacks correctly wrap the _createRecord/_updateRecord calls which
-    // themselves run their own run_callbacks(:create/:update) { ... } chains.
     const saveOk = await runCallbacks(this, "save", async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
@@ -3045,18 +2072,8 @@ export class Base extends Model {
       if (saved) {
         this._transactionAction = wasNewRecord ? "create" : "update";
         (this as any)._newRecordBeforeLastCommit = wasNewRecord;
-        // `@_trigger_update_callback` is set inside `_updateRecord` from the
-        // UPDATE's affected-row count (Rails persistence.rb:900-909), so it is
-        // NOT forced here: a real update whose WHERE matched zero rows (e.g. a
-        // separate instance deleted the row earlier in the transaction) must
-        // leave the flag false so after_update_commit doesn't fire.
       }
 
-      // Rails Callbacks#create_or_update is `_run_save_callbacks { super }`,
-      // where `super` (Persistence#create_or_update) returns `result != false`.
-      // Threading that boolean back as the run_callbacks block value lets the
-      // after-model-callback `value != false` conditional skip after_save when
-      // an inner before_create/before_update chain halted via throw(:abort).
       return saved;
     });
 
@@ -3069,12 +2086,9 @@ export class Base extends Model {
     return saved;
   }
 
-  // Mirrors ActiveRecord::Timestamp's @_touch_record ivar (timestamp.rb:104),
-  // set by Timestamp#create_or_update and read by record_update_timestamps.
   private _touchRecord: boolean | null = null;
   private _instanceRecordTimestamps: boolean | null = null;
 
-  // Mirrors: ActiveRecord class_attribute :record_timestamps instance-level override
   get recordTimestamps(): boolean {
     return this._instanceRecordTimestamps ?? (this.constructor as typeof Base).recordTimestamps;
   }
@@ -3083,56 +2097,9 @@ export class Base extends Model {
     this._instanceRecordTimestamps = value;
   }
 
-  // update / updateBang extracted to persistence.ts; wired via include() below.
 
-  // destroy / destroyBang extracted to persistence.ts; wired via include() below.
 
-  /**
-   * The persistence half of destroy — runs callbacks, performs DELETE,
-   * updates counter caches, and touches parents. Called by destroy() inside
-   * a transaction wrapper.
-   *
-   * Mirrors: ActiveRecord::Persistence#destroy (the super that Transactions#destroy calls)
-   */
-  /**
-   * Materialize this record's unloaded `belongs_to` targets before the destroy
-   * callback chain runs, so a sync `before_destroy`/`around_destroy` callback
-   * reading the association sees a loaded record (matching Rails' lazy
-   * synchronous query) rather than trails' async-reader Promise.
-   *
-   * Scoped to classes that actually register a before/around destroy callback,
-   * and further narrowed to the `belongs_to` targets whose association name
-   * appears in the callback source — mirroring Rails, which lazily loads only
-   * the associations a callback dereferences and issues no query for the rest.
-   * When a before/around destroy callback is an object/method filter whose body
-   * cannot be introspected, we conservatively load every `belongs_to` (we can't
-   * tell what it reads). A same-FK sibling (e.g. Account#firm and
-   * Account#unautosavedFirm share `firm_id`) referenced in the source is loaded
-   * too; the extra read is side-effect-free and resolves to the same owner row.
-   *
-   * Loading is best-effort: a `belongs_to` whose target class is unregistered or
-   * whose row is missing must not abort the destroy (the callback may never read
-   * it). On a load failure we resolve the association to `null` rather than
-   * leaving it unloaded, so a sync callback that *does* read it sees `null` and
-   * not trails' async-reader Promise — keeping the bare `if (record.parent)`
-   * guard safe even when the preload could not materialize the parent. Any load
-   * that runs inside an open transaction is isolated in its own savepoint: a
-   * doomed query (e.g. a `belongs_to ..., primary_key:` at a non-existent column
-   * like `tag_with_primary_key`) throwing here would otherwise abort the whole
-   * PostgreSQL transaction (25P02), and the surrounding `catch` swallowing the
-   * JS error cannot undo that abort. Narrowing removes the *per-association*
-   * savepoint churn PR #4792 paid on every `belongs_to` — only the (usually one)
-   * association the callback actually names is loaded, so an unread doomed query
-   * is never issued in the first place.
-   *
-   * The scan resolves reads reached through the record's own helper methods, not
-   * just those inline in the registered filter, by expanding the callback source
-   * with the source of any model-defined method it references (see
-   * `expandCallbackSourcesWithHelpers`). This mirrors Rails resolving
-   * associations by ordinary method dispatch at any call depth.
-   *
-   * @internal
-   */
+  /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Base;
     if (typeof (this as any).association !== "function") return;
@@ -3141,8 +2108,6 @@ export class Base extends Model {
     const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor, this);
     const useSavepoint = _currentTransactionPublic().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
-      // Narrow to associations the callback names (unless an opaque callback
-      // forces loading all): Rails only queries the targets it dereferences.
       if (!opaque && !referencesAssociationName(expanded, ref.name)) continue;
       let assoc: any;
       try {
@@ -3154,29 +2119,12 @@ export class Base extends Model {
           await assoc.loadTarget();
         }
       } catch {
-        // An unregistered target class, missing FK row, strict-loading
-        // violation, or transient DB error must not abort the destroy. Resolve
-        // the association to `null` so a sync callback that reads it sees `null`
-        // rather than trails' async-reader Promise.
         assoc?.setTarget?.(null);
       }
     }
   }
 
-  /**
-   * Resolve `belongs_to ..., default:` blocks before validation runs.
-   *
-   * Rails registers the default on before_validation
-   * (associations/builder/belongs_to.rb#add_default_callbacks) so a required
-   * association's presence validation sees the defaulted foreign key. A default
-   * block may be async (e.g. `() => Developer.first()`); on the save path its
-   * awaited resolution runs here — a pre-validation pass invoked from `save` —
-   * before the chain, so the FK is set once and marked applied. The
-   * before_validation callback the builder registers still covers the
-   * standalone `valid?` path.
-   *
-   * @internal
-   */
+  /** @internal */
   private async _runBelongsToDefaults(): Promise<void> {
     const ctor = this.constructor as typeof Base;
     if (typeof (this as any).association !== "function") return;
@@ -3193,38 +2141,14 @@ export class Base extends Model {
   private async _destroyRow(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
 
-    // A sync `before_destroy` callback that reads an unloaded `belongs_to`
-    // cannot await trails' async association reader, so the reader surfaces a
-    // Promise and the callback's `if record.parent` guard sees a truthy
-    // Promise (or skips it). Rails issues the lazy synchronous query inside the
-    // callback. We approximate that by materializing the record's `belongs_to`
-    // targets here — before the destroy callback chain runs — so the reader
-    // returns the loaded record synchronously. The dependent-destroy cascade
-    // has its own inverse preload (`preloadDestroyInverseBelongsTo`); this is
-    // the direct-destroy counterpart.
     await this._preloadBelongsToForDestroyCallbacks();
 
     let didDelete = false;
     const destroyResult = await runCallbacks(this, "destroy", async () => {
-      // Mirrors Rails Persistence#destroy: `destroy_associations` runs inside the
-      // destroy callback chain — after before_destroy, before the row delete.
-      // The base hook is a no-op; HABTM overrides it to clean up join rows.
       await (this as any).destroyAssociations();
 
       const table = ctor.arelTable;
-      // Mirrors Rails Persistence#destroy: `@_trigger_destroy_callback ||=
-      // persisted? && destroy_row > 0` (persistence.rb:457). The DELETE runs
-      // iff the record is persisted — a new record (even one with an assigned
-      // primary key) runs callbacks/freeze but emits no DELETE. When persisted,
-      // `destroy_row` always calls `_delete_record(_query_constraints_hash)`
-      // (persistence.rb:866-871) with no id-present guard, so query-constraints
-      // models (and nil-in-database PKs) still issue the DELETE.
       if (this.isPersisted()) {
-        // Mirrors Rails Persistence#destroy → _delete_record(_query_constraints_hash):
-        // WHERE targets each query-constraint column's `*_in_database` value (the
-        // primary key keyed to `id_in_database` when no query_constraints are
-        // declared), so destroying a record whose primary key was mutated in
-        // memory still removes the originally loaded row.
         const dm = new DeleteManager()
           .from(table)
           .where(
@@ -3234,9 +2158,6 @@ export class Base extends Model {
           );
         const lockCol = ctor.lockingColumn;
         if (ctor.lockingEnabled) {
-          // Mirrors Rails _lock_value_for_database: if user explicitly changed lock_version,
-          // use valueForDatabase (user-set value as expected DB version → stale if mismatch).
-          // Otherwise use originalValueForDatabase() so NULL-in-DB → IS NULL.
           const lockAttr = this._attributes.getAttribute(lockCol);
           const lockWhereValue = this.isWillSaveChangeToAttribute(lockCol)
             ? lockAttr.valueForDatabase
@@ -3249,34 +2170,17 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        // Thread the `withConnection` connection rather than the deprecated
-        // `.connection` getter (see `_createRecord` in persistence.ts); resolved here, at the
-        // actual DELETE, so a connectionless model never touches `.connection`.
         const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
-        // `c.delete(dm, "#{self} Destroy")` (persistence.rb:294-296) — the
-        // public statement method, which is where `dirties_query_cache` is
-        // wired (query_cache.rb:13-15).
         const affected = await adapter.delete(dm, `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");
         }
-        // Mirrors Rails CounterCache#destroy_row, which wraps
-        // Persistence#destroy_row and decrements the belongs_to counter caches
-        // from the affected-row count — before `@destroyed = true`, so the
-        // owner is still `persisted?` when `decrement_counters` runs.
         didDelete = (await CounterCache.destroyRow.call(this as any, async () => affected)) > 0;
       }
 
       this._destroyed = true;
       this._previouslyNewRecord = false;
-      // Rails' destroy ends with a bare `freeze` (persistence.rb) — it does
-      // NOT touch `@association_cache`. Delegate to `freeze` for the
-      // clone-and-freeze semantics on `_attributes` and leave the association
-      // caches intact: loaded associations stay readable on a destroyed record
-      // exactly as in Rails (and as `Core#freeze` already documents).
       this.freeze();
-      // Rails' `_run_destroy_callbacks { super }` block value is truthy; only a
-      // halted chain yields false (run_callbacks returns env.value).
       return true;
     });
 
@@ -3292,27 +2196,13 @@ export class Base extends Model {
     return true;
   }
 
-  // delete extracted to persistence.ts; wired via include() below.
 
-  /**
-   * Delete record(s) by primary key without callbacks / validations.
-   *
-   * Mirrors: ActiveRecord::Base.delete — Rails defines this as
-   * `delete_by(primary_key => id_or_array)`, so single ids, arrays of
-   * ids, `nil`, and empty arrays all route through the same where-builder.
-   * Composite primary keys are supported via `where(cols, tuples)` for
-   * both single-tuple and array-of-tuples inputs, which compiles to an
-   * OR-of-AND predicate — not a per-column IN cross-product.
-   */
   static async delete(id: unknown): Promise<number> {
     if (id === null || id === undefined || (Array.isArray(id) && id.length === 0)) {
       return 0;
     }
     const pk = this.primaryKey;
     if (Array.isArray(pk)) {
-      // Composite PK — mirror find()'s detection:
-      //   - array-of-arrays → multiple tuples
-      //   - single array    → one tuple
       if (!Array.isArray(id)) {
         throw argumentError(
           `${this.name}.delete expects a tuple (or array of tuples) matching the composite primary key [${pk.join(", ")}]`,
@@ -3327,30 +2217,14 @@ export class Base extends Model {
           );
         }
       }
-      // where(cols, tuples) compiles to OR-of-AND (`(pk1=v1 AND pk2=v2) OR ...`)
-      // via PredicateBuilder.buildComposite, so multi-tuple deletes produce
-      // correct SQL instead of a cross-product of per-column IN lists.
       return this.all().where(pk, tuples).deleteAll();
     }
-    // Single-column PK — where({[pk]: id}) handles scalar and array alike
-    // (predicate builder emits `=` or `IN(...)` as appropriate).
     return this.all()
       .where({ [pk]: id as unknown })
       .deleteAll();
   }
 
-  // reload extracted to persistence.ts; wired via include() below.
 
-  /**
-   * Reload the record with a pessimistic lock (SELECT ... FOR UPDATE), and
-   * `with_lock` wraps a block in a transaction that first locks the record.
-   *
-   * Mirrors: ActiveRecord::Locking::Pessimistic#lock! and #with_lock.
-   * Wired via include() after class. The module functions use
-   * `<T extends Base>(this: T, ...)` generics so subclass instances see
-   * `this`-polymorphic types — `user.lockBang()` returns `Promise<User>`
-   * (when `user: User`), and `user.withLock(cb)` gives `cb` a `User` record.
-   */
   declare lockBang: typeof LockingPessimistic.lockBang;
   declare withLock: typeof LockingPessimistic.withLock;
 
@@ -3360,72 +2234,36 @@ export class Base extends Model {
   declare prettyPrint: typeof _Core.prettyPrint;
   declare attributeForInspect: (attr: string) => string;
 
-  // slice extracted to persistence.ts.
 
-  /**
-   * Return a GlobalID for this record.
-   *
-   * Mirrors: ActiveRecord::Base#to_gid — alias of to_global_id; returns a
-   * GlobalID instance. Requires setApp() from \@blazetrails/globalid to be
-   * called first.
-   */
   toGid(
     options?: import("@blazetrails/globalid").GlobalIDOptions,
   ): import("@blazetrails/globalid").GlobalID {
     return this.toGlobalId(options);
   }
 
-  /**
-   * Return a SignedGlobalID for this record.
-   * Uses the model's `signedIdVerifier` (same secret as signed IDs).
-   *
-   * Mirrors: ActiveRecord::Base#to_sgid
-   */
   toSgid(options?: ToSgidOptions): SignedGlobalIDType {
     const verifier = (this.constructor as typeof Base).signedIdVerifier;
     return _SignedGlobalIDCtor.create(this as GlobalIDModel, { ...options, verifier });
   }
 
-  /**
-   * Return the signed GlobalID token string for this record.
-   *
-   * Mirrors: ActiveRecord::Base#to_sgid_param
-   */
   toSgidParam(options?: Parameters<Base["toSgid"]>[0]): string {
     return this.toSgid(options).toParam();
   }
 
-  /** Mirrors: Identification#to_global_id — returns a GlobalID instance. */
   toGlobalId(
     options?: import("@blazetrails/globalid").GlobalIDOptions,
   ): import("@blazetrails/globalid").GlobalID {
     return _GlobalIDCtor.create(this as unknown as GlobalIDModel, options);
   }
 
-  /** Mirrors: Identification#to_gid_param — base64url-encoded GID. */
   toGidParam(options?: import("@blazetrails/globalid").GlobalIDOptions): string {
     return this.toGlobalId(options).toParam();
   }
 
-  /** Mirrors: Identification#to_signed_global_id — alias of toSgid. */
   toSignedGlobalId(options?: Parameters<Base["toSgid"]>[0]): SignedGlobalIDType {
     return this.toSgid(options);
   }
 
-  /**
-   * Find a record by its GlobalID URI string (or GlobalID instance).
-   * Returns null if the GID is invalid, the model class isn't registered, or
-   * the `only:` filter rejects it. If the record doesn't exist, `find`
-   * raises (Rails parity: RecordNotFound).
-   *
-   * NOT Rails: `find_global_id` exists nowhere in Rails or globalid — apps call
-   * `GlobalID::Locator.locate` directly, and globalid's railtie injects only the
-   * instance-side `GlobalID::Identification`. Left deliberately un-suppressed in
-   * `parity:api:extra` so it keeps reporting as extra surface until it is
-   * removed or a caller justifies it (story
-   * globalid-model-side-finders-are-uncalled-trails-invention, in the
-   * globalid-surfaced-deviations bucket).
-   */
   static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
     options?: import("@blazetrails/globalid").LocateOptions,
@@ -3433,12 +2271,6 @@ export class Base extends Model {
     return _Locator.locate(input, options);
   }
 
-  /**
-   * Signed counterpart of {@link findGlobalId} — uses signedIdVerifier(this).
-   *
-   * NOT Rails: same invention as {@link findGlobalId}, carrying the verifier
-   * this model signs with; Rails apps call `GlobalID::Locator.locate_signed`.
-   */
   static async findSignedGlobalId(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
@@ -3447,11 +2279,6 @@ export class Base extends Model {
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
-  /**
-   * Raising counterpart of {@link findSignedGlobalId} — throws on miss.
-   *
-   * NOT Rails: same invention as {@link findGlobalId}, in the bang shape.
-   */
   static async findSignedGlobalIdBang(
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
@@ -3461,21 +2288,11 @@ export class Base extends Model {
     return found;
   }
 
-  // valuesAt / assignAttributes extracted to persistence.ts.
 
-  /**
-   * Update the updated_at timestamp (and optionally other timestamp
-   * columns) without changing other attributes. Skips validations
-   * and callbacks.
-   *
-   * Mirrors: ActiveRecord::Base#touch. Wired via include() after class.
-   */
   declare touch: typeof TouchLater.touch;
   declare touchLater: typeof TouchLater.touchLater;
   declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
 
-  // updateAttribute / updateColumn / updateColumns / dup / clone / becomes
-  // extracted to persistence.ts; wired via include() below.
 
   declare hasAttribute: (name: string) => boolean;
   declare attributePresent: (name: string) => boolean;
@@ -3488,9 +2305,7 @@ export class Base extends Model {
   declare queryAttribute: (name: string) => boolean;
   declare _queryAttribute: (name: string) => boolean;
   declare readAttribute: (name: string, block?: (name: string) => unknown) => unknown;
-  /** Mirrors: ActiveRecord::AttributeMethods#[] (attribute_methods.rb:415) */
   declare get: (attrName: string) => unknown;
-  /** Mirrors: ActiveRecord::AttributeMethods#[]= (attribute_methods.rb:428) */
   declare set: (attrName: string, value: unknown) => void;
   /** @internal */
   declare _readAttribute: (name: string) => unknown;
@@ -3508,46 +2323,17 @@ export class Base extends Model {
     return AttributeMethodsClassMethods.attributeNames.call(this);
   }
 
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#_has_attribute?
-   * (attribute_methods.rb:260-262).
-   *
-   * @internal Rails-private helper.
-   */
+  /** @internal */
   static _hasAttribute(attrName: string): boolean {
     return AttributeMethodsClassMethods._hasAttribute.call(this as never, attrName);
   }
 
-  /**
-   * Return a hash of attribute name to default value.
-   *
-   * Mirrors: ActiveRecord::Base.column_defaults
-   */
   static get columnDefaults(): Record<string, unknown> {
     return ModelSchema.columnDefaults.call(this as any);
   }
 
-  // -- Strict loading class-level default --
-  //
-  // Off by default, matching Rails
-  // (`config.active_record.strict_loading_by_default` is false unless
-  // explicitly enabled). Opt in per-class with
-  // `Post.strictLoadingByDefault = true`, per-instance with
-  // `record.strictLoadingBang()`, or globally with
-  // `Base.strictLoadingByDefault = true`.
-  //
-  // Phase R.3 makes strict loading LOUD on sync singular-association
-  // reader access: when enabled, `post.author` on an unloaded
-  // association throws `StrictLoadingViolationError` — pointing users
-  // at `post.loadBelongsTo("author")` or `Post.includes("author")`
-  // instead of silently returning null.
   static _strictLoadingByDefault = false;
 
-  /**
-   * When true, all records loaded from this model will have strict_loading enabled.
-   *
-   * Mirrors: ActiveRecord::Base.strict_loading_by_default
-   */
   static get strictLoadingByDefault(): boolean {
     return this._strictLoadingByDefault;
   }
@@ -3556,19 +2342,8 @@ export class Base extends Model {
     this._strictLoadingByDefault = value;
   }
 
-  // -- Strict loading mode (per-model) --
-  //
-  // Selects strictness when strict loading is on: "all" (default, raises on
-  // any lazily-loaded association) or "n_plus_one_only" (raises only on
-  // associations that would lead to N+1 queries). Set per-class with
-  // `Post.strictLoadingMode = "n_plus_one_only"`; subclasses inherit via JS
-  // prototype lookup and may override.
-  //
-  // Mirrors: ActiveRecord::Base — `class_attribute :strict_loading_mode,
-  // instance_accessor: false, default: :all` in core.rb.
   static _strictLoadingMode: _Core.StrictLoadingMode = "all";
 
-  /** Mirrors: ActiveRecord::Base.strict_loading_mode */
   static get strictLoadingMode(): _Core.StrictLoadingMode {
     return this._strictLoadingMode;
   }
@@ -3577,15 +2352,8 @@ export class Base extends Model {
     this._strictLoadingMode = value;
   }
 
-  // Whether the STI inheritance column stores the full namespaced class name
-  // ("Namespaced::Post") or the demodulized bare name ("Post"). Subclasses
-  // inherit via JS prototype lookup and may override per-class.
-  //
-  // Mirrors: ActiveRecord::ModelSchema — `class_attribute :store_full_sti_class,
-  // instance_writer: false, default: true`.
   static _storeFullStiClass = true;
 
-  /** Mirrors: ActiveRecord::Base.store_full_sti_class */
   static get storeFullStiClass(): boolean {
     return this._storeFullStiClass;
   }
@@ -3594,15 +2362,8 @@ export class Base extends Model {
     this._storeFullStiClass = value;
   }
 
-  // Whether polymorphic `*_type` columns store the full namespaced class name
-  // or the demodulized bare name. Also gates `sti_name` together with
-  // `storeFullStiClass`. Subclasses inherit via JS prototype lookup.
-  //
-  // Mirrors: ActiveRecord::ModelSchema — `class_attribute
-  // :store_full_class_name, instance_writer: false, default: true`.
   static _storeFullClassName = true;
 
-  /** Mirrors: ActiveRecord::Base.store_full_class_name */
   static get storeFullClassName(): boolean {
     return this._storeFullClassName;
   }
@@ -3611,17 +2372,8 @@ export class Base extends Model {
     this._storeFullClassName = value;
   }
 
-  // When the same persisted row participates in one transaction via multiple
-  // instances, controls which instance runs the transactional commit
-  // callbacks: `true` keeps the FIRST saved instance, `false` the last.
-  // Subclasses inherit via JS prototype lookup.
-  //
-  // Mirrors: ActiveRecord::Core — `class_attribute
-  // :run_commit_callbacks_on_first_saved_instances_in_transaction,
-  // instance_accessor: false, default: true` (core.rb:96).
   static _runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
 
-  /** Mirrors: ActiveRecord::Base.run_commit_callbacks_on_first_saved_instances_in_transaction */
   static get runCommitCallbacksOnFirstSavedInstancesInTransaction(): boolean {
     return this._runCommitCallbacksOnFirstSavedInstancesInTransaction;
   }
@@ -3630,17 +2382,7 @@ export class Base extends Model {
     this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
   }
 
-  // -- Core config accessors (ActiveRecord::Core class_attributes) --
-  //
-  // Each mirrors a `class_attribute` declared in core.rb. trails realizes the
-  // backing behavior elsewhere (or matches the Rails default), so these are
-  // plain settable class fields the existing call sites already read.
 
-  // The default ConnectionHandler. Rails layers an IsolatedExecutionState
-  // override on top of this in `connection_handler`; trails reads
-  // `_connectionHandler` directly (no per-context override), so the default
-  // handler IS that field.
-  // Mirrors: ActiveRecord::Core.default_connection_handler (core.rb:98).
   static get defaultConnectionHandler(): ConnectionHandler {
     return this._connectionHandler;
   }
@@ -3649,120 +2391,56 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  // The default connected role, its own class_attribute in Rails (distinct from
-  // `writing_role`), seeded to `writing_role` at load (core.rb:250). `currentRole`
-  // falls back to it when no `connected_to` frame applies (core.rb:165).
-  // Mirrors: ActiveRecord::Core.default_role (core.rb:100).
   static defaultRole: string = WRITING_ROLE;
 
-  // When true, `belongs_to` associations are required (validate presence)
-  // unless `optional: true`. Read by associations/builder/belongs-to.ts.
-  // Mirrors: ActiveRecord::Core.belongs_to_required_by_default (core.rb:88).
   static belongsToRequiredByDefault = false;
 
-  // Force enumeration of all columns in SELECT statements instead of `SELECT *`.
-  // Read by relation/query-methods.ts.
-  // Mirrors: ActiveRecord::Core.enumerate_columns_in_select_statements (core.rb:86).
   static enumerateColumnsInSelectStatements = false;
 
-  // The resolver used by the ShardSelector middleware. nil (no selector) by
-  // default — trails' actual behavior absent explicit sharding config.
-  // Mirrors: ActiveRecord::Core.shard_selector (core.rb:104).
   static shardSelector: unknown = null;
 
-  // Mirrors: ActiveRecord::Core._destroy_association_async_job (core.rb:24),
-  // minus Rails' "ActiveRecord::DestroyAssociationAsyncJob" default: that
-  // ActiveJob::Base subclass is unported (scripts/api-compare/unported-files.ts),
-  // so adopting the default would make every read raise NameError.
   static _destroyAssociationAsyncJob: unknown = null;
 
   static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
 
-  // Maximum records destroyed per background job by `dependent: :destroy_async`.
-  // nil (single job) by default, matching Rails and trails' behavior.
-  // Mirrors: ActiveRecord::Core.destroy_association_async_batch_size (core.rb:47).
   static destroyAssociationAsyncBatchSize: number | null = null;
 
-  // -- ModelSchema config accessors (ActiveRecord::ModelSchema class_attributes) --
 
-  // Controls the primary-key naming prefix convention. nil (no prefix) by
-  // default. Read by attribute-methods/primary-key.ts.
-  // Mirrors: ActiveRecord::ModelSchema.primary_key_prefix_type (model_schema.rb:163).
   static primaryKeyPrefixType: string | null = null;
 
   static getPrimaryKey = _getPrimaryKey;
 
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#reset_primary_key */
   static resetPrimaryKey = _resetPrimaryKey;
 
-  // Column used to order records when no explicit order is given (e.g. for
-  // `first`/`last`). nil by default. Read by relation/finder-methods.ts.
-  // Mirrors: ActiveRecord::ModelSchema.implicit_order_column (model_schema.rb:169).
   static implicitOrderColumn: string | null = null;
 
-  // When true (the Rails default), inferred table names are pluralized. Read by
-  // model-schema.ts (undecoratedTableName / containedTableNamePrefix).
-  // Mirrors: ActiveRecord::ModelSchema.pluralize_table_names (model_schema.rb:168).
   static pluralizeTableNames = true;
 
-  // The unprefixed name of the table tracking run migrations. Composed with
-  // tableNamePrefix/Suffix by SchemaMigration. Mirrors Rails default.
-  // Mirrors: ActiveRecord::ModelSchema.schema_migrations_table_name (model_schema.rb:166).
   static schemaMigrationsTableName = "schema_migrations";
 
-  // The unprefixed name of the internal metadata table. Composed with
-  // tableNamePrefix/Suffix by InternalMetadata. Mirrors Rails default.
-  // Mirrors: ActiveRecord::ModelSchema.internal_metadata_table_name (model_schema.rb:167).
   static internalMetadataTableName = "ar_internal_metadata";
 
-  // When true, string attribute types reflected from the schema are made
-  // immutable (StringType#toImmutableString). nil/false by default. Read by
-  // model-schema.ts column-type resolution.
-  // Mirrors: ActiveRecord::ModelSchema.immutable_strings_by_default (model_schema.rb:170).
   static immutableStringsByDefault = false;
 
-  /** Whether this class inherits directly from ActiveRecord::Base (i.e. is not
-   * an STI subclass).
-   * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record? */
   static isDescendsFromActiveRecord = _isDescendsFromActiveRecord;
 
-  /** Whether the given row carries a non-empty inheritance-column value that
-   * this class can dispatch on.
-   * Mirrors: ActiveRecord::Inheritance::ClassMethods#using_single_table_inheritance?
-   * @internal */
+  /** @internal */
   static usingSingleTableInheritance = _usingSingleTableInheritance;
 
-  /** Generates the `<association>Attributes=` writer for a nested-attributes
-   * association.
-   * Mirrors: ActiveRecord::NestedAttributes::ClassMethods#generate_association_writer
-   * @internal */
+  /** @internal */
   static generateAssociationWriter = _NestedAttributes.generateAssociationWriter;
 
-  /** The memoized per-model module holding the relation methods generated for
-   * this class's delegation carriers.
-   * Mirrors: ActiveRecord::Delegation::DelegateCache#generated_relation_methods
-   * @internal */
+  /** @internal */
   static generatedRelationMethods = _generatedRelationMethods;
 
-  /** The value stored in a polymorphic `*_type` column for this class —
-   * the full namespaced name when `storeFullClassName`, else demodulized.
-   * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name */
   static polymorphicName(): string {
     return inheritancePolymorphicName(this);
   }
 
-  /** The value stored in the STI inheritance column for this class.
-   * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name */
   static stiName(): string {
     return stiName(this);
   }
 
-  /**
-   * Generate a signed ID for this record using HMAC-SHA256 via MessageVerifier.
-   * The purpose parameter scopes the signed ID. expiresIn is in seconds.
-   *
-   * Mirrors: ActiveRecord::SignedId#signed_id
-   */
   signedId(options?: {
     purpose?: string;
     expiresIn?: number;
@@ -3771,11 +2449,6 @@ export class Base extends Model {
     return _signedId(this, options);
   }
 
-  /**
-   * Find a record by its signed ID, or return null.
-   *
-   * Mirrors: ActiveRecord::SignedId.find_signed
-   */
   static async findSigned<T extends typeof Base>(
     this: T,
     signedId: string,
@@ -3788,12 +2461,6 @@ export class Base extends Model {
     >(this, signedId, options);
   }
 
-  /**
-   * Find a record by its signed ID, or throw.
-   * Throws InvalidSignature if tampered/expired, RecordNotFound if not found.
-   *
-   * Mirrors: ActiveRecord::SignedId.find_signed!
-   */
   static async findSignedBang<T extends typeof Base>(
     this: T,
     signedId: string,
@@ -3806,43 +2473,17 @@ export class Base extends Model {
     >(this, signedId, options);
   }
 
-  /**
-   * Mirrors: ActiveRecord::SignedId::ClassMethods#combine_signed_id_purposes
-   */
   static combineSignedIdPurposes(purpose?: string): string {
     return SignedId.combineSignedIdPurposes(this, purpose);
   }
 
-  /**
-   * Compare two records for equality based on class and primary key.
-   *
-   * Mirrors: ActiveRecord::Core#==
-   */
   declare equals: (other: unknown) => boolean;
 
-  /**
-   * Order two records by primary key.
-   *
-   * Mirrors: ActiveRecord::Core#<=>
-   */
   declare compare: (other: unknown) => number | undefined;
 
-  /**
-   * Return a value that dedups records the way Ruby's `hash` + `eql?` do.
-   *
-   * Mirrors: ActiveRecord::Core#hash
-   */
   declare hash: () => unknown;
 
-  // becomesBang / updateAttributeBang extracted to persistence.ts.
 
-  /**
-   * Instance-level transaction wrapper — delegates to the class method
-   * so `record.transaction(...)` and `Model.transaction(...)` share one
-   * implementation path.
-   *
-   * Mirrors: ActiveRecord::Base#transaction
-   */
   async transaction<R>(
     fn: (tx: any) => Promise<R>,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
@@ -3850,13 +2491,6 @@ export class Base extends Model {
     return (this.constructor as typeof Base).transaction(fn, options);
   }
 
-  /**
-   * Class-level transaction wrapper.
-   *
-   * Mirrors: ActiveRecord::Base.transaction — Rails exposes this as a
-   * class method (`Model.transaction do ... end`). In TS the block is
-   * async, so callers must `await` the result.
-   */
   static transaction<R>(
     this: typeof Base,
     fn: (tx: any) => Promise<R>,
@@ -3865,24 +2499,10 @@ export class Base extends Model {
     return _transaction(this, fn, options);
   }
 
-  /**
-   * Returns the currently active transaction, or a null transaction if no
-   * transaction is open. On the null transaction, `afterCommit` runs
-   * immediately and `afterRollback` is a no-op.
-   *
-   * Mirrors: ActiveRecord::Base.current_transaction
-   */
   static currentTransaction() {
     return _currentTransactionPublic();
   }
 
-  /**
-   * Mirrors: ActiveRecord::Callbacks.after_initialize / .after_find /
-   * .after_touch — the three `define_model_callbacks :initialize, :find,
-   * :touch, only: :after` (callbacks.rb:415) generates. As with the twelve
-   * below, generation runs in {@link InstanceMethods}' `included` hook and
-   * these are the type-only halves TypeScript needs.
-   */
   declare static afterInitialize: <T extends typeof Base>(
     this: T,
     fn:
@@ -3910,15 +2530,6 @@ export class Base extends Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
-  /**
-   * Mirrors: ActiveRecord::Callbacks.before_save — one of the twelve macros
-   * `define_model_callbacks :save, :create, :update, :destroy`
-   * (callbacks.rb:416) generates through `define_singleton_method`
-   * (activemodel/lib/active_model/callbacks.rb:130, :137, :144). The generation
-   * runs in {@link InstanceMethods}' `included` hook; these are the type-only
-   * halves TypeScript needs because it cannot see a static defined at runtime,
-   * and carry no implementation.
-   */
   declare static beforeSave: <T extends typeof Base>(
     this: T,
     fn:
@@ -4029,7 +2640,6 @@ export class Base extends Model {
 
   static beforeCommit = _beforeCommit;
 
-  /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
   static afterCommit = _afterCommit;
 
   static afterSaveCommit = _afterSaveCommit;
@@ -4040,25 +2650,11 @@ export class Base extends Model {
 
   static afterDestroyCommit = _afterDestroyCommit;
 
-  /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
   static afterRollback = _afterRollback;
 
-  /** Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback (transactions.rb:304-318). */
   static override setCallback = _txSetCallback;
 
-  /**
-   * Run validations and return self.
-   *
-   * Mirrors: ActiveRecord::Validations#validate
-   */
-  // readAttributeForValidation: wired via include() below.
 
-  /**
-   * Mirrors: ActiveRecord::Validations#valid?
-   *
-   * Delegates to validations module for context resolution, then runs
-   * autosave association validations.
-   */
   override async isValid(context?: ValidationContextArg): Promise<boolean> {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
@@ -4066,28 +2662,15 @@ export class Base extends Model {
     return this.errors.empty && output;
   }
 
-  // validate / customValidationContext: wired via include() below.
 
   declare isPresent: () => boolean;
   declare isBlank: () => boolean;
 
-  // Associations instance methods wired via include() below;
-  // signatures declared on the merged `interface Base` at the bottom
-  // of this file so subclass-variance rules treat them as methods
-  // (bivariant) rather than properties (invariant).
 
   static async tableExists(): Promise<boolean> {
     return ModelSchema.tableExists.call(this);
   }
 
-  /**
-   * Class-level string representation, e.g. `Post(id: integer, title: string)`.
-   *
-   * Mirrors: ActiveRecord::Core.inspect (the class method). Crucially, the
-   * not-connected branch must NOT touch the connection — a Model whose
-   * connection config points at an unreachable database (see
-   * invalid-connection.test.ts) inspects without raising.
-   */
   static inspect(): string {
     const name = this.name;
     if (this === Base) {
@@ -4097,32 +2680,22 @@ export class Base extends Model {
     } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.connectedQ()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
     }
-    // Schema is loaded (or a live connection is available): list the columns'
-    // attribute types. Mirrors Rails' `table_exists?` branch — `columnsHash` is
-    // empty when the table is absent.
     const columns = this.columnsHash();
     if (Object.keys(columns).length === 0) {
       return `${name}(Table doesn't exist)`;
     }
     const attrList = Object.entries(this.attributeTypes())
-      // Rails interpolates `type.type` (core.rb:383); a nil type renders as the
-      // empty string, so mirror Ruby's nil-to-"" rather than JS's "undefined".
       .map(([attr, type]) => `${attr}: ${type.type() ?? ""}`)
       .join(", ");
     return `${name}(${attrList})`;
   }
 
-  /** Mirrors: ActiveRecord::AttributeMethods::ClassMethods#has_attribute?
-   * (attribute_methods.rb:254-258). */
   static hasAttribute(name: string): boolean {
     let attrName = String(name);
     attrName = this.attributeAliases[attrName] ?? attrName;
     return Object.hasOwn(this.attributeTypes(), attrName);
   }
 
-  /**
-   * Mirrors: ActiveRecord::TokenFor#generate_token_for (token_for.rb:118).
-   */
   generateTokenFor(purpose: string): string {
     return _generateTokenFor.call(this, purpose);
   }
@@ -4130,130 +2703,34 @@ export class Base extends Model {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {
-  /** Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26). */
   normalizeAttribute(name: string): void;
-  /**
-   * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes
-   * (normalization.rb:112, private).
-   *
-   * @internal
-   */
+  /** @internal */
   normalizeChangedInPlaceAttributes(): void;
 
-  /**
-   * Assigned by `init_internals` (core.rb:834-849) during `super()`. Declared
-   * here rather than as a class field because a field initializer runs after
-   * `super()` returns and would clobber what the chain just assigned.
-   *
-   * @internal
-   */
+  /** @internal */
   _strictLoading: boolean;
   /** @internal */
   _strictLoadingMode?: _Core.StrictLoadingMode;
-  /**
-   * The single backing slot for this record's association cache — RFC-0022's
-   * fold of the three formerly-separate maps into one store keyed by name (see
-   * `_resetAssociationCaches`). The two accessors below are `Map`-compatible
-   * facet views onto one field of this shared store, mirroring Rails' single
-   * `@association_cache`, which `Associations#init_internals` allocates
-   * (associations.rb:75-77) — hence no class field here either.
-   *
-   * @internal
-   */
+  /** @internal */
   _associationCacheStore: _AssociationCache;
   /** @internal */
   _collectionProxies: Map<string, unknown>;
   /** @internal */
   _associationInstances: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
-  /**
-   * Explicitly load a `belongsTo` target and resolve to it.
-   *
-   * @noRailsEquivalent PERMANENT Ruby has no counterpart because it needs none:
-   * `post.author` is a plain reader that blocks on I/O
-   * (`vendor/rails/activerecord/lib/active_record/associations/builder/association.rb:102`
-   * generates it via `define_readers`), so `def load_belongs_to` exists nowhere
-   * in Rails. A JS getter cannot await, so the async half of the reader has to be
-   * a separately named method. It is also the deliberate strict-loading escape
-   * hatch: an explicit call bumps the bypass count for the duration of the load
-   * (`associations/instance-methods.ts:104`), which is how a caller says "this
-   * lazy load is intentional" — the role Ruby fills by simply calling the
-   * reader.
-   */
+  /** @noRailsEquivalent PERMANENT */
   loadBelongsTo(name: string): Promise<Base | null>;
-  /**
-   * Explicitly load a `hasOne` target and resolve to it.
-   *
-   * @noRailsEquivalent PERMANENT Same reasoning as {@link Base.loadBelongsTo}:
-   * no `def load_has_one` exists in Rails, the Ruby reader blocks on I/O, and
-   * the explicit call doubles as the strict-loading bypass.
-   */
+  /** @noRailsEquivalent PERMANENT */
   loadHasOne(name: string): Promise<Base | null>;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes
-   * (attribute_methods/dirty.rb:118-120). A zero-arg Ruby reader, so an
-   * accessor property here — see CLAUDE.md, "Generated attribute readers are
-   * properties". Ported on the `Dirty` class module and mixed in, as
-   * {@link Base.attributeBeforeLastSave} is.
-   */
   readonly savedChanges: Record<string, [unknown, unknown]>;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save?
-   * (attribute_methods/dirty.rb:169-171). Accessor property and mixed in as
-   * {@link Base.savedChanges} is.
-   */
   readonly hasChangesToSave: boolean;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changes_to_save
-   * (attribute_methods/dirty.rb:175-177). Accessor property and mixed in as
-   * {@link Base.savedChanges} is.
-   */
   readonly changesToSave: Record<string, [unknown, unknown]>;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changed_attribute_names_to_save
-   * (attribute_methods/dirty.rb:181-183). Accessor property and mixed in as
-   * {@link Base.savedChanges} is.
-   */
   readonly changedAttributeNamesToSave: string[];
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attributes_in_database
-   * (attribute_methods/dirty.rb:191-193). Accessor property and mixed in as
-   * {@link Base.savedChanges} is.
-   */
   readonly attributesInDatabase: Record<string, unknown>;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
-   * (attribute_methods/dirty.rb:86-88). Ported and mixed in as
-   * {@link Base.attributeBeforeLastSave} is.
-   */
   isSavedChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
-   * (attribute_methods/dirty.rb:108-110).
-   *
-   * Ported in `attribute-methods/dirty.ts` and mixed onto the prototype, so
-   * only the signature lives here. A class-body definition would win over the
-   * mixin — `include()` never replaces a class-body method — and displace the
-   * port.
-   */
   attributeBeforeLastSave(attr: string): unknown;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
-   * (attribute_methods/dirty.rb:138-140). Ported and mixed in as
-   * {@link Base.attributeBeforeLastSave} is.
-   */
   isWillSaveChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
-   * (attribute_methods/dirty.rb:152-154). Ported and mixed in as
-   * {@link Base.attributeBeforeLastSave} is.
-   */
   attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
-   * (attribute_methods/dirty.rb:164-166). Ported and mixed in as
-   * {@link Base.attributeBeforeLastSave} is.
-   */
   attributeInDatabase(attr: string): unknown;
   readAttributeForValidation(attribute: string): unknown;
   validate(context?: ValidationContextArg): Promise<boolean>;
@@ -4318,19 +2795,6 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
 }
 
-// ---------------------------------------------------------------------------
-// Ruby-style mixin wiring — one `extend` per module, mirroring Rails:
-//
-//   class Base
-//     extend ConnectionHandling  # via ClassMethods in connection-handling.ts
-//     extend Querying
-//     include Core, Integration, AttributeMethods, PrimaryKey
-//   end
-//
-// Per-method types chain from the source modules via `declare static` lines
-// in the class body, so `Base.findBySql` and `Base.connectsTo` carry the
-// exact generics, `this` parameter, and return type of their implementations.
-// ---------------------------------------------------------------------------
 
 extend(Base, ConnectionHandling.ClassMethods);
 extend(Base, Inheritance.ClassMethods);
@@ -4338,9 +2802,6 @@ extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
-// Re-define `connection` as a getter (accessor) after extend() overwrites it
-// with a data property. The getter delegates to ConnectionHandling.connection
-// with the correct `this` binding and includes the _adapter fast-path.
 Object.defineProperty(Base, "connection", {
   get() {
     return ConnectionHandling.connection.call(this);
@@ -4352,7 +2813,6 @@ Object.defineProperty(Base, "connection", {
 extend(Base, { collectionCacheKey: _collectionCacheKey });
 extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, { configurations: _Core.configurations });
-// Mirrors core.rb:74 — `self.configurations = {}` runs at load.
 Base.configurations({});
 extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
@@ -4369,9 +2829,6 @@ extend(Base, Translation.ClassMethods);
 extend(Base, Sanitization.ClassMethods);
 extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
-// Mirrors ActiveRecord::Locking::Optimistic::ClassMethods#update_counters, which
-// prepends over CounterCache#update_counters and `super`s into it after merging
-// the locking-column bump. Capture the CounterCache implementation as `super`.
 {
   const superUpdateCounters = CounterCache.updateCounters;
   extend(Base, {
@@ -4388,14 +2845,6 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
-// `validates`' `const_get("#{key.to_s.camelize}Validator")`
-// (activemodel/lib/active_model/validations/validates.rb:121) resolves against
-// the model's ancestors, which include `ActiveRecord::Validations` — so an AR
-// model finds THAT module's column-aware validators. JS has no ancestry
-// constant lookup, so they ride on `Base` as statics, inherited the way Ruby
-// inherits the constant. Assigned, not extended: `extend()` skips constants
-// because Ruby's `extend` copies methods only.
-// Listed in the require order of validations.rb:96-101.
 Object.assign(Base, {
   AssociatedValidator: _Validations.AssociatedValidator,
   UniquenessValidator: _Validations.UniquenessValidator,
@@ -4405,7 +2854,6 @@ Object.assign(Base, {
   NumericalityValidator: _Validations.NumericalityValidator,
 });
 include(Base, CallbacksInstanceMethods);
-// Ruby `include ActiveRecord::Transactions` (transactions.rb:10-14).
 include(Base, TransactionsInstanceMethods);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.InstanceMethods);
@@ -4426,10 +2874,6 @@ extend(Base, {
   buildExplainClause: _buildExplainClause,
 });
 extend(Base, _Reflection.ClassMethods);
-// Mirrors `class_attribute :_reflections, instance_writer: false, default: {}`
-// (reflection.rb:11): reads walk the constructor chain, writes are local to the
-// class, so `add_reflection`'s reassignment is the whole copy-on-write
-// mechanism.
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
@@ -4446,7 +2890,6 @@ classAttribute.call(Base, "defaultScopeOverride", {
 });
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
-// Mirrors token_for.rb:10-11.
 classAttribute.call(Base, "tokenDefinitions", {
   instanceAccessor: false,
   instancePredicate: false,
@@ -4460,17 +2903,8 @@ classAttribute.call(Base, "counterCachedAssociationNames", {
   instanceWriter: false,
   default: [],
 });
-// The railtie initializer "active_record.generated_token_verifier"
-// (railtie.rb:328-334) assigns `self.generated_token_verifier ||=
-// app.message_verifier("active_record/token_for")` onto ActiveRecord::Base at
-// boot. trails has no railtie, so token-for.ts builds the verifier from the
-// injected secret and this sink performs that assignment.
 let _bootTokenVerifier: _MessageVerifier | null = null;
 _registerGeneratedTokenVerifierSink((verifier) => {
-  // railtie.rb:331 assigns with `||=`, so an explicit
-  // `Base.generatedTokenVerifier = ...` is never overwritten. The seam may
-  // still replace the value it installed itself, which is how a re-injected
-  // secret reaches the slot.
   if (Base.generatedTokenVerifier != null && Base.generatedTokenVerifier !== _bootTokenVerifier) {
     return;
   }
@@ -4482,18 +2916,7 @@ extend(Base, {
   unscoped: _unscoped,
 });
 extend(Base, ModelSchema.ClassMethods);
-// base.rb:311 — `include Attributes`, which is
-// `include ActiveModel::AttributeRegistration` (activerecord/attributes.rb:8)
-// and nothing else on the instance side. `ActiveModel::Model` does NOT carry it
-// (model.rb:42-45), so this include is where `Base` gets it.
 include(Base, AttributeRegistration);
-// base.rb:316 — `include AttributeMethods`, which is
-// `include ActiveModel::AttributeMethods` (activerecord/attribute_methods.rb:9).
-// ActiveRecord does NOT include `ActiveModel::Attributes` anywhere, so the
-// registration and method-generation halves arrive separately, in Rails' order:
-// AttributeMethods lands second, which is what makes its alias-resolving
-// `resolve_attribute_name` (activemodel/attribute_methods.rb:396-398) win over
-// the registration one (attribute_registration.rb:101-103).
 include(Base, AMAttributeMethods.AttributeMethods);
 
 extend(Base, {
@@ -4506,47 +2929,27 @@ extend(Base, {
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
   _defaultAttributes: _arDefaultAttributes,
   resolveTypeName: _resolveTypeName,
-  // attributes.rb:293-295 — ActiveRecord's override of
-  // AttributeRegistration::ClassMethods#reset_default_attributes.
   resetDefaultAttributes: _resetDefaultAttributes,
-  // timestamp.rb:84-89 — the outermost `reload_schema_from_cache` override in
-  // the chain (Timestamp -> Attributes -> ModelSchema); every caller sends it,
-  // so this is the seat, and each half calls the next as its `super`.
   reloadSchemaFromCache: Timestamp.reloadSchemaFromCache,
 });
-// AttributeMethods class method — gates association/attribute names that would
-// clash with an Active Record instance method (Rails: dangerous_attribute_method?).
-// Consumed by Associations::Builder::Association#build to reject e.g. `has_one :save`.
 extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
-// ActiveRecord's override of ActiveModel's predicate (attribute_methods.rb:165):
-// define_attribute_method_pattern dispatches it through the class, so the
-// dangerous-method raise runs before any accessor is generated.
 extend(Base, { isInstanceMethodAlreadyImplemented: _pkIsInstanceMethodAlreadyImplemented });
 extend(Base, {
   defineMethodAttribute: _defineMethodAttribute,
   setDefineMethodAttribute: _setDefineMethodAttribute,
 });
 extend(Base, {
-  // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
-  // (it's a standalone export, not in the ClassMethods object), so wire it here.
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
   localStoredAttributes: _localStoredAttributes,
 });
 
-// base.rb:326 — `include Store`, whose ClassMethods carry the two macros.
 extend(Base, _StoreClassMethods);
 
-// `include ActiveRecord::Serialization` (base.rb:325), which is
-// `include ActiveModel::Serializers::JSON` (serialization.rb:6) — the JSON
-// surface ActiveModel::Model does NOT carry (model.rb:42-45). Its `included do`
-// block sets `self.include_root_in_json = false` (serialization.rb:9-11).
 include(Base, JSONSerializer);
 Base.includeRootInJson = false;
 
 include(Base, {
-  // AttributeMethods::Write
   writeAttribute: _writeAttributeMethod,
-  // Persistence
   isNewRecord: _Persistence.isNewRecord,
   isPersisted: _Persistence.isPersisted,
   isDestroyed: _Persistence.isDestroyed,
@@ -4578,7 +2981,6 @@ include(Base, {
   clone: _Persistence.clone,
   becomes: _Persistence.becomes,
   becomesBang: _Persistence.becomesBang,
-  // Core
   inspect: _inspect,
   prettyPrint: _Core.prettyPrint,
   attributeForInspect: _attributeForInspect,
@@ -4596,16 +2998,12 @@ include(Base, {
   isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
   isFrozen: _Core.isFrozen,
   freeze: _Core.freeze,
-  // NoTouching
   isNoTouching: _isNoTouching,
-  // Integration
   toParam: _toParam,
   cacheKey: _cacheKey,
   cacheKeyWithVersion: _cacheKeyWithVersion,
   cacheVersion: _cacheVersion,
-  // Serialization
   serializableHash: Serialization.serializableHash,
-  // AttributeMethods
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
@@ -4613,84 +3011,29 @@ include(Base, {
   get: _get,
   set: _set,
   _writeAttribute: _writeAttributeLowLevel,
-  // write.rb:45 — `alias :attribute= :_write_attribute`. Ruby's `alias` captures
-  // the method as it stands in `Write`, so the `=` pattern's proxy target keeps
-  // reaching that body even though `HasReadonlyAttributes#_write_attribute`
-  // (readonly_attributes.rb:57-62) is included above it.
   "attribute=": _writeAttributeLowLevel,
-  // PrimaryKey
   toKey: _toKey,
-  // Store (private instance helpers)
   readStoreAttribute: _readStoreAttribute,
   writeStoreAttribute: _writeStoreAttribute,
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
-// attribute_methods.rb:13 — `include Read`.
 include(Base, _Read);
-// attribute_methods.rb:14 — `include Write`, whose `included do` block declares
-// the `=` writer pattern (write.rb:9-11). `ActiveModel::Model` does NOT carry it
-// (model.rb:42-45), so this include is where `Base` gets it, ahead of the
-// patterns the modules below add.
 include(Base, _Write);
-// attribute_methods.rb:15 includes BeforeTypeCast ahead of Dirty, so its
-// `included do` patterns (before_type_cast.rb:32-33) precede both halves of
-// Dirty's in `attributeMethodPatterns`.
 include(Base, _BeforeTypeCast);
-// attribute_methods.rb:16 — `include Query`, whose `included do` block
-// (query.rb:9-11) declares the `?` pattern. It lands after BeforeTypeCast's
-// suffixes and before PrimaryKey's, which is the order Rails builds
-// `attributeMethodPatterns` in.
 include(Base, _Query);
-// attribute_methods.rb:17 — `include PrimaryKey`, ahead of TimeZoneConversion
-// and Dirty.
 include(Base, _PrimaryKey);
-// Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
-// Array (primary_key.rb:132); each of its bodies opens with the
-// `composite_primary_key?` guard, so mixing it in once above PrimaryKey is the
-// same behaviour for a scalar-keyed model.
 include(Base, _CompositePrimaryKey);
-// attribute_methods.rb:18 — `include TimeZoneConversion`. It defines no
-// instance methods; the include is what issues its `included do` class
-// attributes (time_zone_conversion.rb:59-63), and its private
-// `ClassMethods#hook_attribute_type` reaches `Base` through the class-body
-// `hookAttributeType` above.
 include(Base, _TimeZoneConversion);
-// `include ActiveModel::Dirty` (attribute_methods/dirty.rb:42) — the surface
-// `ActiveRecord::AttributeMethods::Dirty` builds on, and which
-// `ActiveModel::Model` does NOT carry (model.rb:42-45). A class module, so
-// `include()` copies the module's zero-arg readers as accessor descriptors;
-// its `[included]` hook issues the `included do` affixes (dirty.rb:241-245) and
-// splices the module's `init_internals` / `initialize_dup` links (dirty.rb:
-// 371-376, :248-251) into this prototype's chains, below Core — the position
-// they had while `ActiveModel::Model` carried them on its own prototype.
 include(Base, AMDirty);
-// The accessor-property half of AttributeMethods::Dirty. A class module, so
-// `include()` copies the getter descriptors rather than flattening them.
 include(Base, _Dirty);
-// attribute_methods.rb:20 — `include Serialization`. It defines no instance
-// methods, so the include's payload is its `included do` block
-// (serialization.rb:19-21) declaring `default_column_serializer`, plus the
-// `extend ClassMethods` its Concern does — which is what carries `serialize`
-// (serialization.rb:183-205).
 include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
-// TouchLater is included after Timestamp, so include()'s last-included-wins
-// ancestry lets TouchLater#touch (deferred-attr merge) override Timestamp#touch
-// — no manual prototype patching needed. Mirrors Ruby's include ordering.
-// Aggregations is NOT included here: mirroring Rails, it is mixed in lazily by
-// composed_of (see aggregations.ts includeAggregations), so models without a
-// composed_of declaration never carry its reload/initialize_dup overrides.
 include(Base, TouchLater.InstanceMethods);
 include(Base, _AttributeAssignment.InstanceMethods);
 include(Base, AutosaveAssociation);
-// The `init_internals` chain (core.rb:834 is the root; every other definition
-// opens with `super`). Prepended in Rails' `include` order (base.rb:299-322), so
-// the last one wired is the outermost link and the stack unwinds into Core —
-// and, below it, into the ActiveModel links `Model.prototype` carries
-// (validations.rb:467, dirty.rb:372).
 prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
 prepend(Base.prototype, {
@@ -4701,26 +3044,12 @@ prepend(Base.prototype, { initInternals: _associationsInitInternals as PrependMe
 prepend(Base.prototype, { initInternals: _autosaveInitInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _transactionsInitInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: TouchLater.initInternals as PrependMethod });
-// The `initialize_dup` chain, same construction: Core (core.rb:550) fires the
-// initialize callbacks and resets the new-record state, then `super` unwinds
-// through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
-// (timestamp.rb:50-53), whose clears therefore run AFTER the callbacks have seen
-// the source's `lock_version` / timestamps, and above/below them Associations
-// (base.rb:317) and Inheritance (base.rb:303). Aggregations' link (aggregations.rb:6)
-// is prepended above these by `includeAggregations` on composed_of models only.
-// `dup` (persistence.ts) enters the chain once the duped attributes and dirty
-// baseline are in place.
 prepend(Base.prototype, { initializeDup: _Core.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: Inheritance.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: _associationsInitializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-// AutosaveAssociation#reload resets marked-for-destruction / destroyed-by-
-// association state, then calls super. Capture the inherited reload (Persistence)
-// at wire time and slot it BELOW Aggregations' lazy wrap, so the MRO is
-// Aggregations → AutosaveAssociation → Persistence. Mirrors Ruby's module super
-// chain; trails has no super across mixins, so wire it explicitly.
 {
   const inheritedReload = (Base.prototype as any).reload as (
     this: Base,
@@ -4742,11 +3071,7 @@ include(Base, {
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
-// Wire private/internal helpers onto Base so parity:api credits them to base.rb.
-// These are standalone exports in their respective module files; the include()
-// call here is the only thing that causes the extractor to attribute them to base.ts.
 include(Base, {
-  // Core privates
   initWithAttributes: _Core.initWithAttributes,
   initAttributes: _Core.initAttributes,
   fullInspect: _Core.fullInspect,
@@ -4756,7 +3081,6 @@ include(Base, {
   inspectWithAttributes: _Core.inspectWithAttributes,
   attributesForInspect: _Core.attributesForInspect,
   allAttributesForInspect: _Core.allAttributesForInspect,
-  // Persistence privates
   strictLoadedAssociations: _Persistence.strictLoadedAssociations,
   _findRecord: _Persistence._findRecord,
   _inMemoryQueryConstraintsHash: _Persistence._inMemoryQueryConstraintsHash,
@@ -4767,18 +3091,14 @@ include(Base, {
   _raiseRecordNotDestroyed: _Persistence._raiseRecordNotDestroyed,
   _raiseReadonlyRecordError: _Persistence._raiseReadonlyRecordError,
   _raiseRecordNotTouchedError: _Persistence._raiseRecordNotTouchedError,
-  // Inheritance / Scoping privates
   _inheritanceColumn: ModelSchema._inheritanceColumn,
   ensureProperType: _ensureProperType,
   populateWithCurrentScopeAttributes: _populateWithCurrentScopeAttributes,
-  // Integration privates
   canUseFastCacheVersion: _canUseFastCacheVersion,
   rawTimestampToCacheVersion: _rawTimestampToCacheVersion,
-  // Validations privates
   defaultValidationContext,
   raiseValidationError: _Validations.raiseValidationError,
   performValidations: _Validations.performValidations,
-  // AttributeMethods privates and additional instance methods
   _hasAttribute: _privateHasAttribute,
   isAttributeMethod: _isAttributeMethod,
   attributesWithValues: _attributesWithValues,
@@ -4792,10 +3112,6 @@ include(Base, {
   attributeBeforeTypeCast: _attributeBeforeTypeCast,
   attributeForDatabase: _attributeForDatabase,
   attributeCameFromUser: _attributeCameFromUser,
-  // `primary_key_values_present?` and the ID_ATTRIBUTE_METHODS readers arrive
-  // with `include(Base, _PrimaryKey)` / `include(Base, _CompositePrimaryKey)`
-  // above: the readers are accessor properties, and only those calls copy
-  // descriptors — this object literal is read by value and would flatten them.
   isSavedChangeToAttribute: _isSavedChangeToAttribute,
   isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
   savedChangeToAttribute: _savedChangeToAttribute,
@@ -4804,26 +3120,16 @@ include(Base, {
   attributeInDatabase: _attributeInDatabase,
   attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
-  // isSavedChanges is AR-specific (not on Model); safe to wire.
   isSavedChanges: _isSavedChanges,
-  // TouchLater privates — not on Model; safe to wire.
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // savedChanges/hasChangesToSave/changesToSave/changedAttributeNamesToSave/
-  // attributesInDatabase are accessor properties, so they arrive with
-  // `include(Base, _Dirty)` above — this object literal is read by value and
-  // would flatten them into data properties.
-  // CounterCache privates
   _foreignKeysEqual: CounterCache._foreignKeysEqual,
-  // Associations privates
   isAssociationCached: _isAssociationCached,
   associationInstanceGet: _associationInstanceGet,
   associationInstanceSet: _associationInstanceSet,
-  // AutosaveAssociation privates
   computePrimaryKey: _computePrimaryKey,
   _ensureNoDuplicateErrors: _autosaveEnsureNoDuplicateErrors,
-  // Transactions instance methods
   committedBang: _committedBang,
   rolledbackBang: _rolledbackBang,
   isTriggerTransactionalCallbacks: _isTriggerTransactionalCallbacks,
@@ -4838,22 +3144,12 @@ include(Base, {
   rememberTransactionRecordState: _rememberTransactionRecordState,
   restoreTransactionRecordState: _restoreTransactionRecordState,
   isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  // TouchLater privates (instance-level) wired here for parity:api credit.
   surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
 });
 
-// `ActiveModel::Dirty#init_attributes` (dirty.rb:253-262) sits ABOVE
-// `ActiveRecord::Core#init_attributes` (core.rb:563-573) in AR::Base's
-// ancestors and opens with `super`, so it is prepended over the Core body the
-// `include` above just installed — the same ancestry, with `super_` bound to
-// Core's.
 prepend(Base.prototype, { initAttributes: dirtyInitAttributes as PrependMethod });
 
-// Rails layers create_or_update / _create_record / _update_record by include
-// order (base.rb:299-316): Timestamp sits above Callbacks, so its body runs
-// first and reaches Callbacks' through `super`. Each layer takes that `super`
-// as an explicit continuation.
 for (const [name, fn] of [
   [
     "createOrUpdate",
@@ -4904,25 +3200,14 @@ for (const [name, fn] of [
   });
 }
 
-// Register Model's super method for the Validations module.
-// Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid).
 _setSuperIsValid(Model.prototype.isValid);
 
-// `ActiveRecord::AttributeMethods#attributes` (attribute_methods.rb:339-341) and
-// the `alias attributes= assign_attributes` `include AttributeAssignment`
-// (base.rb:302) brings with it (attribute_assignment.rb:36). Ruby resolves the
-// two independently; a JS property takes both halves from one descriptor, and
-// an object-literal setter loses its descriptor through `include()`, so
-// `defineProperty` merges them here.
 {
   Object.defineProperty(Base.prototype, "attributes", {
     get(this: Base): Record<string, unknown> {
       return _attributes.call(this as unknown as ThisParameterType<typeof _attributes>);
     },
     set(this: Base, attrs: Record<string, unknown>) {
-      // A TS `set` accessor cannot await, so a key whose writer reaches the
-      // database is parked for `save` to drain; `setAttributes` is the
-      // awaitable spelling of the same alias (attribute_assignment.rb:36).
       const pending = this.setAttributes(attrs);
       if (pending) _NestedAttributes.parkNestedReaderLoad(this, pending);
     },
@@ -4958,17 +3243,9 @@ registerMigrationArConfig({
   databaseTasks: () => DatabaseTasks,
 });
 
-// Side-effect import (currently no-op); kept so future globalid hooks can
-// register here without callers needing to re-add it.
 import "@blazetrails/globalid/wire";
 
 import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
-// Compile-time wire: AR's static `Base.unscoped(block)` is the
-// `LocatorModel.unscoped` implementation that GlobalID's `UnscopedLocator`
-// invokes — wrapping lookups in `klass.unscoped { ... }` so default scopes
-// don't hide rows being located by GID. `Base.unscoped` is wired statically
-// via `extend(Base, { unscoped: _unscoped })` above; this assertion fails
-// the build if a future refactor removes or renames it.
 type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;
@@ -4976,36 +3253,10 @@ void _arBaseUnscopedWire;
 
 setCurrentAdapterResolver(() => Base);
 
-// Wire Base into DatabaseTasks so migrationConnection() works synchronously
-// without waiting for an async method to capture _baseClass first.
-// Registered before runLoadHooks so that any on_load(:active_record) callback
-// can call migrationConnection() and find it wired.
 DatabaseTasks._registerBase(Base);
 
-// Mirrors `ActiveSupport.run_load_hooks(:active_record, Base)` at the
-// bottom of `activerecord/lib/active_record/base.rb`. Lets railtie
-// initializers register `on_load(:active_record)` consumers that need a
-// fully-defined `Base` class (timezone, filter attributes, ...).
 runLoadHooks("active_record", Base);
 
-// Mirrors: `ActiveSupport.on_load(:active_record) { Arel::Table.engine = self }`
-// (active_record.rb:562-564) — `self` there is Base. Rails can register that
-// consumer from the entrypoint because requiring `active_record` is the only
-// way to reach `Base`; here many modules and tests deep-import `base.js`
-// directly and never evaluate `index.ts`, so the assignment rides the same
-// module as the hook run to keep `Table.engine` set on every load path.
-//
-// Rails assigns `Base` itself and reaches the visitor via
-// `engine.with_connection` (arel/nodes/node.rb:150). trails' `withConnection` is
-// async, and `to_sql` is synchronous in Rails and at every call site here, so
-// the engine must expose a *synchronous* connection. Assigning bare `Base` would
-// route through `Base.connection`, which is deprecated: under
-// `ActiveRecord.permanentConnectionCheckout = "disallowed"` it raises
-// (connection-handling.ts:461-463), so every `toSql()` in the app would throw —
-// something Rails' `with_connection`-based `to_sql` never does. This delegates
-// to the pool's non-deprecated sync surface instead: the already-checked-out
-// connection when there is one, else a sync lease — the same connection
-// `Base.connection` would return, without the deprecation gate.
 Table.engine = {
   get connection(): DatabaseAdapter {
     const pool = Base.connectionPool();
@@ -5013,12 +3264,6 @@ Table.engine = {
   },
 };
 
-// Rails resolves `ActiveRecord::Base` at call time through autoload, so none of
-// these modules `require` base.rb. In ESM a value import is a load-time edge,
-// and an edge back into base.ts would make base.ts a cycle member — deciding,
-// purely by the graph's entry point, whether the mixin wiring above reads
-// initialized bindings or hits a TDZ ReferenceError. Consumers that only need
-// `Base` at call time take it from here instead.
 
 _registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);

@@ -1,5 +1,4 @@
 import type { Company } from "./company.js";
-// vendor/rails/activerecord/test/models/vegetables.rb
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";

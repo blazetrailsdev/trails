@@ -1,6 +1,3 @@
-/**
- * Mirrors activerecord/test/cases/numeric_data_test.rb
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -13,8 +10,6 @@ beforeAll(async () => {
   await NumericData.loadSchema();
 });
 
-// Mirrors models/numeric_data.rb: world_population / my_house_population are
-// declared big_integer (decimal-with-0-scale-as-integer is deprecated in Rails).
 class NumericData extends Base {
   static _tableName = "numeric_data";
   static {
@@ -89,12 +84,7 @@ describe("NumericDataTest", () => {
     expect((m1!.big_bank_balance as BigDecimal).toString("F")).toBe("234000567.95");
   });
 
-  // Rails guards test_numeric_fields_with_nan with current_adapter?(:PostgreSQLAdapter):
-  // only PostgreSQL's numeric type stores NaN (SQLite/MySQL reject 'NaN'::numeric).
   it.skipIf(adapterType !== "postgres")("numeric fields with nan", async () => {
-    // BigDecimal has no NaN form, so BigDecimal("NaN") (passed in as the JS
-    // NaN) round-trips as the sentinel "NaN" rather than a BigDecimal — the
-    // stand-in for Rails' `nan?` predicate.
     const m = NumericData.new({
       bank_balance: NaN,
       big_bank_balance: NaN,

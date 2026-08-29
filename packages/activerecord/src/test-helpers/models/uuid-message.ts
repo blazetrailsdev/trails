@@ -1,5 +1,4 @@
 import type { UuidEntry } from "./uuid-entry.js";
-// vendor/rails/activerecord/test/models/uuid_message.rb
 import { Base } from "../../base.js";
 
 export class UuidMessage extends Base {

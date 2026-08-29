@@ -1,5 +1,4 @@
 import type { Temporal } from "@blazetrails/date";
-// vendor/rails/activerecord/test/models/book_encrypted.rb
 import { Base } from "../../base.js";
 
 export class UnencryptedBook extends Base {
@@ -138,14 +137,11 @@ export class EncryptedBookWithSerializedSecondBinary extends Base {
   }
 }
 
-// trails-only: no Rails counterpart. Guards Serialized(Encrypted(...)) unwrap
-// in deterministicEncryptedAttributes / encryptedAttribute?.
 export class EncryptedBookWithSerializedDeterministicName extends Base {
   static _tableName = "encrypted_books";
 
   static {
     this.encrypts("name", { deterministic: true });
-    // Lenient JSON coder: the column default `<untitled>` is not valid JSON.
     this.serialize("name", {
       coder: {
         dump: (value: unknown) => JSON.stringify(value),

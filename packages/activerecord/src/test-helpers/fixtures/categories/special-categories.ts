@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/categories/special_categories.yml
 export const categoriesSpecialCategoriesFixtureData = {
   sub_special_1: {
     id: 100,

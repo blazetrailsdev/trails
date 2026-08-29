@@ -1,4 +1,3 @@
-// activerecord/test/cases/encryption/encrypted_fixtures_test.rb
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import "../relation.js";
 import { fixtures } from "../test-fixtures.js";
@@ -24,10 +23,6 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   });
 });
 
-// encryptedBookThatIgnoresCases and encryptedBooks both map to the same table;
-// loading both under one handler would have the second seeder wipe the first
-// set. A second EncryptableFixtureTest describe (its own handler suite) isolates
-// the seeders while keeping the Rails-matching describe path flat.
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {

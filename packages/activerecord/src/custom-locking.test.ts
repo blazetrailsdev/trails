@@ -1,7 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/custom_locking_test.rb
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect } from "vitest";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";

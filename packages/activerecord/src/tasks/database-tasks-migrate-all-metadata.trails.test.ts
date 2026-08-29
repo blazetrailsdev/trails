@@ -6,7 +6,6 @@ import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 
-// Rails' `MIGRATIONS_ROOT` (`test/cases/migration_test.rb`).
 const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
 
 describe("DatabaseTasksMigrateAllMetadataTest", () => {

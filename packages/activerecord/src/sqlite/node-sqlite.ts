@@ -14,24 +14,19 @@ import {
 } from "../sqlite-adapter.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
 
-// Soft-load: Node 22.5+ only. Sync via createRequire so the module stays sync.
-// open() rejects with a clear error on Node < 22.5 instead of crashing on import.
 type NodeSqliteModule = typeof import("node:sqlite");
 let nodeSqlite: NodeSqliteModule | undefined;
 try {
   nodeSqlite = createRequire(import.meta.url)("node:sqlite") as NodeSqliteModule;
-} catch {
-  /* Node < 22.5 or --experimental-sqlite not set */
-}
+} catch {}
 
-/** True when node:sqlite loaded successfully; use as a describe.skipIf gate in tests. */
 export const isNodeSqliteAvailable = nodeSqlite !== undefined;
 
 /** @internal */
 function expandBinds(binds: SqliteBinds | undefined): unknown[] {
   if (binds === undefined) return [];
   if (Array.isArray(binds)) return binds as unknown[];
-  return [binds]; // named object is the first positional argument
+  return [binds];
 }
 
 /** @internal */
@@ -39,10 +34,7 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
   readonly reader: boolean;
 
   constructor(private readonly stmt: import("node:sqlite").StatementSync) {
-    stmt.setAllowBareNamedParameters(true); // allow { name: val } to bind $name
-    // Rails branches .all()/.run() on stmt.column_count.zero?; node:sqlite exposes
-    // the same count via columns(). Using it rather than a leading-keyword regex
-    // is what makes `INSERT ... RETURNING` classify as row-returning.
+    stmt.setAllowBareNamedParameters(true);
     this.reader = stmt.columns().length > 0;
   }
 
@@ -107,8 +99,6 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
     const stmt = this.raw.prepare(`PRAGMA ${source}`);
-    // Write PRAGMAs (source contains `=`) don't return rows; must use run().
-    // better-sqlite3 throws if all() is called on a non-reader statement.
     if (source.includes("=")) {
       stmt.run();
       return [];
@@ -120,14 +110,6 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     return stmt.all();
   }
 
-  /**
-   * `sqlite3_changes()` / `sqlite3_last_insert_rowid()` — the ruby sqlite3
-   * gem's `Database#changes` / `#last_insert_row_id`, which Rails'
-   * `perform_query` reads after every statement. No driver here exposes them
-   * as an API, so they are read with the SQL functions of the same names: a
-   * pure read, which leaves both counters alone. The prepared statements are
-   * cached because `perform_query` reads them on EVERY statement.
-   */
   changes(): number {
     this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
     return (this.#changesStmt.get() as { v: number }).v;
@@ -158,13 +140,9 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
   const opts: import("node:sqlite").DatabaseSyncOptions = {
     ...(config.driverOptions as import("node:sqlite").DatabaseSyncOptions | undefined),
     readOnly: config.readOnly ?? false,
-    enableForeignKeyConstraints: false, // match better-sqlite3 default
+    enableForeignKeyConstraints: false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
-  // node:sqlite's `enableDoubleQuotedStringLiterals` defaults to false (DQS
-  // off = strict), but SqliteOpenConfig.strict documents a default of false.
-  // Mirror that contract for direct driver users by mapping `strict ?? false`
-  // onto the option, not just when the caller passes it explicitly.
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
   return new nodeSqlite.DatabaseSync(config.database, opts);
 }
@@ -207,9 +185,6 @@ export const nodeSqliteDriver: SqliteDriver = {
           "On Node 22.5–22.9 you may also need --experimental-sqlite.",
       );
     }
-    // node:sqlite's top-level backup() abstracts sqlite3_backup_*: source
-    // handle → destination path/URI. Open the source read-only to match
-    // better-sqlite3's restore semantics.
     const source = new nodeSqlite.DatabaseSync(sourcePath, { readOnly: true });
     try {
       await nodeSqlite.backup(source, destination);

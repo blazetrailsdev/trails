@@ -1,9 +1,3 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- *
- * Ported from vendor/rails/activerecord/test/cases/counter_cache_test.rb.
- */
 import { Temporal } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel, registerSubclass } from "./index.js";
@@ -29,8 +23,6 @@ import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 
-// Register the canonical models used directly and via through/dependent
-// associations so the reflection registry can resolve them by class name.
 for (const model of [
   Topic,
   Reply,
@@ -61,8 +53,6 @@ for (const model of [
   registerModel(model);
 }
 
-// Rails defines these as ::SpecialTopic < ::Topic and ::SpecialReply < ::Reply
-// inside CounterCacheTest. They share the STI `topics` table.
 export class SpecialTopic extends Topic {
   static {
     this.hasMany("specialReplies", { className: "SpecialReply", foreignKey: "parent_id" });
@@ -95,7 +85,6 @@ function epochMs(v: unknown): number {
   return Number(new Date(String(v)));
 }
 
-/** Mirrors Rails' minitest `assert_difference`. */
 async function assertDifference(
   reads: Array<() => Promise<number>>,
   delta: number,
@@ -107,7 +96,6 @@ async function assertDifference(
   after.forEach((a, i) => expect(a - before[i]).toBe(delta));
 }
 
-/** Mirrors the private `assert_touching` helper in counter_cache_test.rb. */
 async function assertTouching(
   record: any,
   attributes: string[],
@@ -237,20 +225,16 @@ describe("CounterCacheTest", () => {
   });
 
   it("reset counters", async () => {
-    // throw the count off by 1
     await Topic.incrementCounter("replies_count", topic.id);
 
-    // check that it gets reset
     await assertDifference([reloadRepliesCount], -1, async () => {
       await Topic.resetCounters(topic.id, "replies");
     });
   });
 
   it("reset counters by counter name", async () => {
-    // throw the count off by 1
     await Topic.incrementCounter("replies_count", topic.id);
 
-    // check that it gets reset
     await assertDifference([reloadRepliesCount], -1, async () => {
       await Topic.resetCounters(topic.id, "replies_count");
     });
@@ -341,8 +325,6 @@ describe("CounterCacheTest", () => {
   it("reset counter skips query for correct counter", async () => {
     await Topic.resetCounters(topic.id, "replies_count");
 
-    // SELECT "topics".* FROM "topics" WHERE "topics"."id" = ? LIMIT ?
-    // SELECT COUNT(*) FROM "topics" WHERE "topics"."type" IN (?, ?, ?, ?, ?) AND "topics"."parent_id" = ?
     await assertQueriesCount(2, false, async () => {
       await Topic.resetCounters(topic.id, "replies_count");
     });
@@ -351,9 +333,6 @@ describe("CounterCacheTest", () => {
   it("reset counter performs query for correct counter with touch: true", async () => {
     await Topic.resetCounters(topic.id, "replies_count");
 
-    // SELECT "topics".* FROM "topics" WHERE "topics"."id" = ? LIMIT ?
-    // SELECT COUNT(*) FROM "topics" WHERE "topics"."type" IN (?, ?, ?, ?, ?) AND "topics"."parent_id" = ?
-    // UPDATE "topics" SET "updated_at" = ? WHERE "topics"."id" = ?
     await assertQueriesCount(3, false, async () => {
       await Topic.resetCounters(topic.id, "replies_count", { touch: true });
     });
@@ -361,10 +340,8 @@ describe("CounterCacheTest", () => {
 
   it("reset counters for cpk model", async () => {
     const order = (await CpkOrder.first()) as CpkOrder;
-    // throw the count off by 1
     await CpkOrder.incrementCounter("books_count", order.id);
 
-    // check that it gets reset
     await assertDifference(
       [
         async () => {

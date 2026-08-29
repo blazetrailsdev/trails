@@ -1,13 +1,3 @@
-/**
- * DX: the `declare` patterns for typing runtime-attached members.
- *
- * Several things in ActiveRecord are attached to a class/instance at runtime
- * (via `this.attribute`, `this.hasMany`, `this.scope`, `this.enum`, ...)
- * and so aren't visible to the TypeScript type system by default. Use a
- * `declare` field on the class body to pin the static type. This file is
- * the canonical reference for every supported pattern.
- */
-
 import { describe, it, expectTypeOf } from "vitest";
 import {
   Base,
@@ -18,9 +8,6 @@ import {
   defineEnum,
 } from "@blazetrails/activerecord";
 
-// --- Attribute typing: `this.attribute("name", "string")` + `declare name: string` ---
-// (Don't redeclare `id` — Base defines it as an accessor; narrow at the use
-// site with `user.id as number` instead.)
 class User extends Base {
   declare name: string;
   declare email: string;
@@ -32,8 +19,6 @@ class User extends Base {
     this.attribute("admin", "boolean", { default: false });
   }
 }
-
-// --- Association typing ---
 
 class Comment extends Base {
   declare body: string;
@@ -56,28 +41,12 @@ class Tag extends Base {
 class Author extends Base {
   declare name: string;
 
-  // hasMany → AssociationProxy reader. Chainable
-  // (`author.comments.where(...).order(...)`), awaitable
-  // (`await author.comments` returns `Comment[]`), and array-shaped
-  // against the loaded target (`for (const c of author.comments)`,
-  // `.length`, `.map`, `[0]`). Matches Rails' `author.comments` which
-  // is also a `CollectionProxy`.
   declare comments: AssociationProxy<Comment>;
 
-  // hasAndBelongsToMany → same shape as hasMany (AssociationProxy).
-  // Collections don't need a loader method — `await author.tags`
-  // triggers the load directly via the proxy's thenable.
   declare tags: AssociationProxy<Tag>;
 
-  // hasOne → Profile | null (sync reader; returns the currently loaded
-  // record or null). Use `author.loadHasOne("profile")` for an
-  // explicit async load — the typed overload below narrows the return.
   declare profile: Profile | null;
 
-  // Per-macro singular-association loaders. Virtualizer aggregates
-  // all belongsTo calls into `declare loadBelongsTo: ...` and all
-  // hasOne calls into `declare loadHasOne: ...`. Hand-written version
-  // shown here for the dx-test reference.
   declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
   static {
@@ -92,7 +61,6 @@ class Profile extends Base {
   declare bio: string;
   declare author_id: number;
 
-  // belongsTo → Author | null (synchronous reader)
   declare author: Author | null;
 
   static {
@@ -102,12 +70,10 @@ class Profile extends Base {
   }
 }
 
-// --- Named scope typing: `this.scope("published", fn)` + `declare static published: ...` ---
 class Post extends Base {
   declare title: string;
   declare published: boolean;
 
-  // Class-level scope returns the scoped Relation.
   declare static published: () => Relation<Post>;
   declare static recent: (sinceDays: number) => Relation<Post>;
 
@@ -124,20 +90,13 @@ class Post extends Base {
   }
 }
 
-// --- Enum typing (Base.enum form): `this.enum("status", {...})` generates
-// a predicate and an in-memory bang setter per value, plus a class-level
-// scope per value.
 class Task extends Base {
   declare status: string;
 
-  // record.isLow() / record.isHigh() — boolean predicates
   declare isLow: () => boolean;
   declare isHigh: () => boolean;
-  // record.lowBang() / record.highBang() — persisting bang methods (update!).
-  // Return undefined when a before_save callback raises Rollback.
   declare lowBang: () => Promise<true | undefined>;
   declare highBang: () => Promise<true | undefined>;
-  // Class-level enum scopes: Task.low() / Task.high()
   declare static low: () => Relation<Task>;
   declare static high: () => Relation<Task>;
 
@@ -147,26 +106,15 @@ class Task extends Base {
   }
 }
 
-// --- Enum typing (defineEnum form): richer surface with async persisting
-// bang setters, plain in-memory setters, and `not*` scopes.
-// Like Base.enum, defineEnum now overrides the attribute accessor and stores
-// the label — `record.status` returns the string label ("draft"), while the
-// database column holds the mapped integer. (`readEnumValue` still works.)
 class Article extends Base {
-  declare status: string; // label-storing accessor (Rails-faithful)
+  declare status: string;
 
-  // Predicates (same as Base.enum)
   declare isDraft: () => boolean;
   declare isPublished: () => boolean;
-  // Plain in-memory setters (defineEnum only) — return void
   declare draft: () => void;
   declare published: () => void;
-  // Async bang setters (defineEnum only). Sets the attribute in memory; if
-  // the record is already persisted, also calls `updateColumn(...)` — which
-  // bypasses validations and callbacks. For a new record, it's in-memory only.
   declare draftBang: () => Promise<void>;
   declare publishedBang: () => Promise<void>;
-  // Class scopes (positive + negative, defineEnum only for `not*`)
   declare static draft: () => Relation<Article>;
   declare static published: () => Relation<Article>;
   declare static notDraft: () => Relation<Article>;
@@ -178,9 +126,6 @@ class Article extends Base {
   }
 }
 
-// `defineEnum`'s options match `_enum`'s full surface (prefix/suffix/scopes/
-// instanceMethods/validate/default) — no `as any` needed for a supported
-// option. Compile-only: never invoked.
 export function _defineEnumOptionsTypecheck(): void {
   defineEnum(
     Article,
@@ -197,7 +142,6 @@ export function _defineEnumOptionsTypecheck(): void {
   );
 }
 
-// --- Temporal attribute typing ---
 import { Temporal } from "@blazetrails/date";
 class Event extends Base {
   declare starts_at: Temporal.Instant | Temporal.PlainDateTime;
@@ -211,7 +155,6 @@ class Event extends Base {
   }
 }
 
-// --- big_integer attribute typing ---
 class BigRecord extends Base {
   declare score: bigint;
   declare smallId: bigint;
@@ -234,19 +177,13 @@ describe("declare patterns — typing runtime-attached members", () => {
     const r = new BigRecord({ score: 2n ** 62n });
     expectTypeOf(r.score).toEqualTypeOf<bigint>();
     expectTypeOf(r.smallId).toEqualTypeOf<bigint>();
-    // PrimaryKeyScalar includes bigint
     expectTypeOf<bigint>().toMatchTypeOf<import("@blazetrails/activerecord").PrimaryKeyScalar>();
   });
 
   it("hasMany accessor: `declare comments: AssociationProxy<Comment>` (chainable + awaitable + array-shaped)", async () => {
     const author = new Author({ name: "dean" });
     expectTypeOf(author.comments).toEqualTypeOf<AssociationProxy<Comment>>();
-    // Awaitable → Comment[]
     expectTypeOf(await author.comments).toEqualTypeOf<Comment[]>();
-    // Array-shaped — sync against loaded target. `proxy.length` is now
-    // Relation's async `length()` under CP-extends-Relation; reach for
-    // `proxy.target.length` or `Array.from(proxy).length` for a sync
-    // count.
     expectTypeOf(author.comments.target.length).toBeNumber();
     expectTypeOf(author.comments[0]).toEqualTypeOf<Comment | undefined>();
   });
@@ -315,12 +252,8 @@ describe("declare patterns — typing runtime-attached members", () => {
       }
     }
     const p = new Plain({ name: "x" });
-    // Instance members type-check via Model's `[key: string]: unknown`
-    // index signature, but resolve to `unknown`.
     expectTypeOf(p.name).toBeUnknown();
     expectTypeOf(p.posts).toBeUnknown();
-    // Static members have no index signature — without `declare static`,
-    // they don't exist on the class type. Assert that:
     type HasActive = "active" extends keyof typeof Plain ? true : false;
     expectTypeOf<HasActive>().toEqualTypeOf<false>();
   });

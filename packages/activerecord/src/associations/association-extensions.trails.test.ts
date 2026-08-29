@@ -1,13 +1,3 @@
-/**
- * Trails-only surface: `Association#extensions`
- * (activerecord/lib/active_record/associations/association.rb:169-177) has no
- * live trails caller yet — `CollectionProxy#initialize` reads the macro
- * record's `extend:` option directly — so nothing else exercises the getter.
- * Cover it here, because the reflection an `Association` is constructed with is
- * the lightweight macro record, which carries neither `extensions` nor
- * `scope_for`: the getter has to resolve the rich reflection the way
- * `Association#klass` does, and a body reading them off the macro record throws.
- */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";

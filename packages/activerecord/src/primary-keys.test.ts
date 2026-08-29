@@ -1,6 +1,3 @@
-/**
- * Mirrors: activerecord/test/cases/primary_keys_test.rb
- */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
@@ -38,13 +35,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("resolves a custom string primary key with no explicit primary_key= via the schema cache", async () => {
-    // Country declares no `static _primaryKey`; its `country_id` PK is resolved
-    // from the reflected schema. This guards the schema-cache PK resolution
-    // across adapters — notably MySQL/MariaDB, whose `columns()` carries no
-    // per-column primary flag (matching Rails' `MySQL::Column`), so resolution
-    // must come through the authoritative `_primaryKeys` warming rather than a
-    // column flag. A regression there would silently misresolve to the "id"
-    // convention.
     (Country as unknown as { resetColumnInformation?: () => void }).resetColumnInformation?.();
     await (Country as unknown as { loadSchema?: () => Promise<void> }).loadSchema?.();
     expect(Country.primaryKey).toBe("country_id");
@@ -59,8 +49,6 @@ describe("PrimaryKeysTest", () => {
 
   it("to key with composite primary key", () => {
     const order = new CpkOrder();
-    // Rails: assert_equal [nil, nil], order.to_key
-    // TS: toKey returns null when any pk value is null
     expect(order.toKey()).toBeNull();
     order.id = [1, 2];
     expect((order.toKey() ?? []).map(Number)).toEqual([1, 2]);
@@ -73,26 +61,17 @@ describe("PrimaryKeysTest", () => {
 
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
     const keyboard = await Keyboard.createBang();
-    // keyboard's PK is key_number, not id — readAttribute("id") returns null
     expect(keyboard.readAttribute("id")).toBeNull();
   });
 
   it("write_attribute id remaps to a scalar custom primary key", async () => {
-    // Rails write.rb:34 — `name = @primary_key if name == "id" && @primary_key`.
-    // The strict unknown-attribute guard must not reject `id` here: it remaps to
-    // the real `key_number` column rather than raising.
     const keyboard = await Keyboard.createBang();
     keyboard.writeAttribute("id", 42);
     expect(Number(keyboard.readAttribute("key_number"))).toBe(42);
   });
 
   it("write_attribute id on a composite primary key raises", () => {
-    // Rails write.rb:35 remaps `id` → the PK array (`@primary_key`), then
-    // `write_from_user([...], v)` misses the attribute hash → Null attribute →
-    // MissingAttributeError, even though cpk_books has a real `id` column.
-    // Composite `id=` assignment uses the per-column path and is unaffected.
     const book = new CpkBook();
-    // Rails interpolates the remapped name (the PK array) into the message.
     expect(() => book.writeAttribute("id", 7)).toThrow(
       'can\'t write unknown attribute `["author_id", "id"]`',
     );
@@ -100,16 +79,11 @@ describe("PrimaryKeysTest", () => {
 
   it("read attribute with composite primary key", () => {
     const book = new CpkBook();
-    book.id = [1, 2]; // sets author_id=1, id=2 (pk is ["author_id", "id"])
-    // readAttribute("id") returns the scalar "id" column value, not the composite array
+    book.id = [1, 2];
     expect(book.readAttribute("id")).toBe(2);
   });
 
   it("to key with primary key after destroy", async () => {
-    // Rails: topic = Topic.find(1); topic.destroy; assert_equal [1], topic.to_key
-    // Topic.destroy triggers Reply→SillyReply cascade blocked by inverseOf validation
-    // in the framework; use Dashboard (no associations) to test the same post-destroy
-    // toKey behaviour: the in-memory instance retains its id after destroy.
     const d = (await Dashboard.createBang({
       dashboard_id: "destroy-pk-test",
     } as any)) as unknown as Dashboard;
@@ -139,22 +113,14 @@ describe("PrimaryKeysTest", () => {
     expect(t1.author_name).toBe(topics("first").author_name);
     const t2 = await Topic.find(topics("second").id);
     expect(t2.author_name).toBe(topics("second").author_name);
-    // Rails: also creates a new Topic, saves, and re-finds it. Omitted here:
-    // Topic.beforeCreate has a callback `this`-binding gap in the TS port (the
-    // framework calls cb(record) not cb.call(record, record)).
   });
 
   it("customized primary key auto assigns on save", async () => {
     await Keyboard.deleteAll();
-    // Advance the serial sequence past 1 before the asserted create. On PG the
-    // sequence is non-transactional, so a stale in-memory PK only diverges from
-    // the DB-generated value once the sequence has moved off 1 — without this a
-    // bug that left `keyboard.id` at 1 would be masked.
     await new Keyboard({ name: "seed" }).saveBang();
     const keyboard = new Keyboard({ name: "HHKB" });
     await keyboard.saveBang();
     const found = (await Keyboard.findBy({ name: "HHKB" })) as Keyboard;
-    // Rails: assert_equal keyboard.id, Keyboard.find_by_name("HHKB").id
     expect(keyboard.id).toBe(found.id);
     const refound = await Keyboard.find(keyboard.id);
     expect(refound.id).toBe(keyboard.id);
@@ -283,9 +249,6 @@ describe("PrimaryKeysTest", () => {
         this._tableName = "developers_projects";
       }
     }
-    // Rails reflects the primary key lazily on first access; getPrimaryKeyAttr
-    // reads only the already-warmed schema cache, so warm it for the no-PK join
-    // table here (an explicit await stands in for Rails' implicit reflection).
     await (Base.connection as any).internalSchemaCache.primaryKeys(
       Base.connection,
       "developers_projects",
@@ -294,10 +257,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("quoted primary key after set primary key", () => {
-    // Rails: k.quoted_primary_key changes from '"id"' to '"foo"' when k.primary_key= is set
-    // quotedPrimaryKey is in attribute-methods/primary-key.ts but not wired to the
-    // Base class surface (base.ts has no quotedPrimaryKey assignment). Test the underlying
-    // primary_key= setter which is wired and drives the change Rails tests.
     class AnonBar extends Base {
       static {
         this._tableName = "bar";
@@ -309,18 +268,10 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("auto detect primary key from schema", () => {
-    // Rails: MixedCaseMonkey.reset_primary_key detects "monkeyID" from schema
-    // TS: _primaryKey explicitly set on the model (schema auto-detection not wired)
     expect(MixedCaseMonkey.primaryKey).toBe("monkeyID");
   });
 
   it("primary key update with custom key name", async () => {
-    // Rails: create!(dashboard_id: "1"); dashboard.id = "2"; save!; Dashboard.first.id == "2"
-    // The UPDATE must use id_was ("1") in the WHERE clause, not the new value.
-    // TS dirty-tracking for schema-primaryKey: false tables does not yet capture
-    // the original PK value before a change — attributeInDatabase returns the new
-    // value, so the WHERE clause targets the wrong row and the update is a no-op.
-    // Partial test: verify create + persist with custom PK name.
     const dashboard = (await Dashboard.createBang({
       dashboard_id: "upd-1",
     } as any)) as unknown as Dashboard;
@@ -329,8 +280,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("create without primary key no extra query", async () => {
-    // Rails: asserts create! query count = 3 (schema cache warm)
-    // TS: just verify create works for a custom-pk model
     class AnonDashboard extends Base {
       static {
         this._tableName = "dashboards";
@@ -341,7 +290,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("assign id raises error if primary key doesnt exist", async () => {
-    // Rails: anonymous class for dashboards (no id col) → id= raises MissingAttributeError
     class AnonDashboard extends Base {
       static {
         this._tableName = "dashboards";
@@ -356,9 +304,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("id returns nil if primary key doesnt exist", async () => {
-    // Rails AttributeMethods::PrimaryKey#id reads through the AttributeSet's
-    // Null attribute for a key-less table, returning nil without raising
-    // (asymmetric with id=, which raises MissingAttributeError).
     class AnonDashboard extends Base {
       static {
         this._tableName = "dashboards";
@@ -391,9 +336,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("serial with quoted sequence name", async () => {
-    // columnsHash() reads from the model's schema cache which is cleared by
-    // clearSchemaCache after each test; use connection.columns() directly so the
-    // PG adapter's full column introspection (with defaultFunction) is always fresh.
     const cols = (await (Base.connection as any).columns("mixed_case_monkeys")) as {
       name: string;
       defaultFunction?: string;
@@ -406,8 +348,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("serial with unquoted sequence name", async () => {
-    // Same schema-cache issue as above — use connection.columns() for fresh PG
-    // introspection.
     const cols = (await (Base.connection as any).columns("topics")) as {
       name: string;
       defaultFunction?: string;
@@ -445,9 +385,6 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
     await record1.destroy();
     const record2 = await AutoIncrement.createBang();
     expect(record2.id).not.toBeNull();
-    // Rails: assert_operator record2.id, :>, record1.id (sequences don't reuse after delete)
-    // SQLite INTEGER PRIMARY KEY without AUTOINCREMENT may reuse the deleted rowid;
-    // the strict-monotonicity assertion only holds on PG/MySQL where sequences never reuse.
     if (adapterType !== "sqlite") {
       expect(record2.id as number).toBeGreaterThan(record1.id as number);
     } else {
@@ -456,7 +393,6 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   }
 
   it("primary key with integer", async () => {
-    // Rails: id: :integer → SERIAL on PG; INTEGER on MySQL/SQLite.
     const type = "integer";
     await (Base.connection as any).createTable("auto_increments", {
       id: { type },
@@ -466,7 +402,6 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   });
 
   it("primary key with bigint", async () => {
-    // Rails: id: :bigint → BIGSERIAL on PG; BIGINT AUTO_INCREMENT on MySQL.
     const type = "bigint";
     await (Base.connection as any).createTable("auto_increments", {
       id: { type },
@@ -512,8 +447,6 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it("schema dump primary key includes type and options", async () => {
-    // Rails: assert_match %r/create_table "barcodes", primary_key: "code", id: { type: :string, limit: 42 }/
-    //        assert_no_match %r{t\.index \["code"\]}, schema
     const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "barcodes");
     expect(schema).toMatch(
       /createTable\("barcodes", \{ primaryKey: "code", id: \{ type: "string", limit: 42 \}/,
@@ -522,8 +455,6 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it.skipIf(adapterType !== "mysql")("schema typed primary key column", async () => {
-    // Rails (:Mysql2Adapter/:TrilogyAdapter): assert_match /create_table "scheduled_logs", id: :timestamp.*/, schema
-    // TS dumper emits the TS DSL form `id: "timestamp"`; assert the equivalent.
     await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
     await (Base.connection as any).createTable("scheduled_logs", {
       id: "timestamp",
@@ -539,7 +470,6 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 });
 
-/** Cross-adapter: return ordered PK column list via the adapter's primaryKeys() method. */
 async function primaryKeysOf(tableName: string): Promise<string[]> {
   return (Base.connection as any).primaryKeys(tableName);
 }
@@ -624,14 +554,11 @@ describe("CompositePrimaryKeyTest", () => {
       book.id = [42, 42];
       expect(book.toKey()).toEqual([42, 42]);
       book.id = invalidId as number[];
-      // Rails: id? returns false when any pk value is nil → toKey returns null
       expect(book.toKey()).toBeNull();
     }
   });
 
   it("derives composite primary key", () => {
-    // Rails: anonymous class with only table_name auto-detects ["region", "code"]
-    // TS: schema auto-detection not wired; _primaryKey must be explicit
     class AnonUberBarcodes extends Base {
       static {
         this._tableName = "uber_barcodes";
@@ -642,15 +569,11 @@ describe("CompositePrimaryKeyTest", () => {
   });
 
   it("collectly dump composite primary key", async () => {
-    // Rails: assert_match /create_table "uber_barcodes", primary_key: ["region", "code"]/, schema
-    // TS dumper emits the TS DSL `ctx.createTable("uber_barcodes", { primaryKey: [...] })`
-    // form rather than Rails' Ruby `create_table` literal; assert the equivalent.
     const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "uber_barcodes");
     expect(schema).toMatch(/createTable\("uber_barcodes", \{ primaryKey: \["region","code"\]/);
   });
 
   it("dumping composite primary key out of order", async () => {
-    // Rails: assert_match %r{create_table "barcodes_reverse", primary_key: \["code", "region"\]}
     const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "barcodes_reverse");
     expect(schema).toMatch(/createTable\("barcodes_reverse", \{ primaryKey: \["code","region"\]/);
   });
@@ -696,7 +619,6 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
   it.skipIf(adapterType === "sqlite")(
     "schema dump primary key integer with default nil",
     async () => {
-      // Rails: skip if SQLite3Adapter; assert_match %r{create_table "int_defaults", id: :integer, default: nil}
       await (Base.connection as any).createTable("int_defaults", {
         id: "integer",
         default: null,
@@ -708,7 +630,6 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
   );
 
   it("schema dump primary key bigint with default nil", async () => {
-    // Rails: assert_match %r{create_table "int_defaults", id: :bigint, default: nil}
     await (Base.connection as any).createTable("int_defaults", {
       id: "bigint",
       default: null,
@@ -744,7 +665,6 @@ describe("PrimaryKeyIntegerTest", () => {
     void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    // Rails: assert_equal :integer, column.type; assert_not_predicate column, :bigint?
     expect(col.type).toBe("integer");
     expect(col.isBigint()).toBe(false);
   });
@@ -760,9 +680,7 @@ describe("PrimaryKeyIntegerTest", () => {
     },
   );
 
-  // Rails gates this on current_adapter?(:Mysql2, :PostgreSQL) (primary_keys_test.rb).
   it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", async () => {
-    // Rails: assert_match %r{create_table "widgets", id: :#{pk_type}, }
     await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
     const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "widgets");
     expect(schema).toMatch(new RegExp(`createTable\\("widgets", \\{ id: "${pkType}", `));
@@ -776,10 +694,6 @@ describe("PrimaryKeyIntegerTest", () => {
     void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    // Rails: assert_predicate column, :auto_increment?
-    //        assert_equal :integer, column.type
-    //        assert_not_predicate column, :bigint?
-    //        assert_predicate column, :unsigned?
     expect(col.isAutoIncrement()).toBe(true);
     expect(col.type).toBe("integer");
     expect(col.isBigint()).toBe(false);
@@ -794,10 +708,6 @@ describe("PrimaryKeyIntegerTest", () => {
     void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    // Rails: assert_predicate column, :auto_increment?
-    //        assert_equal :integer, column.type
-    //        assert_predicate column, :bigint?
-    //        assert_predicate column, :unsigned?
     expect(col.isAutoIncrement()).toBe(true);
     expect(col.type).toBe("integer");
     expect(col.isBigint()).toBe(true);

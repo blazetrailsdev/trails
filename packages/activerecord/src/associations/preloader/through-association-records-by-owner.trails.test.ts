@@ -1,17 +1,3 @@
-/**
- * Preloader::ThroughAssociation#records_by_owner forces its child loaders.
- *
- * Rails reaches `through_records_by_owner` / `source_records_by_owner` through
- * the public `records_by_owner` reader, which forces `load_records` before
- * answering (preloader/association.rb:148-151), so neither reader can observe
- * an unloaded child loader. trails' `loadRecords` is async, so `recordsByOwner`
- * awaits the children itself.
- *
- * The `Batch` runner always runs the through and source loaders before calling
- * `recordsByOwner`, so this pins the *direct* call, which nothing else covers:
- * without the forcing step the merges would read empty child caches and
- * memoize an empty result instead of loading the records.
- */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";

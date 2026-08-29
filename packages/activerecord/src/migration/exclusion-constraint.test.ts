@@ -1,14 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/migration/exclusion_constraint_test.rb
- * (PostgreSQL-only — `supports_exclusion_constraints?`).
- *
- * The model-backed arms (test_added_exclusion_constraint_ensures_valid_values,
- * test_added_deferrable_initially_immediate_exclusion_constraint) are not
- * ported here; this file covers the add/remove paths that
- * PostgreSQL::SchemaStatements#add_exclusion_constraint and
- * #remove_exclusion_constraint route through create_alter_table +
- * schema_creation.accept.
- */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -22,9 +11,6 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
   let scratch: ScratchDatabase;
   let connection: PostgreSQLAdapter;
 
-  // `invoices` is a canonical table (`schema.rb:675`) and this suite clobbers
-  // and drops it exactly as Rails does, so it runs against a database of its
-  // own rather than the shared per-worker one (RFC 0079).
   beforeAll(async () => {
     scratch = await openScratchDatabase("exclusion_constraints");
     connection = scratch.connection;
@@ -149,9 +135,6 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
           using: "gist",
           deferrable: true as never,
         }),
-        // Rails' message names the Ruby symbols `:immediate` / `:deferred`;
-        // trails' analogues are the string literals, so the rendered message
-        // quotes them instead.
       ).rejects.toThrow('deferrable must be `"immediate"` or `"deferred"`, got: `true`');
     });
 

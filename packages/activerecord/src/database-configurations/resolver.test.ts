@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
-// connection-handling registers the adapter class resolver validateBang() needs.
 import "../connection-handling.js";
 import { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 
@@ -22,14 +21,9 @@ describe("PoolConfig", () => {
     });
 
     it("url invalid adapter", () => {
-      // Rails passes the URL string straight to establish_connection; trails'
-      // establishConnection takes an already-resolved config.
       const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
       const handler = new ConnectionHandler();
       expect(() => handler.establishConnection(dbConfig)).toThrow(AdapterNotFound);
-      // Mirrors Rails' assert_match on the nonexistent-adapter message.
-      // The available-adapters list varies with what the running suite has
-      // registered, so the two fixed clauses are matched around it.
       expect(() => handler.establishConnection(dbConfig)).toThrow(
         /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
       );
@@ -93,10 +87,7 @@ describe("PoolConfig", () => {
       });
     });
 
-    it.skip("url missing scheme", () => {
-      // DIVERGES: we treat non-URL strings as env name lookups (like Ruby symbols);
-      // Rails always parses string args as URLs and raises InvalidConfigurationError.
-    });
+    it.skip("url missing scheme", () => {});
 
     it("url host db", () => {
       const poolConfig = resolveDbConfig("abstract://foo/bar?encoding=utf8");
@@ -157,12 +148,6 @@ describe("PoolConfig", () => {
     });
 
     it("pool config with invalid type", () => {
-      // Rails passes Object.new to establish_connection and expects a TypeError;
-      // resolve() raises the same for a value that is neither a string, a hash,
-      // nor a DatabaseConfig. A number (not a plain object) is the faithful JS
-      // analog: resolve() treats *any* non-null object as a hash, so `{}` would
-      // build a HashConfig instead of throwing — only a non-object primitive
-      // reaches the TypeError arm.
       const configs = new DatabaseConfigurations({});
       expect(() => configs.resolve(123)).toThrow(TypeError);
     });

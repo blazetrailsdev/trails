@@ -1,13 +1,6 @@
-/**
- * Attribute query methods (the `attribute?` pattern from Ruby).
- *
- * Mirrors: ActiveRecord::AttributeMethods::Query
- */
-
 import { included, isBlank } from "@blazetrails/activesupport";
 import { BooleanType, type Type } from "@blazetrails/activemodel";
 
-/** The host `include ActiveRecord::AttributeMethods::Query` needs. */
 interface QueryIncludeHost {
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
 }
@@ -17,35 +10,16 @@ interface QueryHost {
   typeForAttribute(name: string, block?: () => Type): Type;
 }
 
-/**
- * `ActiveRecord::AttributeMethods::Query` — the module `attribute_methods.rb:16`
- * includes. Its instance methods are the `this`-typed functions below
- * (CLAUDE.md, "Module mixins"), so the module object carries them plus its
- * `included do` block (query.rb:9-11), which declares the `?` suffix pattern.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Query (query.rb:6-48)
- */
 export const Query = {
   [included](base: QueryIncludeHost): void {
     base.attributeMethodSuffix("?", { parameters: false });
   },
   queryAttribute,
   _queryAttribute,
-  // query.rb:25 — `alias :attribute? :query_attribute`. The `?` pattern the
-  // hook above declares proxies to this name, the way the `=` pattern proxies
-  // to Write's `attribute=` (write.rb:45).
   "attribute?": queryAttribute,
   queryCastAttribute,
 };
 
-/**
- * Query whether an attribute value is truthy.
- *
- * Calls the getter method by name (like Rails' public_send), so overridden
- * getters and virtual attributes are respected.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Query#query_attribute
- */
 export function queryAttribute(this: QueryHost, attrName: string): boolean {
   const value = publicSend(this, attrName);
 
@@ -53,14 +27,12 @@ export function queryAttribute(this: QueryHost, attrName: string): boolean {
 }
 
 function publicSend(obj: object, name: string): unknown {
-  // Check own property first (singleton methods assigned per-instance)
   const ownDesc = Object.getOwnPropertyDescriptor(obj, name);
   if (ownDesc) {
     if (ownDesc.get) return (obj as Record<string, unknown>)[name];
     if (typeof ownDesc.value === "function") return (ownDesc.value as () => unknown).call(obj);
     return ownDesc.value;
   }
-  // Walk prototype chain for accessor getters and prototype methods
   let proto = Object.getPrototypeOf(obj) as object | null;
   while (proto) {
     const desc = Object.getOwnPropertyDescriptor(proto, name);
@@ -74,28 +46,16 @@ function publicSend(obj: object, name: string): unknown {
   return (obj as Record<string, unknown>)[name];
 }
 
-/**
- * Like queryAttribute but reads via _readAttribute, bypassing alias
- * resolution — used internally where the name is already canonical.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Query#_query_attribute
- */
 export function _queryAttribute(this: QueryHost, attrName: string): boolean {
   const value = this._readAttribute(attrName);
 
   return queryCastAttribute.call(this, attrName, value);
 }
 
-// Mirrors: ActiveRecord::AttributeMethods::Query private#query_cast_attribute
-// (attribute_methods/query.rb:29-46).
 /** @internal */
 export function queryCastAttribute(this: QueryHost, attrName: string, value: unknown): boolean {
   if (value === true) return true;
   if (value === false || value == null) return false;
-  // Ruby `!type_for_attribute(attr_name) { false }` — the block supplies
-  // `false` when the name is not a declared attribute, so the negation is
-  // "this is a virtual/method-backed name", and the value has to be coerced
-  // from its raw form rather than through a column type.
   if (!this.typeForAttribute(attrName, () => false as unknown as Type)) {
     if (typeof value === "number" || typeof value === "bigint" || !/[^0-9]/.test(String(value))) {
       return toI(value) !== 0;
@@ -103,15 +63,12 @@ export function queryCastAttribute(this: QueryHost, attrName: string, value: unk
     if (BooleanType.FALSE_VALUES.has(value)) return false;
     return !isBlank(value);
   } else if (typeof value === "number" || typeof value === "bigint") {
-    // Ruby `value.respond_to?(:zero?)` — the Numeric protocol, and the only
-    // JS values that answer it.
     return value !== 0 && value !== 0n;
   } else {
     return !isBlank(value);
   }
 }
 
-// Ruby String#to_i: leading integer prefix, 0 when there is none.
 function toI(value: unknown): number {
   if (typeof value === "number") return Math.trunc(value);
   if (typeof value === "bigint") return Number(value);

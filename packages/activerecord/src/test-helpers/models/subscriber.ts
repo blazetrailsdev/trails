@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
 import type { Subscription } from "./subscription.js";
-// vendor/rails/activerecord/test/models/subscriber.rb
 import { Base } from "../../base.js";
 
 export class Subscriber extends Base {

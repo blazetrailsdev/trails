@@ -1,28 +1,14 @@
-/**
- * Test helpers that mirror Rails' ActiveRecord::TestCase helpers.
- *
- * Mirrors: activerecord/test/cases/test_case.rb
- */
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { zone, setZone } from "@blazetrails/activesupport";
 
 interface TimezoneConfig {
-  /** Mirrors Rails' `default_timezone` — "utc" or "local". */
   default?: "utc" | "local";
-  /** Mirrors Rails' `time_zone_aware_attributes`. */
   awareAttributes?: boolean;
-  /** Mirrors Rails' `time_zone_aware_types`. */
   awareTypes?: string[];
-  /** Mirrors Rails' `zone:` — sets Time.zone for the duration of the block. */
   zone?: string;
 }
 
-/**
- * Temporarily applies timezone-related configuration, yields, then restores.
- *
- * Mirrors: ActiveRecord::TestCase#with_timezone_config
- */
 export async function withTimezoneConfig(
   cfg: TimezoneConfig,
   fn: () => Promise<void> | void,
@@ -30,8 +16,6 @@ export async function withTimezoneConfig(
   const oldDefault = ActiveRecord.defaultTimezone;
   const base = Base as any;
 
-  // Snapshot existence + value so restore is symmetric: if the property wasn't
-  // present before we set it, we delete it on restore rather than leaving it.
   const hadAwareAttributes = "timeZoneAwareAttributes" in base;
   const oldAwareAttributes = base.timeZoneAwareAttributes;
   const hadAwareTypes = "timeZoneAwareTypes" in base;
@@ -40,9 +24,6 @@ export async function withTimezoneConfig(
 
   try {
     if (cfg.default !== undefined) ActiveRecord.defaultTimezone = cfg.default;
-    // Apply unconditionally — mirrors Rails' Base.time_zone_aware_attributes = cfg[:aware_attributes].
-    // If Base doesn't define the property yet the assignment still takes effect (JS class property),
-    // making the helper forward-compatible when the wiring lands.
     if (cfg.awareAttributes !== undefined) base.timeZoneAwareAttributes = cfg.awareAttributes;
     if (cfg.awareTypes !== undefined) base.timeZoneAwareTypes = cfg.awareTypes;
     if (cfg.zone !== undefined) setZone(cfg.zone);

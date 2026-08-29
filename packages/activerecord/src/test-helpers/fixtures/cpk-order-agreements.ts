@@ -1,6 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/cpk_order_agreements.yml
 export const cpkOrderAgreementFixtureData = {
   order_agreement_one: {
     signature: "abc123",

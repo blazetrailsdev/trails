@@ -1,5 +1,3 @@
-// Tests for the tableless fixture loader — mirrors Rails' naked/yml fixture test cases.
-// vendor/rails/activerecord/test/cases/fixtures_test.rb (FixturesTest)
 import { describe, it, expect } from "vitest";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
@@ -11,10 +9,7 @@ import { nakedYmlCompaniesFixtureData } from "./test-helpers/fixtures/naked/yml/
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
 
-// accounts, companies, parrots, and trees are canonical schema.rb tables laid
-// by the boot schema — the tableless tests ride them rather than recreating.
 describe("tableless useFixtures (naked/yml)", () => {
-  // test_empty_yaml_fixture — accounts.yml is an empty file; seeding 0 rows succeeds.
   describe("test_empty_yaml_fixture", () => {
     const { accounts } = fixtures([{ table: "accounts", data: nakedYmlAccountsFixtureData }]);
 
@@ -23,7 +18,6 @@ describe("tableless useFixtures (naked/yml)", () => {
     });
   });
 
-  // test_empty_yaml_fixture_with_a_comment_in_it — companies.yml has only a comment.
   describe("test_empty_yaml_fixture_with_a_comment_in_it", () => {
     const { companies } = fixtures([{ table: "companies", data: nakedYmlCompaniesFixtureData }]);
 
@@ -32,17 +26,6 @@ describe("tableless useFixtures (naked/yml)", () => {
     });
   });
 
-  // test_yaml_file_with_invalid_column — parrots.yml has columns "arrr" and "foobar"
-  // that do not exist on the parrots table.
-  // Rails: table "parrots" has no columns named "arrr", "foobar".
-  // Trails: mirrors the same error format, reporting all invalid columns at once.
-  //
-  // The test calls defineJoinTableFixtures directly rather than routing through
-  // fixtures() because the error surfaces in beforeEach: Vitest marks the enclosing
-  // test as failed with the hook error, which cannot be intercepted with
-  // expect().rejects inside the same test body. Testing the underlying function is
-  // equivalent — the fixture loader delegates to defineJoinTableFixtures in its
-  // beforeEach without wrapping the error.
   describe("test_yaml_file_with_invalid_column", () => {
     it("raises with Rails-mirrored message listing all unknown columns", async () => {
       await expect(
@@ -51,9 +34,6 @@ describe("tableless useFixtures (naked/yml)", () => {
     });
   });
 
-  // test_yaml_file_with_symbol_columns — trees.yml uses Ruby symbol keys (:id, :name).
-  // Rails strips the leading colon and inserts id=1, name="The Root".
-  // Trails: the TS fixture data already uses plain keys; insertion works correctly.
   describe("test_yaml_file_with_symbol_columns", () => {
     const { trees } = fixtures([{ table: "trees", data: nakedYmlTreesFixtureData }]);
 

@@ -1,9 +1,3 @@
-/**
- * Properties for encryption message headers.
- *
- * Mirrors: ActiveRecord::Encryption::Properties
- */
-
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
@@ -42,7 +36,6 @@ export class Properties {
     return this._data.has(key);
   }
 
-  // Mirrors Rails' `delegate :each, :key?, to: :data` (properties.rb:20).
   each(fn: (key: string, value: unknown) => void): void {
     for (const [key, value] of this._data) {
       fn(key, value);
@@ -129,8 +122,6 @@ export class Properties {
 
   validateValueType(value: unknown): void {
     if (value === null) return;
-    // Raw cipher header bytes (iv, at) are carried as Buffers — the TS analogue
-    // of Rails' binary Strings. The serializer base64-encodes them in one hop.
     if (Buffer.isBuffer(value)) return;
     if (typeof value === "object" && value !== null && "payload" in value && "headers" in value)
       return;

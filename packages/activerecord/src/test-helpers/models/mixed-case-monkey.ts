@@ -1,5 +1,4 @@
 import type { Human } from "./human.js";
-// vendor/rails/activerecord/test/models/mixed_case_monkey.rb
 import { Base } from "../../base.js";
 
 export class MixedCaseMonkey extends Base {

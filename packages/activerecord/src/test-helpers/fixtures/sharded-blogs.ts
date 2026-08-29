@@ -1,4 +1,3 @@
-// activerecord/test/fixtures/sharded_blogs.yml
 export const shardedBlogFixtureData = {
   sharded_blog_one: {
     name: "Blog One",

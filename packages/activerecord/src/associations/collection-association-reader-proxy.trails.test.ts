@@ -1,12 +1,3 @@
-/**
- * Trails-only: pins `CollectionAssociation#reader`
- * (collection_association.rb:33-42) to Rails' four lines — `ensure_klass_exists!`,
- * the stale-target `reload`, `@proxy ||= CollectionProxy.create(klass, self)`,
- * and `@proxy.reset_scope`. Rails reaches `reader` through the generated
- * accessor, so it has no test of its own; these reach the OO association
- * directly because that is where the port had drifted — the stale-reload arm
- * lived in a callerless `asyncReader` and `reader` returned the bare target.
- */
 import { describe, it, expect, vi } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";

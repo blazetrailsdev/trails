@@ -1,31 +1,5 @@
-// Mirror of vendor/rails/activerecord/test/schema/schema.rb.
-//
-// Single canonical schema declaration for the AR fixture port (see
-// docs/fixtures-port-plan.md). Tables appear in the same order as the
-// Rails source (which is broadly — but not strictly — alphabetical;
-// e.g. `paragraphs` sits inside the `cpk_*` block). Built incrementally
-// across PRs 0.5a..0.5h; the wire-up into setup-adapter-suite happens
-// in the final split.
-//
-// Features Rails' schema.rb expresses that defineSchema cannot yet
-// express (deliberately dropped during the port — fixture-row tests
-// don't depend on them):
-//   - secondary indexes / expression indexes
-//   - identifier-length stress columns (t.string "a" * max_identifier_length)
-//   - polymorphic helper (modeled directly as `<name>_id` + `<name>_type`)
-
 import type { Schema } from "../support/schema-types.js";
 
-/**
- * PR 0.5a group: alphabetical range "1_need_quoting".."bulbs" (covers
- * digits, A-tables, and the leading B-tables). Sibling PRs 0.5b..0.5h
- * append the remaining groups to this same object.
- *
- * Tables declared as an empty `{}` mirror Rails `create_table :x do |t| end`
- * — `defineSchema` (and Rails) creates the table with only the implicit
- * primary-key column. Use `{ columns: {...}, primaryKey: false }` for a
- * genuinely id-less table.
- */
 export const TEST_SCHEMA: Schema = {
   "1_need_quoting": {
     name: "string",
@@ -40,9 +14,6 @@ export const TEST_SCHEMA: Schema = {
   },
 
   admin_accounts: {
-    // Rails `t.string :name` is nullable; the bare-string shorthand would create a
-    // NOT NULL column, which on MySQL/MariaDB reflects an implicit `""` default and
-    // breaks `Admin::Account.new`'s nil `name` (filter_attributes "nil value" tests).
     name: { type: "string", null: true },
   },
 
@@ -58,8 +29,6 @@ export const TEST_SCHEMA: Schema = {
       parent: { type: "string", null: true, limit: 1024 },
       spouse: { type: "string", null: true, limit: 1024 },
       configs: { type: "string", null: true, limit: 1024 },
-      // MySQL does not allow defaults on blobs; Rails fakes it with a large
-      // varchar, mirrored here.
       preferences: { type: "string", null: true, default: "", limit: 1024 },
       json_data: { type: "string", null: true, limit: 1024 },
       json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
@@ -113,7 +82,6 @@ export const TEST_SCHEMA: Schema = {
 
   attachments: {
     columns: {
-      // Polymorphic reference expanded:
       record_type: { type: "string", null: false },
       record_id: { type: "big_integer", null: false },
     },
@@ -144,17 +112,9 @@ export const TEST_SCHEMA: Schema = {
     favorite_author_id: "integer",
   },
 
-  // Mirrors Rails `create_table :auto_id_tests, id: false` with columns
-  // declared `value`, `published_at`, then `t.primary_key :auto_id` LAST. The
-  // PK position matters: persistence_test
-  // `test_populates_autoincremented_id_pk_regardless_of_its_position_in_columns_list`
-  // asserts the first auto-populated column is `published_at`, not the PK.
   auto_id_tests: {
     columns: {
       value: "integer",
-      // Rails: `t.timestamp :published_at, default: -> { "CURRENT_TIMESTAMP" }`.
-      // precision: null emits a bare DATETIME (no MySQL precision-6 upgrade),
-      // required to pair with the CURRENT_TIMESTAMP function default.
       published_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
       auto_id: "integer",
     },
@@ -165,7 +125,6 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
     data: "binary",
     short_data: { type: "binary", limit: 2048 },
-    // Rails uses t.blob; mirrors as binary across our supported adapters.
     blob_data: "binary",
   },
 
@@ -175,9 +134,6 @@ export const TEST_SCHEMA: Schema = {
     pirate_id: "integer",
   },
 
-  // Rails declares `id: :integer` (narrower than the default bigint).
-  // defineSchema currently emits the adapter-default PK type; fixture row
-  // ids fit either width, so the override is dropped.
   books: {
     columns: {
       author_id: "big_integer",
@@ -204,10 +160,6 @@ export const TEST_SCHEMA: Schema = {
       updated_at: "datetime",
       updated_on: "date",
     },
-    // Mirrors Rails schema.rb books indexes. The partial `where` is dropped on
-    // adapters without partial-index support (Rails schema_creation.rb:120), and
-    // the expression index is emitted only where supported (Rails' schema.rb
-    // `if supports_expression_index?`) — defineSchema applies both gates.
     indexes: [
       { columns: ["author_id", "name"], unique: true },
       { columns: "isbn", unique: true, where: "published_on IS NOT NULL" },
@@ -271,9 +223,6 @@ export const TEST_SCHEMA: Schema = {
     updated_at: { type: "datetime", null: false },
   },
 
-  // Rails: `create_table :old_cars, id: :integer` — an integer (not bigint)
-  // auto-increment PK, kept in sync with the canonical registry so the shared
-  // per-worker DB doesn't drift between the two schema loaders.
   old_cars: {
     columns: { id: { type: "integer" } },
     primaryKey: ["id"],
@@ -310,20 +259,11 @@ export const TEST_SCHEMA: Schema = {
   },
 
   citations: {
-    // Rails declares these via `t.references`, which defaults to bigint. The
-    // citations fixture stores `book2_id: i*i` for i up to 65535
-    // (4_294_836_225), overflowing a 32-bit integer column on PG/MariaDB —
-    // SQLite's dynamic typing tolerated it. Widen to bigint to match Rails.
     columns: {
       book1_id: "big_integer",
       book2_id: "big_integer",
       citation_id: "big_integer",
     },
-    // Rails' `t.references` defaults to `index: true`, so schema.rb emits an
-    // index per reference column. The `citation_id` index is load-bearing for
-    // `EagerLoadingTooManyIdsTest`: `eager_load(:citations)` is a self-LEFT-JOIN
-    // on `citation_id`, and over the 65536-row fixture the MySQL-family lanes
-    // fall back to an O(n²) nested-loop scan without it (>360s vs ~0.2s indexed).
     indexes: [{ columns: "book1_id" }, { columns: "book2_id" }, { columns: "citation_id" }],
   },
 
@@ -375,14 +315,6 @@ export const TEST_SCHEMA: Schema = {
     comment: "string",
   },
 
-  // Rails keeps cpk_orders on a DB-level autoincrement `id` (schema.rb) and
-  // declares the composite PK only on the MODEL (Cpk::Order:
-  // `self.primary_key = [:shop_id, :id]`), so this single-id table matches Rails.
-  // Rails' fixtures omit shop_id: FixtureSet.composite_identify keys on
-  // `model_class.composite_primary_key?` and fills it from the label. The fixture
-  // loader mirrors that (defineFixtures' model-composite-PK fill), generating
-  // shop_id at load time so the composite delete/update subquery tuple is
-  // non-NULL without pinning fixture data.
   cpk_orders: {
     shop_id: "integer",
     status: "string",
@@ -503,7 +435,6 @@ export const TEST_SCHEMA: Schema = {
       parent_id: "integer",
       author_type: "string",
       author_id: "big_integer",
-      // Rails comment: kept as string so preload works when types don't match.
       resource_id: "string",
       resource_type: "string",
       origin_id: "integer",
@@ -536,15 +467,7 @@ export const TEST_SCHEMA: Schema = {
       description: { type: "string", default: "" },
       status: { type: "integer", default: 0 },
     },
-    // Mirrors schema.rb `create_table :companies` secondary indexes, in order.
-    // Adapter-gated DDL (sub-part length → MySQL, nulls-not-distinct → PG≥15,
-    // expression index → supports_expression_index?) is dropped by defineSchema
-    // / SchemaCreation on unsupporting backends, matching Rails.
     indexes: [
-      // Rails declares `order: :desc` (scalar). Stored as an explicit per-column
-      // map so the value survives the shared-worker reconstruct path (a scalar
-      // order is dropped by the connected `add_index` path); the dumper collapses
-      // the uniform map back to Rails' scalar `order: :desc` form.
       { columns: ["name", "rating"], order: { name: "desc", rating: "desc" } },
       { columns: ["name", "description"], length: 10 },
       {
@@ -564,7 +487,6 @@ export const TEST_SCHEMA: Schema = {
         columns: "(CASE WHEN rating > 0 THEN lower(name) END) DESC",
         name: "company_expression_index",
       },
-      // schema.rb:426 — MySQL-only functional index (current_adapter?(:Mysql2, :Trilogy)).
       {
         columns: "(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))",
         name: "full_name_index",
@@ -598,7 +520,6 @@ export const TEST_SCHEMA: Schema = {
     updated_at: "datetime",
   },
 
-  // Rails declares `id: false` — pure join table, no synthetic PK.
   computers_developers: {
     columns: {
       computer_id: "big_integer",
@@ -609,12 +530,6 @@ export const TEST_SCHEMA: Schema = {
     indexes: [{ columns: "computer_id" }, { columns: "developer_id" }],
     primaryKey: false,
   },
-
-  // PR 0.5c group: C-stragglers (contracts..customer_carriers), D-tables
-  // (dashboards..doubloons), E-tables (edges..eyes), F-tables
-  // (families..friendships, plus the `cold_jokes` row Rails sandwiches in
-  // the F block), and G-tables (goofy_string_id..guitars, plus the
-  // `having` row Rails sandwiches between goofy_string_id and guids).
 
   contracts: {
     developer_id: "big_integer",
@@ -640,8 +555,6 @@ export const TEST_SCHEMA: Schema = {
     indexes: [{ columns: "customer_id" }, { columns: "carrier_id" }],
   },
 
-  // Rails declares `id: false` with a string `dashboard_id` column — the
-  // model treats `dashboard_id` as the PK at the AR layer.
   dashboards: {
     columns: {
       dashboard_id: "string",
@@ -736,7 +649,6 @@ export const TEST_SCHEMA: Schema = {
     legacy_updated_on: "datetime",
   },
 
-  // Rails declares `id: false` — pure join table, no synthetic PK.
   developers_projects: {
     columns: {
       developer_id: { type: "integer", null: false },
@@ -765,8 +677,6 @@ export const TEST_SCHEMA: Schema = {
     weight: "integer",
   },
 
-  // Rails declares `id: false`; unique index on [source_id, sink_id] is
-  // dropped per the secondary-index note at the top of this file.
   edges: {
     columns: {
       source_id: { type: "integer", null: false },
@@ -785,11 +695,6 @@ export const TEST_SCHEMA: Schema = {
   },
 
   engines: {
-    // Rails declares this via `t.references :car`, which defaults to bigint.
-    // The adapter_prevent_writes test inserts car_id '138853948594', which
-    // overflows a 32-bit integer column on MySQL/MariaDB — widen to bigint to
-    // match Rails. Also matches the bigint `cars.id` PK so the engines→cars
-    // foreign key (SchemaMigrationsTest) has matching column types.
     car_id: "big_integer",
   },
 
@@ -799,7 +704,6 @@ export const TEST_SCHEMA: Schema = {
   },
 
   entries: {
-    // Polymorphic reference expanded:
     entryable_type: { type: "string", null: false },
     entryable_id: { type: "integer", null: false },
     account_id: { type: "integer", null: false },
@@ -844,7 +748,6 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
   },
 
-  // Rails declares `cold_jokes` between funny_jokes and friendships.
   cold_jokes: {
     cold_name: "string",
   },
@@ -854,9 +757,6 @@ export const TEST_SCHEMA: Schema = {
     follower_id: "integer",
   },
 
-  // Rails declares `id: false` with an explicit `t.string :id, null: false`
-  // column — no DB-level PK constraint. The model promotes `id` to PK at
-  // the AR layer via `self.primary_key = "id"`, same shape as `dashboards`.
   goofy_string_id: {
     columns: {
       id: { type: "string", null: false },
@@ -865,7 +765,6 @@ export const TEST_SCHEMA: Schema = {
     primaryKey: false,
   },
 
-  // Rails declares `having` between goofy_string_id and guids.
   having: {
     where: "string",
   },
@@ -878,21 +777,12 @@ export const TEST_SCHEMA: Schema = {
     color: "string",
   },
 
-  // PR 0.5e group: H-M range (no Rails H-table sits in this slice —
-  // `hardbacks` is sandwiched in the B-block and `having` in the G-block,
-  // both already ported). Covers I-tables (inept_wizards..items), J-tables
-  // (jobs..jobs_pool), K-tables (keyboards..kitchens), L-tables
-  // (legacy_things..lock_without_defaults_cust, plus the `students` row
-  // Rails sandwiches between lessons_students and lint_models), and
-  // M-tables (magazines..movies).
-
   inept_wizards: {
     name: { type: "string", null: false },
     city: { type: "string", null: false },
     type: "string",
   },
 
-  // Rails loops i in 1..8 declaring `c_int_#{i}` with limit:i.
   integer_limits: {
     c_int_without_limit: "integer",
     c_int_1: { type: "integer", limit: 1 },
@@ -935,8 +825,6 @@ export const TEST_SCHEMA: Schema = {
     primaryKey: false,
   },
 
-  // Rails declares `id: false` with `t.primary_key :key_number` — the
-  // table has a real PK, just not named `id`.
   keyboards: {
     columns: {
       key_number: "integer",
@@ -956,10 +844,6 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
   },
 
-  // Rails sandwiches `students` inside the L-block, immediately after
-  // `lessons_students` (schema.rb:720-724), so it lands here rather than with
-  // the S-tables — but ahead of `lessons_students`, whose inline foreign key
-  // needs the referenced table to exist already.
   students: {
     name: "string",
     active: "boolean",
@@ -968,15 +852,10 @@ export const TEST_SCHEMA: Schema = {
 
   lessons_students: {
     columns: {
-      // Rails schema.rb uses `t.references :lesson` / `t.references :student`,
-      // which create bigint FK columns (matching the bigint `students.id` PK so
-      // `add_foreign_key :lessons_students, :students` is type-compatible).
       lesson_id: "big_integer",
       student_id: "big_integer",
     },
     indexes: [{ columns: "lesson_id" }, { columns: "student_id" }],
-    // schema.rb:726 `add_foreign_key :lessons_students, :students,
-    // on_delete: :cascade, deferrable: :immediate`.
     foreignKeys: [
       {
         toTable: "students",
@@ -1005,7 +884,6 @@ export const TEST_SCHEMA: Schema = {
     is_vegetarian: { type: "boolean", default: false },
   },
 
-  // `t.timestamps null: true` expands to nullable created_at/updated_at.
   lock_without_defaults: {
     title: "string",
     lock_version: "integer",
@@ -1052,7 +930,6 @@ export const TEST_SCHEMA: Schema = {
     primaryKey: false,
   },
 
-  // `t.integer :club_id, :member_id` declares both columns as integer.
   memberships: {
     joined_on: "datetime",
     club_id: "integer",
@@ -1076,8 +953,6 @@ export const TEST_SCHEMA: Schema = {
     updated_at: "datetime",
   },
 
-  // Rails declares `id: false`; `minivan_id` is the string PK at the AR
-  // layer (same pattern as `dashboards`).
   minivans: {
     columns: {
       minivan_id: "string",
@@ -1092,8 +967,6 @@ export const TEST_SCHEMA: Schema = {
     expires_at: "big_integer",
   },
 
-  // Rails declares `id: false` with `t.primary_key :monkeyID` — real PK
-  // under a non-`id` (and intentionally camelCased) name.
   mixed_case_monkeys: {
     columns: {
       monkeyID: "integer",
@@ -1117,8 +990,6 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
   },
 
-  // Rails declares `id: false` with `t.primary_key :movieid` — real PK
-  // under a non-`id` name.
   movies: {
     columns: {
       movieid: "integer",
@@ -1130,8 +1001,6 @@ export const TEST_SCHEMA: Schema = {
     message: "string",
   },
 
-  // precision/scale mirror schema.rb exactly. Rails' `t.numeric :numeric_number`
-  // maps to a bare decimal here — the Schema DSL has no separate numeric primitive.
   numeric_data: {
     bank_balance: { type: "decimal", precision: 10, scale: 2 },
     big_bank_balance: { type: "decimal", precision: 15, scale: 2 },
@@ -1295,8 +1164,6 @@ export const TEST_SCHEMA: Schema = {
       pet_id: "integer",
       name: "string",
       owner_id: "integer",
-      // Rails schema.rb: `t.integer :owner_id, :integer` — creates both owner_id AND a
-      // column literally named "integer" (multi-arg form of t.integer).
       integer: { type: "integer", null: true },
       created_at: "datetime",
       updated_at: "datetime",
@@ -1324,9 +1191,6 @@ export const TEST_SCHEMA: Schema = {
       tags_with_destroy_count: { type: "integer", default: 0 },
       tags_with_nullify_count: { type: "integer", default: 0 },
     },
-    // Rails: `t.references :author` — references default `index: true`, so
-    // schema.rb emits index_posts_on_author_id (load-bearing for the SQLite
-    // explain eager-loading plan: SEARCH posts USING INDEX, not SCAN).
     indexes: [{ columns: "author_id", name: "index_posts_on_author_id" }],
   },
 
@@ -1344,10 +1208,6 @@ export const TEST_SCHEMA: Schema = {
     title: { type: "string", null: false },
   },
 
-  // Rails uses custom polymorphic column names here (not the
-  // `<name>_id`/`<name>_type` default) to exercise the
-  // `foreign_key:`/`foreign_type:` override path on `belongs_to ...,
-  // polymorphic: true`. Mirrored verbatim from schema.rb.
   images: {
     imageable_identifier: "integer",
     imageable_class: "string",
@@ -1436,16 +1296,6 @@ export const TEST_SCHEMA: Schema = {
     ],
   },
 
-  // PR 0.5f group: S-W range in Rails source order. Covers the second
-  // `disable_referential_integrity` block (seminars..sections), the
-  // shape_/shipping_/ship/* run, S-strays, T-tables, U-V, and
-  // "warehouse-things". Rails sandwiches `prisoners` (P-prefix) between
-  // `squeaks` and `sinks` at schema.rb:1137; we keep Rails' declaration
-  // order rather than alphabetizing (same convention as `having` in
-  // the G block and `cold_jokes` in the F block). The remaining tail
-  // (circles..long-table-name plus fk_test_* and overloaded_types)
-  // lands in sibling PR 0.5g.
-
   seminars: { name: "string" },
 
   sessions: {
@@ -1514,8 +1364,6 @@ export const TEST_SCHEMA: Schema = {
     indexes: [{ columns: "customer_id" }, { columns: "customer_carrier_id" }],
   },
 
-  // Rails declares `id: false` with a string `speedometer_id` column; the
-  // model promotes `speedometer_id` to PK at the AR layer (dashboards shape).
   speedometers: {
     columns: {
       speedometer_id: "string",
@@ -1533,8 +1381,6 @@ export const TEST_SCHEMA: Schema = {
     sponsor_id: "big_integer",
   },
 
-  // Rails declares `id: false` with an explicit `t.string :id, null: false`
-  // column — model promotes `id` to PK (same shape as goofy_string_id).
   string_key_objects: {
     columns: {
       id: { type: "string", null: false },
@@ -1542,14 +1388,9 @@ export const TEST_SCHEMA: Schema = {
       lock_version: { type: "integer", null: false, default: 0 },
     },
     primaryKey: false,
-    // Rails schema.rb: `t.index :id, unique: true` (schema.rb:1162-1166). On
-    // MySQL/MariaDB this stays a plain unique key (no PK promotion), so the
-    // dumper emits `id: false` — see mysql columns() primary-key reflection.
     indexes: [{ columns: "id", unique: true }],
   },
 
-  // Rails declares `id: false` with `nick` (promoted to PK at the AR layer)
-  // and a separate `id` integer column.
   subscribers: {
     columns: {
       nick: { type: "string", null: false },
@@ -1559,9 +1400,6 @@ export const TEST_SCHEMA: Schema = {
       update_count: { type: "integer", null: false, default: 0 },
     },
     primaryKey: false,
-    // Rails schema.rb: `t.index :nick, unique: true`. Load-bearing — the
-    // adapter_test uniqueness-violation probe inserts the same nick twice and
-    // expects RecordNotUnique.
     indexes: [{ columns: "nick", unique: true }],
   },
 
@@ -1599,7 +1437,6 @@ export const TEST_SCHEMA: Schema = {
       last_read: "date",
       content: "text",
       important: "text",
-      // Rails uses t.blob; mirrors as binary across our supported adapters.
       binary_content: "binary",
       approved: { type: "boolean", default: true },
       replies_count: { type: "integer", default: 0 },
@@ -1666,10 +1503,6 @@ export const TEST_SCHEMA: Schema = {
 
   "warehouse-things": { value: "integer" },
 
-  // Tail section: Rails' schema.rb declares these after the alphabetical
-  // block (lines 1273..1462 of schema.rb). Kept in Rails source order to
-  // keep the diff against the source minimal.
-
   circles: {},
   squares: {},
   triangles: {},
@@ -1711,9 +1544,6 @@ export const TEST_SCHEMA: Schema = {
     indexes: [{ columns: ["wheelable_type", "wheelable_id"], name: "index_wheels_on_wheelable" }],
   },
 
-  // Rails declares `id: false` with `t.string :<x>_id, primary_key: true` —
-  // a real DB-level primary key on the string column rather than the
-  // implicit `id`. Modeled via `primaryKey: [name]` (NOT NULL implied).
   countries: {
     columns: {
       country_id: "string",
@@ -1742,8 +1572,6 @@ export const TEST_SCHEMA: Schema = {
   molecules: { liquid_id: "integer", name: "string" },
   electrons: { molecule_id: "integer", name: "string" },
 
-  // Rails column names include special characters; keep them verbatim as
-  // string keys.
   weirds: {
     a$b: "string",
     なまえ: "string",
@@ -1783,8 +1611,6 @@ export const TEST_SCHEMA: Schema = {
 
   records: {},
 
-  // Rails declares `primary_key: "pk_id"` — DB-level PK on a non-`id`
-  // column; no synthetic `id`.
   fk_test_has_pk: {
     columns: {
       pk_id: { type: "big_integer", null: false },
@@ -1803,9 +1629,6 @@ export const TEST_SCHEMA: Schema = {
 
   fk_object_to_point_tos: {},
   fk_pointing_to_non_existent_objects: {
-    // Rails declares this via `t.references :fk_object_to_point_to` (schema.rb:1403),
-    // which defaults to bigint — and `fk_that_will_be_broken` points it at a default
-    // bigint `id`, so an integer column is a MismatchedForeignKey on MySQL.
     columns: {
       fk_object_to_point_to_id: { type: "big_integer", null: false },
     },
@@ -1845,8 +1668,6 @@ export const TEST_SCHEMA: Schema = {
     desc: "string",
   },
 
-  // Rails declares `id: false` with an explicit integer `id` column — no
-  // DB-level PK constraint.
   non_primary_keys: {
     columns: {
       id: "integer",
@@ -1860,7 +1681,6 @@ export const TEST_SCHEMA: Schema = {
     toooooooo_long_b_id: { type: "big_integer", null: false },
   },
 
-  // to_be_linked fixtures (no corresponding model class; inline inline-map only).
   to_be_linked_accounts: {
     name: "string",
   },
@@ -1870,7 +1690,6 @@ export const TEST_SCHEMA: Schema = {
     settings: "text",
   },
 
-  // Tables used by reflection.test.ts (not in Rails schema.rb; reflection-test-specific).
   appointments: { doctor_id: "integer", patient_id: "integer" },
   bookmarks: { author_name: "string" },
   cat_categories: { name: "string" },
@@ -1953,17 +1772,6 @@ export const TEST_SCHEMA: Schema = {
   topic2s: { title: "string" },
 };
 
-/**
- * Mirror of `schema.rb:1444-1460` — the tables Rails creates through the
- * *second* connection (`Course`/`College`/`Professor.lease_connection`), so they
- * exist in `arunit2` and never in the primary `arunit` database. They are kept
- * out of {@link TEST_SCHEMA} for that reason: `MultipleDbTest` asserts that a
- * `SELECT` on the primary pool raises for these tables.
- *
- * `dogs` is deliberately absent: `schema.rb:559` puts the full-shape table in
- * the primary database and `schema.rb:1462` a bare id-only one in arunit2, so
- * arunit2's copy is laid by `setup-second-pool.ts` rather than from here.
- */
 export const ARUNIT2_SCHEMA: Schema = {
   courses: {
     columns: {
@@ -1984,24 +1792,7 @@ export const ARUNIT2_SCHEMA: Schema = {
   },
 };
 
-/**
- * Mirror of vendor/rails/activerecord/test/schema/postgresql_specific_schema.rb
- * — tables that only exist on PostgreSQL. They use PG-only column types (here,
- * `uuid` primary keys with a `gen_random_uuid()` default), which `defineSchema`
- * rejects on SQLite/MySQL, so this schema must only ever be applied on the
- * postgres adapter.
- *
- * Rails sets `uuid_default = supports_pgcrypto_uuid? ? {} : { default:
- * "uuid_generate_v4()" }` and applies it to `:chat_messages`. With pgcrypto
- * available (always true on our postgres lane — `supports_pgcrypto_uuid?` is
- * PG >= 9.4) the column gets the adapter's default uuid function,
- * `gen_random_uuid()`. `:chat_messages_custom_pk` hardcodes the uuid-ossp
- * `uuid_generate_v4()`, so the postgres test DB must have the `uuid-ossp`
- * extension enabled (Rails does `enable_extension!("uuid-ossp")`).
- */
 export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
-  // create_table :chat_messages, id: :uuid, force: true, **uuid_default
-  // (uuid_default = {} when supports_pgcrypto_uuid? → gen_random_uuid())
   chat_messages: {
     columns: {
       id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
@@ -2009,8 +1800,6 @@ export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
     },
     primaryKey: ["id"],
   },
-  // create_table :chat_messages_custom_pk, id: false, force: true do |t|
-  //   t.uuid :message_id, primary_key: true, default: "uuid_generate_v4()"
   chat_messages_custom_pk: {
     columns: {
       message_id: { type: "uuid", defaultFunction: "uuid_generate_v4()" },

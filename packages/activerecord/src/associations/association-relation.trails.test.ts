@@ -1,13 +1,3 @@
-// AssociationRelation — writes on a relation produced by a collection
-// association should route through the owner so the foreign key, inverse,
-// and loaded target stay wired up. Mirrors Rails'
-// ActiveRecord::AssociationRelation behavior.
-//
-// No 1:1 Rails counterpart; AssociationRelation behaviour lives across
-// relations_test.rb / has_many_associations_test.rb. Rides the canonical
-// schema (`Ship has_many :parts`, `ShipPart belongs_to :ship` + validates
-// name) + fixtures, no inline tables and no defineSchema.
-
 import { describe, it, expect } from "vitest";
 import { association, registerModel, AssociationRelation } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

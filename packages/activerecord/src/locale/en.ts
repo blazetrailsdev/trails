@@ -1,16 +1,6 @@
-/**
- * Mirrors: activerecord/lib/active_record/locale/en.yml.
- *
- * Rails appends this file to `I18n.load_path` from the `on_load(:i18n)` hook at
- * the bottom of `activerecord/lib/active_record.rb`. The data lives here as a
- * module instead, which `i18n.ts` registers before appending its path to
- * `I18n.load_path`.
- */
-
 import type { TranslationData } from "@blazetrails/i18n";
 
 export const en: TranslationData = {
-  // Default error messages
   errors: {
     messages: {
       required: "must exist",
@@ -18,7 +8,6 @@ export const en: TranslationData = {
     },
   },
 
-  // Active Record models configuration
   activerecord: {
     errors: {
       messages: {

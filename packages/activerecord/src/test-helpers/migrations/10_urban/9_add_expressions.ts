@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/migrations/10_urban/9_add_expressions.rb
 import { Migration } from "../../../migration.js";
 
 export class AddExpressions extends Migration {

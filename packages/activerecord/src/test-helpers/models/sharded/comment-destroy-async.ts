@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/sharded/comment_destroy_async.rb
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 
@@ -8,7 +7,6 @@ export class ShardedCommentDestroyAsync extends Base {
   static {
     queryConstraints.call(this, "blog_id", "id");
 
-    // Rails: dependent: :destroy_async — using "destroy" until AssociationOptions.dependent is widened
     this.belongsTo("blogPost", {
       className: "ShardedBlogPostDestroyAsync",
       dependent: "destroy",

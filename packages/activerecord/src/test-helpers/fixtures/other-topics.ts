@@ -1,10 +1,5 @@
 import { ref } from "../../fixtures.js";
 
-// activerecord/test/fixtures/other_topics.yml
-// Loaded into the `topics` table under Topic (Rails uses `set_fixture_class`
-// to map the other_topics fixture file onto Topic). Intra-set refs use
-// `ref("topics", ...)` because the loader keys the declared-id registry by
-// destination tableName, not by fixture-file name.
 export const otherTopicFixtureData = {
   first: {
     id: 1,

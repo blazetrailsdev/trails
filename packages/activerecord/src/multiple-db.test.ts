@@ -11,20 +11,9 @@ import { Entrant } from "./test-helpers/models/entrant.js";
 import { Bird } from "./test-helpers/models/bird.js";
 
 describe("MultipleDbTest", () => {
-  // Rails sets `self.use_transactional_tests = false`; fixtures() pins
-  // the schema/fixtures across the file.
   fixtures({}, { useTransactionalTests: false });
   withSecondPool();
 
-  // Rails: `fixtures :colleges, :courses, :entrants`.
-  // Colleges + courses live in arunit2; entrants in the primary pool.
-  // Seed in insertion order (colleges → courses → entrants) so FK refs resolve.
-  // Entrant course_id is supplied explicitly because `entrantFixtureData` uses
-  // ref("courses", …) which can't cross adapter registries (arunit2 ↔ primary).
-  // Seed each set through its model-specific connection via `fixtures()`'
-  // caller-supplied `connection` knob. `use_transactional_tests = false`
-  // (Rails). The tables are created by `withSecondPool` (colleges/courses in
-  // arunit2, entrants in primary), not from the canonical template clone.
   const seedOpts = { useTransactionalTests: false } as const;
   const { colleges } = fixtures(["colleges"], {
     connection: () => College.connection,
@@ -97,10 +86,6 @@ describe("MultipleDbTest", () => {
   });
 
   it("course connection should survive reloads", async () => {
-    // Rails removes the Course constant and `load`s models/course.rb again, then
-    // re-checks the connection. ESM can't hot-reload a module, so a re-import
-    // returns the same cached `Course` class — this asserts the connection still
-    // resolves through ARUnit2Model rather than a literal reload.
     expect(await Course.leaseConnection()).toBeTruthy();
     const reloaded = (await import("./test-helpers/models/course.js")).Course;
     expect(await reloaded.leaseConnection()).toBeTruthy();
@@ -120,9 +105,7 @@ describe("MultipleDbTest", () => {
           throw new Error("No I messed up.");
         });
       });
-    } catch {
-      // Yup caught it
-    }
+    } catch {}
 
     expect(c1.name).toBe("Typo");
     expect(e1.name).toBe("Typo");
@@ -136,14 +119,6 @@ describe("MultipleDbTest", () => {
     expect(await Entrant.leaseConnection()).not.toBe(await Course.leaseConnection());
   });
 
-  // Rails guards these two with `unless in_memory_db?` (multiple_db_test.rb): its
-  // in-memory harness can't give arunit2 a genuinely separate pool, so College
-  // would resolve to Base's connection. trails' arunit2 is always a genuinely
-  // separate pool — a provisioned database on PG/MySQL, the `_2` sibling file
-  // on sqlite (`sqliteSiblingDatabase`, `support/config.ts`) — so the
-  // assertions hold and we run them. This differs from the primary-class pair, which stay skipped
-  // because `connects_to(arunit/arunit)` is *expected* to share Base's
-  // connection — which independent in-memory DBs can't do.
   it("count on custom connection", async () => {
     expect(await ARUnit2Model.leaseConnection()).toBe(await College.leaseConnection());
     expect(await Base.leaseConnection()).not.toBe(await College.leaseConnection());
