@@ -293,6 +293,11 @@ tester.run("no-freeform-comments (tag arguments are data)", rule, {
       output: `/** @noRailsEquivalent PERMANENT */\nconst x = 1;\n`,
     },
     // Several tags in one block each keep their own data.
+    {
+      code: `/**\n * Prose.\n * @internal\n * @missingRailsCall merge! — PERMANENT: not yet ported.\n */\nconst x = 1;\n`,
+      errors: prose,
+      output: `/**\n * @internal\n * @missingRailsCall merge! — PERMANENT\n */\nconst x = 1;\n`,
+    },
   ],
 });
 
