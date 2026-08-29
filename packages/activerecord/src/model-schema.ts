@@ -16,6 +16,7 @@ import {
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
+import { withoutAliasAttributeGeneration } from "./attribute-methods.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { NullColumn } from "./connection-adapters/column.js";
@@ -581,13 +582,19 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
  * is instead the end of a schema load — the columns just reflected are exactly
  * the ones an instance is about to read. It runs *after* `_schemaLoaded` is
  * set, so `define_attribute_methods`' own `load_schema` (attribute_methods.rb:114)
- * returns immediately instead of re-entering the load.
+ * returns immediately instead of re-entering the load. Only the plain readers
+ * are generated: the alias half stays lazy, on Rails' own demand point
+ * (`Core#init_internals`, core.rb:848), so `alias_attribute_method_definition`
+ * (attribute_methods.rb:87-97) is reached when a record is built rather than
+ * when a column set is reflected.
  *
  * @noRailsEquivalent Rails needs no such hook: its readers are methods, so
  * `method_missing` is the trigger.
  */
 function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
-  (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.();
+  withoutAliasAttributeGeneration(() =>
+    (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.(),
+  );
   (host as unknown as { _columns?: unknown })._columns = undefined;
 }
 

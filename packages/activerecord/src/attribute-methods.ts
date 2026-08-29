@@ -227,6 +227,8 @@ export function eagerlyGenerateAliasAttributeMethods(
   _oldName: string,
 ): void {}
 
+let aliasAttributeGenerationSuppressed = false;
+
 export function generateAliasAttributeMethods(
   this: AttributeMethodsHost,
   codeGenerator: CodeGenerator,
@@ -294,7 +296,21 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   return true;
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function withoutAliasAttributeGeneration<T>(body: () => T): T {
+  aliasAttributeGenerationSuppressed = true;
+  try {
+    return body();
+  } finally {
+    aliasAttributeGenerationSuppressed = false;
+  }
+}
+
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
+  if (aliasAttributeGenerationSuppressed) return;
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
