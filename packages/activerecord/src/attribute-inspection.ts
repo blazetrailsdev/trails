@@ -1,4 +1,6 @@
-import { inspect, ParameterFilter } from "@blazetrails/activesupport";
+import { inspect, ParameterFilter, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
+import { Temporal } from "@blazetrails/date";
 
 export class InspectionMask {
   private _value: string;
@@ -71,6 +73,15 @@ export function formatForInspect(this: any, name: string, value: unknown): strin
   if (filtered === null || filtered === undefined) return "nil";
   if (typeof filtered === "string") {
     return filtered.length > 50 ? inspect(`${filtered.substring(0, 50)}...`) : inspect(filtered);
+  }
+  if (filtered instanceof Temporal.PlainDate) {
+    return `"${dateToFs(filtered, "inspect")}"`;
+  }
+  if (filtered instanceof Temporal.Instant) {
+    return `"${toFs(filtered, "inspect")}"`;
+  }
+  if (filtered instanceof TimeWithZone) {
+    return `"${filtered.toFs("inspect")}"`;
   }
   // boundary: legacy custom-typed attributes may still be JS Date.
   if (filtered instanceof Date) {
