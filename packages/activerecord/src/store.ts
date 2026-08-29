@@ -77,59 +77,31 @@ export function storedAttributes(this: typeof Base): Record<string, string[]> {
 export class HashAccessor {
   static read(object: Base, attribute: string, key: string): unknown {
     this.prepare(object, attribute);
-    const data = object.readAttribute(attribute);
-    if (data === null || data === undefined) return null;
-    const obj = this._readHash(data);
-    return obj[key] ?? null;
+    const hash = object.readAttribute(attribute);
+    const value =
+      hash instanceof HashWithIndifferentAccess
+        ? hash.get(key)
+        : (hash as Record<string, unknown>)[key];
+    return value ?? null;
   }
 
   static write(object: Base, attribute: string, key: string, value: unknown): void {
     this.prepare(object, attribute);
     if (value !== this.read(object, attribute, key)) {
-      const raw = object.readAttribute(attribute);
-      const obj = this._writeHash(raw);
-      obj[key] = value;
-      object.writeAttribute(attribute, obj);
+      const hash = object.readAttribute(attribute);
+      if (hash instanceof HashWithIndifferentAccess) {
+        hash.set(key, value);
+      } else {
+        (hash as Record<string, unknown>)[key] = value;
+      }
     }
   }
 
   static prepare(object: Base, attribute: string): void {
     const val = object.readAttribute(attribute);
-    if (val === null || val === undefined || val === false) {
+    if (val == null || val === false) {
       object.writeAttribute(attribute, {});
-    } else if (
-      typeof val === "object" &&
-      !Array.isArray(val) &&
-      !(val instanceof HashWithIndifferentAccess) &&
-      (Object.getPrototypeOf(val) === Object.prototype || Object.getPrototypeOf(val) === null)
-    ) {
-      const hwia = new HashWithIndifferentAccess(val as Record<string, unknown>);
-      object.writeAttribute(attribute, hwia.toHash());
     }
-  }
-
-  protected static _readHash(data: unknown): Readonly<Record<string, unknown>> {
-    if (data instanceof HashWithIndifferentAccess) return data.toHash();
-    if (data === null || data === undefined) return {};
-    if (typeof data === "string") return JSON.parse(data);
-    if (typeof data === "object" && !Array.isArray(data)) return data as Record<string, unknown>;
-    return {};
-  }
-
-  protected static _writeHash(data: unknown): Record<string, unknown> {
-    if (data instanceof HashWithIndifferentAccess) return data.toHash();
-    if (data === null || data === undefined) return {};
-    if (typeof data === "string") {
-      const parsed = JSON.parse(data);
-      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return { ...parsed };
-      }
-      return {};
-    }
-    if (typeof data === "object" && !Array.isArray(data)) {
-      return { ...(data as Record<string, unknown>) };
-    }
-    return {};
   }
 }
 

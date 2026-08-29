@@ -225,7 +225,7 @@ describe("StoreTest", () => {
         "jenny",
       ),
     ).toBe("blue");
-    expect(user.color).toMatchObject({ jenny: "blue" });
+    expect((user.color as HashWithIndifferentAccess).get("jenny")).toBe("blue");
   });
 
   it("store takes precedence when updating store and accessor", async () => {
