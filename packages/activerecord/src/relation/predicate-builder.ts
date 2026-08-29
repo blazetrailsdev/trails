@@ -281,11 +281,11 @@ export class PredicateBuilder {
     return builder;
   }
 
-  static references(conditions: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
+  static references(attributes: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
     const refs: Nodes.SqlLiteral[] = [];
-    const entries: Array<[string, unknown]> = Array.isArray(conditions)
-      ? conditions.map((k) => [k, undefined] as [string, unknown])
-      : Object.entries(conditions);
+    const entries: Array<[string, unknown]> = Array.isArray(attributes)
+      ? attributes.map((k) => [k, undefined] as [string, unknown])
+      : Object.entries(attributes);
     for (const [key, value] of entries) {
       if (isPlainObject(value)) {
         refs.push(sql(key, { retryable: true }));

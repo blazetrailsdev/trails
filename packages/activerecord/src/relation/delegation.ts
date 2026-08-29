@@ -245,10 +245,10 @@ function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
 const _relationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
 /** @internal */
-export function relationClassFor(modelClass: typeof Base): RelationCtor {
+export function relationClassFor(model: typeof Base): RelationCtor {
   return perModelCarrier(
     _relationClassByModel,
-    modelClass,
+    model,
     _relationFamilySlot.relation,
   ) as RelationCtor;
 }
@@ -293,10 +293,10 @@ export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
 
 export function generateRelationMethod(
   modelClass: typeof Base,
-  name: string,
+  method: string,
   fn: AnyCallable,
 ): void {
-  modelClass.generatedRelationMethods().generateMethod(name, fn);
+  modelClass.generatedRelationMethods().generateMethod(method, fn);
 }
 
 export function classMethodDelegator(prop: string): AnyCallable {
@@ -321,12 +321,12 @@ export function classMethodDelegator(prop: string): AnyCallable {
   };
 }
 
-export function generateMethod(name: string): AnyCallable {
+export function generateMethod(method: string): AnyCallable {
   const holder = { model: null } as any;
-  ASDelegation.generate(holder, [name], { to: "model", allowNil: true });
-  if (typeof holder[name] === "function") return holder[name];
+  ASDelegation.generate(holder, [method], { to: "model", allowNil: true });
+  if (typeof holder[method] === "function") return holder[method];
   return function (this: any, ...args: any[]) {
-    return this.model?.[name]?.(...args);
+    return this.model?.[method]?.(...args);
   };
 }
 

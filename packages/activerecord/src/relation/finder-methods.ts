@@ -283,11 +283,11 @@ async function performFind(this: FinderRelation, ...args: unknown[]): Promise<an
 /** @internal */
 async function performFindBy(
   this: FinderRelation,
-  conditions: unknown,
-  ...rest: unknown[]
+  arg: unknown,
+  ...args: unknown[]
 ): Promise<any | null> {
   try {
-    const records = await this.where(conditions, ...rest)
+    const records = await this.where(arg, ...args)
       .limit(1)
       .toArray();
     return records[0] ?? null;
@@ -300,12 +300,12 @@ async function performFindBy(
 /** @internal */
 async function performFindByBang(
   this: FinderRelation,
-  conditions: unknown,
-  ...rest: unknown[]
+  arg: unknown,
+  ...args: unknown[]
 ): Promise<any> {
-  const record = await performFindBy.call(this, conditions, ...rest);
+  const record = await performFindBy.call(this, arg, ...args);
   if (!record) {
-    raiseRecordNotFoundExceptionBang.call(this.where(conditions, ...rest));
+    raiseRecordNotFoundExceptionBang.call(this.where(arg, ...args));
   }
   return record;
 }

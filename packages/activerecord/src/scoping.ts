@@ -19,72 +19,72 @@ export class ScopeRegistry {
     return IsolatedExecutionState.fetch(SCOPE_REGISTRY_KEY, () => new ScopeRegistry());
   }
 
-  currentScope(modelClass: object, skipInheritedScope = false): any | null {
-    return valueFor(this._currentScopes, modelClass, skipInheritedScope);
+  currentScope(model: object, skipInheritedScope = false): any | null {
+    return valueFor(this._currentScopes, model, skipInheritedScope);
   }
 
-  setCurrentScope(modelClass: object, scope: any): void {
-    setValueFor(this._currentScopes, modelClass, scope);
+  setCurrentScope(model: object, value: any): void {
+    setValueFor(this._currentScopes, model, value);
   }
 
-  ignoreDefaultScope(modelClass: object, skipInheritedScope = false): any | null {
-    return valueFor(this._ignoreDefaultScope, modelClass, skipInheritedScope);
+  ignoreDefaultScope(model: object, skipInheritedScope = false): any | null {
+    return valueFor(this._ignoreDefaultScope, model, skipInheritedScope);
   }
 
-  setIgnoreDefaultScope(modelClass: object, value: any): void {
-    setValueFor(this._ignoreDefaultScope, modelClass, value);
+  setIgnoreDefaultScope(model: object, value: any): void {
+    setValueFor(this._ignoreDefaultScope, model, value);
   }
 
-  globalCurrentScope(modelClass: object, skipInheritedScope = false): any | null {
-    return valueFor(this._globalCurrentScope, modelClass, skipInheritedScope);
+  globalCurrentScope(model: object, skipInheritedScope = false): any | null {
+    return valueFor(this._globalCurrentScope, model, skipInheritedScope);
   }
 
-  setGlobalCurrentScope(modelClass: object, scope: any): void {
-    setValueFor(this._globalCurrentScope, modelClass, scope);
+  setGlobalCurrentScope(model: object, value: any): void {
+    setValueFor(this._globalCurrentScope, model, value);
   }
 
-  static currentScope(modelClass: object, skipInheritedScope = false): any | null {
-    return this.instance().currentScope(modelClass, skipInheritedScope);
+  static currentScope(model: object, skipInheritedScope = false): any | null {
+    return this.instance().currentScope(model, skipInheritedScope);
   }
-  static setCurrentScope(modelClass: object, scope: any): void {
-    this.instance().setCurrentScope(modelClass, scope);
+  static setCurrentScope(model: object, value: any): void {
+    this.instance().setCurrentScope(model, value);
   }
-  static ignoreDefaultScope(modelClass: object, skipInheritedScope = false): any | null {
-    return this.instance().ignoreDefaultScope(modelClass, skipInheritedScope);
+  static ignoreDefaultScope(model: object, skipInheritedScope = false): any | null {
+    return this.instance().ignoreDefaultScope(model, skipInheritedScope);
   }
-  static setIgnoreDefaultScope(modelClass: object, value: any): void {
-    this.instance().setIgnoreDefaultScope(modelClass, value);
+  static setIgnoreDefaultScope(model: object, value: any): void {
+    this.instance().setIgnoreDefaultScope(model, value);
   }
-  static globalCurrentScope(modelClass: object, skipInheritedScope = false): any | null {
-    return this.instance().globalCurrentScope(modelClass, skipInheritedScope);
+  static globalCurrentScope(model: object, skipInheritedScope = false): any | null {
+    return this.instance().globalCurrentScope(model, skipInheritedScope);
   }
-  static setGlobalCurrentScope(modelClass: object, scope: any): void {
-    this.instance().setGlobalCurrentScope(modelClass, scope);
+  static setGlobalCurrentScope(model: object, value: any): void {
+    this.instance().setGlobalCurrentScope(model, value);
   }
 }
 
 /** @internal */
 function valueFor(
-  map: WeakMap<object, any>,
-  modelClass: object,
+  scopeType: WeakMap<object, any>,
+  model: object,
   skipInheritedScope: boolean,
 ): any | null {
-  const value = map.get(modelClass);
+  const value = scopeType.get(model);
   if (value !== undefined) return value;
   if (skipInheritedScope) return null;
-  const parent = Object.getPrototypeOf(modelClass);
-  if (typeof parent === "function" && parent !== modelClass) {
-    return valueFor(map, parent, false);
+  const parent = Object.getPrototypeOf(model);
+  if (typeof parent === "function" && parent !== model) {
+    return valueFor(scopeType, parent, false);
   }
   return null;
 }
 
 /** @internal */
-function setValueFor(map: WeakMap<object, any>, modelClass: object, value: any): void {
+function setValueFor(scopeType: WeakMap<object, any>, model: object, value: any): void {
   if (value === null) {
-    map.delete(modelClass);
+    scopeType.delete(model);
   } else {
-    map.set(modelClass, value);
+    scopeType.set(model, value);
   }
 }
 

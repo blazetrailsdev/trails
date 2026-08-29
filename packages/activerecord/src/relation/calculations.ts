@@ -398,7 +398,7 @@ export async function pluck(
 
   return this.withConnection(async () => {
     if (this.whereClause.isContradiction()) {
-      return await typeCastPluckValues(Result.empty(), columnNames, this as any);
+      return await typeCastPluckValues.call(this, Result.empty(), columnNames);
     }
     const firstColumnName =
       columnNames.length === 0
@@ -448,7 +448,7 @@ export async function pluck(
       this._conn().selectAll(manager, `${this.model.name} Pluck`),
     );
 
-    return await typeCastPluckValues(result, columns, this as any);
+    return await typeCastPluckValues.call(this, result, columns);
   });
 }
 
@@ -518,7 +518,7 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
         }),
       );
 
-  return await typeCastPluckValues(result, columns, this as any);
+  return await typeCastPluckValues.call(this, result, columns);
 }
 
 export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
@@ -568,25 +568,25 @@ export interface CalculationMethods {
   asyncIds(): Promise<unknown[]>;
 }
 
-function inQueryConnection<A extends unknown[], R>(
-  fn: (this: CalculationRelation, ...args: A) => Promise<R>,
-): (this: CalculationRelation, ...args: A) => Promise<R> {
+function inQueryConnection<F extends (this: CalculationRelation, ...args: never[]) => Promise<any>>(
+  fn: F,
+): F {
   const materialized = withDeferredDistinctPkPredicates(fn);
-  return function (this: CalculationRelation, ...args: A): Promise<R> {
+  return function (this: CalculationRelation, ...args: unknown[]) {
     const modelClass = (this as { _model?: unknown })._model as typeof Base;
-    return modelClass.withConnection(() => materialized.apply(this, args));
-  };
+    return modelClass.withConnection(() => materialized.apply(this, args as never[]));
+  } as unknown as F;
 }
 
-function withDeferredDistinctPkPredicates<A extends unknown[], R>(
-  fn: (this: CalculationRelation, ...args: A) => Promise<R>,
-): (this: CalculationRelation, ...args: A) => Promise<R> {
-  return async function (this: CalculationRelation, ...args: A): Promise<R> {
+function withDeferredDistinctPkPredicates<
+  F extends (this: CalculationRelation, ...args: never[]) => Promise<any>,
+>(fn: F): F {
+  return async function (this: CalculationRelation, ...args: never[]) {
     await (
       this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> }
     )._materializeDeferredDistinctPkPredicates?.();
     return fn.apply(this, args);
-  };
+  } as unknown as F;
 }
 
 export const Calculations = {
@@ -1032,21 +1032,21 @@ function castTypeFromKlass(klass: any, name: string): unknown {
  * @missingRailsCall size — PERMANENT
  */
 export async function typeCastPluckValues(
+  this: CalculationRelation,
   result: Result,
   columns: Array<string | Nodes.Node | unknown>,
-  rel: CalculationRelation,
 ): Promise<unknown[]> {
-  await rel.model.ensureSchemaLoaded();
+  await this.model.ensureSchemaLoaded();
   if (result.columns.length !== columns.length) {
-    return result.castValues(rel.model.attributeTypes());
+    return result.castValues(this.model.attributeTypes());
   }
   let joinDependencies: JoinDependency[] | undefined;
   const castTypes = result.columns.map((name, i) => {
-    const known = pluckCastTypeForKnownColumn(rel.model, name);
+    const known = pluckCastTypeForKnownColumn(this.model, name);
     if (known) return known;
-    joinDependencies ??= buildJoinDependencies.call(rel as any);
+    joinDependencies ??= buildJoinDependencies.call(this as any);
     return (
-      (lookupCastTypeFromJoinDependencies(rel, name, joinDependencies) as ColumnType | null) ??
+      (lookupCastTypeFromJoinDependencies(this, name, joinDependencies) as ColumnType | null) ??
       columnType(result, name, i, {})
     );
   });

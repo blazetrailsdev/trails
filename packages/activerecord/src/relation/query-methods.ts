@@ -268,8 +268,8 @@ function includes(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   return includesBang.apply(this.spawn(), args);
 }
 
-function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this.includesValues = unionAppend(this.includesValues, associations);
+function includesBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  this.includesValues = unionAppend(this.includesValues, args);
   return this;
 }
 
@@ -282,8 +282,8 @@ function eagerLoad(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   return eagerLoadBang.apply(this.spawn(), args);
 }
 
-function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this.eagerLoadValues = unionAppend(this.eagerLoadValues, associations);
+function eagerLoadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  this.eagerLoadValues = unionAppend(this.eagerLoadValues, args);
   return this;
 }
 
@@ -292,8 +292,8 @@ function preload(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   return preloadBang.apply(this.spawn(), args);
 }
 
-function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this.preloadValues = unionAppend(this.preloadValues, associations);
+function preloadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  this.preloadValues = unionAppend(this.preloadValues, args);
   return this;
 }
 
@@ -392,8 +392,8 @@ function reselect(this: QueryMethodsHost, ...args: any[]): any {
   return reselectBang.apply(this.spawn(), args);
 }
 
-function reselectBang(this: QueryMethodsHost, ...columns: any[]): any {
-  this.selectValues = columns.map((c: any) => {
+function reselectBang(this: QueryMethodsHost, ...args: any[]): any {
+  this.selectValues = args.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
     if (typeof c === "object" && c !== null && "value" in c)
       return new Nodes.SqlLiteral((c as { value: string }).value);
@@ -402,8 +402,8 @@ function reselectBang(this: QueryMethodsHost, ...columns: any[]): any {
   return this;
 }
 
-function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
-  const flat = columns.flat(Infinity);
+function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
+  const flat = fields.flat(Infinity);
   const normalized = flat.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
     if (typeof c === "function") return c;
@@ -466,9 +466,9 @@ function group(this: QueryMethodsHost, ...args: (string | Nodes.Node)[]): any {
 
 function groupBang(
   this: QueryMethodsHost,
-  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...args: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): any {
-  this.groupValues = [...this.groupValues, ...(columns as string[])];
+  this.groupValues = [...this.groupValues, ...(args as string[])];
   return this;
 }
 
@@ -479,9 +479,9 @@ function regroup(this: QueryMethodsHost, ...args: string[]): any {
 
 function regroupBang(
   this: QueryMethodsHost,
-  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...args: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): any {
-  this.groupValues = [...(columns as string[])];
+  this.groupValues = [...(args as string[])];
   return this;
 }
 
@@ -674,10 +674,10 @@ function unscope(
 
 function unscopeBang(
   this: QueryMethodsHost,
-  ...types: Array<string | { where: string | string[] }>
+  ...args: Array<string | { where: string | string[] }>
 ): any {
-  this.unscopeValues = [...this.unscopeValues, ...types];
-  for (const rawScope of types) {
+  this.unscopeValues = [...this.unscopeValues, ...args];
+  for (const rawScope of args) {
     if (typeof rawScope === "string") {
       const scope = rawScope === "leftJoins" ? "leftOuterJoins" : rawScope;
       if (!VALID_UNSCOPING_VALUES.has(scope as UnscopeType)) {
@@ -1183,10 +1183,10 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
 
 function extending(
   this: QueryMethodsHost,
-  mod?: Record<string, (...args: any[]) => any> | ((rel: any) => void),
+  modules?: Record<string, (...args: any[]) => any> | ((rel: any) => void),
 ): any {
-  if (!mod) return this;
-  return extendingBang.call(this.spawn(), mod);
+  if (!modules) return this;
+  return extendingBang.call(this.spawn(), modules);
 }
 
 function extendingBang(
@@ -1274,8 +1274,8 @@ function annotate(this: QueryMethodsHost, ...args: string[]): any {
   return annotateBang.apply(this.spawn(), args);
 }
 
-function annotateBang(this: QueryMethodsHost, ...comments: string[]): any {
-  this.annotateValues = [...this.annotateValues, ...comments];
+function annotateBang(this: QueryMethodsHost, ...args: string[]): any {
+  this.annotateValues = [...this.annotateValues, ...args];
   return this;
 }
 
@@ -1648,8 +1648,8 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
 }
 
 /** @internal */
-export function extractTableNameFrom(orderTerm: string): string | null {
-  const match = orderTerm.match(/^\W?(\w+)\W?\./);
+export function extractTableNameFrom(string: string): string | null {
+  const match = string.match(/^\W?(\w+)\W?\./);
   return match ? match[1] : null;
 }
 
@@ -2268,7 +2268,7 @@ export function buildArel(
   const table: any = this.table;
   const arel = new SelectManager(table);
 
-  buildJoins.call(this, arel, aliases);
+  buildJoins.call(this, arel.joinSources(), aliases);
 
   if (!this.whereClause.isEmpty()) arel.where(this.whereClause.ast);
   if (!this.havingClause.isEmpty()) arel.having(this.havingClause.ast);
@@ -2483,8 +2483,12 @@ export interface JoinEmissionPlan {
  * @internal
  * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
-export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmissionPlan): void {
-  if (plan.leadingJoins.length > 0) manager.joinSources().push(...plan.leadingJoins);
+export function emitJoinPlan(
+  this: QueryMethodsHost,
+  joinSources: any[],
+  plan: JoinEmissionPlan,
+): void {
+  if (plan.leadingJoins.length > 0) joinSources.push(...plan.leadingJoins);
 
   let trackerWasBuilt = false;
   const sharedTracker = (): AliasTracker => {
@@ -2497,12 +2501,10 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   const joinType = plan.joinType;
   if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, joinType);
-    manager
-      .joinSources()
-      .push(...jd.joinConstraints(plan.stashedJoins, sharedTracker(), references));
+    joinSources.push(...jd.joinConstraints(plan.stashedJoins, sharedTracker(), references));
   }
 
-  if (plan.joinNodes.length > 0) manager.joinSources().push(...plan.joinNodes);
+  if (plan.joinNodes.length > 0) joinSources.push(...plan.joinNodes);
 
   if (plan.aliases && trackerWasBuilt) {
     for (const [name, count] of sharedTracker().aliases) {
@@ -2515,8 +2517,12 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
  * @internal
  * @missingRailsCall empty? — PERMANENT
  */
-export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
-  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return;
+export function buildJoins(
+  this: QueryMethodsHost,
+  joinSources: any[],
+  aliases?: AliasTracker,
+): any[] {
+  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return joinSources;
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
   const leadingJoins = buckets.leading_join as Nodes.Join[];
@@ -2526,7 +2532,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     memoTracker ??= this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
     return memoTracker;
   };
-  emitJoinPlan.call(this, arel, {
+  emitJoinPlan.call(this, joinSources, {
     leadingJoins,
     joinNodes,
     stashedJoins: buckets.stashed_join as JoinDependency[],
@@ -2535,6 +2541,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     aliases,
     tracker,
   });
+  return joinSources;
 }
 
 /**
