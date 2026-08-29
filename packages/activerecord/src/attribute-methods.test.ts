@@ -632,7 +632,7 @@ describe("AttributeMethodsTest", () => {
 
     await (Model as any).insertBang({ expires_at: timestamp });
     let record2 = await (Model as any).last();
-    expect(record2.id).not.toBe(record1.id);
+    expect(record1.equals(record2)).toBe(false);
     expect(epochSeconds(record2.expires_at)).toBe(timestamp);
 
     await inTimeZone("Pacific Time (US & Canada)", async () => {
@@ -646,7 +646,7 @@ describe("AttributeMethodsTest", () => {
 
       await (Model as any).insertBang({ expires_at: timestamp });
       record2 = await (Model as any).last();
-      expect(record2.id).not.toBe(record1.id);
+      expect(record1.equals(record2)).toBe(false);
       expect(record2.expires_at.toTime().toI()).toBe(timestamp);
     });
   });
