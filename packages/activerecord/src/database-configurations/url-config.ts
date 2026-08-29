@@ -16,11 +16,10 @@ export class UrlConfig extends HashConfig {
     super(envName, name, configurationHash);
 
     this.url = url;
-    configurationHash = {
+    const hash: Record<string, unknown> = {
       ...this.configurationHash,
       ...this.buildUrlHash(),
     };
-    const hash = configurationHash as Record<string, unknown>;
     camelizeUrlKeys(hash);
 
     if (hash.schemaDump === "false") {
