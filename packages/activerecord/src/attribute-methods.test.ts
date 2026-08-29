@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { TimeWithZone, TimeZone, zone } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, toFs, zone } from "@blazetrails/activesupport";
 import { BooleanType } from "@blazetrails/activemodel";
 import { Base, DangerousAttributeError } from "./index.js";
 
@@ -265,7 +265,7 @@ describe("AttributeMethodsTest", () => {
   it("attribute_for_inspect with a date", async () => {
     const t = topics("first") as any;
 
-    expect(t.attributeForInspect("written_on")).toBe(`"${t.written_on}"`);
+    expect(t.attributeForInspect("written_on")).toBe(`"${toFs(t.written_on, "inspect")}"`);
   });
 
   it("attribute_for_inspect with a long array", async () => {
