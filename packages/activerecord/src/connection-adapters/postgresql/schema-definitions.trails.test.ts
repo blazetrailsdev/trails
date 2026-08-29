@@ -324,12 +324,13 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
     td.bit("a", "b", { limit: 8 });
     td.bitVarying("c", { limit: 4 });
     td.bigserial("d", "e");
-    expect(td.columns.map((c) => c.sqlType)).toEqual([
-      "BIT(8)",
-      "BIT(8)",
-      "BIT VARYING(4)",
-      "BIGSERIAL",
-      "BIGSERIAL",
+    const schemaCreation = new PgSchemaCreation(leased as unknown as PgSchemaCreationHost);
+    expect(td.columns.map((c) => schemaCreation.typeToSql(c.type, c.options))).toEqual([
+      "bit(8)",
+      "bit(8)",
+      "bit varying(4)",
+      "bigserial",
+      "bigserial",
     ]);
   });
 });
@@ -487,8 +488,8 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     expect(sql).toContain('"path" ltree');
     expect(sql).toContain('"doc" tsvector');
     expect(sql).toContain('"payload" xml');
-    expect(sql).toContain('"flags" BIT(8)');
-    expect(sql).toContain('"flex" BIT VARYING(16)');
+    expect(sql).toContain('"flags" bit(8)');
+    expect(sql).toContain('"flex" bit varying(16)');
     expect(sql).toContain('"price" money');
     expect(sql).toContain('"oid_col" oid');
     expect(sql).toContain('"during" tsrange');

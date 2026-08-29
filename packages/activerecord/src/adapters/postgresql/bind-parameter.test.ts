@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { describeIfPg } from "./test-helper.js";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../../test-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
@@ -34,7 +35,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("where with decimal for string column using bind parameters", async () => {
-      await assertQuotedAs("0", 0);
+      await assertQuotedAs("0.0", new BigDecimal(0));
     });
 
     it("where with rational for string column using bind parameters", async () => {

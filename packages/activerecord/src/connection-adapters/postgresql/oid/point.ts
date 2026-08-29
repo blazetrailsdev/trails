@@ -54,7 +54,7 @@ export class Point extends ValueType<PointValue> {
   override serialize(value: unknown): string | null {
     if (value == null) return null;
     if (value instanceof PointValue) {
-      return `(${numberForPoint(value.x)},${numberForPoint(value.y)})`;
+      return `(${this.numberForPoint(value.x)},${this.numberForPoint(value.y)})`;
     }
     if (globalThis.Array.isArray(value)) {
       if (value.length !== 2) return null;
@@ -81,18 +81,17 @@ export class Point extends ValueType<PointValue> {
     return Number.isNaN(n) ? null : n;
   }
 
+  private numberForPoint(number: unknown): string {
+    const s = String(number);
+    return s.endsWith(".0") ? s.slice(0, -2) : s;
+  }
+
   private buildPoint(x: unknown, y: unknown): PointValue | null {
     const fx = this.toCoordinate(x);
     const fy = this.toCoordinate(y);
     if (fx == null || fy == null) return null;
     return new PointValue(fx, fy);
   }
-}
-
-/** @internal */
-function numberForPoint(number: number): string {
-  const s = String(number);
-  return s.endsWith(".0") ? s.slice(0, -2) : s;
 }
 
 /** @internal */

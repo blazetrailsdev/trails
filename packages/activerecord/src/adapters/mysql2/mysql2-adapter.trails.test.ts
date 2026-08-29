@@ -222,9 +222,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       await adapter.executeMutation("DO 1");
       expect(adapter._databaseTimezone).toBe("local");
       adapter._databaseTimezone = "utc";
-      await adapter.exec("DO 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
       await adapter.explain("SELECT 1");
       expect(adapter._databaseTimezone).toBe("local");
     });

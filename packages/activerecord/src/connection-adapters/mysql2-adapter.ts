@@ -134,10 +134,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   _affectedRowsBeforeWarnings = 0;
 
-  private _syncDatabaseTimezone(): void {
-    this._databaseTimezone = ActiveRecord.defaultTimezone;
-  }
-
   protected override _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     const build = (): Error => {
       if (isMysql2DriverTimeout(e)) {
@@ -316,7 +312,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
-    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
     const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
@@ -487,7 +482,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
@@ -525,7 +519,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string | null = "SQL",
   ): Promise<number> {
     sql = this.preprocessQuery(sql);
-    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
@@ -641,7 +634,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql = this.preprocessQuery(sql);
     try {
       if (materializeTransactions) {
-        this._syncDatabaseTimezone();
         await this.materializeTransactions();
       }
       const driverSql = this.mysqlQuote(sql);
@@ -701,7 +693,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async exec(sql: string): Promise<void> {
-    this._syncDatabaseTimezone();
     const conn = await this.getConn();
     await conn.query(this.mysqlQuote(sql));
   }
@@ -883,7 +874,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async configureConnection(): Promise<void> {
-    this._syncDatabaseTimezone();
+    this._databaseTimezone = ActiveRecord.defaultTimezone;
     if (this._connectionConfigured || !this._client) return;
     this._connectionConfigured = true;
     await super.configureConnection();
