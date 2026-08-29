@@ -1525,8 +1525,8 @@ export interface AbstractMysqlAdapter {
   ): Promise<void>;
 
   createTable(
-    name: string,
-    optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
+    tableName: string,
+    options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<void>;
 

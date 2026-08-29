@@ -44,7 +44,7 @@ export class LegacyPoint extends ValueType<[number, number]> {
 }
 
 /** @internal */
-function numberForPoint(n: number): string {
-  const s = n.toString();
+function numberForPoint(number: number): string {
+  const s = number.toString();
   return s.endsWith(".0") ? s.slice(0, -2) : s;
 }

@@ -17,7 +17,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
   removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | Record<string, unknown>,
+    toTable?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
@@ -28,7 +28,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
   removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | Record<string, unknown>,
+    expression?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata;
@@ -46,10 +46,10 @@ export async function addForeignKey(
 export async function removeForeignKey(
   adapter: SQLite3SchemaAdapter,
   fromTable: string,
-  toTableOrOptions?: string | Record<string, unknown>,
+  toTable?: string | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): Promise<void> {
-  return adapter.removeForeignKey(fromTable, toTableOrOptions, options);
+  return adapter.removeForeignKey(fromTable, toTable, options);
 }
 
 export async function checkConstraints(
@@ -71,10 +71,10 @@ export async function addCheckConstraint(
 export async function removeCheckConstraint(
   adapter: SQLite3SchemaAdapter,
   tableName: string,
-  expressionOrOptions?: string | Record<string, unknown>,
+  expression?: string | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): Promise<void> {
-  return adapter.removeCheckConstraint(tableName, expressionOrOptions, options);
+  return adapter.removeCheckConstraint(tableName, expression, options);
 }
 
 const INDEX_ON_REGEX =

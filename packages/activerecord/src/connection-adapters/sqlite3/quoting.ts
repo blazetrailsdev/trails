@@ -63,8 +63,8 @@ export function quoteColumnName(name: unknown): string {
 }
 
 /** @missingRailsCall quote — PERMANENT */
-export function quoteString(value: string): string {
-  return value.replace(/'/g, "''");
+export function quoteString(s: string): string {
+  return s.replace(/'/g, "''");
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {

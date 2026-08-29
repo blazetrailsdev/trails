@@ -394,7 +394,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async createSchema(
-    name: string,
+    schemaName: string,
     options: { force?: boolean; ifNotExists?: boolean } = {},
   ): Promise<void> {
     if (options.force && options.ifNotExists) {
@@ -403,15 +403,15 @@ export class SchemaStatements extends AbstractSchemaStatements {
       );
     }
     if (options.force) {
-      await this.dropSchema(name, { ifExists: true });
+      await this.dropSchema(schemaName, { ifExists: true });
     }
     const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
-    await this.execute(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
+    await this.execute(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(schemaName)}`);
   }
 
-  async dropSchema(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
+  async dropSchema(schemaName: string, options: { ifExists?: boolean } = {}): Promise<void> {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.execute(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)} CASCADE`);
+    await this.execute(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(schemaName)} CASCADE`);
   }
 
   async schemaExists(name: string): Promise<boolean> {
@@ -856,10 +856,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string; expression?: string },
+    options: string | { name: string; expression?: string },
   ): Promise<void> {
-    const options = typeof nameOrOptions === "string" ? { name: nameOrOptions } : nameOrOptions;
-    const chkNameToValidate = (await this.checkConstraintForBang(tableName, options)).name;
+    const opts = typeof options === "string" ? { name: options } : options;
+    const chkNameToValidate = (await this.checkConstraintForBang(tableName, opts)).name;
     await this.validateConstraint(tableName, chkNameToValidate);
   }
 
@@ -1037,20 +1037,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async removeExclusionConstraint(
     tableName: string,
-    expressionOrOptions?: string | Record<string, unknown> | null,
+    expression?: string | Record<string, unknown> | null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const expression =
-      typeof expressionOrOptions === "string" || expressionOrOptions == null
-        ? expressionOrOptions
-        : null;
-    const opts =
-      typeof expressionOrOptions === "object" && expressionOrOptions !== null
-        ? expressionOrOptions
-        : options;
-    const exclNameToDelete = (
-      await this.exclusionConstraintForBang(tableName, expression ?? null, opts)
-    ).name!;
+    const expr = typeof expression === "string" || expression == null ? expression : null;
+    const opts = typeof expression === "object" && expression !== null ? expression : options;
+    const exclNameToDelete = (await this.exclusionConstraintForBang(tableName, expr ?? null, opts))
+      .name!;
     await this.removeConstraint(tableName, exclNameToDelete);
   }
 
@@ -1183,24 +1176,21 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async removeUniqueConstraint(
     tableName: string,
-    columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
+    columnName?: string | string[] | Record<string, unknown> | null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const columnName =
-      columnNameOrOptions === null ||
-      typeof columnNameOrOptions === "string" ||
-      Array.isArray(columnNameOrOptions) ||
-      columnNameOrOptions === undefined
-        ? columnNameOrOptions
+    const column =
+      columnName === null ||
+      typeof columnName === "string" ||
+      Array.isArray(columnName) ||
+      columnName === undefined
+        ? columnName
         : undefined;
     const opts =
-      typeof columnNameOrOptions === "object" &&
-      columnNameOrOptions !== null &&
-      !Array.isArray(columnNameOrOptions)
-        ? columnNameOrOptions
+      typeof columnName === "object" && columnName !== null && !Array.isArray(columnName)
+        ? columnName
         : options;
-    const uniqueNameToDelete = (await this.uniqueConstraintForBang(tableName, columnName, opts))
-      .name!;
+    const uniqueNameToDelete = (await this.uniqueConstraintForBang(tableName, column, opts)).name!;
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
@@ -1516,9 +1506,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return names as string[];
   }
 
-  async pkAndSequenceFor(tableName: string): Promise<[string, Name | null] | null> {
+  async pkAndSequenceFor(table: string): Promise<[string, Name | null] | null> {
     try {
-      const quotedTable = this.quote(this.quoteTableName(tableName));
+      const quotedTable = this.quote(this.quoteTableName(table));
 
       let result = (
         await this.query(
@@ -1576,9 +1566,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
   }
 
-  async serialSequence(tableName: string, column: string): Promise<string | null> {
+  async serialSequence(table: string, column: string): Promise<string | null> {
     return ((await this.queryValue(
-      `SELECT pg_get_serial_sequence(${this.quote(tableName)}, ${this.quote(column)})`,
+      `SELECT pg_get_serial_sequence(${this.quote(table)}, ${this.quote(column)})`,
       "SCHEMA",
     )) ?? null) as string | null;
   }
@@ -1620,38 +1610,38 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return `${tbl}_${col}_${suffix}`;
   }
 
-  async setPkSequenceBang(tableName: string, value: number): Promise<void> {
-    const result = await this.pkAndSequenceFor(tableName);
+  async setPkSequenceBang(table: string, value: number): Promise<void> {
+    const result = await this.pkAndSequenceFor(table);
     const [pk, seq] = result ?? [null, null];
     if (!pk) return;
     if (seq) {
       const quotedSequence = this.quoteTableName(seq.toString());
       await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
     } else {
-      this.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+      this.logger?.warn?.(`${table} has primary key ${pk} with no default sequence.`);
     }
   }
 
   async resetPkSequenceBang(
-    tableName: string,
+    table: string,
     pk: string | null = null,
     sequence: string | null = null,
   ): Promise<void> {
     if (!pk || !sequence) {
-      const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(tableName)) ?? [null, null];
+      const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(table)) ?? [null, null];
       pk = pk ?? defaultPk;
       sequence = sequence ?? defaultSeq?.toString() ?? null;
     }
 
     if (pk && !sequence) {
-      this.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+      this.logger?.warn?.(`${table} has primary key ${pk} with no default sequence.`);
     }
 
     if (!pk || !sequence) return;
 
     const quotedSequence = this.quoteTableName(sequence);
     const maxPk = await this.queryValue(
-      `SELECT MAX(${this.quoteColumnName(pk)}) FROM ${this.quoteTableName(tableName)}`,
+      `SELECT MAX(${this.quoteColumnName(pk)}) FROM ${this.quoteTableName(table)}`,
       "SCHEMA",
     );
     let minvalue: unknown = null;

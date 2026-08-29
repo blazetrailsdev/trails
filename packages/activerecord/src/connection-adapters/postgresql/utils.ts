@@ -37,8 +37,8 @@ export class Name {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
-  export function extractSchemaQualifiedName(name: string): Name {
-    const parts = splitQuotedIdentifier(name);
+  export function extractSchemaQualifiedName(string: string): Name {
+    const parts = splitQuotedIdentifier(string);
     let schema: string | null = parts[0] ?? null;
     let table = parts[1] ?? null;
     if (table == null) {
@@ -49,11 +49,11 @@ export namespace Utils {
   }
 }
 
-export function unquoteIdentifier(name: string): string {
-  if (name.startsWith('"') && name.endsWith('"')) {
-    return name.slice(1, -1).replace(/""/g, '"');
+export function unquoteIdentifier(identifier: string): string {
+  if (identifier.startsWith('"') && identifier.endsWith('"')) {
+    return identifier.slice(1, -1).replace(/""/g, '"');
   }
-  return name;
+  return identifier;
 }
 
 export function splitQuotedIdentifier(name: string): string[] {

@@ -19,11 +19,8 @@ import { Utils } from "./utils.js";
 import { toS } from "@blazetrails/activesupport";
 
 export class IntegerOutOf64BitRange extends Error {
-  constructor(value: bigint | number) {
-    super(
-      `${value} is out of range for PostgreSQL bigint (64-bit signed integer): ` +
-        `-9223372036854775808 to 9223372036854775807`,
-    );
+  constructor(msg: string) {
+    super(msg);
     this.name = "IntegerOutOf64BitRange";
   }
 }
@@ -71,8 +68,8 @@ export function quoteColumnName(name: unknown): string {
 }
 
 /** @missingRailsCall with_raw_connection — CONVERGEABLE pg-quote-string-escapes-without-with-raw-connection */
-export function quoteString(value: string): string {
-  return value.replace(/'/g, "''");
+export function quoteString(s: string): string {
+  return s.replace(/'/g, "''");
 }
 
 export function quoteBinaryColumn(value: Buffer): string {
@@ -233,14 +230,17 @@ export function lookupCastTypeFromColumn(
 export const checkIntInRange = checkIntegerRange;
 
 export function checkIntegerRange(value: bigint | number): void {
+  const exception =
+    `${value} is out of range for PostgreSQL bigint (64-bit signed integer): ` +
+    `-9223372036854775808 to 9223372036854775807`;
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) {
-      throw new IntegerOutOf64BitRange(value);
+      throw new IntegerOutOf64BitRange(exception);
     }
   }
   const bigVal = typeof value === "bigint" ? value : BigInt(value);
   if (bigVal < PG_INT64_MIN || bigVal > PG_INT64_MAX) {
-    throw new IntegerOutOf64BitRange(value);
+    throw new IntegerOutOf64BitRange(exception);
   }
 }
 
