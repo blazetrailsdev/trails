@@ -239,7 +239,7 @@ export function generateAliasAttributeMethods(
   this.attributeMethodPatternsCache().clear();
 }
 
-/** @missingRailsCall has_attribute? — PERMANENT */
+/** @missingRailsCall has_attribute? — CONVERGEABLE converge-alias-attribute-not-an-attribute-raise */
 export function aliasAttributeMethodDefinition(
   this: AttributeMethodsHost,
   codeGenerator: CodeGenerator,
