@@ -8,8 +8,8 @@ import type {
   ColumnType,
   IdHashOptions,
   PrimaryKeyType,
-  SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
+import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { ArgumentError } from "@blazetrails/activemodel";

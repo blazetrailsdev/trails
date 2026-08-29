@@ -12,7 +12,8 @@ import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-sta
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
-import type { SchemaStatementsLike, TableDefinitionOf } from "../abstract/schema-definitions.js";
+import type { TableDefinitionOf } from "../abstract/schema-definitions.js";
+import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
 import type { Result } from "../../result.js";
 

@@ -8,11 +8,8 @@ import {
   splitColumnNames,
   AlterTable as AbstractAlterTable,
 } from "../abstract/schema-definitions.js";
-import type {
-  ColumnOptions,
-  ColumnType,
-  SchemaStatementsLike,
-} from "../abstract/schema-definitions.js";
+import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
+import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace

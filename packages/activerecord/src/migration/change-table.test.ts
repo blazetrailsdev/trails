@@ -1,9 +1,7 @@
 import { describe, it, expect as vitestExpect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  Table,
-  type SchemaStatementsLike,
-} from "../connection-adapters/abstract/schema-definitions.js";
+import { Table } from "../connection-adapters/abstract/schema-definitions.js";
+import type { SchemaStatementsLike } from "../connection-adapters/abstract/schema-statements-like.js";
 import { Table as PgTable } from "../connection-adapters/postgresql/schema-definitions.js";
 import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 
