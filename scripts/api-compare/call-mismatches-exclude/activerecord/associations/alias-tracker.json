@@ -8,18 +8,6 @@
     "rubyArgs": [
       "num:0"
     ],
-    "reason": "RFC 0099: alias_tracker.rb:12 builds `Hash.new(0)` — a hash with a DEFAULT-VALUE proc. A JS Map has no default, so the port carries the zero/initial-count default in `AliasTracker#_getCount` instead and this `new` has no counterpart argument. Converging needs a default-proc Map port; filed separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/alias-tracker.ts",
-    "rubyName": "create",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:tableAliasLength",
-      "ref:aliases"
-    ],
-    "reason": "alias_tracker.rb:24 `new(connection.table_alias_length, aliases)` — the alias counts Rails computes lazily through the Hash `default_proc` installed at lines 13-22 have no `Map` analogue, so trails carries `joins` and the quoter onto the tracker and computes the initial count in `_getCount` instead. The two extra arguments ARE the default_proc. Language shortcoming."
+    "reason": "alias_tracker.rb:14 builds `Hash.new(0)` — a hash with a DEFAULT-VALUE proc. A JS Map has no default, so the port passes the proc itself to the `AliasCounts` Map subclass that carries it; the literal `0` Rails passes has no counterpart argument."
   }
 ]

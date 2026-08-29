@@ -11,6 +11,7 @@ import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
 import {
+  AliasCounts,
   AliasTracker,
   aliasedArelTableFor,
   aliasedArelTableForReflection,
@@ -125,10 +126,7 @@ export class JoinDependency {
     this._baseModel = base;
     table ??= (base as any).arelTable;
     this._baseAlias = (table as any).name ?? (base as any).tableName;
-    this._aliasTracker = new AliasTracker(
-      this._baseTableAliasLength(),
-      new Map([[this._baseAlias, 1]]),
-    );
+    this._aliasTracker = new AliasTracker(this._baseTableAliasLength(), this._baseAliases());
     this._joinType = joinType ?? Nodes.OuterJoin;
     const tree = JoinDependency.makeTree(associations ?? []);
     this._joinRoot = new JoinBase(base, table as Table, this.build(tree, base));
@@ -256,10 +254,7 @@ export class JoinDependency {
     if (aliasTracker) {
       this._aliasTracker = aliasTracker;
     } else {
-      this._aliasTracker = new AliasTracker(
-        this._baseTableAliasLength(),
-        new Map([[this._baseAlias, 1]]),
-      );
+      this._aliasTracker = new AliasTracker(this._baseTableAliasLength(), this._baseAliases());
     }
     this._references = new Map();
     this._joinedTables = new Map();
@@ -647,6 +642,12 @@ export class JoinDependency {
   }
 
   /** @internal */
+  private _baseAliases(): AliasCounts {
+    const aliases = new AliasCounts(() => 0);
+    aliases.set(this._baseAlias, 1);
+    return aliases;
+  }
+
   private get aliasTracker(): AliasTracker {
     return this._aliasTracker;
   }

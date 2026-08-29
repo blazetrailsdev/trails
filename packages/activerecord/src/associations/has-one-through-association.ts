@@ -243,7 +243,7 @@ async function loadHasOneThrough(
     options.through!,
   ) as unknown as AssociationDefinition | null;
   if (!throughAssoc) {
-    throw _hmtNotFound(ctor, assocName, options.through!);
+    throw _hmtNotFound(ctor, assocName);
   }
 
   let throughRecord: Base | null;

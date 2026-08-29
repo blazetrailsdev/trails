@@ -70,7 +70,7 @@ import {
   DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
-import { AliasTracker } from "./associations/alias-tracker.js";
+import { AliasCounts, AliasTracker } from "./associations/alias-tracker.js";
 
 export type LoadedRelation<R> = Omit<R, "then">;
 
@@ -1470,7 +1470,7 @@ export class Relation<T extends Base> {
     return this.limitValue !== null || this.offsetValue !== null;
   }
 
-  aliasTracker(joins: Nodes.Node[] = [], aliases?: Map<string, number>): AliasTracker {
+  aliasTracker(joins: Nodes.Node[] = [], aliases?: AliasCounts): AliasTracker {
     return AliasTracker.create(
       this.model.connectionPool(),
       String(this.table.name),

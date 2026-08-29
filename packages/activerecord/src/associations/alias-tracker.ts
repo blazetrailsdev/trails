@@ -32,40 +32,62 @@ export function aliasedArelTableForReflection(
   return aliasedArelTableFor(klass, tableName, effectiveName);
 }
 
-export class AliasTracker {
-  readonly aliases: Map<string, number>;
-  private _tableAliasLength: number;
-  private _joins: any[];
-  private _connection?: Quoting;
+/** @noRailsEquivalent PERMANENT */
+export class AliasCounts extends Map<string, number> {
+  /** @noRailsEquivalent PERMANENT */
+  defaultProc: (h: AliasCounts, k: string) => number;
 
-  constructor(
-    tableAliasLength?: number,
-    aliases?: Map<string, number>,
-    joins?: any[],
-    connection?: Quoting,
-  ) {
-    this._tableAliasLength = tableAliasLength ?? DEFAULT_TABLE_ALIAS_LENGTH;
-    this.aliases = aliases ?? new Map();
-    this._joins = joins ?? [];
-    this._connection = connection;
+  constructor(defaultProc: (h: AliasCounts, k: string) => number) {
+    super();
+    this.defaultProc = defaultProc;
   }
 
-  /** @missingRailsCall initial_count_for — PERMANENT */
+  override get(key: string): number {
+    return super.has(key) ? super.get(key)! : this.defaultProc(this, key);
+  }
+}
+
+export class AliasTracker {
+  readonly aliases: AliasCounts;
+  private _tableAliasLength: number;
+
+  constructor(tableAliasLength?: number, aliases?: AliasCounts) {
+    this.aliases = aliases ?? new AliasCounts(() => 0);
+    this._tableAliasLength = tableAliasLength ?? DEFAULT_TABLE_ALIAS_LENGTH;
+  }
+
   static create(
     pool: any,
     initialTable: string,
     joins: any[],
-    aliases?: Map<string, number>,
+    aliases?: AliasCounts,
   ): AliasTracker {
     const connection =
       typeof pool?.tableAliasLength === "function"
         ? pool
         : (pool?.activeConnection ?? pool?.leaseConnectionSync?.());
-    const tableAliasLength = connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH;
 
-    const map = aliases ? new Map(aliases) : new Map<string, number>();
-    map.set(initialTable, 1);
-    return new AliasTracker(tableAliasLength, map, joins, connection);
+    if (joins.length === 0) {
+      aliases ??= new AliasCounts(() => 0);
+    } else if (aliases) {
+      const defaultProc = aliases.defaultProc;
+      aliases.defaultProc = (h, k) => {
+        const count = AliasTracker.initialCountFor(connection, k, joins) + defaultProc(h, k);
+        h.set(k, count);
+        return count;
+      };
+    } else {
+      aliases = new AliasCounts((h, k) => {
+        const count = AliasTracker.initialCountFor(connection, k, joins);
+        h.set(k, count);
+        return count;
+      });
+    }
+    aliases.set(initialTable, 1);
+    return new AliasTracker(
+      connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH,
+      aliases,
+    );
   }
 
   /** @missingRailsCall size — PERMANENT */
@@ -94,16 +116,6 @@ export class AliasTracker {
     return count;
   }
 
-  private _getCount(key: string): number {
-    if (this.aliases.has(key)) return this.aliases.get(key)!;
-    if (this._joins.length > 0) {
-      const count = AliasTracker.initialCountFor(this._connection, key, this._joins);
-      this.aliases.set(key, count);
-      return count;
-    }
-    return 0;
-  }
-
   aliasedTableFor(
     arelTable: Table | any,
     tableName: string | null = null,
@@ -111,7 +123,7 @@ export class AliasTracker {
   ): Table | any {
     tableName = (tableName ?? arelTable.name ?? String(arelTable)) as string;
 
-    if (this._getCount(tableName) === 0) {
+    if (this.aliases.get(tableName) === 0) {
       this.aliases.set(tableName, 1);
       if (arelTable.name !== tableName && typeof arelTable.alias === "function") {
         arelTable = arelTable.alias(tableName);
@@ -119,7 +131,7 @@ export class AliasTracker {
     } else {
       let aliasedName = this.tableAliasFor(block());
 
-      const count = this._getCount(aliasedName) + 1;
+      const count = this.aliases.get(aliasedName) + 1;
       this.aliases.set(aliasedName, count);
 
       if (count > 1) aliasedName = `${this.truncate(aliasedName)}_${count}`;
@@ -128,17 +140,6 @@ export class AliasTracker {
     }
 
     return arelTable;
-  }
-
-  aliasFor(tableName: string): string {
-    const count = this._getCount(tableName);
-    if (count === 0) {
-      this.aliases.set(tableName, 1);
-      return tableName;
-    }
-    const newCount = count + 1;
-    this.aliases.set(tableName, newCount);
-    return `${tableName}_${newCount}`;
   }
 
   private tableAliasFor(tableName: string): string {

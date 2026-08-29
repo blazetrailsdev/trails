@@ -10,17 +10,6 @@ import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
 import type { Nodes } from "@blazetrails/arel";
 
-const TRUSTED_CLONE = Symbol("DisableJoinsAssociationRelation.trustedClone");
-
-interface TrustedClonePayload<T extends Base> {
-  [TRUSTED_CLONE]: {
-    storedIds: DjarIds;
-    storedKeyStrings: string[] | null;
-    composite: boolean;
-    chainWalker?: () => Promise<{ relation: Relation<T> }>;
-  };
-}
-
 export type DjarKey = string | string[];
 export type DjarIds = unknown[] | unknown[][];
 
@@ -41,41 +30,16 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
 
   readonly key: DjarKey;
-  private readonly _storedIds: DjarIds;
-  private readonly _storedKeyStrings: string[] | null;
-  private readonly _composite: boolean;
-  private readonly _chainWalker?: () => Promise<{ relation: Relation<T> }>;
+  private _storedIds: DjarIds;
+  private _storedKeyStrings: string[] | null;
+  private _composite: boolean;
+  private _chainWalker?: () => Promise<{ relation: Relation<T> }>;
   private _walkPromise?: Promise<{ relation: Relation<T> }>;
 
   constructor(klass: typeof Base, key: string, ids: unknown[]);
   constructor(klass: typeof Base, key: string[], ids: unknown[][]);
-  constructor(
-    klass: typeof Base,
-    key: DjarKey,
-    ids: DjarIds,
-    chainWalkerOrTrusted: (() => Promise<{ relation: Relation<T> }>) | TrustedClonePayload<T>,
-  );
-  constructor(
-    klass: typeof Base,
-    key: DjarKey,
-    ids: DjarIds,
-    chainWalkerOrTrusted?: (() => Promise<{ relation: Relation<T> }>) | TrustedClonePayload<T>,
-  ) {
+  constructor(klass: typeof Base, key: DjarKey, ids: DjarIds) {
     super(klass);
-    if (
-      chainWalkerOrTrusted &&
-      typeof chainWalkerOrTrusted === "object" &&
-      TRUSTED_CLONE in chainWalkerOrTrusted
-    ) {
-      const t = chainWalkerOrTrusted[TRUSTED_CLONE];
-      this.key = key;
-      this._composite = t.composite;
-      this._storedIds = t.storedIds;
-      this._storedKeyStrings = t.storedKeyStrings;
-      this._chainWalker = t.chainWalker;
-      return;
-    }
-    const chainWalker = chainWalkerOrTrusted;
     if (!Array.isArray(ids)) {
       throw argumentError(
         `DisableJoinsAssociationRelation: ids must be an array (got ${ids === null ? "null" : typeof ids})`,
@@ -99,9 +63,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
           return id[0];
         });
       }
-    }
-    if (normalizedKey === "" && !chainWalker) {
-      throw argumentError("DisableJoinsAssociationRelation: key must not be empty");
     }
     this.key = normalizedKey;
     this._composite = Array.isArray(normalizedKey);
@@ -145,7 +106,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       this._storedIds = Array.from(new Set(scalarIds));
       this._storedKeyStrings = null;
     }
-    this._chainWalker = chainWalker;
   }
 
   static deferred<T extends Base>(
@@ -153,7 +113,9 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     chainWalker: () => Promise<{ relation: Relation<T> }>,
   ): DisableJoinsAssociationRelation<T> {
     const Ctor = disableJoinsAssociationRelationClassFor(klass);
-    return new Ctor(klass, "", [], chainWalker);
+    const relation = new Ctor(klass, "", []) as DisableJoinsAssociationRelation<T>;
+    relation._chainWalker = chainWalker;
+    return relation;
   }
 
   private _composeChainedState(walkerResult: Relation<T>): Relation<T> {
@@ -281,26 +243,19 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * @noRailsEquivalent PERMANENT
    */
   override clone(): Relation<T> {
-    const payload: TrustedClonePayload<T> = {
-      [TRUSTED_CLONE]: {
-        storedIds: this._storedIds,
-        storedKeyStrings: this._storedKeyStrings,
-        composite: this._composite,
-        chainWalker: this._chainWalker,
-      },
-    };
-    const trusted = payload as unknown as () => Promise<{ relation: Relation<T> }>;
     const Ctor = disableJoinsAssociationRelationClassFor(this.model);
-    const rel = (this._composite
-      ? new Ctor(this.model, this.key as string[], this._storedIds as unknown[][], trusted)
-      : new Ctor(
-          this.model,
-          this.key as string,
-          this._storedIds as unknown[],
-          trusted,
-        )) as unknown as Relation<T>;
+    const copy = new Ctor(this.model, this.key, []) as DisableJoinsAssociationRelation<T>;
+    copy._adoptNormalizedState(this);
+    const rel = copy as unknown as Relation<T>;
     rel.initializeCopy(this as unknown as Relation<T>);
     return wrapWithScopeProxy(rel);
+  }
+
+  private _adoptNormalizedState(source: DisableJoinsAssociationRelation<T>): void {
+    this._composite = source._composite;
+    this._storedIds = source._storedIds;
+    this._storedKeyStrings = source._storedKeyStrings;
+    this._chainWalker = source._chainWalker;
   }
 
   protected override async execQueries(): Promise<T[]> {

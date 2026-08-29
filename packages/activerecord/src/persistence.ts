@@ -1088,20 +1088,11 @@ export async function _createRecord(
   }
 
   const attrs = this._attributes.valuesForDatabase();
-  const selfNames =
-    attributeNames ?? this.attributeNames().filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
-  let names: string[];
-  if (ctor.partialInserts) {
-    const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
-    names = changed ?? selfNames;
-  } else {
-    names = selfNames.filter((name) => {
-      const col = ctor.columnForAttribute?.(name);
-      const autoPopulated = col?.isAutoPopulated?.() ?? col?.defaultFunction != null;
-      return !(autoPopulated && !(this as any).attributeChanged?.(name));
-    });
-  }
-  names = LockingOptimistic._createRecord.call(this as any, names, (n: string[]) => n) as string[];
+  const names = LockingOptimistic._createRecord.call(
+    this as any,
+    attributeNames ?? this.attributeNames(),
+    (n: string[]) => n,
+  ) as string[];
   const columns = attributesForCreate.call(this as any, names);
 
   await withConnection.call(ctor as unknown as typeof Base, async (connection) => {

@@ -585,7 +585,7 @@ async function loadHasManyThrough(
     options.through!,
   ) as unknown as AssociationDefinition | null;
   if (!throughAssoc) {
-    throw _hmtNotFound(ctor, assocName, options.through!);
+    throw _hmtNotFound(ctor, assocName);
   }
   if (!targetReflectionHasAssociatedRecord(record, throughAssoc)) return [];
 

@@ -10,17 +10,33 @@ function withCorrections(message: string, corrections: string[]): string {
 
 export class AssociationNotFoundError extends ConfigurationError {
   readonly record: any;
-  readonly associationName: string;
-  readonly corrections: string[];
+  readonly associationName: string | null;
+  private _corrections?: string[];
 
-  constructor(record: any, associationName: string, corrections: string[] = []) {
-    super(
-      `Association named '${associationName}' was not found on ${record?.constructor?.name ?? record}; perhaps you misspelled it?`,
-    );
+  constructor(record: any = null, associationName: string | null = null) {
+    if (record && associationName) {
+      super(
+        `Association named '${associationName}' was not found on ${record?.constructor?.name ?? record}; perhaps you misspelled it?`,
+      );
+    } else {
+      super("Association was not found.");
+    }
     this.name = "AssociationNotFoundError";
     this.record = record;
     this.associationName = associationName;
-    this.corrections = corrections;
+  }
+
+  get corrections(): string[] {
+    if (this.record && this.associationName) {
+      if (!this._corrections) {
+        const maybeThese = Object.keys(this.record.constructor.reflections());
+        this._corrections = new SpellChecker({ dictionary: maybeThese }).correct(
+          this.associationName,
+        );
+      }
+      return this._corrections;
+    }
+    return [];
   }
 
   detailedMessage(): string {
@@ -115,22 +131,54 @@ export class InverseOfAssociationRecursiveError extends ActiveRecordError {
   }
 }
 
+/** @internal */
+export interface HasManyThroughOwnerClass {
+  readonly name: string;
+  reflections(): Readonly<Record<string, unknown>>;
+}
+
+/** @internal */
+export interface HasManyThroughReflection {
+  readonly name: string;
+  readonly options: Record<string, unknown>;
+}
+
 export class HasManyThroughAssociationNotFoundError extends ActiveRecordError {
-  readonly ownerClass: string;
-  readonly reflection: string;
-  readonly corrections: string[];
+  readonly ownerClass: HasManyThroughOwnerClass | null;
+  readonly reflection: HasManyThroughReflection | null;
+  private _corrections?: string[];
 
   constructor(
-    owner: string,
-    through: string,
-    reflection: string = through,
-    corrections: string[] = [],
+    ownerClass: HasManyThroughOwnerClass | null = null,
+    reflection: HasManyThroughReflection | null = null,
   ) {
-    super(`Could not find the association :${through} in model ${owner}`);
+    if (ownerClass && reflection) {
+      super(
+        `Could not find the association :${String(reflection.options["through"])} in model ${ownerClass.name}`,
+      );
+      this.ownerClass = ownerClass;
+      this.reflection = reflection;
+    } else {
+      super("Could not find the association.");
+      this.ownerClass = null;
+      this.reflection = null;
+    }
     this.name = "HasManyThroughAssociationNotFoundError";
-    this.ownerClass = owner;
-    this.reflection = reflection;
-    this.corrections = corrections;
+  }
+
+  get corrections(): string[] {
+    if (this.ownerClass && this.reflection) {
+      if (!this._corrections) {
+        const maybeThese = Object.keys(this.ownerClass.reflections()).filter(
+          (n) => n !== this.reflection!.name,
+        );
+        this._corrections = new SpellChecker({ dictionary: maybeThese }).correct(
+          String(this.reflection.options["through"] ?? ""),
+        );
+      }
+      return this._corrections;
+    }
+    return [];
   }
 
   detailedMessage(): string {

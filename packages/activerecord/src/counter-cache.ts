@@ -187,6 +187,7 @@ type InstanceCounterHost = {
   constructor: typeof Base;
   destroyedByAssociation: unknown;
   association(name: string): any;
+  attributeNames(): string[];
 };
 
 function derivedForeignKey(
@@ -203,9 +204,11 @@ function derivedForeignKey(
 /** @internal */
 export async function _createRecord(
   this: InstanceCounterHost,
-  superFn: () => Promise<unknown>,
+  attributeNames: string[] | undefined,
+  superFn: (attributeNames: string[]) => Promise<unknown>,
 ): Promise<unknown> {
-  const id = await superFn();
+  attributeNames ??= this.attributeNames();
+  const id = await superFn(attributeNames);
   for (const associationName of this.constructor.counterCachedAssociationNames) {
     await this.association(associationName).incrementCounters();
   }

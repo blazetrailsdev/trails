@@ -120,11 +120,47 @@ function rubyForms(ruby: ParamInfo[]): ParamInfo[][] {
   return collapsed ? [positional, collapsed] : [positional];
 }
 
+/** Is this an ANONYMOUS splat — Ruby's `*` / `**` with no name after the sigil?
+ *  `def initialize(*, serial: nil, **)`
+ *  (`connection_adapters/postgresql/column.rb:9`) forwards its whole positional
+ *  list to `super` without naming any of it, and TypeScript has no forwarding
+ *  form: the port has to spell every forwarded parameter out. So the one Ruby
+ *  slot stands for however many TS slots precede the kwargs. */
+function isAnonymousSplat(p: ParamInfo): boolean {
+  return (p.kind === "rest" || p.kind === "keyword_rest") && !isIdentifier(p.name);
+}
+
+/** `rubyList` resized so its anonymous splat covers exactly `length` TS slots —
+ *  the splat repeated as many times as the port spells out, or — for `**` only
+ *  — dropped when the port spells none (`initialize(klass, association, **)`
+ *  (`associations/collection_proxy.rb:32`) against a two-parameter TS
+ *  constructor). Null when the two cannot be lined up that way: no anonymous
+ *  splat, more than one (which of them absorbs the surplus would be a guess),
+ *  or a length no re-spelling of the splat reaches. An anonymous slot never
+ *  carries a name, so every position it covers is exempt by
+ *  {@link isLegitimateDifference} and no rename can hide inside the resize. */
+function widenAnonymousSplat(rubyList: ParamInfo[], length: number): ParamInfo[] | null {
+  const copies = length - rubyList.length + 1;
+  if (copies === 1 || copies < 0) return null;
+  const splats = rubyList.filter(isAnonymousSplat);
+  if (splats.length !== 1) return null;
+  const at = rubyList.findIndex(isAnonymousSplat);
+  // Dropping the slot entirely is only for `**`: a port that spells no kwargs
+  // bag has declined one. A positional `*` folded into a JS rest parameter is
+  // the port's own convention, and reading it as absent would line the rest
+  // parameter up against whatever Ruby names AFTER the splat.
+  if (copies === 0 && rubyList[at].kind !== "keyword_rest") return null;
+  const filler = Array<ParamInfo>(copies).fill(rubyList[at]);
+  return [...rubyList.slice(0, at), ...filler, ...rubyList.slice(at + 1)];
+}
+
 /** Every TS candidate form that lines up with `rubyList` position-for-position.
  *  Empty when none does — a length disagreement is arity's finding. */
 export function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): ParamInfo[][] {
   if (rubyList.length === 0) return [];
-  return tsForms(ts).filter((f) => f.length === rubyList.length);
+  return tsForms(ts).filter(
+    (f) => f.length === rubyList.length || widenAnonymousSplat(rubyList, f.length) !== null,
+  );
 }
 
 /** The TS candidate forms, in the order arity.ts tries them. */
@@ -151,8 +187,9 @@ export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamName
   // `(node)`. The strips exist to ABSORB the port's conventions, so the reading
   // that absorbs the most is the honest one; taking the first would invent a
   // rename out of the very convention the strip is there to recognise.
-  for (const rubyList of rubyForms(ruby)) {
-    for (const form of alignedTsForms(rubyList, ts)) {
+  for (const base of rubyForms(ruby)) {
+    for (const form of alignedTsForms(base, ts)) {
+      const rubyList = form.length === base.length ? base : widenAnonymousSplat(base, form.length)!;
       const mismatches: ParamNameMismatch[] = [];
       for (let position = 0; position < rubyList.length; position++) {
         const rubyParam = rubyList[position];

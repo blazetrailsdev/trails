@@ -5,13 +5,13 @@ import {
   HasManyThroughAssociationNotFoundError,
   InverseOfAssociationNotFoundError,
 } from "./errors.js";
-import { _associationNotFound } from "../associations.js";
 
 describe("AssociationErrors", () => {
   it("AssociationNotFoundError keeps the suggestion out of message but in detailedMessage", () => {
-    const err = new AssociationNotFoundError({ constructor: { name: "Post" } }, "taggingz", [
-      "tagging",
-    ]);
+    const err = new AssociationNotFoundError(
+      { constructor: { name: "Post", reflections: () => ({ tagging: {}, comments: {} }) } },
+      "taggingz",
+    );
     expect(err.message).toMatch(
       /Association named 'taggingz' was not found on Post; perhaps you misspelled it\?/,
     );
@@ -21,35 +21,24 @@ describe("AssociationErrors", () => {
   });
 
   it("AssociationNotFoundError.detailedMessage equals message when there are no corrections", () => {
-    const err = new AssociationNotFoundError({ constructor: { name: "Post" } }, "taggingz");
+    const err = new AssociationNotFoundError(
+      { constructor: { name: "Post", reflections: () => ({}) } },
+      "taggingz",
+    );
     expect(err.corrections).toEqual([]);
     expect(err.detailedMessage()).toBe(err.message);
   });
 
-  it("_associationNotFound spell-checks the name against declared association names", () => {
-    const record = {
-      constructor: {
-        _reflections: { tagging: { name: "tagging" }, comments: { name: "comments" } },
-      },
-    } as any;
-    const err = _associationNotFound(record, "taggingz");
-    expect(err).toBeInstanceOf(AssociationNotFoundError);
-    expect(err.corrections).toContain("tagging");
-    expect(err.detailedMessage()).toContain("Did you mean?  tagging");
-  });
-
   it("HasManyThroughAssociationNotFoundError exposes ownerClass and reflection", () => {
-    const err = new HasManyThroughAssociationNotFoundError("Author", "memberships", "posts");
+    const ownerClass = { name: "Author", reflections: () => ({ memberships: {}, posts: {} }) };
+    const reflection = { name: "posts", options: { through: "membershipz" } };
+    const err = new HasManyThroughAssociationNotFoundError(ownerClass, reflection);
     expect(err).toBeInstanceOf(Error);
-    expect(err.ownerClass).toBe("Author");
-    expect(err.reflection).toBe("posts");
-    expect(err.message).toMatch(/memberships/);
+    expect(err.ownerClass).toBe(ownerClass);
+    expect(err.reflection).toBe(reflection);
+    expect(err.message).toMatch(/membershipz/);
     expect(err.message).toMatch(/Author/);
-  });
-
-  it("HasManyThroughAssociationNotFoundError reflection defaults to through when unspecified", () => {
-    const err = new HasManyThroughAssociationNotFoundError("Author", "memberships");
-    expect(err.reflection).toBe("memberships");
+    expect(err.corrections).toContain("memberships");
   });
 
   it("InverseOfAssociationNotFoundError exposes associatedClass when provided", () => {

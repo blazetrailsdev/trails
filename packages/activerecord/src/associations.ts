@@ -1,7 +1,6 @@
 import type { Base } from "./base.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
-import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
@@ -20,7 +19,11 @@ export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementCache } from "./statement-cache.js";
-import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
+import {
+  HasManyThroughAssociationNotFoundError,
+  type HasManyThroughOwnerClass,
+  type HasManyThroughReflection,
+} from "./associations/errors.js";
 import {
   AssociationNotFoundError,
   InverseOfAssociationNotFoundError,
@@ -324,23 +327,11 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 export function _hmtNotFound(
   ctor: typeof Base,
   assocName: string,
-  through: string,
 ): HasManyThroughAssociationNotFoundError {
-  const dictionary = Object.keys(Reflection.reflections(ctor)).filter((n) => n !== assocName);
-  const corrections = _correctNames(dictionary, through);
-  return new HasManyThroughAssociationNotFoundError(ctor.name, through, assocName, corrections);
-}
-
-/** @internal */
-export function _associationNotFound(record: Base, name: string): AssociationNotFoundError {
-  const dictionary = Object.keys(Reflection.reflections(record.constructor as typeof Base));
-  const corrections = _correctNames(dictionary, name);
-  return new AssociationNotFoundError(record, name, corrections);
-}
-
-/** @internal */
-export function _correctNames(dictionary: string[], input: string): string[] {
-  return new SpellChecker({ dictionary }).correct(input);
+  return new HasManyThroughAssociationNotFoundError(
+    ctor as unknown as HasManyThroughOwnerClass,
+    ctor._reflectOnAssociation(assocName) as unknown as HasManyThroughReflection,
+  );
 }
 
 export class Associations {
@@ -807,7 +798,7 @@ export function association<T extends Base = Base>(
   const ctor = record.constructor as typeof Base;
   const assocDef = ctor._reflectOnAssociation(assocName) as unknown as AssociationDefinition | null;
   if (!assocDef) {
-    throw _associationNotFound(record, assocName);
+    throw new AssociationNotFoundError(record, assocName);
   }
   validateThroughReflection(ctor, assocName);
   const instance = record.association(assocName) as unknown as { isCollection(): boolean };

@@ -6,11 +6,8 @@ import { HasManyAssociation } from "./has-many-association.js";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { HasOneAssociation } from "./has-one-association.js";
 import { HasOneThroughAssociation } from "./has-one-through-association.js";
-import {
-  _associationNotFound,
-  associationInstanceGet,
-  type AssociationDefinition as AssocDef,
-} from "../associations.js";
+import { associationInstanceGet, type AssociationDefinition as AssocDef } from "../associations.js";
+import { AssociationNotFoundError } from "./errors.js";
 
 /** @internal */
 export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
@@ -61,7 +58,7 @@ function assertSingularAssociation(
   const ctor = this.constructor as typeof Base;
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as AssocDef | null;
   if (!assocDef) {
-    throw _associationNotFound(this, name);
+    throw new AssociationNotFoundError(this, name);
   }
   if (assocDef.macro !== expected) {
     if (assocDef.macro === "hasMany" || assocDef.macro === "hasAndBelongsToMany") {
@@ -97,7 +94,7 @@ export function association(this: Base, name: string): AssociationInstance {
   const ctor = this.constructor as typeof Base;
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as AssocDef | undefined;
   if (!assocDef) {
-    throw _associationNotFound(this, name);
+    throw new AssociationNotFoundError(this, name);
   }
 
   const instance = _buildAssociationInstance.call(this, assocDef);

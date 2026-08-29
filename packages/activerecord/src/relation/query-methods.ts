@@ -21,7 +21,7 @@ import { FromClause } from "./from-clause.js";
 import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import { JoinDependency } from "../associations/join-dependency.js";
-import type { AliasTracker } from "../associations/alias-tracker.js";
+import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
 import {
@@ -243,7 +243,7 @@ interface QueryMethodsHost {
   createWithValue: Record<string, unknown>;
   skipQueryCacheValue: boolean | null;
   _isNone: boolean;
-  aliasTracker(joins?: Nodes.Node[], aliases?: Map<string, number>): AliasTracker;
+  aliasTracker(joins?: Nodes.Node[], aliases?: AliasCounts): AliasTracker;
   clone(): any;
   spawn(): any;
   /** @internal */

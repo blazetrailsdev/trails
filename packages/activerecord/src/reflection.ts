@@ -16,7 +16,6 @@ import {
   merge,
 } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
-import { _correctNames } from "./associations.js";
 import { deriveJoinTableName } from "./model-schema.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
@@ -1483,12 +1482,7 @@ export class ThroughReflection extends AbstractReflection {
 
   checkValidityBang(): void {
     if (!this.throughReflection) {
-      throw new HasManyThroughAssociationNotFoundError(
-        this.activeRecord.name,
-        this.through,
-        this.name,
-        this._throughCorrections(),
-      );
+      throw new HasManyThroughAssociationNotFoundError(this.activeRecord as any, this as any);
     }
 
     if (this.throughReflection.isPolymorphic()) {
@@ -1581,14 +1575,6 @@ export class ThroughReflection extends AbstractReflection {
   /** @internal */
   protected deriveClassName(): string {
     return (this.options.sourceType as string) || (this.sourceReflection as any)?.className || "";
-  }
-
-  /** @internal */
-  private _throughCorrections(): string[] {
-    const rawReflections: Record<string, unknown> =
-      (this.activeRecord as { _reflections?: Record<string, unknown> })._reflections ?? {};
-    const dictionary = Object.keys(rawReflections).filter((k) => k !== this.name);
-    return _correctNames(dictionary, this.through);
   }
 
   /** @internal */
