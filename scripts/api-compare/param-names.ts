@@ -34,6 +34,8 @@ const RESERVED_RUBY_PARAM_NAMES = new Set([
       return super switch this throw true try typeof var void while with`.split(/\s+/),
   // Reserved only in strict mode — which every module is.
   ...`implements interface let package private protected public static yield`.split(/\s+/),
+  // Not reserved words, but binding either is a SyntaxError in strict mode.
+  ...`arguments eval`.split(/\s+/),
 ]);
 
 /** TS names a Ruby splat/kwarg group is conventionally collapsed into. The port

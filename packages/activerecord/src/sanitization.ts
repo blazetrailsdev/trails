@@ -108,22 +108,22 @@ export function disallowRawSqlBang(
   }
 }
 
-export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
-  if (escapeChar === "") return value;
-  const escapedEsc = escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (escapeChar !== "%" && escapeChar !== "_") {
-    return value.replace(new RegExp(`${escapedEsc}|[%_]`, "g"), (c) => escapeChar + c);
+export function sanitizeSqlLike(string: string, escapeCharacter: string = "\\"): string {
+  if (escapeCharacter === "") return string;
+  const escapedEsc = escapeCharacter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (escapeCharacter !== "%" && escapeCharacter !== "_") {
+    return string.replace(new RegExp(`${escapedEsc}|[%_]`, "g"), (c) => escapeCharacter + c);
   }
-  return value.replace(/[%_]/g, (c) => escapeChar + c);
+  return string.replace(/[%_]/g, (c) => escapeCharacter + c);
 }
 
 export function sanitizeSql(
   this: { sanitizeSqlArray(template: string, ...binds: unknown[]): string },
-  input: string | [string, ...unknown[]] | null | undefined,
+  condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
-  if (isBlankCondition(input)) return null;
-  if (typeof input === "string") return input;
-  const [template, ...binds] = input as [string, ...unknown[]];
+  if (isBlankCondition(condition)) return null;
+  if (typeof condition === "string") return condition;
+  const [template, ...binds] = condition as [string, ...unknown[]];
   return this.sanitizeSqlArray(template, ...binds);
 }
 
@@ -153,7 +153,7 @@ export function sanitizeSqlArray(this: QuoterHost, template: string, ...binds: u
 
 export function sanitizeSqlForConditions(
   this: QuoterHost & {
-    sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
+    sanitizeSql(condition: string | [string, ...unknown[]] | null | undefined): string | null;
   },
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
@@ -164,7 +164,7 @@ export function sanitizeSqlForConditions(
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
     tableName?: string;
-    sanitizeSql(input: string | [string, ...unknown[]] | null | undefined): string | null;
+    sanitizeSql(condition: string | [string, ...unknown[]] | null | undefined): string | null;
     sanitizeSqlHashForAssignment(
       attrs: Record<string, unknown>,
       table: string,

@@ -116,8 +116,8 @@ export class DatabaseTasks {
     handler: DatabaseTaskHandler;
   }> = [];
 
-  static registerTask(pattern: RegExp | string, handler: DatabaseTaskHandler): void {
-    this._registeredTasks.push({ pattern, handler });
+  static registerTask(pattern: RegExp | string, task: DatabaseTaskHandler): void {
+    this._registeredTasks.push({ pattern, handler: task });
   }
 
   /** @internal */
@@ -556,12 +556,12 @@ export class DatabaseTasks {
 
   static async structureDump(
     configuration: DatabaseConfig | string | Record<string, unknown>,
-    filename: string,
-    root?: string,
+    ...args: unknown[]
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
+    const filename = args.shift() as string;
     const flags = this.structureDumpFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig, ...(root === undefined ? [] : [root]));
+    const handler = this.databaseAdapterFor(dbConfig, ...args);
     if (!handler.structureDump) {
       throw new Error(`Adapter '${dbConfig.adapter}' does not support structureDump`);
     }
@@ -570,12 +570,12 @@ export class DatabaseTasks {
 
   static async structureLoad(
     configuration: DatabaseConfig | string | Record<string, unknown>,
-    filename: string,
-    root?: string,
+    ...args: unknown[]
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
+    const filename = args.shift() as string;
     const flags = this.structureLoadFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig, ...(root === undefined ? [] : [root]));
+    const handler = this.databaseAdapterFor(dbConfig, ...args);
     if (!handler.structureLoad) {
       throw new Error(`Adapter '${dbConfig.adapter}' does not support structureLoad`);
     }

@@ -11,29 +11,30 @@ export class UrlConfig extends HashConfig {
     envName: string,
     name: string,
     url: string,
-    configuration: DatabaseConfigOptions = {},
+    configurationHash: DatabaseConfigOptions = {},
   ) {
-    super(envName, name, configuration);
+    super(envName, name, configurationHash);
 
     this.url = url;
-    const configurationHash: Record<string, unknown> = {
+    configurationHash = {
       ...this.configurationHash,
       ...this.buildUrlHash(),
     };
-    camelizeUrlKeys(configurationHash);
+    const hash = configurationHash as Record<string, unknown>;
+    camelizeUrlKeys(hash);
 
-    if (configurationHash.schemaDump === "false") {
-      configurationHash.schemaDump = false;
+    if (hash.schemaDump === "false") {
+      hash.schemaDump = false;
     }
 
-    if (configurationHash.queryCache === "false") {
-      configurationHash.queryCache = false;
+    if (hash.queryCache === "false") {
+      hash.queryCache = false;
     }
 
-    toBooleanBang(configurationHash, "replica");
-    toBooleanBang(configurationHash, "databaseTasks");
+    toBooleanBang(hash, "replica");
+    toBooleanBang(hash, "databaseTasks");
 
-    _setConfigurationHash(this, configurationHash as DatabaseConfigOptions);
+    _setConfigurationHash(this, hash as DatabaseConfigOptions);
   }
 
   /** @internal */

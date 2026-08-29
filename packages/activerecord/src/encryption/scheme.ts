@@ -113,8 +113,8 @@ export class Scheme {
         (this.deterministic.fixed != null && this.deterministic.fixed !== false)));
   }
 
-  merge(other: Scheme): Scheme {
-    return new Scheme({ ...this.toH(), ...other.toH() });
+  merge(otherScheme: Scheme): Scheme {
+    return new Scheme({ ...this.toH(), ...otherScheme.toH() });
   }
 
   withContext<T>(fn: () => T): T {
@@ -124,8 +124,8 @@ export class Scheme {
     return fn();
   }
 
-  isCompatibleWith(other: Scheme): boolean {
-    return this.isDeterministic() === other.isDeterministic();
+  isCompatibleWith(otherScheme: Scheme): boolean {
+    return this.isDeterministic() === otherScheme.isDeterministic();
   }
 
   toH(): SchemeOptions {

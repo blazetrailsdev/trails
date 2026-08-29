@@ -146,8 +146,8 @@ export async function resetCounters(
   }
 }
 
-export function isCounterCacheColumn(this: typeof Base, columnName: string): boolean {
-  return this._counterCacheColumns.includes(columnName);
+export function isCounterCacheColumn(this: typeof Base, name: string): boolean {
+  return this._counterCacheColumns.includes(name);
 }
 
 export function loadSchemaBang(this: typeof Base, superFn: () => void): void {

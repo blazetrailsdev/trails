@@ -441,10 +441,10 @@ export function columnForAttribute(this: SchemaHost, name: string): any {
   return name in hash ? hash[name] : new NullColumn(name);
 }
 
-export function symbolColumnToString(this: SchemaHost, name: string): string | undefined {
+export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | undefined {
   loadSchema.call(this);
   const hash = getColumnsHash(this);
-  return hash[name] ? name : undefined;
+  return hash[nameSymbol] ? nameSymbol : undefined;
 }
 
 function clearAdapterDataSourceCache(host: SchemaHost): void {

@@ -498,12 +498,14 @@ function stiColumnIsAttribute(
 }
 
 /** @internal */
-export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
+export function typeCondition(
+  modelClass: typeof Base,
+  table: any = (modelClass as any).arelTable,
+): any {
   const inheritCol = modelClass.inheritanceColumn;
   if (inheritCol === null) {
     throw new ActiveRecordError("Cannot build type condition without an inheritance column");
   }
-  const table = arelTable || (modelClass as any).arelTable;
   if (!table) throw new ActiveRecordError("Cannot build type condition without arel table");
 
   const stiColumn = typeof table.get === "function" ? table.get(inheritCol) : table[inheritCol];

@@ -136,7 +136,7 @@ export class EncryptableRecord {
   static overrideAccessorsToPreserveOriginal(
     modelClass: any,
     name: string,
-    originalName: string,
+    originalAttributeName: string,
   ): void {
     if (typeof modelClass.beforeSave === "function") {
       modelClass.beforeSave((record: any) => {
@@ -146,19 +146,19 @@ export class EncryptableRecord {
           ? record.changedAttributeNamesToSave
           : [];
         if (!isNew && !changed.includes(name)) return;
-        record.writeAttribute(originalName, record.readAttribute(name));
+        record.writeAttribute(originalAttributeName, record.readAttribute(name));
       });
     }
     Object.defineProperty(modelClass.prototype, name, {
       configurable: true,
       get(this: any) {
-        const originalValue = this.readAttribute(originalName);
+        const originalValue = this.readAttribute(originalAttributeName);
         if (originalValue != null) return originalValue;
         return this.readAttribute(name);
       },
       set(this: any, value: unknown) {
         this.writeAttribute(name, value);
-        this.writeAttribute(originalName, value);
+        this.writeAttribute(originalAttributeName, value);
       },
     });
   }

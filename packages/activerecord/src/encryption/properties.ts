@@ -46,8 +46,11 @@ export class Properties {
     return this._data.has(key);
   }
 
-  add(props: Record<string, unknown> | Properties): void {
-    const entries = props instanceof Properties ? props.entries() : Object.entries(props);
+  add(otherProperties: Record<string, unknown> | Properties): void {
+    const entries =
+      otherProperties instanceof Properties
+        ? otherProperties.entries()
+        : Object.entries(otherProperties);
     for (const [key, value] of entries) {
       this.set(key, value);
     }
