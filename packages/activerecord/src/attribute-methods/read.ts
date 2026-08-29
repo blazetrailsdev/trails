@@ -38,10 +38,10 @@ interface ReadAttributeHost {
 
 export function _readAttribute(
   this: AttributeHolder,
-  name: string,
+  attrName: string,
   block?: (name: string) => unknown,
 ): unknown {
-  return this._attributes.fetchValue(name, block) ?? null;
+  return this._attributes.fetchValue(attrName, block) ?? null;
 }
 
 /** @internal */

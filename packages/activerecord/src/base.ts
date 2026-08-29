@@ -968,7 +968,7 @@ export class Base extends Model {
   }
 
   static async establishConnection(
-    config?:
+    configOrEnv?:
       | string
       | DatabaseConfig
       | {
@@ -982,7 +982,7 @@ export class Base extends Model {
           [key: string]: unknown;
         },
   ): Promise<void> {
-    return ConnectionHandling.establishConnection(this, config);
+    return ConnectionHandling.establishConnection(this, configOrEnv);
   }
 
   declare static connectsTo: typeof ConnectionHandling.connectsTo;
@@ -2236,7 +2236,7 @@ export class Base extends Model {
 
   declare inspect: () => string;
   declare prettyPrint: typeof _Core.prettyPrint;
-  declare attributeForInspect: (attr: string) => string;
+  declare attributeForInspect: (attrName: string) => string;
 
   toGid(
     options?: import("@blazetrails/globalid").GlobalIDOptions,
@@ -2295,16 +2295,16 @@ export class Base extends Model {
   declare touchLater: typeof TouchLater.touchLater;
   declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
 
-  declare hasAttribute: (name: string) => boolean;
-  declare attributePresent: (name: string) => boolean;
-  declare readAttributeBeforeTypeCast: (name: string) => unknown;
+  declare hasAttribute: (attrName: string) => boolean;
+  declare attributePresent: (attrName: string) => boolean;
+  declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
   declare attributesBeforeTypeCast: () => Record<string, unknown>;
   declare typeForAttribute: (name: string, block?: () => Type) => Type;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
-  declare queryAttribute: (name: string) => boolean;
-  declare _queryAttribute: (name: string) => boolean;
+  declare queryAttribute: (attrName: string) => boolean;
+  declare _queryAttribute: (attrName: string) => boolean;
   declare readAttribute: (name: string, block?: (name: string) => unknown) => unknown;
   declare get: (attrName: string) => unknown;
   declare set: (attrName: string, value: unknown) => void;
@@ -2685,8 +2685,8 @@ export class Base extends Model {
     return `${name}(${attrList})`;
   }
 
-  static hasAttribute(name: string): boolean {
-    let attrName = String(name);
+  static hasAttribute(attrName: string): boolean {
+    attrName = String(attrName);
     attrName = this.attributeAliases[attrName] ?? attrName;
     return Object.hasOwn(this.attributeTypes(), attrName);
   }

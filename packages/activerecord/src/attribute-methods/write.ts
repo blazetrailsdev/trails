@@ -43,8 +43,8 @@ export function writeAttribute(this: WriteRecord, attrName: string, value: unkno
   this._attributes.writeFromUser(name, value);
 }
 
-export function _writeAttribute(this: WriteRecord, name: string, value: unknown): void {
-  this._attributes.writeFromUser(name, value);
+export function _writeAttribute(this: WriteRecord, attrName: string, value: unknown): void {
+  this._attributes.writeFromUser(attrName, value);
 }
 
 /** @internal */

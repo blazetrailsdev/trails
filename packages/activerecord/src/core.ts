@@ -272,7 +272,7 @@ export function initWithAttributes(
 
 export function initAttributes(
   this: CoreRecord & { _attributes: any; constructor: { primaryKey?: string | string[] } },
-  _other: unknown,
+  _: unknown,
 ): any {
   const attrs = this._attributes.deepDup();
   const primaryKey = this.constructor.primaryKey;
