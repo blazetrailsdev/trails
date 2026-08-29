@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import {
@@ -24,6 +24,7 @@ import { Category } from "./test-helpers/models/category.js";
 import { Computer } from "./test-helpers/models/computer.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
+import { CpkOrder } from "./test-helpers/models/cpk.js";
 
 registerModel([Developer, AuditLog, AuditLogRequired]);
 
@@ -97,10 +98,16 @@ describe("AttributeMethodsTest", () => {
   const { topics } = fixtures(["topics", "developers", "companies", "computers"]);
 
   let target: typeof Base;
+  let oldMatchers: (typeof Base)["attributeMethodPatterns"];
 
   beforeEach(() => {
+    oldMatchers = [...Base.attributeMethodPatterns];
     target = class extends Base {};
     target.tableName = "topics";
+  });
+
+  afterEach(() => {
+    Base.attributeMethodPatterns = oldMatchers;
   });
 
   it("attribute keys on a new instance", async () => {
@@ -320,9 +327,10 @@ describe("AttributeMethodsTest", () => {
   }
 
   it("aliasing `id` attribute allows reading the column value for a CPK model", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_id" });
-    expect(p.id).toBeDefined();
+    const order = (await CpkOrder.create({ id: [1, 123_456] } as any)) as any;
+
+    expect(order.id_value).not.toBeNull();
+    expect(order.id_value).toBe(123_456);
   });
   it("#id_value alias is not defined if id column doesn't exist", async () => {
     class Keyboard extends Base {
@@ -409,19 +417,57 @@ describe("AttributeMethodsTest", () => {
     expect(topic.titleHelloWorld).toBeUndefined();
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "prefixed" });
-    expect(p.title).toBe("prefixed");
+    const topic = new target({ title: "Budget" } as any) as any;
+    for (const prefix of ["default_", "title_"]) {
+      target.attributeMethodPrefix(prefix);
+      const pattern = target.attributeMethodPatterns.at(-1)!;
+      (target.prototype as any)[pattern.proxyTarget] = function (...args: unknown[]) {
+        return args;
+      };
+      target.defineAttributeMethods();
+
+      const meth = pattern.methodName("title");
+      expect(topic.respondTo(meth)).toBe(true);
+      expect(topic[meth]()).toEqual(["title"]);
+      expect(topic[meth]("a")).toEqual(["title", "a"]);
+      expect(topic[meth](1, 2, 3)).toEqual(["title", 1, 2, 3]);
+    }
   });
   it("declared suffixed attribute method affects respond_to? and method_missing", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "suffixed" });
-    expect(p.title).toBe("suffixed");
+    for (const suffix of ["_default", "_title_default", "_it!", "_candidate=", "able?"]) {
+      target.attributeMethodSuffix(suffix);
+      const pattern = target.attributeMethodPatterns.at(-1)!;
+      (target.prototype as any)[pattern.proxyTarget] = function (...args: unknown[]) {
+        return args;
+      };
+      const topic = new target({ title: "Budget" } as any) as any;
+
+      const meth = pattern.methodName("title");
+      expect(topic.respondTo(meth)).toBe(true);
+      expect(topic[meth]()).toEqual(["title"]);
+      expect(topic[meth]("a")).toEqual(["title", "a"]);
+      expect(topic[meth](1, 2, 3)).toEqual(["title", 1, 2, 3]);
+    }
   });
   it("declared affixed attribute method affects respond_to? and method_missing", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "affixed" });
-    expect(p.title).toBe("affixed");
+    for (const [prefix, suffix] of [
+      ["mark_", "_for_update"],
+      ["reset_", "!"],
+      ["default_", "_value?"],
+    ]) {
+      target.attributeMethodAffix({ prefix, suffix });
+      const pattern = target.attributeMethodPatterns.at(-1)!;
+      (target.prototype as any)[pattern.proxyTarget] = function (...args: unknown[]) {
+        return args;
+      };
+      const topic = new target({ title: "Budget" } as any) as any;
+
+      const meth = pattern.methodName("title");
+      expect(topic.respondTo(meth)).toBe(true);
+      expect(topic[meth]()).toEqual(["title"]);
+      expect(topic[meth]("a")).toEqual(["title", "a"]);
+      expect(topic[meth](1, 2, 3)).toEqual(["title", 1, 2, 3]);
+    }
   });
   it("should unserialize attributes for frozen records", async () => {
     const myobj = { value1: "value2" };
@@ -771,9 +817,13 @@ describe("AttributeMethodsTest", () => {
     expect(((await Klass.find(realTopic.id)) as any)["title?"]).toBe(!realTopic["title?"]);
   });
   it("calling super when the parent does not define method raises NoMethodError", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "super_nm" });
-    expect(p.id).toBeDefined();
+    const klass = newTopicLikeArClass((klass) => {
+      (klass.prototype as any).someMethodThatIsNotOnSuper = function (this: Base): unknown {
+        return Object.getPrototypeOf(klass.prototype).someMethodThatIsNotOnSuper.call(this);
+      };
+    });
+
+    expect(() => (new klass() as any).someMethodThatIsNotOnSuper()).toThrow(TypeError);
   });
   it("generated attribute methods ancestors have correct module", async () => {
     const mod = (CanonicalTopic as any)._generatedAttributeMethods;
@@ -1274,7 +1324,7 @@ describe("AttributeMethodsTest", () => {
     klass.tableName = "topics";
     block?.(klass);
 
-    expect((klass as any)._attributeMethodsGenerated).toBeFalsy();
+    expect((klass as any).generatedAttributeMethods().instanceMethods()).toEqual([]);
     return klass;
   }
 
