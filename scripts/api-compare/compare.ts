@@ -3051,7 +3051,7 @@ export function main() {
       scope: "package" | "dep" = "package",
       owner = "",
     ) => {
-      if (scope === "package" && !isTestHelperFile(file)) {
+      if (scope === "package") {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsOwnersByFileName.set(file, owners);
@@ -3084,7 +3084,7 @@ export function main() {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
-      if (scope === "package") {
+      if (scope === "package" && !isTestHelperFile(file)) {
         const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
         pkgSigs.push(m.params);
         tsParamsByNameInPkg.set(m.name, pkgSigs);
