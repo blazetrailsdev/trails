@@ -11,6 +11,7 @@ import {
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType, BinaryData } from "@blazetrails/activemodel";
+import { Text as TextType } from "../type/text.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
@@ -342,6 +343,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         throw translated;
       }
     });
+  }
+
+  /** @internal */
+  isTextType(type: string): boolean {
+    return (
+      Mysql2Adapter.TYPE_MAP.lookup(type) instanceof StringType ||
+      Mysql2Adapter.TYPE_MAP.lookup(type) instanceof TextType
+    );
   }
 
   private async _ensureClient(): Promise<mysql.Connection> {

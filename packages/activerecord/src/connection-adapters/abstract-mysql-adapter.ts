@@ -93,7 +93,6 @@ import { ActiveRecord } from "../ar-config.js";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
-  StringType,
   IntegerType,
   BigIntegerType,
   FloatType,
@@ -155,6 +154,17 @@ const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
 type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface AbstractMysqlAdapter {
+  /**
+   * drift-ok: concrete adapters only — `text_type?` is defined by
+   * `mysql2_adapter.rb:140-142`, not by `abstract_mysql_adapter.rb`.
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  isTextType(type: string): boolean;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
@@ -676,15 +686,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   addSqlCommentBang(sql: string, comment: string): string {
     if (comment) return `${sql} COMMENT ${this.quote(comment)}`;
     return sql;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  isTextType(type: string): boolean {
-    const TYPE_MAP = (this.constructor as typeof AbstractMysqlAdapter).TYPE_MAP;
-    return TYPE_MAP.lookup(type) instanceof StringType || TYPE_MAP.lookup(type) instanceof TextType;
   }
 
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {

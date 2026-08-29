@@ -5,7 +5,7 @@ import {
   _inlineOwnerKey,
   _inlinePolymorphicKeys,
   _ownerChainReflection,
-  _preloadedHolderTarget,
+  associationInstanceGet,
   _resolveInverseName,
   _routeThroughViaAssociationScope,
   _scopeForAssociation,
@@ -26,6 +26,7 @@ import {
   DeleteRestrictionError,
 } from "./errors.js";
 import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
+import type { Association } from "./association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
 import {
@@ -403,9 +404,9 @@ async function findTarget(
     ) {
       return cache.target;
     }
-    const preloaded = _preloadedHolderTarget(record, assocName);
-    if (preloaded) {
-      return (preloaded.value ?? []) as Base[];
+    const holder = associationInstanceGet.call(record, assocName) as Association | null;
+    if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
+      return (holder.target ?? []) as Base[];
     }
   }
 

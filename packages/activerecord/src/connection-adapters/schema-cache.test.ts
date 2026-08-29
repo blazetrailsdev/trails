@@ -407,6 +407,20 @@ describe("SchemaCacheTest", () => {
     expect((cache as unknown as { _columns: Map<string, Column[]> })._columns).toBe(cols);
   });
 
+  it("#init_with reads columns_hash from the coder", () => {
+    const col = makeColumn("id", "integer");
+    const cache = new SchemaCache();
+    cache.initWith({
+      columns: new Map<string, Column[]>([["t", [col]]]),
+      columns_hash: new Map<string, Record<string, Column>>([["t", { id: col }]]),
+      deduplicated: true,
+    });
+    const columnsHash = (cache as unknown as { _columnsHash: Map<string, Record<string, Column>> })
+      ._columnsHash;
+    expect(columnsHash.size).toBe(1);
+    expect(columnsHash.get("t")!["id"]).toBe(col);
+  });
+
   it("#encode_with sorts members", async () => {
     const cache = new SchemaCache();
     await warm(cache, "zebras", "id", [makeColumn("id", "integer")]);

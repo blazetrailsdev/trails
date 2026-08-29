@@ -8,7 +8,7 @@ import { HasOneAssociation } from "./has-one-association.js";
 import { HasOneThroughAssociation } from "./has-one-through-association.js";
 import {
   _associationNotFound,
-  _preloadedHolderTarget,
+  associationInstanceGet,
   type AssociationDefinition as AssocDef,
 } from "../associations.js";
 
@@ -47,9 +47,9 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
     }
     return;
   }
-  const preloaded = _preloadedHolderTarget(this, name);
-  if (preloaded) {
-    instance._setTargetFromLoader(preloaded.value as any);
+  const holder = associationInstanceGet.call(this, name) as AssociationInstance | null;
+  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
+    instance._setTargetFromLoader((holder.target ?? null) as any);
   }
 }
 

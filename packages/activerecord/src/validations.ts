@@ -9,7 +9,8 @@ import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { UniquenessValidator, validatesUniquenessOf } from "./validations/uniqueness.js";
-import { _preloadedHolderTarget } from "./associations.js";
+import { associationInstanceGet } from "./associations.js";
+import type { Association } from "./associations/association.js";
 import type { Base } from "./base.js";
 
 export {
@@ -139,8 +140,13 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   }
   const cached = this._associationCache?.(attribute)?.target;
   if (cached !== undefined) return cached;
-  const preloaded = _preloadedHolderTarget(this as unknown as Base, attribute);
-  if (preloaded) return preloaded.value;
+  const holder = associationInstanceGet.call(
+    this as unknown as Base,
+    attribute,
+  ) as Association | null;
+  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
+    return holder.target ?? null;
+  }
   return this.readAttribute(attribute);
 }
 
