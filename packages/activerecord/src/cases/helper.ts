@@ -94,7 +94,7 @@ afterAll(() => {
 });
 
 export async function inTimeZone(
-  zone: string | null,
+  zone: string | number | null,
   fn: () => Promise<void> | void,
 ): Promise<void> {
   const oldZone = timeZone();

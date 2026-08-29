@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import {
@@ -8,10 +8,11 @@ import {
   toFs,
   zone,
 } from "@blazetrails/activesupport";
-import { BooleanType } from "@blazetrails/activemodel";
-import { Base, DangerousAttributeError } from "./index.js";
+import { BooleanType, DateTimeType, TimeType } from "@blazetrails/activemodel";
+import { Base, DangerousAttributeError, Type } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
+import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 import { inTimeZone } from "./cases/helper.js";
 import { deprecator } from "./deprecator.js";
 import { fixtures } from "./test-fixtures.js";
@@ -39,6 +40,27 @@ class ToBeLoadedSecond extends Base {
     this.aliasAttribute("subject", "title");
   }
 }
+
+class EpochTimestamp extends DateTimeType {
+  override deserialize(timeOrInt: unknown): any {
+    return timeOrInt == null
+      ? null
+      : Temporal.Instant.fromEpochMilliseconds(Number(timeOrInt) * 1000);
+  }
+
+  override serialize(time: unknown): unknown {
+    if (time == null) return null;
+    if (time instanceof TimeWithZone) return time.toTime().toI();
+    if (time instanceof Temporal.Instant) return epochSeconds(time);
+    return Number(time);
+  }
+}
+
+function epochSeconds(instant: Temporal.Instant): number {
+  return Math.trunc(Number(instant.epochNanoseconds / 1_000_000n) / 1000);
+}
+
+Type.register("epoch_timestamp", EpochTimestamp);
 
 class ClassWithDeprecatedAliasAttributeBehaviorResolved extends Base {
   static {
@@ -73,6 +95,13 @@ class ChildWithAnAliasFromAbstractClass extends AbstractClassInBetween {}
 
 describe("AttributeMethodsTest", () => {
   const { topics } = fixtures(["topics", "developers", "companies", "computers"]);
+
+  let target: typeof Base;
+
+  beforeEach(() => {
+    target = class extends Base {};
+    target.tableName = "topics";
+  });
 
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
@@ -417,75 +446,216 @@ describe("AttributeMethodsTest", () => {
     }
   });
   it("setting time zone-aware read attribute", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "tz_read" });
-    expect(p.title).toBe("tz_read");
+    const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
+    const cstTime = new TimeWithZone(utcTime, TimeZone.find("Central Time (US & Canada)")!);
+    await inTimeZone("Pacific Time (US & Canada)", async () => {
+      const record = (await (await target.create({ written_on: cstTime })).reload()) as any;
+      expect(record.get("written_on").utc().toTime().epochNanoseconds).toBe(
+        utcTime.epochNanoseconds,
+      );
+      expect(record.get("written_on").timeZone.name).toBe("Pacific Time (US & Canada)");
+      expect([
+        record.get("written_on").time.year,
+        record.get("written_on").time.month,
+        record.get("written_on").time.day,
+        record.get("written_on").time.hour,
+        record.get("written_on").time.minute,
+        record.get("written_on").time.second,
+      ]).toEqual([2007, 12, 31, 16, 0, 0]);
+    });
   });
   it("setting time zone-aware attribute with a string", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "tz_str" });
-    expect(p.title).toBe("tz_str");
+    const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
+    for (let timezoneOffset = -11; timezoneOffset <= 13; timezoneOffset++) {
+      const timeString = new TimeWithZone(utcTime, TimeZone.find(timezoneOffset)!).toString();
+      await inTimeZone("Pacific Time (US & Canada)", () => {
+        const record = target.new({}) as any;
+        record.written_on = timeString;
+        expect(record.written_on.utc().toTime().epochNanoseconds).toBe(
+          zone()!.parse(timeString)!.utc().toTime().epochNanoseconds,
+        );
+        expect(record.written_on.timeZone.name).toBe("Pacific Time (US & Canada)");
+        expect([
+          record.written_on.time.year,
+          record.written_on.time.month,
+          record.written_on.time.day,
+          record.written_on.time.hour,
+          record.written_on.time.minute,
+          record.written_on.time.second,
+        ]).toEqual([2007, 12, 31, 16, 0, 0]);
+      });
+    }
   });
   it("time zone-aware attribute saved", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "tz_saved" });
-    const found = await Post.find(p.id!);
-    expect(found.title).toBe("tz_saved");
+    await inTimeZone(1, async () => {
+      const record = (await target.create({ written_on: "2012-02-20 10:00" })) as any;
+
+      record.written_on = "2012-02-20 09:00";
+      await record.save();
+      expect((await record.reload()).written_on.utc().toTime().epochNanoseconds).toBe(
+        zone()!.local(2012, 2, 20, 9).utc().toTime().epochNanoseconds,
+      );
+    });
   });
   it("setting a time zone-aware attribute to a blank string returns nil", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "" });
-    expect(p.title).toBe("");
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const record = target.new({}) as any;
+      record.written_on = " ";
+      expect(record.written_on).toBeNull();
+      expect(record.get("written_on")).toBeNull();
+    });
   });
   it("setting a time zone-aware attribute interprets time zone-unaware string in time zone", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "tz_interp" });
-    expect(p.title).toBe("tz_interp");
+    const timeString = "Tue Jan 01 00:00:00 2008";
+    for (let timezoneOffset = -11; timezoneOffset <= 13; timezoneOffset++) {
+      await inTimeZone(timezoneOffset, () => {
+        const record = target.new({}) as any;
+        record.written_on = timeString;
+        expect(record.written_on.utc().toTime().epochNanoseconds).toBe(
+          zone()!.parse(timeString)!.utc().toTime().epochNanoseconds,
+        );
+        expect(record.written_on.timeZone.utcOffset).toBe(TimeZone.find(timezoneOffset)!.utcOffset);
+        expect([
+          record.written_on.time.year,
+          record.written_on.time.month,
+          record.written_on.time.day,
+          record.written_on.time.hour,
+          record.written_on.time.minute,
+          record.written_on.time.second,
+        ]).toEqual([2008, 1, 1, 0, 0, 0]);
+      });
+    }
   });
   it("setting a time zone-aware datetime in the current time zone", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "tz_datetime" });
-    expect(p.id).toBeDefined();
+    const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const record = target.new({}) as any;
+      record.written_on = new TimeWithZone(utcTime, zone()!);
+      expect(record.written_on.utc().toTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
+      expect(record.written_on.timeZone.name).toBe("Pacific Time (US & Canada)");
+      expect([
+        record.written_on.time.year,
+        record.written_on.time.month,
+        record.written_on.time.day,
+        record.written_on.time.hour,
+        record.written_on.time.minute,
+        record.written_on.time.second,
+      ]).toEqual([2007, 12, 31, 16, 0, 0]);
+    });
   });
-  it("YAML dumping a record with time zone-aware attribute", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "yaml_tz" });
-    expect(p.title).toBe("yaml_tz");
+  it.skip("YAML dumping a record with time zone-aware attribute", async () => {
+    // PERMANENT-SKIP: Ruby-only — Psych round-trips an Active Record object
   });
   it("setting a time zone-aware time in the current time zone", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "tz_time" });
-    expect(p.title).toBe("tz_time");
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const record = target.new({}) as any;
+      const timeString = "10:00:00";
+      const expectedTime = zone()!.parse(`2000-01-01 ${timeString}`)!;
+
+      record.bonus_time = timeString;
+      expect(record.bonus_time.utc().toTime().epochNanoseconds).toBe(
+        expectedTime.utc().toTime().epochNanoseconds,
+      );
+      expect(record.bonus_time.timeZone.name).toBe("Pacific Time (US & Canada)");
+
+      record.bonus_time = "";
+      expect(record.bonus_time).toBeNull();
+    });
   });
-  it("setting a time zone-aware time with DST", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "dst_time" });
-    expect(p.title).toBe("dst_time");
+  it.skip("setting a time zone-aware time with DST", async () => {
+    // BLOCKED: saving a tz-aware `time` attribute holding a TimeWithZone clears the in-memory value — see fix-time-column-write-back-drops-time-with-zone
   });
   it("setting invalid string to a zone-aware time attribute", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "invalid_tz" });
-    expect(p.title).toBe("invalid_tz");
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const record = target.new({}) as any;
+      const timeString = "ABC";
+
+      record.bonus_time = timeString;
+      expect(record.bonus_time).toBeNull();
+    });
   });
   it("removing time zone-aware types", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "rm_tz" });
-    expect(p.id).toBeDefined();
+    await withTimeZoneAwareTypes(["datetime"], async () => {
+      await inTimeZone("Pacific Time (US & Canada)", () => {
+        const record = target.new({ bonus_time: "10:00:00" }) as any;
+        const expectedTime = Temporal.Instant.from("2000-01-01T10:00:00Z");
+
+        expect(record.bonus_time.epochNanoseconds).toBe(expectedTime.epochNanoseconds);
+        expect(record.bonus_time).toBeInstanceOf(Temporal.Instant);
+      });
+    });
   });
   it("time zone-aware attributes do not recurse infinitely on invalid values", async () => {
-    const { Post } = makeModel();
-    const p = new Post({ title: "no_recurse" });
-    expect(p.title).toBe("no_recurse");
+    let model = newTopicLikeArClass();
+
+    let type = model.typeForAttribute("bonus_time");
+    expect(type).toBeInstanceOf(TimeType);
+
+    let invalidTime: unknown = [];
+    let record = model.new({ bonus_time: invalidTime }) as any;
+    expect(record.bonus_time).toEqual(invalidTime);
+
+    invalidTime = Math.trunc(Date.now() / 1000);
+    record = model.new({ bonus_time: invalidTime }) as any;
+    expect(record.bonus_time).toEqual(invalidTime);
+
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      model = newTopicLikeArClass();
+
+      type = model.typeForAttribute("bonus_time");
+      expect(type).toBeInstanceOf(TimeZoneConverter);
+
+      invalidTime = [];
+      record = model.new({ bonus_time: invalidTime }) as any;
+      expect(record.bonus_time).toEqual(invalidTime);
+
+      invalidTime = Math.trunc(Date.now() / 1000);
+      record = model.new({ bonus_time: invalidTime }) as any;
+      expect(record.bonus_time).toEqual(invalidTime);
+    });
   });
   it("time zone-aware custom attributes", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "custom_tz" });
-    expect(p.title).toBe("custom_tz");
+    const timestamp = Math.trunc(Date.now() / 1000);
+
+    class Model extends Base {
+      static {
+        this.tableName = "minimalistics";
+      }
+    }
+    (Model as any).attribute("expires_at", "epoch_timestamp");
+
+    let type = Model.typeForAttribute("expires_at");
+    expect(type).toBeInstanceOf(EpochTimestamp);
+
+    let record1 = await (Model as any).createBang({ expires_at: timestamp });
+    expect(epochSeconds(record1.expires_at)).toBe(timestamp);
+
+    await (Model as any).insertBang({ expires_at: timestamp });
+    let record2 = await (Model as any).last();
+    expect(record2.id).not.toBe(record1.id);
+    expect(epochSeconds(record2.expires_at)).toBe(timestamp);
+
+    await inTimeZone("Pacific Time (US & Canada)", async () => {
+      (Model as any).attribute("expires_at", "epoch_timestamp");
+
+      type = Model.typeForAttribute("expires_at");
+      expect(type).toBeInstanceOf(TimeZoneConverter);
+
+      record1 = await (Model as any).createBang({ expires_at: timestamp });
+      expect(record1.expires_at.toTime().toI()).toBe(timestamp);
+
+      await (Model as any).insertBang({ expires_at: timestamp });
+      record2 = await (Model as any).last();
+      expect(record2.id).not.toBe(record1.id);
+      expect(record2.expires_at.toTime().toI()).toBe(timestamp);
+    });
   });
   it("setting a time_zone_conversion_for_attributes should write the value on a class variable", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "tz_conv" });
-    expect(p.id).toBeDefined();
+    CanonicalTopic.skipTimeZoneConversionForAttributes = ["field_a"];
+    Minimalistic.skipTimeZoneConversionForAttributes = ["field_b"];
+
+    expect(CanonicalTopic.skipTimeZoneConversionForAttributes).toEqual(["field_a"]);
+    expect(Minimalistic.skipTimeZoneConversionForAttributes).toEqual(["field_b"]);
   });
   it("attribute predicates respect access control", async () => {
     const { Post } = makeModel();
@@ -1142,6 +1312,32 @@ describe("AttributeMethodsTest", () => {
     topic.approved = "true";
     expect(topic["approved?"]).toBe(true);
   });
+
+  function newTopicLikeArClass(block?: (klass: typeof Base) => void): typeof Base {
+    const klass = class extends Base {};
+    klass.tableName = "topics";
+    block?.(klass);
+
+    expect(
+      Object.getOwnPropertyNames((klass as any).generatedAttributeMethods().prototype ?? {}).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual([]);
+    return klass;
+  }
+
+  async function withTimeZoneAwareTypes(
+    types: string[],
+    fn: () => Promise<void> | void,
+  ): Promise<void> {
+    const oldTypes = Base.timeZoneAwareTypes;
+    Base.timeZoneAwareTypes = types;
+    try {
+      await fn();
+    } finally {
+      Base.timeZoneAwareTypes = oldTypes;
+    }
+  }
 });
 
 describe("AttributeMethodsTest", () => {
