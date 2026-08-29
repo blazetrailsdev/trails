@@ -148,10 +148,10 @@ function blockKey(kind: BlockRunnerKind): string {
 /** @internal */
 function registerBlockFor(
   klass: typeof Trailtie,
-  kind: BlockRunnerKind,
+  type: BlockRunnerKind,
   block: TrailtieBlock,
 ): void {
-  ownState(klass, blockKey(kind), () => [] as TrailtieBlock[]).push(block);
+  ownState(klass, blockKey(type), () => [] as TrailtieBlock[]).push(block);
 }
 
 /** @internal */

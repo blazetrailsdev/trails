@@ -48,38 +48,41 @@ export class ShowExceptions {
   }
 
   /** @internal */
-  private async renderException(env: RackEnv, wrapper: ExceptionWrapper): Promise<RackResponse> {
+  private async renderException(
+    request: RackEnv,
+    wrapper: ExceptionWrapper,
+  ): Promise<RackResponse> {
     const status = wrapper.statusCode;
-    const originalPath = env["PATH_INFO"];
-    const originalMethod = env["REQUEST_METHOD"];
-    env["action_dispatch.original_path"] = originalPath;
-    env["action_dispatch.original_request_method"] = originalMethod;
-    this.fallbackToHtmlFormatIfInvalidMimeType(env);
-    env["PATH_INFO"] = `/${status}`;
-    env["REQUEST_METHOD"] = "GET";
+    const originalPath = request["PATH_INFO"];
+    const originalMethod = request["REQUEST_METHOD"];
+    request["action_dispatch.original_path"] = originalPath;
+    request["action_dispatch.original_request_method"] = originalMethod;
+    this.fallbackToHtmlFormatIfInvalidMimeType(request);
+    request["PATH_INFO"] = `/${status}`;
+    request["REQUEST_METHOD"] = "GET";
     try {
       try {
-        const response = await this.exceptionsApp(env);
+        const response = await this.exceptionsApp(request);
         const cascade = response[1]["x-cascade"] ?? response[1]["X-Cascade"];
         return cascade === "pass" ? this.passResponse(status) : response;
       } catch {
         return this.failsafeResponse(wrapper);
       }
     } finally {
-      env["PATH_INFO"] = originalPath;
-      env["REQUEST_METHOD"] = originalMethod;
+      request["PATH_INFO"] = originalPath;
+      request["REQUEST_METHOD"] = originalMethod;
     }
   }
 
   /** @internal */
-  private fallbackToHtmlFormatIfInvalidMimeType(env: RackEnv): void {
-    const ct = env["CONTENT_TYPE"];
+  private fallbackToHtmlFormatIfInvalidMimeType(request: RackEnv): void {
+    const ct = request["CONTENT_TYPE"];
     if (typeof ct === "string" && !isValidMimeLike(ct)) {
-      env["CONTENT_TYPE"] = "text/html";
+      request["CONTENT_TYPE"] = "text/html";
     }
-    const accept = env["HTTP_ACCEPT"];
+    const accept = request["HTTP_ACCEPT"];
     if (typeof accept === "string" && !isValidMimeLike(accept)) {
-      env["HTTP_ACCEPT"] = "text/html";
+      request["HTTP_ACCEPT"] = "text/html";
     }
   }
 

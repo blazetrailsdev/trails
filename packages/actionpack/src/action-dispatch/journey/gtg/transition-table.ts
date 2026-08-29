@@ -102,14 +102,14 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     return Array.isArray(t) ? t : [t as number];
   }
 
-  move(state: GtgState, fullString: string, startIndex: number, endIndex: number): GtgState {
-    if (state.length === 0) return [];
+  move(t: GtgState, fullString: string, startIndex: number, endIndex: number): GtgState {
+    if (t.length === 0) return [];
     const nextStates: Array<readonly [number, number | null]> = [];
 
     const tok = fullString.slice(startIndex, endIndex);
     const tokenMatchesDefault = DEFAULT_EXP_ANCHORED.test(tok);
 
-    for (const [s, previousStart] of state) {
+    for (const [s, previousStart] of t) {
       if (previousStart === null) {
         // Fast path for standard `:param` segments.
         if (tokenMatchesDefault) {
@@ -279,8 +279,8 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 
   /** @internal */
-  private statesHashFor(re: RegExp): Map<number, Map<RegExp, number>> {
-    return isDefaultExp(re) ? this._stdparamStates : this._regexpStates;
+  private statesHashFor(sym: RegExp): Map<number, Map<RegExp, number>> {
+    return isDefaultExp(sym) ? this._stdparamStates : this._regexpStates;
   }
 }
 

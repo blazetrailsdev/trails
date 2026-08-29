@@ -40,10 +40,10 @@ export class Logger {
   private logger: RackLoggerLike;
   private taggers: Tagger[];
 
-  constructor(app: RackApp, options: LoggerOptions = {}) {
+  constructor(app: RackApp, taggers: LoggerOptions = {}) {
     this.app = app;
-    this.logger = options.logger ?? NOOP_LOGGER;
-    this.taggers = options.taggers ?? [];
+    this.logger = taggers.logger ?? NOOP_LOGGER;
+    this.taggers = taggers.taggers ?? [];
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

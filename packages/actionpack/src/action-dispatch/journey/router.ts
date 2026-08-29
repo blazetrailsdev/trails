@@ -86,19 +86,19 @@ export class Router {
   }
 
   recognize(
-    req: RouterRequest,
+    railsReq: RouterRequest,
     // Block return is `unknown` so expression-bodied callbacks like
     // `(r) => arr.push(r.name)` (which return a number) remain type-
     // compatible with the previous `() => void` signature. Only an
     // explicit `=== true` signals short-circuit.
     block: (route: Route, parameters: Record<string, unknown>) => unknown,
   ): void {
-    for (const { match, parameters, route } of this.findRoutes(req)) {
+    for (const { match, parameters, route } of this.findRoutes(railsReq)) {
       if (!route.path.anchored) {
-        req.scriptName = match.toString();
+        railsReq.scriptName = match.toString();
         let post = match.postMatch();
         if (!post.startsWith("/")) post = "/" + post;
-        req.pathInfo = post;
+        railsReq.pathInfo = post;
       }
       const merged: Record<string, unknown> = { ...route.defaults, ...parameters };
       // JS callbacks can't `return` from the caller's frame the way Ruby

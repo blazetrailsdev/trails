@@ -10,7 +10,7 @@ import { camelize, demodulize, NameError } from "@blazetrails/activesupport";
  *   - `clearHelpers(cls)` — reset, then re-add previous `_helperMethods`.
  *   - `_helpersForModification(cls)` — copy-on-write clone for subclass mutation.
  *   - `modulesForHelpers(args, opts)` — Rails `Resolution#modules_for_helpers`.
- *   - `allHelpersFromPath(paths)` — Rails `Resolution#all_helpers_from_path`.
+ *   - `allHelpersFromPath(path)` — Rails `Resolution#all_helpers_from_path`.
  *   - `helperModulesFromPaths(paths, opts)` — Rails `Resolution#helper_modules_from_paths`.
  *   - `defaultHelperModuleBang(cls, opts)` — Rails `default_helper_module!`.
  *
@@ -118,13 +118,13 @@ const helperMethodsByClass = new WeakMap<HelpersClassMethods, HelperMethodsModul
 
 /** @internal */
 export function defineHelpersModule(
-  cls: HelpersClassMethods,
+  klass: HelpersClassMethods,
   helpers?: HelperMethodsModule | null,
 ): HelperMethodsModule {
-  const existing = helperMethodsByClass.get(cls);
+  const existing = helperMethodsByClass.get(klass);
   if (existing) return existing;
   const mod = Object.create(helpers ?? null) as HelperMethodsModule;
-  helperMethodsByClass.set(cls, mod);
+  helperMethodsByClass.set(klass, mod);
   return mod;
 }
 
@@ -344,7 +344,7 @@ export function modulesForHelpers(
  * app path) under each given root and return the de-duplicated, sorted
  * basename list (without the `_helper` suffix or extension).
  */
-export async function allHelpersFromPath(paths: string | readonly string[]): Promise<string[]> {
+export async function allHelpersFromPath(path: string | readonly string[]): Promise<string[]> {
   // Built path + `@vite-ignore` so bundlers (the website SW bundle in
   // particular) don't statically resolve the Node-only glob dep
   // (`tinyglobby` → `fdir` uses `createRequire`). Callers in non-Node
@@ -353,7 +353,7 @@ export async function allHelpersFromPath(paths: string | readonly string[]): Pro
   const { glob } = (await import(
     /* @vite-ignore */ modName
   )) as typeof import("@blazetrails/activesupport/glob");
-  const roots = typeof paths === "string" ? [paths] : paths;
+  const roots = typeof path === "string" ? [path] : path;
   // Rails: per-path `sort!` then concat across paths, then `uniq!`
   // preserving first-occurrence order. We do NOT globally re-sort.
   const out: string[] = [];

@@ -63,18 +63,18 @@ export class LazyRouteSet extends RouteSet {
 
   override generateExtras(
     options: Record<string, unknown>,
-    defaults: Record<string, unknown> = {},
+    recall: Record<string, unknown> = {},
   ): [string, string[]] {
     reloadHook();
-    return super.generateExtras(options, defaults);
+    return super.generateExtras(options, recall);
   }
 
   override recognizePath(
     path: string,
-    options: { method?: string | null; extras?: Record<string, unknown> } = {},
+    environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
     reloadHook();
-    return super.recognizePath(path, options);
+    return super.recognizePath(path, environment);
   }
 
   override recognizePathWithRequest(

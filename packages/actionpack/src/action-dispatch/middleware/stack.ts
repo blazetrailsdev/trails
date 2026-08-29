@@ -81,30 +81,28 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(index, 0, { klass, args });
   }
 
-  insertBefore(target: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
-    const idx = this.findIndex(target);
+  insertBefore(index: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
+    const idx = this.findIndex(index);
     if (idx === -1) throw new Error("No such middleware to insert before");
     this.entries.splice(idx, 0, { klass, args });
   }
 
-  insertAfter(
-    target: MiddlewareFactory | number,
-    klass: MiddlewareFactory,
-    ...args: unknown[]
-  ): void {
-    if (typeof target === "number") {
-      this.entries.splice(target + 1, 0, { klass, args });
+  insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
+    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
+    if (typeof index === "number") {
+      this.entries.splice(index + 1, 0, { klass, args: rest });
     } else {
-      const idx = this.findIndex(target);
+      const idx = this.findIndex(index);
       if (idx === -1) throw new Error("No such middleware to insert after");
-      this.entries.splice(idx + 1, 0, { klass, args });
+      this.entries.splice(idx + 1, 0, { klass, args: rest });
     }
   }
 
-  swap(target: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
+  swap(target: MiddlewareFactory, ...args: unknown[]): void {
+    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
     const idx = this.findIndex(target);
     if (idx === -1) throw new Error("No such middleware to swap");
-    this.entries[idx] = { klass, args };
+    this.entries[idx] = { klass, args: rest };
   }
 
   delete(target: MiddlewareFactory): void {
@@ -120,30 +118,30 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(idx, 1);
   }
 
-  move(target: MiddlewareFactory, index: number): void {
+  move(target: MiddlewareFactory, source: number): void {
     const idx = this.findIndex(target);
     if (idx === -1) throw new Error("No such middleware to move");
     const [entry] = this.entries.splice(idx, 1);
-    this.entries.splice(index, 0, entry);
+    this.entries.splice(source, 0, entry);
   }
 
-  moveBefore(target: MiddlewareFactory, beforeTarget: MiddlewareFactory): void {
+  moveBefore(target: MiddlewareFactory, source: MiddlewareFactory): void {
     const srcIdx = this.findIndex(target);
     if (srcIdx === -1) throw new Error("No such middleware to move");
     const [entry] = this.entries.splice(srcIdx, 1);
-    const destIdx = this.findIndex(beforeTarget);
+    const destIdx = this.findIndex(source);
     if (destIdx === -1) throw new Error("No such middleware to move before");
     this.entries.splice(destIdx, 0, entry);
   }
 
-  moveAfter(target: MiddlewareFactory, afterTarget: MiddlewareFactory | number): void {
+  moveAfter(target: MiddlewareFactory, source: MiddlewareFactory | number): void {
     const srcIdx = this.findIndex(target);
     if (srcIdx === -1) throw new Error("No such middleware to move");
     const [entry] = this.entries.splice(srcIdx, 1);
-    if (typeof afterTarget === "number") {
-      this.entries.splice(afterTarget, 0, entry);
+    if (typeof source === "number") {
+      this.entries.splice(source, 0, entry);
     } else {
-      const destIdx = this.findIndex(afterTarget);
+      const destIdx = this.findIndex(source);
       if (destIdx === -1) throw new Error("No such middleware to move after");
       this.entries.splice(destIdx + 1, 0, entry);
     }

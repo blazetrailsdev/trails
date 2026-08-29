@@ -22,12 +22,12 @@ export class Callbacks extends CallbacksBase {
     this.app = app;
   }
 
-  static before(callback: BeforeCallback): void {
-    this.beforeCallback("call", callback);
+  static before(args: BeforeCallback): void {
+    this.beforeCallback("call", args);
   }
 
-  static after(callback: AfterCallback): void {
-    this.afterCallback("call", callback);
+  static after(args: AfterCallback): void {
+    this.afterCallback("call", args);
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

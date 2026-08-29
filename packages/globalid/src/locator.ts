@@ -354,10 +354,10 @@ export class Locator {
   }
 
   /** @internal Mirrors: Locator.find_allowed?. */
-  static findAllowed(klass: LocatorModel, only?: LocateOptions["only"]): boolean {
+  static findAllowed(modelClass: LocatorModel, only?: LocateOptions["only"]): boolean {
     if (!only) return true;
     const list = Array.isArray(only) ? only : [only];
-    const fn = klass as unknown as Ctor;
+    const fn = modelClass as unknown as Ctor;
     return list.some((c) => {
       const cFn = c as unknown as Ctor;
       return fn === cFn || fn.prototype instanceof cFn;

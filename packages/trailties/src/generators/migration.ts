@@ -63,14 +63,14 @@ export interface MigrationTemplateHost extends CreateMigrationHost {
 }
 
 // Rails source: railties/lib/rails/generators/migration.rb#migration_template.
-// The Rails version reads the ERB source and renders it inline; here the
-// caller supplies a `render` callback that receives the migration assigns
-// (so the EJS/template pipeline can be swapped in later without changing
-// this dispatch).
+// Rails' `source` is an ERB template path it reads and renders inline; here
+// the same slot is a callback that receives the migration assigns (so the
+// EJS/template pipeline can be swapped in later without changing this
+// dispatch). Argument order follows Rails: source, destination, config.
 export async function migrationTemplate(
   host: MigrationTemplateHost,
+  source: (assigns: MigrationAssigns) => string | Promise<string>,
   destination: string,
-  render: (assigns: MigrationAssigns) => string | Promise<string>,
   config: CreateMigrationConfig = {},
 ): Promise<string> {
   const path = getPath();
@@ -91,5 +91,5 @@ export async function migrationTemplate(
   // can't drift from the just-computed assigns even if the host's own
   // migrationFileName field hasn't been synced.
   const wrapped: CreateMigrationHost = { ...host, migrationFileName: assigns.migrationFileName };
-  return createMigration(wrapped, numbered, () => render(assigns), config);
+  return createMigration(wrapped, numbered, () => source(assigns), config);
 }

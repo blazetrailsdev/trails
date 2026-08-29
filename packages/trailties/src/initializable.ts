@@ -68,8 +68,8 @@ export class Collection extends Array<Initializer> {
   }
 
   /** Mirrors: Rails `tsort_each_child` (initializable.rb:49). */
-  tsortEachChild(node: Initializer): Initializer[] {
-    return this.filter((i) => i.before === node.name || i.name === node.after);
+  tsortEachChild(initializer: Initializer): Initializer[] {
+    return this.filter((i) => i.before === initializer.name || i.name === initializer.after);
   }
 
   /** DFS post-order matching Ruby `TSort#tsort_each`. Stable on iteration order. */

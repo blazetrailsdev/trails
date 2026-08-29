@@ -86,8 +86,8 @@ describe("migration", () => {
     };
     const dest = await migrationTemplate(
       host,
-      "db/migrate/create_articles.rb",
       (a) => `class ${a.migrationClassName} {}`,
+      "db/migrate/create_articles.rb",
     );
     expect(dest).toBe("/app/db/migrate/20260101000000_create_articles.rb");
     expect(captured?.migrationClassName).toBe("CreateArticles");

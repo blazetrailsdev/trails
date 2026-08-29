@@ -635,13 +635,13 @@ export class IntegrationTest {
    * Register a custom request encoder. Mirrors `Behavior::ClassMethods#register_encoder`.
    */
   static registerEncoder(
-    mimeName: string,
+    args: string,
     options: {
       paramEncoder?: (params: unknown) => unknown;
       responseParser?: (body: string) => unknown;
     } = {},
   ): void {
-    RequestEncoder.registerEncoder(mimeName, options);
+    RequestEncoder.registerEncoder(args, options);
   }
 
   /**

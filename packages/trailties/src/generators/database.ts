@@ -49,8 +49,8 @@ export abstract class Database {
     return this.service ? `${this.name}-data` : undefined;
   }
 
-  static build(name: string): Database {
-    switch (name) {
+  static build(databaseName: string): Database {
+    switch (databaseName) {
       case "mysql":
         return new MySQL2();
       case "postgresql":

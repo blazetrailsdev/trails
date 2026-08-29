@@ -14,8 +14,8 @@ export class PropertyList {
     return this.entries.map(([name]) => name);
   }
 
-  valueFor(name: string): InfoValue | undefined {
-    const found = this.entries.find(([n]) => n === name);
+  valueFor(propertyName: string): InfoValue | undefined {
+    const found = this.entries.find(([n]) => n === propertyName);
     return found ? found[1] : undefined;
   }
 }

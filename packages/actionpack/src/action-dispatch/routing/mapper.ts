@@ -370,21 +370,30 @@ export class Mapper {
 
   // --- namespace ---
 
-  namespace(name: string, callback: MapperCallback): void {
+  namespace(
+    path: string,
+    options: NamespaceOptions | MapperCallback = {},
+    callback?: MapperCallback,
+  ): void {
+    const opts: NamespaceOptions = typeof options === "function" ? {} : options;
+    const cb = typeof options === "function" ? options : callback;
+    if (!cb) throw new Error("Mapper#namespace requires a callback block");
     // Rails mapper.rb:1626-1632: inside a resource scope, namespace must go
     // through nested so parent-resource path segments are included correctly.
     // Use _scope.isResourceScope() (level-based) to avoid infinite recursion —
     // once nested() is entered the level becomes "nested", not "resources".
     if (this._scope.isResourceScope()) {
-      this.nested(() => this.namespace(name, callback));
+      this.nested(() => this.namespace(path, opts, cb));
       return;
     }
+    // Rails mapper.rb:961-974 — `:path` names the URL segment, `:as` the
+    // name prefix, `:module` the controller namespace; each defaults to `path`.
     this.scopeStack.push({
-      path: this.currentPrefix() + "/" + name,
-      namePrefix: name,
-      controller: name,
+      path: this.currentPrefix() + "/" + (opts.path ?? path),
+      namePrefix: opts.as ?? path,
+      controller: opts.module ?? path,
     });
-    callback(this);
+    cb(this);
     this.scopeStack.pop();
   }
 
@@ -526,13 +535,13 @@ export class Mapper {
    * this Mapper instead. Passing a string throws — file-based draw is not
    * supported.
    */
-  draw(nameOrCallback: string | MapperCallback): void {
-    if (typeof nameOrCallback === "function") {
-      nameOrCallback(this);
+  draw(name: string | MapperCallback): void {
+    if (typeof name === "function") {
+      name(this);
       return;
     }
     throw new Error(
-      `Mapper#draw(${JSON.stringify(nameOrCallback)}): file-based draw is not supported in trails. ` +
+      `Mapper#draw(${JSON.stringify(name)}): file-based draw is not supported in trails. ` +
         "Pass a callback (mapper) => void with the route definitions, or import and invoke a routes module directly.",
     );
   }
@@ -571,11 +580,11 @@ export class Mapper {
   // --- constraints block ---
 
   constraints(
-    constraintsOrCallback: RouteOptions["constraints"] | MapperCallback,
+    constraints: RouteOptions["constraints"] | MapperCallback,
     callback?: MapperCallback,
   ): void {
-    if (typeof constraintsOrCallback === "function") {
-      constraintsOrCallback(this);
+    if (typeof constraints === "function") {
+      constraints(this);
     } else {
       // Store constraints in scope for nested routes
       // For now, just execute the callback
@@ -585,8 +594,8 @@ export class Mapper {
 
   // --- concern / concerns ---
 
-  concern(name: string, callback: ConcernCallback): void {
-    this.concerns.set(name, callback);
+  concern(name: string, callable: ConcernCallback): void {
+    this.concerns.set(name, callable);
   }
 
   useConcerns(...names: string[]): void {
@@ -606,14 +615,14 @@ export class Mapper {
    * resolves the token back to the instance so dispatch goes through the
    * same `Redirect` endpoint Rails uses.
    */
-  redirect(target: string | RedirectOptions | RedirectFunction): string {
+  redirect(args: string | RedirectOptions | RedirectFunction): string {
     let endpoint: Redirect;
-    if (typeof target === "string") {
-      endpoint = redirectFactory(target);
-    } else if (typeof target === "function") {
-      endpoint = redirectFactory(target);
+    if (typeof args === "string") {
+      endpoint = redirectFactory(args);
+    } else if (typeof args === "function") {
+      endpoint = redirectFactory(args);
     } else {
-      const { status, ...opts } = target;
+      const { status, ...opts } = args;
       endpoint = redirectFactory({ ...opts, status });
     }
     const id = `__redirect__:${this.redirectCounter++}`;
@@ -656,9 +665,9 @@ export class Mapper {
    * `controller` field is a *module/namespace prefix* (used by `namespace`),
    * whereas `controller(...)` overrides the controller name directly.
    */
-  controller(controllerName: string, callback: MapperCallback): void {
+  controller(controller: string, callback: MapperCallback): void {
     const previous = this._scope;
-    this._scope = this._scope.newChild({ controller: controllerName });
+    this._scope = this._scope.newChild({ controller });
     try {
       callback(this);
     } finally {
@@ -666,11 +675,11 @@ export class Mapper {
     }
   }
 
-  defaults(defaultsHash: Record<string, string>, callback: MapperCallback): void {
+  defaults(defaults: Record<string, string>, callback: MapperCallback): void {
     const previous = this._scope;
     const merged = this.mergeDefaultsScope(
       this._scope.get("defaults") as Record<string, string> | undefined,
-      defaultsHash,
+      defaults,
     );
     this._scope = this._scope.newChild({ defaults: merged });
     try {
@@ -842,7 +851,7 @@ export class Mapper {
     path: string,
     controller: string | undefined,
     options: RouteOptions & { on?: string },
-    optionPath: string | undefined,
+    _path: string | undefined,
     to: string | undefined,
     via: string | string[],
     formatted: boolean | undefined,
@@ -854,7 +863,7 @@ export class Mapper {
         path,
         controller,
         options,
-        optionPath,
+        _path,
         to,
         via,
         formatted,
@@ -878,7 +887,7 @@ export class Mapper {
     if (controller && !merged.to) merged.controller = controller;
     if (formatted !== undefined) merged.format = formatted;
     merged.anchor = anchor;
-    this.match(optionPath ?? path, merged);
+    this.match(_path ?? path, merged);
   }
 
   /** @internal */
@@ -1363,8 +1372,8 @@ export class Mapper {
   }
 
   /** @internal */
-  withDefaultScope(scopeOptions: ScopeOptions, callback: MapperCallback): void {
-    this.scope(scopeOptions, callback);
+  withDefaultScope(scope: ScopeOptions, callback: MapperCallback): void {
+    this.scope(scope, callback);
   }
 
   /** @internal */
@@ -1534,6 +1543,10 @@ interface ScopeFrame {
 interface ScopeOptions {
   as?: string;
   module?: string;
+}
+
+interface NamespaceOptions extends ScopeOptions {
+  path?: string;
 }
 
 interface MountOptions extends RouteOptions {

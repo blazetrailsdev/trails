@@ -884,11 +884,11 @@ export class Request {
   }
 
   /** @internal Rails: `reset_stream` — rewind before+after yielding. */
-  protected resetStream<T>(stream: { rewind?: () => void }, fn: () => T): T {
-    if (typeof stream.rewind === "function") {
-      stream.rewind();
+  protected resetStream<T>(bodyStream: { rewind?: () => void }, fn: () => T): T {
+    if (typeof bodyStream.rewind === "function") {
+      bodyStream.rewind();
       const result = fn();
-      stream.rewind();
+      bodyStream.rewind();
       return result;
     }
     return fn();
@@ -1199,11 +1199,11 @@ export async function* emptyRackBody(): RackBody {}
 
 export class PassNotFound {
   /** @internal */
-  static action(_name: unknown): typeof PassNotFound {
+  static action(_: unknown): typeof PassNotFound {
     return PassNotFound;
   }
   /** @internal */
-  static call(_env: RackEnv): RackResponse {
+  static call(_: RackEnv): RackResponse {
     return [404, { [X_CASCADE]: "pass" }, emptyRackBody()];
   }
   /** @internal */

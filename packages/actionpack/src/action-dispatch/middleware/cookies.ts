@@ -118,15 +118,15 @@ export class CookieJar implements Iterable<[string, string]> {
    */
   static build<T extends CookieJar>(
     this: new (options?: CookieJarOptions) => T,
-    request: RequestCookieMethodsHost | { cookiesAppOptions?: CookieJarOptions } | null | undefined,
+    req: RequestCookieMethodsHost | { cookiesAppOptions?: CookieJarOptions } | null | undefined,
     cookies: Record<string, string>,
   ): T {
     // Rails: `jar = new(req); jar.update(cookies); jar` — the request stores
     // the options used by signed/encrypted jars. We forward
-    // `request.cookiesAppOptions` if the host exposes it so signed/encrypted
+    // `req.cookiesAppOptions` if the host exposes it so signed/encrypted
     // accessors can find their secrets in test setups.
-    const jar = new this(request?.cookiesAppOptions ?? {});
-    if (request && "env" in request) jar._request = request;
+    const jar = new this(req?.cookiesAppOptions ?? {});
+    if (req && "env" in req) jar._request = req;
     for (const [k, v] of Object.entries(cookies ?? {})) {
       jar._cookies.set(k, v);
     }
@@ -139,11 +139,11 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies.get(key);
   }
 
-  fetch(key: string, defaultValue?: string): string {
-    const val = this._cookies.get(key);
+  fetch(name: string, args?: string): string {
+    const val = this._cookies.get(name);
     if (val !== undefined) return val;
-    if (defaultValue !== undefined) return defaultValue;
-    throw new KeyError(`key not found: "${key}"`);
+    if (args !== undefined) return args;
+    throw new KeyError(`key not found: "${name}"`);
   }
 
   has(key: string): boolean {
@@ -189,19 +189,19 @@ export class CookieJar implements Iterable<[string, string]> {
     this._deletedCookies.delete(key);
   }
 
-  delete(key: string, options?: { path?: string; domain?: string }): string | undefined {
+  delete(name: string, options?: { path?: string; domain?: string }): string | undefined {
     if (this._committed) return undefined;
-    const val = this._cookies.get(key);
-    this._cookies.delete(key);
-    this._setCookies.delete(key);
-    this._deletedCookies.set(key, options ?? {});
+    const val = this._cookies.get(name);
+    this._cookies.delete(name);
+    this._setCookies.delete(name);
+    this._deletedCookies.set(name, options ?? {});
     return val ?? undefined;
   }
 
-  isDeleted(key: string, options?: { path?: string; domain?: string }): boolean {
-    if (!this._deletedCookies.has(key)) return false;
+  isDeleted(name: string, options?: { path?: string; domain?: string }): boolean {
+    if (!this._deletedCookies.has(name)) return false;
     if (!options) return true;
-    const delOpts = this._deletedCookies.get(key)!;
+    const delOpts = this._deletedCookies.get(name)!;
     if (options.path && delOpts.path !== options.path) return false;
     if (options.domain && delOpts.domain !== options.domain) return false;
     return true;

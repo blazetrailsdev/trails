@@ -108,29 +108,30 @@ export class SSL {
     return [status, headers, body];
   }
 
-  private redirectToHttps(env: RackEnv): RackResponse {
-    const location = this.httpsLocationFor(env);
+  private redirectToHttps(request: RackEnv): RackResponse {
+    const location = this.httpsLocationFor(request);
     const body = this.redirectBody ?? [
       `<html><body>You are being <a href="${location}">redirected</a>.</body></html>`,
     ];
     return [
-      this.redirectStatusOverride ?? this.redirectionStatus(env),
+      this.redirectStatusOverride ?? this.redirectionStatus(request),
       { "content-type": "text/html; charset=utf-8", location },
       bodyFromString(body.join("")),
     ];
   }
 
   /** @internal */
-  private redirectionStatus(env: RackEnv): number {
-    const method = (env["REQUEST_METHOD"] as string | undefined) ?? "";
+  private redirectionStatus(request: RackEnv): number {
+    const method = (request["REQUEST_METHOD"] as string | undefined) ?? "";
     if (PERMANENT_REDIRECT_REQUEST_METHODS.includes(method)) return 301;
     if (this.sslDefaultRedirectStatus != null) return this.sslDefaultRedirectStatus;
     return 307;
   }
 
   /** @internal */
-  private httpsLocationFor(env: RackEnv): string {
-    const httpHost = (env["HTTP_HOST"] as string) || (env["SERVER_NAME"] as string) || "localhost";
+  private httpsLocationFor(request: RackEnv): string {
+    const httpHost =
+      (request["HTTP_HOST"] as string) || (request["SERVER_NAME"] as string) || "localhost";
     const requestHostNoPort = httpHost.replace(/:\d+$/, "");
     const requestPortMatch = httpHost.match(/:(\d+)$/);
     const requestPort = requestPortMatch ? parseInt(requestPortMatch[1], 10) : 80;
@@ -138,8 +139,8 @@ export class SSL {
     const host = this.redirectHost ?? requestHostNoPort;
     const port = this.redirectPort ?? requestPort;
 
-    const path = (env["PATH_INFO"] as string) || "/";
-    const qs = (env["QUERY_STRING"] as string) || "";
+    const path = (request["PATH_INFO"] as string) || "/";
+    const qs = (request["QUERY_STRING"] as string) || "";
     let location = `https://${host}`;
     if (port !== 80 && port !== 443) location += `:${port}`;
     location += path;

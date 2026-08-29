@@ -216,8 +216,11 @@ export class PathRedirect extends Redirect {
   }
 
   /** @internal */
-  private interpolationRequired(s: string | undefined, params: Record<string, string>): boolean {
-    return Object.keys(params).length > 0 && !!s && /%\{\w*\}/.test(s);
+  private interpolationRequired(
+    string: string | undefined,
+    params: Record<string, string>,
+  ): boolean {
+    return Object.keys(params).length > 0 && !!string && /%\{\w*\}/.test(string);
   }
 }
 

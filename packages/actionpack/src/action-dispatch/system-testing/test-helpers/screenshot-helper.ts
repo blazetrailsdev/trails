@@ -168,13 +168,13 @@ export function displayImage(
 }
 
 /** @internal */
-export function inlineBase64(str: string): string {
-  return Buffer.from(str).toString("base64");
+export function inlineBase64(path: string): string {
+  return Buffer.from(path).toString("base64");
 }
 
 /** @internal */
-function show(message: string): void {
-  console.log(message);
+function show(img: string): void {
+  console.log(img);
 }
 
 /** @internal */

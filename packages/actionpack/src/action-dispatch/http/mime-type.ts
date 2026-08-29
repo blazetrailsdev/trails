@@ -147,8 +147,8 @@ export class AcceptList {
     return out;
   }
 
-  static findItemByName(list: AcceptItem[], name: string): number | null {
-    const idx = list.findIndex((item) => item.name === name);
+  static findItemByName(array: AcceptItem[], name: string): number | null {
+    const idx = array.findIndex((item) => item.name === name);
     return idx === -1 ? null : idx;
   }
 }
@@ -181,14 +181,14 @@ export class MimeType {
     return this.string;
   }
 
-  match(pattern: string | RegExp): boolean {
-    if (pattern instanceof RegExp) return pattern.test(this.string);
-    if (pattern === "*/*") return true;
-    if (pattern.endsWith("/*")) {
-      const type = pattern.slice(0, -2);
+  match(mimeType: string | RegExp): boolean {
+    if (mimeType instanceof RegExp) return mimeType.test(this.string);
+    if (mimeType === "*/*") return true;
+    if (mimeType.endsWith("/*")) {
+      const type = mimeType.slice(0, -2);
       return this.string.startsWith(type + "/");
     }
-    return this.string === pattern || this.synonyms.includes(pattern);
+    return this.string === mimeType || this.synonyms.includes(mimeType);
   }
 
   ref(): string {
@@ -261,9 +261,9 @@ export class MimeType {
     }
   }
 
-  static lookup(symbolOrString: string): MimeType {
-    if (MimeType.registry.has(symbolOrString)) return MimeType.registry.get(symbolOrString)!;
-    const stripped = symbolOrString.split(";")[0].trimEnd();
+  static lookup(string: string): MimeType {
+    if (MimeType.registry.has(string)) return MimeType.registry.get(string)!;
+    const stripped = string.split(";")[0].trimEnd();
     return MimeType.registry.get(stripped) ?? new MimeType(stripped, stripped);
   }
 
@@ -279,8 +279,8 @@ export class MimeType {
     return MimeType.registry.has(stripped);
   }
 
-  static lookupByExtension(ext: string): MimeType | undefined {
-    return MimeType.extensionMap.get(ext.replace(/^\./, ""));
+  static lookupByExtension(extension: string): MimeType | undefined {
+    return MimeType.extensionMap.get(extension.replace(/^\./, ""));
   }
 
   /**
